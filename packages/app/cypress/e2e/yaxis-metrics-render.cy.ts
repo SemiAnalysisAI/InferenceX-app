@@ -10,6 +10,8 @@ describe('Y-Axis Metrics All Render Data', () => {
     'Input Token Throughput per GPU',
     'Output Token Throughput per GPU',
     'Token Throughput per All in Utility MW',
+    'Input Token Throughput per All in Utility MW',
+    'Output Token Throughput per All in Utility MW',
     'Cost per Million Total Tokens (Owning - Hyperscaler)',
     'Cost per Million Total Tokens (Owning - Neocloud Giant)',
     'Cost per Million Total Tokens (3 Year Rental)',
