@@ -2,7 +2,7 @@ name: 'Tests (E2E)'
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, master]
     types: [opened, synchronize, ready_for_review]
     paths:
       - '.github/workflows/tests-e2e.yml'
