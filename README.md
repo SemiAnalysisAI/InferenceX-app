@@ -39,6 +39,8 @@ corepack prepare pnpm@latest --activate
 
 ## Getting Started
 
+feel free to file an github issue if u need help setting up the dashboard
+
 ### 1. Clone & Install
 
 ```bash
