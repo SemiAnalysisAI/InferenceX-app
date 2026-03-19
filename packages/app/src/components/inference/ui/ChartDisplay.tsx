@@ -435,6 +435,13 @@ export default function ChartDisplay() {
                               </Link>
                             </small>
                           </p>
+                          <p className="text-muted-foreground mt-1">
+                            <small>
+                              Note: Disaggregated inference configurations calculate power per
+                              decode/prefill GPU rather than per total GPU count. Direct power
+                              comparison with aggregated configs is not apples-to-apples.
+                            </small>
+                          </p>
                         </>
                       )}
                       {(selectedYAxisMetric === 'y_costh' ||
