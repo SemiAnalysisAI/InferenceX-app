@@ -51,6 +51,47 @@ Invalidation is **version-based, not time-based**. A 5-minute heartbeat polls `/
 
 Both tiers are best-effort — failures return null, never throw. This prevents IndexedDB quota errors or private browsing restrictions from breaking the app.
 
+## Server-Side Caching (API Routes)
+
+API route responses are cached at two layers before hitting the CDN.
+
+### Two-Tier Server Cache
+
+| Tier                  | Mechanism          | Size Limit     | When Used                                     |
+| --------------------- | ------------------ | -------------- | --------------------------------------------- |
+| Local (unstable_cache) | Next.js in-process | ~2 MB default  | Small payloads (availability, workflow-info, etc.) |
+| Blob storage          | Vercel Blob        | No practical limit | Large payloads that exceed the 2 MB threshold |
+
+`cachedQuery()` in `src/lib/api-cache.ts` wraps both tiers. Pass `{ blobOnly: true }` for payloads known to be large (e.g. `/api/v1/benchmarks`, which returns full benchmark rows for a model). The blob path is `{BLOB_CACHE_PREFIX}/{keyPrefix}:{args}.json`.
+
+`blobSet()` is no-op if the key already exists, making concurrent lambda invocations race-safe — only the first writer wins, subsequent calls skip silently.
+
+### Tag-Based Invalidation
+
+`unstable_cache` entries are tagged `'db'`. Calling `revalidateTag('db', { expire: 0 })` evicts all local cache entries in one call. Blob storage has no built-in tag system, so `blobPurge()` walks the paginated blob list and deletes every object under the prefix.
+
+Both are called together by `purgeAll()`, which also writes a new `cache-version` timestamp to blob storage.
+
+### Cache-Version Tracking
+
+`purgeAll()` writes `{ v: new Date().toISOString() }` to the blob key `cache-version` after every purge. The client (`QueryProvider`) polls `/api/v1/cache-version` on a 5-minute heartbeat. That route reads the blob and returns `{ v }` with a 60-second CDN TTL (so the CDN itself doesn't stale the version indefinitely).
+
+When the client detects a version change, it clears IndexedDB and records the new version in `localStorage`. In-memory React Query data is intentionally left intact to avoid mid-session chart rebuilds — the fresh data is loaded on the next page visit.
+
+### CDN Cache Headers
+
+`cachedJson()` sets:
+```
+Cache-Control: public, max-age=0, s-maxage=31536000
+Vercel-Cache-Tag: db
+```
+
+`s-maxage=31536000` (1 year) keeps responses on the Vercel CDN essentially forever. `Vercel-Cache-Tag: db` allows the CDN layer to be purged by tag when `revalidateTag` fires, so stale CDN entries are evicted immediately on invalidation rather than waiting for TTL expiry. Responses stream in 64 KB chunks to stay within Vercel's 20 MB CDN response limit.
+
+### /api/v1/invalidate
+
+`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header (compared with `timingSafeEqual` to prevent timing attacks). On success it calls `purgeAll()` — which clears blob storage, bumps the cache-version timestamp, and revalidates the `'db'` tag — then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipeline after each benchmark run completes.
+
 ## React Query Configuration
 
 - **staleTime Infinity / gcTime Infinity**: Data changes at most a few times per day (cron-triggered rebuilds). Infinite TTLs mean React Query never refetches or garbage-collects on its own — all invalidation is driven by the cache-version heartbeat.

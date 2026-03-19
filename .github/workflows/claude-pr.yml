@@ -143,7 +143,7 @@ jobs:
             Use `mcp__github_inline_comment__create_inline_comment` to leave an inline comment with:
 
             🔴 **BLOCKING**: Missing tests for new code.
-            **Why it matters**: All new features and utility functions must have corresponding tests. See the "Testing Requirements" section in CLAUDE.md.
+            **Why it matters**: All new features and utility functions must have corresponding tests. See `docs/testing.md` for full requirements and quality standards.
             **Fix**: Add colocated unit tests in `packages/app/src/lib/<module>.test.ts` for utility code, or E2E tests in `packages/app/cypress/e2e/<feature>.cy.ts` for UI features.
 
             **Important**: Only flag NEW code in the PR diff. Do not flag existing untested code that was not changed in this PR. Also, do not flag trivial changes (config tweaks, comment updates, CSS-only changes) that don't warrant tests.
