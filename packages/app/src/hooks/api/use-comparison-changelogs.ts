@@ -2,7 +2,6 @@ import { useQueries } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { fetchWorkflowInfo, type ChangelogRow, type WorkflowInfoResponse } from '@/lib/api';
-import { idbPersister } from '@/lib/indexdb-cache';
 
 export interface ComparisonChangelog {
   date: string;
@@ -36,7 +35,6 @@ export function useComparisonChangelogs(
       queryKey: ['workflow-info', date],
       queryFn: () => fetchWorkflowInfo(date),
       enabled: isComparisonMode,
-      persister: idbPersister,
     })),
   });
 
