@@ -2,7 +2,7 @@ name: PR Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review, labeled]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -18,10 +18,11 @@ jobs:
     if: |
       (github.event_name == 'pull_request' &&
        !github.event.pull_request.draft &&
-       contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association)) ||
+       (contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
+        contains(github.event.pull_request.labels.*.name, 'run-workflows'))) ||
       ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
        contains(github.event.comment.body, '@pr-claude') &&
-       contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association))
+       contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
     permissions:
       contents: read
       pull-requests: write

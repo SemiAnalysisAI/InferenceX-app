@@ -3,11 +3,14 @@ name: 'Tests (Unit)'
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review, labeled]
 
 jobs:
   vitest:
-    if: ${{ !github.event.pull_request.draft }}
+    if: |
+      !github.event.pull_request.draft &&
+      (contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
+       contains(github.event.pull_request.labels.*.name, 'run-workflows'))
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
