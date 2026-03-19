@@ -410,7 +410,9 @@ export default function ChartDisplay() {
                           </>
                         )}
                       </p>
-                      {selectedYAxisMetric === 'y_tpPerMw' && (
+                      {(selectedYAxisMetric === 'y_tpPerMw' ||
+                        selectedYAxisMetric === 'y_inputTputPerMw' ||
+                        selectedYAxisMetric === 'y_outputTputPerMw') && (
                         <>
                           <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
                             All in Power/GPU:{' '}
