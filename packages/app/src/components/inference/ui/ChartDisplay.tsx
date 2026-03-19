@@ -70,7 +70,7 @@ function E2eXAxisDropdown({
           onClick={(e) => e.stopPropagation()}
         >
           vs. {xAxisLabel}
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+          <ChevronDown className="no-export h-3.5 w-3.5 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-1" align="start">
