@@ -53,7 +53,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
           isLegendExpanded ? 'w-fit whitespace-nowrap' : '',
         )}
         title={!isLegendExpanded && isLongText ? label : title}
-        onMouseEnter={onHover ? () => onHover(hw || name) : undefined}
+        onMouseEnter={onHover && isActive ? () => onHover(hw || name) : undefined}
         onMouseLeave={onHoverEnd}
       >
         <span

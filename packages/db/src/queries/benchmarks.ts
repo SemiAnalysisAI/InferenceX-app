@@ -106,7 +106,7 @@ export async function getLatestBenchmarks(
     FROM latest_benchmarks lb
     JOIN configs c ON c.id = lb.config_id
     WHERE c.model = ${modelKey}
-    ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl
+    ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
   `;
   return rows as unknown as BenchmarkRow[];
 }
