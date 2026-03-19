@@ -132,6 +132,8 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   outputTputPerGpu?: { y: number; roof: boolean };
   inputTputPerGpu?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
+  inputTputPerMw?: { y: number; roof: boolean };
+  outputTputPerMw?: { y: number; roof: boolean };
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
@@ -158,6 +160,8 @@ export type YAxisMetricKey =
   | 'outputTputPerGpu'
   | 'inputTputPerGpu'
   | 'tpPerMw'
+  | 'inputTputPerMw'
+  | 'outputTputPerMw'
   | 'costh'
   | 'costn'
   | 'costr'
@@ -210,6 +214,14 @@ export interface ChartDefinition {
   y_tpPerMw_label?: string;
   y_tpPerMw_title?: string;
   y_tpPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_inputTputPerMw?: string;
+  y_inputTputPerMw_label?: string;
+  y_inputTputPerMw_title?: string;
+  y_inputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTputPerMw?: string;
+  y_outputTputPerMw_label?: string;
+  y_outputTputPerMw_title?: string;
+  y_outputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_costh?: string;
   y_costh_label?: string;
   y_costh_title?: string;

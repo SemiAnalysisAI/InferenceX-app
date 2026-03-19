@@ -30,7 +30,14 @@ import { Model, Sequence } from '@/lib/data-mappings';
 const METRIC_GROUPS = [
   {
     label: 'Throughput',
-    metrics: ['y_tpPerGpu', 'y_inputTputPerGpu', 'y_outputTputPerGpu', 'y_tpPerMw'],
+    metrics: [
+      'y_tpPerGpu',
+      'y_inputTputPerGpu',
+      'y_outputTputPerGpu',
+      'y_tpPerMw',
+      'y_inputTputPerMw',
+      'y_outputTputPerMw',
+    ],
   },
   { label: 'Cost per Million Total Tokens', metrics: ['y_costh', 'y_costn', 'y_costr'] },
   {

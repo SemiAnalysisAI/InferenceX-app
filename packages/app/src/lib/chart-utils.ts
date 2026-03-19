@@ -77,6 +77,8 @@ export const Y_AXIS_METRICS = [
   'y_inputTputPerGpu',
   'y_outputTputPerGpu',
   'y_tpPerMw',
+  'y_inputTputPerMw',
+  'y_outputTputPerMw',
   'y_costh',
   'y_costn',
   'y_costr',
@@ -248,6 +250,22 @@ export function createChartDataPoint(
     ...(outputTputPerGpu ? { outputTputPerGpu: { y: outputTputPerGpu, roof: false } } : {}),
     ...(inputTputPerGpu ? { inputTputPerGpu: { y: inputTputPerGpu, roof: false } } : {}),
     tpPerMw: { y: (tputPerGpu * 1000) / hardwarePower, roof: false },
+    ...(inputTputPerGpu
+      ? {
+          inputTputPerMw: {
+            y: hardwarePower ? (inputTputPerGpu * 1000) / hardwarePower : 0,
+            roof: false,
+          },
+        }
+      : {}),
+    ...(outputTputPerGpu
+      ? {
+          outputTputPerMw: {
+            y: hardwarePower ? (outputTputPerGpu * 1000) / hardwarePower : 0,
+            roof: false,
+          },
+        }
+      : {}),
 
     // Cost fields (combined throughput)
     costh: {
@@ -463,6 +481,8 @@ export const calculateRoofline = (
     | `outputTputPerGpu.y`
     | `inputTputPerGpu.y`
     | `tpPerMw.y`
+    | `inputTputPerMw.y`
+    | `outputTputPerMw.y`
     | `costh.y`
     | `costn.y`
     | `costr.y`
@@ -526,6 +546,8 @@ export function computeAllRooflines(
             | `outputTputPerGpu.y`
             | `inputTputPerGpu.y`
             | `tpPerMw.y`
+            | `inputTputPerMw.y`
+            | `outputTputPerMw.y`
             | `costh.y`
             | `costn.y`
             | `costr.y`
@@ -567,6 +589,8 @@ export function markRooflinePoints(
         newPoint.inputTputPerGpu.roof = false;
       }
       newPoint.tpPerMw.roof = false;
+      if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = false;
+      if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = false;
       newPoint.costh.roof = false;
       newPoint.costn.roof = false;
       newPoint.costr.roof = false;
@@ -610,6 +634,10 @@ export function markRooflinePoints(
           }
         } else if (chartDefYKey === 'y_tpPerMw') {
           newPoint.tpPerMw.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_inputTputPerMw') {
+          if (newPoint.inputTputPerMw) newPoint.inputTputPerMw.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_outputTputPerMw') {
+          if (newPoint.outputTputPerMw) newPoint.outputTputPerMw.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costh') {
           newPoint.costh.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costn') {
