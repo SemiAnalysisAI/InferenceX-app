@@ -1,5 +1,19 @@
 {
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm fmt:fix; pnpm lint:fix; true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

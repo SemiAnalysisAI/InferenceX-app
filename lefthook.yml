@@ -8,3 +8,6 @@ pre-commit:
     - name: format
       run: pnpm fmt:fix -- {staged_files}
       stage_fixed: true
+
+    - name: typecheck
+      run: pnpm typecheck
