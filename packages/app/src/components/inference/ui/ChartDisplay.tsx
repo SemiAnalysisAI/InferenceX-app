@@ -435,13 +435,6 @@ export default function ChartDisplay() {
                               </Link>
                             </small>
                           </p>
-                          <p className="text-muted-foreground mt-1">
-                            <small>
-                              Note: Disaggregated inference configurations calculate power per
-                              decode/prefill GPU rather than per total GPU count. Direct power
-                              comparison with aggregated configs is not apples-to-apples.
-                            </small>
-                          </p>
                         </>
                       )}
                       {(selectedYAxisMetric === 'y_costh' ||
@@ -566,6 +559,22 @@ export default function ChartDisplay() {
                           <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
                           SGLang, Dynamo TRT) calculate cost per decode GPU or per prefill GPU,
                           rather than per total GPU count. This makes direct cost comparison with
+                          aggregated configs not an apples-to-apples comparison.
+                        </p>
+                      </div>
+                      <div
+                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
+                          selectedYAxisMetric === 'y_tpPerMw' ||
+                          selectedYAxisMetric === 'y_inputTputPerMw' ||
+                          selectedYAxisMetric === 'y_outputTputPerMw'
+                            ? 'max-h-20 opacity-100'
+                            : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
+                          SGLang, Dynamo TRT) calculate power per decode GPU or per prefill GPU,
+                          rather than per total GPU count. This makes direct power comparison with
                           aggregated configs not an apples-to-apples comparison.
                         </p>
                       </div>
