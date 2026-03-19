@@ -4,6 +4,15 @@ on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/tests-unit.yml'
+      - 'package.json'
+      - 'packages/app/**'
+      - 'packages/constants/**'
+      - 'packages/db/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
 
 jobs:
   vitest:
