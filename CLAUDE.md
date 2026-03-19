@@ -145,7 +145,8 @@ Order: `inference` → `evaluation` → `historical` → `calculator` → `relia
 3. Add chart config: `src/components/inference/inference-chart-config.json`
 4. Add Y-axis dropdown: `ChartControls.tsx`
 5. Add subtitle/disclaimer in `ChartDisplay.tsx` if metric depends on assumed constants
-6. Expose in UI state: `InferenceContext.tsx`
+6. Add disagg caveat banner in `ChartDisplay.tsx` for per-GPU or per-MW metrics (animated amber `border-l-2` banner pattern)
+7. Expose in UI state: `InferenceContext.tsx`
 
 ### Add a new model or GPU
 
