@@ -489,12 +489,12 @@ const ScatterGraph = React.memo(
         const root = d3.select(svg);
         root
           .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .transition()
+          .transition('legend-hover')
           .duration(150)
           .style('opacity', (d) => (!isPointVisible(d) ? 0 : String(d.hwKey) === hwKey ? 1 : 0.15));
         root
           .selectAll<SVGPathElement, unknown>('.roofline-path')
-          .transition()
+          .transition('legend-hover')
           .duration(150)
           .style('opacity', function () {
             if (!isRooflineVisible(this)) return 0;
@@ -510,12 +510,12 @@ const ScatterGraph = React.memo(
       const root = d3.select(svg);
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .transition()
+        .transition('legend-hover')
         .duration(150)
         .style('opacity', (d) => (isPointVisible(d) ? 1 : 0));
       root
         .selectAll<SVGPathElement, unknown>('.roofline-path')
-        .transition()
+        .transition('legend-hover')
         .duration(150)
         .style('opacity', function () {
           return isRooflineVisible(this) ? 1 : 0;

@@ -334,7 +334,10 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           const newPos = this.getAttribute('transform');
           if (oldPos !== undefined && newPos && oldPos !== newPos) {
             this.setAttribute('transform', oldPos);
-            d3.select(this).transition().duration(transitionDuration).attr('transform', newPos);
+            d3.select(this)
+              .transition('data-update')
+              .duration(transitionDuration)
+              .attr('transform', newPos);
           }
         });
         // Roofline paths: restore old path, then transition to current
@@ -343,7 +346,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           const newD = this.getAttribute('d');
           if (oldD !== undefined && newD && oldD !== newD) {
             this.setAttribute('d', oldD);
-            d3.select(this).transition().duration(transitionDuration).attr('d', newD);
+            d3.select(this).transition('data-update').duration(transitionDuration).attr('d', newD);
           }
         });
       }
