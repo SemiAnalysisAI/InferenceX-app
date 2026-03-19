@@ -1,0 +1,91 @@
+name: 'Tests (E2E)'
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/tests-e2e.yml'
+      - 'package.json'
+      - 'packages/app/**'
+      - 'packages/constants/**'
+      - 'packages/db/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
+
+jobs:
+  cypress:
+    if: ${{ !github.event.pull_request.draft }}
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: browser-actions/setup-firefox@6d143ba54fa4f34583c4071d6f1e07bad7a90e52 # v1.7.1
+        if: matrix.browser == 'firefox'
+        with:
+          firefox-version: latest
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Cache Cypress binary
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ matrix.browser }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            cypress-binary-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install Cypress binary if missing
+        working-directory: packages/app
+        run: pnpm exec cypress verify || pnpm exec cypress install
+      - name: Build app
+        run: pnpm build
+        env:
+          BLOB_CACHE_PREFIX: ci-cache
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+      - name: Run component tests
+        working-directory: packages/app
+        run: pnpm exec cypress run --component
+        env:
+          CI: true
+      - name: Run integration tests
+        uses: cypress-io/github-action@82482149c343a5dee155d22104111b9319f9dd45 # v7.1.6
+        with:
+          working-directory: packages/app
+          install: false
+          start: pnpm start
+          wait-on: 'http://localhost:3000'
+          browser: ${{ matrix.browser }}
+        env:
+          BLOB_CACHE_PREFIX: ci-cache
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          CI: true
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+      - name: Upload Cypress artifacts
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        if: ${{ !cancelled() }}
+        with:
+          name: cypress-${{ matrix.browser }}-report
+          path: |
+            packages/app/cypress/screenshots/
+          retention-days: 1

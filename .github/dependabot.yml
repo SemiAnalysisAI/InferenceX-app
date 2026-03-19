@@ -1,0 +1,47 @@
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 2
+    labels:
+      - 'dependencies'
+    commit-message:
+      prefix: 'chore'
+    groups:
+      all-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      all-major:
+        patterns:
+          - '*'
+        update-types:
+          - 'major'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 2
+    labels:
+      - 'dependencies'
+    commit-message:
+      prefix: 'chore'
+    groups:
+      all-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      all-major:
+        patterns:
+          - '*'
+        update-types:
+          - 'major'

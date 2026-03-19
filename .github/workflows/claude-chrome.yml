@@ -1,0 +1,406 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude:
+    if: |
+      (
+        (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
+        contains(github.event.comment.body, '@chrome-claude') &&
+        contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      ) ||
+      (
+        github.event_name == 'issues' &&
+        (contains(github.event.issue.body, '@chrome-claude') || contains(github.event.issue.title, '@chrome-claude')) &&
+        contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association)
+      )
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.PAT }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.CLAUDE_BLOB_READ_WRITE_TOKEN }}
+      VERCEL_GIT_COMMIT_REF: claude/${{ github.ref_name }}
+
+      # Optional "belt & suspenders": CI already disables collection per docs,
+      # but this makes it explicit.
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: '1'
+
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Verify Chrome is available
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null 2>&1; then
+            google-chrome --version
+          elif command -v google-chrome-stable >/dev/null 2>&1; then
+            google-chrome-stable --version
+          else
+            echo "ERROR: Chrome not found on runner."
+            echo "If you're on a custom runner image, install Chrome stable or set --executable-path for chrome-devtools-mcp."
+            exit 1
+          fi
+
+      - name: Start dev server
+        id: devserver
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          LOG=/tmp/next-dev.log
+          echo "log=$LOG" >> "$GITHUB_OUTPUT"
+
+          pnpm run dev -- --hostname 0.0.0.0 --port 3000 > "$LOG" 2>&1 &
+          DEV_PID=$!
+          echo "pid=$DEV_PID" >> "$GITHUB_OUTPUT"
+
+          for i in {1..60}; do
+            if curl -sSf http://localhost:3000 >/dev/null; then
+              echo "Dev server is up"
+              echo "up=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if ! kill -0 "$DEV_PID" 2>/dev/null; then
+              echo "Dev server process exited early"
+              break
+            fi
+
+            sleep 2
+          done
+
+          echo "Dev server failed to start (best effort; continuing)."
+          echo "up=false" >> "$GITHUB_OUTPUT"
+          tail -n 200 "$LOG" || true
+          kill "$DEV_PID" 2>/dev/null || true
+          exit 0
+
+      - name: Run Claude Code
+        id: claude
+        if: ${{ always() }}
+        uses: anthropics/claude-code-action@04f907ba2a4c77706a56b4078c682d250716cc0c # v1.0.72
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+          BASH_DEFAULT_TIMEOUT_MS: '1800000'
+          BASH_MAX_TIMEOUT_MS: '3600000'
+
+          DEV_SERVER_UP: ${{ steps.devserver.outputs.up }}
+          DEV_SERVER_PID: ${{ steps.devserver.outputs.pid }}
+          DEV_SERVER_LOG: ${{ steps.devserver.outputs.log }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.PAT }}
+          trigger_phrase: '@chrome-claude'
+          track_progress: true
+          allowed_bots: ''
+          settings: |
+            {"fastMode": true}
+
+          additional_permissions: |
+            actions: read
+
+          claude_args: |
+            --model ${{ contains(github.event.comment.body || github.event.issue.body || '', '@claude sonnet') && 'claude-sonnet-4-5-20250929' || contains(github.event.comment.body || github.event.issue.body || '', '@claude haiku') && 'claude-haiku-4-5-20251001' || 'claude-opus-4-6' }}
+            --mcp-config '{"mcpServers":{"fetch":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-fetch@latest"]},"chrome":{"command":"npx","args":["-y","chrome-devtools-mcp@latest","--headless=true","--isolated=true"]}}}'
+            --allowedTools "Write,Edit,Read,Glob,Grep,WebFetch,mcp__github__*,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__*,mcp__fetch__*,mcp__chrome__*,Bash"
+
+          prompt: |
+            You are a Frontend agent for the InferenceX dashboard.
+
+            You can use:
+            - Chrome DevTools MCP server (name: "chrome") for browser automation + debugging on http://localhost:3000.
+            - For non-localhost URLs (documentation, external sites), you can use WebFetch.
+
+            ## Chrome DevTools MCP usage rules (READ CAREFULLY)
+            Chrome MCP is UID-driven:
+            1) Always call `mcp__chrome__take_snapshot` BEFORE trying to click/fill/hover.
+              - The snapshot is an accessibility-tree text dump and assigns each element a `uid`.
+              - UIDs can change after navigation or major rerenders, so re-snapshot if a uid fails.
+            2) Use these tools with uids from the latest snapshot:
+              - `mcp__chrome__click` / `mcp__chrome__fill` / `mcp__chrome__hover` / `mcp__chrome__upload_file`
+              - `mcp__chrome__press_key` for keyboard shortcuts (e.g. "Enter", "Escape", "Control+Shift+R").
+            3) Screenshotting is mandatory for verification:
+              - After loading the page AND after every key interaction, call `mcp__chrome__take_screenshot`.
+              - Use `fullPage: true` when debugging layout issues.
+            4) Debugging checklist after interactions:
+              - `mcp__chrome__list_console_messages` (and `mcp__chrome__get_console_message` for details)
+              - `mcp__chrome__list_network_requests` (and `mcp__chrome__get_network_request` for failing requests)
+              - `mcp__chrome__evaluate_script` for custom runtime checks (DOM state, text presence, counts).
+            5) Navigation:
+              - Use `mcp__chrome__new_page` or `mcp__chrome__navigate_page` to open/reload.
+              - Use `mcp__chrome__wait_for` to wait for key text to appear before interacting.
+
+            Whenever you push a commit to a PR, a Vercel deployment is triggered automatically.
+            ## Non-negotiables (Definition of Done)
+            - Do not mark a task complete until you have verified it via Chrome DevTools MCP in a real browser session:
+              - take_snapshot + take_screenshot evidence of the UI state
+              - no blocking console errors
+              - charts render real data (not placeholders)
+
+            - If any inference graph shows either:
+              - "No data available"
+              - "Please change the model, sequence, precision, date range or GPU"
+              then the task is NOT complete. Continue debugging until real data points render.
+
+            ## Dev server status (best effort)
+            A best-effort dev server start was attempted before you ran:
+            - DEV_SERVER_UP=${DEV_SERVER_UP:-unknown}
+            - DEV_SERVER_LOG=${DEV_SERVER_LOG:-/tmp/next-dev.log}
+            - DEV_SERVER_PID=${DEV_SERVER_PID:-unknown}
+
+            If DEV_SERVER_UP is not "true" (or http://localhost:3000 is unreachable):
+            1) Inspect the log: `tail -n 200 "$DEV_SERVER_LOG"`
+            2) Fix the underlying issue in the repo.
+            3) Restart the dev server in the background, then re-check:
+               `pnpm run dev -- --hostname 0.0.0.0 --port 3000 > /tmp/next-dev.log 2>&1 &`
+               `curl -sSf http://localhost:3000 >/dev/null`
+            Only then proceed with Chrome DevTools MCP verification.
+
+            ## 0) Grounding checklist (DO THIS FIRST, ONCE)
+            This prompt is a guide, not ground truth. Before coding:
+            1. Verify the repo tree and key paths exist:
+               - `ls -la`
+               - `find packages/app/src packages/app/public packages/app/cypress -maxdepth 5 -type f | sort | sed -n '1,160p'`
+               - If any referenced file does not exist, locate the real file via `rg`/`find` and follow the actual codebase.
+            2. Identify the exact change surface:
+               - Start at `packages/app/src/app/page.tsx` (what renders).
+               - Then follow into chart contexts → hooks → chart UI components.
+            3. If behavior differs between local and Vercel, prefer the Vercel preview as the final verification target.
+
+            ## 1) System overview (how components connect)
+            InferenceX = DB-backed API + runtime chart rendering.
+
+            This is a pnpm workspaces monorepo. The Next.js app lives at `packages/app/`.
+            All app source paths are under `packages/app/src/`. Run commands from repo root (they delegate via workspace).
+
+            Data pipeline: Neon PostgreSQL → API routes (`/api/v1/*`) → React Query hooks (`src/hooks/api/`) → Context providers → D3 charts.
+            - DB layer: `packages/db/` (schema, migrations, ETL, queries)
+            - API routes: `packages/app/src/app/api/v1/` (benchmarks, availability, workflow-info, reliability, evaluations, github-stars, invalidate)
+            - React Query hooks: `packages/app/src/hooks/api/` (use-benchmarks, use-availability, use-workflow-info, etc.)
+            - UI state lives in per-section Context providers (InferenceChartContext, EvaluationChartContext, ReliabilityChartContext), rendering in D3 components.
+
+            Debug rule of thumb:
+            - If the chart has no points → first check API response (browser Network tab or curl /api/v1/benchmarks) → then check filters in context → then check data transformations in hooks.
+
+            ## 2) Repo map (key paths + what they do)
+            NOTE: Confirm these exist; if the repo differs, use the actual tree and treat this as a hint.
+            All paths are under `packages/app/`. The `@/*` alias maps to `packages/app/src/`.
+
+            ```
+            packages/app/src/app/
+            ├── page.tsx                           # Main page: tab router
+            ├── layout.tsx                         # Root layout: theme provider, global UI shell
+            ├── api/cron/route.ts                  # Cron endpoint: validates CRON_SECRET, triggers VERCEL_DEPLOY_HOOK_URL
+            └── api/v1/                            # API routes (all DB-backed)
+                ├── benchmarks/route.ts            # Benchmark data by model+date
+                ├── benchmarks/history/route.ts    # Historical benchmark trends
+                ├── availability/route.ts          # Model availability dates
+                ├── workflow-info/route.ts          # Workflow runs, changelogs, configs
+                ├── reliability/route.ts           # Reliability data
+                ├── evaluations/route.ts           # Evaluation data
+                ├── github-stars/route.ts          # GitHub star count
+                ├── invalidate/route.ts            # Cache invalidation (admin)
+                └── server-log/route.ts            # Client error logging
+
+            packages/app/src/hooks/api/            # React Query hooks (data fetching layer)
+            ├── use-benchmarks.ts
+            ├── use-benchmark-history.ts
+            ├── use-availability.ts
+            ├── use-workflow-info.ts
+            ├── use-evaluations.ts
+            ├── use-reliability.ts
+            └── use-github-stars.ts
+
+            packages/app/src/components/
+            ├── page-content.tsx                   # Tab layout: VALID_TABS, desktop TabsTrigger + mobile Select
+            ├── header/
+            │   ├── header.tsx                     # Top nav + layout
+            │   └── GithubStars.tsx                # GitHub stars widget
+            ├── inference/
+            │   ├── InferenceChartContext.tsx       # Source-of-truth state: filters, metric, visible GPUs, overlays
+            │   ├── hooks/
+            │   │   └── useChartData.ts            # Transforms API data, applies filters
+            │   └── ui/
+            │       ├── ChartControls.tsx          # Filters/selectors UI; user input → context state
+            │       ├── ChartDisplay.tsx           # Layout + error/fallback boundaries
+            │       ├── ScatterGraph.tsx           # Main D3 scatter plot; zoom/pan, axes, rooflines, tooltips
+            │       └── GPUGraph.tsx               # Alternate D3 view (GPU-focused)
+            ├── evaluation/
+            │   └── EvaluationChartContext.tsx      # Evaluation tab state
+            ├── reliability/
+            │   └── ReliabilityChartContext.tsx     # Reliability tab state
+            └── ui/                                 # Design system wrappers (Radix + Tailwind)
+                ├── d3-chart-wrapper.tsx            # Shared D3 container: SVG ref, resize, tooltip portal
+                └── theme-provider.tsx             # Theme toggling
+
+            packages/app/src/hooks/
+            ├── useStickyTooltip.ts                # Tooltip pin/dismiss state management
+            └── useChartTooltipHandlers.ts         # Mouse/touch → tooltip event wiring
+
+            packages/app/src/lib/
+            ├── constants.ts                       # HARDWARE_CONFIG, GPU_COLOR_FAMILIES, MODEL_ORDER, etc.
+            ├── data-mappings.ts                   # MODEL_OPTIONS/SEQUENCE_OPTIONS/PRECISION_OPTIONS
+            ├── chart-utils.ts                     # Y_AXIS_METRICS, roofline calculations, metric math
+            ├── api.ts                             # Thin fetch wrapper for API routes
+            ├── api-cache.ts                       # Server-side API response caching (Vercel Blob)
+            ├── blob-cache.ts                      # Vercel Blob read/write for cache layer
+            └── d3-chart/                          # Shared D3 library
+                ├── chart-setup.ts                 # SVG skeleton, axes groups, defs, clip paths
+                ├── chart-update.ts                # Data join, bindpoints, zoom setup
+                ├── watermark.ts                   # Chart watermark rendering
+                └── layers/                        # Rendering layers: points, bars, lines, rooflines, etc.
+
+            packages/db/                           # DB layer (@semianalysisai/inferencex-db)
+            └── src/                               # Schema, migrations, ETL, queries
+
+            packages/constants/                    # Shared constants (@semianalysisai/inferencex-constants)
+            └── src/                               # GPU keys, model mappings
+            ```
+
+            Other high-signal repo files to consult:
+            - `packages/app/package.json` (scripts)
+            - `packages/app/next.config.*` (Next settings)
+            - `packages/app/src/app/globals.css` (GPU CSS variables + global styles)
+            - `packages/app/src/components/inference/inference-chart-config.json` (metric definitions, Pareto directions)
+
+            ## Reference docs
+            The `docs/` directory contains detailed guides. Always consult these before making changes:
+            - `docs/index.md` — index of all docs **MUST ALWAYS READ IN CASE OF RELEVANT INFORMATION**
+
+            ## 3) Common tasks (where to change what)
+            - Chart appearance / D3 behavior:
+              - `packages/app/src/components/inference/ui/ScatterGraph.tsx`
+              - `packages/app/src/components/inference/ui/GPUGraph.tsx`
+              - Layout/error UI: `packages/app/src/components/inference/ui/ChartDisplay.tsx`
+              - Shared D3 library: `packages/app/src/lib/d3-chart/`
+
+            - Chart state & filters:
+              - Add/change state: `packages/app/src/components/inference/InferenceChartContext.tsx`
+              - Wire UI controls: `packages/app/src/components/inference/ui/ChartControls.tsx`
+              - Apply filter logic / normalization: `packages/app/src/components/inference/hooks/useChartData.ts`
+
+            - Add/modify a metric:
+              - Register in `packages/app/src/lib/chart-utils.ts`: Y_AXIS_METRICS, roofline calculations
+              - Add chart config: `packages/app/src/components/inference/inference-chart-config.json`
+              - Expose/select metric in UI state: `InferenceChartContext.tsx`
+              - Use it in charts: `ScatterGraph.tsx` / `GPUGraph.tsx`
+
+            - Data pipeline changes:
+              - DB schema/ETL: `packages/db/src/`
+              - API routes: `packages/app/src/app/api/v1/`
+              - React Query hooks: `packages/app/src/hooks/api/`
+
+            - Add a new GPU:
+              - `packages/app/src/lib/constants.ts`: HARDWARE_CONFIG + ordering + color family
+              - `packages/app/src/app/globals.css`: add `--gpu-name` color variable
+
+            - Add a new model:
+              - `packages/app/src/lib/data-mappings.ts`: enum/options/order
+
+            ## 4) Playbooks & pitfalls (battle-tested)
+            ### A) Schema evolution
+            When adding new metric fields:
+            - Make new TS fields OPTIONAL in types.
+            - Register in `chart-utils.ts` (Y_AXIS_METRICS, roofline calculations).
+            - Add runtime computation fallback for historical data missing the field in `useChartData.ts`.
+            - Watch for silent failures: checks like `metricKey in filteredData[0]` can cause "No data available".
+
+            ### B) Empty responses and error handling
+            - `{}` is truthy; check `Object.keys(obj).length > 0`.
+            - API routes may return empty arrays for dates with no data; handle gracefully.
+            - React Query hooks handle loading/error states; check `isLoading`/`error` before accessing `data`.
+
+            ### C) Axis stability & legend toggles in D3
+            - Compute axis domains from ALL points (including hidden series) so axes don't jump.
+            - Prefer render-all + opacity transitions + `pointer-events: none` for hidden points/lines.
+            - Preserve zoom transform across re-renders (save to ref, re-apply after setup).
+
+            ### D) Smooth zoom/pan performance in D3
+            If zoom/pan is laggy:
+            - Keep the zoom handler critical path cheap (point transforms only).
+            - Throttle expensive recalcs (grid, rooflines, paths) with `requestAnimationFrame`.
+            - Cache D3 selections outside the zoom handler.
+            - Cancel pending rAF on unmount/cleanup.
+
+            ### E) Overlay datasets (unofficial runs, comparisons)
+            - Include overlay data in axis domain calculations so it remains visible.
+            - Allow zoom-out below 1x if users need to see off-domain data.
+            - Visually distinguish overlay (shape/dash/watermark/legend label).
+
+            ### F) Sticky/click-to-pin tooltips
+            - Use ref + state to avoid stale closures and rerender cascades.
+            - During zoom/pan, dismiss pinned tooltip via rAF to avoid jank.
+            - While pinned: disable hover handlers; enable `pointer-events: auto` and `user-select: text`.
+
+            ### G) Verification of D3 zoom/pan (Chrome MCP)
+            Chrome MCP does not have a dedicated mouse-wheel-by-coordinate tool.
+            Preferred approach:
+            - Verify that data points render correctly via screenshots.
+            - Verify state changes via controls (filters/date range) rather than zoom gestures.
+
+            If you MUST test zoom/pan behavior:
+            - Use `take_snapshot` to locate the chart container uid.
+            - Use `evaluate_script` against that uid to dispatch synthetic events (best-effort),
+              then take a screenshot to confirm the view changed.
+            - If synthetic events do not work, record that limitation and focus on ensuring
+              data renders + no console errors.
+
+            ## 5) Environment variables (relevant)
+            - `GITHUB_TOKEN`: GitHub API access
+            - `DATABASE_READONLY_URL`: Neon PostgreSQL connection (read-only, used by API routes)
+            - `DATABASE_WRITE_URL`: Neon PostgreSQL connection (admin, used by ETL/migrations)
+            - `BLOB_READ_WRITE_TOKEN`: Vercel Blob access for API response caching
+            - `BLOB_CACHE_PREFIX`: Prefix for cached API responses in Vercel Blob
+            - `CRON_SECRET`: secures /api/cron endpoint
+            - `VERCEL_DEPLOY_HOOK_URL`: triggers rebuilds
+
+            ## 6) Testing Requirements (MANDATORY)
+            When implementing new features or fixing bugs, you MUST write tests:
+            1. **New utility functions** in `packages/app/src/lib/` or `packages/app/src/scripts/` → add colocated unit test (e.g., `packages/app/src/lib/<module>.test.ts`)
+            2. **New UI features** → add E2E tests in `packages/app/cypress/e2e/<feature>.cy.ts`
+            3. **Bug fixes** → add a regression test that would have caught the bug
+            4. Run `pnpm test:unit` to verify unit tests pass before marking the task complete
+            5. Follow existing test patterns in `packages/app/src/**/*.test.ts` (Vitest) and `packages/app/cypress/e2e/` (Cypress)
+
+            A task is NOT complete if:
+            - New code was added without corresponding tests
+            - Tests fail when running `pnpm run test:unit`
+
+            ## Final instruction
+            Do not end a task until you have verified via Chrome DevTools MCP that the feature works and charts render real data (not error placeholders).

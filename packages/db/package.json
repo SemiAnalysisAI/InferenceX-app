@@ -1,0 +1,39 @@
+{
+  "name": "@semianalysisai/inferencex-db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./connection": "./src/connection.ts",
+    "./etl/*": "./src/etl/*.ts",
+    "./migrate": "./src/migrate.ts",
+    "./queries/*": "./src/queries/*.ts"
+  },
+  "scripts": {
+    "db:ingest:ci": "tsx src/ingest-ci-run.ts",
+    "db:ingest:run": "dotenv -e ../../.env -- tsx src/ingest-ci-run.ts --download",
+    "db:ingest:gcs": "dotenv -e ../../.env -- tsx src/ingest-gcs-backup.ts",
+    "db:ingest:supplemental": "dotenv -e ../../.env -- tsx src/ingest-supplemental.ts",
+    "db:migrate": "dotenv -e ../../.env -- tsx src/migrate.ts",
+    "db:apply-overrides": "dotenv -e ../../.env -- tsx src/apply-overrides.ts",
+    "db:reset": "dotenv -e ../../.env -- tsx src/reset-db.ts",
+    "db:verify": "dotenv -e ../../.env -- tsx src/verify-db.ts",
+    "test:unit": "vitest run",
+    "test:unit:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@semianalysisai/inferencex-constants": "workspace:*",
+    "adm-zip": "^0.5.16",
+    "postgres": "^3.4.8"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "dotenv-cli": "^11.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

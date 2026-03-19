@@ -1,0 +1,109 @@
+name: Ingest Benchmark Results
+
+on:
+  repository_dispatch:
+    types: [ingest-results]
+
+jobs:
+  ingest:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Wait for source run to finish
+        run: sleep 300
+
+      - name: Harden runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --filter @semianalysisai/inferencex-db...
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Run migrations
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: pnpm admin:db:migrate --yes
+
+      - name: Download artifacts from InferenceX run
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          RUN_ID: ${{ github.event.client_payload.run-id }}
+          ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+        run: |
+          mkdir -p "$ARTIFACTS_PATH"
+
+          # Download all artifacts for the run, deduplicated by name (keep latest).
+          gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}/artifacts" --paginate \
+            | jq -r '
+                [.artifacts[]]
+                | group_by(.name) | map(sort_by(.created_at) | last)[]
+                | "\(.name)\t\(.archive_download_url)"' \
+            | while IFS=$'\t' read -r name url; do
+                echo "Downloading artifact: ${name}"
+                ok=false
+                for attempt in 1 2 3; do
+                  if gh api "${url}" > artifact.zip; then
+                    ok=true
+                    break
+                  fi
+                  echo "  Attempt ${attempt}/3 failed, retrying in ${attempt}s..."
+                  sleep "$attempt"
+                done
+                if [ "$ok" = false ]; then
+                  echo "::error::Failed to download artifact after 3 attempts: ${name} — skipping"
+                  rm -f artifact.zip
+                  echo 1 >> "$ARTIFACTS_PATH/.failures"
+                  continue
+                fi
+                mkdir -p "${ARTIFACTS_PATH}/${name}"
+                unzip -o artifact.zip -d "${ARTIFACTS_PATH}/${name}"
+                rm artifact.zip
+              done
+
+          echo "Downloaded artifacts:"
+          ls "$ARTIFACTS_PATH/"
+
+          if [ -f "$ARTIFACTS_PATH/.failures" ]; then
+            count=$(wc -l < "$ARTIFACTS_PATH/.failures")
+            rm "$ARTIFACTS_PATH/.failures"
+            echo "::error::${count} artifact(s) failed to download"
+            exit 1
+          fi
+
+      - name: Ingest results to DB
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          INGEST_RUN_ID: ${{ github.event.client_payload.run-id }}
+          INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt }}
+          INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+          INGEST_REPO: SemiAnalysisAI/InferenceX
+        run: pnpm admin:db:ingest:ci
+
+      - name: Apply run overrides
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: pnpm admin:db:apply-overrides --yes
+
+      - name: Verify database
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: pnpm admin:db:verify
+
+      - name: Invalidate Vercel cache
+        env:
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: |
+          curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate" \
+            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true

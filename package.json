@@ -1,0 +1,54 @@
+{
+  "name": "inferencex",
+  "version": "0.1.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SemiAnalysisAI/inferencemax-app"
+  },
+  "scripts": {
+    "prepare": "is-ci || lefthook install",
+    "clean": "pnpm -r --parallel clean",
+    "clean:all": "pnpm -r --parallel clean:all && rimraf node_modules \"packages/*/node_modules\"",
+    "dev": "pnpm --filter *app --color dev",
+    "build": "pnpm --filter *app --color build",
+    "start": "pnpm --filter *app --color start",
+    "preview": "pnpm --filter *app --color preview",
+    "typecheck": "tsc --noEmit",
+    "security": "pnpm audit && audit-ci",
+    "lint": "oxlint --deny-warnings",
+    "lint:fix": "oxlint --deny-warnings --fix",
+    "fmt": "oxfmt --check",
+    "fmt:fix": "oxfmt --write",
+    "test": "pnpm --filter *app --color test",
+    "test:e2e": "pnpm --filter *app --color test:e2e",
+    "test:e2e:component": "pnpm --filter *app --color test:e2e:component",
+    "test:e2e:integration": "pnpm --filter *app --color test:e2e:integration",
+    "test:unit": "pnpm -r test:unit",
+    "test:unit:coverage": "pnpm -r test:unit:coverage",
+    "admin:cache:invalidate": "pnpm --filter *app cache:invalidate",
+    "admin:cache:warmup": "pnpm --filter *app cache:warmup",
+    "admin:db:ingest:run": "pnpm --filter *db db:ingest:run",
+    "admin:db:ingest:ci": "pnpm --filter *db db:ingest:ci",
+    "admin:db:ingest:gcs": "pnpm --filter *db db:ingest:gcs",
+    "admin:db:ingest:supplemental": "pnpm --filter *db db:ingest:supplemental",
+    "admin:db:migrate": "pnpm --filter *db db:migrate",
+    "admin:db:apply-overrides": "pnpm --filter *db db:apply-overrides",
+    "admin:db:reset": "pnpm --filter *db db:reset",
+    "admin:db:verify": "pnpm --filter *db db:verify"
+  },
+  "devDependencies": {
+    "audit-ci": "^7.1.0",
+    "is-ci": "^4.1.0",
+    "lefthook": "^2.1.4",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
+    "rimraf": "^6.1.3",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.30.3"
+}

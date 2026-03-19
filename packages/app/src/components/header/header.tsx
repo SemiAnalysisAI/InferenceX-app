@@ -1,0 +1,114 @@
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { track } from '@/lib/analytics';
+
+import { ModeToggle } from '@/components/ui/mode-toggle';
+import { cn } from '@/lib/utils';
+
+import { GitHubStars } from './GithubStars';
+
+export const Header = () => {
+  return (
+    <header
+      data-testid="header"
+      className={cn(
+        'before:absolute',
+        'before:bg-muted/50',
+        'dark:before:bg-muted',
+        'before:bottom-0',
+        'before:content-[""]',
+        'before:hidden lg:before:block',
+        'before:top-0',
+        'before:w-1/2',
+        'before:h-full',
+        'before:left-0',
+        "before:mask-[url('/left-pattern-full.svg')]",
+        'before:mask-no-repeat',
+        'before:mask-position-[top_right]',
+        'before:mask-size-[100%]',
+        'before:-z-10',
+      )}
+    >
+      <div className="container mx-auto py-4 lg:p-8">
+        <div className="flex flex-col gap-2 p-4 lg:p-8">
+          <div className="flex flex-row gap-4 lg:gap-8">
+            <div className="flex flex-col justify-center">
+              <h1 className="scroll-m-20 text-2xl md:text-3xl lg:text-5xl font-bold tracking-tight text-balance">
+                InferenceX
+              </h1>
+              <p className="text-xs md:text-sm text-muted-foreground italic pl-2">
+                (formerly InferenceMAX)
+              </p>
+              <div className="flex flex-row gap-2 text-sm lg:text-base items-center pl-25 md:pl-28 lg:pl-45 -mt-1 md:-mt-2 lg:-mt-9">
+                By
+                <Link className="hover:underline" target="_blank" href="https://semianalysis.com/">
+                  <Image
+                    src="/logo.webp"
+                    alt="SemiAnalysis logo"
+                    width={128}
+                    height={53}
+                    className="inline w-[64px] md:w-[96px] lg:w-[128px]"
+                    priority
+                  />
+                </Link>
+              </div>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <Link
+                data-testid="nav-link-dashboard"
+                href="/"
+                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+                onClick={() => track('header_dashboard_clicked')}
+              >
+                Dashboard
+              </Link>
+              <Link
+                data-testid="nav-link-media"
+                href="/media"
+                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+                onClick={() => track('header_media_clicked')}
+              >
+                Media
+              </Link>
+              <Link
+                data-testid="nav-link-supporters"
+                href="/quotes"
+                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+                onClick={() => track('header_supporters_clicked')}
+              >
+                Supporters
+              </Link>
+              <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
+              <ModeToggle />
+            </div>
+          </div>
+          <div data-testid="mobile-nav" className="flex md:hidden items-center gap-2 mt-8">
+            <Link
+              href="/"
+              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+              onClick={() => track('header_dashboard_clicked')}
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/media"
+              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+              onClick={() => track('header_media_clicked')}
+            >
+              Media
+            </Link>
+            <Link
+              href="/quotes"
+              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+              onClick={() => track('header_supporters_clicked')}
+            >
+              Supporters
+            </Link>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};

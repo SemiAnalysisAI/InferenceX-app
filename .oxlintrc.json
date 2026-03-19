@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "correctness": "warn",
+    "suspicious": "warn",
+    "pedantic": "off",
+    "style": "warn",
+    "nursery": "off"
+  }
+}

@@ -1,0 +1,320 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Base Theme Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-border-alt: var(--border-alt);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Fonts */
+  --font-sans: var(--font-dm-sans);
+  --font-mono: monospace;
+
+  /* Breakpoints */
+  --breakpoint-2xl: 80rem;
+  --breakpoint-3xl: 80rem;
+
+  /* Sidebar */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  /* GPU Colors - NVIDIA */
+  --color-h100: var(--h100);
+  --color-h100-dynamo-trt: var(--h100-dynamo-trt);
+  --color-h100-dynamo-trt-mtp: var(--h100-dynamo-trt-mtp);
+  --color-h100-dynamo-sglang-mtp: var(--h100-dynamo-sglang-mtp);
+  --color-h100-vllm: var(--h100-vllm);
+  --color-h200: var(--h200);
+  --color-h200-trt: var(--h200-trt);
+  --color-h200-trt-mtp: var(--h200-trt-mtp);
+  --color-h200-dynamo-trt: var(--h200-dynamo-trt);
+  --color-h200-dynamo-trt-mtp: var(--h200-dynamo-trt-mtp);
+  --color-h200-sglang: var(--h200-sglang);
+  --color-h200-dynamo-sglang: var(--h200-dynamo-sglang);
+  --color-h200-dynamo-sglang-mtp: var(--h200-dynamo-sglang-mtp);
+  --color-h200-vllm: var(--h200-vllm);
+  --color-b200: var(--b200);
+  --color-b200-trt: var(--b200-trt);
+  --color-b200-trt-mtp: var(--b200-trt-mtp);
+  --color-b200-dynamo-trt: var(--b200-dynamo-trt);
+  --color-b200-dynamo-trt-mtp: var(--b200-dynamo-trt-mtp);
+  --color-b200-sglang: var(--b200-sglang);
+  --color-b200-sglang-mtp: var(--b200-sglang-mtp);
+  --color-b200-dynamo-sglang: var(--b200-dynamo-sglang);
+  --color-b200-dynamo-sglang-mtp: var(--b200-dynamo-sglang-mtp);
+  --color-b200-vllm: var(--b200-vllm);
+  --color-b300: var(--b300);
+  --color-b300-dynamo-trt: var(--b300-dynamo-trt);
+  --color-b300-dynamo-trt-mtp: var(--b300-dynamo-trt-mtp);
+  --color-gb200: var(--gb200);
+  --color-gb200-mtp: var(--gb200-mtp);
+  --color-gb200-dynamo-trt: var(--gb200-dynamo-trt);
+  --color-gb200-dynamo-trt-mtp: var(--gb200-dynamo-trt-mtp);
+  --color-gb200-dynamo-trtllm: var(--gb200-dynamo-trtllm);
+  --color-gb200-dynamo-trtllm-mtp: var(--gb200-dynamo-trtllm-mtp);
+  --color-gb200-dynamo-sglang: var(--gb200-dynamo-sglang);
+  --color-gb300: var(--gb300);
+  --color-gb300-dynamo-trt: var(--gb300-dynamo-trt);
+  --color-gb300-dynamo-trt-mtp: var(--gb300-dynamo-trt-mtp);
+  --color-gb300-dynamo-trtllm: var(--gb300-dynamo-trtllm);
+  --color-gb300-dynamo-trtllm-mtp: var(--gb300-dynamo-trtllm-mtp);
+  --color-gb300-dynamo-sglang: var(--gb300-dynamo-sglang);
+
+  /* GPU Colors - AMD */
+  --color-mi300x: var(--mi300x);
+  --color-mi300x-sglang: var(--mi300x-sglang);
+  --color-mi300x-vllm: var(--mi300x-vllm);
+  --color-mi325x: var(--mi325x);
+  --color-mi325x-sglang: var(--mi325x-sglang);
+  --color-mi325x-vllm: var(--mi325x-vllm);
+  --color-mi355x: var(--mi355x);
+  --color-mi355x-mori-sglang: var(--mi355x-mori-sglang);
+  --color-mi355x-mori-sglang-mtp: var(--mi355x-mori-sglang-mtp);
+  --color-mi355x-sglang: var(--mi355x-sglang);
+  --color-mi355x-sglang-mtp: var(--mi355x-sglang-mtp);
+  --color-mi355x-vllm: var(--mi355x-vllm);
+  --color-mi355x-atom: var(--mi355x-atom);
+  --color-mi355x-atom-mtp: var(--mi355x-atom-mtp);
+}
+
+:root {
+  /* Setup variables */
+  --radius: 0.625rem;
+
+  /* Base Theme Colors */
+  --background: #eaebec;
+  --foreground: #131416;
+  --card: #eaebec;
+  --card-foreground: #131416;
+  --popover: #fafafa;
+  --popover-foreground: #171717;
+  --primary: #f7b041;
+  --primary-foreground: #fafafa;
+  --secondary: #0b86d1;
+  --secondary-foreground: #fafafa;
+  --muted: #b4b9bc;
+  --muted-foreground: #27272a;
+  --accent: #fafafa;
+  --accent-foreground: #1d1f21;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #656b72;
+  --border-alt: #c2ccd7;
+  --input: #656b72;
+  --ring: #27272a;
+
+  /* Sidebar */
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+
+  /* GPU Colors - NVIDIA (light → dark within each group, fixed hue+chroma per group) */
+  --h100: oklch(82% 0.19 140);
+  --h100-dynamo-trt: oklch(78% 0.19 140);
+  --h100-dynamo-trt-mtp: oklch(74% 0.19 140);
+  --h100-dynamo-sglang-mtp: oklch(72% 0.19 140);
+  --h100-vllm: oklch(70% 0.19 140);
+  --h200: oklch(76% 0.18 142);
+  --h200-trt: oklch(73% 0.18 142);
+  --h200-trt-mtp: oklch(70% 0.18 142);
+  --h200-dynamo-trt: oklch(67% 0.18 142);
+  --h200-dynamo-trt-mtp: oklch(64% 0.18 142);
+  --h200-sglang: oklch(61% 0.18 142);
+  --h200-dynamo-sglang: oklch(58% 0.18 142);
+  --h200-dynamo-sglang-mtp: oklch(55% 0.18 142);
+  --h200-vllm: oklch(52% 0.18 142);
+  --b200: oklch(60% 0.15 155);
+  --b200-trt: oklch(57% 0.15 155);
+  --b200-trt-mtp: oklch(54% 0.15 155);
+  --b200-dynamo-trt: oklch(51% 0.15 155);
+  --b200-dynamo-trt-mtp: oklch(48% 0.15 155);
+  --b200-sglang: oklch(45% 0.15 155);
+  --b200-sglang-mtp: oklch(42% 0.15 155);
+  --b200-dynamo-sglang: oklch(39% 0.15 155);
+  --b200-dynamo-sglang-mtp: oklch(36% 0.15 155);
+  --b200-vllm: oklch(33% 0.15 155);
+  --b300: oklch(50% 0.14 150);
+  --b300-dynamo-trt: oklch(46% 0.14 150);
+  --b300-dynamo-trt-mtp: oklch(42% 0.14 150);
+  --gb200: oklch(65% 0.16 132);
+  --gb200-mtp: oklch(62% 0.16 132);
+  --gb200-dynamo-trt: oklch(59% 0.16 132);
+  --gb200-dynamo-trt-mtp: oklch(56% 0.16 132);
+  --gb200-dynamo-trtllm: oklch(53% 0.16 132);
+  --gb200-dynamo-trtllm-mtp: oklch(50% 0.16 132);
+  --gb200-dynamo-sglang: oklch(47% 0.16 132);
+  --gb300: oklch(43% 0.12 148);
+  --gb300-dynamo-trt: oklch(40% 0.12 148);
+  --gb300-dynamo-trt-mtp: oklch(37% 0.12 148);
+  --gb300-dynamo-trtllm: oklch(34% 0.12 148);
+  --gb300-dynamo-trtllm-mtp: oklch(31% 0.12 148);
+  --gb300-dynamo-sglang: oklch(28% 0.12 148);
+
+  /* GPU Colors - AMD (light → dark within each group, fixed hue+chroma per group) */
+  --mi300x: oklch(72% 0.23 25);
+  --mi300x-sglang: oklch(68% 0.23 25);
+  --mi300x-vllm: oklch(64% 0.23 25);
+  --mi325x: oklch(60% 0.21 32);
+  --mi325x-sglang: oklch(56% 0.21 32);
+  --mi325x-vllm: oklch(52% 0.21 32);
+  --mi355x: oklch(55% 0.17 35);
+  --mi355x-mori-sglang: oklch(51% 0.17 35);
+  --mi355x-mori-sglang-mtp: oklch(47% 0.17 35);
+  --mi355x-sglang: oklch(43% 0.17 35);
+  --mi355x-sglang-mtp: oklch(41% 0.17 35);
+  --mi355x-vllm: oklch(39% 0.17 35);
+  --mi355x-atom: oklch(35% 0.17 35);
+  --mi355x-atom-mtp: oklch(31% 0.17 35);
+}
+
+.dark {
+  /* Base Theme Colors */
+  --background: #131416;
+  --foreground: #eaebec;
+  --card: #131416;
+  --card-foreground: #eaebec;
+  --popover: #171717;
+  --popover-foreground: #fafafa;
+  --primary: #f7b041;
+  --primary-foreground: #131416;
+  --secondary: #0b86d1;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #b4b9bc;
+  --accent: #1d1f21;
+  --accent-foreground: #fafafa;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #656b72;
+  --border-alt: #222426;
+  --input: oklch(1 0 0 / 15%);
+  --ring: #fafafa;
+
+  /* Sidebar */
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+/* Custom scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.3);
+  background-clip: padding-box;
+}
+
+/* Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
+}
+.axis-tick-text {
+  fill: hsl(var(--muted-foreground));
+}
+
+.axis-label-text {
+  fill: hsl(var(--foreground));
+}
+
+/* D3 chart theming via CSS vars */
+.chart-root .x-axis .domain,
+.chart-root .y-axis .domain {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.chart-root .tick line {
+  stroke: var(--border);
+}
+.chart-root .tick text {
+  font-size: 10px;
+  fill: var(--foreground);
+}
+.chart-root .grid line {
+  stroke: var(--border-alt);
+}
+.y-axis-label,
+.x-axis-label {
+  fill: var(--foreground);
+}
+
+/* Subtle star button glow animation - loops forever */
+@keyframes star-glow {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  50% {
+    box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
+  }
+}
+
+.star-button-glow {
+  animation: star-glow 2s ease-in-out infinite;
+}

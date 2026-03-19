@@ -1,0 +1,10 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: lint
+      run: pnpm lint:fix -- {staged_files}
+      stage_fixed: true
+
+    - name: format
+      run: pnpm fmt:fix -- {staged_files}
+      stage_fixed: true
