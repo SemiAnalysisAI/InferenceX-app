@@ -31,21 +31,25 @@ Source: `packages/app/src/components/page-content.tsx` lines 203–239.
 File: `packages/app/src/components/GlobalFilterContext.tsx`
 
 **Selection state** (user-settable, URL-initialised):
+
 - `selectedModel` — active model (`g_model`)
 - `selectedSequence` — active ISL/OSL sequence (`i_seq`; owned here because it gates availability for all tabs)
 - `selectedPrecisions` — active precision list (`i_prec`; same reason)
 - `selectedRunDate` / `selectedRunId` — active benchmark run date and run ID (`g_rundate`, `g_runid`)
 
 **Effective (auto-corrected) values** (derived, not settable directly):
+
 - `effectiveSequence` — `selectedSequence` if valid for current model, else first available
 - `effectivePrecisions` — subset of `selectedPrecisions` that are available; falls back to `[availablePrecisions[0]]`
 - `effectiveRunDate` — latest available date unless user explicitly picked one
 
 **Derived availability** (memos over `availabilityRows`):
+
 - `availableModels`, `availableSequences`, `availablePrecisions`, `availableDates`
 - `availabilityRows` — raw `AvailabilityRow[]` from `useAvailability()`, passed down to InferenceProvider for GPU filtering
 
 **Workflow / run info** (derived from `useWorkflowInfo(effectiveRunDate)`):
+
 - `availableRuns`, `workflowInfo`, `workflowLoading`, `workflowError`
 
 **Why here, not InferenceProvider**: Model, sequence, and precision are cross-tab. EvaluationContext consumes `selectedModel` and `availableModels` directly. If these lived in InferenceProvider, EvaluationProvider would need an indirect coupling or duplicate state.
@@ -59,12 +63,14 @@ File: `packages/app/src/components/inference/InferenceContext.tsx`
 Depends on: `GlobalFilterProvider` (reads all filter state and availability, including `availabilityRows`).
 
 **GPU comparison state** (inference-only, URL-initialised):
+
 - `selectedGPUs` — hardware keys selected for GPU filter/comparison (`i_gpus`)
 - `selectedDates` — discrete comparison dates (`i_dates`)
 - `selectedDateRange` — `{startDate, endDate}` for range comparisons (`i_dstart`, `i_dend`)
 - `activeDates` — `Set<string>` toggle controlling visible comparison overlays (keyed by `${date}_${gpuKey}`)
 
 **Chart axis / display state** (URL-initialised):
+
 - `selectedYAxisMetric` (`i_metric`), `selectedXAxisMetric` (`i_xmetric`), `selectedE2eXAxisMetric` (`i_e2e_xmetric`)
 - `scaleType` — `auto | linear | log` (`i_scale`)
 - `hideNonOptimal` (`i_optimal`), `hidePointLabels` (`i_nolabel`), `logScale` (`i_log`)
@@ -73,25 +79,31 @@ Depends on: `GlobalFilterProvider` (reads all filter state and availability, inc
 - `colorShuffleSeed` — no URL param; ephemeral
 
 **Derived availability** (GPU-level, computed from `availabilityRows` inherited from GlobalFilterContext):
+
 - `availableGPUs` — hardware configs that have data for the current model + sequence + precisions AND exist in `HARDWARE_CONFIG`
 - `dateRangeAvailableDates` — dates available for the current filter combination, further narrowed by `selectedGPUs`
 - `hwTypesWithData` — `Set<string>` of GPU keys currently present in fetched chart data
 
 **Hardware toggle set**:
+
 - `activeHwTypes` — subset of `hwTypesWithData` that are visible (managed by `useChartDataFilter`)
 
 **Tracked configs / presets**:
+
 - `trackedConfigs` — up to 6 pinned data points for cross-chart comparison
 - `activePresetId`, `pendingHwFilter` — active favourite preset and its deferred GPU filter
 
 **User overrides**:
+
 - `userCosts`, `userPowers` — per-GPU cost/power overrides for custom cost metric; reset when `selectedYAxisMetric` changes away from `y_costUser`/`y_powerUser`
 
 **Run filtering** (inference-local, not written back to GlobalFilterContext):
+
 - `filteredAvailableRuns` — `availableRuns` filtered to runs matching `selectedModel` + `effectivePrecisions`
 - `effectiveSelectedRunId` — validated run ID within `filteredAvailableRuns`; intentionally NOT synced back to GlobalFilterContext to avoid full-tree re-renders on precision change
 
 **Charts data** (from `useChartData`):
+
 - `graphs` — `RenderableGraph[]` used by all D3 charts
 - `hardwareConfig` — config map derived from benchmark rows
 - `loading`, `error`
@@ -107,14 +119,17 @@ File: `packages/app/src/components/evaluation/EvaluationContext.tsx`
 Depends on: `GlobalFilterProvider` (reads `selectedModel`, `setSelectedModel`, `selectedRunDate`, `selectedRunDateRev`, `setSelectedRunDate`, `availableModels`, `availableDates`).
 
 **Selection state**:
+
 - `selectedRunDate` — evaluation-specific date; initialised from `e_rundate` URL param or `globalRunDate`. Bidirectionally synced: when the user picks a date, it calls `setGlobalRunDate` (if the date exists in inference availability). When `globalRunDate` changes (from another tab), the effect at line 124 applies it here.
 - `selectedBenchmark` — active eval task (`e_bench`)
 
 **UI state**:
+
 - `highContrast` (`e_hc`), `isLegendExpanded` (`e_legend`), `showLabels` (`e_labels`)
 - `enabledHardware` — toggle set of visible hardware keys
 
 **Derived**:
+
 - `availableDates` — dates with eval rows for the selected model (derived from raw `EvalRow[]`, not from `availabilityRows`)
 - `availableBenchmarks` — all unique tasks across raw rows
 - `availableHardware` — hardware keys in raw rows
@@ -133,13 +148,16 @@ File: `packages/app/src/components/reliability/ReliabilityContext.tsx`
 Does NOT consume `GlobalFilterProvider`. Fully standalone — reliability data has no cross-tab filter dependency.
 
 **Selection state**:
+
 - `dateRange` — one of `last-3-days | last-7-days | last-month | last-3-months | all-time` (`r_range`)
 
 **UI state**:
+
 - `highContrast` (`r_hc`), `isLegendExpanded` (`r_legend`), `showPercentagesOnBars` (`r_pct`)
 - `enabledModels` — toggle set of visible model keys
 
 **Derived**:
+
 - `dateRangeSuccessRateData` — raw `ReliabilityRow[]` aggregated into buckets; all five ranges computed once
 - `filteredReliabilityData` — data for the active `dateRange`
 - `chartData` — `filteredReliabilityData` filtered by `enabledModels` and sorted
@@ -213,12 +231,12 @@ Source files: `packages/app/src/lib/url-state.ts`, `packages/app/src/hooks/useUr
 
 ### Prefix convention
 
-| Prefix | Scope |
-|--------|-------|
-| `g_` | GlobalFilterContext — model, run date, run ID |
-| `i_` | InferenceProvider — sequence, precision, GPUs, dates, metrics, display toggles |
-| `e_` | EvaluationProvider — eval date (only when it differs from globalRunDate), benchmark |
-| `r_` | ReliabilityProvider — date range, display toggles |
+| Prefix | Scope                                                                               |
+| ------ | ----------------------------------------------------------------------------------- |
+| `g_`   | GlobalFilterContext — model, run date, run ID                                       |
+| `i_`   | InferenceProvider — sequence, precision, GPUs, dates, metrics, display toggles      |
+| `e_`   | EvaluationProvider — eval date (only when it differs from globalRunDate), benchmark |
+| `r_`   | ReliabilityProvider — date range, display toggles                                   |
 
 Note: `i_seq` and `i_prec` are written by `GlobalFilterProvider` (not InferenceProvider) because they live in GlobalFilterContext.
 
@@ -242,34 +260,34 @@ Historical Trends and TCO Calculator share the inference tab's URL path (`/infer
 
 ### Full parameter list
 
-| Param | Owner | Default |
-|-------|-------|---------|
-| `g_model` | GlobalFilterContext | `DeepSeek-R1-0528` |
-| `g_rundate` | GlobalFilterContext | `''` |
-| `g_runid` | GlobalFilterContext | `''` |
-| `i_seq` | GlobalFilterContext | `8k/1k` |
-| `i_prec` | GlobalFilterContext | `fp4` |
-| `i_metric` | InferenceProvider | `y_tpPerGpu` |
-| `i_xmetric` | InferenceProvider | `p99_ttft` |
-| `i_e2e_xmetric` | InferenceProvider | `''` |
-| `i_scale` | InferenceProvider | `auto` |
-| `i_gpus` | InferenceProvider | `''` |
-| `i_dates` | InferenceProvider | `''` |
-| `i_dstart` | InferenceProvider | `''` |
-| `i_dend` | InferenceProvider | `''` |
-| `i_optimal` | InferenceProvider | `''` (truthy = hide non-optimal) |
-| `i_nolabel` | InferenceProvider | `''` |
-| `i_hc` | InferenceProvider | `''` |
-| `i_log` | InferenceProvider | `''` |
-| `i_legend` | InferenceProvider | `''` |
-| `i_advlabel` | InferenceProvider | `''` |
-| `i_gradlabel` | InferenceProvider | `''` |
-| `e_rundate` | EvaluationProvider | `''` |
-| `e_bench` | EvaluationProvider | `''` |
-| `e_hc` | EvaluationProvider | `''` |
-| `e_labels` | EvaluationProvider | `''` |
-| `e_legend` | EvaluationProvider | `''` |
-| `r_range` | ReliabilityProvider | `last-3-months` |
-| `r_pct` | ReliabilityProvider | `''` |
-| `r_hc` | ReliabilityProvider | `''` |
-| `r_legend` | ReliabilityProvider | `''` |
+| Param           | Owner               | Default                          |
+| --------------- | ------------------- | -------------------------------- |
+| `g_model`       | GlobalFilterContext | `DeepSeek-R1-0528`               |
+| `g_rundate`     | GlobalFilterContext | `''`                             |
+| `g_runid`       | GlobalFilterContext | `''`                             |
+| `i_seq`         | GlobalFilterContext | `8k/1k`                          |
+| `i_prec`        | GlobalFilterContext | `fp4`                            |
+| `i_metric`      | InferenceProvider   | `y_tpPerGpu`                     |
+| `i_xmetric`     | InferenceProvider   | `p99_ttft`                       |
+| `i_e2e_xmetric` | InferenceProvider   | `''`                             |
+| `i_scale`       | InferenceProvider   | `auto`                           |
+| `i_gpus`        | InferenceProvider   | `''`                             |
+| `i_dates`       | InferenceProvider   | `''`                             |
+| `i_dstart`      | InferenceProvider   | `''`                             |
+| `i_dend`        | InferenceProvider   | `''`                             |
+| `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal) |
+| `i_nolabel`     | InferenceProvider   | `''`                             |
+| `i_hc`          | InferenceProvider   | `''`                             |
+| `i_log`         | InferenceProvider   | `''`                             |
+| `i_legend`      | InferenceProvider   | `''`                             |
+| `i_advlabel`    | InferenceProvider   | `''`                             |
+| `i_gradlabel`   | InferenceProvider   | `''`                             |
+| `e_rundate`     | EvaluationProvider  | `''`                             |
+| `e_bench`       | EvaluationProvider  | `''`                             |
+| `e_hc`          | EvaluationProvider  | `''`                             |
+| `e_labels`      | EvaluationProvider  | `''`                             |
+| `e_legend`      | EvaluationProvider  | `''`                             |
+| `r_range`       | ReliabilityProvider | `last-3-months`                  |
+| `r_pct`         | ReliabilityProvider | `''`                             |
+| `r_hc`          | ReliabilityProvider | `''`                             |
+| `r_legend`      | ReliabilityProvider | `''`                             |

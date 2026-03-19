@@ -57,10 +57,10 @@ API route responses are cached at two layers before hitting the CDN.
 
 ### Two-Tier Server Cache
 
-| Tier                  | Mechanism          | Size Limit     | When Used                                     |
-| --------------------- | ------------------ | -------------- | --------------------------------------------- |
-| Local (unstable_cache) | Next.js in-process | ~2 MB default  | Small payloads (availability, workflow-info, etc.) |
-| Blob storage          | Vercel Blob        | No practical limit | Large payloads that exceed the 2 MB threshold |
+| Tier                   | Mechanism          | Size Limit         | When Used                                          |
+| ---------------------- | ------------------ | ------------------ | -------------------------------------------------- |
+| Local (unstable_cache) | Next.js in-process | ~2 MB default      | Small payloads (availability, workflow-info, etc.) |
+| Blob storage           | Vercel Blob        | No practical limit | Large payloads that exceed the 2 MB threshold      |
 
 `cachedQuery()` in `src/lib/api-cache.ts` wraps both tiers. Pass `{ blobOnly: true }` for payloads known to be large (e.g. `/api/v1/benchmarks`, which returns full benchmark rows for a model). The blob path is `{BLOB_CACHE_PREFIX}/{keyPrefix}:{args}.json`.
 
@@ -81,6 +81,7 @@ When the client detects a version change, it clears IndexedDB and records the ne
 ### CDN Cache Headers
 
 `cachedJson()` sets:
+
 ```
 Cache-Control: public, max-age=0, s-maxage=31536000
 Vercel-Cache-Tag: db

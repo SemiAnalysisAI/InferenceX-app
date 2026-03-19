@@ -72,7 +72,7 @@ Dismissing a pinned tooltip inside a D3 zoom handler calls `setState`, which tri
 
 **Bug pattern**: GPU comparison shows no data for comparison dates.
 
-Date relabeling happens in `useChartData` (line 126, 131): comparison date rows get their `date` field overwritten to the *requested* comparison date, and main rows get stamped with `selectedRunDate` when the user explicitly picks a date (because the materialized view query returns undated "latest" data). The `activeDates` toggle set matches rows against their `date` field — without stamping, rows would never match the toggle and comparison renders empty. The original DB date is preserved in `actualDate` (used by tooltips).
+Date relabeling happens in `useChartData` (line 126, 131): comparison date rows get their `date` field overwritten to the _requested_ comparison date, and main rows get stamped with `selectedRunDate` when the user explicitly picks a date (because the materialized view query returns undated "latest" data). The `activeDates` toggle set matches rows against their `date` field — without stamping, rows would never match the toggle and comparison renders empty. The original DB date is preserved in `actualDate` (used by tooltips).
 
 This relabeling is scoped to `useChartData` in the inference tab. Evaluation, reliability, and historical trends all use real DB dates unmodified.
 

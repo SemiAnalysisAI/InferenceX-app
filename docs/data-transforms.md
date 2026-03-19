@@ -32,6 +32,7 @@ RenderableGraph[]  (consumed by ScatterGraph)
 ### Step 1: API row to AggDataEntry (`lib/benchmark-transform.ts`)
 
 **`rowToAggDataEntry(row)`** — does three things:
+
 1. Flattens `row.metrics` into typed fields (e.g. `m.median_ttft ?? 0`).
 2. Resolves the DB model slug to a human display name via `DB_MODEL_TO_DISPLAY`.
 3. Copies all config fields (topology, disagg flags, image, dates) verbatim.
@@ -39,6 +40,7 @@ RenderableGraph[]  (consumed by ScatterGraph)
 `hwKey` is left as `''` at this point — it is not known until `getHardwareKey` runs in the next phase.
 
 **`transformBenchmarkRows(rows)`** — orchestrates the full BenchmarkRow[] → InferenceData[][] transform:
+
 1. Converts every row to `AggDataEntry` once (via `rowToAggDataEntry`).
 2. Calls `getHardwareKey(entry)` and writes the result back into `entry.hwKey`.
 3. Calls `getHardwareConfig(hwKey)` with a per-call cache to build the `HardwareConfig` map (hardware display metadata — label, color, GPU title).
@@ -70,7 +72,7 @@ The hook runs a 5-step memoized pipeline:
 
 1. **Fetch** — `useBenchmarks(model, date)` via React Query. When the selected date equals the latest available date, the query key is normalized to `''` to reuse the eagerly-cached materialized-view response and avoid a duplicate fetch.
 
-2. **Comparison date merging** — for GPU-vs-GPU date comparisons, `useQueries` fires one additional fetch per comparison date. Each row is stamped with the *user-selected* comparison date (overriding the actual DB date) so that `GPUGraph`'s `activeDates` filter, which is keyed by user-selected date, matches the points. The original DB date is preserved in `actualDate`.
+2. **Comparison date merging** — for GPU-vs-GPU date comparisons, `useQueries` fires one additional fetch per comparison date. Each row is stamped with the _user-selected_ comparison date (overriding the actual DB date) so that `GPUGraph`'s `activeDates` filter, which is keyed by user-selected date, matches the points. The original DB date is preserved in `actualDate`.
 
 3. **Sequence filter + transform** — rows are filtered to `isl`/`osl` for the selected sequence, then passed to `transformBenchmarkRows`. This is the only place `transformBenchmarkRows` is called in normal rendering.
 
@@ -106,14 +108,15 @@ The resulting key must exactly match an entry in `HARDWARE_CONFIG`. A key that d
 
 `inference-chart-config.json` defines exactly two `ChartDefinition` objects:
 
-| `chartType` | Default x-axis | x meaning |
-|---|---|---|
+| `chartType`     | Default x-axis  | x meaning                                                      |
+| --------------- | --------------- | -------------------------------------------------------------- |
 | `interactivity` | `median_intvty` | Interactivity (tok/s/user) — higher = more responsive per user |
-| `e2e` | `median_e2el` | End-to-end latency (s) — lower = faster |
+| `e2e`           | `median_e2el`   | End-to-end latency (s) — lower = faster                        |
 
 Both charts share the same Y-axis options. The `y` field is the default `AggDataEntry` key used for raw Y values; each `y_{metric}` field overrides this with a dotted path into the `InferenceData` derived fields (e.g. `"tpPerGpu.y"`).
 
 **Per-metric Y-axis schema** — for each metric key (e.g. `y_costh`), the config carries:
+
 - `y_{metric}`: dotted path for the value (e.g. `"costh.y"`).
 - `y_{metric}_label`: Y-axis label string.
 - `y_{metric}_title`: dropdown/UI title string.
