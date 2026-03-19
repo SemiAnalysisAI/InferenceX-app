@@ -340,8 +340,8 @@ jobs:
             - React Query hooks handle loading/error states; check `isLoading`/`error` before accessing `data`.
 
             ### C) Axis stability & legend toggles in D3
-            - Compute axis domains from ALL points (including hidden series) so axes don't jump.
-            - Prefer render-all + opacity transitions + `pointer-events: none` for hidden points/lines.
+            - Compute axis domains from VISIBLE (non-hidden) data only so axes rescale to fill the chart when GPUs are toggled off. Using all points leaves large blank areas.
+            - Prefer opacity transitions for hiding points/lines (no DOM removal).
             - Preserve zoom transform across re-renders (save to ref, re-apply after setup).
 
             ### D) Smooth zoom/pan performance in D3

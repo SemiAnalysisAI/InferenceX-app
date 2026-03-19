@@ -92,3 +92,46 @@ The TCO Calculator and Historical Trends interpolate metrics at a target interac
 When comparing FP4 vs FP8 for the same GPU, each precision needs its own Pareto front. Without composite keys (`hwKey__precision`), all precisions would be mixed into one front, producing invalid rooflines that connect FP4 and FP8 data points.
 
 The `__` separator is intentional — it can't appear in hwKey (which uses `-` and `_`) or precision names.
+
+## Normalizer Resolution Order
+
+All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The functions below are called by `mapBenchmarkRow()` in `benchmark-mapper.ts`; any row that cannot be fully resolved is counted by `SkipTracker` and dropped.
+
+### Model Key Resolution
+
+`resolveModelKey(row)` applies the following steps in order:
+
+1. **Prefer `infmax_model_prefix`** (or `model_prefix` for eval artifacts). This canonical field was added 2025-12-08 and is the authoritative source for all recent runs.
+2. **Strip precision suffixes** from the prefix (`-fp4`, `-fp8`, `-mxfp4`, `-nvfp4`), then check the resulting string against `DB_MODEL_KEYS` (derived from `DB_MODEL_TO_DISPLAY`).
+3. **Check `PREFIX_ALIASES`** for prefixes that still don't match after suffix stripping (e.g. `gptoss` → `gptoss120b`).
+4. **Fall back to `model` field** → lookup in `MODEL_TO_KEY`. This map covers all historical variants: HuggingFace paths (`deepseek-ai/DeepSeek-R1`), local mounts (`/mnt/lustre01/models/...`), and shorthand names (`dsr1-fp8`).
+5. **Return null** if neither path resolves. The row is skipped and the raw value is added to `tracker.unmappedModels` so operators can detect new model names in CI artifacts.
+
+### Hardware Key Resolution
+
+`hwToGpuKey(hw)` applies the following steps in order:
+
+1. Lowercase and **strip runner index suffix** with `/_\d+$/` (e.g. `mi355x_0` → `mi355x`).
+2. **Strip known framework/config suffixes** in a fixed order: `-trt`, `-multinode-slurm`, `-multinode`, `-nvs`, `-disagg`, `-amds`, `-amd`, `-nvd`, `-dgxc`, `-nb`, `-nv`. The order matters — longer suffixes (`-multinode-slurm`) are matched before their substrings (`-multinode`, `-slurm`).
+3. **Validate against `GPU_KEYS`** (the canonical set from `@semianalysisai/inferencex-constants`).
+4. **Return null** if the stripped base is not in the set. The raw value is added to `tracker.unmappedHws`.
+
+### Framework Normalization
+
+`normalizeFramework(fw, disaggField)` resolves a raw framework string to a canonical name and a disaggregated-inference flag:
+
+1. Look up `fw.toLowerCase()` in `FRAMEWORK_ALIASES` (defined in `packages/constants/src/framework-aliases.ts`).
+2. If a match exists, use `alias.canonical` as the framework name and `alias.disagg` as the disagg flag. Example: `sglang-disagg` → `{ framework: 'mori-sglang', disagg: true }`.
+3. If no alias exists, the lowercased raw string is used as-is.
+4. The disagg flag falls back to the raw `disaggField` from the artifact (coerced via `parseBool`, accepting `true`, `"true"`, `"True"`).
+
+`FRAMEWORK_ALIASES` keys are sorted longest-first in `SORTED_ALIASES` (used by `resolveFrameworkAliasesInString`) to prevent substring conflicts — `dynamo-trtllm` must be matched before `trtllm`.
+
+### Schema Version Detection
+
+`mapBenchmarkRow()` detects which artifact schema version is present by checking for the `prefill_tp` field:
+
+- **v1 (pre-2025-12-19)**: Only `tp`, `ep`, and `dp_attention` are present. These are copied symmetrically: `prefillTp = decodeTp = tp`, `prefillEp = decodeEp = ep`. Both `numPrefillGpu` and `numDecodeGpu` are set to `tp * ep`.
+- **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to `tp * ep` if absent.
+
+Detection is a single `'prefill_tp' in row` check — no version field is required in the artifact.

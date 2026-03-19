@@ -67,3 +67,23 @@ If axis domains are computed from all data (including hidden GPUs), the visible 
 Dismissing a pinned tooltip inside a D3 zoom handler calls `setState`, which triggers React re-render during the zoom event. The re-render causes a layout shift that feeds back into the zoom handler.
 
 **Fix**: Defer tooltip dismissal via `requestAnimationFrame`. The state update happens after the current frame completes, breaking the feedback loop.
+
+## Comparison Date Stamping
+
+**Bug pattern**: GPU comparison shows no data for comparison dates.
+
+Date relabeling happens in `useChartData` (line 126, 131): comparison date rows get their `date` field overwritten to the _requested_ comparison date, and main rows get stamped with `selectedRunDate` when the user explicitly picks a date (because the materialized view query returns undated "latest" data). The `activeDates` toggle set matches rows against their `date` field — without stamping, rows would never match the toggle and comparison renders empty. The original DB date is preserved in `actualDate` (used by tooltips).
+
+This relabeling is scoped to `useChartData` in the inference tab. Evaluation, reliability, and historical trends all use real DB dates unmodified.
+
+## Hardware Config Ref Stability
+
+**Bug pattern**: Chart re-renders every time any unrelated state changes.
+
+`useChartData` memoizes the sorted hardware config using a deep comparison ref check: if the new `hwConfig` array has identical content to the previous one, the existing reference is returned unchanged. This prevents downstream `useMemo` hooks in `InferenceContext` and `ScatterGraph` from invalidating when the reference changes but the data hasn't. Removing or bypassing this ref check causes cascading re-renders through the entire inference rendering tree, including every tooltip and legend item, on every state update anywhere in the context.
+
+## Cost Calculation Inheritance
+
+**Bug pattern**: Custom user cost for H100 doesn't apply to H100-TRT variant.
+
+`getGpuSpecs(hwKey)` strips framework suffixes from the hwKey to look up the base GPU entry in `GPU_SPECS`. User-provided cost and power overrides must therefore be keyed by the base GPU name (e.g. `h100`), not the full hwKey (e.g. `h100-trt`). If overrides are stored or applied against the full hwKey, variants that share the same physical GPU won't inherit the override because the base lookup finds the unmodified default entry.

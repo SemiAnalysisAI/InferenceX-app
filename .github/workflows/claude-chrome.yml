@@ -347,8 +347,8 @@ jobs:
             - React Query hooks handle loading/error states; check `isLoading`/`error` before accessing `data`.
 
             ### C) Axis stability & legend toggles in D3
-            - Compute axis domains from ALL points (including hidden series) so axes don't jump.
-            - Prefer render-all + opacity transitions + `pointer-events: none` for hidden points/lines.
+            - Compute axis domains from VISIBLE (non-hidden) data only so axes rescale to fill the chart when GPUs are toggled off. Using all points leaves large blank areas.
+            - Prefer opacity transitions for hiding points/lines (no DOM removal).
             - Preserve zoom transform across re-renders (save to ref, re-apply after setup).
 
             ### D) Smooth zoom/pan performance in D3
@@ -398,9 +398,28 @@ jobs:
             4. Run `pnpm test:unit` to verify unit tests pass before marking the task complete
             5. Follow existing test patterns in `packages/app/src/**/*.test.ts` (Vitest) and `packages/app/cypress/e2e/` (Cypress)
 
+            ### Pre-commit checklist (MANDATORY)
+            Before every commit, Claude agents MUST:
+            1. Start the dev server (if not already running):
+               ```bash
+               pnpm run dev -- --hostname 0.0.0.0 --port 3000 &
+               curl --retry 10 --retry-delay 2 --retry-connrefused -sSf http://localhost:3000 >/dev/null
+               ```
+            2. Run unit tests:
+               ```bash
+               pnpm run test:unit
+               ```
+            3. Run Cypress E2E tests:
+               ```bash
+               pnpm run test:e2e
+               ```
+            4. If any tests fail, fix the issues before committing.
+            5. Only after both unit and E2E tests pass, proceed with git add, git commit, and git push.
+
             A task is NOT complete if:
+            - Unit tests fail (`pnpm run test:unit`)
+            - Cypress E2E tests fail (`pnpm run test:e2e`)
             - New code was added without corresponding tests
-            - Tests fail when running `pnpm run test:unit`
 
             ## Final instruction
             Do not end a task until you have verified via Chrome DevTools MCP that the feature works and charts render real data (not error placeholders).
