@@ -159,6 +159,8 @@ function fullPt(
     jInputY?: number;
     outputTputY?: number;
     inputTputY?: number;
+    inputTputPerMwY?: number;
+    outputTputPerMwY?: number;
   },
 ): InferenceData {
   return {
@@ -194,6 +196,12 @@ function fullPt(
       : {}),
     ...(vals.inputTputY !== undefined
       ? { inputTputPerGpu: { y: vals.inputTputY, roof: false } }
+      : {}),
+    ...(vals.inputTputPerMwY !== undefined
+      ? { inputTputPerMw: { y: vals.inputTputPerMwY, roof: false } }
+      : {}),
+    ...(vals.outputTputPerMwY !== undefined
+      ? { outputTputPerMw: { y: vals.outputTputPerMwY, roof: false } }
       : {}),
   } as InferenceData;
 }
@@ -965,6 +973,36 @@ describe('createChartDataPoint', () => {
     expect(point.tpPerMw.y).toBeCloseTo((1000 * 1000) / 700, 5);
   });
 
+  it('computes inputTputPerMw when input_tput_per_gpu > 0', () => {
+    // inputTputPerMw = (input_tput_per_gpu * 1000) / power = (300 * 1000) / 700
+    const e = entry({ input_tput_per_gpu: 300 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.inputTputPerMw).toBeDefined();
+    expect(point.inputTputPerMw!.y).toBeCloseTo((300 * 1000) / 700, 5);
+    expect(point.inputTputPerMw!.roof).toBe(false);
+  });
+
+  it('omits inputTputPerMw when input_tput_per_gpu is 0', () => {
+    const e = entry({ input_tput_per_gpu: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.inputTputPerMw).toBeUndefined();
+  });
+
+  it('computes outputTputPerMw when output_tput_per_gpu > 0', () => {
+    // outputTputPerMw = (output_tput_per_gpu * 1000) / power = (800 * 1000) / 700
+    const e = entry({ output_tput_per_gpu: 800 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.outputTputPerMw).toBeDefined();
+    expect(point.outputTputPerMw!.y).toBeCloseTo((800 * 1000) / 700, 5);
+    expect(point.outputTputPerMw!.roof).toBe(false);
+  });
+
+  it('omits outputTputPerMw when output_tput_per_gpu is 0', () => {
+    const e = entry({ output_tput_per_gpu: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.outputTputPerMw).toBeUndefined();
+  });
+
   it('computes cost fields (costh, costn, costr) from hardware config and throughput', () => {
     // tokensPerHour = (tput_per_gpu * 3600) / 1_000_000 = (1000 * 3600) / 1e6 = 3.6
     // costh.y = hwConfig.costh / tokensPerHour = 2.8 / 3.6
@@ -1469,6 +1507,60 @@ describe('markRooflinePoints energy and output fields', () => {
     expect(m1.inputTputPerGpu!.roof).toBe(true);
     expect(m2.inputTputPerGpu!.roof).toBe(true);
     expect(m3.inputTputPerGpu!.roof).toBe(false);
+  });
+
+  it('marks inputTputPerMw.roof for points on the input per-MW roofline', () => {
+    const chartDef = {
+      chartType: 'e2e',
+      heading: 'Test',
+      x: 'median_e2el',
+      x_label: 'E2E Latency',
+      y: 'tput_per_gpu',
+      y_inputTputPerMw: 'inputTputPerMw.y',
+      y_inputTputPerMw_roofline: 'upper_right',
+    } as any;
+
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, inputTputPerMwY: 100 });
+    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, inputTputPerMwY: 400 });
+    const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, inputTputPerMwY: 250 });
+
+    const groupedData = { h100: [p1, p2, p3] };
+    const rooflines = computeAllRooflines(groupedData, chartDef);
+    const marked = markRooflinePoints(groupedData, rooflines, chartDef);
+
+    const m1 = marked.find((p) => p.x === 1)!;
+    const m2 = marked.find((p) => p.x === 2)!;
+    const m3 = marked.find((p) => p.x === 3)!;
+    expect(m1.inputTputPerMw!.roof).toBe(true);
+    expect(m2.inputTputPerMw!.roof).toBe(true);
+    expect(m3.inputTputPerMw!.roof).toBe(false);
+  });
+
+  it('marks outputTputPerMw.roof for points on the output per-MW roofline', () => {
+    const chartDef = {
+      chartType: 'e2e',
+      heading: 'Test',
+      x: 'median_e2el',
+      x_label: 'E2E Latency',
+      y: 'tput_per_gpu',
+      y_outputTputPerMw: 'outputTputPerMw.y',
+      y_outputTputPerMw_roofline: 'upper_right',
+    } as any;
+
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, outputTputPerMwY: 200 });
+    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, outputTputPerMwY: 500 });
+    const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, outputTputPerMwY: 350 });
+
+    const groupedData = { h100: [p1, p2, p3] };
+    const rooflines = computeAllRooflines(groupedData, chartDef);
+    const marked = markRooflinePoints(groupedData, rooflines, chartDef);
+
+    const m1 = marked.find((p) => p.x === 1)!;
+    const m2 = marked.find((p) => p.x === 2)!;
+    const m3 = marked.find((p) => p.x === 3)!;
+    expect(m1.outputTputPerMw!.roof).toBe(true);
+    expect(m2.outputTputPerMw!.roof).toBe(true);
+    expect(m3.outputTputPerMw!.roof).toBe(false);
   });
 
   it('handles points missing optional roofline fields gracefully', () => {
