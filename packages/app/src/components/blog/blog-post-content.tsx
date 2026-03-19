@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 
 import type { BlogPost } from './blog-data';
 
-export function BlogPostContent({ post }: { post: BlogPost }) {
+export function BlogPostContent({ post, readingTime }: { post: BlogPost; readingTime?: number }) {
   const formattedDate = new Date(post.date + 'T00:00:00').toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -32,6 +32,12 @@ export function BlogPostContent({ post }: { post: BlogPost }) {
               <span>{formattedDate}</span>
               <span>&middot;</span>
               <span className="font-semibold text-foreground">{post.author}</span>
+              {readingTime && (
+                <>
+                  <span>&middot;</span>
+                  <span>{readingTime} min read</span>
+                </>
+              )}
               {post.tags?.map((tag) => (
                 <span
                   key={tag}

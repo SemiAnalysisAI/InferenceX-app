@@ -76,6 +76,9 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: SITE_URL,
+    types: {
+      'application/rss+xml': `${SITE_URL}/feed.xml`,
+    },
   },
   icons: {
     icon: [
@@ -161,10 +164,7 @@ export default function RootLayout({
       </head>
       <body className={`${dm_sans.variable} antialiased relative`}>
         <PostHogProvider>
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-          />
+          <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
           <QueryProvider>
             <ThemeProvider
               attribute="class"
