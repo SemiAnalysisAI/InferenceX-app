@@ -245,12 +245,12 @@ const GPUGraph = React.memo(
       const root = d3.select(svg);
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .transition()
+        .transition('legend-hover')
         .duration(150)
         .style('opacity', (d) => (`${d.date}_${d.hwKey}` === seriesId ? 1 : 0.15));
       root
         .selectAll<SVGPathElement, unknown>('.roofline-path')
-        .transition()
+        .transition('legend-hover')
         .duration(150)
         .style('opacity', function () {
           const key = (d3.select(this).datum() as { key: string } | null)?.key ?? '';
@@ -263,8 +263,12 @@ const GPUGraph = React.memo(
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
-      root.selectAll('.dot-group').transition().duration(150).style('opacity', null);
-      root.selectAll('.roofline-path').transition().duration(150).style('opacity', null);
+      root.selectAll('.dot-group').transition('legend-hover').duration(150).style('opacity', null);
+      root
+        .selectAll('.roofline-path')
+        .transition('legend-hover')
+        .duration(150)
+        .style('opacity', null);
     }, []);
 
     if (data.length === 0) {
