@@ -235,7 +235,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Date:</strong> ${d.date}
+        <strong>Date:</strong> ${d.date}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">(data from ${d.actualDate})</span>` : ''}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>GPU Config:</strong> ${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}
