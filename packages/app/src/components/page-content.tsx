@@ -316,7 +316,10 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                     )}
                     overrides={{
                       order: ['OpenAI'],
-                      labels: { 'Together AI': 'Tri Dao' },
+                      labels: {
+                        'Together AI': 'Tri Dao',
+                        'PyTorch Foundation': 'PyTorch',
+                      },
                     }}
                     moreHref="/quotes"
                   />
