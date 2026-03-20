@@ -303,7 +303,16 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <QuoteCarousel
                     quotes={QUOTES.filter(
-                      (q) => !['NVIDIA', 'AMD', 'Supermicro', 'Vultr'].includes(q.org),
+                      (q) =>
+                        ![
+                          'NVIDIA',
+                          'AMD',
+                          'Supermicro',
+                          'Vultr',
+                          'Prime Intellect',
+                          'DatologyAI',
+                          'Stas Bekman',
+                        ].includes(q.org),
                     )}
                     overrides={{
                       order: ['OpenAI'],
