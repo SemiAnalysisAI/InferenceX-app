@@ -18,6 +18,13 @@ export const MEDIA_ITEMS: MediaItem[] = [
     date: '2026-03-20',
   },
   {
+    title: 'AMD Head of AI Product, Ramine Roane, shows his Inference King Champion Belt',
+    organization: 'AMD',
+    url: 'https://x.com/roaner/status/2034700440173154368',
+    type: 'video',
+    date: '2026-03-19',
+  },
+  {
     title: 'NVIDIA H200 vs B200 vs GB200: Which GPU to Rent for AI in 2026?',
     organization: 'Spheron Network',
     url: 'https://www.spheron.network/blog/nvidia-h200-vs-b200-vs-gb200/',
@@ -45,6 +52,13 @@ export const MEDIA_ITEMS: MediaItem[] = [
     url: 'https://sebastianbarros.substack.com/p/telcos-are-the-best-channel-to-democratize',
     type: 'article',
     date: '2026-03-17',
+  },
+  {
+    title: 'GTC 2026: Jensen announces that he is one of the Inference King',
+    organization: 'NVIDIA',
+    url: 'https://x.com/dylan522p/status/2034501674711302339',
+    type: 'video',
+    date: '2026-03-16',
   },
   {
     title: 'How NVIDIA Dynamo 1.0 Powers Multi-Node Inference at Production Scale',
