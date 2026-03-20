@@ -156,4 +156,11 @@ export const QUOTES: Quote[] = [
     company: 'Vultr',
     logo: 'vultr.svg',
   },
+  {
+    text: "At Prime Intellect, we're pushing the frontier of AI post-training and open research. InferenceX\u2122 complements that work by providing open, reproducible benchmarks that track real-world inference performance across hardware and software stacks as they evolve. For researchers like us, having transparent, continuously updated data on throughput and efficiency means we can focus on building better models instead of second-guessing infrastructure. This is the kind of community-driven effort that accelerates progress for everyone.",
+    name: 'Jack Min Ong',
+    title: 'Researcher, Prime Intellect',
+    company: 'Prime Intellect',
+    logo: 'prime-intellect.svg',
+  },
 ];
