@@ -2,13 +2,18 @@
 
 import { useState } from 'react';
 
-export function CompanyLogo({ company, logo }: { company: string; logo?: string }) {
+export function CompanyLogo({ org, logo }: { org: string; logo?: string }) {
   const [failed, setFailed] = useState(false);
 
   if (!logo || failed) {
     return (
-      <div className="h-12 shrink-0 rounded-full bg-muted flex items-center justify-center px-3">
-        <span className="text-xs font-bold text-muted-foreground">{company[0]}</span>
+      <div className="size-10 shrink-0 rounded-full bg-muted flex items-center justify-center">
+        <span className="text-sm font-bold text-muted-foreground">
+          {org
+            .split(' ')
+            .map((w) => w[0])
+            .join('')}
+        </span>
       </div>
     );
   }
@@ -16,7 +21,7 @@ export function CompanyLogo({ company, logo }: { company: string; logo?: string 
   return (
     <img
       src={`/logos/${logo}`}
-      alt={company}
+      alt={org}
       className="h-10 min-w-10 max-w-20 shrink-0 object-contain grayscale opacity-70 dark:invert"
       onError={() => setFailed(true)}
     />
