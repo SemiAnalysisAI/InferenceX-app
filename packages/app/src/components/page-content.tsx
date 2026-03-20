@@ -256,31 +256,23 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
             <section>
               <Card data-testid="intro-section">
                 <h2 className="text-lg font-semibold mb-2">
-                  LLM inference performance is a major concern in providing AI services, but
-                  accurate performance analysis remains elusive.
+                  Open Source Continuous Inference Standard and Research Platform trusted by Operators of Trillion Dollar Token Factories such as OpenAI, Oracle, Microsoft, etc. 
                 </h2>
                 <p className="text-muted-foreground mb-2">
-                  The fast cadence of software development and model releases makes comparing
-                  performance between setups difficult. Existing performance benchmarks quickly
-                  become obsolete because they are static, and participants often game the
-                  benchmarks with unrealistic, highly specific configurations.
+                  In the AI world, software development and model releases move at the speed of light.
+                  Existing performance benchmarks  become obsolete because they are static, and participants
+                  often submit software images purpose built for the benchmark itself.
                 </p>
                 <p className="text-muted-foreground mb-2">
-                  <strong>InferenceX</strong> (formerly InferenceMAX) addresses these issues by
-                  benchmarking popular models on major hardware platforms, updating benchmarks as
-                  new software versions are released.
-                </p>
-                <p className="text-muted-foreground mb-2">
-                  For each model and hardware combination, <strong>InferenceX</strong> sweeps
-                  through different tensor parallel sizes and maximum concurrent requests,
-                  presenting a throughput vs. latency graph for a complete picture. In terms of
-                  software configurations, we ensure they are broadly applicable across different
-                  serving scenarios, and we open-source the repo to encourage community
-                  contributions.
+                  <strong>InferenceX</strong> (formerly InferenceMAX) is our independent, reproducible
+                  benchmark which addresses these issues by continously benchmarking inference software
+                  across an wide range of AI accelerators that is acutally available to the the ML community. 
+                  We continously update the benchmarks to capture the speed of progress.
                 </p>
                 <p className="text-muted-foreground">
-                  We hope <strong>InferenceX</strong> provides the community with up-to-date and
-                  realistic LLM inference performance insights. Learn more in our articles:{' '}
+                  Our open data & insights is widely adopted by the ML community, capacity planning strategy teams at trillion dollar token factories & AI Labs
+                  & at multiple billion dollar NeoClouds.
+                  Learn more in our articles:{' '}
                   <a
                     href="https://newsletter.semianalysis.com/p/inferencemax-open-source-inference"
                     target="_blank"
