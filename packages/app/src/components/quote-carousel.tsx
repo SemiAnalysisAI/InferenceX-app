@@ -22,8 +22,8 @@ const COMPANY_LOGO_FILE: Record<string, string> = {
   Vultr: 'vultr.svg',
 };
 
-const EXCLUDED_COMPANIES = new Set(['NVIDIA', 'AMD']);
-const ROTATE_INTERVAL_MS = 10_000;
+const EXCLUDED_COMPANIES = new Set(['NVIDIA', 'AMD', 'Supermicro', 'Vultr']);
+const ROTATE_INTERVAL_MS = 8_000;
 
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
@@ -46,7 +46,9 @@ function buildCompanyQuotes(quotes: Quote[]): { company: string; quote: Quote }[
     company,
     quote: pool[Math.floor(Math.random() * pool.length)],
   }));
-  return shuffleArray(entries);
+  const openai = entries.filter((e) => e.company === 'OpenAI');
+  const rest = shuffleArray(entries.filter((e) => e.company !== 'OpenAI'));
+  return [...openai, ...rest];
 }
 
 function CompanyLogo({ company }: { company: string }) {
