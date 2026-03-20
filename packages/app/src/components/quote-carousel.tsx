@@ -158,20 +158,6 @@ export function QuoteCarousel({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Hidden measurement container — renders all quotes to find tallest */}
-      <div
-        ref={measureRef}
-        aria-hidden
-        className="absolute left-0 right-0 overflow-hidden pointer-events-none"
-        style={{ visibility: 'hidden', position: 'absolute', zIndex: -1 }}
-      >
-        {entries.map((e) => (
-          <div key={e.company}>
-            <QuoteBlock quote={e.quote} />
-          </div>
-        ))}
-      </div>
-
       {/* Company logo strip */}
       <div className="flex flex-wrap items-center justify-evenly gap-x-4 gap-y-2 mx-4">
         {entries.map((e, i) => (
@@ -191,7 +177,20 @@ export function QuoteCarousel({
       </div>
 
       {/* Visible quote — fixed height from measurement */}
-      <div className="relative flex items-start" style={{ minHeight: measuredHeight || undefined }}>
+      <div className="relative" style={{ minHeight: measuredHeight || undefined }}>
+        {/* Hidden measurement — same width as this container */}
+        <div
+          ref={measureRef}
+          aria-hidden
+          className="absolute inset-x-0 top-0 overflow-hidden pointer-events-none"
+          style={{ visibility: 'hidden', zIndex: -1 }}
+        >
+          {entries.map((e) => (
+            <div key={e.company}>
+              <QuoteBlock quote={e.quote} />
+            </div>
+          ))}
+        </div>
         <div
           className={`w-full transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`}
         >
