@@ -30,72 +30,24 @@ export default function ComparisonChangelog({
 }: ComparisonChangelogProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Filter changelog entries to only show those matching selected GPUs and precisions.
-  // For GPUs without a direct entry on a date, walk backwards to the most recent prior changelog.
+  // Filter changelog entries to only show those matching selected GPUs and precisions
   const filteredChangelogs = useMemo(() => {
     const precSet = new Set(selectedPrecisions);
-    const sorted = [...changelogs].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
 
-    const matchesGpu = (key: string) => {
-      const precision = key.split('-')[1];
-      return precSet.has(precision) && selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu));
-    };
-
-    return sorted
-      .map((item) => {
-        // Direct entries matching selected GPUs/precisions
-        const directEntries = item.entries.filter((entry) => entry.config_keys.some(matchesGpu));
-
-        // Find GPUs that have direct entries on this date
-        const coveredGPUs = new Set<string>();
-        for (const entry of directEntries) {
-          for (const key of entry.config_keys) {
-            if (!matchesGpu(key)) continue;
-            for (const gpu of selectedGPUs) {
-              if (configKeyMatchesHwKey(key, gpu)) coveredGPUs.add(gpu);
-            }
-          }
-        }
-
-        // For uncovered GPUs, walk backwards through earlier dates
-        const inheritedEntries: {
-          config_keys: string[];
-          description: string;
-          pr_link: string | null;
-          inheritedFromDate: string;
-        }[] = [];
-
-        for (const gpu of selectedGPUs) {
-          if (coveredGPUs.has(gpu)) continue;
-          // Walk backwards through sorted changelogs before this date
-          for (let i = sorted.indexOf(item) - 1; i >= 0; i--) {
-            const prior = sorted[i];
-            const match = prior.entries.find((entry) =>
-              entry.config_keys.some((key) => matchesGpu(key) && configKeyMatchesHwKey(key, gpu)),
+    return changelogs
+      .map((item) => ({
+        ...item,
+        entries: item.entries.filter((entry) =>
+          entry.config_keys.some((key) => {
+            const precision = key.split('-')[1];
+            return (
+              precSet.has(precision) && selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
             );
-            if (match) {
-              // Avoid duplicates if same entry covers multiple uncovered GPUs
-              if (
-                !inheritedEntries.some(
-                  (e) => e.inheritedFromDate === prior.date && e.description === match.description,
-                )
-              ) {
-                inheritedEntries.push({ ...match, inheritedFromDate: prior.date });
-              }
-              break;
-            }
-          }
-        }
-
-        return {
-          ...item,
-          entries: directEntries,
-          inheritedEntries,
-        };
-      })
-      .filter((item) => item.entries.length > 0 || item.inheritedEntries.length > 0);
+          }),
+        ),
+      }))
+      .filter((item) => item.entries.length > 0)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [changelogs, selectedGPUs, selectedPrecisions]);
 
   const handleToggle = () => {
@@ -182,15 +134,6 @@ export default function ComparisonChangelog({
                 </div>
                 {item.entries.map((entry, entryIndex) => (
                   <div key={entryIndex} className="text-sm text-muted-foreground pl-5">
-                    {formatChangelogDescription(entry.description)}
-                  </div>
-                ))}
-                {item.inheritedEntries.map((entry, entryIndex) => (
-                  <div
-                    key={`inherited-${entryIndex}`}
-                    className="text-sm text-muted-foreground pl-5 italic"
-                  >
-                    <span className="text-xs opacity-70">(from {entry.inheritedFromDate})</span>{' '}
                     {formatChangelogDescription(entry.description)}
                   </div>
                 ))}
