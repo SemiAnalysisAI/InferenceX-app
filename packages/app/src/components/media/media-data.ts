@@ -25,6 +25,13 @@ export const MEDIA_ITEMS: MediaItem[] = [
     date: '2026-03-19',
   },
   {
+    title: 'Morgan Stanley TMT Conference 2026 (timestamp: 21:41)',
+    organization: 'Morgan Stanley',
+    url: 'https://youtu.be/xv7UVAfyebk?si=JOb53qGigwwsVnCH&t=1302',
+    type: 'video',
+    date: '2026-03-18',
+  },
+  {
     title: 'NVIDIA H200 vs B200 vs GB200: Which GPU to Rent for AI in 2026?',
     organization: 'Spheron Network',
     url: 'https://www.spheron.network/blog/nvidia-h200-vs-b200-vs-gb200/',
