@@ -186,7 +186,7 @@ export function QuoteCarousel({ quotes, overrides = {}, intervalMs = 8_000 }: Qu
       </div>
 
       {/* Company logo strip — same shuffled order as cycling */}
-      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 mx-4">
         {entries.map((e, i) => (
           <button
             key={e.company}
