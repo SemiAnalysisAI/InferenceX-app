@@ -10,6 +10,7 @@ import { GpuSpecsContent } from '@/components/gpu-specs/gpu-specs-content';
 import GpuMetricsDisplay from '@/components/gpu-power/GpuPowerDisplay';
 import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
 import { ExportNudge } from '@/components/export-nudge';
+import { GitHubStarModal } from '@/components/github-star-modal';
 import { StarNudge } from '@/components/star-nudge';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
@@ -244,6 +245,7 @@ function ChartTabs({ initialTab }: { initialTab: string }) {
 export function PageContent({ initialTab = 'inference' }: { initialTab?: string }) {
   return (
     <>
+      <GitHubStarModal />
       <StarNudge />
       <ExportNudge />
       <UnofficialRunProvider>
