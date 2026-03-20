@@ -183,4 +183,11 @@ export const QUOTES: Quote[] = [
     title: 'Developer & Author of Machine Learning Engineering Open Book',
     org: 'Stas Bekman',
   },
+  {
+    text: "SGLang is the inference engine behind many production inference factories such as xAI's Grok, earning its recognition as THE Inference King. At scale, we see firsthand how much performance varies across hardware, models, and configurations. InferenceX\u2122 benchmarks SGLang across every major GPU platform nightly, capturing that variance in a way no other benchmark does, continuously, & reproducibly.",
+    name: 'Mingyi Lu',
+    title: 'SGLang Product Lead',
+    org: 'SGLang',
+    logo: 'sglang.png',
+  },
 ];
