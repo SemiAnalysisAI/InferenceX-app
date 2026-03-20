@@ -17,7 +17,6 @@ interface ComparisonChangelogProps {
   changelogs: ComparisonChangelogType[];
   selectedGPUs: string[];
   selectedPrecisions: string[];
-  selectedDateRange: { startDate: string; endDate: string };
   loading?: boolean;
   totalDatesQueried: number;
 }
@@ -26,7 +25,6 @@ export default function ComparisonChangelog({
   changelogs,
   selectedGPUs,
   selectedPrecisions,
-  selectedDateRange,
   loading,
   totalDatesQueried,
 }: ComparisonChangelogProps) {
@@ -51,20 +49,13 @@ export default function ComparisonChangelog({
       .filter((item) => item.entries.length > 0);
   }, [changelogs, selectedGPUs, selectedPrecisions]);
 
-  // Always include start/end dates, even if they have no changelog entries
-  const sortedChangelogs = useMemo(() => {
-    const byDate = new Map(filteredChangelogs.map((c) => [c.date, c]));
-    const { startDate, endDate } = selectedDateRange;
-    if (startDate && !byDate.has(startDate)) {
-      byDate.set(startDate, { date: startDate, entries: [] });
-    }
-    if (endDate && !byDate.has(endDate)) {
-      byDate.set(endDate, { date: endDate, entries: [] });
-    }
-    return [...byDate.values()].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-  }, [filteredChangelogs, selectedDateRange]);
+  const sortedChangelogs = useMemo(
+    () =>
+      [...filteredChangelogs].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      ),
+    [filteredChangelogs],
+  );
 
   const handleToggle = () => {
     const newState = !isExpanded;

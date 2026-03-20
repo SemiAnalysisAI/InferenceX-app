@@ -1,7 +1,7 @@
 'use client';
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 import { useInference } from '@/components/inference/InferenceContext';
@@ -37,7 +37,6 @@ import {
   Sequence,
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
-import { configKeyMatchesHwKey } from '@/components/inference/utils/changelogFormatters';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 
 import ChartControls from './ChartControls';
@@ -113,8 +112,6 @@ export default function ChartDisplay() {
     selectedGPUs,
     selectedPrecisions,
     selectedDateRange,
-    setSelectedDates,
-    availableDates,
     dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
@@ -130,49 +127,15 @@ export default function ChartDisplay() {
 
   const {
     changelogs,
+    intermediateDates,
     loading: changelogsLoading,
     totalDatesQueried,
-  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, availableDates);
-
-  // Auto-populate intermediate dates from changelog dates so they appear on the GPU graph
-  const prevChangelogDatesRef = useRef('');
-  useEffect(() => {
-    if (!selectedDateRange.startDate || !selectedDateRange.endDate || selectedGPUs.length === 0)
-      return;
-    const gpuDatesSet = new Set(dateRangeAvailableDates);
-    const precSet = new Set(selectedPrecisions);
-    const changelogDates = changelogs
-      .filter((c) =>
-        c.entries.some((entry) =>
-          entry.config_keys.some((key) => {
-            const precision = key.split('-')[1];
-            return (
-              precSet.has(precision) && selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
-            );
-          }),
-        ),
-      )
-      .map((c) => c.date)
-      .filter(
-        (d) =>
-          d !== selectedDateRange.startDate &&
-          d !== selectedDateRange.endDate &&
-          gpuDatesSet.has(d),
-      )
-      .sort();
-    const key = changelogDates.join(',');
-    if (key !== prevChangelogDatesRef.current) {
-      prevChangelogDatesRef.current = key;
-      setSelectedDates(changelogDates);
-    }
-  }, [
-    changelogs,
-    selectedDateRange,
+  } = useComparisonChangelogs(
     selectedGPUs,
     selectedPrecisions,
-    setSelectedDates,
+    selectedDateRange,
     dateRangeAvailableDates,
-  ]);
+  );
 
   const { unofficialRunInfo, getOverlayData, isUnofficialRun } = useUnofficialRun();
 
@@ -705,7 +668,7 @@ export default function ChartDisplay() {
                 <SocialShareButtons compact className="hidden sm:flex" />
               </div>
             </div>
-            <ChartControls />
+            <ChartControls intermediateDates={intermediateDates} />
             <ModelArchitectureDiagram model={selectedModel} />
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
             {selectedGPUs.length > 0 &&
@@ -715,7 +678,6 @@ export default function ChartDisplay() {
                   changelogs={changelogs}
                   selectedGPUs={selectedGPUs}
                   selectedPrecisions={selectedPrecisions}
-                  selectedDateRange={selectedDateRange}
                   loading={changelogsLoading}
                   totalDatesQueried={totalDatesQueried}
                 />
