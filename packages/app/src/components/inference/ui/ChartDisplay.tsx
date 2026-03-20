@@ -666,17 +666,15 @@ export default function ChartDisplay() {
             <ChartControls intermediateDates={intermediateDates} />
             <ModelArchitectureDiagram model={selectedModel} />
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
-            {selectedGPUs.length > 0 &&
-              selectedDateRange.startDate &&
-              selectedDateRange.endDate && (
-                <ComparisonChangelog
-                  changelogs={changelogs}
-                  selectedGPUs={selectedGPUs}
-                  selectedPrecisions={selectedPrecisions}
-                  loading={changelogsLoading}
-                  totalDatesQueried={totalDatesQueried}
-                />
-              )}
+            {selectedGPUs.length > 0 && (
+              <ComparisonChangelog
+                changelogs={changelogs}
+                selectedGPUs={selectedGPUs}
+                selectedPrecisions={selectedPrecisions}
+                loading={changelogsLoading}
+                totalDatesQueried={totalDatesQueried}
+              />
+            )}
           </div>
         </Card>
       </section>

@@ -19,40 +19,46 @@ export function useComparisonChangelogs(
   selectedDateRange: { startDate: string; endDate: string },
   availableDates: string[],
 ) {
-  const isComparisonMode =
-    selectedGPUs.length > 0 && !!selectedDateRange.startDate && !!selectedDateRange.endDate;
+  const hasGPUs = selectedGPUs.length > 0;
+  const hasDateRange = !!selectedDateRange.startDate && !!selectedDateRange.endDate;
 
-  // Query all available dates within the selected range to discover which have changelog entries
-  const datesInRange = useMemo(() => {
-    if (!isComparisonMode) return [];
+  // When GPUs selected: fetch all available dates. When date range also set: limit to range.
+  const datesToQuery = useMemo(() => {
+    if (!hasGPUs) return [];
+    if (!hasDateRange) return availableDates;
     return availableDates.filter(
       (d) => d >= selectedDateRange.startDate && d <= selectedDateRange.endDate,
     );
-  }, [isComparisonMode, availableDates, selectedDateRange.startDate, selectedDateRange.endDate]);
+  }, [
+    hasGPUs,
+    hasDateRange,
+    availableDates,
+    selectedDateRange.startDate,
+    selectedDateRange.endDate,
+  ]);
 
   const queries = useQueries({
-    queries: datesInRange.map((date) => ({
+    queries: datesToQuery.map((date) => ({
       queryKey: ['workflow-info', date],
       queryFn: () => fetchWorkflowInfo(date),
-      enabled: isComparisonMode,
+      enabled: hasGPUs,
     })),
   });
 
   const changelogs = useMemo(() => {
-    if (!isComparisonMode) return [];
+    if (!hasGPUs) return [];
 
     const results: ComparisonChangelog[] = [];
 
-    for (let i = 0; i < datesInRange.length; i++) {
+    for (let i = 0; i < datesToQuery.length; i++) {
       const query = queries[i];
       if (!query.data) continue;
 
       const data = query.data as WorkflowInfoResponse;
       if (!data.changelogs || data.changelogs.length === 0) continue;
 
-      // Include all changelogs for this date (across all runs)
       results.push({
-        date: datesInRange[i],
+        date: datesToQuery[i],
         headRef: data.changelogs[data.changelogs.length - 1]?.head_ref,
         runUrl: data.runs[data.runs.length - 1]?.html_url ?? undefined,
         entries: data.changelogs.map((c: ChangelogRow) => ({
@@ -64,18 +70,18 @@ export function useComparisonChangelogs(
     }
 
     return results;
-  }, [isComparisonMode, datesInRange, queries]);
+  }, [hasGPUs, datesToQuery, queries]);
 
-  // Intermediate dates with any changelog entries (excluding start/end)
+  // Intermediate dates with any changelog entries (excluding start/end when date range is set)
   const intermediateDates = useMemo(() => {
-    if (!isComparisonMode) return [];
+    if (!hasGPUs || !hasDateRange) return [];
     return changelogs
       .filter((c) => c.date !== selectedDateRange.startDate && c.date !== selectedDateRange.endDate)
       .map((c) => c.date)
       .sort();
-  }, [isComparisonMode, changelogs, selectedDateRange.startDate, selectedDateRange.endDate]);
+  }, [hasGPUs, hasDateRange, changelogs, selectedDateRange.startDate, selectedDateRange.endDate]);
 
   const loading = queries.some((q) => q.isLoading);
 
-  return { changelogs, intermediateDates, loading, totalDatesQueried: datesInRange.length };
+  return { changelogs, intermediateDates, loading, totalDatesQueried: datesToQuery.length };
 }
