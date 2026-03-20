@@ -93,33 +93,12 @@ export function QuoteCarousel({
   const [entries, setEntries] = useState<CompanyEntry[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
-  const [measuredHeight, setMeasuredHeight] = useState(0);
-  const measureRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Build shuffled company order on mount (client only)
   useEffect(() => {
     setEntries(buildCompanyQuotes(quotes, order));
   }, [quotes, order]);
-
-  // Measure tallest quote and update on resize
-  useEffect(() => {
-    const el = measureRef.current;
-    if (!el) return;
-    const measure = () => {
-      const children = el.children;
-      let max = 0;
-      for (let i = 0; i < children.length; i++) {
-        const h = (children[i] as HTMLElement).offsetHeight;
-        if (h > max) max = h;
-      }
-      setMeasuredHeight(max);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [entries.length]);
 
   const advance = useCallback(() => {
     setFading(true);
@@ -154,8 +133,6 @@ export function QuoteCarousel({
 
   if (entries.length === 0) return null;
 
-  const current = entries[activeIndex];
-
   return (
     <div className="flex flex-col gap-4">
       {/* Company logo strip */}
@@ -176,26 +153,19 @@ export function QuoteCarousel({
         ))}
       </div>
 
-      {/* Visible quote — fixed height from measurement */}
-      <div className="relative" style={{ minHeight: measuredHeight || undefined }}>
-        {/* Hidden measurement — same width as this container */}
-        <div
-          ref={measureRef}
-          aria-hidden
-          className="absolute inset-x-0 top-0 overflow-hidden pointer-events-none"
-          style={{ visibility: 'hidden', zIndex: -1 }}
-        >
-          {entries.map((e) => (
-            <div key={e.company}>
-              <QuoteBlock quote={e.quote} />
-            </div>
-          ))}
-        </div>
-        <div
-          className={`w-full transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`}
-        >
-          <QuoteBlock quote={current.quote} />
-        </div>
+      {/* All quotes stacked in same grid cell — tallest sets height */}
+      <div className="grid">
+        {entries.map((e, i) => (
+          <div
+            key={e.company}
+            className={`col-start-1 row-start-1 transition-opacity duration-300 ease-in-out ${
+              i === activeIndex && !fading ? 'opacity-100' : 'opacity-0'
+            }`}
+            aria-hidden={i !== activeIndex}
+          >
+            <QuoteBlock quote={e.quote} />
+          </div>
+        ))}
       </div>
 
       {moreHref && (
