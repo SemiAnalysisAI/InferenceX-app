@@ -38,9 +38,13 @@ export async function getLatestBenchmarks(
   sql: NeonClient,
   modelKey: string,
   date?: string,
+  exact?: boolean,
 ): Promise<BenchmarkRow[]> {
   if (date) {
     // Date-filtered: use base table with DISTINCT ON (the view only has the absolute latest)
+    // exact=true: only return data from this exact date (for GPU comparison)
+    // exact=false (default): return latest data as of this date (for main chart)
+    const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
     const rows = await sql`
       SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
         c.hardware,
@@ -71,7 +75,7 @@ export async function getLatestBenchmarks(
       JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
       WHERE c.model = ${modelKey}
         AND br.error IS NULL
-        AND br.date <= ${date}::date
+        AND ${dateFilter}
       ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
     `;
     return rows as unknown as BenchmarkRow[];

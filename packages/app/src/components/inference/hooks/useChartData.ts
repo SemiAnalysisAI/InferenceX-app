@@ -100,7 +100,9 @@ export function useChartData(
   }, [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate]);
 
   const comparisonQueries = useQueries({
-    queries: comparisonDates.map((date) => benchmarkQueryOptions(selectedModel, date, enabled)),
+    queries: comparisonDates.map((date) =>
+      benchmarkQueryOptions(selectedModel, date, enabled, true),
+    ),
   });
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
