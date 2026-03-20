@@ -109,7 +109,7 @@ function ChartTabs({ initialTab }: { initialTab: string }) {
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       {/* Mobile: Dropdown */}
-      <div className="sm:hidden mb-4">
+      <div className="lg:hidden mb-4">
         <div className="w-full border-t-2 border-secondary dark:border-primary pb-6" />
         <Card>
           <div className="space-y-2">
@@ -149,7 +149,7 @@ function ChartTabs({ initialTab }: { initialTab: string }) {
       </div>
 
       {/* Desktop: Tabs */}
-      <TabsList data-testid="chart-section-tabs" className="hidden sm:flex mb-4">
+      <TabsList data-testid="chart-section-tabs" className="hidden lg:flex mb-4">
         <TabsTrigger
           data-testid="tab-trigger-inference"
           data-ph-capture-attribute-tab="inference"
@@ -252,7 +252,7 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
       <ExportNudge />
       <UnofficialRunProvider>
         <main className="relative min-h-screen">
-          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
+          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
             <section>
               <Card data-testid="intro-section">
                 <h2 className="text-lg font-semibold mb-2">

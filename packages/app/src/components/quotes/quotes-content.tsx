@@ -2,31 +2,38 @@
 
 import { Card } from '@/components/ui/card';
 
+import { CompanyLogo, highlightBrand } from './quote-utils';
 import { QUOTES } from './quotes-data';
 
 function QuoteCard({
   text,
   name,
   title,
+  company,
+  logo,
   link,
 }: {
   text: string;
   name: string;
   title: string;
+  company: string;
+  logo?: string;
   link?: string;
 }) {
   const content = (
-    <Card className="p-6 lg:p-8">
-      <blockquote className="space-y-4">
-        <p className="text-base lg:text-lg leading-relaxed text-foreground/90 italic">
-          &ldquo;{text}&rdquo;
-        </p>
-        <footer className="text-sm text-muted-foreground pl-6">
-          <span className="font-semibold text-foreground not-italic">&ndash; {name}</span>
-          <span className="block mt-0.5">{title}</span>
-        </footer>
-      </blockquote>
-    </Card>
+    <blockquote className="space-y-4">
+      <p className="text-base lg:text-lg leading-relaxed text-muted-foreground italic">
+        &ldquo;{highlightBrand(text)}&rdquo;
+      </p>
+      <footer className="flex items-center gap-3">
+        <CompanyLogo company={company} logo={logo} />
+        <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
+        <div className="text-sm">
+          <span className="font-semibold text-foreground">{name}</span>
+          <span className="block text-muted-foreground text-xs">{title}</span>
+        </div>
+      </footer>
+    </blockquote>
   );
 
   if (link) {
@@ -61,13 +68,15 @@ export function QuotesContent() {
             </p>
           </Card>
           <Card>
-            <div className="flex flex-col gap-3 md:pl-6">
+            <div className="flex flex-col gap-10 md:gap-12 mx-4 md:mx-8">
               {QUOTES.map((quote) => (
                 <QuoteCard
                   key={quote.name}
                   text={quote.text}
                   name={quote.name}
                   title={quote.title}
+                  company={quote.company}
+                  logo={quote.logo}
                   link={quote.link}
                 />
               ))}
