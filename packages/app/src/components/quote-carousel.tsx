@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { CompanyLogo, highlightBrand } from '@/components/quotes/quote-utils';
 
 export interface CarouselQuote {
   text: string;
@@ -63,40 +64,6 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   return shuffleArray(entries);
 }
 
-function CompanyLogo({ quote }: { quote: CarouselQuote }) {
-  const [failed, setFailed] = useState(false);
-
-  if (!quote.logo || failed) {
-    return (
-      <div className="h-12 shrink-0 rounded-full bg-muted flex items-center justify-center px-3">
-        <span className="text-xs font-bold text-muted-foreground">{quote.company[0]}</span>
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={`/logos/${quote.logo}`}
-      alt={quote.company}
-      className="h-10 min-w-10 max-w-20 shrink-0 object-contain grayscale opacity-70 dark:invert"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-function highlightBrand(text: string) {
-  const parts = text.split(/(InferenceMAX™?|InferenceX™?|InferenceMAX|InferenceX)/gi);
-  return parts.map((part, i) =>
-    /^inference(max|x)/i.test(part) ? (
-      <span key={i} className="text-secondary dark:text-primary font-semibold">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
-}
-
 function QuoteBlock({ quote }: { quote: CarouselQuote }) {
   return (
     <blockquote className="w-full">
@@ -104,7 +71,7 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
         &ldquo;{highlightBrand(quote.text)}&rdquo;
       </p>
       <footer className="mt-3 flex items-center gap-3">
-        <CompanyLogo quote={quote} />
+        <CompanyLogo company={quote.company} logo={quote.logo} />
         <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
         <div className="text-sm">
           <span className="font-semibold text-foreground">{quote.name}</span>
