@@ -20,7 +20,10 @@ export const STORAGE_KEY = 'inferencex-star-modal-dismissed';
 export const STARRED_KEY = 'inferencex-star-modal-starred';
 export const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
+let sessionDismissed = false;
+
 export function shouldShowModal(): boolean {
+  if (sessionDismissed) return false;
   try {
     if (localStorage.getItem(STARRED_KEY)) return false;
     const value = localStorage.getItem(STORAGE_KEY);
@@ -63,6 +66,7 @@ export function GitHubStarModal() {
 
   const handleDismiss = useCallback(() => {
     setOpen(false);
+    sessionDismissed = true;
     saveDismissTimestamp();
     track('github_star_modal_dismissed');
   }, []);
@@ -70,6 +74,7 @@ export function GitHubStarModal() {
   const handleStar = useCallback(() => {
     window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
     setOpen(false);
+    sessionDismissed = true;
     saveStarred();
     track('github_star_modal_starred');
   }, []);
