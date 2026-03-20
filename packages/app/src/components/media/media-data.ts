@@ -54,6 +54,13 @@ export const MEDIA_ITEMS: MediaItem[] = [
     date: '2026-03-17',
   },
   {
+    title: 'GTC 2026: Jensen announces that he is one of the Inference King',
+    organization: 'NVIDIA',
+    url: 'https://x.com/dylan522p/status/2034501674711302339',
+    type: 'video',
+    date: '2026-03-16',
+  },
+  {
     title: 'How NVIDIA Dynamo 1.0 Powers Multi-Node Inference at Production Scale',
     organization: 'NVIDIA Developer Blog',
     url: 'https://developer.nvidia.com/blog/nvidia-dynamo-1-production-ready/',
