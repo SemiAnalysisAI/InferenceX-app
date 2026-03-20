@@ -192,7 +192,7 @@ export function QuoteCarousel() {
                 : 'opacity-40 text-muted-foreground hover:opacity-70'
             }`}
           >
-            {e.company}
+            {e.company === 'Together AI' ? 'Tri Dao' : e.company}
           </button>
         ))}
       </div>
