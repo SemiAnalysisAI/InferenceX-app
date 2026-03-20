@@ -180,7 +180,7 @@ export const QUOTES: Quote[] = [
   {
     text: "InferenceX\u2122 provides the open source measurements the community needs \u2014 nightly results across real workloads, real hardware, and real software stacks. As someone who has written extensively about the gap between theoretical and actual system performance, I'm glad to see a project that makes that gap visible and trackable for everyone.",
     name: 'Stas Bekman',
-    title: 'Developer & Author of Machine Learning Engineering Open Book',
+    title: 'Developer & Author of Machine Learning Engineering Open Book (17.5K+ ⭐)',
     org: 'Stas Bekman',
   },
   {
