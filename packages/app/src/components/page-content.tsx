@@ -256,12 +256,13 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
             <section>
               <Card data-testid="intro-section">
                 <h2 className="text-lg font-semibold mb-2">
-                  Open Source Continuous Inference Standard and Research Platform trusted by Operators of Trillion Dollar Token Factories such as OpenAI, Oracle, Microsoft, etc. 
+                  Open Source Continuous Inference Standard and Research Platform trusted by Operators of Trillion Dollar Token Factories
                 </h2>
                 <p className="text-muted-foreground mb-2">
-                  In the AI world, software development and model releases move at the speed of light.
-                  Existing performance benchmarks  become obsolete because they are static, and participants
-                  often submit software images purpose built for the benchmark itself.
+                  As the world progresses exponentially towards AGI, software development and model releases move at the speed of light.
+                  Existing benchmarks rapidly become obsolete due to their static nature, and participants
+                  often submit software images purpose built for the benchmark itself which do not reflect 
+                  real world performance
                 </p>
                 <p className="text-muted-foreground mb-2">
                   <strong>InferenceX</strong> (formerly InferenceMAX) is our independent, reproducible
