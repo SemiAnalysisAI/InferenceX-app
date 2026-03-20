@@ -189,12 +189,6 @@ export function DateRangePicker({
               )}
             </DialogDescription>
           </DialogHeader>
-          {availableDates && availableDates.length === 1 && (
-            <p className="text-xs text-red-600 dark:text-red-400 border-l-2 border-red-500 pl-2 bg-red-500/5 py-1">
-              <strong>Warning:</strong> Only 1 date available for the selected configuration.
-              Historical comparison requires multiple dates.
-            </p>
-          )}
           {availableDates && availableDates.length >= 2 && (
             <div className="flex flex-wrap gap-2">
               {[
@@ -286,6 +280,19 @@ export function DateRangePicker({
                     <p className="text-sm font-medium text-foreground">No available dates</p>
                     <p className="text-xs text-muted-foreground">
                       Please change Model, ISL/OSL, or GPU to see available dates.
+                    </p>
+                  </div>
+                </div>
+              )}
+            {!isCheckingAvailableDates &&
+              availableDates !== undefined &&
+              availableDates.length === 1 && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+                  <div className="flex flex-col items-center gap-2 text-center px-4">
+                    <p className="text-sm font-medium text-foreground">Only 1 date available</p>
+                    <p className="text-xs text-muted-foreground">
+                      Historical comparison requires at least 2 dates. Please change Model, ISL/OSL,
+                      or GPU selection.
                     </p>
                   </div>
                 </div>
