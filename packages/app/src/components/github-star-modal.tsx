@@ -17,10 +17,12 @@ import {
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 export const STORAGE_KEY = 'inferencex-star-modal-dismissed';
+export const STARRED_KEY = 'inferencex-star-modal-starred';
 export const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export function shouldShowModal(): boolean {
   try {
+    if (localStorage.getItem(STARRED_KEY)) return false;
     const value = localStorage.getItem(STORAGE_KEY);
     if (!value) return true;
     const dismissedAt = Number(value);
@@ -34,6 +36,14 @@ export function shouldShowModal(): boolean {
 export function saveDismissTimestamp(): void {
   try {
     localStorage.setItem(STORAGE_KEY, String(Date.now()));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+export function saveStarred(): void {
+  try {
+    localStorage.setItem(STARRED_KEY, '1');
   } catch {
     // localStorage unavailable
   }
@@ -60,7 +70,7 @@ export function GitHubStarModal() {
   const handleStar = useCallback(() => {
     window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
     setOpen(false);
-    saveDismissTimestamp();
+    saveStarred();
     track('github_star_modal_starred');
   }, []);
 
