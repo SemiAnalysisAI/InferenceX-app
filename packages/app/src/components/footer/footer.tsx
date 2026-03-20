@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { SocialShareButtons } from '@/components/social-share-buttons';
 import { cn } from '@/lib/utils';
 
-import { FooterStarCta } from './footer-star-cta';
+import { FooterStarButton } from './footer-star-cta';
 
 export const Footer = () => {
   return (
@@ -30,13 +30,16 @@ export const Footer = () => {
       )}
     >
       <div className="container mx-auto py-8 px-4 flex flex-col items-center justify-center">
-        {/* GitHub Star CTA */}
-        <FooterStarCta />
-
-        {/* Social Share */}
-        <div className="flex flex-col items-center gap-2 mb-6 pb-6 border-b border-border/40">
-          <p className="text-xs text-muted-foreground">Share InferenceX with your network</p>
-          <SocialShareButtons compact />
+        {/* Open Source CTA */}
+        <div className="flex flex-col items-center gap-3 mb-6 pb-6 border-b border-border/40">
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            InferenceX is open source. If this data helps your work, star us or share with your
+            network.
+          </p>
+          <div className="flex items-center gap-1.5">
+            <FooterStarButton />
+            <SocialShareButtons compact />
+          </div>
         </div>
 
         {/* Policy Links */}
