@@ -21,6 +21,8 @@ export interface QuoteCarouselProps {
     /** Override display names in the company strip */
     labels?: Record<string, string>;
   };
+  /** Link to a page with all quotes */
+  moreHref?: string;
   /** Auto-rotate interval in ms (default 8000) */
   intervalMs?: number;
 }
@@ -82,11 +84,24 @@ function CompanyLogo({ quote }: { quote: CarouselQuote }) {
   );
 }
 
+function highlightBrand(text: string) {
+  const parts = text.split(/(InferenceMAX™?|InferenceX™?|InferenceMAX|InferenceX)/gi);
+  return parts.map((part, i) =>
+    /^inference(max|x)/i.test(part) ? (
+      <span key={i} className="text-secondary dark:text-primary font-semibold">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 function QuoteBlock({ quote }: { quote: CarouselQuote }) {
   return (
     <blockquote className="w-full">
       <p className="text-sm lg:text-base leading-relaxed text-muted-foreground italic">
-        &ldquo;{quote.text}&rdquo;
+        &ldquo;{highlightBrand(quote.text)}&rdquo;
       </p>
       <footer className="mt-3 flex items-center gap-3">
         <CompanyLogo quote={quote} />
@@ -100,7 +115,12 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
   );
 }
 
-export function QuoteCarousel({ quotes, overrides = {}, intervalMs = 8_000 }: QuoteCarouselProps) {
+export function QuoteCarousel({
+  quotes,
+  overrides = {},
+  moreHref,
+  intervalMs = 8_000,
+}: QuoteCarouselProps) {
   const { order, labels = {} } = overrides;
 
   const [entries, setEntries] = useState<CompanyEntry[]>([]);
@@ -210,6 +230,14 @@ export function QuoteCarousel({ quotes, overrides = {}, intervalMs = 8_000 }: Qu
         >
           <QuoteBlock quote={current.quote} />
         </div>
+        {moreHref && (
+          <a
+            href={moreHref}
+            className="absolute right-0 bottom-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            See more supporters &rarr;
+          </a>
+        )}
       </div>
     </div>
   );

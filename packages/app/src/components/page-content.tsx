@@ -309,6 +309,7 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                       order: ['OpenAI'],
                       labels: { 'Together AI': 'Tri Dao' },
                     }}
+                    moreHref="/quotes"
                   />
                 </div>
               </Card>
