@@ -9,14 +9,14 @@ function QuoteCard({
   text,
   name,
   title,
-  company,
+  org,
   logo,
   link,
 }: {
   text: string;
   name: string;
   title: string;
-  company: string;
+  org: string;
   logo?: string;
   link?: string;
 }) {
@@ -26,7 +26,7 @@ function QuoteCard({
         &ldquo;{highlightBrand(text)}&rdquo;
       </p>
       <footer className="flex items-center gap-3">
-        <CompanyLogo company={company} logo={logo} />
+        <CompanyLogo org={org} logo={logo} />
         <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
         <div className="text-sm">
           <span className="font-semibold text-foreground">{name}</span>
@@ -75,7 +75,7 @@ export function QuotesContent() {
                   text={quote.text}
                   name={quote.name}
                   title={quote.title}
-                  company={quote.company}
+                  org={quote.org}
                   logo={quote.logo}
                   link={quote.link}
                 />

@@ -9,7 +9,7 @@ export interface CarouselQuote {
   text: string;
   name: string;
   title: string;
-  company: string;
+  org: string;
   logo?: string;
   link?: string;
 }
@@ -19,7 +19,7 @@ export interface QuoteCarouselProps {
   overrides?: {
     /** Companies pinned to the front in this order; rest are shuffled after */
     order?: string[];
-    /** Override display names in the company strip */
+    /** Override display names in the org strip */
     labels?: Record<string, string>;
   };
   /** Link to a page with all quotes */
@@ -38,27 +38,27 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 interface CompanyEntry {
-  company: string;
+  org: string;
   quote: CarouselQuote;
 }
 
 function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyEntry[] {
   const byCompany = new Map<string, CarouselQuote[]>();
   for (const q of quotes) {
-    const list = byCompany.get(q.company);
+    const list = byCompany.get(q.org);
     if (list) list.push(q);
-    else byCompany.set(q.company, [q]);
+    else byCompany.set(q.org, [q]);
   }
-  const entries = [...byCompany.entries()].map(([company, pool]) => ({
-    company,
+  const entries = [...byCompany.entries()].map(([org, pool]) => ({
+    org,
     quote: pool[Math.floor(Math.random() * pool.length)],
   }));
   if (order?.length) {
     const orderSet = new Set(order);
     const pinned = order
-      .map((c) => entries.find((e) => e.company === c))
+      .map((c) => entries.find((e) => e.org === c))
       .filter((e): e is CompanyEntry => !!e);
-    const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.company)));
+    const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.org)));
     return [...pinned, ...rest];
   }
   return shuffleArray(entries);
@@ -71,7 +71,7 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
         &ldquo;{highlightBrand(quote.text)}&rdquo;
       </p>
       <footer className="mt-3 flex items-center gap-3">
-        <CompanyLogo company={quote.company} logo={quote.logo} />
+        <CompanyLogo org={quote.org} logo={quote.logo} />
         <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
         <div className="text-sm">
           <span className="font-semibold text-foreground">{quote.name}</span>
@@ -95,7 +95,7 @@ export function QuoteCarousel({
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Build shuffled company order on mount (client only)
+  // Build shuffled org order on mount (client only)
   useEffect(() => {
     setEntries(buildCompanyQuotes(quotes, order));
   }, [quotes, order]);
@@ -136,10 +136,10 @@ export function QuoteCarousel({
   return (
     <div className="flex flex-col gap-4">
       {/* Company logo strip */}
-      <div className="flex flex-wrap items-center justify-evenly gap-x-4 gap-y-2 mx-4">
+      <div className="flex flex-wrap items-center justify-evenly gap-x-6 gap-y-2 mx-4">
         {entries.map((e, i) => (
           <button
-            key={e.company}
+            key={e.org}
             type="button"
             onClick={() => goTo(i)}
             className={`text-xs font-semibold tracking-wide uppercase transition-opacity duration-200 ${
@@ -148,7 +148,7 @@ export function QuoteCarousel({
                 : 'opacity-40 text-muted-foreground hover:opacity-70'
             }`}
           >
-            {labels[e.company] ?? e.company}
+            {labels[e.org] ?? e.org}
           </button>
         ))}
       </div>
@@ -157,7 +157,7 @@ export function QuoteCarousel({
       <div className="grid">
         {entries.map((e, i) => (
           <div
-            key={e.company}
+            key={e.org}
             className={`col-start-1 row-start-1 transition-opacity duration-300 ease-in-out ${
               i === activeIndex && !fading ? 'opacity-100' : 'opacity-0'
             }`}
