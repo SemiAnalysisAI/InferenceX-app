@@ -256,24 +256,26 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
             <section>
               <Card data-testid="intro-section">
                 <h2 className="text-lg font-semibold mb-2">
-                  Open Source Continuous Inference Standard and Research Platform trusted by Operators of Trillion Dollar Token Factories
+                  Open Source Continuous Inference Standard and Research Platform trusted by
+                  Operators of Trillion Dollar Token Factories
                 </h2>
                 <p className="text-muted-foreground mb-2">
-                  As the world progresses exponentially towards AGI, software development and model releases move at the speed of light.
-                  Existing benchmarks rapidly become obsolete due to their static nature, and participants
-                  often submit software images purpose built for the benchmark itself which do not reflect 
-                  real world performance
+                  As the world progresses exponentially towards AGI, software development and model
+                  releases move at the speed of light. Existing benchmarks rapidly become obsolete
+                  due to their static nature, and participants often submit software images purpose
+                  built for the benchmark itself which do not reflect real world performance
                 </p>
                 <p className="text-muted-foreground mb-2">
-                  <strong>InferenceX</strong> (formerly InferenceMAX) is our independent, reproducible
-                  benchmark which addresses these issues by continously benchmarking inference software
-                  across an wide range of AI accelerators that is acutally available to the the ML community. 
-                  We continously update the benchmarks to capture the speed of progress.
+                  <strong>InferenceX</strong> (formerly InferenceMAX) is our independent,
+                  reproducible benchmark which addresses these issues by continously benchmarking
+                  inference software across an wide range of AI accelerators that is acutally
+                  available to the the ML community. We continously update the benchmarks to capture
+                  the speed of progress.
                 </p>
                 <p className="text-muted-foreground">
-                  Our open data & insights is widely adopted by the ML community, capacity planning strategy teams at trillion dollar token factories & AI Labs
-                  & at multiple billion dollar NeoClouds.
-                  Learn more in our articles:{' '}
+                  Our open data & insights is widely adopted by the ML community, capacity planning
+                  strategy teams at trillion dollar token factories & AI Labs & at multiple billion
+                  dollar NeoClouds. Learn more in our articles:{' '}
                   <a
                     href="https://newsletter.semianalysis.com/p/inferencemax-open-source-inference"
                     target="_blank"
