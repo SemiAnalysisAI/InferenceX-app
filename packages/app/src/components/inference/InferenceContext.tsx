@@ -469,6 +469,17 @@ export function InferenceProvider({
     }
   }, [selectedGPUs]);
 
+  // Reset date range when selected dates are no longer available (e.g. precision change)
+  useEffect(() => {
+    if (!selectedDateRange.startDate || !selectedDateRange.endDate) return;
+    if (selectedGPUs.length === 0) return;
+    const dateSet = new Set(dateRangeAvailableDates);
+    if (!dateSet.has(selectedDateRange.startDate) || !dateSet.has(selectedDateRange.endDate)) {
+      setSelectedDateRange({ startDate: '', endDate: '' });
+      setSelectedDates([]);
+    }
+  }, [dateRangeAvailableDates]);
+
   useEffect(() => {
     setActiveDates(allDateIds);
   }, [allDateIds, setActiveDates]);
