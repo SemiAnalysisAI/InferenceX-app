@@ -233,7 +233,7 @@ export function QuoteCarousel({
         {moreHref && (
           <a
             href={moreHref}
-            className="absolute right-0 bottom-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-0 bottom-0 text-xs font-bold text-secondary dark:text-primary hover:underline transition-opacity"
           >
             See more supporters &rarr;
           </a>
