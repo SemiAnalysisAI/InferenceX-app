@@ -130,12 +130,7 @@ export default function ChartDisplay() {
     intermediateDates,
     loading: changelogsLoading,
     totalDatesQueried,
-  } = useComparisonChangelogs(
-    selectedGPUs,
-    selectedPrecisions,
-    selectedDateRange,
-    dateRangeAvailableDates,
-  );
+  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
 
   const { unofficialRunInfo, getOverlayData, isUnofficialRun } = useUnofficialRun();
 
