@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { QuoteCarousel } from '@/components/quote-carousel';
 import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
 import { getTabTitle, isValidTab } from '@/lib/tab-meta';
 
@@ -298,6 +299,9 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                   </a>
                   .
                 </p>
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <QuoteCarousel />
+                </div>
               </Card>
             </section>
             <ChartTabs initialTab={initialTab} />
