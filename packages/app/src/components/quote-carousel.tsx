@@ -197,15 +197,18 @@ export function QuoteCarousel({
         >
           <QuoteBlock quote={current.quote} />
         </div>
-        {moreHref && (
+      </div>
+
+      {moreHref && (
+        <div className="flex justify-end">
           <a
             href={moreHref}
-            className="absolute right-0 bottom-0 text-xs font-bold text-secondary dark:text-primary hover:underline transition-opacity"
+            className="text-xs font-bold text-secondary dark:text-primary hover:underline"
           >
             See more supporters &rarr;
           </a>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
