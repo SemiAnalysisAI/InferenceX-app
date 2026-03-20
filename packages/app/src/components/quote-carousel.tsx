@@ -1,29 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
-import { type Quote, QUOTES } from './quotes/quotes-data';
+export interface CarouselQuote {
+  text: string;
+  name: string;
+  title: string;
+  company: string;
+  logo?: string;
+  link?: string;
+}
 
-const COMPANY_LOGO_FILE: Record<string, string> = {
-  OpenAI: 'openai.svg',
-  Microsoft: 'microsoft.svg',
-  'Together AI': 'together-ai.svg',
-  vLLM: 'vllm.svg',
-  'GPU Mode': 'gpu-mode.png',
-  'PyTorch Foundation': 'pytorch.svg',
-  Oracle: 'oracle.svg',
-  CoreWeave: 'coreweave.svg',
-  Nebius: 'nebius.svg',
-  Crusoe: 'crusoe.svg',
-  Supermicro: 'supermicro.svg',
-  TensorWave: 'tensorwave.svg',
-  Vultr: 'vultr.svg',
-};
-
-const EXCLUDED_COMPANIES = new Set(['NVIDIA', 'AMD', 'Supermicro', 'Vultr']);
-const ROTATE_INTERVAL_MS = 8_000;
+export interface QuoteCarouselProps {
+  quotes: CarouselQuote[];
+  overrides?: {
+    /** Companies pinned to the front in this order; rest are shuffled after */
+    order?: string[];
+    /** Override display names in the company strip */
+    labels?: Record<string, string>;
+  };
+  /** Auto-rotate interval in ms (default 8000) */
+  intervalMs?: number;
+}
 
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
@@ -34,9 +34,13 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-/** Group quotes by company, pick one random quote per company, shuffle company order. */
-function buildCompanyQuotes(quotes: Quote[]): { company: string; quote: Quote }[] {
-  const byCompany = new Map<string, Quote[]>();
+interface CompanyEntry {
+  company: string;
+  quote: CarouselQuote;
+}
+
+function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyEntry[] {
+  const byCompany = new Map<string, CarouselQuote[]>();
   for (const q of quotes) {
     const list = byCompany.get(q.company);
     if (list) list.push(q);
@@ -46,41 +50,46 @@ function buildCompanyQuotes(quotes: Quote[]): { company: string; quote: Quote }[
     company,
     quote: pool[Math.floor(Math.random() * pool.length)],
   }));
-  const openai = entries.filter((e) => e.company === 'OpenAI');
-  const rest = shuffleArray(entries.filter((e) => e.company !== 'OpenAI'));
-  return [...openai, ...rest];
+  if (order?.length) {
+    const orderSet = new Set(order);
+    const pinned = order
+      .map((c) => entries.find((e) => e.company === c))
+      .filter((e): e is CompanyEntry => !!e);
+    const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.company)));
+    return [...pinned, ...rest];
+  }
+  return shuffleArray(entries);
 }
 
-function CompanyLogo({ company }: { company: string }) {
+function CompanyLogo({ quote }: { quote: CarouselQuote }) {
   const [failed, setFailed] = useState(false);
-  const file = COMPANY_LOGO_FILE[company];
 
-  if (!file || failed) {
+  if (!quote.logo || failed) {
     return (
       <div className="h-12 shrink-0 rounded-full bg-muted flex items-center justify-center px-3">
-        <span className="text-xs font-bold text-muted-foreground">{company[0]}</span>
+        <span className="text-xs font-bold text-muted-foreground">{quote.company[0]}</span>
       </div>
     );
   }
 
   return (
     <img
-      src={`/logos/${file}`}
-      alt={company}
+      src={`/logos/${quote.logo}`}
+      alt={quote.company}
       className="h-10 min-w-10 max-w-20 shrink-0 object-contain grayscale opacity-70 dark:invert"
       onError={() => setFailed(true)}
     />
   );
 }
 
-function QuoteBlock({ quote }: { quote: Quote }) {
+function QuoteBlock({ quote }: { quote: CarouselQuote }) {
   return (
     <blockquote className="w-full">
       <p className="text-sm lg:text-base leading-relaxed text-muted-foreground italic">
         &ldquo;{quote.text}&rdquo;
       </p>
       <footer className="mt-3 flex items-center gap-3">
-        <CompanyLogo company={quote.company} />
+        <CompanyLogo quote={quote} />
         <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
         <div className="text-sm">
           <span className="font-semibold text-foreground">{quote.name}</span>
@@ -91,13 +100,10 @@ function QuoteBlock({ quote }: { quote: Quote }) {
   );
 }
 
-export function QuoteCarousel() {
-  const filteredQuotes = useMemo(
-    () => QUOTES.filter((q) => !EXCLUDED_COMPANIES.has(q.company)),
-    [],
-  );
+export function QuoteCarousel({ quotes, overrides = {}, intervalMs = 8_000 }: QuoteCarouselProps) {
+  const { order, labels = {} } = overrides;
 
-  const [entries, setEntries] = useState<{ company: string; quote: Quote }[]>([]);
+  const [entries, setEntries] = useState<CompanyEntry[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const [measuredHeight, setMeasuredHeight] = useState(0);
@@ -106,8 +112,8 @@ export function QuoteCarousel() {
 
   // Build shuffled company order on mount (client only)
   useEffect(() => {
-    setEntries(buildCompanyQuotes(filteredQuotes));
-  }, [filteredQuotes]);
+    setEntries(buildCompanyQuotes(quotes, order));
+  }, [quotes, order]);
 
   // Measure tallest quote and update on resize
   useEffect(() => {
@@ -139,11 +145,11 @@ export function QuoteCarousel() {
   // Auto-rotate
   useEffect(() => {
     if (entries.length <= 1) return;
-    timerRef.current = setInterval(advance, ROTATE_INTERVAL_MS);
+    timerRef.current = setInterval(advance, intervalMs);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [advance, entries.length]);
+  }, [advance, entries.length, intervalMs]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -153,10 +159,10 @@ export function QuoteCarousel() {
         setActiveIndex(index);
         setFading(false);
       }, 300);
-      timerRef.current = setInterval(advance, ROTATE_INTERVAL_MS);
+      timerRef.current = setInterval(advance, intervalMs);
       track('quote_carousel_navigated');
     },
-    [advance],
+    [advance, intervalMs],
   );
 
   if (entries.length === 0) return null;
@@ -192,7 +198,7 @@ export function QuoteCarousel() {
                 : 'opacity-40 text-muted-foreground hover:opacity-70'
             }`}
           >
-            {e.company === 'Together AI' ? 'Tri Dao' : e.company}
+            {labels[e.company] ?? e.company}
           </button>
         ))}
       </div>

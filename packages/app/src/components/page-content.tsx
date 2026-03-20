@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuoteCarousel } from '@/components/quote-carousel';
+import { QUOTES } from '@/components/quotes/quotes-data';
 import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
 import { getTabTitle, isValidTab } from '@/lib/tab-meta';
 
@@ -300,7 +301,15 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                   .
                 </p>
                 <div className="mt-4 pt-4 border-t border-border/50">
-                  <QuoteCarousel />
+                  <QuoteCarousel
+                    quotes={QUOTES.filter(
+                      (q) => !['NVIDIA', 'AMD', 'Supermicro', 'Vultr'].includes(q.company),
+                    )}
+                    overrides={{
+                      order: ['OpenAI'],
+                      labels: { 'Together AI': 'Tri Dao' },
+                    }}
+                  />
                 </div>
               </Card>
             </section>
