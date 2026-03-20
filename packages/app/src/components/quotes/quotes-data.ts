@@ -170,4 +170,11 @@ export const QUOTES: Quote[] = [
     org: 'Firmus',
     logo: 'firmus.svg',
   },
+  {
+    text: 'InferenceMAX has been useful for us even if Dylan Patel is a nice little guy with feelings',
+    name: 'Matthew Leavitt',
+    title: 'Chief Science Officer, DatologyAI',
+    org: 'DatologyAI',
+    logo: 'datologyai.svg',
+  },
 ];
