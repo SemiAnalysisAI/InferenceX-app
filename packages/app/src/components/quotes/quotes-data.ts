@@ -163,4 +163,11 @@ export const QUOTES: Quote[] = [
     org: 'Prime Intellect',
     logo: 'prime-intellect.svg',
   },
+  {
+    text: "At Firmus, we're building the most energy-efficient AI Factories in the world \u2014 and efficiency only matters if you can measure it. InferenceX\u2122 gives the industry open, reproducible benchmarks that track real-world throughput, cost, and performance per watt across the latest GPU platforms and software stacks. As we scale gigawatts of renewable-powered AI infrastructure across Asia-Pacific & Australia, this kind of transparent, continuously updated data helps the entire ecosystem understand what these systems actually deliver.",
+    name: 'Tim Rosenfield',
+    title: 'Co-Founder & Co-CEO, Firmus',
+    org: 'Firmus',
+    logo: 'firmus.svg',
+  },
 ];
