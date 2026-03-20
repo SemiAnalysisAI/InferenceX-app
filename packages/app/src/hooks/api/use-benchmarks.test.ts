@@ -5,7 +5,12 @@ import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 describe('benchmarkQueryOptions', () => {
   it('builds query key from model and date', () => {
     const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01');
-    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01']);
+    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'latest']);
+  });
+
+  it('builds exact query key when exact=true', () => {
+    const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01', true, true);
+    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'exact']);
   });
 
   it('produces distinct keys for different models', () => {
