@@ -48,6 +48,7 @@ export default function ReliabilityChartDisplay() {
       <ChartSection
         chartId={CHART_ID}
         analyticsPrefix="reliability"
+        zoomResetEvent={`d3chart_zoom_reset_${CHART_ID}`}
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}
       >
