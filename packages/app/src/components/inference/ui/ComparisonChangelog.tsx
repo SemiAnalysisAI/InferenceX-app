@@ -28,7 +28,7 @@ export default function ComparisonChangelog({
   loading,
   totalDatesQueried,
 }: ComparisonChangelogProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Filter changelog entries to only show those matching selected GPUs and precisions.
   // For GPUs without a direct entry on a date, walk backwards to the most recent prior changelog.
