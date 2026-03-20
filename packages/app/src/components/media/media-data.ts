@@ -25,6 +25,14 @@ export const MEDIA_ITEMS: MediaItem[] = [
     date: '2026-03-18',
   },
   {
+    title:
+      'GMI Cloud \u6210\u4E3A\u82F1\u4F1F\u8FBE Dynamo 1.0 \u53CA OpenShell \u9996\u53D1\u5408\u4F5C\u4F19\u4F34',
+    organization: 'GMI Cloud (Juejin)',
+    url: 'https://juejin.cn/post/7618440658614681600',
+    type: 'article',
+    date: '2026-03-18',
+  },
+  {
     title: 'Nvidia\u2019s Jensen Huang Says AI Compute Could Near $1 Trillion by 2027',
     organization: 'PYMNTS',
     url: 'https://www.pymnts.com/artificial-intelligence-2/2026/nvidias-jensen-huang-says-ai-compute-could-near-1-trillion-by-2027/',
