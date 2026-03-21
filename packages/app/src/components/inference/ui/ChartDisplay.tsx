@@ -265,10 +265,16 @@ export default function ChartDisplay() {
                 }
                 setIsLegendExpanded={setIsLegendExpanded}
                 onExportCsv={() => {
-                  const visibleData = graph.data.filter((d) =>
-                    activeHwTypes.has(d.hwKey as string),
+                  const visibleData = graph.data.filter(
+                    (d) =>
+                      activeHwTypes.has(d.hwKey as string) &&
+                      selectedPrecisions.includes(d.precision),
                   );
-                  const { headers, rows } = inferenceChartToCsv(visibleData);
+                  const { headers, rows } = inferenceChartToCsv(
+                    visibleData,
+                    graph.model,
+                    graph.sequence,
+                  );
                   exportToCsv(`chart-${graphIndex}-${Date.now()}`, headers, rows);
                 }}
               />

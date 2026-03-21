@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { QuoteCarousel } from '@/components/quote-carousel';
+import { QUOTES } from '@/components/quotes/quotes-data';
 import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
 import { getTabTitle, isValidTab } from '@/lib/tab-meta';
 
@@ -107,8 +109,8 @@ function ChartTabs({ initialTab }: { initialTab: string }) {
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       {/* Mobile: Dropdown */}
-      <div className="sm:hidden mb-4">
-        <div className="w-full border-t-2 border-secondary dark:border-primary pb-6" />
+      <div className="lg:hidden mb-4">
+        <div className="w-full border-t-2 border-brand pb-6" />
         <Card>
           <div className="space-y-2">
             <Label htmlFor="chart-select">Select Chart</Label>
@@ -147,7 +149,7 @@ function ChartTabs({ initialTab }: { initialTab: string }) {
       </div>
 
       {/* Desktop: Tabs */}
-      <TabsList data-testid="chart-section-tabs" className="hidden sm:flex mb-4">
+      <TabsList data-testid="chart-section-tabs" className="hidden lg:flex mb-4">
         <TabsTrigger
           data-testid="tab-trigger-inference"
           data-ph-capture-attribute-tab="inference"
@@ -250,40 +252,35 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
       <ExportNudge />
       <UnofficialRunProvider>
         <main className="relative min-h-screen">
-          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
+          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
             <section>
               <Card data-testid="intro-section">
                 <h2 className="text-lg font-semibold mb-2">
-                  LLM inference performance is a major concern in providing AI services, but
-                  accurate performance analysis remains elusive.
+                  Open Source Continuous Inference Benchmark trusted by Operators of Trillion Dollar
+                  GigaWatt Scale Token Factories
                 </h2>
                 <p className="text-muted-foreground mb-2">
-                  The fast cadence of software development and model releases makes comparing
-                  performance between setups difficult. Existing performance benchmarks quickly
-                  become obsolete because they are static, and participants often game the
-                  benchmarks with unrealistic, highly specific configurations.
+                  As the world progresses exponentially towards AGI, software development and model
+                  releases move at the speed of light. Existing benchmarks rapidly become obsolete
+                  due to their static nature, and participants often submit software images
+                  purpose-built for the benchmark itself which do not reflect real world
+                  performance.
                 </p>
                 <p className="text-muted-foreground mb-2">
-                  <strong>InferenceX</strong> (formerly InferenceMAX) addresses these issues by
-                  benchmarking popular models on major hardware platforms, updating benchmarks as
-                  new software versions are released.
-                </p>
-                <p className="text-muted-foreground mb-2">
-                  For each model and hardware combination, <strong>InferenceX</strong> sweeps
-                  through different tensor parallel sizes and maximum concurrent requests,
-                  presenting a throughput vs. latency graph for a complete picture. In terms of
-                  software configurations, we ensure they are broadly applicable across different
-                  serving scenarios, and we open-source the repo to encourage community
-                  contributions.
+                  <strong>InferenceX&trade;</strong> (formerly InferenceMAX) is our independent,
+                  vendor neutral, reproducible benchmark which addresses these issues by
+                  continuously benchmarking inference software across a wide range of AI
+                  accelerators that are actually available to the ML community.
                 </p>
                 <p className="text-muted-foreground">
-                  We hope <strong>InferenceX</strong> provides the community with up-to-date and
-                  realistic LLM inference performance insights. Learn more in our articles:{' '}
+                  Our open data & insights are widely adopted by the ML community, capacity planning
+                  strategy teams at trillion dollar token factories & AI Labs & at multiple billion
+                  dollar NeoClouds. Learn more in our articles:{' '}
                   <a
                     href="https://newsletter.semianalysis.com/p/inferencemax-open-source-inference"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline font-medium"
+                    className="text-brand hover:underline font-medium"
                   >
                     v1
                   </a>
@@ -292,12 +289,40 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                     href="https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline font-medium"
+                    className="text-brand hover:underline font-medium"
                   >
                     v2
                   </a>
                   .
                 </p>
+                <div className="mt-4 pt-4 border-t border-foreground">
+                  <QuoteCarousel
+                    quotes={QUOTES.filter((q) =>
+                      [
+                        'OpenAI',
+                        'Microsoft',
+                        'Together AI',
+                        'vLLM',
+                        'GPU Mode',
+                        'PyTorch Foundation',
+                        'Oracle',
+                        'CoreWeave',
+                        'Nebius',
+                        'Crusoe',
+                        'TensorWave',
+                        'SGLang',
+                      ].includes(q.org),
+                    )}
+                    overrides={{
+                      order: ['OpenAI'],
+                      labels: {
+                        'Together AI': 'Tri Dao',
+                        'PyTorch Foundation': 'PyTorch',
+                      },
+                    }}
+                    moreHref="/quotes"
+                  />
+                </div>
               </Card>
             </section>
             <ChartTabs initialTab={initialTab} />
