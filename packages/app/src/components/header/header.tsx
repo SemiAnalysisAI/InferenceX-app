@@ -80,14 +80,6 @@ export const Header = () => {
               >
                 Supporters
               </Link>
-              <Link
-                data-testid="nav-link-blog"
-                href="/blog"
-                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => track('header_blog_clicked')}
-              >
-                Blog
-              </Link>
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
               <ModeToggle />
             </div>
@@ -113,13 +105,6 @@ export const Header = () => {
               onClick={() => track('header_supporters_clicked')}
             >
               Supporters
-            </Link>
-            <Link
-              href="/blog"
-              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-              onClick={() => track('header_blog_clicked')}
-            >
-              Blog
             </Link>
           </div>
         </div>
