@@ -309,6 +309,7 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                           'Stas Bekman',
                           'Firmus',
                           'Adaptive ML',
+                          'Baseten',
                         ].includes(q.org),
                     )}
                     overrides={{
