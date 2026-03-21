@@ -50,8 +50,20 @@ export function useChartUIState(config: UseChartStateConfig) {
   const hcParam = `${urlPrefix}hc` as any;
   const legendParam = `${urlPrefix}legend` as any;
 
-  const [highContrast, setHighContrast] = useState(() => getUrlParam(hcParam) === '1');
-  const [isLegendExpanded, setIsLegendExpanded] = useState(() => getUrlParam(legendParam) !== '0');
+  // Initialize with safe defaults that match SSR output to avoid hydration mismatches.
+  // URL-param values are applied in a mount effect so the state is only set client-side.
+  const [highContrast, setHighContrast] = useState(false);
+  const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const didInit = useRef(false);
+
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    const hcVal = getUrlParam(hcParam);
+    if (hcVal === '1') setHighContrast(true);
+    const legendVal = getUrlParam(legendParam);
+    if (legendVal === '0') setIsLegendExpanded(false);
+  }, [getUrlParam, hcParam, legendParam]);
 
   return {
     highContrast,

@@ -34,18 +34,11 @@ export function cachedQuery<T, Args extends unknown[]>(
   return async (...args: Args): Promise<T> => nextCached(...args);
 }
 
-/** Purge both unstable_cache (via revalidateTag) and blob storage, then bump cache version. */
+/** Purge both unstable_cache (via revalidateTag) and blob storage. */
 export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge();
-  await blobSet('cache-version', { v: new Date().toISOString() });
   revalidateTag('db', { expire: 0 });
   return deleted;
-}
-
-/** Read the current cache version (UTC timestamp set on last invalidation). */
-export async function getCacheVersion(): Promise<string> {
-  const data = await blobGet<{ v: string }>('cache-version');
-  return data?.v ?? '';
 }
 
 /** 1 year — Vercel max. Purged on demand via revalidateTag('db'), no TTL needed. */

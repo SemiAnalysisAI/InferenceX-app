@@ -189,75 +189,6 @@ export function DateRangePicker({
               )}
             </DialogDescription>
           </DialogHeader>
-          {availableDates && availableDates.length === 1 && (
-            <p className="text-xs text-red-600 dark:text-red-400 border-l-2 border-red-500 pl-2 bg-red-500/5 py-1">
-              <strong>Warning:</strong> Only 1 date available for the selected configuration.
-              Historical comparison requires multiple dates.
-            </p>
-          )}
-          {availableDates && availableDates.length >= 2 && (
-            <div className="flex flex-wrap gap-2">
-              {[
-                {
-                  label: 'Max Range',
-                  getRange: () => ({
-                    startDate: availableDates[0],
-                    endDate: availableDates[availableDates.length - 1],
-                  }),
-                },
-                {
-                  label: 'Last 30 Days',
-                  getRange: () => {
-                    const cutoff = new Date();
-                    cutoff.setDate(cutoff.getDate() - 30);
-                    const cutoffStr = cutoff.toISOString().slice(0, 10);
-                    const filtered = availableDates.filter((d) => d >= cutoffStr);
-                    if (filtered.length < 2) return null;
-                    return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
-                  },
-                },
-                {
-                  label: 'Last 60 Days',
-                  getRange: () => {
-                    const cutoff = new Date();
-                    cutoff.setDate(cutoff.getDate() - 60);
-                    const cutoffStr = cutoff.toISOString().slice(0, 10);
-                    const filtered = availableDates.filter((d) => d >= cutoffStr);
-                    if (filtered.length < 2) return null;
-                    return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
-                  },
-                },
-                {
-                  label: 'Last 90 Days',
-                  getRange: () => {
-                    const cutoff = new Date();
-                    cutoff.setDate(cutoff.getDate() - 90);
-                    const cutoffStr = cutoff.toISOString().slice(0, 10);
-                    const filtered = availableDates.filter((d) => d >= cutoffStr);
-                    if (filtered.length < 2) return null;
-                    return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
-                  },
-                },
-              ].map(({ label, getRange }) => {
-                const range = getRange();
-                if (!range) return null;
-                return (
-                  <Button
-                    key={label}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={() => {
-                      setTempRange(range);
-                      track('date_range_picker_quick_select', { label });
-                    }}
-                  >
-                    {label}
-                  </Button>
-                );
-              })}
-            </div>
-          )}
           <div className="py-4 relative">
             <CalendarGrid
               dateRange={tempRange}
@@ -290,25 +221,92 @@ export function DateRangePicker({
                   </div>
                 </div>
               )}
+            {!isCheckingAvailableDates &&
+              availableDates !== undefined &&
+              availableDates.length === 1 && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+                  <div className="flex flex-col items-center gap-2 text-center px-4">
+                    <p className="text-sm font-medium text-foreground">Only 1 date available</p>
+                    <p className="text-xs text-muted-foreground">
+                      Historical comparison requires at least 2 dates. Please change Model, ISL/OSL,
+                      or GPU selection.
+                    </p>
+                  </div>
+                </div>
+              )}
           </div>
           {error && <p className="text-md text-center text-red-500">{error}</p>}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
+          <DialogFooter className="flex-row justify-between sm:justify-between">
+            {availableDates && availableDates.length >= 2 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  {
+                    label: 'Max Range',
+                    getRange: () => ({
+                      startDate: availableDates[0],
+                      endDate: availableDates[availableDates.length - 1],
+                    }),
+                  },
+                  {
+                    label: 'Last 90 Days',
+                    getRange: () => {
+                      const cutoff = new Date();
+                      cutoff.setDate(cutoff.getDate() - 90);
+                      const cutoffStr = cutoff.toISOString().slice(0, 10);
+                      const filtered = availableDates.filter((d) => d >= cutoffStr);
+                      if (filtered.length < 2) return null;
+                      return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
+                    },
+                  },
+                  {
+                    label: 'Last 30 Days',
+                    getRange: () => {
+                      const cutoff = new Date();
+                      cutoff.setDate(cutoff.getDate() - 30);
+                      const cutoffStr = cutoff.toISOString().slice(0, 10);
+                      const filtered = availableDates.filter((d) => d >= cutoffStr);
+                      if (filtered.length < 2) return null;
+                      return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
+                    },
+                  },
+                ].map(({ label, getRange }) => {
+                  const range = getRange();
+                  if (!range) return null;
+                  return (
+                    <Button
+                      key={label}
+                      variant="outline"
+                      onClick={() => {
+                        setTempRange(range);
+                        track('date_range_picker_quick_select', { label });
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button variant="outline" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                onClick={handleApply}
+                disabled={
+                  !tempRange.startDate ||
+                  !tempRange.endDate ||
+                  isApplying ||
+                  (availableDates !== undefined && availableDates.length < 2)
+                }
+              >
+                {isApplying ? 'Applying...' : 'Apply'}
               </Button>
-            </DialogClose>
-            <Button
-              onClick={handleApply}
-              disabled={
-                !tempRange.startDate ||
-                !tempRange.endDate ||
-                isApplying ||
-                (availableDates !== undefined && availableDates.length < 2)
-              }
-            >
-              {isApplying ? 'Applying...' : 'Apply'}
-            </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

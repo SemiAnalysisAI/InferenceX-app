@@ -1,7 +1,7 @@
 'use client';
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 import { useInference } from '@/components/inference/InferenceContext';
@@ -37,7 +37,6 @@ import {
   Sequence,
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
-import { configKeyMatchesHwKey } from '@/components/inference/utils/changelogFormatters';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 
 import ChartControls from './ChartControls';
@@ -70,7 +69,7 @@ function E2eXAxisDropdown({
           onClick={(e) => e.stopPropagation()}
         >
           vs. {xAxisLabel}
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+          <ChevronDown className="no-export h-3.5 w-3.5 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-1" align="start">
@@ -113,8 +112,6 @@ export default function ChartDisplay() {
     selectedGPUs,
     selectedPrecisions,
     selectedDateRange,
-    setSelectedDates,
-    availableDates,
     dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
@@ -130,49 +127,10 @@ export default function ChartDisplay() {
 
   const {
     changelogs,
+    intermediateDates,
     loading: changelogsLoading,
     totalDatesQueried,
-  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, availableDates);
-
-  // Auto-populate intermediate dates from changelog dates so they appear on the GPU graph
-  const prevChangelogDatesRef = useRef('');
-  useEffect(() => {
-    if (!selectedDateRange.startDate || !selectedDateRange.endDate || selectedGPUs.length === 0)
-      return;
-    const gpuDatesSet = new Set(dateRangeAvailableDates);
-    const precSet = new Set(selectedPrecisions);
-    const changelogDates = changelogs
-      .filter((c) =>
-        c.entries.some((entry) =>
-          entry.config_keys.some((key) => {
-            const precision = key.split('-')[1];
-            return (
-              precSet.has(precision) && selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
-            );
-          }),
-        ),
-      )
-      .map((c) => c.date)
-      .filter(
-        (d) =>
-          d !== selectedDateRange.startDate &&
-          d !== selectedDateRange.endDate &&
-          gpuDatesSet.has(d),
-      )
-      .sort();
-    const key = changelogDates.join(',');
-    if (key !== prevChangelogDatesRef.current) {
-      prevChangelogDatesRef.current = key;
-      setSelectedDates(changelogDates);
-    }
-  }, [
-    changelogs,
-    selectedDateRange,
-    selectedGPUs,
-    selectedPrecisions,
-    setSelectedDates,
-    dateRangeAvailableDates,
-  ]);
+  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
 
   const { unofficialRunInfo, getOverlayData, isUnofficialRun } = useUnofficialRun();
 
@@ -307,10 +265,16 @@ export default function ChartDisplay() {
                 }
                 setIsLegendExpanded={setIsLegendExpanded}
                 onExportCsv={() => {
-                  const visibleData = graph.data.filter((d) =>
-                    activeHwTypes.has(d.hwKey as string),
+                  const visibleData = graph.data.filter(
+                    (d) =>
+                      activeHwTypes.has(d.hwKey as string) &&
+                      selectedPrecisions.includes(d.precision),
                   );
-                  const { headers, rows } = inferenceChartToCsv(visibleData);
+                  const { headers, rows } = inferenceChartToCsv(
+                    visibleData,
+                    graph.model,
+                    graph.sequence,
+                  );
                   exportToCsv(`chart-${graphIndex}-${Date.now()}`, headers, rows);
                 }}
               />
@@ -705,21 +669,18 @@ export default function ChartDisplay() {
                 <SocialShareButtons compact className="hidden sm:flex" />
               </div>
             </div>
-            <ChartControls />
+            <ChartControls intermediateDates={intermediateDates} />
             <ModelArchitectureDiagram model={selectedModel} />
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
-            {selectedGPUs.length > 0 &&
-              selectedDateRange.startDate &&
-              selectedDateRange.endDate && (
-                <ComparisonChangelog
-                  changelogs={changelogs}
-                  selectedGPUs={selectedGPUs}
-                  selectedPrecisions={selectedPrecisions}
-                  selectedDateRange={selectedDateRange}
-                  loading={changelogsLoading}
-                  totalDatesQueried={totalDatesQueried}
-                />
-              )}
+            {selectedGPUs.length > 0 && (
+              <ComparisonChangelog
+                changelogs={changelogs}
+                selectedGPUs={selectedGPUs}
+                selectedPrecisions={selectedPrecisions}
+                loading={changelogsLoading}
+                totalDatesQueried={totalDatesQueried}
+              />
+            )}
           </div>
         </Card>
       </section>

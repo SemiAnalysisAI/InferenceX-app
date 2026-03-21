@@ -18,7 +18,7 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="w-full border-t-2 border-secondary dark:border-primary pb-6" />
+      <div className="w-full border-t-2 border-brand pb-6" />
       <TabsPrimitive.List
         data-slot="tabs-list"
         className="relative inline-flex p-1 gap-1 items-center justify-center bg-transparent"

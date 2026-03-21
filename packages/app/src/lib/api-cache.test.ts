@@ -12,7 +12,7 @@ vi.mock('./blob-cache', () => ({
   blobPurge: vi.fn(),
 }));
 
-import { cachedQuery, purgeAll, getCacheVersion, cachedJson } from './api-cache';
+import { cachedQuery, purgeAll, cachedJson } from './api-cache';
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobGet, blobSet, blobPurge } from './blob-cache';
 
@@ -120,63 +120,21 @@ describe('cachedQuery', () => {
 });
 
 describe('purgeAll', () => {
-  it('calls revalidateTag, blobPurge, and sets cache-version', async () => {
+  it('calls revalidateTag and blobPurge', async () => {
     mockBlobPurge.mockResolvedValue(15);
-    mockBlobSet.mockResolvedValue(undefined);
 
     const deleted = await purgeAll();
 
     expect(deleted).toBe(15);
     expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
     expect(mockBlobPurge).toHaveBeenCalled();
-    expect(mockBlobSet).toHaveBeenCalledWith(
-      'cache-version',
-      expect.objectContaining({ v: expect.any(String) }),
-    );
-  });
-
-  it('stores an ISO timestamp as cache version', async () => {
-    mockBlobPurge.mockResolvedValue(0);
-    mockBlobSet.mockResolvedValue(undefined);
-
-    await purgeAll();
-
-    const [, versionObj] = mockBlobSet.mock.calls[0];
-    const { v } = versionObj as { v: string };
-    // Should be a valid ISO date string
-    expect(new Date(v).toISOString()).toBe(v);
   });
 
   it('returns 0 when no blobs were deleted', async () => {
     mockBlobPurge.mockResolvedValue(0);
-    mockBlobSet.mockResolvedValue(undefined);
 
     const deleted = await purgeAll();
     expect(deleted).toBe(0);
-  });
-});
-
-describe('getCacheVersion', () => {
-  it('returns the version string when cache-version exists', async () => {
-    mockBlobGet.mockResolvedValue({ v: '2025-06-01T00:00:00.000Z' });
-
-    const version = await getCacheVersion();
-    expect(version).toBe('2025-06-01T00:00:00.000Z');
-    expect(mockBlobGet).toHaveBeenCalledWith('cache-version');
-  });
-
-  it('returns empty string when cache-version is missing', async () => {
-    mockBlobGet.mockResolvedValue(null);
-
-    const version = await getCacheVersion();
-    expect(version).toBe('');
-  });
-
-  it('returns empty string when blob returns object without v field', async () => {
-    mockBlobGet.mockResolvedValue({});
-
-    const version = await getCacheVersion();
-    expect(version).toBe('');
   });
 });
 

@@ -10,9 +10,46 @@ export interface MediaItem {
 
 export const MEDIA_ITEMS: MediaItem[] = [
   {
+    title: 'GTC 2026 Keynote: Long Live the Inference King',
+    organization: 'EE Times',
+    url: 'https://www.eetimes.com/gtc-2026-keynote-long-live-the-inference-king/',
+    type: 'article',
+    date: '2026-03-20',
+  },
+  {
+    title:
+      '\u82F1\u4F1F\u8FBE\u70ED\u70B9\u5C0F\u65F6\u62A5: \u6570\u636E\u4E2D\u5FC3\u5C31\u662FToken\u5DE5\u5382 \u2014 Jensen Huang GTC 2026',
+    organization: 'Sina Tech',
+    url: 'https://k.sina.com.cn/article_7857201856_1d45362c001903dwbo.html?from=tech',
+    type: 'article',
+    date: '2026-03-20',
+  },
+  {
+    title: 'AMD Head of AI Product, Ramine Roane, shows his Inference King Champion Belt',
+    organization: 'AMD',
+    url: 'https://x.com/roaner/status/2034700440173154368',
+    type: 'video',
+    date: '2026-03-19',
+  },
+  {
+    title: 'Morgan Stanley TMT Conference 2026 (timestamp: 21:41)',
+    organization: 'Morgan Stanley',
+    url: 'https://youtu.be/xv7UVAfyebk?si=JOb53qGigwwsVnCH&t=1302',
+    type: 'video',
+    date: '2026-03-18',
+  },
+  {
     title: 'NVIDIA H200 vs B200 vs GB200: Which GPU to Rent for AI in 2026?',
     organization: 'Spheron Network',
     url: 'https://www.spheron.network/blog/nvidia-h200-vs-b200-vs-gb200/',
+    type: 'article',
+    date: '2026-03-18',
+  },
+  {
+    title:
+      'GMI Cloud \u6210\u4E3A\u82F1\u4F1F\u8FBE Dynamo 1.0 \u53CA OpenShell \u9996\u53D1\u5408\u4F5C\u4F19\u4F34',
+    organization: 'GMI Cloud (Juejin)',
+    url: 'https://juejin.cn/post/7618440658614681600',
     type: 'article',
     date: '2026-03-18',
   },
@@ -29,6 +66,13 @@ export const MEDIA_ITEMS: MediaItem[] = [
     url: 'https://sebastianbarros.substack.com/p/telcos-are-the-best-channel-to-democratize',
     type: 'article',
     date: '2026-03-17',
+  },
+  {
+    title: 'GTC 2026: Jensen announces that he is one of the Inference King',
+    organization: 'NVIDIA',
+    url: 'https://x.com/dylan522p/status/2034501674711302339',
+    type: 'video',
+    date: '2026-03-16',
   },
   {
     title: 'How NVIDIA Dynamo 1.0 Powers Multi-Node Inference at Production Scale',

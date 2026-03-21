@@ -326,6 +326,7 @@ export default function ThroughputBarChart({
   const chartRef = useRef<D3ChartHandle>(null);
 
   // Stable refs to avoid re-running the D3 effect
+  const hoveredBarXRef = useRef(0);
   const selectedBarsRef = useRef(selectedBars);
   selectedBarsRef.current = selectedBars;
 
@@ -387,32 +388,6 @@ export default function ThroughputBarChart({
       },
     };
 
-    // Hit areas — transparent full-width rects for easier mouse interaction
-    const hitAreaLayer: CustomLayerConfig = {
-      type: 'custom',
-      key: 'hit-areas',
-      render: (zoomGroup, ctx) => {
-        const yScale = ctx.yScale as d3.ScaleBand<string>;
-
-        return zoomGroup
-          .selectAll<SVGRectElement, InterpolatedResult>('.bar-hit')
-          .data(sortedResults, (d) => d.resultKey)
-          .join('rect')
-          .attr('class', 'bar-hit')
-          .attr('y', (d) => yScale(d.resultKey) ?? 0)
-          .attr('x', 0)
-          .attr('width', ctx.width)
-          .attr('height', yScale.bandwidth())
-          .attr('fill', 'transparent')
-          .style('cursor', 'pointer');
-      },
-      onZoom: (zoomGroup, ctx) => {
-        zoomGroup
-          .selectAll<SVGRectElement, InterpolatedResult>('.bar-hit')
-          .attr('width', ctx.width);
-      },
-    };
-
     // Combined label layer — value + overlay labels flip inside/outside together
     const labelLayer: CustomLayerConfig = {
       type: 'custom',
@@ -468,7 +443,7 @@ export default function ThroughputBarChart({
       },
     };
 
-    return [barLayer, hitAreaLayer, labelLayer];
+    return [barLayer, labelLayer];
   }, [sortedResults, barMetric, costType, hardwareConfig, mode]);
 
   // ── Tooltip ──
@@ -478,35 +453,18 @@ export default function ThroughputBarChart({
       rulerType: 'vertical' as const,
       content: (d: InterpolatedResult, _isPinned: boolean) =>
         generateTooltipHTML(d, hardwareConfig, mode, barMetric, costType, runUrl),
-      getRulerX: (
-        d: InterpolatedResult,
-        xScale:
-          | d3.ScaleBand<string>
-          | d3.ScaleLinear<number, number>
-          | d3.ScaleLogarithmic<number, number>,
-      ) => (xScale as d3.ScaleLinear<number, number>)(getMetricValue(d, barMetric, costType)),
-      onHoverStart: (
-        sel: d3.Selection<any, InterpolatedResult, any, any>,
-        d: InterpolatedResult,
-      ) => {
-        // Highlight the corresponding visible bar, not the transparent hit area
-        const barGroup = sel.node()?.parentNode;
-        if (!barGroup) return;
-        const bars = d3.select(barGroup).selectAll<SVGRectElement, InterpolatedResult>('.bar');
-        const bar = bars.filter((b) => b.resultKey === d.resultKey);
+      getRulerX: () => hoveredBarXRef.current,
+      onHoverStart: (sel: d3.Selection<any, InterpolatedResult, any, any>) => {
+        hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
         const hasSelection = selectedBarsRef.current.size > 0;
         if (!hasSelection) {
-          bar.attr('opacity', 1).attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+          sel.attr('opacity', 1).attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
         }
       },
       onHoverEnd: (sel: d3.Selection<any, InterpolatedResult, any, any>, d: InterpolatedResult) => {
-        const barGroup = sel.node()?.parentNode;
-        if (!barGroup) return;
-        const bars = d3.select(barGroup).selectAll<SVGRectElement, InterpolatedResult>('.bar');
-        const bar = bars.filter((b) => b.resultKey === d.resultKey);
         const hasSelection = selectedBarsRef.current.size > 0;
         const isSelected = selectedBarsRef.current.has(d.resultKey);
-        bar
+        sel
           .attr('opacity', hasSelection ? (isSelected ? 0.95 : 0.15) : 0.85)
           .attr('stroke', 'none');
       },
@@ -514,7 +472,7 @@ export default function ThroughputBarChart({
         onBarSelectRef.current(d.resultKey);
         track('calculator_bar_selected', { gpu: d.hwKey, precision: d.precision });
       },
-      attachToLayer: 1,
+      attachToLayer: 0,
     }),
     [hardwareConfig, mode, barMetric, costType, runUrl],
   );

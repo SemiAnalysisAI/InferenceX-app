@@ -269,7 +269,7 @@ export function DatePicker({
           variant="ghost"
           size="sm"
           onClick={handleGoToLatestExternal}
-          disabled={isCurrentDateLatest() || isCheckingAvailableDates}
+          disabled={isCurrentDateLatest() || !!isCheckingAvailableDates}
           className="text-xs px-2"
         >
           Latest
@@ -278,7 +278,7 @@ export function DatePicker({
           variant="ghost"
           size="icon"
           onClick={handleGoPrevious}
-          disabled={!canGoPrevious() || isCheckingAvailableDates}
+          disabled={!canGoPrevious() || !!isCheckingAvailableDates}
           className="h-8 w-8"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -321,7 +321,7 @@ export function DatePicker({
               <Button
                 variant="outline"
                 onClick={handleGoToLatest}
-                disabled={isLatestDateSelected() || isCheckingAvailableDates}
+                disabled={isLatestDateSelected() || !!isCheckingAvailableDates}
               >
                 Go to Latest
               </Button>
@@ -342,7 +342,7 @@ export function DatePicker({
           variant="ghost"
           size="icon"
           onClick={handleGoNext}
-          disabled={!canGoNext() || isCheckingAvailableDates}
+          disabled={!canGoNext() || !!isCheckingAvailableDates}
           className="h-8 w-8"
         >
           <ChevronRight className="h-4 w-4" />

@@ -99,7 +99,7 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
         // apply zoom reset with animation
         const transition = d3
           .select(svgRef.current)
-          .transition()
+          .transition('zoom')
           .duration(750)
           .call(zoomRef.current.transform as any, defaultZoomTransform);
 
@@ -187,7 +187,7 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
       // double-click to reset zoom
       svg.on('dblclick.zoom', () => {
         svg
-          .transition()
+          .transition('zoom')
           .duration(750)
           .call(zoom.transform as any, defaultZoomTransform);
         zoomTransformRef.current = defaultZoomTransform;

@@ -74,9 +74,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.91.0
         version: 5.91.0(react@19.2.4)
-      '@tanstack/react-query-persist-client':
-        specifier: ^5.90.25
-        version: 5.90.25(@tanstack/react-query@5.91.0(react@19.2.4))(react@19.2.4)
       '@vercel/analytics':
         specifier: ^2.0.1
         version: 2.0.1(next@16.2.0(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
@@ -1748,15 +1745,6 @@ packages:
 
   '@tanstack/query-core@5.91.0':
     resolution: {integrity: sha512-FYXN8Kk9Q5VKuV6AIVaNwMThSi0nvAtR4X7HQoigf6ePOtFcavJYVIzgFhOVdtbBQtCJE3KimDIMMJM2DR1hjw==}
-
-  '@tanstack/query-persist-client-core@5.92.2':
-    resolution: {integrity: sha512-id+pZeO+NidGU1OC6Hr7Prfrx4uMZfBxAcynwBbCFKsqINCGvpzMokiZ2LRRkXV8qKgFWm6Xg5k7t7YnIkHynQ==}
-
-  '@tanstack/react-query-persist-client@5.90.25':
-    resolution: {integrity: sha512-ZQElYJSIOS7fq7jv4VYhTZpY4ZLkmur9tSyeE+MW+kWxkWyzAE/h4FOODKP6Ii9N3+4IsGIrUgsMRJuSgRJBeQ==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.91.0
-      react: ^18 || ^19
 
   '@tanstack/react-query@5.91.0':
     resolution: {integrity: sha512-S8FODsDTNv0Ym+o/JVBvA6EWiWVhg6K2Q4qFehZyFKk6uW4H9OPbXl4kyiN9hAly0uHJ/1GEbR6kAI4MZWfjEA==}
@@ -5092,16 +5080,6 @@ snapshots:
       tailwindcss: 4.2.2
 
   '@tanstack/query-core@5.91.0': {}
-
-  '@tanstack/query-persist-client-core@5.92.2':
-    dependencies:
-      '@tanstack/query-core': 5.91.0
-
-  '@tanstack/react-query-persist-client@5.90.25(@tanstack/react-query@5.91.0(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@tanstack/query-persist-client-core': 5.92.2
-      '@tanstack/react-query': 5.91.0(react@19.2.4)
-      react: 19.2.4
 
   '@tanstack/react-query@5.91.0(react@19.2.4)':
     dependencies:

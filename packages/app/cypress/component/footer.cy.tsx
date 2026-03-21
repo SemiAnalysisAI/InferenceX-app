@@ -28,13 +28,12 @@ describe('Footer', () => {
   it('shows the GitHub star CTA linking to GitHub repo', () => {
     cy.get('[data-testid="footer-star-cta"]').should('be.visible');
     cy.get('[data-testid="footer-star-cta"]')
-      .find('a')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
   });
 
   it('footer star CTA opens in new tab', () => {
-    cy.get('[data-testid="footer-star-cta"] a').should('have.attr', 'target', '_blank');
+    cy.get('[data-testid="footer-star-cta"]').should('have.attr', 'target', '_blank');
   });
 
   it('shows social share buttons', () => {

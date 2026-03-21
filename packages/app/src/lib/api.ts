@@ -94,9 +94,10 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-export function fetchBenchmarks(model: string, date?: string) {
+export function fetchBenchmarks(model: string, date?: string, exact?: boolean) {
   const params = new URLSearchParams({ model });
   if (date) params.set('date', date);
+  if (exact) params.set('exact', 'true');
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`);
 }
 

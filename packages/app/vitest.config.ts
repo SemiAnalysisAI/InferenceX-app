@@ -9,7 +9,6 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/lib/**/*.ts', 'src/scripts/**/*.ts', 'src/app/api/**/*.ts'],
       exclude: [
-        'src/lib/indexdb-cache.ts',
         'src/lib/d3-chart/layers/scatter-points.ts',
         'src/lib/d3-chart/layers/test-helpers.ts',
         'src/lib/d3-chart/D3Chart/D3Chart.tsx',

@@ -52,7 +52,7 @@ describe('GET /api/v1/benchmarks', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockRows);
-    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', 'dsr1', undefined);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', 'dsr1', undefined, undefined);
   });
 
   it('passes date param to query when provided', async () => {
@@ -60,7 +60,22 @@ describe('GET /api/v1/benchmarks', () => {
 
     const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01'));
     expect(res.status).toBe(200);
-    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', 'dsr1', '2026-03-01');
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      'dsr1',
+      '2026-03-01',
+      undefined,
+    );
+  });
+
+  it('passes exact=true when query param set', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01&exact=true'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', 'dsr1', '2026-03-01', true);
   });
 
   it('returns 500 when query throws', async () => {

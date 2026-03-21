@@ -107,3 +107,14 @@ jobs:
         run: |
           curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate" \
             -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ github.event.client_payload.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }

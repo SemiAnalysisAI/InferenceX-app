@@ -198,6 +198,10 @@ export function useChartExport({ chartId, setIsLegendExpanded }: UseChartExportO
       // CSS custom properties (e.g. text-muted-foreground → var(--muted-foreground)).
       const figcaption = clone.querySelector('figcaption');
       if (figcaption) {
+        // Prevent title from wrapping mid-phrase in the export (e.g. "End-to-end Latency")
+        const heading = figcaption.querySelector('h2');
+        if (heading) (heading as HTMLElement).style.whiteSpace = 'nowrap';
+
         const origCaption = element.querySelector('figcaption');
         if (origCaption) {
           const origEls = [

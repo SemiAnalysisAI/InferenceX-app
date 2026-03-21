@@ -17,7 +17,6 @@ interface ComparisonChangelogProps {
   changelogs: ComparisonChangelogType[];
   selectedGPUs: string[];
   selectedPrecisions: string[];
-  selectedDateRange: { startDate: string; endDate: string };
   loading?: boolean;
   totalDatesQueried: number;
 }
@@ -26,11 +25,10 @@ export default function ComparisonChangelog({
   changelogs,
   selectedGPUs,
   selectedPrecisions,
-  selectedDateRange,
   loading,
   totalDatesQueried,
 }: ComparisonChangelogProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Filter changelog entries to only show those matching selected GPUs and precisions
   const filteredChangelogs = useMemo(() => {
@@ -48,23 +46,9 @@ export default function ComparisonChangelog({
           }),
         ),
       }))
-      .filter((item) => item.entries.length > 0);
+      .filter((item) => item.entries.length > 0)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [changelogs, selectedGPUs, selectedPrecisions]);
-
-  // Always include start/end dates, even if they have no changelog entries
-  const sortedChangelogs = useMemo(() => {
-    const byDate = new Map(filteredChangelogs.map((c) => [c.date, c]));
-    const { startDate, endDate } = selectedDateRange;
-    if (startDate && !byDate.has(startDate)) {
-      byDate.set(startDate, { date: startDate, entries: [] });
-    }
-    if (endDate && !byDate.has(endDate)) {
-      byDate.set(endDate, { date: endDate, entries: [] });
-    }
-    return [...byDate.values()].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-  }, [filteredChangelogs, selectedDateRange]);
 
   const handleToggle = () => {
     const newState = !isExpanded;
@@ -104,13 +88,13 @@ export default function ComparisonChangelog({
         }`}
       >
         <div className="px-4 pt-2 pb-4 flex flex-col gap-3">
-          {sortedChangelogs.length === 0 ? (
+          {filteredChangelogs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No config changelog data matching the selected GPUs and precisions for this date
               range. Changelog tracking began Dec 30, 2025.
             </p>
           ) : (
-            sortedChangelogs.map((item) => (
+            filteredChangelogs.map((item) => (
               <div key={item.date} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{item.date}</span>

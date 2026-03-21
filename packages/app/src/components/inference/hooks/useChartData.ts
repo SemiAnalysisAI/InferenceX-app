@@ -100,7 +100,9 @@ export function useChartData(
   }, [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate]);
 
   const comparisonQueries = useQueries({
-    queries: comparisonDates.map((date) => benchmarkQueryOptions(selectedModel, date, enabled)),
+    queries: comparisonDates.map((date) =>
+      benchmarkQueryOptions(selectedModel, date, enabled, true),
+    ),
   });
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
@@ -121,9 +123,25 @@ export function useChartData(
     if (!allRows || !sequenceIslOsl) return [];
     const seqFilter = (r: { isl: number; osl: number }) =>
       r.isl === sequenceIslOsl.isl && r.osl === sequenceIslOsl.osl;
-    const mainRows = allRows
-      .filter(seqFilter)
-      .map((r) => (selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r));
+    const seqFiltered = allRows.filter(seqFilter);
+
+    // For each (hw, framework, spec_method, disagg, precision) group, keep only
+    // rows from the most recent date. When parallelism settings change between runs,
+    // old config_ids create stale data points under the same legend line — drop them.
+    const maxDatePerGroup = new Map<string, string>();
+    for (const r of seqFiltered) {
+      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}`;
+      const cur = maxDatePerGroup.get(key);
+      if (!cur || r.date > cur) maxDatePerGroup.set(key, r.date);
+    }
+    const deduped = seqFiltered.filter((r) => {
+      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}`;
+      return r.date === maxDatePerGroup.get(key);
+    });
+
+    const mainRows = deduped.map((r) =>
+      selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r,
+    );
     if (comparisonDates.length === 0) return mainRows;
     const extraRows = comparisonQueries.flatMap((q, i) =>
       (q.data ?? [])

@@ -38,7 +38,6 @@
     "@semianalysisai/inferencex-db": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.91.0",
-    "@tanstack/react-query-persist-client": "^5.90.25",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.1",
     "@vercel/speed-insights": "^1.3.1",
