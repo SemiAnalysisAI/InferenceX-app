@@ -1,0 +1,27 @@
+---
+title: Hello World
+author: SemiAnalysis
+date: '2026-03-21'
+excerpt: Our first blog post on InferenceX.
+tags:
+  - announcement
+---
+
+# Hello World
+
+Welcome to the **InferenceX** blog. We'll be sharing insights on AI inference benchmarking, GPU performance analysis, and the latest trends in ML infrastructure.
+
+## What is InferenceX?
+
+InferenceX is the open-source AI inference benchmark dashboard by SemiAnalysis. We compare GPU performance for LLM inference across NVIDIA, AMD, and more.
+
+```python
+# Example: running a benchmark
+from inferencex import Benchmark
+
+bench = Benchmark(model="llama-3.1-70b", gpu="H100")
+result = bench.run(concurrency=64)
+print(f"Throughput: {result.tokens_per_second} tok/s")
+```
+
+Stay tuned for more posts.
