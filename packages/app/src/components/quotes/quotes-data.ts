@@ -230,4 +230,10 @@ export const QUOTES: Quote[] = [
     org: 'Baseten',
     logo: 'baseten.svg',
   },
+  {
+    text: 'Verda was founded because AI engineers deserve affordable, high-performance compute without overhead. InferenceX\u2122 reinforces that mission by giving the community open, reproducible benchmarks that show what GPUs actually deliver under real inference workloads. We want our customers to see transparent, continuously updated performance data \u2014 not marketing claims. InferenceX provides exactly that.',
+    name: 'Ruben Bryon',
+    title: 'Founder & CEO, Verda',
+    org: 'Verda',
+  },
 ];
