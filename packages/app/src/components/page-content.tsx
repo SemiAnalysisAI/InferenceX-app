@@ -266,8 +266,8 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                   built for the benchmark itself which do not reflect real world performance
                 </p>
                 <p className="text-muted-foreground mb-2">
-                  <strong>InferenceX</strong> (formerly InferenceMAX) is our independent, vendor
-                  neutral, reproducible benchmark which addresses these issues by continously
+                  <strong>InferenceX&trade;</strong> (formerly InferenceMAX) is our independent,
+                  vendor neutral, reproducible benchmark which addresses these issues by continously
                   benchmarking inference software across an wide range of AI accelerators that is
                   acutally available to the the ML community. We continously update the benchmarks
                   to capture the speed of progress.
