@@ -20,6 +20,26 @@ const VARIANTS = [
     id: 'v15',
     name: 'V15: Brand Split — Content top, circuit footer with gold divider + wordmark',
   },
+  {
+    id: 'v16',
+    name: 'V16: Slide Title — Gold bg, dark text, circuit right panel (GSA title slide)',
+  },
+  {
+    id: 'v17',
+    name: 'V17: Slide Content — Charcoal bg, uppercase title, chart grid, gold bottom bar',
+  },
+  {
+    id: 'v18',
+    name: 'V18: Slide Hybrid — Gold left + charcoal right, two-tone presentation split',
+  },
+  {
+    id: 'v19',
+    name: 'V19: Slide Keynote — Gold title on charcoal, italic subtitle, gold footer bar',
+  },
+  {
+    id: 'v20',
+    name: 'V20: Slide Full — Gold top+bottom bars, circuit right panel, gold chart title',
+  },
 ];
 
 export default function OgPreviewPage() {
@@ -27,8 +47,9 @@ export default function OgPreviewPage() {
     <main className="container mx-auto px-4 py-12 max-w-5xl">
       <h1 className="text-3xl font-bold mb-2">OG Image Variants Preview</h1>
       <p className="text-muted-foreground mb-8">
-        All 15 variants rendered with the &quot;Hello World&quot; post data. V11–V15 use the exact
-        SemiAnalysis brand palette. Pick your favorite.
+        All 20 variants rendered with the &quot;Hello World&quot; post data. V11–V15 use the exact
+        SemiAnalysis brand palette. V16–V20 are fully branded, matching the actual GSA presentation
+        slide style. Pick your favorite.
       </p>
       <div className="flex flex-col gap-10">
         {VARIANTS.map((v) => (
