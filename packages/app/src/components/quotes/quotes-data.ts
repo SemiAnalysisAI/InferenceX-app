@@ -191,9 +191,10 @@ export const QUOTES: Quote[] = [
     logo: 'sglang.png',
   },
   {
-    text: "Our customers ship AI to production using frontier open-source models \u2014 and at scale, every token per second and every dollar per million tokens matters. InferenceX\u2122 gives the ecosystem something we've always needed: an objective, open benchmark that tracks real inference performance continuously across hardware such as GB300 NVL72, GB200 NVL72, H100 & soon Rubin & TPU & Trainium. Very helpful in allowing the wider community to understand the landscape and creating a clear taxonomy around performance.",
-    name: 'Alex Ker',
-    title: 'Engineer, Baseten',
-    org: 'Baseten',
+    text: 'We use InferenceX benchmarks ourselves as one of the key datapoints to help us make infrastructure decisions at Adaptive ML. Inference performance is critical for large-scale RL workloads, where fast generation directly impacts time to market & revenue for our customers. InferenceX\u2122 benchmarks the full stack continuously \u2014 engine, model, software, and hardware across rack-scale systems like GB300 NVL72. This is the kind of open, transparent, reproducible signal the ecosystem has been missing.',
+    name: 'Julien Launay',
+    title: 'Co-Founder & CEO, Adaptive ML',
+    org: 'Adaptive ML',
+    logo: 'adaptive-ml.svg',
   },
 ];
