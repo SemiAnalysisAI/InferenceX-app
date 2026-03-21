@@ -9,6 +9,8 @@
 
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
 
+import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+
 interface CsvData {
   headers: string[];
   rows: (string | number | boolean | null | undefined)[][];
@@ -19,8 +21,16 @@ interface CsvData {
  * Exports all raw benchmark metrics so the user gets a full data dump,
  * regardless of which axes are currently plotted.
  */
-export function inferenceChartToCsv(data: InferenceData[]): CsvData {
+export function inferenceChartToCsv(
+  data: InferenceData[],
+  model: string,
+  sequence: string,
+): CsvData {
+  const islOsl = sequenceToIslOsl(sequence);
   const headers = [
+    'Model',
+    'ISL',
+    'OSL',
     'Hardware',
     'Hardware Key',
     'Framework',
@@ -71,6 +81,9 @@ export function inferenceChartToCsv(data: InferenceData[]): CsvData {
   const rows = data
     .filter((d) => !d.hidden)
     .map((d) => [
+      model,
+      islOsl?.isl ?? '',
+      islOsl?.osl ?? '',
       d.hw ?? '',
       d.hwKey,
       d.framework ?? '',

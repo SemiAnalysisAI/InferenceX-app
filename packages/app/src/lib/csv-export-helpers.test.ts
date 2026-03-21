@@ -57,7 +57,7 @@ describe('inferenceChartToCsv', () => {
 
   it('exports all raw benchmark fields', () => {
     const data = [makePoint()];
-    const { headers, rows } = inferenceChartToCsv(data);
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
 
     // Should have all metric columns
     expect(headers).toContain('Throughput/GPU (tok/s)');
@@ -71,9 +71,22 @@ describe('inferenceChartToCsv', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it('includes Model, ISL, and OSL columns from model and sequence', () => {
+    const data = [makePoint()];
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/8k');
+    const row = rows[0];
+
+    expect(headers[0]).toBe('Model');
+    expect(headers[1]).toBe('ISL');
+    expect(headers[2]).toBe('OSL');
+    expect(row[0]).toBe('llama-3.1-405b');
+    expect(row[1]).toBe(1024);
+    expect(row[2]).toBe(8192);
+  });
+
   it('includes throughput and latency values in correct columns', () => {
     const data = [makePoint()];
-    const { headers, rows } = inferenceChartToCsv(data);
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     const row = rows[0];
 
     const tputIdx = headers.indexOf('Throughput/GPU (tok/s)');
@@ -88,13 +101,13 @@ describe('inferenceChartToCsv', () => {
 
   it('filters out hidden data points', () => {
     const data = [makePoint(), makePoint({ hidden: true })];
-    const { rows } = inferenceChartToCsv(data);
+    const { rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     expect(rows).toHaveLength(1);
   });
 
   it('includes disaggregated and parallelism fields', () => {
     const data = [makePoint({ disagg: true, num_prefill_gpu: 2, num_decode_gpu: 6, ep: 4 })];
-    const { headers, rows } = inferenceChartToCsv(data);
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     const row = rows[0];
 
     expect(row[headers.indexOf('Disaggregated')]).toBe(true);
@@ -104,7 +117,7 @@ describe('inferenceChartToCsv', () => {
   });
 
   it('handles empty data', () => {
-    const { rows } = inferenceChartToCsv([]);
+    const { rows } = inferenceChartToCsv([], 'llama-3.1-405b', '1k/1k');
     expect(rows).toHaveLength(0);
   });
 
@@ -129,7 +142,7 @@ describe('inferenceChartToCsv', () => {
         costri: { y: 0, roof: false },
       } as InferenceData,
     ];
-    const { headers, rows } = inferenceChartToCsv(data);
+    const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     const row = rows[0];
 
     // Missing optional fields should be ''
