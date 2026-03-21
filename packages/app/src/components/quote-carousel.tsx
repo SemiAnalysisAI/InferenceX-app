@@ -80,9 +80,10 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
               href={quote.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors"
+              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors group/link"
             >
-              {quote.name} <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
+              <span className="group-hover/link:underline">{quote.name}</span>{' '}
+              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{quote.name}</span>
@@ -171,7 +172,7 @@ export function QuoteCarousel({
           <div
             key={e.org}
             className={`col-start-1 row-start-1 transition-opacity duration-300 ease-in-out ${
-              i === activeIndex && !fading ? 'opacity-100' : 'opacity-0'
+              i === activeIndex && !fading ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
             aria-hidden={i !== activeIndex}
           >

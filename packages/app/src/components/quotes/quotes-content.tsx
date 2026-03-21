@@ -36,9 +36,10 @@ function QuoteCard({
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors"
+              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors group/link"
             >
-              {name} <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
+              <span className="group-hover/link:underline">{name}</span>{' '}
+              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{name}</span>
