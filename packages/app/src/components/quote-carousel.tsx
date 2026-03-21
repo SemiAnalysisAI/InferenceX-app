@@ -165,7 +165,7 @@ export function QuoteCarousel({
       </div>
 
       {/* All quotes stacked in same grid cell — tallest sets height */}
-      <div className="grid">
+      <div className="grid items-center">
         {entries.map((e, i) => (
           <div
             key={e.org}
