@@ -158,6 +158,7 @@ export const QUOTES: Quote[] = [
     title: 'Founder & CEO, Supermicro',
     org: 'Supermicro',
     logo: 'supermicro.svg',
+    link: 'https://en.wikipedia.org/wiki/Charles_Liang',
   },
   {
     text: "At TensorWave, we're building a next-generation cloud on AMD GPUs because we believe innovation thrives when customers have strong alternatives. InferenceMAX\u2122 reinforces that vision by providing open source, reproducible benchmarks that track throughput, efficiency, and cost across the latest hardware and software. By cutting through synthetic numbers and highlighting real-world inference performance, it helps customers see the full potential of AMD platforms for AI at scale.",
