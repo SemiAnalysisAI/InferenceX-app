@@ -204,11 +204,4 @@ export const QUOTES: Quote[] = [
     org: 'Baseten',
     logo: 'baseten.svg',
   },
-  {
-    text: "At Periodic Labs, we're building AI scientists that turn compute into real-world scientific discoveries. That means we care deeply about what each GPU actually delivers. InferenceX\u2122 provides open, reproducible benchmarks that cut through spec sheets and show real-world throughput, efficiency, and cost across the latest hardware and software stacks. Having done inference across thousands of GPUs, I can say this kind of transparent, continuously updated data is exactly what practitioners need to make smart infrastructure decisions.",
-    name: 'Xander Dunn',
-    title: 'Founding Team, Periodic Labs',
-    org: 'Periodic Labs',
-    logo: 'periodic-labs.png',
-  },
 ];
