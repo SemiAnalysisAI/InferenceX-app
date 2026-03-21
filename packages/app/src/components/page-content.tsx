@@ -311,6 +311,7 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                         'Crusoe',
                         'TensorWave',
                         'SGLang',
+                        'WEKA',
                       ].includes(q.org),
                     )}
                     overrides={{
