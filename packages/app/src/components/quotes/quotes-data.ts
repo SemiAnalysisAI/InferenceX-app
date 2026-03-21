@@ -235,5 +235,6 @@ export const QUOTES: Quote[] = [
     name: 'Ruben Bryon',
     title: 'Founder & CEO, Verda',
     org: 'Verda',
+    logo: 'verda.svg',
   },
 ];
