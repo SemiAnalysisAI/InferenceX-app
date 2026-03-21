@@ -74,7 +74,18 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
         <CompanyLogo org={quote.org} logo={quote.logo} />
         <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
         <div className="text-sm">
-          <span className="font-semibold text-foreground">{quote.name}</span>
+          {quote.link ? (
+            <a
+              href={quote.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors"
+            >
+              {quote.name} ↗
+            </a>
+          ) : (
+            <span className="font-semibold text-foreground">{quote.name}</span>
+          )}
           <span className="block text-muted-foreground text-xs">{quote.title}</span>
         </div>
       </footer>

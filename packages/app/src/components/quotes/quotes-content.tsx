@@ -29,25 +29,23 @@ function QuoteCard({
         <CompanyLogo org={org} logo={logo} />
         <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
         <div className="text-sm">
-          <span className="font-semibold text-foreground">{name}</span>
+          {link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors"
+            >
+              {name} ↗
+            </a>
+          ) : (
+            <span className="font-semibold text-foreground">{name}</span>
+          )}
           <span className="block text-muted-foreground text-xs">{title}</span>
         </div>
       </footer>
     </blockquote>
   );
-
-  if (link) {
-    return (
-      <a
-        href={link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block transition-opacity hover:opacity-80"
-      >
-        {content}
-      </a>
-    );
-  }
 
   return content;
 }

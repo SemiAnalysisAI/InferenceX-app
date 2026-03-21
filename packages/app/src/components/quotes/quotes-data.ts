@@ -98,7 +98,6 @@ export const QUOTES: Quote[] = [
     title: 'GPU Mode Founder & Meta PyTorch Engineer',
     org: 'GPU Mode',
     logo: 'gpu-mode.png',
-    link: 'https://discord.com/channels/1189498204333543425/1189640399476764692/1478445293614923856',
   },
   {
     text: 'InferenceMAX\u2122 demonstrates how an open ecosystem can operate in practice. Many leading inference stacks such as vLLM, SGLang, and TensorRT-LLM are built on PyTorch, and benchmarks like this show how innovations across kernels, runtimes, and frameworks translate into measurable performance on a range of hardware platforms, including NVIDIA and AMD GPUs. By being open source and running nightly, InferenceMAX\u2122 offers a transparent, community-driven approach to tracking progress and providing PyTorch users with data-driven insights.',
@@ -182,6 +181,7 @@ export const QUOTES: Quote[] = [
     name: 'Stas Bekman',
     title: 'Developer & Author of Machine Learning Engineering Open Book (17.5K+ ⭐)',
     org: 'Stas Bekman',
+    link: 'https://github.com/stas00/ml-engineering',
   },
   {
     text: "SGLang is the inference engine behind many production inference factories such as xAI's Grok, earning its recognition as THE Inference King. At scale, we see firsthand how much performance varies across hardware, models, and configurations. InferenceX\u2122 benchmarks SGLang across every major GPU platform nightly, capturing that variance in a way no other benchmark does, continuously, & reproducibly.",
@@ -189,5 +189,12 @@ export const QUOTES: Quote[] = [
     title: 'SGLang Product Lead',
     org: 'SGLang',
     logo: 'sglang.png',
+  },
+  {
+    text: 'We use InferenceX benchmarks ourselves as one of the key datapoints to help us make infrastructure decisions at Adaptive ML. Inference performance is critical for large-scale RL workloads, where fast generation directly impacts time to market & revenue for our customers. InferenceX\u2122 benchmarks the full stack continuously \u2014 engine, model, software, and hardware across rack-scale systems like GB300 NVL72. This is the kind of open, transparent, reproducible signal the ecosystem has been missing.',
+    name: 'Julien Launay',
+    title: 'Co-Founder & CEO, Adaptive ML',
+    org: 'Adaptive ML',
+    logo: 'adaptive-ml.svg',
   },
 ];
