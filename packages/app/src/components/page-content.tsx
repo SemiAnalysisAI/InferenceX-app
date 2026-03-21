@@ -266,11 +266,11 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                   built for the benchmark itself which do not reflect real world performance
                 </p>
                 <p className="text-muted-foreground mb-2">
-                  <strong>InferenceX</strong> (formerly InferenceMAX) is our independent,
-                  reproducible benchmark which addresses these issues by continously benchmarking
-                  inference software across an wide range of AI accelerators that is acutally
-                  available to the the ML community. We continously update the benchmarks to capture
-                  the speed of progress.
+                  <strong>InferenceX</strong> (formerly InferenceMAX) is our independent, vendor
+                  neutral, reproducible benchmark which addresses these issues by continously
+                  benchmarking inference software across an wide range of AI accelerators that is
+                  acutally available to the the ML community. We continously update the benchmarks
+                  to capture the speed of progress.
                 </p>
                 <p className="text-muted-foreground">
                   Our open data & insights is widely adopted by the ML community, capacity planning
