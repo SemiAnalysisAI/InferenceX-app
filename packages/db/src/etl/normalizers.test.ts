@@ -58,6 +58,12 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('gb200-dgxc')).toBe('gb200');
   });
 
+  it('strips -dgxc-slurm suffix', () => {
+    expect(hwToGpuKey('b200-dgxc-slurm')).toBe('b200');
+    expect(hwToGpuKey('h200-dgxc-slurm')).toBe('h200');
+    expect(hwToGpuKey('h100-dgxc-slurm')).toBe('h100');
+  });
+
   it('strips -nb suffix', () => {
     expect(hwToGpuKey('b300-nb')).toBe('b300');
   });

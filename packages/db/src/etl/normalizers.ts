@@ -31,6 +31,7 @@ export function hwToGpuKey(hw: string): string | null {
     .replace(/-amds$/, '')
     .replace(/-amd$/, '')
     .replace(/-nvd$/, '')
+    .replace(/-dgxc-slurm$/, '')
     .replace(/-dgxc$/, '')
     .replace(/-nb$/, '')
     .replace(/-nv$/, '');
