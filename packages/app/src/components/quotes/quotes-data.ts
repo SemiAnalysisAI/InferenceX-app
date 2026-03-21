@@ -197,4 +197,10 @@ export const QUOTES: Quote[] = [
     org: 'Adaptive ML',
     logo: 'adaptive-ml.svg',
   },
+  {
+    text: "Our customers ship AI to production using frontier open-source models \u2014 and at scale, every token per second and every dollar per million tokens matters. InferenceX\u2122 gives the ecosystem something we've always needed: an objective, open benchmark that tracks real inference performance continuously across hardware such as GB300 NVL72, GB200 NVL72, H100 & soon Rubin & TPU & Trainium. Very helpful in allowing the wider community to understand the landscape and creating a clear taxonomy around performance.",
+    name: 'Alex Ker',
+    title: 'Engineer, Baseten',
+    org: 'Baseten',
+  },
 ];

@@ -308,6 +308,7 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                           'DatologyAI',
                           'Stas Bekman',
                           'Firmus',
+                          'Adaptive ML',
                         ].includes(q.org),
                     )}
                     overrides={{
