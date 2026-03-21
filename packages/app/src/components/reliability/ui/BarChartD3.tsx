@@ -249,17 +249,18 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
 
   const isEmpty = error || chartData.length === 0;
 
+  const emptyOverlay = isEmpty ? (
+    <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
+      <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
+        {error
+          ? 'Failed to load reliability data.'
+          : 'No reliability data available for this date range.'}
+      </p>
+    </div>
+  ) : null;
+
   return (
     <div className="relative">
-      {isEmpty && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
-          <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-            {error
-              ? 'Failed to load reliability data.'
-              : 'No reliability data available for this date range.'}
-          </p>
-        </div>
-      )}
       <D3Chart<ChartItem>
         chartId="reliability-chart"
         data={sortedChartData}
@@ -269,6 +270,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         grabCursor
         clipContent={false}
         caption={caption}
+        noDataOverlay={emptyOverlay}
         instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
         xScale={{ type: 'linear', domain: [0, 100] }}
         yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
