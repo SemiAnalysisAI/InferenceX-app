@@ -14,6 +14,7 @@ export const QUOTES: Quote[] = [
     title: 'VP of Infrastructure and Industrial Compute, OpenAI Stargate',
     org: 'OpenAI',
     logo: 'openai.svg',
+    link: 'https://www.linkedin.com/in/peter-hoeschele/',
   },
   {
     text: 'Open collaboration is driving the next era of AI innovation. The open-source InferenceMAX benchmark gives the community transparent, nightly results that inspire trust and accelerate progress. It highlights the competitive TCO performance of our AMD Instinct MI300, MI325X, and MI355X GPUs across diverse workloads, underscoring the strength of our platform and our commitment to giving developers real-time visibility into our software progress.',
@@ -21,6 +22,7 @@ export const QUOTES: Quote[] = [
     title: 'Chair and CEO, AMD',
     org: 'AMD',
     logo: 'amd.svg',
+    link: 'https://www.linkedin.com/in/lisasu-amd/',
   },
   {
     text: "Inference demand is growing exponentially, driven by long-context reasoning. NVIDIA Grace Blackwell NVL72 was invented for this new era of thinking AI. NVIDIA is meeting that demand through constant hardware and software innovation to enable what's next in AI. By benchmarking frequently, InferenceMAX\u2122 gives the industry a transparent view of LLM inference performance on real-world workloads. The results are clear: Grace Blackwell NVL72 with TRT-LLM and Dynamo delivers unmatched performance per dollar and per megawatt\u2014powering the most productive and cost-effective AI factories in the world.",
@@ -28,6 +30,7 @@ export const QUOTES: Quote[] = [
     title: 'Founder & CEO, NVIDIA',
     org: 'NVIDIA',
     logo: 'nvidia.svg',
+    link: 'https://www.linkedin.com/in/jenhsunhuang/',
   },
   {
     text: "Speed is the moat. InferenceMAX\u2122's nightly benchmarks match the speed of improvement of the AMD software stack. It's fantastic to see AMD's MI300, MI325, and MI355 GPUs performing so well across diverse workloads and interactivity levels.",
@@ -35,6 +38,7 @@ export const QUOTES: Quote[] = [
     title: 'VP GPU Software, AMD',
     org: 'AMD',
     logo: 'amd.svg',
+    link: 'https://www.linkedin.com/in/anushelangovan/',
   },
   {
     text: 'InferenceMAX\u2122 highlights workloads that the ML community cares about. At NVIDIA, we welcome these comparisons because they underscore the advantage of our full-stack approach\u2014from GPUs hardware to NVLink networking to NVL72 Rack Scale to Dynamo disaggregated serving that consistently delivers industry-leading inference performance and ROI at scale.',
@@ -42,6 +46,7 @@ export const QUOTES: Quote[] = [
     title: 'VP & GM, Hyperscale, NVIDIA & Inventor of CUDA',
     org: 'NVIDIA',
     logo: 'nvidia.svg',
+    link: 'https://www.linkedin.com/in/ian-buck-19201315/',
   },
   {
     text: "InferenceMAX\u2122's nightly results highlight the rapid pace of progress in the AMD software stack. It's exciting to witness the birth of an open project that provides a tied feedback loop between what the software team works on here at AMD and how it affects specific ML use cases across our MI300, MI325, and MI355 GPUs. I'm looking forward to see what's next for InferenceMAX and to showcase what the AMD platform can do. AMD GPUs will continue to get faster every week.",
@@ -49,6 +54,7 @@ export const QUOTES: Quote[] = [
     title: 'Senior Director, AMD, Ex-Brium CEO',
     org: 'AMD',
     logo: 'amd.svg',
+    link: 'https://www.linkedin.com/in/quentincolombet/',
   },
   {
     text: "Our mission at Azure is to give customers the most performant, efficient, and cost-effective cloud for AI. SemiAnalysis InferenceMAX\u2122 supports that mission by providing transparent, reproducible benchmarks that track inference performance across GPUs and software stacks under realistic workloads. This continuous data on throughput, efficiency, and cost per watt strengthens our ability to tune Azure's inference platform for scale, helping customers build with confidence on Microsoft Cloud.",
@@ -56,6 +62,7 @@ export const QUOTES: Quote[] = [
     title: 'Executive Vice President, Microsoft Cloud & AI',
     org: 'Microsoft',
     logo: 'microsoft.svg',
+    link: 'https://www.linkedin.com/in/guthriescott/',
   },
   {
     text: 'At Microsoft, delivering the best inference performance and economics for our customers at scale requires a deep understanding of how AI models interact with real-world hardware and software. Open-source, reproducible benchmarks, like InferenceMAX\u2122, are essential for generating transparent insights into throughput, efficiency, and cost under realistic workloads. These continuous signals help guide our platform strategy, enabling us to optimize the entire stack from silicon, to systems, to software, so that every layer works together to unlock the full potential of our infrastructure.',
@@ -63,6 +70,7 @@ export const QUOTES: Quote[] = [
     title: 'Corporate Vice President, Azure Strategic Planning & Architecture',
     org: 'Microsoft',
     logo: 'microsoft.svg',
+    link: 'https://www.linkedin.com/in/saurabhdighe/',
   },
   {
     text: 'The gap between theoretical peak and real-world inference throughput is often determined by systems software: inference engine, distributed strategies, and low-level kernels. InferenceMAX\u2122 is valuable because it benchmarks the latest software showing how optimizations like FP4, MTP, speculative decode, and wide-EP actually play out across various hardware. Open, reproducible results like these help the whole community move faster.',
@@ -70,6 +78,7 @@ export const QUOTES: Quote[] = [
     title: 'Chief Scientist of Together AI & Inventor of Flash Attention',
     org: 'Together AI',
     logo: 'together-ai.svg',
+    link: 'https://tridao.me/',
   },
   {
     text: "The industry needs many public, reproducible benchmarks of inference performance. We're excited to collaborate with InferenceMAX\u2122 from the vLLM team. More diverse workloads and scenarios that everyone can trust and reference will help the ecosystem move forward. Fair, transparent measurements drive progress across every layer of the stack, from model architectures to inference engines to hardware.",
@@ -77,6 +86,7 @@ export const QUOTES: Quote[] = [
     title: 'vLLM Project Co-Lead',
     org: 'vLLM',
     logo: 'vllm.svg',
+    link: 'https://www.linkedin.com/in/simon-mo-834217162/',
   },
   {
     text: 'The benchmark is good sir',
@@ -84,6 +94,7 @@ export const QUOTES: Quote[] = [
     title: 'vLLM Maintainer',
     org: 'vLLM',
     logo: 'vllm.svg',
+    link: 'https://www.linkedin.com/in/michael-goin/',
   },
   {
     text: 'InferenceMAX\u2122 benchmark is pogchamp & W in chat',
@@ -91,6 +102,7 @@ export const QUOTES: Quote[] = [
     title: 'vLLM Project Co-Lead',
     org: 'vLLM',
     logo: 'vllm.svg',
+    link: 'https://www.linkedin.com/in/youkaichao/',
   },
   {
     text: 'Arguably the most important OSS benchmark suite out today InferenceX',
@@ -98,6 +110,7 @@ export const QUOTES: Quote[] = [
     title: 'GPU Mode Founder & Meta PyTorch Engineer',
     org: 'GPU Mode',
     logo: 'gpu-mode.png',
+    link: 'https://x.com/marksaroufim',
   },
   {
     text: 'InferenceMAX\u2122 demonstrates how an open ecosystem can operate in practice. Many leading inference stacks such as vLLM, SGLang, and TensorRT-LLM are built on PyTorch, and benchmarks like this show how innovations across kernels, runtimes, and frameworks translate into measurable performance on a range of hardware platforms, including NVIDIA and AMD GPUs. By being open source and running nightly, InferenceMAX\u2122 offers a transparent, community-driven approach to tracking progress and providing PyTorch users with data-driven insights.',
@@ -105,6 +118,7 @@ export const QUOTES: Quote[] = [
     title: 'Executive Director, PyTorch Foundation',
     org: 'PyTorch Foundation',
     logo: 'pytorch.svg',
+    link: 'https://www.linkedin.com/in/mdwdata/',
   },
   {
     text: 'Oracle Cloud Infrastructure is built to give frontier labs & enterprises flexibility and choice, with many GPU SKUs available for AI at scale. InferenceMAX strengthens that mission by delivering open source, reproducible benchmarks that reflect real-world performance, efficiency, and cost on the latest hardware and software. With this transparency, customers can confidently select the platforms that best align with their AI strategies.',
@@ -112,6 +126,7 @@ export const QUOTES: Quote[] = [
     title: 'Vice President, Oracle Cloud Infrastructure',
     org: 'Oracle',
     logo: 'oracle.svg',
+    link: 'https://www.linkedin.com/in/jayejackson/',
   },
   {
     text: 'InferenceMAX\u2122 raises the bar by delivering open, transparent benchmarks that track how inference really performs across the latest GPUs and software stacks. For customers, having reproducible data that measures real world tokens per dollar & tokens per watt, turns abstract marketing numbers into actionable insight. At CoreWeave, we support this effort because it brings clarity to a fast-moving space and helps the entire ecosystem build with confidence.',
@@ -119,6 +134,7 @@ export const QUOTES: Quote[] = [
     title: 'CTO, CoreWeave',
     org: 'CoreWeave',
     logo: 'coreweave.svg',
+    link: 'https://www.linkedin.com/in/salanki/',
   },
   {
     text: "InferenceMAX\u2122 sets a new standard by providing open, transparent benchmarks that reveal how inference performs across today's leading GPUs and software stacks. With reproducible data measuring real-world tokens per dollar and tokens per watt, customers can move beyond marketing claims to actionable insights. For us at Nebius, as a full-stack AI cloud provider, this initiative helps us build our inference platform with confidence and ensure we are aligned with the ecosystem.",
@@ -126,6 +142,7 @@ export const QUOTES: Quote[] = [
     title: 'Co-Founder & Chief Business Officer, Nebius',
     org: 'Nebius',
     logo: 'nebius.svg',
+    link: 'https://www.linkedin.com/in/roman-chernin-1b4b8758/',
   },
   {
     text: "At Crusoe, we believe being a great partner means empowering our customers with choice and clarity. That's why we're proud to support InferenceMAX\u2122, which provides the entire AI community with open-source, reproducible benchmarks for the latest hardware. By delivering transparent, real-world data on throughput, efficiency, and cost, InferenceMAX\u2122 cuts through the hype and helps our customers confidently select the very best platform for their unique workloads.",
@@ -133,6 +150,7 @@ export const QUOTES: Quote[] = [
     title: 'Co-Founder & CEO, Crusoe',
     org: 'Crusoe',
     logo: 'crusoe.svg',
+    link: 'https://www.linkedin.com/in/chase-lochmiller-604483341/',
   },
   {
     text: 'Supermicro is excited about the launch of InferenceMAX\u2122, the SemiAnalysis benchmarking system that measures real-world throughput, performance per dollar, and energy efficiency. This open-source tool provides reproducible benchmarks running on the latest hardware and software enabling AI labs and enterprises to choose the best platforms at scale.',
@@ -147,6 +165,7 @@ export const QUOTES: Quote[] = [
     title: 'CEO, TensorWave',
     org: 'TensorWave',
     logo: 'tensorwave.svg',
+    link: 'https://www.linkedin.com/in/darrick-horton/',
   },
   {
     text: 'Vultr is committed to providing an open ecosystem that gives developers freedom in how they build and scale AI \u2014 whether on NVIDIA or AMD GPUs. With InferenceMAX\u2122, customers gain open, reproducible benchmarks that deliver clear insights into throughput, efficiency, and cost across cutting-edge hardware and software. By showcasing real-world performance, we empower teams to confidently choose the right platform for their AI workloads.',
@@ -154,6 +173,7 @@ export const QUOTES: Quote[] = [
     title: 'SVP of Engineering, Vultr',
     org: 'Vultr',
     logo: 'vultr.svg',
+    link: 'https://www.linkedin.com/in/nathangoulding/',
   },
   {
     text: "At Prime Intellect, we're pushing the frontier of AI post-training and open research. InferenceX\u2122 complements that work by providing open, reproducible benchmarks that track real-world inference performance across hardware and software stacks as they evolve. For researchers like us, having transparent, continuously updated data on throughput and efficiency means we can focus on building better models instead of second-guessing infrastructure. This is the kind of community-driven effort that accelerates progress for everyone.",
@@ -161,6 +181,7 @@ export const QUOTES: Quote[] = [
     title: 'Researcher, Prime Intellect',
     org: 'Prime Intellect',
     logo: 'prime-intellect.svg',
+    link: 'https://www.linkedin.com/in/jackminong/',
   },
   {
     text: "At Firmus, we're building the most energy-efficient AI Factories in the world \u2014 and efficiency only matters if you can measure it. InferenceX\u2122 gives the industry open, reproducible benchmarks that track real-world throughput, cost, and performance per watt across the latest GPU platforms and software stacks. As we scale gigawatts of renewable-powered AI infrastructure across Asia-Pacific & Australia, this kind of transparent, continuously updated data helps the entire ecosystem understand what these systems actually deliver.",
@@ -168,6 +189,7 @@ export const QUOTES: Quote[] = [
     title: 'Co-Founder & Co-CEO, Firmus',
     org: 'Firmus',
     logo: 'firmus.svg',
+    link: 'https://www.linkedin.com/in/tim-rosenfield-a735a4112',
   },
   {
     text: 'InferenceMAX has been useful for us even if Dylan Patel is a nice little guy with feelings',
@@ -175,6 +197,7 @@ export const QUOTES: Quote[] = [
     title: 'Chief Science Officer, DatologyAI',
     org: 'DatologyAI',
     logo: 'datologyai.svg',
+    link: 'https://www.linkedin.com/in/matthew-leavitt-6797703b/',
   },
   {
     text: "InferenceX\u2122 provides the open source measurements the community needs \u2014 nightly results across real workloads, real hardware, and real software stacks. As someone who has written extensively about the gap between theoretical and actual system performance, I'm glad to see a project that makes that gap visible and trackable for everyone.",
@@ -189,6 +212,7 @@ export const QUOTES: Quote[] = [
     title: 'SGLang Product Lead',
     org: 'SGLang',
     logo: 'sglang.png',
+    link: 'https://www.linkedin.com/in/mingyi-lu/',
   },
   {
     text: 'We use InferenceX benchmarks ourselves as one of the key datapoints to help us make infrastructure decisions at Adaptive ML. Inference performance is critical for large-scale RL workloads, where fast generation directly impacts time to market & revenue for our customers. InferenceX\u2122 benchmarks the full stack continuously \u2014 engine, model, software, and hardware across rack-scale systems like GB300 NVL72. This is the kind of open, transparent, reproducible signal the ecosystem has been missing.',
@@ -196,5 +220,6 @@ export const QUOTES: Quote[] = [
     title: 'Co-Founder & CEO, Adaptive ML',
     org: 'Adaptive ML',
     logo: 'adaptive-ml.svg',
+    link: 'https://www.linkedin.com/in/julienlaunay/',
   },
 ];

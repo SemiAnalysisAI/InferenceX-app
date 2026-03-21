@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { CompanyLogo, highlightBrand } from '@/components/quotes/quote-utils';
 
 export interface CarouselQuote {
@@ -81,7 +82,7 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
               rel="noopener noreferrer"
               className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors"
             >
-              {quote.name} ↗
+              {quote.name} <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{quote.name}</span>
