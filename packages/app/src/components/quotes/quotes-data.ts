@@ -202,6 +202,6 @@ export const QUOTES: Quote[] = [
     name: 'Alex Ker',
     title: 'Engineer, Baseten',
     org: 'Baseten',
-    logo: 'baseten.svg',
+    logo: 'baseten.jpg',
   },
 ];
