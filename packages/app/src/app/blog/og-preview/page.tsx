@@ -9,6 +9,17 @@ const VARIANTS = [
   { id: 'v8', name: 'V8: Bottom Circuit — Circuit footer with gold separator' },
   { id: 'v9', name: 'V9: Scattered Nodes — Organic constellation of nodes' },
   { id: 'v10', name: 'V10: Border Frame — Circuit blocks framing entire card' },
+  { id: 'v11', name: 'V11: Brand Corners — SemiAnalysis palette, circuit corners, gold/blue/teal' },
+  { id: 'v12', name: 'V12: Brand Grid — Full tiled circuit grid, exact sharecard style' },
+  { id: 'v13', name: 'V13: Brand Left Panel — Circuit sidebar with blue accent bar, gold nodes' },
+  {
+    id: 'v14',
+    name: 'V14: Brand Frame Gold — Circuit frame, gold L-brackets, semianalysis wordmark',
+  },
+  {
+    id: 'v15',
+    name: 'V15: Brand Split — Content top, circuit footer with gold divider + wordmark',
+  },
 ];
 
 export default function OgPreviewPage() {
@@ -16,7 +27,8 @@ export default function OgPreviewPage() {
     <main className="container mx-auto px-4 py-12 max-w-5xl">
       <h1 className="text-3xl font-bold mb-2">OG Image Variants Preview</h1>
       <p className="text-muted-foreground mb-8">
-        All 10 variants rendered with the &quot;Hello World&quot; post data. Pick your favorite.
+        All 15 variants rendered with the &quot;Hello World&quot; post data. V11–V15 use the exact
+        SemiAnalysis brand palette. Pick your favorite.
       </p>
       <div className="flex flex-col gap-10">
         {VARIANTS.map((v) => (

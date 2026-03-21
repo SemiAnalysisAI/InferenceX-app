@@ -13,6 +13,11 @@ import { renderOgImage as v7 } from '@/app/blog/[slug]/og-variants/v7-right-pane
 import { renderOgImage as v8 } from '@/app/blog/[slug]/og-variants/v8-bottom-circuit';
 import { renderOgImage as v9 } from '@/app/blog/[slug]/og-variants/v9-scattered-nodes';
 import { renderOgImage as v10 } from '@/app/blog/[slug]/og-variants/v10-border-frame';
+import { renderOgImage as v11 } from '@/app/blog/[slug]/og-variants/v11-brand-corners';
+import { renderOgImage as v12 } from '@/app/blog/[slug]/og-variants/v12-brand-grid';
+import { renderOgImage as v13 } from '@/app/blog/[slug]/og-variants/v13-brand-left-panel';
+import { renderOgImage as v14 } from '@/app/blog/[slug]/og-variants/v14-brand-frame-gold';
+import { renderOgImage as v15 } from '@/app/blog/[slug]/og-variants/v15-brand-split';
 
 const variants: Record<string, (meta: any) => ImageResponse> = {
   v1,
@@ -25,6 +30,11 @@ const variants: Record<string, (meta: any) => ImageResponse> = {
   v8,
   v9,
   v10,
+  v11,
+  v12,
+  v13,
+  v14,
+  v15,
 };
 
 export async function GET(request: NextRequest) {
