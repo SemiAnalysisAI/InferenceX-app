@@ -297,20 +297,21 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                 </p>
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <QuoteCarousel
-                    quotes={QUOTES.filter(
-                      (q) =>
-                        ![
-                          'NVIDIA',
-                          'AMD',
-                          'Supermicro',
-                          'Vultr',
-                          'Prime Intellect',
-                          'DatologyAI',
-                          'Stas Bekman',
-                          'Firmus',
-                          'Adaptive ML',
-                          'Baseten',
-                        ].includes(q.org),
+                    quotes={QUOTES.filter((q) =>
+                      [
+                        'OpenAI',
+                        'Microsoft',
+                        'Together AI',
+                        'vLLM',
+                        'GPU Mode',
+                        'PyTorch Foundation',
+                        'Oracle',
+                        'CoreWeave',
+                        'Nebius',
+                        'Crusoe',
+                        'TensorWave',
+                        'SGLang',
+                      ].includes(q.org),
                     )}
                     overrides={{
                       order: ['OpenAI'],
