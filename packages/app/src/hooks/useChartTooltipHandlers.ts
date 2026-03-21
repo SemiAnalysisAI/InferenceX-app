@@ -38,7 +38,10 @@ export interface ChartTooltipConfig<TData> {
    */
   getRulerY?: (
     data: TData,
-    yScale: d3.ScaleLinear<number, number, never> | d3.ScaleLogarithmic<number, number, never>,
+    yScale:
+      | d3.ScaleBand<string>
+      | d3.ScaleLinear<number, number, never>
+      | d3.ScaleLogarithmic<number, number, never>,
   ) => number;
 
   /**

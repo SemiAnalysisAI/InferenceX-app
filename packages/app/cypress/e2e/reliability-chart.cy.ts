@@ -59,26 +59,27 @@ describe('Reliability Chart — Content & Interactions', () => {
     cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
   });
 
-  it('switching date range from default to "Last 7 days" changes the number of bars or bar heights', () => {
+  it('switching date range from default to "Last 7 days" changes the chart display', () => {
     cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
 
-    cy.get('#reliability-chart svg rect.bar').then(($bars) => {
-      const initialCount = $bars.length;
-      const initialHeights = Array.from($bars).map((bar) => bar.getAttribute('height'));
+    cy.get('#reliability-chart svg rect.bar')
+      .its('length')
+      .then((initialCount) => {
+        cy.get('[data-testid="reliability-date-range"]').click();
+        cy.contains('[role="option"]', 'Last 7 days').click();
 
-      cy.get('[data-testid="reliability-date-range"]').click();
-      cy.contains('[role="option"]', 'Last 7 days').click();
+        // "Last 7 days" may have fewer bars or no bars at all (empty overlay shown).
+        cy.get('#reliability-chart svg').should('exist');
+        cy.document().then((doc) => {
+          const newCount = doc.querySelectorAll('#reliability-chart svg rect.bar').length;
+          expect(newCount !== initialCount || newCount === 0).to.equal(true);
+        });
 
-      cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
-
-      cy.get('#reliability-chart svg rect.bar').then(($newBars) => {
-        const newCount = $newBars.length;
-        const newHeights = Array.from($newBars).map((bar) => bar.getAttribute('height'));
-        const countChanged = newCount !== initialCount;
-        const heightsChanged = JSON.stringify(newHeights) !== JSON.stringify(initialHeights);
-        expect(countChanged || heightsChanged).to.equal(true);
+        // Reset back to All time so subsequent tests have data
+        cy.get('[data-testid="reliability-date-range"]').click();
+        cy.contains('[role="option"]', 'All time').click();
+        cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
       });
-    });
   });
 
   it('legend sidebar renders with at least one hardware item', () => {

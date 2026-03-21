@@ -1,13 +1,14 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
 import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import { ModelSuccessRateData } from '@/components/reliability/types';
@@ -69,6 +70,7 @@ function positionLabelPairs(
 }
 
 export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode }) {
+  const hoveredBarXRef = useRef(0);
   const {
     error,
     chartData,
@@ -186,6 +188,10 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             getCssColor(resolveColor(d.model)),
           );
         },
+        onZoom: (group, ctx) => {
+          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          positionLabelPairs(group, newXScale, (d) => getCssColor(resolveColor(d.model)));
+        },
       },
     ],
     [sortedChartData, getCssColor, resolveColor],
@@ -241,77 +247,91 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [],
   );
 
-  if (error || chartData.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-100 text-muted-foreground">
-        {error ? 'Failed to load reliability data.' : 'No reliability data available.'}
-      </div>
-    );
-  }
+  const isEmpty = error || chartData.length === 0;
+
+  const emptyOverlay = isEmpty ? (
+    <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
+      <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
+        {error
+          ? 'Failed to load reliability data.'
+          : 'No reliability data available for this date range.'}
+      </p>
+    </div>
+  ) : null;
 
   return (
-    <D3Chart<ChartItem>
-      chartId="reliability-chart"
-      data={sortedChartData}
-      height={dynamicHeight}
-      margin={CHART_MARGIN}
-      watermark="logo"
-      grabCursor={false}
-      clipContent={false}
-      caption={caption}
-      instructions="Hover over a bar for details · Click a bar to pin tooltip"
-      xScale={{ type: 'linear', domain: [0, 100] }}
-      yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
-      xAxis={xAxisConfig}
-      yAxis={yAxisConfig}
-      layers={layers}
-      tooltip={{
-        rulerType: 'vertical',
-        content: generateReliabilityTooltipContent,
-        getRulerX: (d, xs) => {
-          return (xs as d3.ScaleLinear<number, number>)(d.successRate);
-        },
-        getRulerY: (d, ys) => {
-          const bandScale = ys as unknown as d3.ScaleBand<string>;
-          return (bandScale(d.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
-        },
-        onHoverStart: (sel) => {
-          sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
-        },
-        onHoverEnd: (sel) => {
-          sel.attr('stroke', 'none');
-        },
-        attachToLayer: 0,
-      }}
-      legendElement={
-        <ChartLegend
-          variant="sidebar"
-          legendItems={legendItems}
-          isLegendExpanded={isLegendExpanded}
-          onExpandedChange={(expanded) => {
-            setIsLegendExpanded(expanded);
-            track('reliability_legend_expanded', { expanded });
-          }}
-          switches={[
-            {
-              id: 'reliability-high-contrast',
-              label: 'High Contrast',
-              checked: highContrast,
-              onCheckedChange: (checked) => {
-                setHighContrast(checked);
-                track('reliability_high_contrast_toggled', { enabled: checked });
+    <div className="relative">
+      <D3Chart<ChartItem>
+        chartId="reliability-chart"
+        data={sortedChartData}
+        height={dynamicHeight}
+        margin={CHART_MARGIN}
+        watermark="logo"
+        grabCursor
+        clipContent={false}
+        caption={caption}
+        noDataOverlay={emptyOverlay}
+        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
+        xScale={{ type: 'linear', domain: [0, 100] }}
+        yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
+        xAxis={xAxisConfig}
+        yAxis={yAxisConfig}
+        layers={layers}
+        zoom={{
+          enabled: true,
+          axes: 'x',
+          scaleExtent: [0.1, 1],
+          rescaleX: (xScale, transform) =>
+            xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
+          customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
+        }}
+        tooltip={{
+          rulerType: 'vertical',
+          content: generateReliabilityTooltipContent,
+          getRulerX: () => hoveredBarXRef.current,
+          getRulerY: (d, ys) => {
+            const bandScale = ys as unknown as d3.ScaleBand<string>;
+            return (bandScale(d.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
+          },
+          onHoverStart: (sel) => {
+            hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
+            sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+          },
+          onHoverEnd: (sel) => {
+            sel.attr('stroke', 'none');
+          },
+          attachToLayer: 0,
+        }}
+        legendElement={
+          <ChartLegend
+            variant="sidebar"
+            legendItems={legendItems}
+            isLegendExpanded={isLegendExpanded}
+            onExpandedChange={(expanded) => {
+              setIsLegendExpanded(expanded);
+              track('reliability_legend_expanded', { expanded });
+            }}
+            switches={[
+              {
+                id: 'reliability-high-contrast',
+                label: 'High Contrast',
+                checked: highContrast,
+                onCheckedChange: (checked) => {
+                  setHighContrast(checked);
+                  track('reliability_high_contrast_toggled', { enabled: checked });
+                },
               },
-            },
-          ]}
-          showResetFilter={true}
-          allSelected={enabledModels.size === modelsWithData.size}
-          onResetFilter={() => {
-            selectAllModels();
-            track('reliability_filter_reset');
-          }}
-          enableTooltips={true}
-        />
-      }
-    />
+            ]}
+            showResetFilter={true}
+            allSelected={enabledModels.size === modelsWithData.size}
+            onResetFilter={() => {
+              selectAllModels();
+              track('reliability_filter_reset');
+            }}
+            enableTooltips={true}
+          />
+        }
+      />
+    </div>
   );
 }
