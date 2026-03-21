@@ -10,6 +10,13 @@ export interface MediaItem {
 
 export const MEDIA_ITEMS: MediaItem[] = [
   {
+    title: 'GTC 2026 Keynote: Long Live the Inference King',
+    organization: 'EE Times',
+    url: 'https://www.eetimes.com/gtc-2026-keynote-long-live-the-inference-king/',
+    type: 'article',
+    date: '2026-03-20',
+  },
+  {
     title:
       '\u82F1\u4F1F\u8FBE\u70ED\u70B9\u5C0F\u65F6\u62A5: \u6570\u636E\u4E2D\u5FC3\u5C31\u662FToken\u5DE5\u5382 \u2014 Jensen Huang GTC 2026',
     organization: 'Sina Tech',
