@@ -110,7 +110,7 @@ function ChartTabs({ initialTab }: { initialTab: string }) {
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       {/* Mobile: Dropdown */}
       <div className="lg:hidden mb-4">
-        <div className="w-full border-t-2 border-secondary dark:border-primary pb-6" />
+        <div className="w-full border-t-2 border-brand pb-6" />
         <Card>
           <div className="space-y-2">
             <Label htmlFor="chart-select">Select Chart</Label>
@@ -262,24 +262,25 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                 <p className="text-muted-foreground mb-2">
                   As the world progresses exponentially towards AGI, software development and model
                   releases move at the speed of light. Existing benchmarks rapidly become obsolete
-                  due to their static nature, and participants often submit software images purpose
-                  built for the benchmark itself which do not reflect real world performance
+                  due to their static nature, and participants often submit software images
+                  purpose-built for the benchmark itself which do not reflect real world
+                  performance.
                 </p>
                 <p className="text-muted-foreground mb-2">
                   <strong>InferenceX&trade;</strong> (formerly InferenceMAX) is our independent,
-                  vendor neutral, reproducible benchmark which addresses these issues by continously
-                  benchmarking inference software across an wide range of AI accelerators that is
-                  acutally available to the the ML community.
+                  vendor neutral, reproducible benchmark which addresses these issues by
+                  continuously benchmarking inference software across a wide range of AI
+                  accelerators that are actually available to the ML community.
                 </p>
                 <p className="text-muted-foreground">
-                  Our open data & insights is widely adopted by the ML community, capacity planning
+                  Our open data & insights are widely adopted by the ML community, capacity planning
                   strategy teams at trillion dollar token factories & AI Labs & at multiple billion
                   dollar NeoClouds. Learn more in our articles:{' '}
                   <a
                     href="https://newsletter.semianalysis.com/p/inferencemax-open-source-inference"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline font-medium"
+                    className="text-brand hover:underline font-medium"
                   >
                     v1
                   </a>
@@ -288,13 +289,13 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
                     href="https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline font-medium"
+                    className="text-brand hover:underline font-medium"
                   >
                     v2
                   </a>
                   .
                 </p>
-                <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="mt-4 pt-4 border-t border-foreground">
                   <QuoteCarousel
                     quotes={QUOTES.filter((q) =>
                       [

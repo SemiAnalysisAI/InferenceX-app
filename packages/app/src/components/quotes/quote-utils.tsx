@@ -32,7 +32,7 @@ export function highlightBrand(text: string) {
   const parts = text.split(/(InferenceMAX™?|InferenceX™?|InferenceMAX|InferenceX)/gi);
   return parts.map((part, i) =>
     /^inference(max|x)/i.test(part) ? (
-      <span key={i} className="text-secondary dark:text-primary font-semibold">
+      <span key={i} className="text-brand font-semibold">
         {part}
       </span>
     ) : (

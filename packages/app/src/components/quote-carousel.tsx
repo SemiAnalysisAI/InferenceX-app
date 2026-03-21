@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { CompanyLogo, highlightBrand } from '@/components/quotes/quote-utils';
 
 export interface CarouselQuote {
@@ -72,16 +73,17 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
       </p>
       <footer className="mt-3 flex items-center gap-3">
         <CompanyLogo org={quote.org} logo={quote.logo} />
-        <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
+        <div className="h-12 w-0.5 bg-brand" />
         <div className="text-sm">
           {quote.link ? (
             <a
               href={quote.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors"
+              className="font-semibold text-foreground hover:text-brand transition-colors group/link"
             >
-              {quote.name} ↗
+              <span className="group-hover/link:underline">{quote.name}</span>{' '}
+              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{quote.name}</span>
@@ -170,7 +172,7 @@ export function QuoteCarousel({
           <div
             key={e.org}
             className={`col-start-1 row-start-1 transition-opacity duration-300 ease-in-out ${
-              i === activeIndex && !fading ? 'opacity-100' : 'opacity-0'
+              i === activeIndex && !fading ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
             aria-hidden={i !== activeIndex}
           >
@@ -181,10 +183,7 @@ export function QuoteCarousel({
 
       {moreHref && (
         <div className="flex justify-end">
-          <a
-            href={moreHref}
-            className="text-xs font-bold text-secondary dark:text-primary hover:underline"
-          >
+          <a href={moreHref} className="text-xs font-bold text-brand hover:underline">
             See more supporters &rarr;
           </a>
         </div>
