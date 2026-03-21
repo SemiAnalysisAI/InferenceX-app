@@ -29,14 +29,14 @@ function QuoteCard({
       </p>
       <footer className="flex items-center gap-3">
         <CompanyLogo org={org} logo={logo} />
-        <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
+        <div className="h-12 w-0.5 bg-brand" />
         <div className="text-sm">
           {link ? (
             <a
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors group/link"
+              className="font-semibold text-foreground hover:text-brand transition-colors group/link"
             >
               <span className="group-hover/link:underline">{name}</span>{' '}
               <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />

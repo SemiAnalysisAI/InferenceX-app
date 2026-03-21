@@ -73,14 +73,14 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
       </p>
       <footer className="mt-3 flex items-center gap-3">
         <CompanyLogo org={quote.org} logo={quote.logo} />
-        <div className="h-12 w-0.5 bg-secondary dark:bg-primary" />
+        <div className="h-12 w-0.5 bg-brand" />
         <div className="text-sm">
           {quote.link ? (
             <a
               href={quote.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-secondary dark:hover:text-primary transition-colors group/link"
+              className="font-semibold text-foreground hover:text-brand transition-colors group/link"
             >
               <span className="group-hover/link:underline">{quote.name}</span>{' '}
               <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
@@ -183,10 +183,7 @@ export function QuoteCarousel({
 
       {moreHref && (
         <div className="flex justify-end">
-          <a
-            href={moreHref}
-            className="text-xs font-bold text-secondary dark:text-primary hover:underline"
-          >
+          <a href={moreHref} className="text-xs font-bold text-brand hover:underline">
             See more supporters &rarr;
           </a>
         </div>
