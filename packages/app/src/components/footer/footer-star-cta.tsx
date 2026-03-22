@@ -31,6 +31,3 @@ export function StarButton() {
     </Button>
   );
 }
-
-/** @deprecated Use StarButton instead */
-export const FooterStarButton = StarButton;

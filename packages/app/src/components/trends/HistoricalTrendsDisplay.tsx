@@ -19,7 +19,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ShareButton } from '@/components/ui/share-button';
-import { SocialShareButtons } from '@/components/social-share-buttons';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getModelSortIndex, GPU_SPECS } from '@/lib/constants';
@@ -202,7 +202,10 @@ export default function HistoricalTrendsDisplay() {
             </div>
             <div className="flex items-center gap-1.5">
               <ShareButton />
-              <SocialShareButtons compact className="hidden sm:flex" />
+              <div className="hidden sm:flex items-center gap-1.5">
+                <ShareTwitterButton />
+                <ShareLinkedInButton />
+              </div>
             </div>
           </div>
           <ChartControls hideGpuComparison />

@@ -6,7 +6,7 @@ import { useReliabilityContext } from '@/components/reliability/ReliabilityConte
 import { Card } from '@/components/ui/card';
 import { ChartSection } from '@/components/ui/chart-section';
 import { ShareButton } from '@/components/ui/share-button';
-import { SocialShareButtons } from '@/components/social-share-buttons';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { exportToCsv } from '@/lib/csv-export';
 import { reliabilityChartToCsv } from '@/lib/csv-export-helpers';
 
@@ -37,7 +37,10 @@ export default function ReliabilityChartDisplay() {
               </div>
               <div className="flex items-center gap-1.5">
                 <ShareButton />
-                <SocialShareButtons compact className="hidden sm:flex" />
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <ShareTwitterButton />
+                  <ShareLinkedInButton />
+                </div>
               </div>
             </div>
             <ReliabilityChartControls />
