@@ -39,7 +39,7 @@ function QuoteCard({
               className="font-semibold text-foreground hover:text-brand transition-colors group/link"
             >
               <span className="group-hover/link:underline">{name}</span>{' '}
-              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
+              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em] align-middle" />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{name}</span>
