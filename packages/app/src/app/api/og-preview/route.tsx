@@ -128,6 +128,56 @@ import { renderOgImage as v122 } from '@/app/blog/[slug]/og-variants/v122-postma
 import { renderOgImage as v123 } from '@/app/blog/[slug]/og-variants/v123-breaking-news';
 import { renderOgImage as v124 } from '@/app/blog/[slug]/og-variants/v124-japanese-minimal';
 import { renderOgImage as v125 } from '@/app/blog/[slug]/og-variants/v125-brutalist';
+import { renderOgImage as v126 } from '@/app/blog/[slug]/og-variants/v126-ancient-scroll';
+import { renderOgImage as v127 } from '@/app/blog/[slug]/og-variants/v127-cave-painting';
+import { renderOgImage as v128 } from '@/app/blog/[slug]/og-variants/v128-art-deco';
+import { renderOgImage as v129 } from '@/app/blog/[slug]/og-variants/v129-constructivist';
+import { renderOgImage as v130 } from '@/app/blog/[slug]/og-variants/v130-ukiyo-e';
+import { renderOgImage as v131 } from '@/app/blog/[slug]/og-variants/v131-stained-glass';
+import { renderOgImage as v132 } from '@/app/blog/[slug]/og-variants/v132-hieroglyphs';
+import { renderOgImage as v133 } from '@/app/blog/[slug]/og-variants/v133-illuminated';
+import { renderOgImage as v134 } from '@/app/blog/[slug]/og-variants/v134-pop-art';
+import { renderOgImage as v135 } from '@/app/blog/[slug]/og-variants/v135-bauhaus';
+import { renderOgImage as v136 } from '@/app/blog/[slug]/og-variants/v136-chalkboard';
+import { renderOgImage as v137 } from '@/app/blog/[slug]/og-variants/v137-neon-sign';
+import { renderOgImage as v138 } from '@/app/blog/[slug]/og-variants/v138-leather-book';
+import { renderOgImage as v139 } from '@/app/blog/[slug]/og-variants/v139-shipping-label';
+import { renderOgImage as v140 } from '@/app/blog/[slug]/og-variants/v140-polaroid';
+import { renderOgImage as v141 } from '@/app/blog/[slug]/og-variants/v141-cassette';
+import { renderOgImage as v142 } from '@/app/blog/[slug]/og-variants/v142-license-plate';
+import { renderOgImage as v143 } from '@/app/blog/[slug]/og-variants/v143-credit-card';
+import { renderOgImage as v144 } from '@/app/blog/[slug]/og-variants/v144-prescription';
+import { renderOgImage as v145 } from '@/app/blog/[slug]/og-variants/v145-billboard';
+import { renderOgImage as v146 } from '@/app/blog/[slug]/og-variants/v146-dna-helix';
+import { renderOgImage as v147 } from '@/app/blog/[slug]/og-variants/v147-star-chart';
+import { renderOgImage as v148 } from '@/app/blog/[slug]/og-variants/v148-weather-map';
+import { renderOgImage as v149 } from '@/app/blog/[slug]/og-variants/v149-periodic-element';
+import { renderOgImage as v150 } from '@/app/blog/[slug]/og-variants/v150-microscope';
+import { renderOgImage as v151 } from '@/app/blog/[slug]/og-variants/v151-seismograph';
+import { renderOgImage as v152 } from '@/app/blog/[slug]/og-variants/v152-aurora';
+import { renderOgImage as v153 } from '@/app/blog/[slug]/og-variants/v153-coral-reef';
+import { renderOgImage as v154 } from '@/app/blog/[slug]/og-variants/v154-crystal';
+import { renderOgImage as v155 } from '@/app/blog/[slug]/og-variants/v155-telescope';
+import { renderOgImage as v156 } from '@/app/blog/[slug]/og-variants/v156-receipt';
+import { renderOgImage as v157 } from '@/app/blog/[slug]/og-variants/v157-passport';
+import { renderOgImage as v158 } from '@/app/blog/[slug]/og-variants/v158-ransom-note';
+import { renderOgImage as v159 } from '@/app/blog/[slug]/og-variants/v159-typewriter';
+import { renderOgImage as v160 } from '@/app/blog/[slug]/og-variants/v160-sticky-note';
+import { renderOgImage as v161 } from '@/app/blog/[slug]/og-variants/v161-safety-card';
+import { renderOgImage as v162 } from '@/app/blog/[slug]/og-variants/v162-nutrition-label';
+import { renderOgImage as v163 } from '@/app/blog/[slug]/og-variants/v163-warning-sign';
+import { renderOgImage as v164 } from '@/app/blog/[slug]/og-variants/v164-test-pattern';
+import { renderOgImage as v165 } from '@/app/blog/[slug]/og-variants/v165-boot-screen';
+import { renderOgImage as v166 } from '@/app/blog/[slug]/og-variants/v166-mondrian';
+import { renderOgImage as v167 } from '@/app/blog/[slug]/og-variants/v167-rothko';
+import { renderOgImage as v168 } from '@/app/blog/[slug]/og-variants/v168-kandinsky';
+import { renderOgImage as v169 } from '@/app/blog/[slug]/og-variants/v169-impossible';
+import { renderOgImage as v170 } from '@/app/blog/[slug]/og-variants/v170-op-art';
+import { renderOgImage as v171 } from '@/app/blog/[slug]/og-variants/v171-data-mosh';
+import { renderOgImage as v172 } from '@/app/blog/[slug]/og-variants/v172-risograph';
+import { renderOgImage as v173 } from '@/app/blog/[slug]/og-variants/v173-linocut';
+import { renderOgImage as v174 } from '@/app/blog/[slug]/og-variants/v174-psychedelic';
+import { renderOgImage as v175 } from '@/app/blog/[slug]/og-variants/v175-hologram';
 
 const variants: Record<string, (meta: any) => Promise<ImageResponse>> = {
   v1,
@@ -255,6 +305,56 @@ const variants: Record<string, (meta: any) => Promise<ImageResponse>> = {
   v123,
   v124,
   v125,
+  v126,
+  v127,
+  v128,
+  v129,
+  v130,
+  v131,
+  v132,
+  v133,
+  v134,
+  v135,
+  v136,
+  v137,
+  v138,
+  v139,
+  v140,
+  v141,
+  v142,
+  v143,
+  v144,
+  v145,
+  v146,
+  v147,
+  v148,
+  v149,
+  v150,
+  v151,
+  v152,
+  v153,
+  v154,
+  v155,
+  v156,
+  v157,
+  v158,
+  v159,
+  v160,
+  v161,
+  v162,
+  v163,
+  v164,
+  v165,
+  v166,
+  v167,
+  v168,
+  v169,
+  v170,
+  v171,
+  v172,
+  v173,
+  v174,
+  v175,
 };
 
 export async function GET(request: NextRequest) {
