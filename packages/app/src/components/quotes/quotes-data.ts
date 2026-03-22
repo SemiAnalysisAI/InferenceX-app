@@ -230,4 +230,18 @@ export const QUOTES: Quote[] = [
     org: 'Baseten',
     logo: 'baseten.svg',
   },
+  {
+    text: 'Verda was founded because AI engineers deserve affordable, high-performance compute without overhead. InferenceX\u2122 reinforces that mission by giving the community open, reproducible benchmarks that show what GPUs actually deliver under real inference workloads. We want our customers to see transparent, continuously updated performance data \u2014 not marketing claims. InferenceX provides exactly that.',
+    name: 'Ruben Bryon',
+    title: 'Founder & CEO, Verda',
+    org: 'Verda',
+    logo: 'verda.svg',
+  },
+  {
+    text: "InferenceX\u2122 ensembles precisely that \u2014 open, reproducible benchmarks that are continuously updated as xPU accelerators (GPUs/TPUs/LPUs), memory, storage, and software stacks evolve. I'm excited to see the InferenceX benchmarking roadmap include agentic coding workloads that stress CPU KV Cache offloading & soon NVMe KV Cache offloading from xPUs. As WEKA helps scale the Memory Wall by building the KV Cache infrastructure that feeds these xPUs, having this level of visibility into inference performance helps the entire ecosystem make smarter decisions about where to invest.",
+    name: 'Val Bercovici',
+    title: 'Chief AI Officer, WEKA',
+    org: 'WEKA',
+    logo: 'weka.svg',
+  },
 ];

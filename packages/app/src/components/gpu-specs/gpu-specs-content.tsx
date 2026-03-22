@@ -6,7 +6,7 @@ import { BarChart3, Radar, Table2 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { ShareButton } from '@/components/ui/share-button';
-import { SocialShareButtons } from '@/components/social-share-buttons';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
   formatTflops,
   getScaleUpDomainMemory,
@@ -293,7 +293,10 @@ export function GpuSpecsContent() {
             </div>
             <div className="flex items-center gap-1.5">
               <ShareButton />
-              <SocialShareButtons compact className="hidden sm:flex" />
+              <div className="hidden sm:flex items-center gap-1.5">
+                <ShareTwitterButton />
+                <ShareLinkedInButton />
+              </div>
             </div>
           </div>
         </Card>

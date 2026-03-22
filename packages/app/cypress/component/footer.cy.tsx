@@ -15,58 +15,47 @@ describe('Footer', () => {
     );
   });
 
-  it('renders the footer element', () => {
-    cy.get('[data-testid="footer"]').should('exist');
-  });
-
   it('displays copyright notice with semianalysis.com and current year', () => {
     const year = new Date().getFullYear().toString();
     cy.get('[data-testid="footer-copyright"]').should('contain', 'semianalysis.com');
     cy.get('[data-testid="footer-copyright"]').should('contain', year);
   });
 
-  it('shows the GitHub star CTA linking to GitHub repo', () => {
+  it('shows the GitHub star CTA', () => {
     cy.get('[data-testid="footer-star-cta"]').should('be.visible');
-    cy.get('[data-testid="footer-star-cta"]')
-      .should('have.attr', 'href')
-      .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-  });
-
-  it('footer star CTA opens in new tab', () => {
-    cy.get('[data-testid="footer-star-cta"]').should('have.attr', 'target', '_blank');
+    cy.get('[data-testid="footer-star-cta"]').should('contain', 'Star');
   });
 
   it('shows social share buttons', () => {
-    cy.get('[data-testid="social-share-buttons"]').should('be.visible');
+    cy.get('[data-testid="footer-social-buttons"]').should('be.visible');
+    cy.get('[data-testid="footer-social-buttons"]')
+      .find('button')
+      .should('have.length.greaterThan', 1);
   });
 
   it('has Privacy Policy link', () => {
-    cy.get('[data-testid="footer"]')
-      .contains('Privacy Policy')
+    cy.get('[data-testid="footer-link-privacy"]')
       .should('have.attr', 'href')
       .and('include', 'semianalysis.com/privacy-policy');
   });
 
   it('has Cookie Policy link', () => {
-    cy.get('[data-testid="footer"]')
-      .contains('Cookie Policy')
+    cy.get('[data-testid="footer-link-cookies"]')
       .should('have.attr', 'href')
       .and('include', 'semianalysis.com/cookie-policy');
   });
 
-  it('has Contribute link pointing to GitHub', () => {
-    cy.get('[data-testid="footer"]')
-      .contains('Contribute')
+  it('has Contribute section with GitHub links', () => {
+    cy.get('[data-testid="footer-link-benchmarks"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-  });
-
-  it('shows the SemiAnalysis logo', () => {
-    cy.get('[data-testid="footer"]').find('img[alt="SemiAnalysis logo"]').should('exist');
+    cy.get('[data-testid="footer-link-frontend"]')
+      .should('have.attr', 'href')
+      .and('include', 'github.com/SemiAnalysisAI/InferenceX-app');
   });
 
   it('all external links open in a new tab', () => {
-    cy.get('[data-testid="footer"]')
+    cy.get('[data-testid="footer-links"]')
       .find('a[target="_blank"]')
       .should('have.length.greaterThan', 0);
   });

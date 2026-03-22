@@ -234,7 +234,12 @@ export default function ChartLegend({
       >
         {switches.map((sw) => (
           <div key={sw.id} className="mt-2 flex items-center gap-2">
-            <Switch id={sw.id} checked={sw.checked} onCheckedChange={sw.onCheckedChange} />
+            <Switch
+              id={sw.id}
+              data-testid={sw.id}
+              checked={sw.checked}
+              onCheckedChange={sw.onCheckedChange}
+            />
             <Label
               htmlFor={sw.id}
               className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
@@ -461,7 +466,7 @@ export default function ChartLegend({
 
   const content = (
     <div className={isSidebar ? 'h-full' : 'relative'}>
-      <div className={outerClasses} style={outerStyle}>
+      <div data-testid="chart-legend" className={outerClasses} style={outerStyle}>
         {searchInput}
         {scrollContent}
         {bottomControls}

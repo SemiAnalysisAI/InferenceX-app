@@ -36,10 +36,10 @@ function QuoteCard({
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-brand transition-colors group/link"
+              className="font-semibold text-foreground hover:text-brand transition-colors group"
             >
-              <span className="group-hover/link:underline">{name}</span>{' '}
-              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
+              <span className="group-hover:underline">{name}</span>
+              <ExternalLinkIcon />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{name}</span>
@@ -55,7 +55,7 @@ function QuoteCard({
 
 export function QuotesContent() {
   return (
-    <main className="relative min-h-screen">
+    <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>
