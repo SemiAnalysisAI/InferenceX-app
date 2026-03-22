@@ -60,7 +60,7 @@ const SIZES = [
 
 export default function OgPreviewPage() {
   return (
-    <main className="container mx-auto px-4 py-12 max-w-7xl">
+    <main className="container mx-auto px-4 py-12 max-w-7xl overflow-hidden">
       <h1 className="text-3xl font-bold mb-2">OG Image Variants Preview</h1>
       <p className="text-muted-foreground mb-10">
         Each variant shown at actual platform render sizes. V1–V10: generic. V11–V15: brand palette.
