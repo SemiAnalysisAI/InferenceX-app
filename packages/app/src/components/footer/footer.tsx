@@ -64,8 +64,8 @@ export const Footer = () => {
               className="text-sm text-muted-foreground max-w-xs text-center md:text-left"
             >
               Continuous open-source inference benchmarking. Real-world, reproducible, auditable
-              performance data trusted by trillion dollar AI infrastructure operators like
-              OpenAI, Oracle, Microsoft, etc.
+              performance data trusted by trillion dollar AI infrastructure operators like OpenAI,
+              Oracle, Microsoft, etc.
             </p>
           </div>
 
