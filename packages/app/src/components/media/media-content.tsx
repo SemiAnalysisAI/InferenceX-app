@@ -51,7 +51,7 @@ function MediaCard({ title, organization, url, type, date }: MediaItem) {
         >
           <h3 className="text-sm sm:text-base lg:text-lg font-medium leading-snug text-foreground group-hover:text-primary transition-colors italic group-hover:underline">
             &ldquo;{title}&rdquo;
-            <ExternalLinkIcon className="ml-1.5 inline-block h-[0.85em] w-[0.85em] opacity-50 group-hover:opacity-100 transition-opacity" />
+            <ExternalLinkIcon />
           </h3>
         </a>
       </div>

@@ -80,10 +80,10 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
               href={quote.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-brand transition-colors group/link"
+              className="font-semibold text-foreground hover:text-brand transition-colors group"
             >
-              <span className="group-hover/link:underline">{quote.name}</span>{' '}
-              <ExternalLinkIcon className="ml-1 inline-block h-[0.85em] w-[0.85em]" />
+              <span className="group-hover:underline">{quote.name}</span>
+              <ExternalLinkIcon />
             </a>
           ) : (
             <span className="font-semibold text-foreground">{quote.name}</span>
