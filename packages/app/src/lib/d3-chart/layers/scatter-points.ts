@@ -53,7 +53,7 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
       .append(shapeConfig.type)
       .attr('class', 'visible-shape')
       .attr('fill', config.getColor(d))
-      .attr('stroke', 'white')
+      .attr('stroke', 'none')
       .attr('cursor', 'pointer') as d3.Selection<
       SVGCircleElement | SVGRectElement | SVGPathElement,
       unknown,
