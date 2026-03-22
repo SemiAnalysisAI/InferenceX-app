@@ -17,6 +17,7 @@ export function StarButton() {
       variant="outline"
       size="sm"
       className="h-7 gap-1.5 text-xs star-button-glow"
+      title="Star on GitHub"
       data-testid="footer-star-cta"
       onClick={() => {
         track('footer_star_cta_clicked', { stars: stars ?? 0 });

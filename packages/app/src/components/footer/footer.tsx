@@ -34,8 +34,12 @@ export const Footer = () => {
         {/* Main grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8 mb-10">
           {/* Left — Brand */}
-          <div className="flex flex-col gap-4">
-            <Link target="_blank" href="https://semianalysis.com/">
+          <div className="flex flex-col gap-4 items-center md:items-start">
+            <Link
+              target="_blank"
+              href="https://semianalysis.com/"
+              className="inline-block w-35 h-14.5"
+            >
               <Image
                 width={140}
                 height={58}
@@ -52,8 +56,8 @@ export const Footer = () => {
               />
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
-              Open-source AI inference benchmarks. Transparent, real-world GPU performance data for
-              the ML community.
+              Continuous open-source inference benchmarks. Transparent, real-world GPU performance
+              data for the ML community.
             </p>
           </div>
 
@@ -116,7 +120,7 @@ export const Footer = () => {
                 Benchmarks
               </a>
               <a
-                href="https://github.com/SemiAnalysisAI/inferencemax-app"
+                href="https://github.com/SemiAnalysisAI/InferenceX-app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -129,13 +133,13 @@ export const Footer = () => {
           {/* Right — CTA + Social */}
           <div className="flex flex-col gap-4 md:items-end">
             <div className="flex items-center gap-1.5">
-              <div className="rounded-md bg-background/80">
+              <div className="rounded-md bg-background/80 w-fit">
                 <StarButton />
               </div>
-              <div className="rounded-md bg-background/80">
+              <div className="rounded-md bg-background/80 w-fit">
                 <ShareTwitterButton />
               </div>
-              <div className="rounded-md bg-background/80">
+              <div className="rounded-md bg-background/80 w-fit">
                 <ShareLinkedInButton />
               </div>
             </div>
