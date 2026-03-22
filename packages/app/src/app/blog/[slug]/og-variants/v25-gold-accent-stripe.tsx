@@ -54,8 +54,8 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 28, color: GOLD, fontWeight: 700 }}>InferenceX Blog</span>
-          <span style={{ fontSize: 24, color: '#999EA4' }}>
+          <span style={{ fontSize: 36, color: GOLD, fontWeight: 700 }}>InferenceX Blog</span>
+          <span style={{ fontSize: 36, color: '#999EA4' }}>
             {meta.author} ·{' '}
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               month: 'short',

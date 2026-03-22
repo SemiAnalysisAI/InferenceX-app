@@ -45,7 +45,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         >
           {meta.title}
         </div>
-        <div style={{ fontSize: 28, color: '#BFBFBF', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 42, color: '#BFBFBF', fontStyle: 'italic' }}>
           {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
         </div>
       </div>
@@ -122,7 +122,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
                     display: 'flex',
                   }}
                 />
-                <span style={{ fontSize: 20, color: '#BFBFBF' }}>{tag}</span>
+                <span style={{ fontSize: 30, color: '#BFBFBF' }}>{tag}</span>
               </div>
             ))}
           </div>
@@ -142,7 +142,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         <div
-          style={{ display: 'flex', gap: 16, fontSize: 24, color: CHARCOAL, alignItems: 'center' }}
+          style={{ display: 'flex', gap: 16, fontSize: 36, color: CHARCOAL, alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span>·</span>

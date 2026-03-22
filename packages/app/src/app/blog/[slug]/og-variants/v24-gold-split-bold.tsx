@@ -37,12 +37,12 @@ export async function renderOgImage(meta: BlogPostMeta) {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <img src={logoSrc} height={120} />
           </div>
-          <span style={{ fontSize: 24, color: '#5D5E5F', fontWeight: 600 }}>InferenceX Blog</span>
+          <span style={{ fontSize: 36, color: '#9ca3af', fontWeight: 600 }}>InferenceX Blog</span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 24, color: '#5D5E5F' }}>{meta.author}</span>
-          <span style={{ fontSize: 24, color: '#6D6E6F' }}>
+          <span style={{ fontSize: 36, color: '#9ca3af' }}>{meta.author}</span>
+          <span style={{ fontSize: 36, color: '#9ca3af' }}>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               month: 'short',
               year: 'numeric',

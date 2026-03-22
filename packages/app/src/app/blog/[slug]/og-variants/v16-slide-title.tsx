@@ -181,7 +181,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         {/* Date */}
-        <div style={{ display: 'flex', fontSize: 24, color: '#5D5E5F' }}>
+        <div style={{ display: 'flex', fontSize: 36, color: '#9ca3af' }}>
           {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
@@ -197,22 +197,22 @@ export async function renderOgImage(meta: BlogPostMeta) {
           </div>
           <div
             style={{
-              fontSize: 28,
-              color: '#5D5E5F',
+              fontSize: 42,
+              color: '#9ca3af',
               lineHeight: 1.4,
-              maxHeight: 80,
+              maxHeight: 70,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 110 ? meta.excerpt.slice(0, 110) + '…' : meta.excerpt}
+            {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
           </div>
         </div>
 
         {/* Bottom: author + logo */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 24, color: '#5D5E5F' }}>{meta.author}</span>
-            <span style={{ fontSize: 24, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
+            <span style={{ fontSize: 36, color: '#9ca3af' }}>{meta.author}</span>
+            <span style={{ fontSize: 36, color: '#9ca3af' }}>{meta.readingTime} min read</span>
           </div>
           <img src={logoSrc} height={84} />
         </div>

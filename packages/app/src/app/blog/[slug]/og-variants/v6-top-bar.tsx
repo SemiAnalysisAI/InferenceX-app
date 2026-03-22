@@ -113,18 +113,18 @@ export async function renderOgImage(meta: BlogPostMeta) {
           <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.2 }}>{meta.title}</div>
           <div
             style={{
-              fontSize: 28,
-              color: '#a1a1aa',
+              fontSize: 42,
+              color: '#d4d4d8',
               lineHeight: 1.4,
-              maxHeight: 80,
+              maxHeight: 60,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '...' : meta.excerpt}
+            {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '...' : meta.excerpt}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 24, fontSize: 24, color: '#a1a1aa' }}>
+        <div style={{ display: 'flex', gap: 24, fontSize: 36, color: '#d4d4d8' }}>
           <span>{meta.author}</span>
           <span>·</span>
           <span>

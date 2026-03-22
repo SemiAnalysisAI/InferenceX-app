@@ -49,19 +49,19 @@ export async function renderOgImage(meta: BlogPostMeta) {
           </div>
           <div
             style={{
-              fontSize: 28,
+              fontSize: 42,
               color: '#C9CACB',
               lineHeight: 1.4,
-              maxHeight: 80,
+              maxHeight: 70,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 120 ? meta.excerpt.slice(0, 120) + '…' : meta.excerpt}
+            {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
           </div>
         </div>
 
         <div
-          style={{ display: 'flex', gap: 20, fontSize: 24, color: '#B4B9BC', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 20, fontSize: 36, color: '#d4d4d8', alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span style={{ color: `${GOLD}60` }}>·</span>
@@ -85,7 +85,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
                   color: GOLD,
                   padding: '4px 16px',
                   borderRadius: 9999,
-                  fontSize: 20,
+                  fontSize: 30,
                 }}
               >
                 {tag}

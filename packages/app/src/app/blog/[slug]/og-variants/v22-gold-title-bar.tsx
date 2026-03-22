@@ -44,7 +44,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <img src={logoSrc} height={112} />
         </div>
-        <span style={{ fontSize: 26, fontWeight: 600, color: '#444647' }}>InferenceX Blog</span>
+        <span style={{ fontSize: 36, fontWeight: 600, color: '#444647' }}>InferenceX Blog</span>
       </div>
 
       {/* Title area */}
@@ -61,7 +61,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         <div style={{ fontSize: titleSize, fontWeight: 800, lineHeight: 1.1, color: '#FFFFFF' }}>
           {meta.title}
         </div>
-        <div style={{ fontSize: 28, color: '#999EA4' }}>{meta.author}</div>
+        <div style={{ fontSize: 36, color: '#999EA4' }}>{meta.author}</div>
       </div>
 
       {/* Thin gold bottom line */}

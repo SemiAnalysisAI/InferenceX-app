@@ -137,7 +137,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
         {/* Date + meta on gold area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, zIndex: 1 }}>
-          <span style={{ fontSize: 24, color: '#5D5E5F' }}>
+          <span style={{ fontSize: 36, color: '#9ca3af' }}>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
@@ -145,7 +145,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
               timeZone: 'UTC',
             })}
           </span>
-          <span style={{ fontSize: 24, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
+          <span style={{ fontSize: 36, color: '#9ca3af' }}>{meta.readingTime} min read</span>
         </div>
       </div>
 
@@ -166,17 +166,17 @@ export async function renderOgImage(meta: BlogPostMeta) {
         </div>
         <div
           style={{
-            fontSize: 28,
+            fontSize: 42,
             color: '#BFBFBF',
             lineHeight: 1.45,
-            maxHeight: 120,
+            maxHeight: 70,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+          {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
         </div>
         <div style={{ display: 'flex', gap: 14, marginTop: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 24, color: '#999EA4' }}>{meta.author}</span>
+          <span style={{ fontSize: 36, color: '#999EA4' }}>{meta.author}</span>
           {meta.tags &&
             meta.tags.slice(0, 3).map((tag) => (
               <span
@@ -187,7 +187,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
                   color: GOLD,
                   padding: '4px 14px',
                   borderRadius: 9999,
-                  fontSize: 20,
+                  fontSize: 30,
                 }}
               >
                 {tag}

@@ -127,8 +127,8 @@ export async function renderOgImage(meta: BlogPostMeta) {
           zIndex: 1,
         }}
       >
-        <span style={{ fontSize: 26, color: GOLD, fontWeight: 600 }}>InferenceX Blog</span>
-        <span style={{ fontSize: 24, color: '#656B72' }}>{meta.author}</span>
+        <span style={{ fontSize: 36, color: GOLD, fontWeight: 600 }}>InferenceX Blog</span>
+        <span style={{ fontSize: 36, color: '#a1a1aa' }}>{meta.author}</span>
       </div>
     </div>,
     size,

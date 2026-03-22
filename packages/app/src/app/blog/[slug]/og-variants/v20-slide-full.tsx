@@ -47,10 +47,10 @@ export async function renderOgImage(meta: BlogPostMeta) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src={logoSrc} height={84} />
-          <span style={{ fontSize: 24, color: '#5D5E5F' }}>InferenceX Blog</span>
+          <span style={{ fontSize: 36, color: '#9ca3af' }}>InferenceX Blog</span>
         </div>
         <div
-          style={{ display: 'flex', gap: 12, fontSize: 24, color: '#5D5E5F', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 12, fontSize: 36, color: '#9ca3af', alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span>·</span>
@@ -86,19 +86,19 @@ export async function renderOgImage(meta: BlogPostMeta) {
           {/* White subtitle */}
           <div
             style={{
-              fontSize: 28,
+              fontSize: 42,
               color: '#FFFFFF',
               lineHeight: 1.45,
-              maxHeight: 120,
+              maxHeight: 70,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+            {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
           </div>
 
           {/* Tags + reading time */}
           <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 4 }}>
-            <span style={{ fontSize: 24, color: '#BFBFBF' }}>{meta.readingTime} min read</span>
+            <span style={{ fontSize: 36, color: '#BFBFBF' }}>{meta.readingTime} min read</span>
             {meta.tags &&
               meta.tags.slice(0, 3).map((tag, i) => (
                 <span key={tag} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -111,7 +111,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
                       display: 'flex',
                     }}
                   />
-                  <span style={{ fontSize: 20, color: '#BFBFBF' }}>{tag}</span>
+                  <span style={{ fontSize: 30, color: '#BFBFBF' }}>{tag}</span>
                 </span>
               ))}
           </div>

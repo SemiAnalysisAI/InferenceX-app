@@ -79,15 +79,15 @@ export async function renderOgImage(meta: BlogPostMeta) {
         {/* White italic subtitle */}
         <div
           style={{
-            fontSize: 28,
+            fontSize: 42,
             color: '#FFFFFF',
             lineHeight: 1.4,
             fontStyle: 'italic',
-            maxHeight: 80,
+            maxHeight: 70,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 130 ? meta.excerpt.slice(0, 130) + '…' : meta.excerpt}
+          {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
         </div>
 
         {/* Author + date */}
@@ -95,14 +95,14 @@ export async function renderOgImage(meta: BlogPostMeta) {
           style={{
             display: 'flex',
             gap: 16,
-            fontSize: 24,
+            fontSize: 36,
             color: '#BFBFBF',
             alignItems: 'center',
             marginTop: 8,
           }}
         >
           <span>{meta.author}</span>
-          <span style={{ color: '#656B72' }}>|</span>
+          <span style={{ color: '#a1a1aa' }}>|</span>
           <span>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               year: 'numeric',
@@ -111,7 +111,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
               timeZone: 'UTC',
             })}
           </span>
-          <span style={{ color: '#656B72' }}>|</span>
+          <span style={{ color: '#a1a1aa' }}>|</span>
           <span>{meta.readingTime} min read</span>
           {meta.tags &&
             meta.tags.slice(0, 3).map((tag) => (
@@ -125,7 +125,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
                     display: 'flex',
                   }}
                 />
-                <span style={{ fontSize: 20, color: '#BFBFBF' }}>{tag}</span>
+                <span style={{ fontSize: 30, color: '#BFBFBF' }}>{tag}</span>
               </span>
             ))}
         </div>
@@ -144,7 +144,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         <img src={logoSrc} height={84} />
-        <span style={{ fontSize: 24, color: CHARCOAL, fontWeight: 500 }}>InferenceX Blog</span>
+        <span style={{ fontSize: 36, color: CHARCOAL, fontWeight: 500 }}>InferenceX Blog</span>
       </div>
     </div>,
     size,
