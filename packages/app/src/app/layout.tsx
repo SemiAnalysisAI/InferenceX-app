@@ -174,7 +174,7 @@ export default function RootLayout({
             >
               <PostHogPageView />
               <Header />
-              <div className="flex-1">{children}</div>
+              <div className="grow flex flex-col">{children}</div>
               <Footer />
             </ThemeProvider>
           </QueryProvider>
