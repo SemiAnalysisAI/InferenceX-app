@@ -23,6 +23,11 @@ import { renderOgImage as v17 } from '@/app/blog/[slug]/og-variants/v17-slide-co
 import { renderOgImage as v18 } from '@/app/blog/[slug]/og-variants/v18-slide-hybrid';
 import { renderOgImage as v19 } from '@/app/blog/[slug]/og-variants/v19-slide-keynote';
 import { renderOgImage as v20 } from '@/app/blog/[slug]/og-variants/v20-slide-full';
+import { renderOgImage as v21 } from '@/app/blog/[slug]/og-variants/v21-compact-bold';
+import { renderOgImage as v22 } from '@/app/blog/[slug]/og-variants/v22-gold-title-bar';
+import { renderOgImage as v23 } from '@/app/blog/[slug]/og-variants/v23-bold-circuit';
+import { renderOgImage as v24 } from '@/app/blog/[slug]/og-variants/v24-gold-split-bold';
+import { renderOgImage as v25 } from '@/app/blog/[slug]/og-variants/v25-gold-accent-stripe';
 
 const variants: Record<string, (meta: any) => ImageResponse> = {
   v1,
@@ -45,6 +50,11 @@ const variants: Record<string, (meta: any) => ImageResponse> = {
   v18,
   v19,
   v20,
+  v21,
+  v22,
+  v23,
+  v24,
+  v25,
 };
 
 export async function GET(request: NextRequest) {
