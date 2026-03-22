@@ -13,7 +13,7 @@ export const size = { width: 1200, height: 630 };
 
 export async function renderOgImage(meta: BlogPostMeta) {
   const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
-  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 52 : 60;
+  const titleSize = meta.title.length > 60 ? 56 : meta.title.length > 40 ? 60 : 68;
 
   return new ImageResponse(
     <div
@@ -36,7 +36,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
           padding: '50px 50px 50px 60px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <img src={logoSrc} height={96} />
         </div>
 

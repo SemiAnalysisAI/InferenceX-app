@@ -18,7 +18,7 @@ const BG = '#131416';
 
 export async function renderOgImage(meta: BlogPostMeta) {
   const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
-  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
+  const titleSize = meta.title.length > 60 ? 56 : meta.title.length > 40 ? 64 : 72;
 
   // Top/bottom frame blocks
   const hBlocks = Array.from({ length: 14 }).map((_, i) => ({
@@ -213,7 +213,15 @@ export async function renderOgImage(meta: BlogPostMeta) {
       />
 
       {/* Header with logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, zIndex: 1 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 14,
+          zIndex: 1,
+        }}
+      >
         <img src={logoSrc} height={96} />
       </div>
 

@@ -128,7 +128,7 @@ const CELL_H = 105;
 
 export async function renderOgImage(meta: BlogPostMeta) {
   const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
-  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
+  const titleSize = meta.title.length > 60 ? 56 : meta.title.length > 40 ? 64 : 72;
 
   return new ImageResponse(
     <div
@@ -172,7 +172,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', zIndex: 1 }}>
         <img src={logoSrc} height={96} />
       </div>
 
