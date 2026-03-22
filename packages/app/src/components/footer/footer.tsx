@@ -12,7 +12,7 @@ export const Footer = () => {
     <footer
       data-testid="footer"
       className={cn(
-        'relative w-full overflow-visible mt-auto',
+        'relative w-full overflow-visible mt-auto pt-8',
         'before:absolute',
         'before:bg-muted/50',
         'dark:before:bg-muted',
