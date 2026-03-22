@@ -70,8 +70,21 @@ export default function OgPreviewPage() {
         {VARIANTS.map((v) => (
           <div key={v.id} className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">{v.name}</h2>
-            <div className="flex flex-wrap gap-4 items-end">
-              {SIZES.map((s) => (
+            {/* Full size */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Full (1200×630)</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/og-preview?slug=hello-world&v=${v.id}`}
+                alt={`${v.name} full size`}
+                width={1200}
+                height={630}
+                className="w-full rounded border border-border"
+              />
+            </div>
+            {/* Platform sizes */}
+            <div className="flex gap-4 items-end">
+              {SIZES.slice(1).map((s) => (
                 <div key={s.label} className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">{s.label}</span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
