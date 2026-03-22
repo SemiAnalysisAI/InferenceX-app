@@ -1,9 +1,11 @@
 /**
  * V20: Slide Full Brand — The most complete brand expression. Combines all
- * SemiAnalysis presentation elements: gold title bar top, charcoal content,
+ * presentation elements: gold title bar top, charcoal content,
  * circuit pattern right margin, gold bottom bar, proper typography hierarchy.
- * This is the "if SemiAnalysis designed a blog OG card" version.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -15,8 +17,9 @@ const BLUE = '#0B86D1';
 const CHARCOAL = '#454646';
 const DARK = '#2A2B2C';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 36 : meta.title.length > 40 ? 44 : 52;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 54 : 62;
 
   return new ImageResponse(
     <div
@@ -30,7 +33,7 @@ export function renderOgImage(meta: BlogPostMeta) {
         overflow: 'hidden',
       }}
     >
-      {/* Gold top bar with brand */}
+      {/* Gold top bar with logo */}
       <div
         style={{
           display: 'flex',
@@ -42,13 +45,12 @@ export function renderOgImage(meta: BlogPostMeta) {
           justifyContent: 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontSize: 18, fontWeight: 800, color: BLUE }}>semi</span>
-          <span style={{ fontSize: 18, fontWeight: 800, color: '#444647' }}>analysis</span>
-          <span style={{ fontSize: 14, color: '#5D5E5F', marginLeft: 12 }}>InferenceX Blog</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img src={logoSrc} height={28} />
+          <span style={{ fontSize: 24, color: '#5D5E5F' }}>InferenceX Blog</span>
         </div>
         <div
-          style={{ display: 'flex', gap: 12, fontSize: 13, color: '#5D5E5F', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 12, fontSize: 24, color: '#5D5E5F', alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span>·</span>
@@ -84,32 +86,32 @@ export function renderOgImage(meta: BlogPostMeta) {
           {/* White subtitle */}
           <div
             style={{
-              fontSize: 21,
+              fontSize: 28,
               color: '#FFFFFF',
               lineHeight: 1.45,
-              maxHeight: 92,
+              maxHeight: 120,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 160 ? meta.excerpt.slice(0, 160) + '…' : meta.excerpt}
+            {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
           </div>
 
           {/* Tags + reading time */}
           <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 4 }}>
-            <span style={{ fontSize: 15, color: '#BFBFBF' }}>{meta.readingTime} min read</span>
+            <span style={{ fontSize: 24, color: '#BFBFBF' }}>{meta.readingTime} min read</span>
             {meta.tags &&
               meta.tags.slice(0, 3).map((tag, i) => (
                 <span key={tag} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <div
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 8,
+                      width: 10,
+                      height: 10,
+                      borderRadius: 10,
                       backgroundColor: i === 0 ? GOLD : i === 1 ? BLUE : '#76B041',
                       display: 'flex',
                     }}
                   />
-                  <span style={{ fontSize: 13, color: '#BFBFBF' }}>{tag}</span>
+                  <span style={{ fontSize: 20, color: '#BFBFBF' }}>{tag}</span>
                 </span>
               ))}
           </div>

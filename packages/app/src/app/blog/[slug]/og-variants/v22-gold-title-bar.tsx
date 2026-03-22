@@ -2,6 +2,9 @@
  * V22: Gold Title Bar — Thick gold bar at top with brand in dark text,
  * huge white title on charcoal below. Two clear zones, both legible at any size.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -9,10 +12,10 @@ import type { BlogPostMeta } from '@/lib/blog';
 export const size = { width: 1200, height: 630 };
 
 const GOLD = '#F7B041';
-const BLUE = '#0B86D1';
 const CHARCOAL = '#454646';
 
-export function renderOgImage(meta: BlogPostMeta) {
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
   const titleSize = meta.title.length > 50 ? 54 : meta.title.length > 30 ? 66 : 78;
 
   return new ImageResponse(
@@ -38,9 +41,8 @@ export function renderOgImage(meta: BlogPostMeta) {
           padding: '0 55px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 34, fontWeight: 800, color: BLUE }}>semi</span>
-          <span style={{ fontSize: 34, fontWeight: 800, color: '#444647' }}>analysis</span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <img src={logoSrc} height={38} />
         </div>
         <span style={{ fontSize: 26, fontWeight: 600, color: '#444647' }}>InferenceX Blog</span>
       </div>

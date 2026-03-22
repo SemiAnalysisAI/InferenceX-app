@@ -1,8 +1,10 @@
 /**
- * V16: Slide Title — Matches the actual SemiAnalysis GSA presentation title slide.
- * Gold (#F7B041) background, dark text, circuit pattern on the right side,
- * logo wordmark bottom-right. This is the "opening slide" look.
+ * V16: Slide Title — Gold (#F7B041) background, dark text, circuit pattern on the right side,
+ * logo bottom-left. This is the "opening slide" look.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -13,8 +15,9 @@ const GOLD = '#F7B041';
 const DARK = '#444647';
 const DARK_DEEP = '#2A2B2C';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 42 : meta.title.length > 40 ? 50 : 60;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 66;
 
   return new ImageResponse(
     <div
@@ -178,7 +181,7 @@ export function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         {/* Date */}
-        <div style={{ display: 'flex', fontSize: 18, color: '#5D5E5F' }}>
+        <div style={{ display: 'flex', fontSize: 24, color: '#5D5E5F' }}>
           {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
@@ -194,27 +197,24 @@ export function renderOgImage(meta: BlogPostMeta) {
           </div>
           <div
             style={{
-              fontSize: 22,
+              fontSize: 28,
               color: '#5D5E5F',
               lineHeight: 1.4,
-              maxHeight: 64,
+              maxHeight: 80,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 130 ? meta.excerpt.slice(0, 130) + '…' : meta.excerpt}
+            {meta.excerpt.length > 110 ? meta.excerpt.slice(0, 110) + '…' : meta.excerpt}
           </div>
         </div>
 
-        {/* Bottom: author + brand */}
+        {/* Bottom: author + logo */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 16, color: '#5D5E5F' }}>{meta.author}</span>
-            <span style={{ fontSize: 14, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
+            <span style={{ fontSize: 24, color: '#5D5E5F' }}>{meta.author}</span>
+            <span style={{ fontSize: 24, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#0B86D1' }}>semi</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: DARK }}>analysis</span>
-          </div>
+          <img src={logoSrc} height={28} />
         </div>
       </div>
     </div>,

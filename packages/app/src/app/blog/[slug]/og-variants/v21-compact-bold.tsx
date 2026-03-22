@@ -2,6 +2,9 @@
  * V21: Compact Bold — Huge title, brand top-left, date bottom-right.
  * Nothing else. Maximum readability at small render sizes.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -9,10 +12,10 @@ import type { BlogPostMeta } from '@/lib/blog';
 export const size = { width: 1200, height: 630 };
 
 const GOLD = '#F7B041';
-const BLUE = '#0B86D1';
 const BG = '#131416';
 
-export function renderOgImage(meta: BlogPostMeta) {
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
   const titleSize = meta.title.length > 50 ? 56 : meta.title.length > 30 ? 68 : 80;
 
   return new ImageResponse(
@@ -29,9 +32,8 @@ export function renderOgImage(meta: BlogPostMeta) {
       }}
     >
       {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ fontSize: 32, fontWeight: 800, color: BLUE }}>semi</span>
-        <span style={{ fontSize: 32, fontWeight: 800, color: GOLD }}>analysis</span>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <img src={logoSrc} height={36} />
       </div>
 
       {/* Title — the hero */}

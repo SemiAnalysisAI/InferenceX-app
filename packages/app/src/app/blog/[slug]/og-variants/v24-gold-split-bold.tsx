@@ -3,6 +3,9 @@
  * right 70% dark with massive title. Both zones survive at 360px render.
  * No fine details, just color blocks and big text.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -10,10 +13,10 @@ import type { BlogPostMeta } from '@/lib/blog';
 export const size = { width: 1200, height: 630 };
 
 const GOLD = '#F7B041';
-const BLUE = '#0B86D1';
 const BG = '#131416';
 
-export function renderOgImage(meta: BlogPostMeta) {
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
   const titleSize = meta.title.length > 50 ? 52 : meta.title.length > 30 ? 64 : 76;
 
   return new ImageResponse(
@@ -31,16 +34,15 @@ export function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: BLUE }}>semi</span>
-            <span style={{ fontSize: 36, fontWeight: 800, color: '#444647' }}>analysis</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <img src={logoSrc} height={40} />
           </div>
           <span style={{ fontSize: 24, color: '#5D5E5F', fontWeight: 600 }}>InferenceX Blog</span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 22, color: '#5D5E5F' }}>{meta.author}</span>
-          <span style={{ fontSize: 20, color: '#6D6E6F' }}>
+          <span style={{ fontSize: 24, color: '#5D5E5F' }}>{meta.author}</span>
+          <span style={{ fontSize: 24, color: '#6D6E6F' }}>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               month: 'short',
               year: 'numeric',

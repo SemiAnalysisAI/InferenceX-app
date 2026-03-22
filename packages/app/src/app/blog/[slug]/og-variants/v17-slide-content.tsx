@@ -1,8 +1,10 @@
 /**
- * V17: Slide Content — Matches the SemiAnalysis GSA content slide layout.
- * Dark charcoal (#454646) background, white title at top, gold bottom bar,
- * small logo in footer. The "data slide" look.
+ * V17: Slide Content — Dark charcoal (#454646) background, white title at top, gold bottom bar,
+ * logo in footer. The "data slide" look.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -13,8 +15,9 @@ const GOLD = '#F7B041';
 const BLUE = '#0B86D1';
 const CHARCOAL = '#454646';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 38 : meta.title.length > 40 ? 46 : 54;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 54 : 62;
 
   return new ImageResponse(
     <div
@@ -42,8 +45,8 @@ export function renderOgImage(meta: BlogPostMeta) {
         >
           {meta.title}
         </div>
-        <div style={{ fontSize: 20, color: '#BFBFBF', fontStyle: 'italic' }}>
-          {meta.excerpt.length > 120 ? meta.excerpt.slice(0, 120) + '…' : meta.excerpt}
+        <div style={{ fontSize: 28, color: '#BFBFBF', fontStyle: 'italic' }}>
+          {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
         </div>
       </div>
 
@@ -119,7 +122,7 @@ export function renderOgImage(meta: BlogPostMeta) {
                     display: 'flex',
                   }}
                 />
-                <span style={{ fontSize: 14, color: '#BFBFBF' }}>{tag}</span>
+                <span style={{ fontSize: 20, color: '#BFBFBF' }}>{tag}</span>
               </div>
             ))}
           </div>
@@ -131,15 +134,15 @@ export function renderOgImage(meta: BlogPostMeta) {
         style={{
           display: 'flex',
           width: '100%',
-          height: 44,
+          height: 52,
           backgroundColor: GOLD,
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 20px',
+          padding: '0 24px',
         }}
       >
         <div
-          style={{ display: 'flex', gap: 16, fontSize: 13, color: CHARCOAL, alignItems: 'center' }}
+          style={{ display: 'flex', gap: 16, fontSize: 24, color: CHARCOAL, alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span>·</span>
@@ -154,11 +157,7 @@ export function renderOgImage(meta: BlogPostMeta) {
           <span>·</span>
           <span>{meta.readingTime} min read</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontSize: 14, fontWeight: 800, color: BLUE }}>semi</span>
-          <span style={{ fontSize: 14, fontWeight: 800, color: CHARCOAL }}>analysis</span>
-          <span style={{ fontSize: 12, color: '#5D5E5F', marginLeft: 8 }}>| InferenceX Blog</span>
-        </div>
+        <img src={logoSrc} height={28} />
       </div>
     </div>,
     size,

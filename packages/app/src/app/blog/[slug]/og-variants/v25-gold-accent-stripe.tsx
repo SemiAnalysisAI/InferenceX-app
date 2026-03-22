@@ -3,6 +3,9 @@
  * massive title, brand bottom-left in gold. The most minimal version
  * that still reads as "SemiAnalysis" at thumbnail size.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -10,10 +13,10 @@ import type { BlogPostMeta } from '@/lib/blog';
 export const size = { width: 1200, height: 630 };
 
 const GOLD = '#F7B041';
-const BLUE = '#0B86D1';
 const CHARCOAL = '#454646';
 
-export function renderOgImage(meta: BlogPostMeta) {
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
   const titleSize = meta.title.length > 50 ? 56 : meta.title.length > 30 ? 68 : 80;
 
   return new ImageResponse(
@@ -40,9 +43,8 @@ export function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ fontSize: 30, fontWeight: 800, color: BLUE }}>semi</span>
-          <span style={{ fontSize: 30, fontWeight: 800, color: GOLD }}>analysis</span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <img src={logoSrc} height={34} />
         </div>
 
         {/* Title */}
@@ -53,7 +55,7 @@ export function renderOgImage(meta: BlogPostMeta) {
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 28, color: GOLD, fontWeight: 700 }}>InferenceX Blog</span>
-          <span style={{ fontSize: 22, color: '#999EA4' }}>
+          <span style={{ fontSize: 24, color: '#999EA4' }}>
             {meta.author} ·{' '}
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               month: 'short',

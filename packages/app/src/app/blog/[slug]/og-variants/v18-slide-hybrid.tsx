@@ -3,6 +3,9 @@
  * Left 35% is gold with circuit pattern, right 65% is dark with content.
  * The "two-tone presentation" look.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -10,12 +13,12 @@ import type { BlogPostMeta } from '@/lib/blog';
 export const size = { width: 1200, height: 630 };
 
 const GOLD = '#F7B041';
-const BLUE = '#0B86D1';
 const CHARCOAL = '#454646';
 const DARK = '#2A2B2C';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 38 : meta.title.length > 40 ? 46 : 54;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 54 : 62;
 
   return new ImageResponse(
     <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -127,18 +130,14 @@ export function renderOgImage(meta: BlogPostMeta) {
           />
         </div>
 
-        {/* Brand on gold area */}
+        {/* Brand logo on gold area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 28, fontWeight: 800, color: BLUE }}>semi</span>
-            <span style={{ fontSize: 28, fontWeight: 800, color: '#444647' }}>analysis</span>
-          </div>
-          <span style={{ fontSize: 16, color: '#5D5E5F' }}>InferenceX Blog</span>
+          <img src={logoSrc} height={32} />
         </div>
 
         {/* Date + meta on gold area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, zIndex: 1 }}>
-          <span style={{ fontSize: 15, color: '#5D5E5F' }}>
+          <span style={{ fontSize: 24, color: '#5D5E5F' }}>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
@@ -146,7 +145,7 @@ export function renderOgImage(meta: BlogPostMeta) {
               timeZone: 'UTC',
             })}
           </span>
-          <span style={{ fontSize: 14, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
+          <span style={{ fontSize: 24, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
         </div>
       </div>
 
@@ -167,17 +166,17 @@ export function renderOgImage(meta: BlogPostMeta) {
         </div>
         <div
           style={{
-            fontSize: 21,
+            fontSize: 28,
             color: '#BFBFBF',
             lineHeight: 1.45,
-            maxHeight: 92,
+            maxHeight: 120,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 160 ? meta.excerpt.slice(0, 160) + '…' : meta.excerpt}
+          {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
         </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-          <span style={{ fontSize: 16, color: '#999EA4' }}>{meta.author}</span>
+        <div style={{ display: 'flex', gap: 14, marginTop: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 24, color: '#999EA4' }}>{meta.author}</span>
           {meta.tags &&
             meta.tags.slice(0, 3).map((tag) => (
               <span
@@ -186,9 +185,9 @@ export function renderOgImage(meta: BlogPostMeta) {
                   backgroundColor: `${GOLD}20`,
                   border: `1px solid ${GOLD}35`,
                   color: GOLD,
-                  padding: '2px 12px',
+                  padding: '4px 14px',
                   borderRadius: 9999,
-                  fontSize: 12,
+                  fontSize: 20,
                 }}
               >
                 {tag}

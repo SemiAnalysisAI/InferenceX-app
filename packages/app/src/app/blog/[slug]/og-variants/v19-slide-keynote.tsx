@@ -1,8 +1,10 @@
 /**
- * V19: Slide Keynote — Full dark slide with gold title treatment, matching how
- * SemiAnalysis styles chart titles in presentations. Gold chart-title style for
- * the post title, white subtitle, grid background, gold bottom bar with brand.
+ * V19: Slide Keynote — Full dark slide with gold title treatment. Gold chart-title style for
+ * the post title, white subtitle, grid background, gold bottom bar with logo.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -10,11 +12,11 @@ import type { BlogPostMeta } from '@/lib/blog';
 export const size = { width: 1200, height: 630 };
 
 const GOLD = '#F7B041';
-const BLUE = '#0B86D1';
 const CHARCOAL = '#454646';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 40 : meta.title.length > 40 ? 50 : 60;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 66;
 
   return new ImageResponse(
     <div
@@ -69,23 +71,23 @@ export function renderOgImage(meta: BlogPostMeta) {
           gap: 20,
         }}
       >
-        {/* Gold title — like SemiAnalysis chart titles */}
+        {/* Gold title */}
         <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.15, color: GOLD }}>
           {meta.title}
         </div>
 
-        {/* White italic subtitle — like chart subtitles */}
+        {/* White italic subtitle */}
         <div
           style={{
-            fontSize: 24,
+            fontSize: 28,
             color: '#FFFFFF',
             lineHeight: 1.4,
             fontStyle: 'italic',
-            maxHeight: 70,
+            maxHeight: 80,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 150 ? meta.excerpt.slice(0, 150) + '…' : meta.excerpt}
+          {meta.excerpt.length > 130 ? meta.excerpt.slice(0, 130) + '…' : meta.excerpt}
         </div>
 
         {/* Author + date */}
@@ -93,7 +95,7 @@ export function renderOgImage(meta: BlogPostMeta) {
           style={{
             display: 'flex',
             gap: 16,
-            fontSize: 17,
+            fontSize: 24,
             color: '#BFBFBF',
             alignItems: 'center',
             marginTop: 8,
@@ -116,36 +118,33 @@ export function renderOgImage(meta: BlogPostMeta) {
               <span key={tag} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 8,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 10,
                     backgroundColor: GOLD,
                     display: 'flex',
                   }}
                 />
-                <span style={{ fontSize: 14, color: '#BFBFBF' }}>{tag}</span>
+                <span style={{ fontSize: 20, color: '#BFBFBF' }}>{tag}</span>
               </span>
             ))}
         </div>
       </div>
 
-      {/* Gold bottom bar with brand */}
+      {/* Gold bottom bar with logo */}
       <div
         style={{
           display: 'flex',
           width: '100%',
-          height: 48,
+          height: 52,
           backgroundColor: GOLD,
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 28px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontSize: 16, fontWeight: 800, color: BLUE }}>semi</span>
-          <span style={{ fontSize: 16, fontWeight: 800, color: CHARCOAL }}>analysis</span>
-        </div>
-        <span style={{ fontSize: 14, color: CHARCOAL, fontWeight: 500 }}>InferenceX Blog</span>
+        <img src={logoSrc} height={28} />
+        <span style={{ fontSize: 24, color: CHARCOAL, fontWeight: 500 }}>InferenceX Blog</span>
       </div>
     </div>,
     size,

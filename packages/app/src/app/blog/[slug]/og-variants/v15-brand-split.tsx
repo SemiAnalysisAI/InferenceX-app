@@ -3,6 +3,9 @@
  * a teal-tinted circuit field with the brand mark. Gold divider line between.
  * Most "presentation slide" feel.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -14,8 +17,9 @@ const BLUE = '#0B86D1';
 const TEAL = '#3A7A7A';
 const BG = '#131416';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 40 : meta.title.length > 40 ? 48 : 56;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
 
   return new ImageResponse(
     <div
@@ -45,19 +49,19 @@ export function renderOgImage(meta: BlogPostMeta) {
           </div>
           <div
             style={{
-              fontSize: 22,
+              fontSize: 28,
               color: '#C9CACB',
               lineHeight: 1.4,
-              maxHeight: 62,
+              maxHeight: 80,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+            {meta.excerpt.length > 120 ? meta.excerpt.slice(0, 120) + '…' : meta.excerpt}
           </div>
         </div>
 
         <div
-          style={{ display: 'flex', gap: 20, fontSize: 17, color: '#B4B9BC', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 20, fontSize: 24, color: '#B4B9BC', alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span style={{ color: `${GOLD}60` }}>·</span>
@@ -79,9 +83,9 @@ export function renderOgImage(meta: BlogPostMeta) {
                   backgroundColor: `${GOLD}18`,
                   border: `1px solid ${GOLD}30`,
                   color: GOLD,
-                  padding: '3px 14px',
+                  padding: '4px 16px',
                   borderRadius: 9999,
-                  fontSize: 13,
+                  fontSize: 20,
                 }}
               >
                 {tag}
@@ -154,7 +158,7 @@ export function renderOgImage(meta: BlogPostMeta) {
           }}
         />
 
-        {/* Brand wordmark positioned right */}
+        {/* Brand logo positioned right */}
         <div
           style={{
             position: 'absolute',
@@ -163,16 +167,10 @@ export function renderOgImage(meta: BlogPostMeta) {
             bottom: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
             zIndex: 1,
           }}
         >
-          <span style={{ color: BLUE, fontSize: 28, fontWeight: 800 }}>semi</span>
-          <span style={{ color: GOLD, fontSize: 28, fontWeight: 800, marginLeft: -8 }}>
-            analysis
-          </span>
-          <span style={{ color: '#4D5157', fontSize: 24, margin: '0 8px' }}>|</span>
-          <span style={{ color: '#B4B9BC', fontSize: 22 }}>InferenceX Blog</span>
+          <img src={logoSrc} height={36} />
         </div>
       </div>
     </div>,

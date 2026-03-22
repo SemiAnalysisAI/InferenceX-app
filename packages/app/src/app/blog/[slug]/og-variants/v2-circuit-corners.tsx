@@ -3,6 +3,9 @@
  * Inspired by the sitewide OG image. Teal traces on dark background with gold accent blocks.
  * Content stays in the center, patterns frame it.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -71,8 +74,9 @@ const TEAL_STRONG = '#2dd4bf60';
 const GOLD = '#eab30850';
 const GOLD_STRONG = '#eab308';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 40 : meta.title.length > 40 ? 48 : 56;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
 
   return new ImageResponse(
     <div
@@ -125,26 +129,26 @@ export function renderOgImage(meta: BlogPostMeta) {
         }}
       />
 
-      <div style={{ display: 'flex', fontSize: 20, color: '#a1a1aa', zIndex: 1 }}>
-        InferenceX Blog — SemiAnalysis
+      <div style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
+        <img src={logoSrc} height={32} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, zIndex: 1 }}>
         <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.2 }}>{meta.title}</div>
         <div
           style={{
-            fontSize: 22,
+            fontSize: 28,
             color: '#a1a1aa',
             lineHeight: 1.4,
-            maxHeight: 62,
+            maxHeight: 80,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+          {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '...' : meta.excerpt}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 24, fontSize: 18, color: '#a1a1aa', zIndex: 1 }}>
+      <div style={{ display: 'flex', gap: 24, fontSize: 24, color: '#a1a1aa', zIndex: 1 }}>
         <span>{meta.author}</span>
         <span>·</span>
         <span>
@@ -165,7 +169,7 @@ export function renderOgImage(meta: BlogPostMeta) {
                 backgroundColor: '#27272a',
                 padding: '4px 12px',
                 borderRadius: 9999,
-                fontSize: 14,
+                fontSize: 20,
               }}
             >
               {tag}

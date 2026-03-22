@@ -2,6 +2,9 @@
  * V13: Brand Left Panel — Left 1/4 is a dense circuit panel with SemiAnalysis brand colors.
  * Blue accent bar on border. Gold nodes at intersections. Right 3/4 is content.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -14,8 +17,9 @@ const TEAL = '#3A7A7A';
 const BG = '#131416';
 const PANEL_BG = '#0F1214';
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 40 : meta.title.length > 40 ? 48 : 56;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
 
   return new ImageResponse(
     <div
@@ -185,13 +189,8 @@ export function renderOgImage(meta: BlogPostMeta) {
           padding: '48px 55px',
         }}
       >
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 19, color: '#B4B9BC' }}
-        >
-          <span style={{ color: BLUE, fontWeight: 700 }}>InferenceX</span>
-          <span>Blog</span>
-          <span style={{ color: `${GOLD}80` }}>—</span>
-          <span>SemiAnalysis</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src={logoSrc} height={32} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -200,19 +199,19 @@ export function renderOgImage(meta: BlogPostMeta) {
           </div>
           <div
             style={{
-              fontSize: 21,
+              fontSize: 28,
               color: '#C9CACB',
               lineHeight: 1.4,
-              maxHeight: 60,
+              maxHeight: 80,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 130 ? meta.excerpt.slice(0, 130) + '…' : meta.excerpt}
+            {meta.excerpt.length > 110 ? meta.excerpt.slice(0, 110) + '…' : meta.excerpt}
           </div>
         </div>
 
         <div
-          style={{ display: 'flex', gap: 20, fontSize: 16, color: '#B4B9BC', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 20, fontSize: 24, color: '#B4B9BC', alignItems: 'center' }}
         >
           <span>{meta.author}</span>
           <span style={{ color: `${GOLD}60` }}>·</span>
@@ -234,9 +233,9 @@ export function renderOgImage(meta: BlogPostMeta) {
                   backgroundColor: `${GOLD}18`,
                   border: `1px solid ${GOLD}30`,
                   color: GOLD,
-                  padding: '3px 12px',
+                  padding: '4px 14px',
                   borderRadius: 9999,
-                  fontSize: 12,
+                  fontSize: 20,
                 }}
               >
                 {tag}

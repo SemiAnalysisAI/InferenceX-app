@@ -29,7 +29,7 @@ import { renderOgImage as v23 } from '@/app/blog/[slug]/og-variants/v23-bold-cir
 import { renderOgImage as v24 } from '@/app/blog/[slug]/og-variants/v24-gold-split-bold';
 import { renderOgImage as v25 } from '@/app/blog/[slug]/og-variants/v25-gold-accent-stripe';
 
-const variants: Record<string, (meta: any) => ImageResponse> = {
+const variants: Record<string, (meta: any) => Promise<ImageResponse>> = {
   v1,
   v2,
   v3,
@@ -74,5 +74,5 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return render(result.meta);
+  return await render(result.meta);
 }

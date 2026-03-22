@@ -2,14 +2,18 @@
  * V8: Bottom Circuit — Circuit pattern as a footer strip, gold accent line separating.
  * Content heavy at top, decorative element grounds the bottom.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
 
 export const size = { width: 1200, height: 630 };
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 40 : meta.title.length > 40 ? 48 : 56;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
 
   return new ImageResponse(
     <div
@@ -33,26 +37,26 @@ export function renderOgImage(meta: BlogPostMeta) {
           padding: '50px 60px 30px',
         }}
       >
-        <div style={{ display: 'flex', fontSize: 20, color: '#a1a1aa' }}>
-          InferenceX Blog — SemiAnalysis
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <img src={logoSrc} height={32} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.2 }}>{meta.title}</div>
           <div
             style={{
-              fontSize: 22,
+              fontSize: 28,
               color: '#a1a1aa',
               lineHeight: 1.4,
-              maxHeight: 62,
+              maxHeight: 80,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+            {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '...' : meta.excerpt}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 24, fontSize: 18, color: '#a1a1aa' }}>
+        <div style={{ display: 'flex', gap: 24, fontSize: 24, color: '#a1a1aa' }}>
           <span>{meta.author}</span>
           <span>·</span>
           <span>
@@ -73,7 +77,7 @@ export function renderOgImage(meta: BlogPostMeta) {
                   backgroundColor: '#27272a',
                   padding: '4px 12px',
                   borderRadius: 9999,
-                  fontSize: 14,
+                  fontSize: 20,
                 }}
               >
                 {tag}

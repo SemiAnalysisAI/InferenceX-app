@@ -3,6 +3,9 @@
  * Teal trace tiles (#2A6B6B–#3A7A7A) with gold accent tiles (#F7B041).
  * Content over gradient overlay. Closest recreation of the sharecard aesthetic.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
@@ -41,8 +44,9 @@ function innerColor(type: number): string {
   return `${TEAL}${10 + type * 4}`;
 }
 
-export function renderOgImage(meta: BlogPostMeta) {
-  const titleSize = meta.title.length > 60 ? 40 : meta.title.length > 40 ? 48 : 56;
+export async function renderOgImage(meta: BlogPostMeta) {
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
 
   return new ImageResponse(
     <div
@@ -110,15 +114,10 @@ export function renderOgImage(meta: BlogPostMeta) {
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          fontSize: 20,
-          color: '#B4B9BC',
           zIndex: 1,
         }}
       >
-        <span style={{ color: BLUE, fontWeight: 700 }}>InferenceX</span>
-        <span>Blog</span>
-        <span style={{ color: `${GOLD}80` }}>—</span>
-        <span>SemiAnalysis</span>
+        <img src={logoSrc} height={32} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, zIndex: 1 }}>
@@ -127,14 +126,14 @@ export function renderOgImage(meta: BlogPostMeta) {
         </div>
         <div
           style={{
-            fontSize: 22,
+            fontSize: 28,
             color: '#C9CACB',
             lineHeight: 1.4,
-            maxHeight: 62,
+            maxHeight: 80,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+          {meta.excerpt.length > 120 ? meta.excerpt.slice(0, 120) + '…' : meta.excerpt}
         </div>
       </div>
 
@@ -142,7 +141,7 @@ export function renderOgImage(meta: BlogPostMeta) {
         style={{
           display: 'flex',
           gap: 20,
-          fontSize: 17,
+          fontSize: 24,
           color: '#B4B9BC',
           alignItems: 'center',
           zIndex: 1,
@@ -168,9 +167,9 @@ export function renderOgImage(meta: BlogPostMeta) {
                 backgroundColor: `${GOLD}18`,
                 border: `1px solid ${GOLD}30`,
                 color: GOLD,
-                padding: '3px 14px',
+                padding: '4px 16px',
                 borderRadius: 9999,
-                fontSize: 13,
+                fontSize: 20,
               }}
             >
               {tag}
