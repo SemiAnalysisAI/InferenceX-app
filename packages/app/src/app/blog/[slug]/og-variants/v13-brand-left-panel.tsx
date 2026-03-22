@@ -190,7 +190,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src={logoSrc} height={32} />
+          <img src={logoSrc} height={96} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

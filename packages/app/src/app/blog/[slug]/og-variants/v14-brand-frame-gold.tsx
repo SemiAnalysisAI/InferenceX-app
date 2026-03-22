@@ -214,7 +214,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
       {/* Header with logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, zIndex: 1 }}>
-        <img src={logoSrc} height={32} />
+        <img src={logoSrc} height={96} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, zIndex: 1 }}>

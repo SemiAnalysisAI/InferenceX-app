@@ -170,7 +170,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
             zIndex: 1,
           }}
         >
-          <img src={logoSrc} height={36} />
+          <img src={logoSrc} height={108} />
         </div>
       </div>
     </div>,

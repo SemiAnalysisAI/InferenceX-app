@@ -110,7 +110,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
-        <img src={logoSrc} height={34} />
+        <img src={logoSrc} height={100} />
       </div>
 
       {/* Title */}

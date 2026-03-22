@@ -33,7 +33,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
     >
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <img src={logoSrc} height={36} />
+        <img src={logoSrc} height={108} />
       </div>
 
       {/* Title — the hero */}

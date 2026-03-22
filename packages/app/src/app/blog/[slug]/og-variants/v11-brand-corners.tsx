@@ -254,7 +254,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
           zIndex: 1,
         }}
       >
-        <img src={logoSrc} height={32} />
+        <img src={logoSrc} height={96} />
       </div>
 
       {/* Title + excerpt */}

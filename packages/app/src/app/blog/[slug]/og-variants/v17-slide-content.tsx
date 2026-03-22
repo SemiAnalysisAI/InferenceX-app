@@ -157,7 +157,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
           <span>·</span>
           <span>{meta.readingTime} min read</span>
         </div>
-        <img src={logoSrc} height={28} />
+        <img src={logoSrc} height={84} />
       </div>
     </div>,
     size,

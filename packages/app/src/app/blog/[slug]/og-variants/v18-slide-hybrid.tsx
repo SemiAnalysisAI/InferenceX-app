@@ -132,7 +132,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
         {/* Brand logo on gold area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, zIndex: 1 }}>
-          <img src={logoSrc} height={32} />
+          <img src={logoSrc} height={96} />
         </div>
 
         {/* Date + meta on gold area */}

@@ -214,7 +214,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
             <span style={{ fontSize: 24, color: '#5D5E5F' }}>{meta.author}</span>
             <span style={{ fontSize: 24, color: '#6D6E6F' }}>{meta.readingTime} min read</span>
           </div>
-          <img src={logoSrc} height={28} />
+          <img src={logoSrc} height={84} />
         </div>
       </div>
     </div>,

@@ -46,7 +46,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src={logoSrc} height={28} />
+          <img src={logoSrc} height={84} />
           <span style={{ fontSize: 24, color: '#5D5E5F' }}>InferenceX Blog</span>
         </div>
         <div

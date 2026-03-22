@@ -143,7 +143,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
           padding: '0 28px',
         }}
       >
-        <img src={logoSrc} height={28} />
+        <img src={logoSrc} height={84} />
         <span style={{ fontSize: 24, color: CHARCOAL, fontWeight: 500 }}>InferenceX Blog</span>
       </div>
     </div>,
