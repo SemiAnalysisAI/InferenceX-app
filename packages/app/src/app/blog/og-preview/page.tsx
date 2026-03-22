@@ -80,8 +80,8 @@ export default function OgPreviewPage() {
                     alt={`${v.name} at ${s.label}`}
                     width={s.w}
                     height={s.h}
-                    style={{ width: s.w, height: s.h }}
-                    className="rounded border border-border"
+                    style={{ width: s.w, height: s.h, maxWidth: 'none' }}
+                    className="rounded border border-border shrink-0"
                   />
                 </div>
               ))}
