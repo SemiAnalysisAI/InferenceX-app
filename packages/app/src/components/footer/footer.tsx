@@ -11,7 +11,7 @@ export const Footer = () => {
     <footer
       data-testid="footer"
       className={cn(
-        'w-full',
+        'relative w-full overflow-visible',
         'before:absolute',
         'before:bg-muted/50',
         'dark:before:bg-muted',
@@ -19,7 +19,7 @@ export const Footer = () => {
         'before:content-[""]',
         'before:hidden lg:before:block',
         'before:w-1/2',
-        'before:h-full',
+        'before:h-[200%]',
         'before:right-0',
         "before:mask-[url('/left-pattern-full.svg')]",
         'before:mask-no-repeat',

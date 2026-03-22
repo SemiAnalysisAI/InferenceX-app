@@ -159,7 +159,7 @@ export default function RootLayout({
         <link rel="preconnect" href={SITE_URL} />
         <link rel="dns-prefetch" href={SITE_URL} />
       </head>
-      <body className={`${dm_sans.variable} antialiased relative`}>
+      <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <PostHogProvider>
           <script
             type="application/ld+json"
@@ -174,7 +174,7 @@ export default function RootLayout({
             >
               <PostHogPageView />
               <Header />
-              {children}
+              <div className="flex-1">{children}</div>
               <Footer />
             </ThemeProvider>
           </QueryProvider>
