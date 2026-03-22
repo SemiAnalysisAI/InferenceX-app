@@ -5,7 +5,7 @@ import { PageContent } from '@/components/page-content';
 import { TAB_META, VALID_TABS } from '@/lib/tab-meta';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return [{ tab: [] }, ...VALID_TABS.map((t) => ({ tab: [t] }))];
