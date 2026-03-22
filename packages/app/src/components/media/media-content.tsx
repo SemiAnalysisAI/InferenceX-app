@@ -61,7 +61,7 @@ function MediaCard({ title, organization, url, type, date }: MediaItem) {
 
 export function MediaContent() {
   return (
-    <main className="relative min-h-screen">
+    <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>

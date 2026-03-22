@@ -251,7 +251,7 @@ export function PageContent({ initialTab = 'inference' }: { initialTab?: string 
       <StarNudge />
       <ExportNudge />
       <UnofficialRunProvider>
-        <main className="relative min-h-screen">
+        <main className="relative">
           <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
             <section>
               <Card data-testid="intro-section">
