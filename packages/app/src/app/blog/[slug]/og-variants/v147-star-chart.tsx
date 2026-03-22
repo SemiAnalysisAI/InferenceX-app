@@ -164,7 +164,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
         const minX = Math.min(star.x, next.x);
         const minY = Math.min(star.y, next.y);
         const w = Math.abs(next.x - star.x) || 1;
-        const h = Math.abs(next.y - star.y) || 1;
+        const _h = Math.abs(next.y - star.y) || 1;
         // Approximate line with a thin div (diagonal won't be perfect but suggests a connection)
         return (
           <div

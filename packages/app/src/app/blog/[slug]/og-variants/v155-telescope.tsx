@@ -40,7 +40,7 @@ const RADIUS = 260;
 
 // Corner vignette blocks to create the circular mask effect
 // We use rectangles positioned around the circle to create the illusion
-const vignetteBlocks: { left: number; top: number; width: number; height: number }[] = [
+const _vignetteBlocks: { left: number; top: number; width: number; height: number }[] = [
   // Top strip
   { left: 0, top: 0, width: 1200, height: CY - RADIUS },
   // Bottom strip

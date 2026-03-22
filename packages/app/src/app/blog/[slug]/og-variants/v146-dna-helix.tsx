@@ -105,7 +105,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
           const next = arr[i + 1];
           const dx = next.x - d.x;
           const dy = next.y - d.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
+          const _len = Math.sqrt(dx * dx + dy * dy);
           return (
             <div
               key={`s1-${i}`}

@@ -27,7 +27,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
   const rays = Array.from({ length: 24 }, (_, i) => {
     const angle = (i / 24) * Math.PI;
     const spreadX = Math.cos(angle) * 800;
-    const spreadY = Math.sin(angle) * 600;
+    const _spreadY = Math.sin(angle) * 600;
     return {
       left: 600 + spreadX * 0.5 - 1,
       top: -20,
