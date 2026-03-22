@@ -32,7 +32,7 @@ export const Footer = () => {
     >
       <div className="container mx-auto px-4 lg:px-8 py-12">
         {/* Main grid */}
-        <div className="grid grid-cols-1 md:grid-cols-[4fr_3fr_3fr] gap-10 md:gap-8 mb-10">
+        <div className="flex flex-col md:flex-row md:justify-between gap-10 md:gap-8 mb-10">
           {/* Left — Brand */}
           <div
             data-testid="footer-brand"
@@ -61,7 +61,7 @@ export const Footer = () => {
             </Link>
             <p
               data-testid="footer-brand-description"
-              className="text-sm text-muted-foreground max-w-xs"
+              className="text-sm text-muted-foreground max-w-xs text-center md:text-left"
             >
               Continuous open-source inference benchmarking. Real-world, reproducible, auditable
               performance data you can trust.
@@ -69,7 +69,7 @@ export const Footer = () => {
           </div>
 
           {/* Center — Links */}
-          <div data-testid="footer-links" className="grid grid-cols-3 gap-6">
+          <div data-testid="footer-links" className="flex justify-evenly gap-6">
             <div data-testid="footer-links-semianalysis" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">SemiAnalysis</span>
               <a
@@ -145,7 +145,7 @@ export const Footer = () => {
           </div>
 
           {/* Right — CTA + Social */}
-          <div data-testid="footer-cta" className="flex flex-col gap-4 md:items-end">
+          <div data-testid="footer-cta" className="flex flex-col gap-4 items-center md:items-end">
             <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
               <div className="rounded-md bg-background/80 w-fit">
                 <StarButton />
@@ -157,7 +157,7 @@ export const Footer = () => {
                 <ShareLinkedInButton />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground md:text-right max-w-xs">
+            <p className="text-sm text-muted-foreground text-center md:text-right max-w-xs">
               If this data helps your work, consider starring us on GitHub or sharing with your
               network.
             </p>
