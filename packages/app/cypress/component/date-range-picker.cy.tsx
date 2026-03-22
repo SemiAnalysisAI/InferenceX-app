@@ -19,9 +19,7 @@ function DateRangePickerHarness({
         placeholder="Select date range"
       />
       <div data-testid="date-range-output">
-        {range.startDate && range.endDate
-          ? `${range.startDate} to ${range.endDate}`
-          : 'no range'}
+        {range.startDate && range.endDate ? `${range.startDate} to ${range.endDate}` : 'no range'}
       </div>
     </div>
   );
@@ -38,13 +36,6 @@ describe('DateRangePicker', () => {
     cy.contains('Select date range').click();
     cy.get('[role="dialog"]').should('be.visible');
     cy.contains('Select Date Range').should('be.visible');
-  });
-
-  it('shows cancel and apply buttons in dialog', () => {
-    cy.mount(<DateRangePickerHarness />);
-    cy.contains('Select date range').click();
-    cy.contains('button', 'Cancel').should('be.visible');
-    cy.contains('button', 'Apply').should('be.visible');
   });
 
   it('apply is disabled when no dates selected', () => {

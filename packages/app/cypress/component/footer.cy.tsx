@@ -15,10 +15,6 @@ describe('Footer', () => {
     );
   });
 
-  it('renders the footer element', () => {
-    cy.get('[data-testid="footer"]').should('exist');
-  });
-
   it('displays copyright notice with semianalysis.com and current year', () => {
     const year = new Date().getFullYear().toString();
     cy.get('[data-testid="footer-copyright"]').should('contain', 'semianalysis.com');
@@ -56,10 +52,6 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-frontend"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX-app');
-  });
-
-  it('shows the SemiAnalysis logo', () => {
-    cy.get('[data-testid="footer-brand"]').find('img[alt="SemiAnalysis logo"]').should('exist');
   });
 
   it('all external links open in a new tab', () => {

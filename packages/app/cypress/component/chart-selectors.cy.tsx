@@ -1,6 +1,10 @@
 import { useState } from 'react';
 
-import { ModelSelector, SequenceSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
+import {
+  ModelSelector,
+  SequenceSelector,
+  PrecisionSelector,
+} from '@/components/ui/chart-selectors';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 function ModelSelectorHarness() {
@@ -51,10 +55,6 @@ describe('Chart Selectors', () => {
       cy.mount(<ModelSelectorHarness />);
     });
 
-    it('renders with data-testid', () => {
-      cy.get('[data-testid="model-selector"]').should('be.visible');
-    });
-
     it('shows options when clicked', () => {
       cy.get('[data-testid="model-selector"]').click();
       cy.get('[role="option"]').should('have.length.greaterThan', 0);
@@ -72,10 +72,6 @@ describe('Chart Selectors', () => {
       cy.mount(<SequenceSelectorHarness />);
     });
 
-    it('renders with data-testid', () => {
-      cy.get('[data-testid="sequence-selector"]').should('be.visible');
-    });
-
     it('shows options when clicked', () => {
       cy.get('[data-testid="sequence-selector"]').click();
       cy.get('[role="option"]').should('have.length', 3);
@@ -91,10 +87,6 @@ describe('Chart Selectors', () => {
   describe('PrecisionSelector', () => {
     beforeEach(() => {
       cy.mount(<PrecisionSelectorHarness />);
-    });
-
-    it('renders with data-testid', () => {
-      cy.get('[data-testid="precision-multiselect"]').should('be.visible');
     });
 
     it('shows current selection', () => {

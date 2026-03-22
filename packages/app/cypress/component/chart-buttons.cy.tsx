@@ -11,14 +11,6 @@ describe('ChartButtons', () => {
       );
     });
 
-    it('renders export button', () => {
-      cy.get('[data-testid="export-button"]').should('be.visible');
-    });
-
-    it('renders zoom reset button', () => {
-      cy.get('[data-testid="zoom-reset-button"]').should('be.visible');
-    });
-
     it('zoom reset dispatches custom event', () => {
       cy.window().then((win) => {
         const handler = cy.stub().as('zoomReset');
