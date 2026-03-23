@@ -13,7 +13,7 @@ export async function GET() {
       '',
       `> ${post.subtitle}`,
       '',
-      `- **Author**: ${'SemiAnalysis'}`,
+      `- **Author**: ${AUTHOR_NAME}`,
       `- **Date**: ${post.date}`,
       `- **URL**: ${SITE_URL}/blog/${post.slug}`,
       ...(post.tags ? [`- **Tags**: ${post.tags.join(', ')}`] : []),

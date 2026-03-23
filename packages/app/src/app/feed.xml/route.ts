@@ -21,7 +21,7 @@ export async function GET() {
       <link>${SITE_URL}/blog/${post.slug}</link>
       <guid isPermaLink="false">${SITE_URL}/blog/${post.slug}</guid>
       <description>${escapeXml(post.subtitle)}</description>
-      <dc:creator>${escapeXml('SemiAnalysis')}</dc:creator>
+      <dc:creator>${escapeXml(AUTHOR_NAME)}</dc:creator>
       <pubDate>${new Date(post.date + 'T00:00:00Z').toUTCString()}</pubDate>${
         post.tags
           ? post.tags.map((tag) => `\n      <category>${escapeXml(tag)}</category>`).join('')
