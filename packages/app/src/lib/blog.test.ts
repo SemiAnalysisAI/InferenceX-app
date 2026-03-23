@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import fs from 'fs';
 
-import { getAllPosts, getPostBySlug, getReadingTime } from './blog';
+import { getAllPosts, getPostBySlug, getReadingTime, slugify } from './blog';
 
 const FAKE_MDX = `---
 title: 'Test Post'
@@ -34,6 +34,31 @@ vi.mock('fs', async (importOriginal) => {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('slugify', () => {
+  it('lowercases and replaces non-alphanumeric chars with hyphens', () => {
+    expect(slugify('Hello World')).toBe('hello-world');
+    expect(slugify('My Post!!')).toBe('my-post');
+  });
+
+  it('collapses consecutive special chars into a single hyphen', () => {
+    expect(slugify('foo---bar')).toBe('foo-bar');
+    expect(slugify('a & b @ c')).toBe('a-b-c');
+  });
+
+  it('strips leading and trailing hyphens', () => {
+    expect(slugify('--hello--')).toBe('hello');
+  });
+
+  it('returns "post" for empty or all-special-char input', () => {
+    expect(slugify('')).toBe('post');
+    expect(slugify('!!!')).toBe('post');
+  });
+
+  it('passes through already-valid slugs unchanged', () => {
+    expect(slugify('hello-world')).toBe('hello-world');
+  });
 });
 
 describe('getReadingTime', () => {

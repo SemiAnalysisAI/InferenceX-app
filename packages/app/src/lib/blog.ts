@@ -20,6 +20,15 @@ export interface BlogPostMeta extends BlogFrontmatter {
 const CONTENT_DIR = path.join(process.cwd(), 'content', 'blog');
 const WORDS_PER_MINUTE = 265;
 
+export function slugify(raw: string): string {
+  return (
+    raw
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'post'
+  );
+}
+
 export function getReadingTime(content: string): number {
   const words = content.trim().split(/\s+/).length;
   return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
@@ -31,7 +40,7 @@ export function getAllPosts(): BlogPostMeta[] {
   const files = fs.readdirSync(CONTENT_DIR).filter((f) => f.endsWith('.mdx'));
 
   const posts = files.map((filename) => {
-    const slug = filename.replace(/\.mdx$/, '');
+    const slug = slugify(filename.replace(/\.mdx$/, ''));
     const raw = fs.readFileSync(path.join(CONTENT_DIR, filename), 'utf-8');
     const { data, content } = matter(raw);
 
@@ -46,7 +55,8 @@ export function getAllPosts(): BlogPostMeta[] {
 }
 
 export function getPostBySlug(slug: string): { meta: BlogPostMeta; raw: string } | null {
-  const filePath = path.join(CONTENT_DIR, `${slug}.mdx`);
+  const safe = slugify(slug);
+  const filePath = path.join(CONTENT_DIR, `${safe}.mdx`);
   if (!fs.existsSync(filePath)) return null;
 
   const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -55,7 +65,7 @@ export function getPostBySlug(slug: string): { meta: BlogPostMeta; raw: string }
   return {
     meta: {
       ...(data as BlogFrontmatter),
-      slug,
+      slug: safe,
       readingTime: getReadingTime(content),
     },
     raw: content,
