@@ -129,39 +129,42 @@ export default async function BlogPostPage({ params }: Props) {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>
-            <Link
-              href="/blog"
-              className="text-sm text-muted-foreground hover:underline mb-4 inline-block"
-            >
-              &larr; Back to blog
-            </Link>
-            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
-              <span>{'SemiAnalysis'}</span>
-              <span>&middot;</span>
-              <time dateTime={meta.date}>
-                {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  timeZone: 'UTC',
-                })}
-              </time>
-              <span>&middot;</span>
-              <span>{meta.readingTime} min read</span>
-            </div>
-            {meta.tags && meta.tags.length > 0 && (
-              <div className="flex gap-2 mt-3">
-                {meta.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
-                ))}
+            <nav>
+              <Link
+                href="/blog"
+                className="text-sm text-muted-foreground hover:underline mb-4 inline-block"
+              >
+                &larr;&nbsp;&nbsp;Back to blog
+              </Link>
+            </nav>
+            <header>
+              <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
+              <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
+                <span>{'SemiAnalysis'}</span>
+                <span>&middot;</span>
+                <time dateTime={meta.date}>
+                  {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    timeZone: 'UTC',
+                  })}
+                </time>
+                <span>&middot;</span>
+                <span>{meta.readingTime} min read</span>
+                {meta.tags && meta.tags.length > 0 && (
+                  <>
+                    <span>&middot;</span>
+                    {meta.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-muted px-3 py-0.5 text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </>
+                )}
               </div>
-            )}
+            </header>
           </Card>
           <Card>
             <article className="prose prose-neutral dark:prose-invert max-w-none mx-4 md:mx-8">
