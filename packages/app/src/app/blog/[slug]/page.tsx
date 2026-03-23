@@ -7,6 +7,7 @@ import { createHighlighterCore } from 'shiki/core';
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 import { mdxComponents } from '@/components/blog/mdx-components';
+import { Card } from '@/components/ui/card';
 import { getAllPosts, getPostBySlug } from '@/lib/blog';
 import {
   AUTHOR_HANDLE,
@@ -123,47 +124,52 @@ export default async function BlogPostPage({ params }: Props) {
   };
 
   return (
-    <main className="container mx-auto px-4 py-12 max-w-3xl">
+    <main className="relative">
       <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-
-      <Link
-        href="/blog"
-        className="text-sm text-muted-foreground hover:underline mb-8 inline-block"
-      >
-        &larr; Back to blog
-      </Link>
-
-      <header className="mb-10">
-        <h1 className="text-4xl font-bold mb-4">{meta.title}</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span>{'SemiAnalysis'}</span>
-          <span>&middot;</span>
-          <time dateTime={meta.date}>
-            {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              timeZone: 'UTC',
-            })}
-          </time>
-          <span>&middot;</span>
-          <span>{meta.readingTime} min read</span>
-        </div>
-        {meta.tags && meta.tags.length > 0 && (
-          <div className="flex gap-2 mt-3">
-            {meta.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </header>
-
-      <article className="prose prose-neutral dark:prose-invert max-w-none">{content}</article>
+      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
+        <section>
+          <Card>
+            <Link
+              href="/blog"
+              className="text-sm text-muted-foreground hover:underline mb-4 inline-block"
+            >
+              &larr; Back to blog
+            </Link>
+            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
+              <span>{'SemiAnalysis'}</span>
+              <span>&middot;</span>
+              <time dateTime={meta.date}>
+                {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  timeZone: 'UTC',
+                })}
+              </time>
+              <span>&middot;</span>
+              <span>{meta.readingTime} min read</span>
+            </div>
+            {meta.tags && meta.tags.length > 0 && (
+              <div className="flex gap-2 mt-3">
+                {meta.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+          <Card>
+            <article className="prose prose-neutral dark:prose-invert max-w-none mx-4 md:mx-8">
+              {content}
+            </article>
+          </Card>
+        </section>
+      </div>
     </main>
   );
 }

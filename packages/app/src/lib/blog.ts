@@ -18,7 +18,7 @@ export interface BlogPostMeta extends BlogFrontmatter {
 }
 
 const CONTENT_DIR = path.join(process.cwd(), 'content', 'blog');
-const WORDS_PER_MINUTE = 238;
+const WORDS_PER_MINUTE = 265;
 
 export function getReadingTime(content: string): number {
   const words = content.trim().split(/\s+/).length;

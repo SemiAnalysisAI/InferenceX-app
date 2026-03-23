@@ -9,8 +9,8 @@ describe('getReadingTime', () => {
 
   it('calculates reading time for longer content', () => {
     const words = Array(500).fill('word').join(' ');
-    // 500 words / 238 wpm = 2.1 → ceil = 3
-    expect(getReadingTime(words)).toBe(3);
+    // 500 words / 265 wpm = 1.89 → ceil = 2
+    expect(getReadingTime(words)).toBe(2);
   });
 });
 
