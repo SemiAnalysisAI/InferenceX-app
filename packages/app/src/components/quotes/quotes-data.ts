@@ -258,4 +258,12 @@ export const QUOTES: Quote[] = [
     org: 'Periodic Labs',
     logo: 'periodic-labs.png',
   },
+  {
+    text: 'InferenceX\u2122 makes that gap visible across every major accelerator, continuously and transparently. For anyone working on ML systems research, having an open, reproducible baseline that tracks how inference software continuously improves over time is incredibly valuable. This is the kind of open source data the research community needs.',
+    name: 'Simon Guo',
+    title: 'PhD Student, Stanford Scaling Intelligence',
+    org: 'Stanford',
+    logo: 'stanford.svg',
+    link: 'https://simonguo.tech/',
+  },
 ];
