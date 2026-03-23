@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
@@ -9,7 +10,43 @@ import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
 
+const NAV_LINKS = [
+  {
+    href: '/',
+    label: 'Dashboard',
+    testId: 'nav-link-dashboard',
+    event: 'header_dashboard_clicked',
+  },
+  { href: '/media', label: 'Media', testId: 'nav-link-media', event: 'header_media_clicked' },
+  {
+    href: '/quotes',
+    label: 'Supporters',
+    testId: 'nav-link-supporters',
+    event: 'header_supporters_clicked',
+  },
+  { href: '/blog', label: 'Articles', testId: 'nav-link-blog', event: 'header_blog_clicked' },
+] as const;
+
+function isActive(pathname: string, href: string): boolean {
+  if (href === '/')
+    return (
+      pathname === '/' ||
+      (!pathname.startsWith('/media') &&
+        !pathname.startsWith('/quotes') &&
+        !pathname.startsWith('/blog'))
+    );
+  return pathname.startsWith(href);
+}
+
+const baseClasses =
+  'items-center px-3 py-1.5 rounded-md border transition-colors text-sm font-medium';
+const inactiveClasses =
+  'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800';
+const activeClasses = 'bg-primary/10 border-primary/50 text-primary';
+
 export const Header = () => {
+  const pathname = usePathname();
+
   return (
     <header
       data-testid="header"
@@ -56,71 +93,40 @@ export const Header = () => {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <Link
-                data-testid="nav-link-dashboard"
-                href="/"
-                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => track('header_dashboard_clicked')}
-              >
-                Dashboard
-              </Link>
-              <Link
-                data-testid="nav-link-media"
-                href="/media"
-                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => track('header_media_clicked')}
-              >
-                Media
-              </Link>
-              <Link
-                data-testid="nav-link-supporters"
-                href="/quotes"
-                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => track('header_supporters_clicked')}
-              >
-                Supporters
-              </Link>
-              <Link
-                data-testid="nav-link-blog"
-                href="/blog"
-                className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => track('header_blog_clicked')}
-              >
-                Articles
-              </Link>
+              {NAV_LINKS.map(({ href, label, testId, event }) => (
+                <Link
+                  key={href}
+                  data-testid={testId}
+                  href={href}
+                  className={cn(
+                    'hidden md:flex',
+                    baseClasses,
+                    isActive(pathname, href) ? activeClasses : inactiveClasses,
+                  )}
+                  onClick={() => track(event)}
+                >
+                  {label}
+                </Link>
+              ))}
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
               <ModeToggle />
             </div>
           </div>
           <div data-testid="mobile-nav" className="flex md:hidden items-center gap-2 mt-8">
-            <Link
-              href="/"
-              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-              onClick={() => track('header_dashboard_clicked')}
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/media"
-              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-              onClick={() => track('header_media_clicked')}
-            >
-              Media
-            </Link>
-            <Link
-              href="/quotes"
-              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-              onClick={() => track('header_supporters_clicked')}
-            >
-              Supporters
-            </Link>
-            <Link
-              href="/blog"
-              className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-              onClick={() => track('header_blog_clicked')}
-            >
-              Articles
-            </Link>
+            {NAV_LINKS.map(({ href, label, event }) => (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  'flex',
+                  baseClasses,
+                  isActive(pathname, href) ? activeClasses : inactiveClasses,
+                )}
+                onClick={() => track(event)}
+              >
+                {label}
+              </Link>
+            ))}
           </div>
         </div>
       </div>
