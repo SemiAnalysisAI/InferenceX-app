@@ -130,6 +130,23 @@ export const Footer = () => {
                 Frontend
               </a>
             </div>
+            <div data-testid="footer-links-content" className="flex flex-col gap-2.5">
+              <span className="text-sm font-medium text-foreground">Content</span>
+              <Link
+                data-testid="footer-link-articles"
+                href="/blog"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Articles
+              </Link>
+              <a
+                data-testid="footer-link-rss"
+                href="/feed.xml"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                RSS Feed
+              </a>
+            </div>
           </div>
 
           {/* Right — CTA + Social */}

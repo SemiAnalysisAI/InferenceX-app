@@ -7,6 +7,7 @@ import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { mdxComponents } from '@/components/blog/mdx-components';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
 import { getAllPosts, getPostBySlug } from '@/lib/blog';
 import {
@@ -156,6 +157,10 @@ export default async function BlogPostPage({ params }: Props) {
                     ))}
                   </>
                 )}
+              </div>
+              <div className="flex items-center gap-1.5 mt-4">
+                <ShareTwitterButton />
+                <ShareLinkedInButton />
               </div>
             </header>
           </Card>
