@@ -51,7 +51,7 @@ function MediaCard({ title, organization, url, type, date }: MediaItem) {
         >
           <h3 className="text-sm sm:text-base lg:text-lg font-medium leading-snug text-foreground group-hover:text-primary transition-colors italic group-hover:underline">
             &ldquo;{title}&rdquo;
-            <ExternalLinkIcon className="ml-1.5 inline-block h-[0.85em] w-[0.85em] opacity-50 group-hover:opacity-100 transition-opacity" />
+            <ExternalLinkIcon />
           </h3>
         </a>
       </div>
@@ -61,7 +61,7 @@ function MediaCard({ title, organization, url, type, date }: MediaItem) {
 
 export function MediaContent() {
   return (
-    <main className="relative min-h-screen">
+    <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>

@@ -3,10 +3,10 @@ import type * as d3 from 'd3';
 import { formatNumber } from '@/lib/utils';
 
 // Point shape constants
-export const POINT_SIZE = 4; // Base size (radius for circle, half-width/height for rectangle)
+export const POINT_SIZE = 3.5; // Base size (radius for circle, half-width/height for rectangle)
 export const HOVER_POINT_SIZE = 6; // Hover size
-export const STROKE_WIDTH = 1.5; // Normal stroke width
-export const HOVER_STROKE_WIDTH = 2; // Hover stroke width
+export const STROKE_WIDTH = 0; // Normal stroke width
+export const HOVER_STROKE_WIDTH = 0; // Hover stroke width
 export const HIT_AREA_RADIUS = 12; // Invisible hit area for easier interaction
 
 // Triangle path for BF16 precision

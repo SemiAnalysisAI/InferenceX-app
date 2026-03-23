@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
-import { SocialShareButtons } from '@/components/social-share-buttons';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
@@ -265,10 +265,16 @@ export default function ChartDisplay() {
                 }
                 setIsLegendExpanded={setIsLegendExpanded}
                 onExportCsv={() => {
-                  const visibleData = graph.data.filter((d) =>
-                    activeHwTypes.has(d.hwKey as string),
+                  const visibleData = graph.data.filter(
+                    (d) =>
+                      activeHwTypes.has(d.hwKey as string) &&
+                      selectedPrecisions.includes(d.precision),
                   );
-                  const { headers, rows } = inferenceChartToCsv(visibleData);
+                  const { headers, rows } = inferenceChartToCsv(
+                    visibleData,
+                    graph.model,
+                    graph.sequence,
+                  );
                   exportToCsv(`chart-${graphIndex}-${Date.now()}`, headers, rows);
                 }}
               />
@@ -660,7 +666,10 @@ export default function ChartDisplay() {
               </div>
               <div className="flex items-center gap-1.5">
                 <ShareButton />
-                <SocialShareButtons compact className="hidden sm:flex" />
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <ShareTwitterButton />
+                  <ShareLinkedInButton />
+                </div>
               </div>
             </div>
             <ChartControls intermediateDates={intermediateDates} />

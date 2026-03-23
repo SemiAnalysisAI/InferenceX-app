@@ -15,7 +15,7 @@ describe('ReliabilityBarChartD3', () => {
     mountWithProviders(<ReliabilityBarChartD3 />, {
       reliability: { error: null, chartData: [] },
     });
-    cy.contains('No reliability data available.').should('be.visible');
+    cy.contains('No reliability data available for this date range.').should('be.visible');
   });
 
   it('renders SVG with horizontal bars when data is provided', () => {

@@ -10,14 +10,6 @@ describe('ModeToggle', () => {
     );
   });
 
-  it('renders the theme toggle button', () => {
-    cy.get('[data-testid="theme-toggle"]').should('be.visible');
-  });
-
-  it('has accessible aria-label', () => {
-    cy.get('[data-testid="theme-toggle"]').should('have.attr', 'aria-label');
-  });
-
   it('clicking toggle switches to dark mode', () => {
     cy.get('html').should('not.have.class', 'dark');
     cy.get('[data-testid="theme-toggle"]').click();

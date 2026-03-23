@@ -89,7 +89,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 4. What are the **cost rates** in $/GPU/hr? (hyperscaler, neocloud, 3-year rental)
 5. Which **framework variants** will run on it? (e.g. `sglang`, `trt`, `dynamo-trt`, `vllm`, with/without `mtp`)
 6. Where should it **sort** relative to existing GPUs in legends?
-7. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc`, `-nb`)?
+7. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc-slurm`, `-dgxc`, `-nb`)?
 8. Do you have the **full hardware specs** for the GPU Specs tab? (memory GB, memory bandwidth TB/s, FP4/FP8/BF16 TFLOPS, interconnect tech, scale-up bandwidth, NIC model, scale-out topology)
 
 ### Then apply

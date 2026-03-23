@@ -20,7 +20,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ShareButton } from '@/components/ui/share-button';
-import { SocialShareButtons } from '@/components/social-share-buttons';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   Select,
@@ -501,7 +501,10 @@ export default function ThroughputCalculatorDisplay() {
               </div>
               <div className="flex items-center gap-1.5">
                 <ShareButton />
-                <SocialShareButtons compact className="hidden sm:flex" />
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <ShareTwitterButton />
+                  <ShareLinkedInButton />
+                </div>
               </div>
             </div>
 
@@ -510,18 +513,21 @@ export default function ThroughputCalculatorDisplay() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 <ModelSelector
                   id="calc-model"
+                  data-testid="calc-model-selector"
                   value={selectedModel}
                   onChange={handleModelChange}
                   availableModels={availableModels}
                 />
                 <SequenceSelector
                   id="calc-sequence"
+                  data-testid="calc-sequence-selector"
                   value={selectedSequence}
                   onChange={handleSequenceChange}
                   availableSequences={availableSequences}
                 />
                 <PrecisionSelector
                   id="calc-precision"
+                  data-testid="calc-precision-selector"
                   value={selectedPrecisions}
                   onChange={handlePrecisionChange}
                   availablePrecisions={availablePrecisions}
@@ -534,7 +540,11 @@ export default function ThroughputCalculatorDisplay() {
                     tooltip="The pricing tier used to calculate cost per million tokens. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental."
                   />
                   <Select value={costProvider} onValueChange={handleCostProviderChange}>
-                    <SelectTrigger id="calc-cost" className="w-full">
+                    <SelectTrigger
+                      id="calc-cost"
+                      data-testid="calc-cost-selector"
+                      className="w-full"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -554,7 +564,11 @@ export default function ThroughputCalculatorDisplay() {
                     tooltip="Whether to show costs for total tokens, input tokens only, or output tokens only."
                   />
                   <Select value={costType} onValueChange={handleCostTypeChange}>
-                    <SelectTrigger id="calc-cost-type" className="w-full">
+                    <SelectTrigger
+                      id="calc-cost-type"
+                      data-testid="calc-cost-type-selector"
+                      className="w-full"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

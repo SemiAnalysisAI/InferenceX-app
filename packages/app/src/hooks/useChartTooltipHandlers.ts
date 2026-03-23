@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { useCallback } from 'react';
+import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 import { useStickyTooltip } from './useStickyTooltip';
 
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
@@ -38,7 +39,10 @@ export interface ChartTooltipConfig<TData> {
    */
   getRulerY?: (
     data: TData,
-    yScale: d3.ScaleLinear<number, number, never> | d3.ScaleLogarithmic<number, number, never>,
+    yScale:
+      | d3.ScaleBand<string>
+      | d3.ScaleLinear<number, number, never>
+      | d3.ScaleLogarithmic<number, number, never>,
   ) => number;
 
   /**
@@ -268,9 +272,10 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           if (isPinned()) return;
 
           const rect = containerElement.getBoundingClientRect();
-          tooltipElement
-            .style('left', `${event.clientX - rect.left + 10}px`)
-            .style('top', `${event.clientY - rect.top + 10}px`);
+          const mx = event.clientX - rect.left;
+          const my = event.clientY - rect.top;
+          const pos = computeTooltipPosition(mx, my, tooltipElement, containerElement);
+          tooltipElement.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
         })
         .on('mouseleave', function (_event, d) {
           if (isPinned()) return;
@@ -289,15 +294,18 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         .on('click', function (event, d) {
           event.stopPropagation();
 
-          // Position tooltip near the clicked point
+          // Set content first so dimensions are available for position calc
           const rect = containerElement.getBoundingClientRect();
+          const mx = event.clientX - rect.left;
+          const my = event.clientY - rect.top;
+          tooltipElement.html(config.generateTooltipContent(d, true));
+          const pos = computeTooltipPosition(mx, my, tooltipElement, containerElement);
           tooltipElement
-            .style('left', `${event.clientX - rect.left + 10}px`)
-            .style('top', `${event.clientY - rect.top + 10}px`)
+            .style('left', `${pos.left}px`)
+            .style('top', `${pos.top}px`)
             .style('opacity', 1)
             .style('display', 'block')
-            .style('pointer-events', 'auto')
-            .html(config.generateTooltipContent(d, true));
+            .style('pointer-events', 'auto');
 
           // Position rulers at the clicked point
           const { curX: currentXScale, curY: currentYScale } = getZoomedScales();

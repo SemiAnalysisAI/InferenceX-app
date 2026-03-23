@@ -508,7 +508,7 @@ describe('TCO Calculator', () => {
     });
 
     it('clicking one bar shows a comparison banner with "selected" text', () => {
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar-hit').first().click();
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
       cy.get('[data-testid="calculator-comparison-banner"]').should('contain.text', 'selected');
       cy.get('[data-testid="calculator-comparison-banner"]').should(
@@ -531,7 +531,7 @@ describe('TCO Calculator', () => {
 
     it('clicking two bars shows a comparison ratio', () => {
       // First bar already selected; click second
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar-hit').eq(1).click();
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').eq(1).click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
       cy.get('[data-testid="calculator-comparison-banner"]').should('contain.text', 'x more');
     });

@@ -1,17 +1,18 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { SocialShareButtons } from '@/components/social-share-buttons';
 import { cn } from '@/lib/utils';
 
-import { FooterStarButton } from './footer-star-cta';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
+
+import { StarButton } from './footer-star-cta';
 
 export const Footer = () => {
   return (
     <footer
       data-testid="footer"
       className={cn(
-        'w-full',
+        'relative w-full overflow-visible mt-auto pt-8',
         'before:absolute',
         'before:bg-muted/50',
         'dark:before:bg-muted',
@@ -19,7 +20,7 @@ export const Footer = () => {
         'before:content-[""]',
         'before:hidden lg:before:block',
         'before:w-1/2',
-        'before:h-full',
+        'before:h-[200%]',
         'before:right-0',
         "before:mask-[url('/left-pattern-full.svg')]",
         'before:mask-no-repeat',
@@ -29,68 +30,149 @@ export const Footer = () => {
         'before:-z-10',
       )}
     >
-      <div className="container mx-auto py-8 px-4 flex flex-col items-center justify-center">
-        {/* Open Source CTA */}
-        <div className="flex flex-col items-center gap-3 mb-6 pb-6 border-b border-border/40">
-          <p className="text-sm text-muted-foreground text-center max-w-md">
-            InferenceX is open source. If this data helps your work, star us or share with your
-            network.
-          </p>
-          <div className="flex items-center gap-1.5">
-            <FooterStarButton />
-            <SocialShareButtons compact />
+      <div className="container mx-auto px-4 lg:px-8 py-12">
+        {/* Main grid */}
+        <div className="flex flex-col md:flex-row md:justify-between gap-10 md:gap-8 mb-10">
+          {/* Left — Brand */}
+          <div
+            data-testid="footer-brand"
+            className="flex flex-col gap-4 items-center md:items-start"
+          >
+            <Link
+              data-testid="footer-brand-link"
+              target="_blank"
+              href="https://semianalysis.com/"
+              className="inline-block w-35 h-14.5"
+            >
+              <Image
+                width={140}
+                height={58}
+                src="/logo.png"
+                alt="SemiAnalysis logo"
+                className="hidden dark:block"
+              />
+              <Image
+                width={140}
+                height={58}
+                src="/logo-black.png"
+                alt="SemiAnalysis logo"
+                className="dark:hidden"
+              />
+            </Link>
+            <p
+              data-testid="footer-brand-description"
+              className="text-sm text-muted-foreground max-w-xs text-center md:text-left"
+            >
+              Continuous open-source inference benchmarking. Real-world, reproducible, auditable
+              performance data trusted by trillion dollar AI infrastructure operators like OpenAI,
+              Oracle, Microsoft, etc.
+            </p>
           </div>
-        </div>
 
-        {/* Policy Links */}
-        <nav className="mb-4">
-          <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-            <li>
+          {/* Center — Links */}
+          <div data-testid="footer-links" className="flex justify-evenly gap-6">
+            <div data-testid="footer-links-semianalysis" className="flex flex-col gap-2.5">
+              <span className="text-sm font-medium text-foreground">SemiAnalysis</span>
               <a
-                href="https://semianalysis.com/privacy-policy/"
-                className="underline hover:text-foreground"
+                data-testid="footer-link-main-site"
+                href="https://semianalysis.com"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Main Site
+              </a>
+              <a
+                data-testid="footer-link-newsletter"
+                href="https://newsletter.semianalysis.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Newsletter
+              </a>
+              <a
+                data-testid="footer-link-about"
+                href="https://semianalysis.com/about/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                About
+              </a>
+            </div>
+            <div data-testid="footer-links-legal" className="flex flex-col gap-2.5">
+              <span className="text-sm font-medium text-foreground">Legal</span>
+              <a
+                data-testid="footer-link-privacy"
+                href="https://semianalysis.com/privacy-policy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Privacy Policy
               </a>
-            </li>
-            <li>
               <a
+                data-testid="footer-link-cookies"
                 href="https://semianalysis.com/cookie-policy/"
-                className="underline hover:text-foreground"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Cookie Policy
               </a>
-            </li>
-            <li>
+            </div>
+            <div data-testid="footer-links-contribute" className="flex flex-col gap-2.5">
+              <span className="text-sm font-medium text-foreground">Contribute</span>
               <a
+                data-testid="footer-link-benchmarks"
                 href="https://github.com/SemiAnalysisAI/InferenceX"
-                className="underline hover:text-foreground"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                Contribute
+                Benchmarks
               </a>
-            </li>
-          </ul>
-        </nav>
+              <a
+                data-testid="footer-link-frontend"
+                href="https://github.com/SemiAnalysisAI/InferenceX-app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Frontend
+              </a>
+            </div>
+          </div>
 
-        {/* Copyright Notice */}
-        <p data-testid="footer-copyright" className="text-sm text-muted-foreground text-center">
-          &copy; {new Date().getFullYear()} semianalysis.com All rights reserved.
-        </p>
+          {/* Right — CTA + Social */}
+          <div data-testid="footer-cta" className="flex flex-col gap-4 items-center md:items-end">
+            <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
+              <div className="rounded-md bg-background/80 w-fit">
+                <StarButton />
+              </div>
+              <div className="rounded-md bg-background/80 w-fit">
+                <ShareTwitterButton />
+              </div>
+              <div className="rounded-md bg-background/80 w-fit">
+                <ShareLinkedInButton />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground text-center md:text-right max-w-xs">
+              If this data helps your work, consider starring us on GitHub or sharing with your
+              network.
+            </p>
+          </div>
+        </div>
 
-        {/* Logo Section */}
-        <div className="mt-4 flex items-center justify-center">
-          <Link target="_blank" className="hidden dark:block" href="https://semianalysis.com/">
-            <Image width={184} height={76} src="/logo.png" alt="SemiAnalysis logo" />
-          </Link>
-          <Link target="_blank" className="dark:hidden" href="https://semianalysis.com/">
-            <Image width={184} height={76} src="/logo-black.png" alt="SemiAnalysis logo" />
-          </Link>
+        {/* Bottom bar */}
+        <div
+          data-testid="footer-bottom-bar"
+          className="border-t border-border/40 pt-6 flex flex-col md:flex-row items-center justify-between gap-4"
+        >
+          <p data-testid="footer-copyright" className="text-xs text-muted-foreground">
+            &copy; {new Date().getFullYear()} semianalysis.com. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>

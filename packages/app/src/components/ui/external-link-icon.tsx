@@ -7,10 +7,14 @@ interface ExternalLinkIconProps extends React.SVGProps<SVGSVGElement> {
 }
 
 const ExternalLinkIcon = React.forwardRef<SVGSVGElement, ExternalLinkIconProps>(
-  ({ className, ...props }, ref) => (
+  ({ className, style, ...props }, ref) => (
     <svg
       ref={ref}
-      className={cn('ml-1 inline-block h-[1em] w-[1em]', className)}
+      className={cn(
+        'inline h-[0.85em] w-[0.85em] ml-1 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity',
+        className,
+      )}
+      style={{ verticalAlign: '-0.125em', ...style }}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"

@@ -499,6 +499,11 @@ async function main(): Promise<void> {
     [...unmappedHws].slice(0, 20).forEach((v) => console.log(`    ${v}`));
   }
 
+  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
+  const mvStart = Date.now();
+  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
+  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s`);
+
   console.log('\n=== ingest-ci-run complete ===');
 }
 

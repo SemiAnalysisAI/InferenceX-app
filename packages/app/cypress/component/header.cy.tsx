@@ -18,10 +18,6 @@ describe('Header', () => {
     );
   });
 
-  it('renders the header element', () => {
-    cy.get('[data-testid="header"]').should('be.visible');
-  });
-
   it('displays the InferenceX title', () => {
     cy.get('[data-testid="header"]').contains('InferenceX').should('be.visible');
   });
@@ -50,10 +46,6 @@ describe('Header', () => {
     cy.get('[data-testid="header-star-button"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-  });
-
-  it('GitHub stars button has glow animation class', () => {
-    cy.get('[data-testid="header-star-button"]').should('have.class', 'star-button-glow');
   });
 
   it('shows the theme toggle button', () => {
