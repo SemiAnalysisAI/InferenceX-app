@@ -264,9 +264,9 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/xanderdunn/',
   },
   {
-    text: 'InferenceX\u2122 makes that gap visible across every major accelerator, continuously and transparently. For anyone working on ML systems research, having an open, reproducible baseline that tracks how inference software continuously improves over time is incredibly valuable. This is the kind of open source data the research community needs.',
+    text: 'For researchers working on inference optimizations, understanding how new techniques interact across the software and hardware stack is critical yet incredibly hard to measure. InferenceX\u2122 provides much-needed insights into how inference performance evolves across major hardware platforms, moving the field forward with open, reproducible data that makes the gaps and progress visible.',
     name: 'Simon Guo',
-    title: 'PhD Student, Stanford Scaling Intelligence',
+    title: 'PhD Student, Stanford CS',
     org: 'Stanford',
     logo: 'stanford.svg',
     link: 'https://simonguo.tech/',
