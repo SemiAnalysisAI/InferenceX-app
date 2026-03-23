@@ -40,16 +40,9 @@ This isn't arbitrary. Each provider depends on the one above it:
 - Evaluation and Reliability need the hardware config from Inference context
 - TCO Calculator and Historical Trends reuse InferenceContext state (sequence, precisions) without their own providers — local `useState` is sufficient since they don't share state with other tabs
 
-## Two-Tier Caching (Memory + IndexedDB) with Version Heartbeat
+## Client-Side Caching (React Query — In-Memory Only)
 
-| Tier      | Scope          | TTL        | Rationale                                                                              |
-| --------- | -------------- | ---------- | -------------------------------------------------------------------------------------- |
-| In-memory | All query data | `Infinity` | Never expires on its own — invalidated explicitly by cache-version change on next load |
-| IndexedDB | All query data | `Infinity` | Persists across page reloads; cleared when cache version changes                       |
-
-Invalidation is **version-based, not time-based**. A 5-minute heartbeat polls `/api/v1/cache-version`. When the version changes (i.e., new data was ingested), IndexedDB is cleared so the next page load fetches fresh data. In-memory queries are intentionally _not_ invalidated mid-session to avoid jarring chart rebuilds — users get fresh data on their next visit.
-
-Both tiers are best-effort — failures return null, never throw. This prevents IndexedDB quota errors or private browsing restrictions from breaking the app.
+React Query holds all fetched data in memory with `staleTime: Infinity` and `gcTime: Infinity`. There is no persistent client-side cache — data is fetched fresh on each page load and held in memory for the duration of the session.
 
 ## Server-Side Caching (API Routes)
 
@@ -72,12 +65,6 @@ API route responses are cached at two layers before hitting the CDN.
 
 Both are called together by `purgeAll()`, which also writes a new `cache-version` timestamp to blob storage.
 
-### Cache-Version Tracking
-
-`purgeAll()` writes `{ v: new Date().toISOString() }` to the blob key `cache-version` after every purge. The client (`QueryProvider`) polls `/api/v1/cache-version` on a 5-minute heartbeat. That route reads the blob and returns `{ v }` with a 60-second CDN TTL (so the CDN itself doesn't stale the version indefinitely).
-
-When the client detects a version change, it clears IndexedDB and records the new version in `localStorage`. In-memory React Query data is intentionally left intact to avoid mid-session chart rebuilds — the fresh data is loaded on the next page visit.
-
 ### CDN Cache Headers
 
 `cachedJson()` sets:
@@ -95,7 +82,7 @@ Vercel-Cache-Tag: db
 
 ## React Query Configuration
 
-- **staleTime Infinity / gcTime Infinity**: Data changes at most a few times per day (cron-triggered rebuilds). Infinite TTLs mean React Query never refetches or garbage-collects on its own — all invalidation is driven by the cache-version heartbeat.
+- **staleTime Infinity / gcTime Infinity**: Data changes at most a few times per day (cron-triggered rebuilds). Infinite TTLs mean React Query never refetches or garbage-collects on its own — data is fetched once per page load and held for the session. The server-side CDN cache ensures fast responses.
 - **refetchOnWindowFocus: false**: Users tab away to reference articles, then come back. Auto-refetching would cause jarring chart rebuilds and lose zoom state.
 - **keepPreviousData** (per-hook, e.g. `useBenchmarks`): On sequence/model switch, the old chart stays visible during the fetch. Without this, users see a loading skeleton for 200-500ms on every filter change.
 - **retry: 1**: Single retry catches transient network blips. More retries would delay error display for actual outages.
