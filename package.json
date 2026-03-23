@@ -44,11 +44,11 @@
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
     "rimraf": "^6.1.3",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   },
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@10.30.3"
+  "packageManager": "pnpm@10.32.1"
 }

@@ -2,7 +2,9 @@ packages:
   - packages/*
 
 onlyBuiltDependencies:
+  - core-js
   - cypress
   - esbuild
   - lefthook
+  - protobufjs
   - sharp
