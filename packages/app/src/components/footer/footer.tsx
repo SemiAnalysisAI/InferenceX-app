@@ -22,7 +22,7 @@ export const Footer = () => {
         'before:w-1/2',
         'before:h-[200%]',
         'before:right-0',
-        "before:mask-[url('/left-pattern-full.svg')]",
+        "before:mask-[url('/brand/left-pattern-full.svg')]",
         'before:mask-no-repeat',
         'before:mask-position-[top_right]',
         'before:mask-size-[100%]',
