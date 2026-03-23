@@ -80,7 +80,7 @@ export function D3ChartWrapper({
                 opacity: pinnedPoint ? 1 : 0,
                 pointerEvents: pinnedPoint ? 'auto' : 'none',
                 display: pinnedPoint ? 'block' : 'none',
-                zIndex: 10,
+                zIndex: 50,
               }}
             />
             {noDataOverlay}

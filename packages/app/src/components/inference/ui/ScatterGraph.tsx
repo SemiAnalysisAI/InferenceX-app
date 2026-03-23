@@ -19,6 +19,7 @@ import type {
   ZoomContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 import {
   POINT_SIZE,
   HIT_AREA_RADIUS,
@@ -1062,7 +1063,8 @@ const ScatterGraph = React.memo(
                 .on('mousemove', function (event) {
                   if (chartRef.current?.isPinned()) return;
                   const [mx, my] = d3.pointer(event, container);
-                  tooltip.style('left', `${mx + 10}px`).style('top', `${my + 10}px`);
+                  const pos = computeTooltipPosition(mx, my, tooltip, container);
+                  tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
                 })
                 .on('mouseleave', function () {
                   if (chartRef.current?.isPinned()) return;
@@ -1074,13 +1076,14 @@ const ScatterGraph = React.memo(
                 .on('click', function (event, d) {
                   event.stopPropagation();
                   const [mx, my] = d3.pointer(event, container);
+                  tooltip.html(generateOverlayTooltipContent(createOverlayConfig(d, true)));
+                  const pos = computeTooltipPosition(mx, my, tooltip, container);
                   tooltip
-                    .style('left', `${mx + 10}px`)
-                    .style('top', `${my + 10}px`)
+                    .style('left', `${pos.left}px`)
+                    .style('top', `${pos.top}px`)
                     .style('opacity', 1)
                     .style('display', 'block')
                     .style('pointer-events', 'auto');
-                  tooltip.html(generateOverlayTooltipContent(createOverlayConfig(d, true)));
 
                   // Position rulers at clicked point
                   const ct = d3.zoomTransform(svgNode);
