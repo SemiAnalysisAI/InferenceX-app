@@ -36,7 +36,7 @@ export default function BlogPage() {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>
-            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Articles</h1>
+            <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">Articles</h2>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
               Insights on AI inference benchmarking, GPU performance, and ML infrastructure.
             </p>

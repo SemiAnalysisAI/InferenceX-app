@@ -138,7 +138,7 @@ export default async function BlogPostPage({ params }: Props) {
               </Link>
             </nav>
             <header>
-              <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
+              <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h2>
               <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
                 <span>{AUTHOR_NAME}</span>

@@ -31,7 +31,12 @@ function CustomImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   );
 }
 
+function Heading1(props: React.HTMLAttributes<HTMLHeadingElement>) {
+  return <h2 {...props} />;
+}
+
 export const mdxComponents: Record<string, React.ComponentType<any>> = {
+  h1: Heading1,
   a: CustomLink,
   img: CustomImage,
 };

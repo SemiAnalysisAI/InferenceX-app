@@ -5,7 +5,7 @@ describe('Blog', () => {
     });
 
     it('renders the blog page with heading', () => {
-      cy.get('h1').should('contain.text', 'Articles');
+      cy.get('h2').should('contain.text', 'Articles');
     });
 
     it('displays at least one blog post card', () => {
@@ -32,7 +32,7 @@ describe('Blog', () => {
     });
 
     it('renders the post title', () => {
-      cy.get('h1').should('contain.text', 'Hello World');
+      cy.get('h2').should('contain.text', 'Hello World');
     });
 
     it('displays post metadata', () => {
