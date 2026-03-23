@@ -229,6 +229,7 @@ export const QUOTES: Quote[] = [
     title: 'Engineer, Baseten',
     org: 'Baseten',
     logo: 'baseten.svg',
+    link: 'https://www.linkedin.com/in/alex-ker/',
   },
   {
     text: 'We founded Verda to give AI engineers frictionless access to cutting-edge compute without gatekeeping. InferenceX supports this mission by giving AI builders open, reproducible benchmarks that show what GPUs actually deliver under real inference workloads. We want our customers to see transparent, continuously updated performance data, without marketing fluff. InferenceX provides exactly that.',
@@ -236,6 +237,7 @@ export const QUOTES: Quote[] = [
     title: 'Founder & CEO, Verda',
     org: 'Verda',
     logo: 'verda.svg',
+    link: 'https://www.linkedin.com/in/ruben-bryon/',
   },
   {
     text: "InferenceX\u2122 ensembles precisely that \u2014 open, reproducible benchmarks that are continuously updated as xPU accelerators (GPUs/TPUs/LPUs), memory, storage, and software stacks evolve. I'm excited to see the InferenceX benchmarking roadmap include agentic coding workloads that stress CPU KV Cache offloading & soon NVMe KV Cache offloading from xPUs. As WEKA helps scale the Memory Wall by building the KV Cache infrastructure that feeds these xPUs, having this level of visibility into inference performance helps the entire ecosystem make smarter decisions about where to invest.",
@@ -243,6 +245,7 @@ export const QUOTES: Quote[] = [
     title: 'Chief AI Officer, WEKA',
     org: 'WEKA',
     logo: 'weka.svg',
+    link: 'https://www.linkedin.com/in/valentinbercovici/',
   },
   {
     text: 'Voltage Park is built to give AI teams fast, affordable access to GPU compute at scale. InferenceX\u2122 supports that goal by providing open, reproducible benchmarks that show how inference actually performs across the latest hardware and software stacks. With transparent, continuously updated data on throughput, efficiency, and cost, teams can make confident compute decisions instead of guessing. We\u2019re happy to back an effort that brings this level of clarity to the ecosystem.',
@@ -250,6 +253,7 @@ export const QUOTES: Quote[] = [
     title: 'CTO, Voltage Park',
     org: 'Voltage Park',
     logo: 'voltage-park.svg',
+    link: 'https://www.linkedin.com/in/saurabh-giri/',
   },
   {
     text: "At Periodic Labs, we're building AI scientists that turn compute into real-world scientific discoveries. That means we care deeply about what each GPU actually delivers. InferenceX\u2122 provides open, reproducible benchmarks that cut through spec sheets and show real-world throughput, efficiency, and cost across the latest hardware and software stacks. Having done inference across thousands of GPUs, I can say this kind of transparent, continuously updated data is exactly what practitioners need to make smart infrastructure decisions.",
@@ -257,6 +261,7 @@ export const QUOTES: Quote[] = [
     title: 'Founding Team, Periodic Labs',
     org: 'Periodic Labs',
     logo: 'periodic-labs.png',
+    link: 'https://www.linkedin.com/in/xanderdunn/',
   },
   {
     text: 'InferenceX\u2122 makes that gap visible across every major accelerator, continuously and transparently. For anyone working on ML systems research, having an open, reproducible baseline that tracks how inference software continuously improves over time is incredibly valuable. This is the kind of open source data the research community needs.',
