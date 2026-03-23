@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
 import { createHighlighterCore } from 'shiki/core';
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
+import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { mdxComponents } from '@/components/blog/mdx-components';
 import { Card } from '@/components/ui/card';
 import { getAllPosts, getPostBySlug } from '@/lib/blog';
@@ -129,14 +129,7 @@ export default async function BlogPostPage({ params }: Props) {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>
-            <nav>
-              <Link
-                href="/blog"
-                className="text-sm text-muted-foreground hover:underline mb-4 inline-block"
-              >
-                &larr;&nbsp;&nbsp;Back to articles
-              </Link>
-            </nav>
+            <BlogBackLink />
             <header>
               <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h2>
               <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>

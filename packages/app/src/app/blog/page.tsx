@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
+import { BlogPostCard } from '@/components/blog/blog-post-card';
 import { Card } from '@/components/ui/card';
 import { getAllPosts } from '@/lib/blog';
 import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
@@ -47,11 +47,7 @@ export default function BlogPage() {
             ) : (
               <div className="flex flex-col gap-8 mx-4 md:mx-8">
                 {posts.map((post) => (
-                  <Link
-                    key={post.slug}
-                    href={`/blog/${post.slug}`}
-                    className="group block rounded-lg border border-border p-6 transition-colors hover:bg-muted/50"
-                  >
+                  <BlogPostCard key={post.slug} slug={post.slug} title={post.title}>
                     <article>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
                         <time dateTime={post.date}>
@@ -82,7 +78,7 @@ export default function BlogPage() {
                         </div>
                       )}
                     </article>
-                  </Link>
+                  </BlogPostCard>
                 ))}
               </div>
             )}
