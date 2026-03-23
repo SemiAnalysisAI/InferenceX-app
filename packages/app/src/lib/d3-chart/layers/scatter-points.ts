@@ -224,7 +224,7 @@ export function attachScatterTooltipHandlers<
     });
 }
 
-/** Compute tooltip left/top, flipping to the opposite side when near container edges. */
+/** Compute tooltip left/top, flipping when it would overflow the chart container. */
 export function computeTooltipPosition(
   mx: number,
   my: number,
@@ -235,8 +235,14 @@ export function computeTooltipPosition(
   offset = 10,
 ): { left: number; top: number } {
   const node = tooltip.node();
-  const tw = node?.offsetWidth ?? 0;
-  const th = node?.offsetHeight ?? 0;
+  if (!node) return { left: mx + offset, top: my + offset };
+
+  // Ensure tooltip is measurable
+  node.style.display = 'block';
+
+  // Force reflow so we get real dimensions
+  const tw = node.getBoundingClientRect().width || node.offsetWidth;
+  const th = node.getBoundingClientRect().height || node.offsetHeight;
   const cw = container.clientWidth;
   const ch = container.clientHeight;
 
