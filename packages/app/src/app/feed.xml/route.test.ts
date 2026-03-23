@@ -1,6 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { GET } from './route';
+import type { BlogPostMeta } from '@/lib/blog';
+
+const FAKE_POSTS: BlogPostMeta[] = [
+  {
+    title: 'Test Post',
+    subtitle: 'A test subtitle',
+    date: '2026-01-15',
+    slug: 'test-post',
+    readingTime: 1,
+    tags: ['testing'],
+  },
+];
+
+vi.mock('@/lib/blog', () => ({
+  getAllPosts: () => FAKE_POSTS,
+}));
+
+const { GET } = await import('./route');
 
 describe('RSS feed route', () => {
   it('returns valid RSS XML with correct content type', async () => {
@@ -20,7 +37,7 @@ describe('RSS feed route', () => {
     const body = await response.text();
 
     expect(body).toContain('<item>');
-    expect(body).toContain('Hello World');
+    expect(body).toContain('Test Post');
   });
 
   it('includes required RSS namespaces', async () => {
