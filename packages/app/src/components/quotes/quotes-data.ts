@@ -99,7 +99,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'InferenceMAX\u2122 benchmark is pogchamp & W in chat',
     name: 'Kaichao You',
-    title: 'vLLM Project Co-Lead',
+    title: 'vLLM Project Co-Lead & PhD Student @ Tsinghua University',
     org: 'vLLM',
     logo: 'vllm.svg',
     link: 'https://www.linkedin.com/in/youkaichao/',
