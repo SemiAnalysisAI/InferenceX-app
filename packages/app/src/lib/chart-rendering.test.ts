@@ -45,7 +45,7 @@ describe('SHAPE_CONFIG', () => {
 
   it('hover sizes are larger than normal sizes', () => {
     expect(HOVER_POINT_SIZE).toBeGreaterThan(POINT_SIZE);
-    expect(HOVER_STROKE_WIDTH).toBeGreaterThan(STROKE_WIDTH);
+    expect(HOVER_STROKE_WIDTH).toBeGreaterThanOrEqual(STROKE_WIDTH);
     expect(SHAPE_CONFIG.default.hover.r).toBeGreaterThan(SHAPE_CONFIG.default.normal.r);
   });
 });

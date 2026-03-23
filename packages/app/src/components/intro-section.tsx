@@ -64,6 +64,7 @@ export function IntroSection() {
                 'TensorWave',
                 'SGLang',
                 'WEKA',
+                'Stanford',
               ].includes(q.org),
             )}
             overrides={{
