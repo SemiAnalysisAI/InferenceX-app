@@ -244,4 +244,11 @@ export const QUOTES: Quote[] = [
     org: 'WEKA',
     logo: 'weka.svg',
   },
+  {
+    text: 'Voltage Park is built to give AI teams fast, affordable access to GPU compute at scale. InferenceX\u2122 supports that goal by providing open, reproducible benchmarks that show how inference actually performs across the latest hardware and software stacks. With transparent, continuously updated data on throughput, efficiency, and cost, teams can make confident compute decisions instead of guessing. We\u2019re happy to back an effort that brings this level of clarity to the ecosystem.',
+    name: 'Saurabh Giri',
+    title: 'CTO, Voltage Park',
+    org: 'Voltage Park',
+    logo: 'voltage-park.svg',
+  },
 ];
