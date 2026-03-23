@@ -53,6 +53,7 @@
     "pageleave",
     "postbuild",
     "posthog",
+    "protobufjs",
     "qwen",
     "renderable",
     "semianalysis",

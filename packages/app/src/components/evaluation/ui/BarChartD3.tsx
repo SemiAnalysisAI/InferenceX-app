@@ -30,7 +30,7 @@ const generateEvaluationTooltipContent = (data: EvaluationChartData, isPinned: b
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${data.configLabel.replace('\n', '<br>')}</div>
+      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${data.configLabel.replaceAll('\n', '<br>')}</div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Date:</strong> ${data.date}</div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Mean Score:</strong> ${data.score.toFixed(4)}</div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Min Score:</strong> ${minScore.toFixed(4)}</div>
@@ -120,9 +120,9 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     () =>
       configurations.map(({ hwKey, configLabel }) => ({
         name: configLabel,
-        label: configLabel.replace('\n', ' '),
+        label: configLabel.replaceAll('\n', ' '),
         color: resolveColor(configLabel, hwKey),
-        title: configLabel.replace('\n', ' '),
+        title: configLabel.replaceAll('\n', ' '),
         isHighlighted: highlightedConfigs.has(configLabel),
         hw: hwKey,
         isActive: enabledHardware.has(hwKey),
