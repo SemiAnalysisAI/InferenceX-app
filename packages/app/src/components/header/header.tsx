@@ -86,7 +86,7 @@ export const Header = () => {
                 className="hidden md:flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
                 onClick={() => track('header_blog_clicked')}
               >
-                Blog
+                Articles
               </Link>
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
               <ModeToggle />
@@ -119,7 +119,7 @@ export const Header = () => {
               className="flex items-center px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
               onClick={() => track('header_blog_clicked')}
             >
-              Blog
+              Articles
             </Link>
           </div>
         </div>

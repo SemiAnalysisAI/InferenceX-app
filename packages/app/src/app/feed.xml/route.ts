@@ -37,8 +37,8 @@ export async function GET() {
      xmlns:atom="http://www.w3.org/2005/Atom"
      version="2.0">
   <channel>
-    <title>${escapeXml(SITE_NAME)} Blog</title>
-    <description>Technical blog from ${escapeXml(SITE_NAME)} by ${escapeXml(AUTHOR_NAME)}</description>
+    <title>${escapeXml(SITE_NAME)} Articles</title>
+    <description>Technical articles from ${escapeXml(SITE_NAME)} by ${escapeXml(AUTHOR_NAME)}</description>
     <link>${SITE_URL}/blog</link>
     <lastBuildDate>${now}</lastBuildDate>
     <atom:link href="${SITE_URL}/feed.xml" rel="self" type="application/rss+xml"/>

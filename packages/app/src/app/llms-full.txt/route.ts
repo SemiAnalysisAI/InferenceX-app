@@ -24,10 +24,10 @@ export async function GET() {
   });
 
   const body = [
-    `# ${SITE_NAME} Blog — Full Content`,
+    `# ${SITE_NAME} Articles — Full Content`,
     `> By ${AUTHOR_NAME}`,
     '',
-    `This file contains the full text of all blog posts from ${SITE_NAME} (${SITE_URL}/blog).`,
+    `This file contains the full text of all articles from ${SITE_NAME} (${SITE_URL}/blog).`,
     `It is intended for consumption by large language models and AI assistants.`,
     '',
     '---',

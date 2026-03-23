@@ -4,7 +4,7 @@ import { getAllPosts, getPostBySlug } from '@/lib/blog';
 
 import { renderOgImage, size } from './og-image-render';
 
-export const alt = 'InferenceX Blog';
+export const alt = 'InferenceX Articles';
 export { size };
 export const contentType = 'image/png';
 
@@ -31,7 +31,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
           fontWeight: 700,
         }}
       >
-        InferenceX Blog
+        InferenceX Articles
       </div>,
       size,
     );

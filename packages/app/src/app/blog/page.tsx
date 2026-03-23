@@ -6,11 +6,11 @@ import { getAllPosts } from '@/lib/blog';
 import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {
-  title: 'Blog',
-  description: `Technical blog from ${SITE_NAME} by ${AUTHOR_NAME} — AI inference benchmarking, GPU performance analysis, and ML infrastructure insights.`,
+  title: 'Articles',
+  description: `Technical articles from ${SITE_NAME} by ${AUTHOR_NAME} — AI inference benchmarking, GPU performance analysis, and ML infrastructure insights.`,
   alternates: { canonical: `${SITE_URL}/blog` },
   openGraph: {
-    title: `Blog | ${SITE_NAME} by ${AUTHOR_NAME}`,
+    title: `Articles | ${SITE_NAME} by ${AUTHOR_NAME}`,
     description: 'AI inference benchmarking insights and GPU performance analysis.',
     url: `${SITE_URL}/blog`,
   },
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Blog',
-  name: `${SITE_NAME} Blog`,
+  name: `${SITE_NAME} Articles`,
   url: `${SITE_URL}/blog`,
   publisher: {
     '@type': 'Organization',
@@ -36,7 +36,7 @@ export default function BlogPage() {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
         <section>
           <Card>
-            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Blog</h1>
+            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">Articles</h1>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
               Insights on AI inference benchmarking, GPU performance, and ML infrastructure.
             </p>

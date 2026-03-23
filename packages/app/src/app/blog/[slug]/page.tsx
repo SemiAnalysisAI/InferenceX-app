@@ -134,7 +134,7 @@ export default async function BlogPostPage({ params }: Props) {
                 href="/blog"
                 className="text-sm text-muted-foreground hover:underline mb-4 inline-block"
               >
-                &larr;&nbsp;&nbsp;Back to blog
+                &larr;&nbsp;&nbsp;Back to articles
               </Link>
             </nav>
             <header>
