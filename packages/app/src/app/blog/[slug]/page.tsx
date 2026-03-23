@@ -31,24 +31,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: meta.title,
-    description: meta.excerpt,
+    description: meta.subtitle,
     keywords: meta.tags,
-    authors: [{ name: meta.author }],
+    authors: [{ name: 'SemiAnalysis' }],
     alternates: { canonical: `${SITE_URL}/blog/${slug}` },
     openGraph: {
       title: `${meta.title} | ${SITE_NAME}`,
-      description: meta.excerpt,
+      description: meta.subtitle,
       url: `${SITE_URL}/blog/${slug}`,
       type: 'article',
       publishedTime: `${meta.date}T00:00:00Z`,
       ...(meta.modifiedDate && { modifiedTime: `${meta.modifiedDate}T00:00:00Z` }),
-      authors: [meta.author],
+      authors: ['SemiAnalysis'],
       tags: meta.tags,
     },
     twitter: {
       card: 'summary_large_image',
       title: meta.title,
-      description: meta.excerpt,
+      description: meta.subtitle,
       creator: AUTHOR_HANDLE,
     },
   };
@@ -112,11 +112,11 @@ export default async function BlogPostPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: meta.title,
-    author: { '@type': 'Person', name: meta.author },
+    author: { '@type': 'Person', name: 'SemiAnalysis' },
     publisher: { '@type': 'Organization', name: AUTHOR_NAME },
     datePublished: `${meta.date}T00:00:00Z`,
     ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
-    description: meta.excerpt,
+    description: meta.subtitle,
     url: `${SITE_URL}/blog/${slug}`,
     wordCount: raw.trim().split(/\s+/).length,
     timeRequired: `PT${meta.readingTime}M`,
@@ -136,7 +136,7 @@ export default async function BlogPostPage({ params }: Props) {
       <header className="mb-10">
         <h1 className="text-4xl font-bold mb-4">{meta.title}</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span>{meta.author}</span>
+          <span>{'SemiAnalysis'}</span>
           <span>&middot;</span>
           <time dateTime={meta.date}>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {

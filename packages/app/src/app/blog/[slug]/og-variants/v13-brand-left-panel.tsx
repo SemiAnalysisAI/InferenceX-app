@@ -18,8 +18,8 @@ const BG = '#131416';
 const PANEL_BG = '#0F1214';
 
 export async function renderOgImage(meta: BlogPostMeta) {
-  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
-  const titleSize = meta.title.length > 60 ? 56 : meta.title.length > 40 ? 64 : 72;
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/brand/logo-color.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 50 ? 56 : meta.title.length > 35 ? 64 : 72;
 
   return new ImageResponse(
     <div
@@ -190,11 +190,20 @@ export async function renderOgImage(meta: BlogPostMeta) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-          <img src={logoSrc} height={96} />
+          <img src={logoSrc} height={80} />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.2, color: '#FFFFFF' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div
+            style={{
+              fontSize: titleSize,
+              fontWeight: 700,
+              lineHeight: 1.2,
+              color: '#FFFFFF',
+              maxHeight: 220,
+              overflow: 'hidden',
+            }}
+          >
             {meta.title}
           </div>
           <div
@@ -202,19 +211,19 @@ export async function renderOgImage(meta: BlogPostMeta) {
               fontSize: 42,
               color: '#C9CACB',
               lineHeight: 1.4,
-              maxHeight: 60,
+              maxHeight: 120,
               overflow: 'hidden',
             }}
           >
-            {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
+            {meta.subtitle.length > 80
+              ? meta.subtitle.slice(0, 80).replace(/\s\S*$/, '') + '…'
+              : meta.subtitle}
           </div>
         </div>
 
         <div
-          style={{ display: 'flex', gap: 20, fontSize: 36, color: '#d4d4d8', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 20, fontSize: 28, color: '#d4d4d8', alignItems: 'center' }}
         >
-          <span>{meta.author}</span>
-          <span style={{ color: `${GOLD}60` }}>·</span>
           <span>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               year: 'numeric',
@@ -235,7 +244,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
                   color: GOLD,
                   padding: '4px 14px',
                   borderRadius: 9999,
-                  fontSize: 30,
+                  fontSize: 24,
                 }}
               >
                 {tag}

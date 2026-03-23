@@ -11,9 +11,9 @@ export async function GET() {
     return [
       `# ${post.title}`,
       '',
-      `> ${post.excerpt}`,
+      `> ${post.subtitle}`,
       '',
-      `- **Author**: ${post.author}`,
+      `- **Author**: ${'SemiAnalysis'}`,
       `- **Date**: ${post.date}`,
       `- **URL**: ${SITE_URL}/blog/${post.slug}`,
       ...(post.tags ? [`- **Tags**: ${post.tags.join(', ')}`] : []),

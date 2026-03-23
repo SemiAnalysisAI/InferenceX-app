@@ -18,7 +18,7 @@ const TEAL = '#3A7A7A';
 const BG = '#131416';
 
 export async function renderOgImage(meta: BlogPostMeta) {
-  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/brand/logo-color.png'))).toString('base64')}`;
   const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
 
   return new ImageResponse(
@@ -43,28 +43,22 @@ export async function renderOgImage(meta: BlogPostMeta) {
           padding: '48px 60px 24px',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.2, color: '#FFFFFF' }}>
-            {meta.title}
-          </div>
-          <div
-            style={{
-              fontSize: 42,
-              color: '#C9CACB',
-              lineHeight: 1.4,
-              maxHeight: 70,
-              overflow: 'hidden',
-            }}
-          >
-            {meta.excerpt.length > 100 ? meta.excerpt.slice(0, 100) + '…' : meta.excerpt}
-          </div>
+        <div
+          style={{
+            fontSize: titleSize,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            color: '#FFFFFF',
+            maxHeight: 220,
+            overflow: 'hidden',
+          }}
+        >
+          {meta.title}
         </div>
 
         <div
-          style={{ display: 'flex', gap: 20, fontSize: 36, color: '#d4d4d8', alignItems: 'center' }}
+          style={{ display: 'flex', gap: 20, fontSize: 28, color: '#d4d4d8', alignItems: 'center' }}
         >
-          <span>{meta.author}</span>
-          <span style={{ color: `${GOLD}60` }}>·</span>
           <span>
             {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
               year: 'numeric',
@@ -75,22 +69,6 @@ export async function renderOgImage(meta: BlogPostMeta) {
           </span>
           <span style={{ color: `${GOLD}60` }}>·</span>
           <span>{meta.readingTime} min read</span>
-          {meta.tags &&
-            meta.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  backgroundColor: `${GOLD}18`,
-                  border: `1px solid ${GOLD}30`,
-                  color: GOLD,
-                  padding: '4px 16px',
-                  borderRadius: 9999,
-                  fontSize: 30,
-                }}
-              >
-                {tag}
-              </span>
-            ))}
         </div>
       </div>
 
@@ -170,7 +148,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
             zIndex: 1,
           }}
         >
-          <img src={logoSrc} height={108} />
+          <img src={logoSrc} height={80} />
         </div>
       </div>
     </div>,

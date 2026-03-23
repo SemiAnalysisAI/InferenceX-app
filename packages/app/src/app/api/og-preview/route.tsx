@@ -3,63 +3,21 @@ import type { NextRequest } from 'next/server';
 
 import { getPostBySlug } from '@/lib/blog';
 
-import { renderOgImage as v1 } from '@/app/blog/[slug]/og-variants/v1-current';
-import { renderOgImage as v2 } from '@/app/blog/[slug]/og-variants/v2-circuit-corners';
-import { renderOgImage as v3 } from '@/app/blog/[slug]/og-variants/v3-grid-overlay';
-import { renderOgImage as v4 } from '@/app/blog/[slug]/og-variants/v4-left-stripe';
-import { renderOgImage as v5 } from '@/app/blog/[slug]/og-variants/v5-diagonal-blocks';
-import { renderOgImage as v6 } from '@/app/blog/[slug]/og-variants/v6-top-bar';
-import { renderOgImage as v7 } from '@/app/blog/[slug]/og-variants/v7-right-panel';
-import { renderOgImage as v8 } from '@/app/blog/[slug]/og-variants/v8-bottom-circuit';
-import { renderOgImage as v9 } from '@/app/blog/[slug]/og-variants/v9-scattered-nodes';
-import { renderOgImage as v10 } from '@/app/blog/[slug]/og-variants/v10-border-frame';
 import { renderOgImage as v11 } from '@/app/blog/[slug]/og-variants/v11-brand-corners';
 import { renderOgImage as v12 } from '@/app/blog/[slug]/og-variants/v12-brand-grid';
 import { renderOgImage as v13 } from '@/app/blog/[slug]/og-variants/v13-brand-left-panel';
-import { renderOgImage as v14 } from '@/app/blog/[slug]/og-variants/v14-brand-frame-gold';
 import { renderOgImage as v15 } from '@/app/blog/[slug]/og-variants/v15-brand-split';
-import { renderOgImage as v16 } from '@/app/blog/[slug]/og-variants/v16-slide-title';
-import { renderOgImage as v17 } from '@/app/blog/[slug]/og-variants/v17-slide-content';
-import { renderOgImage as v18 } from '@/app/blog/[slug]/og-variants/v18-slide-hybrid';
-import { renderOgImage as v19 } from '@/app/blog/[slug]/og-variants/v19-slide-keynote';
-import { renderOgImage as v20 } from '@/app/blog/[slug]/og-variants/v20-slide-full';
-import { renderOgImage as v21 } from '@/app/blog/[slug]/og-variants/v21-compact-bold';
-import { renderOgImage as v22 } from '@/app/blog/[slug]/og-variants/v22-gold-title-bar';
-import { renderOgImage as v23 } from '@/app/blog/[slug]/og-variants/v23-bold-circuit';
-import { renderOgImage as v24 } from '@/app/blog/[slug]/og-variants/v24-gold-split-bold';
-import { renderOgImage as v25 } from '@/app/blog/[slug]/og-variants/v25-gold-accent-stripe';
 
 const variants: Record<string, (meta: any) => Promise<ImageResponse>> = {
-  v1,
-  v2,
-  v3,
-  v4,
-  v5,
-  v6,
-  v7,
-  v8,
-  v9,
-  v10,
   v11,
   v12,
   v13,
-  v14,
   v15,
-  v16,
-  v17,
-  v18,
-  v19,
-  v20,
-  v21,
-  v22,
-  v23,
-  v24,
-  v25,
 };
 
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get('slug') ?? 'hello-world';
-  const variant = request.nextUrl.searchParams.get('v') ?? 'v1';
+  const variant = request.nextUrl.searchParams.get('v') ?? 'v11';
 
   const result = getPostBySlug(slug);
   if (!result) {

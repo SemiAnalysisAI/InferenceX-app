@@ -33,9 +33,9 @@ describe('getAllPosts', () => {
     for (const post of posts) {
       expect(post.slug).toBeTruthy();
       expect(post.title).toBeTruthy();
-      expect(post.author).toBeTruthy();
+      expect('SemiAnalysis').toBeTruthy();
       expect(post.date).toBeTruthy();
-      expect(post.excerpt).toBeTruthy();
+      expect(post.subtitle).toBeTruthy();
       expect(post.readingTime).toBeGreaterThanOrEqual(1);
     }
   });

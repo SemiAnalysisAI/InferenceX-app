@@ -60,7 +60,7 @@ export default function BlogPage() {
                   <span>{post.readingTime} min read</span>
                 </div>
                 <h2 className="text-2xl font-semibold mb-2 group-hover:underline">{post.title}</h2>
-                <p className="text-muted-foreground mb-3">{post.excerpt}</p>
+                <p className="text-muted-foreground mb-3">{post.subtitle}</p>
                 {post.tags && post.tags.length > 0 && (
                   <div className="flex gap-2">
                     {post.tags.map((tag) => (

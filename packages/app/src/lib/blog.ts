@@ -5,9 +5,8 @@ import matter from 'gray-matter';
 
 export interface BlogFrontmatter {
   title: string;
-  author: string;
   date: string;
-  excerpt: string;
+  subtitle: string;
   modifiedDate?: string;
   tags?: string[];
   coverImage?: string;

@@ -60,7 +60,7 @@ describe('createLogoWatermark', () => {
 
     const image = defs.select('#logo-pattern image');
     expect(image.empty()).toBe(false);
-    expect(image.attr('href')).toBe('/logo.png');
+    expect(image.attr('href')).toBe('/brand/logo-color.png');
     expect(image.attr('opacity')).toBe('0.1');
 
     const logoSize = Math.min(innerWidth, innerHeight) * 0.6;

@@ -45,7 +45,7 @@ export const Header = () => {
                 By
                 <Link className="hover:underline" target="_blank" href="https://semianalysis.com/">
                   <Image
-                    src="/logo.webp"
+                    src="/brand/logo-color.webp"
                     alt="SemiAnalysis logo"
                     width={128}
                     height={53}

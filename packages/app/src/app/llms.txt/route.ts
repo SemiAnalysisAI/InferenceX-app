@@ -11,7 +11,7 @@ export async function GET() {
     '',
     `## Blog`,
     '',
-    ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.excerpt}`),
+    ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.subtitle}`),
     '',
     `## Links`,
     '',

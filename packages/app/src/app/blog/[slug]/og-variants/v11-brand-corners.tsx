@@ -17,12 +17,11 @@ const BLUE = '#0B86D1';
 const TEAL = '#3A7A7A';
 const BG = '#131416';
 const TEXT = '#EAEBEC';
-const TEXT_MUTED = '#C9CACB';
 const TEXT_DIM = '#B4B9BC';
 
 export async function renderOgImage(meta: BlogPostMeta) {
-  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/logo.png'))).toString('base64')}`;
-  const titleSize = meta.title.length > 60 ? 48 : meta.title.length > 40 ? 56 : 64;
+  const logoSrc = `data:image/png;base64,${(await readFile(join(process.cwd(), 'public/brand/logo-color.png'))).toString('base64')}`;
+  const titleSize = meta.title.length > 50 ? 48 : meta.title.length > 35 ? 56 : 64;
 
   return new ImageResponse(
     <div
@@ -254,24 +253,22 @@ export async function renderOgImage(meta: BlogPostMeta) {
           zIndex: 1,
         }}
       >
-        <img src={logoSrc} height={96} />
+        <img src={logoSrc} height={80} />
       </div>
 
-      {/* Title + excerpt */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, zIndex: 1 }}>
-        <div style={{ fontSize: titleSize, fontWeight: 700, lineHeight: 1.2, color: '#FFFFFF' }}>
-          {meta.title}
-        </div>
+      {/* Title */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, zIndex: 1 }}>
         <div
           style={{
-            fontSize: 28,
-            color: TEXT_MUTED,
-            lineHeight: 1.4,
-            maxHeight: 80,
+            fontSize: titleSize,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            color: '#FFFFFF',
+            maxHeight: 220,
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 120 ? meta.excerpt.slice(0, 120) + '…' : meta.excerpt}
+          {meta.title}
         </div>
       </div>
 
@@ -286,8 +283,6 @@ export async function renderOgImage(meta: BlogPostMeta) {
           zIndex: 1,
         }}
       >
-        <span>{meta.author}</span>
-        <span style={{ color: `${GOLD}60` }}>·</span>
         <span>
           {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
             year: 'numeric',
@@ -298,22 +293,6 @@ export async function renderOgImage(meta: BlogPostMeta) {
         </span>
         <span style={{ color: `${GOLD}60` }}>·</span>
         <span>{meta.readingTime} min read</span>
-        {meta.tags &&
-          meta.tags.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              style={{
-                backgroundColor: `${GOLD}18`,
-                border: `1px solid ${GOLD}30`,
-                color: GOLD,
-                padding: '4px 16px',
-                borderRadius: 9999,
-                fontSize: 20,
-              }}
-            >
-              {tag}
-            </span>
-          ))}
       </div>
     </div>,
     size,

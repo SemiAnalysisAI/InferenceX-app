@@ -66,12 +66,12 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
             overflow: 'hidden',
           }}
         >
-          {meta.excerpt.length > 140 ? meta.excerpt.slice(0, 140) + '…' : meta.excerpt}
+          {meta.subtitle.length > 140 ? meta.subtitle.slice(0, 140) + '…' : meta.subtitle}
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 24, fontSize: 18, color: '#a1a1aa' }}>
-        <span>{meta.author}</span>
+        <span>{'SemiAnalysis'}</span>
         <span>·</span>
         <span>
           {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
