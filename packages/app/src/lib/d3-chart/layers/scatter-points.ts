@@ -192,7 +192,8 @@ export function attachScatterTooltipHandlers<
     .on('mousemove', function (event) {
       if (isPinned()) return;
       const [mx, my] = d3.pointer(event, container);
-      tooltip.style('left', `${mx + 10}px`).style('top', `${my + 10}px`);
+      const pos = computeTooltipPosition(mx, my, tooltip, container);
+      tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
     })
     .on('mouseleave', function (_event, d) {
       if (isPinned()) return;
@@ -203,13 +204,14 @@ export function attachScatterTooltipHandlers<
     .on('click', function (event, d) {
       event.stopPropagation();
       const [mx, my] = d3.pointer(event, container);
+      tooltip.html(generateTooltipContent(d, true));
+      const pos = computeTooltipPosition(mx, my, tooltip, container);
       tooltip
-        .style('left', `${mx + 10}px`)
-        .style('top', `${my + 10}px`)
+        .style('left', `${pos.left}px`)
+        .style('top', `${pos.top}px`)
         .style('opacity', 1)
         .style('display', 'block')
         .style('pointer-events', 'auto');
-      tooltip.html(generateTooltipContent(d, true));
       pinTooltip(d, false);
       onPointClick?.(d, tooltip);
       trackEvent?.(String(d.hwKey), d.x, d.y);
@@ -220,6 +222,28 @@ export function attachScatterTooltipHandlers<
       event.preventDefault();
       onPointDblClick(event, d);
     });
+}
+
+/** Compute tooltip left/top, flipping to the opposite side when near container edges. */
+export function computeTooltipPosition(
+  mx: number,
+  my: number,
+  tooltip:
+    | d3.Selection<HTMLDivElement | null, unknown, null, undefined>
+    | d3.Selection<HTMLDivElement, unknown, null, undefined>,
+  container: HTMLElement,
+  offset = 10,
+): { left: number; top: number } {
+  const node = tooltip.node();
+  const tw = node?.offsetWidth ?? 0;
+  const th = node?.offsetHeight ?? 0;
+  const cw = container.clientWidth;
+  const ch = container.clientHeight;
+
+  const left = mx + offset + tw > cw ? mx - offset - tw : mx + offset;
+  const top = my + offset + th > ch ? my - offset - th : my + offset;
+
+  return { left, top };
 }
 
 /** Update scatter point positions on zoom. */
