@@ -65,6 +65,7 @@ export function IntroSection() {
                 'SGLang',
                 'WEKA',
                 'Stanford',
+                'Core42',
               ].includes(q.org),
             )}
             overrides={{
