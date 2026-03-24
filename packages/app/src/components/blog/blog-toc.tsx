@@ -22,7 +22,7 @@ export function BlogToc({ headings }: BlogTocProps) {
         <li key={h.id}>
           <button
             type="button"
-            className={`text-left text-muted-foreground hover:text-foreground transition-colors ${h.level === 3 ? 'pl-4' : ''}`}
+            className={`text-left text-muted-foreground hover:text-foreground transition-colors ${h.level === 2 ? 'pl-3' : h.level === 3 ? 'pl-6' : ''}`}
             onClick={() => handleClick(h)}
           >
             {h.text}
