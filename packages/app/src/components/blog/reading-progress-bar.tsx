@@ -16,10 +16,10 @@ export function ReadingProgressBar({ slug }: { slug: string }) {
         if (!article) return;
 
         const rect = article.getBoundingClientRect();
-        const articleTop = rect.top + window.scrollY;
-        const articleHeight = rect.height;
-        const scrolled = window.scrollY - articleTop;
-        const p = Math.min(1, Math.max(0, scrolled / (articleHeight - window.innerHeight)));
+        const viewportHeight = window.innerHeight;
+        // 0 when article top is at viewport top, 1 when article bottom reaches viewport bottom
+        const totalDistance = rect.height - viewportHeight;
+        const p = totalDistance <= 0 ? 1 : Math.min(1, Math.max(0, -rect.top / totalDistance));
 
         setProgress(p);
 
