@@ -44,26 +44,6 @@ function CustomImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   );
 }
 
-function Figure(props: { src: string; alt?: string; caption?: string }) {
-  return (
-    <figure className="my-6 flex flex-col items-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={props.src}
-        alt={props.alt ?? ''}
-        loading="lazy"
-        decoding="async"
-        className="rounded-lg w-full md:w-3/4"
-      />
-      {props.caption && (
-        <figcaption className="text-center text-sm text-muted-foreground mt-2">
-          {props.caption}
-        </figcaption>
-      )}
-    </figure>
-  );
-}
-
 function Blur(props: { children?: ReactNode }) {
   return <div className="blur-sm select-none pointer-events-none">{props.children}</div>;
 }
@@ -72,6 +52,7 @@ function Blur(props: { children?: ReactNode }) {
 export function createMdxComponents(): Record<string, React.ComponentType<any>> {
   const seen = new Set<string>();
   const parents: string[] = [];
+  let figureCount = 0;
 
   function uniqueId(text: string, level: number): string {
     const base = slugify(text);
@@ -115,7 +96,27 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
     },
     a: CustomLink,
     img: CustomImage,
-    Figure,
+    Figure: (props: { src: string; alt?: string; caption?: string }) => {
+      const isFirst = figureCount === 0;
+      figureCount++;
+      return (
+        <figure className="my-6 flex flex-col items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={props.src}
+            alt={props.alt ?? ''}
+            loading={isFirst ? 'eager' : 'lazy'}
+            decoding="async"
+            className="rounded-lg w-full md:w-3/4"
+          />
+          {props.caption && (
+            <figcaption className="text-center text-sm text-muted-foreground mt-2">
+              {props.caption}
+            </figcaption>
+          )}
+        </figure>
+      );
+    },
     Blur,
   };
 }

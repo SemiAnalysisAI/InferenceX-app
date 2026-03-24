@@ -161,6 +161,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href={SITE_URL} />
         <link rel="dns-prefetch" href={SITE_URL} />
+        <link rel="preconnect" href="https://substack-post-media.s3.amazonaws.com" />
+        <link rel="dns-prefetch" href="https://substack-post-media.s3.amazonaws.com" />
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <PostHogProvider>
