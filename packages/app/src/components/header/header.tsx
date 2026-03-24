@@ -42,7 +42,7 @@ const baseClasses =
   'items-center px-3 py-1.5 rounded-md border transition-colors text-sm font-medium';
 const inactiveClasses =
   'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800';
-const activeClasses = 'bg-primary/10 border-primary/50 text-primary';
+const activeClasses = 'bg-brand/10 border-brand/50 text-brand';
 
 export const Header = () => {
   const pathname = usePathname();
