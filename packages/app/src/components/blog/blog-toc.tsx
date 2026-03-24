@@ -133,14 +133,13 @@ export function BlogToc({ headings }: BlogTocProps) {
       {/* Inline: when sidebar doesn't fit */}
       {!showSidebar && (
         <Card>
-          <details className="lg:hidden" aria-label="Table of contents">
-            <summary className="text-sm font-medium cursor-pointer">On this page</summary>
+          <details aria-label="Table of contents">
+            <summary className="text-sm font-medium cursor-pointer">
+              On this page{' '}
+              <span className="text-muted-foreground font-normal">(click to expand)</span>
+            </summary>
             <div className="mt-2">{list}</div>
           </details>
-          <nav className="hidden lg:block" aria-label="Table of contents">
-            <p className="text-sm font-medium mb-2">On this page</p>
-            {list}
-          </nav>
         </Card>
       )}
 
