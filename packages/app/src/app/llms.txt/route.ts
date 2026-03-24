@@ -9,10 +9,6 @@ export async function GET() {
     '',
     `> ${SITE_NAME} is the open-source AI inference benchmark dashboard. We compare GPU performance for LLM inference across NVIDIA GB200, H100, AMD MI355X, and more.`,
     '',
-    `## Articles`,
-    '',
-    ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.subtitle}`),
-    '',
     `## Links`,
     '',
     `- [Dashboard](${SITE_URL})`,
@@ -20,6 +16,10 @@ export async function GET() {
     `- [RSS Feed](${SITE_URL}/feed.xml)`,
     `- [Full content for LLMs](${SITE_URL}/llms-full.txt)`,
     `- [GitHub](https://github.com/SemiAnalysisAI/InferenceX)`,
+    '',
+    `## Articles`,
+    '',
+    ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.subtitle}`),
   ];
 
   return new Response(lines.join('\n'), {
