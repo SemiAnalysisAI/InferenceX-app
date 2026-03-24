@@ -271,4 +271,11 @@ export const QUOTES: Quote[] = [
     logo: 'stanford.svg',
     link: 'https://simonguo.tech/',
   },
+  {
+    text: 'As AI infrastructure scales globally, no single vendor or region can define the benchmarks that matter for everyone. InferenceX is an important step toward a shared, transparent view of inference performance and TCO, enabling more rational investments for sovereign AI Cloud operators, as well as healthier competition, and ultimately more accessible AI capacity worldwide.',
+    name: 'Talal M. Al Kaissi',
+    title: 'CEO',
+    org: 'Core42',
+    logo: 'core42.png',
+  },
 ];
