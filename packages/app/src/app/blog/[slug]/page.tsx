@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
+import remarkGfm from 'remark-gfm';
 import { createHighlighterCore } from 'shiki/core';
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
@@ -103,6 +104,7 @@ export default async function BlogPostPage({ params }: Props) {
     components: createMdxComponents(),
     options: {
       mdxOptions: {
+        remarkPlugins: [remarkGfm],
         rehypePlugins: [
           [
             rehypeShikiFromHighlighter,
