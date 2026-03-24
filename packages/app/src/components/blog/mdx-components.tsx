@@ -48,7 +48,15 @@ function Figure(props: { src: string; alt?: string; caption?: string }) {
   return (
     <figure className="my-6 flex flex-col items-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={props.src} alt={props.alt ?? ''} className="rounded-lg w-full md:w-3/4" />
+      <img
+        src={props.src}
+        alt={props.alt ?? ''}
+        width={1456}
+        height={900}
+        loading="lazy"
+        decoding="async"
+        className="rounded-lg w-full md:w-3/4 h-auto"
+      />
       {props.caption && (
         <figcaption className="text-center text-sm text-muted-foreground mt-2">
           {props.caption}
