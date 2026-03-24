@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import fs from 'fs';
 
-import { getAllPosts, getPostBySlug, getReadingTime, slugify } from './blog';
+import { extractHeadings, getAllPosts, getPostBySlug, getReadingTime, slugify } from './blog';
 
 const FAKE_MDX = `---
 title: 'Test Post'
@@ -134,5 +134,44 @@ describe('getPostBySlug', () => {
     expect(result!.meta.title).toBe('Test Post');
     expect(result!.meta.slug).toBe('test-post');
     expect(result!.raw).toContain('# Test Heading');
+  });
+});
+
+describe('extractHeadings', () => {
+  it('extracts h1, h2, h3 headings with correct levels and ids', () => {
+    const mdx = '# Top\n\n## Section\n\n### Sub';
+    const headings = extractHeadings(mdx);
+    expect(headings).toEqual([
+      { level: 1, text: 'Top', id: 'top' },
+      { level: 2, text: 'Section', id: 'section' },
+      { level: 3, text: 'Sub', id: 'sub' },
+    ]);
+  });
+
+  it('returns empty array for input with no headings', () => {
+    expect(extractHeadings('Just a paragraph.')).toEqual([]);
+    expect(extractHeadings('')).toEqual([]);
+  });
+
+  it('ignores headings inside fenced code blocks', () => {
+    const mdx = '## Real\n\n```\n## Fake\n```\n\n## Also Real';
+    const headings = extractHeadings(mdx);
+    expect(headings).toHaveLength(2);
+    expect(headings[0].text).toBe('Real');
+    expect(headings[1].text).toBe('Also Real');
+  });
+
+  it('deduplicates same-text headings using parent prefix', () => {
+    const mdx = '## Overview\n\n### Details\n\n## Results\n\n### Details';
+    const headings = extractHeadings(mdx);
+    expect(headings[1].id).toBe('details');
+    expect(headings[3].id).toBe('results-details');
+  });
+
+  it('deduplicates top-level headings with level suffix fallback', () => {
+    const mdx = '## Intro\n\n## Intro';
+    const headings = extractHeadings(mdx);
+    expect(headings[0].id).toBe('intro');
+    expect(headings[1].id).toBe('intro-2');
   });
 });

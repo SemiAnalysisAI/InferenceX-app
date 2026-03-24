@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { LinkIcon } from 'lucide-react';
+import { track } from '@/lib/analytics';
 
 export function HeadingLink({ id }: { id: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'fading'>('idle');
@@ -12,13 +13,19 @@ export function HeadingLink({ id }: { id: string }) {
       e.preventDefault();
       clearTimeout(timerRef.current);
       const url = `${window.location.origin}${window.location.pathname}#${id}`;
-      navigator.clipboard.writeText(url).then(() => {
-        setState('copied');
-        timerRef.current = setTimeout(() => {
-          setState('fading');
-          timerRef.current = setTimeout(() => setState('idle'), 300);
-        }, 2000);
-      });
+      navigator.clipboard.writeText(url).then(
+        () => {
+          track('blog_heading_link_copied', { id });
+          setState('copied');
+          timerRef.current = setTimeout(() => {
+            setState('fading');
+            timerRef.current = setTimeout(() => setState('idle'), 300);
+          }, 2000);
+        },
+        () => {
+          /* clipboard denied — silent fallback */
+        },
+      );
     },
     [id],
   );
