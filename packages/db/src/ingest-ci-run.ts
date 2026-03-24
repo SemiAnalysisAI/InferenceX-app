@@ -470,7 +470,7 @@ async function main(): Promise<void> {
   console.log(`    eval_results      ${evalCount.n}`);
   console.log(`    changelog_entries ${changelogCount.n}`);
 
-  const { skips, unmappedModels, unmappedHws } = tracker;
+  const { skips, unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
   const totalSkips =
     skips.badZip + skips.unmappedModel + skips.unmappedHw + skips.noIslOsl + skips.dbError;
   if (totalSkips > 0) {
@@ -497,6 +497,27 @@ async function main(): Promise<void> {
   if (unmappedHws.size > 0) {
     console.log(`\n  Unmapped hw values (add to hwToGpuKey to ingest):`);
     [...unmappedHws].slice(0, 20).forEach((v) => console.log(`    ${v}`));
+  }
+
+  if (unmappedPrecisions.size > 0) {
+    console.log(`\n  Unmapped precision values (add to PRECISION_KEYS to ingest):`);
+    [...unmappedPrecisions].forEach((v) => console.log(`    ${v}`));
+  }
+
+  // Write unmapped entities to file so CI workflow can send Slack notifications
+  const unmappedOutPath = process.env.UNMAPPED_ENTITIES_OUTPUT;
+  if (
+    unmappedOutPath &&
+    (unmappedModels.size > 0 || unmappedHws.size > 0 || unmappedPrecisions.size > 0)
+  ) {
+    fs.writeFileSync(
+      unmappedOutPath,
+      JSON.stringify({
+        models: [...unmappedModels],
+        hardware: [...unmappedHws],
+        precisions: [...unmappedPrecisions],
+      }),
+    );
   }
 
   process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');

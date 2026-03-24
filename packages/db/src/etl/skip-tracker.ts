@@ -23,6 +23,7 @@ export interface SkipTracker {
   skips: Skips;
   unmappedModels: Set<string>;
   unmappedHws: Set<string>;
+  unmappedPrecisions: Set<string>;
   /**
    * Record a DB error, printing the first `MAX_DB_ERRORS` to stderr and
    * suppressing further output while still incrementing the count.
@@ -68,12 +69,14 @@ export function createSkipTracker(): SkipTracker {
   const skips: Skips = { badZip: 0, unmappedModel: 0, unmappedHw: 0, noIslOsl: 0, dbError: 0 };
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();
+  const unmappedPrecisions = new Set<string>();
   let dbErrorsPrinted = 0;
 
   return {
     skips,
     unmappedModels,
     unmappedHws,
+    unmappedPrecisions,
 
     recordDbError(context: string, err: Error): void {
       skips.dbError++;

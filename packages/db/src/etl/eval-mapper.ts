@@ -5,6 +5,7 @@
  *   `mapAggEvalRow()` — compiled aggregate (flat row from `agg_eval_all.json`)
  */
 
+import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
 import {
@@ -85,7 +86,10 @@ export function mapEvalRow(
   const tp = parseInt2(meta.tp) ?? 1;
   const ep = parseInt2(meta.ep) ?? 1;
   const dpAttn = parseBool(meta.dp_attention);
-  const precision = String(meta.precision ?? 'fp8').toLowerCase();
+  const precision = String(meta.precision ?? '').toLowerCase();
+  if (!PRECISION_KEYS.has(precision)) {
+    tracker.unmappedPrecisions.add(precision);
+  }
   const specMethod = normalizeSpecMethod(meta.spec_decoding);
   const lmEvalVersion = results.lm_eval_version ? String(results.lm_eval_version) : null;
 
@@ -176,7 +180,10 @@ export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): E
   const tp = parseInt2(row.tp) ?? 1;
   const ep = parseInt2(row.ep) ?? 1;
   const dpAttn = parseBool(row.dp_attention);
-  const precision = String(row.precision ?? 'fp8').toLowerCase();
+  const precision = String(row.precision ?? '').toLowerCase();
+  if (!PRECISION_KEYS.has(precision)) {
+    tracker.unmappedPrecisions.add(precision);
+  }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
   // ISL/OSL is encoded in the source path (e.g. "eval_dsr1_1k8k_.../results_...").

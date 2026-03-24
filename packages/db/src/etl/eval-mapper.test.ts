@@ -185,13 +185,14 @@ describe('mapEvalRow', () => {
       expect(evs[0].metrics).not.toHaveProperty('n_eff');
     });
 
-    it('handles missing precision (defaults to fp8)', () => {
+    it('defaults to empty string when precision absent and flags as unmapped', () => {
       const tracker = createSkipTracker();
       const meta = makeMeta();
       delete meta.precision;
       const result = mapEvalRow(meta, makeResults(), tracker);
 
-      expect(result[0].config.precision).toBe('fp8');
+      expect(result[0].config.precision).toBe('');
+      expect(tracker.unmappedPrecisions.has('')).toBe(true);
     });
 
     it('handles dp_attention as string "True"', () => {
@@ -351,13 +352,14 @@ describe('mapAggEvalRow', () => {
       expect(result!.osl).toBeNull();
     });
 
-    it('handles missing precision (defaults to fp8)', () => {
+    it('defaults to empty string when precision absent and flags as unmapped', () => {
       const tracker = createSkipTracker();
       const row = makeAggRow();
       delete row.precision;
       const result = mapAggEvalRow(row, tracker);
 
-      expect(result!.config.precision).toBe('fp8');
+      expect(result!.config.precision).toBe('');
+      expect(tracker.unmappedPrecisions.has('')).toBe(true);
     });
 
     it('skips undefined metric values', () => {
