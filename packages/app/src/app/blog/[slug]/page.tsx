@@ -134,7 +134,7 @@ export default async function BlogPostPage({ params }: Props) {
       <ReadingProgressBar slug={slug} />
       <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
-        <section>
+        <section className="relative">
           <Card>
             <BlogBackLink />
             <header>
@@ -170,11 +170,7 @@ export default async function BlogPostPage({ params }: Props) {
               </div>
             </header>
           </Card>
-          {headings.length > 0 && (
-            <Card>
-              <BlogToc headings={headings} />
-            </Card>
-          )}
+          {headings.length > 0 && <BlogToc headings={headings} />}
           <Card>
             <article
               data-blog-article
