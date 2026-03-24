@@ -1,4 +1,4 @@
-import { getAllPosts, getPostBySlug } from '@/lib/blog';
+import { getAllPosts } from '@/lib/blog';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 function escapeXml(s: string): string {
@@ -15,12 +15,8 @@ export async function GET() {
   const now = new Date().toUTCString();
 
   const items = posts
-    .map((post) => {
-      const result = getPostBySlug(post.slug);
-      const contentEncoded = result
-        ? `\n      <content:encoded><![CDATA[${result.raw}]]></content:encoded>`
-        : '';
-      return `    <item>
+    .map(
+      (post) => `    <item>
       <title>${escapeXml(post.title)}</title>
       <link>${SITE_URL}/blog/${post.slug}</link>
       <guid isPermaLink="false">${SITE_URL}/blog/${post.slug}</guid>
@@ -30,9 +26,9 @@ export async function GET() {
         post.tags
           ? post.tags.map((tag) => `\n      <category>${escapeXml(tag)}</category>`).join('')
           : ''
-      }${contentEncoded}
-    </item>`;
-    })
+      }
+    </item>`,
+    )
     .join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
