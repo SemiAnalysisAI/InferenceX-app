@@ -53,6 +53,21 @@ export function getAllPosts(): BlogPostMeta[] {
   return posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+export interface AdjacentPosts {
+  prev: BlogPostMeta | null;
+  next: BlogPostMeta | null;
+}
+
+export function getAdjacentPosts(slug: string): AdjacentPosts {
+  const posts = getAllPosts();
+  const index = posts.findIndex((p) => p.slug === slug);
+  if (index === -1) return { prev: null, next: null };
+  return {
+    next: index > 0 ? posts[index - 1] : null,
+    prev: index < posts.length - 1 ? posts[index + 1] : null,
+  };
+}
+
 export function getPostBySlug(slug: string): { meta: BlogPostMeta; raw: string } | null {
   const safe = slugify(slug);
   const filePath = path.join(CONTENT_DIR, `${safe}.mdx`);

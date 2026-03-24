@@ -6,10 +6,11 @@ import { createHighlighterCore } from 'shiki/core';
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 import { BlogBackLink } from '@/components/blog/blog-back-link';
+import { BlogPostNav } from '@/components/blog/blog-post-nav';
 import { mdxComponents } from '@/components/blog/mdx-components';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
-import { getAllPosts, getPostBySlug } from '@/lib/blog';
+import { getAllPosts, getAdjacentPosts, getPostBySlug } from '@/lib/blog';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,
@@ -89,6 +90,7 @@ export default async function BlogPostPage({ params }: Props) {
   if (!result) notFound();
 
   const { meta, raw } = result;
+  const adjacent = getAdjacentPosts(slug);
   const highlighter = await getHighlighter();
 
   const { content } = await compileMDX({
@@ -169,6 +171,10 @@ export default async function BlogPostPage({ params }: Props) {
               {content}
             </article>
           </Card>
+          <BlogPostNav
+            prev={adjacent.prev ? { slug: adjacent.prev.slug, title: adjacent.prev.title } : null}
+            next={adjacent.next ? { slug: adjacent.next.slug, title: adjacent.next.title } : null}
+          />
         </section>
       </div>
     </main>
