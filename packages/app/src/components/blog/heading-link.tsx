@@ -1,31 +1,42 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { LinkIcon, CheckIcon } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
+import { LinkIcon } from 'lucide-react';
 
 export function HeadingLink({ id }: { id: string }) {
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<'idle' | 'copied' | 'fading'>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
+      clearTimeout(timerRef.current);
       const url = `${window.location.origin}${window.location.pathname}#${id}`;
       navigator.clipboard.writeText(url).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setState('copied');
+        timerRef.current = setTimeout(() => {
+          setState('fading');
+          timerRef.current = setTimeout(() => setState('idle'), 300);
+        }, 2000);
       });
     },
     [id],
   );
+
+  const visible = state !== 'idle';
 
   return (
     <a
       href={`#${id}`}
       onClick={handleClick}
       aria-label="Copy link to section"
-      className="inline-flex items-center ml-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+      className={`inline-flex items-center ml-2 no-underline transition-opacity duration-300 text-muted-foreground hover:text-foreground ${visible ? (state === 'fading' ? 'opacity-0' : 'opacity-100') : 'opacity-0 group-hover:opacity-100'}`}
     >
-      {copied ? <CheckIcon className="size-4" /> : <LinkIcon className="size-4" />}
+      {state === 'idle' ? (
+        <LinkIcon className="size-4" />
+      ) : (
+        <span className="text-xs">Link copied</span>
+      )}
     </a>
   );
 }
