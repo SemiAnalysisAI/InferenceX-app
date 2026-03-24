@@ -165,7 +165,7 @@ describe('GPU Specs Tab', () => {
       .within(() => {
         cy.get('defs pattern[id^="logo-scaleout-"]').should('exist');
         cy.get('defs pattern[id^="logo-scaleout-"] image')
-          .should('have.attr', 'href', '/logo.png')
+          .should('have.attr', 'href', '/brand/logo-color.png')
           .and('have.attr', 'opacity', '0.1');
       });
   });
@@ -176,7 +176,7 @@ describe('GPU Specs Tab', () => {
       .within(() => {
         cy.get('defs pattern[id^="logo-scaleup-sw-"]').should('exist');
         cy.get('defs pattern[id^="logo-scaleup-sw-"] image')
-          .should('have.attr', 'href', '/logo.png')
+          .should('have.attr', 'href', '/brand/logo-color.png')
           .and('have.attr', 'opacity', '0.1');
       });
   });
@@ -187,7 +187,7 @@ describe('GPU Specs Tab', () => {
       .within(() => {
         cy.get('defs pattern[id^="logo-scaleup-mesh-"]').should('exist');
         cy.get('defs pattern[id^="logo-scaleup-mesh-"] image')
-          .should('have.attr', 'href', '/logo.png')
+          .should('have.attr', 'href', '/brand/logo-color.png')
           .and('have.attr', 'opacity', '0.1');
       });
   });
@@ -198,7 +198,7 @@ describe('GPU Specs Tab', () => {
       .within(() => {
         cy.get('defs pattern[id^="logo-scaleup-nvl72-"]').should('exist');
         cy.get('defs pattern[id^="logo-scaleup-nvl72-"] image')
-          .should('have.attr', 'href', '/logo.png')
+          .should('have.attr', 'href', '/brand/logo-color.png')
           .and('have.attr', 'opacity', '0.1');
       });
   });
@@ -353,7 +353,7 @@ describe('GPU Specs Radar Chart View', () => {
       .within(() => {
         cy.get('defs pattern#logo-pattern').should('exist');
         cy.get('defs pattern#logo-pattern image')
-          .should('have.attr', 'href', '/logo.png')
+          .should('have.attr', 'href', '/brand/logo-color.png')
           .and('have.attr', 'opacity', '0.1');
       });
   });
