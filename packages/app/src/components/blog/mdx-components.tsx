@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { slugify } from '@/lib/blog';
+import { HeadingLink } from '@/components/blog/heading-link';
 
 function childrenToText(children: ReactNode): string {
   if (typeof children === 'string') return children;
@@ -81,15 +82,30 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
   return {
     h1: (props: React.HTMLAttributes<HTMLHeadingElement>) => {
       const id = uniqueId(childrenToText(props.children), 1);
-      return <h2 id={id} {...props} />;
+      return (
+        <h2 id={id} className="group" {...props}>
+          {props.children}
+          <HeadingLink id={id} />
+        </h2>
+      );
     },
     h2: (props: React.HTMLAttributes<HTMLHeadingElement>) => {
       const id = uniqueId(childrenToText(props.children), 2);
-      return <h2 id={id} {...props} />;
+      return (
+        <h2 id={id} className="group" {...props}>
+          {props.children}
+          <HeadingLink id={id} />
+        </h2>
+      );
     },
     h3: (props: React.HTMLAttributes<HTMLHeadingElement>) => {
       const id = uniqueId(childrenToText(props.children), 3);
-      return <h3 id={id} {...props} />;
+      return (
+        <h3 id={id} className="group" {...props}>
+          {props.children}
+          <HeadingLink id={id} />
+        </h3>
+      );
     },
     a: CustomLink,
     img: CustomImage,
