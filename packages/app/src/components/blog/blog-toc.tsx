@@ -76,7 +76,18 @@ export function BlogToc({ headings }: BlogTocProps) {
       observerRef.current.observe(el);
     }
 
-    return () => observerRef.current?.disconnect();
+    function onScrollEnd() {
+      const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
+      if (atBottom && headings.length > 0) {
+        setActiveId(headings[headings.length - 1].id);
+      }
+    }
+
+    window.addEventListener('scroll', onScrollEnd, { passive: true });
+    return () => {
+      observerRef.current?.disconnect();
+      window.removeEventListener('scroll', onScrollEnd);
+    };
   }, [headings]);
 
   const activeIndex = useMemo(
