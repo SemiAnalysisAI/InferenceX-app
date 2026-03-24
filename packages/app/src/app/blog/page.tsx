@@ -75,35 +75,38 @@ export default async function BlogPage({
             ) : (
               <div className="flex flex-col gap-8 mx-4 md:mx-8">
                 {filtered.map((post) => (
-                  <div key={post.slug}>
-                    <BlogPostCard slug={post.slug} title={post.title}>
-                      <article>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
-                          <time dateTime={post.date}>
-                            {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              timeZone: 'UTC',
-                            })}
-                          </time>
-                          <span>&middot;</span>
-                          <span>{post.readingTime} min read</span>
-                        </div>
-                        <h2 className="text-2xl font-semibold mb-2 group-hover:underline">
-                          {post.title}
-                        </h2>
-                        <p className="text-muted-foreground mb-3">{post.subtitle}</p>
-                      </article>
-                    </BlogPostCard>
-                    {post.tags && post.tags.length > 0 && (
-                      <div className="flex gap-2 mt-2 ml-6">
-                        {post.tags.map((tag) => (
-                          <BlogTagLink key={tag} tag={tag} active={activeTag === tag} />
-                        ))}
+                  <BlogPostCard key={post.slug} slug={post.slug} title={post.title}>
+                    <article>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
+                        <time dateTime={post.date}>
+                          {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            timeZone: 'UTC',
+                          })}
+                        </time>
+                        <span>&middot;</span>
+                        <span>{post.readingTime} min read</span>
                       </div>
-                    )}
-                  </div>
+                      <h2 className="text-2xl font-semibold mb-2 group-hover:underline">
+                        {post.title}
+                      </h2>
+                      <p className="text-muted-foreground mb-3">{post.subtitle}</p>
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="flex gap-2">
+                          {post.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  </BlogPostCard>
                 ))}
               </div>
             )}

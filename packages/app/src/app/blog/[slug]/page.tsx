@@ -7,7 +7,6 @@ import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { BlogPostNav } from '@/components/blog/blog-post-nav';
-import { BlogTagLink } from '@/components/blog/blog-tag-link';
 import { BlogToc } from '@/components/blog/blog-toc';
 import { mdxComponents } from '@/components/blog/mdx-components';
 import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
@@ -158,7 +157,9 @@ export default async function BlogPostPage({ params }: Props) {
                   <>
                     <span>&middot;</span>
                     {meta.tags.map((tag) => (
-                      <BlogTagLink key={tag} tag={tag} />
+                      <span key={tag} className="rounded-full bg-muted px-3 py-0.5 text-xs">
+                        {tag}
+                      </span>
                     ))}
                   </>
                 )}
