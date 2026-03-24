@@ -89,7 +89,7 @@ export default async function BlogPage({
                         <span>&middot;</span>
                         <span>{post.readingTime} min read</span>
                       </div>
-                      <h2 className="text-2xl font-semibold mb-2 group-hover:underline">
+                      <h2 className="text-2xl font-semibold mb-2 group-hover:underline group-hover:text-brand">
                         {post.title}
                       </h2>
                       <p className="text-muted-foreground mb-3">{post.subtitle}</p>
