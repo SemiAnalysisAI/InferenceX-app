@@ -355,13 +355,14 @@ describe('mapBenchmarkRow', () => {
       expect(result!.config.precision).toBe('fp8');
     });
 
-    it('defaults to fp8 when absent', () => {
+    it('defaults to empty string when absent and flags as unmapped', () => {
       const tracker = createSkipTracker();
       const row = makeV1Row();
       delete row.precision;
       const result = mapBenchmarkRow(row, tracker);
 
-      expect(result!.config.precision).toBe('fp8');
+      expect(result!.config.precision).toBe('');
+      expect(tracker.unmappedPrecisions.has('')).toBe(true);
     });
   });
 

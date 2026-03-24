@@ -453,6 +453,11 @@ export function InferenceProvider({
 
   // ── Side effects ──────────────────────────────────────────────────────────
 
+  // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes
+  useEffect(() => {
+    if (hwTypesWithData.size > 0) setActiveHwTypes(hwTypesWithData);
+  }, [selectedModel, effectiveSequence, effectivePrecisions]);
+
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
     if (selectedGPUs.length === 0 || availableGPUs.length === 0) return;

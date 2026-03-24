@@ -14,11 +14,6 @@ jobs:
       - name: Wait for source run to finish
         run: sleep 300
 
-      - name: Harden runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
-        with:
-          egress-policy: audit
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -89,6 +84,7 @@ jobs:
           INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
+          UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
         run: pnpm admin:db:ingest:ci
 
       - name: Apply run overrides
@@ -107,6 +103,38 @@ jobs:
         run: |
           curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate" \
             -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true
+
+      - name: Check for unmapped entities
+        if: always()
+        id: unmapped
+        run: |
+          f="${{ github.workspace }}/unmapped-entities.json"
+          if [ -f "$f" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            models=$(jq -r '.models // [] | join(", ")' "$f")
+            hardware=$(jq -r '.hardware // [] | join(", ")' "$f")
+            precisions=$(jq -r '.precisions // [] | join(", ")' "$f")
+            msg=""
+            [ -n "$models" ] && msg="${msg}Models: ${models}\n"
+            [ -n "$hardware" ] && msg="${msg}Hardware: ${hardware}\n"
+            [ -n "$precisions" ] && msg="${msg}Precisions: ${precisions}\n"
+            {
+              echo 'summary<<EOF'
+              echo -e "$msg"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack on unmapped entities
+        if: steps.unmapped.outputs.found == 'true'
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":warning: *Unrecognized entities during ingest*\nRun ID: ${{ github.event.client_payload.run-id }}\n```${{ steps.unmapped.outputs.summary }}```\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
 
       - name: Notify Slack on failure
         if: failure()

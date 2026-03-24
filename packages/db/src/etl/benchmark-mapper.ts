@@ -5,6 +5,7 @@
 
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
+import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import {
   resolveModelKey,
   hwToGpuKey,
@@ -147,7 +148,10 @@ export function mapBenchmarkRow(
 
   const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
   const isMultinode = parseBool(row.is_multinode);
-  const precision = String(row.precision ?? 'fp8').toLowerCase();
+  const precision = String(row.precision ?? '').toLowerCase();
+  if (!PRECISION_KEYS.has(precision)) {
+    tracker.unmappedPrecisions.add(precision);
+  }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
   let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
