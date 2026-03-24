@@ -9,7 +9,6 @@ export interface BlogFrontmatter {
   subtitle: string;
   modifiedDate?: string;
   tags?: string[];
-  coverImage?: string;
 }
 
 export interface BlogPostMeta extends BlogFrontmatter {
