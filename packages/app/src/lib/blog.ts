@@ -78,11 +78,22 @@ export function extractHeadings(rawMdx: string): TocHeading[] {
   const stripped = rawMdx.replaceAll(/```[\s\S]*?```/g, '');
   const headingRegex = /^(#{1,3})\s+(.+)$/gm;
   const headings: TocHeading[] = [];
+  const seen = new Set<string>();
+  const parents: string[] = []; // parents[level] = slug of most recent heading at that level
   let match: RegExpExecArray | null;
   while ((match = headingRegex.exec(stripped)) !== null) {
     const level = match[1].length as 1 | 2 | 3;
     const text = match[2].trim();
-    headings.push({ level, text, id: slugify(text) });
+    const base = slugify(text);
+    parents[level] = base;
+    let id = base;
+    if (seen.has(id)) {
+      // prefix with nearest parent heading
+      const parent = parents.slice(1, level).findLast((p) => p);
+      id = parent ? `${parent}-${base}` : `${base}-${level}`;
+    }
+    seen.add(id);
+    headings.push({ level, text, id });
   }
   return headings;
 }

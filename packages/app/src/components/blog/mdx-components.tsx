@@ -13,6 +13,22 @@ function childrenToText(children: ReactNode): string {
   return '';
 }
 
+/** Tracks seen heading slugs and parent context for deduplication. */
+const headingSeen = new Set<string>();
+const headingParents: string[] = [];
+
+function uniqueHeadingId(text: string, level: number): string {
+  const base = slugify(text);
+  headingParents[level] = base;
+  let id = base;
+  if (headingSeen.has(id)) {
+    const parent = headingParents.slice(1, level).findLast((p) => p);
+    id = parent ? `${parent}-${base}` : `${base}-${level}`;
+  }
+  headingSeen.add(id);
+  return id;
+}
+
 function CustomLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   const { href, children, ...rest } = props;
   if (href?.startsWith('/')) {
@@ -44,17 +60,17 @@ function CustomImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
 }
 
 function Heading1(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  const id = slugify(childrenToText(props.children));
+  const id = uniqueHeadingId(childrenToText(props.children), 1);
   return <h2 id={id} {...props} />;
 }
 
 function Heading2(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  const id = slugify(childrenToText(props.children));
+  const id = uniqueHeadingId(childrenToText(props.children), 2);
   return <h2 id={id} {...props} />;
 }
 
 function Heading3(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  const id = slugify(childrenToText(props.children));
+  const id = uniqueHeadingId(childrenToText(props.children), 3);
   return <h3 id={id} {...props} />;
 }
 
