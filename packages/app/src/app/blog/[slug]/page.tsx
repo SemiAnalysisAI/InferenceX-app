@@ -178,11 +178,11 @@ export default async function BlogPostPage({ params }: Props) {
               className="prose prose-neutral dark:prose-invert max-w-none mx-4 md:mx-8 blog-prose"
             >
               {content}
+              <p className="text-xs text-muted-foreground">
+                All articles and posts are &copy; SemiAnalysis. All rights reserved. The AGPL-3.0
+                license covering the application source code does not apply to article content.
+              </p>
             </article>
-            <p className="text-xs text-muted-foreground text-center mt-8">
-              All articles and posts are &copy; SemiAnalysis. All rights reserved. The AGPL-3.0
-              license covering the application source code does not apply to article content.
-            </p>
           </Card>
           <BlogPostNav
             prev={adjacent.prev ? { slug: adjacent.prev.slug, title: adjacent.prev.title } : null}
