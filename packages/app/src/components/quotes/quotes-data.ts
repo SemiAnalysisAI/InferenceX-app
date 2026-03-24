@@ -294,4 +294,11 @@ export const QUOTES: Quote[] = [
     logo: 'huggingface.svg',
     link: 'https://www.linkedin.com/in/cdelangue/',
   },
+  {
+    text: 'It is important to have an open and continuously updated platform for benchmarking inference engines across real workloads and diverse hardware. InferenceX provides this kind of transparent and practical evaluation, helping the community better understand real system bottlenecks and tradeoffs. Benchmarks like this are essential for building more efficient and scalable AI systems. Moreover, as LLM agents become increasingly capable at improving systems, such a platform can provide the reliable feedback needed to close the automatic optimization loop, further driving progress in this field.',
+    name: 'Cao Shiyi',
+    title: 'Researcher, Sky Computing Lab',
+    org: 'UC Berkeley',
+    logo: 'sky-berkeley.png',
+  },
 ];
