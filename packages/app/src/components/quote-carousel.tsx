@@ -149,7 +149,7 @@ export function QuoteCarousel({
   return (
     <div className="flex flex-col gap-4">
       {/* Company logo strip */}
-      <div className="flex flex-wrap items-center justify-evenly gap-x-6 gap-y-2 mx-4">
+      <div className="grid grid-rows-2 grid-flow-col place-items-center gap-x-6 gap-y-2 mx-4">
         {entries.map((e, i) => (
           <button
             key={e.org}
