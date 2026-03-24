@@ -11,34 +11,47 @@ interface BlogTocProps {
 
 export function BlogToc({ headings }: BlogTocProps) {
   const [activeId, setActiveId] = useState('');
-  const [sidebarLeft, setSidebarLeft] = useState<number | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const sectionTopRef = useRef(0);
+  const sidebarLeftRef = useRef(0);
 
-  const updatePosition = useCallback(() => {
+  const updateLayout = useCallback(() => {
     const section = sectionRef.current ?? document.querySelector('[data-blog-section]');
     if (!section) return;
     sectionRef.current = section as HTMLElement;
     const rect = section.getBoundingClientRect();
     const rightEdge = rect.right;
-    const viewportWidth = window.innerWidth;
-    // Only show sidebar if there's at least 240px to the right of the content
-    if (viewportWidth - rightEdge >= 240) {
-      setSidebarLeft(rightEdge + 32);
-    } else {
-      setSidebarLeft(null);
+    sectionTopRef.current = rect.top + window.scrollY;
+    sidebarLeftRef.current = rightEdge + 32;
+    const fits = window.innerWidth - rightEdge >= 240;
+    setShowSidebar(fits);
+    if (fits && sidebarRef.current) {
+      sidebarRef.current.style.left = `${rightEdge + 32}px`;
+      const top = Math.max(32, sectionTopRef.current - window.scrollY);
+      sidebarRef.current.style.top = `${top}px`;
     }
   }, []);
 
   useEffect(() => {
-    // Delay to ensure DOM is fully rendered after hydration
-    const raf = requestAnimationFrame(updatePosition);
-    window.addEventListener('resize', updatePosition);
+    const raf = requestAnimationFrame(updateLayout);
+    window.addEventListener('resize', updateLayout);
+
+    function onScroll() {
+      if (!sidebarRef.current) return;
+      const top = Math.max(32, sectionTopRef.current - window.scrollY);
+      sidebarRef.current.style.top = `${top}px`;
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('resize', updateLayout);
+      window.removeEventListener('scroll', onScroll);
     };
-  }, [updatePosition]);
+  }, [updateLayout]);
 
   useEffect(() => {
     const elements = headings
@@ -105,7 +118,7 @@ export function BlogToc({ headings }: BlogTocProps) {
   return (
     <>
       {/* Inline: when sidebar doesn't fit */}
-      {sidebarLeft === null && (
+      {!showSidebar && (
         <Card>
           <nav aria-label="Table of contents">
             <p className="text-sm font-medium mb-2">On this page</p>
@@ -114,11 +127,12 @@ export function BlogToc({ headings }: BlogTocProps) {
         </Card>
       )}
 
-      {/* Fixed sidebar: when enough space exists to the right */}
-      {sidebarLeft !== null && (
+      {/* Sidebar: aligned with title, follows scroll */}
+      {showSidebar && (
         <nav
-          className="fixed top-8 w-52 max-h-[calc(100vh-4rem)] overflow-y-auto"
-          style={{ left: sidebarLeft }}
+          ref={sidebarRef}
+          className="fixed w-52 max-h-[calc(100vh-4rem)] overflow-y-auto"
+          style={{ left: sidebarLeftRef.current, top: 32 }}
           aria-label="Table of contents"
         >
           <p className="text-sm font-medium mb-2">On this page</p>
