@@ -278,4 +278,12 @@ export const QUOTES: Quote[] = [
     org: 'Core42',
     logo: 'core42.png',
   },
+  {
+    text: 'PyTorch was built on the belief that open tools accelerate the entire AI ecosystem. InferenceX\u2122 embodies that same philosophy\u2014open, reproducible, and vendor-neutral benchmarks that give the community real data on real hardware. As inference workloads scale to serve billions of users, having a continuously updated, transparent performance baseline across accelerators is essential for practitioners and platform teams making critical infrastructure decisions.',
+    name: 'Joseph Spisak',
+    title: 'Product Director, Meta Super Intelligence Lab',
+    org: 'Meta MSL',
+    logo: 'meta.svg',
+    link: 'https://www.linkedin.com/in/jspisak',
+  },
 ];
