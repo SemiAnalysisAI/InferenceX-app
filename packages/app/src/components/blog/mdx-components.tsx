@@ -1,5 +1,17 @@
+import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { slugify } from '@/lib/blog';
+
+function childrenToText(children: ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(childrenToText).join('');
+  if (children && typeof children === 'object' && 'props' in children) {
+    return childrenToText((children as { props: { children?: ReactNode } }).props.children);
+  }
+  return '';
+}
 
 function CustomLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   const { href, children, ...rest } = props;
@@ -32,11 +44,24 @@ function CustomImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
 }
 
 function Heading1(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 {...props} />;
+  const id = slugify(childrenToText(props.children));
+  return <h2 id={id} {...props} />;
+}
+
+function Heading2(props: React.HTMLAttributes<HTMLHeadingElement>) {
+  const id = slugify(childrenToText(props.children));
+  return <h2 id={id} {...props} />;
+}
+
+function Heading3(props: React.HTMLAttributes<HTMLHeadingElement>) {
+  const id = slugify(childrenToText(props.children));
+  return <h3 id={id} {...props} />;
 }
 
 export const mdxComponents: Record<string, React.ComponentType<any>> = {
   h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
   a: CustomLink,
   img: CustomImage,
 };

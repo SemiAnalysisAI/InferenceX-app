@@ -68,6 +68,24 @@ export function getAdjacentPosts(slug: string): AdjacentPosts {
   };
 }
 
+export interface TocHeading {
+  level: 2 | 3;
+  text: string;
+  id: string;
+}
+
+export function extractHeadings(rawMdx: string): TocHeading[] {
+  const headingRegex = /^(#{2,3})\s+(.+)$/gm;
+  const headings: TocHeading[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = headingRegex.exec(rawMdx)) !== null) {
+    const level = match[1].length as 2 | 3;
+    const text = match[2].trim();
+    headings.push({ level, text, id: slugify(text) });
+  }
+  return headings;
+}
+
 export function getPostBySlug(slug: string): { meta: BlogPostMeta; raw: string } | null {
   const safe = slugify(slug);
   const filePath = path.join(CONTENT_DIR, `${safe}.mdx`);

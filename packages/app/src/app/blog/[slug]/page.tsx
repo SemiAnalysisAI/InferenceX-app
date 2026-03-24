@@ -7,11 +7,12 @@ import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { BlogPostNav } from '@/components/blog/blog-post-nav';
+import { BlogToc } from '@/components/blog/blog-toc';
 import { mdxComponents } from '@/components/blog/mdx-components';
 import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
-import { getAllPosts, getAdjacentPosts, getPostBySlug } from '@/lib/blog';
+import { getAllPosts, getAdjacentPosts, extractHeadings, getPostBySlug } from '@/lib/blog';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,
@@ -92,6 +93,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   const { meta, raw } = result;
   const adjacent = getAdjacentPosts(slug);
+  const headings = extractHeadings(raw);
   const highlighter = await getHighlighter();
 
   const { content } = await compileMDX({
@@ -168,6 +170,11 @@ export default async function BlogPostPage({ params }: Props) {
               </div>
             </header>
           </Card>
+          {headings.length > 0 && (
+            <Card>
+              <BlogToc headings={headings} />
+            </Card>
+          )}
           <Card>
             <article
               data-blog-article
