@@ -32,7 +32,7 @@ describe('Blog', () => {
     });
 
     it('renders the post title', () => {
-      cy.get('h2').should('contain.text', 'Hello World');
+      cy.get('h2').should('contain.text', 'Lorem Ipsum');
     });
 
     it('displays post metadata', () => {
