@@ -1,7 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import fs from 'fs';
+import fs from 'node:fs';
 
-import { extractHeadings, getAllPosts, getPostBySlug, getReadingTime, slugify } from './blog';
+import {
+  extractHeadings,
+  getAdjacentPosts,
+  getAllPosts,
+  getPostBySlug,
+  getReadingTime,
+  slugify,
+} from './blog';
 
 const FAKE_MDX = `---
 title: 'Test Post'
@@ -27,8 +34,19 @@ date: '2025-12-01'
 Short content.
 `;
 
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
+const FAKE_MDX_MIDDLE = `---
+title: 'Middle Post'
+subtitle: 'A middle subtitle'
+date: '2026-01-01'
+---
+
+# Middle
+
+Some middle content.
+`;
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
   return { ...actual, default: { ...actual } };
 });
 
@@ -134,6 +152,53 @@ describe('getPostBySlug', () => {
     expect(result!.meta.title).toBe('Test Post');
     expect(result!.meta.slug).toBe('test-post');
     expect(result!.raw).toContain('# Test Heading');
+  });
+});
+
+describe('getAdjacentPosts', () => {
+  function mockThreePosts() {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(fs, 'readdirSync').mockReturnValue([
+      'test-post.mdx',
+      'middle-post.mdx',
+      'older-post.mdx',
+    ] as any);
+    vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+      const p = String(filePath);
+      if (p.includes('test-post')) return FAKE_MDX;
+      if (p.includes('middle-post')) return FAKE_MDX_MIDDLE;
+      return FAKE_MDX_OLDER;
+    });
+  }
+
+  it('returns prev (older) and next (newer) for a middle post', () => {
+    mockThreePosts();
+    // sorted newest-first: test-post (Jan 15), middle-post (Jan 1), older-post (Dec 1)
+    const { prev, next } = getAdjacentPosts('middle-post');
+    expect(next!.slug).toBe('test-post');
+    expect(prev!.slug).toBe('older-post');
+  });
+
+  it('returns null next for the newest post', () => {
+    mockThreePosts();
+    const { prev, next } = getAdjacentPosts('test-post');
+    expect(next).toBeNull();
+    expect(prev!.slug).toBe('middle-post');
+  });
+
+  it('returns null prev for the oldest post', () => {
+    mockThreePosts();
+    const { prev, next } = getAdjacentPosts('older-post');
+    expect(next!.slug).toBe('middle-post');
+    expect(prev).toBeNull();
+  });
+
+  it('returns both null for an unknown slug', () => {
+    mockThreePosts();
+    const { prev, next } = getAdjacentPosts('nonexistent');
+    expect(prev).toBeNull();
+    expect(next).toBeNull();
   });
 });
 
