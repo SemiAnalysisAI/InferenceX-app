@@ -51,11 +51,9 @@ function Figure(props: { src: string; alt?: string; caption?: string }) {
       <img
         src={props.src}
         alt={props.alt ?? ''}
-        width={1456}
-        height={900}
         loading="lazy"
         decoding="async"
-        className="rounded-lg w-full md:w-3/4 h-auto"
+        className="rounded-lg w-full md:w-3/4"
       />
       {props.caption && (
         <figcaption className="text-center text-sm text-muted-foreground mt-2">

@@ -10,6 +10,12 @@
   scroll-margin-top: 6rem;
 }
 
+/* Allow long inline code to wrap on mobile */
+.blog-prose code {
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
 /* Remove auto-inserted curly quotes from blockquotes in blog prose */
 .blog-prose blockquote p:first-of-type::before,
 .blog-prose blockquote p:last-of-type::after {
