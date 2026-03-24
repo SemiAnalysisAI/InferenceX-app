@@ -72,6 +72,10 @@ function Figure(props: { src: string; alt?: string; caption?: string }) {
   );
 }
 
+function Blur(props: { children?: ReactNode }) {
+  return <div className="blur-sm select-none pointer-events-none">{props.children}</div>;
+}
+
 export const mdxComponents: Record<string, React.ComponentType<any>> = {
   h1: Heading1,
   h2: Heading2,
@@ -79,4 +83,5 @@ export const mdxComponents: Record<string, React.ComponentType<any>> = {
   a: CustomLink,
   img: CustomImage,
   Figure,
+  Blur,
 };
