@@ -75,10 +75,11 @@ export interface TocHeading {
 }
 
 export function extractHeadings(rawMdx: string): TocHeading[] {
+  const stripped = rawMdx.replace(/```[\s\S]*?```/g, '');
   const headingRegex = /^(#{1,3})\s+(.+)$/gm;
   const headings: TocHeading[] = [];
   let match: RegExpExecArray | null;
-  while ((match = headingRegex.exec(rawMdx)) !== null) {
+  while ((match = headingRegex.exec(stripped)) !== null) {
     const level = match[1].length as 1 | 2 | 3;
     const text = match[2].trim();
     headings.push({ level, text, id: slugify(text) });
