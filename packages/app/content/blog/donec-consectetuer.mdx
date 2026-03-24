@@ -36,13 +36,30 @@ In ut quam vitae odio lacinia tincidunt. Praesent ut ligula non mi varius sagitt
 Cras sagittis. Praesent ac sem eget est egestas volutpat. Vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci. Aenean nec lorem.
 
 ```typescript
+// Praesent ac sem eget est egestas volutpat
+// Vivamus a tellus pellentesque habitant
 const cras = await sagittis.praesent({
   sem: 'egestas',
   volutpat: true,
 });
 
+// Proin pharetra nonummy pede mauris et orci
+// Aenean nec lorem in porttitor donec laoreet
 const result = cras.pellentesque(habitant);
-console.log(`Morbi tristique: ${result.senectus}`);
+
+// Suspendisse dui purus scelerisque at
+// vulputate vitae pretium mattis nunc
+for (const item of result.turpis) {
+  // Mauris eget neque at sem venenatis eleifend
+  const processed = await item.fusce({
+    aliquet: 'pede',
+    suspendisse: true,
+  });
+  console.log(`Morbi tristique: ${processed.senectus}`);
+}
+
+// Donec blandit feugiat ligula
+console.log(`Total: ${result.integer}`);
 ```
 
 In porttitor. Donec laoreet nonummy augue. Suspendisse dui purus, scelerisque at, vulputate vitae, pretium mattis, nunc. Mauris eget neque at sem venenatis eleifend.
