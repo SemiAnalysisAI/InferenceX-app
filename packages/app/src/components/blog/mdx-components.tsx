@@ -60,9 +60,9 @@ function Heading3(props: React.HTMLAttributes<HTMLHeadingElement>) {
 
 function Figure(props: { src: string; alt?: string; caption?: string }) {
   return (
-    <figure className="my-6">
+    <figure className="my-6 flex flex-col items-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={props.src} alt={props.alt ?? ''} className="rounded-lg w-2/3 md:w-full" />
+      <img src={props.src} alt={props.alt ?? ''} className="rounded-lg w-full md:w-3/4" />
       {props.caption && (
         <figcaption className="text-center text-sm text-muted-foreground mt-2">
           {props.caption}
