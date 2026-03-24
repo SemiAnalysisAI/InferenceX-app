@@ -58,10 +58,25 @@ function Heading3(props: React.HTMLAttributes<HTMLHeadingElement>) {
   return <h3 id={id} {...props} />;
 }
 
+function Figure(props: { src: string; alt?: string; caption?: string }) {
+  return (
+    <figure className="my-6">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={props.src} alt={props.alt ?? ''} className="rounded-lg w-full" />
+      {props.caption && (
+        <figcaption className="text-center text-sm text-muted-foreground mt-2">
+          {props.caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
 export const mdxComponents: Record<string, React.ComponentType<any>> = {
   h1: Heading1,
   h2: Heading2,
   h3: Heading3,
   a: CustomLink,
   img: CustomImage,
+  Figure,
 };
