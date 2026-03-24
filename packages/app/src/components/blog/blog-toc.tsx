@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { Card } from '@/components/ui/card';
 import type { TocHeading } from '@/lib/blog';
@@ -11,7 +11,30 @@ interface BlogTocProps {
 
 export function BlogToc({ headings }: BlogTocProps) {
   const [activeId, setActiveId] = useState('');
+  const [sidebarLeft, setSidebarLeft] = useState<number | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
+
+  const updatePosition = useCallback(() => {
+    const section = sectionRef.current ?? document.querySelector('[data-blog-section]');
+    if (!section) return;
+    sectionRef.current = section as HTMLElement;
+    const rect = section.getBoundingClientRect();
+    const rightEdge = rect.right;
+    const viewportWidth = window.innerWidth;
+    // Only show sidebar if there's at least 240px to the right of the content
+    if (viewportWidth - rightEdge >= 240) {
+      setSidebarLeft(rightEdge + 32);
+    } else {
+      setSidebarLeft(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
+  }, [updatePosition]);
 
   useEffect(() => {
     const elements = headings
@@ -77,28 +100,31 @@ export function BlogToc({ headings }: BlogTocProps) {
 
   return (
     <>
-      {/* Inline: screens below 2xl */}
-      <Card className="2xl:hidden">
-        <details className="lg:hidden" aria-label="Table of contents">
-          <summary className="text-sm font-medium cursor-pointer">On this page</summary>
-          <div className="mt-2">{list}</div>
-        </details>
-        <nav className="hidden lg:block" aria-label="Table of contents">
-          <p className="text-sm font-medium mb-2">On this page</p>
-          {list}
-        </nav>
-      </Card>
+      {/* Inline: when sidebar doesn't fit */}
+      {sidebarLeft === null && (
+        <Card>
+          <details className="lg:hidden" aria-label="Table of contents">
+            <summary className="text-sm font-medium cursor-pointer">On this page</summary>
+            <div className="mt-2">{list}</div>
+          </details>
+          <nav className="hidden lg:block" aria-label="Table of contents">
+            <p className="text-sm font-medium mb-2">On this page</p>
+            {list}
+          </nav>
+        </Card>
+      )}
 
-      {/* Sticky sidebar: ultrawide screens — container spans full section height */}
-      <div className="hidden 2xl:block absolute top-0 bottom-0 left-full pl-8">
+      {/* Fixed sidebar: when enough space exists to the right */}
+      {sidebarLeft !== null && (
         <nav
-          className="sticky top-8 w-56 max-h-[calc(100vh-4rem)] overflow-y-auto"
+          className="fixed top-8 w-52 max-h-[calc(100vh-4rem)] overflow-y-auto"
+          style={{ left: sidebarLeft }}
           aria-label="Table of contents"
         >
           <p className="text-sm font-medium mb-2">On this page</p>
           {list}
         </nav>
-      </div>
+      )}
     </>
   );
 }

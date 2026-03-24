@@ -134,7 +134,7 @@ export default async function BlogPostPage({ params }: Props) {
       <ReadingProgressBar slug={slug} />
       <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
-        <section className="relative">
+        <section data-blog-section>
           <Card>
             <BlogBackLink />
             <header>
