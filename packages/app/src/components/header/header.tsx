@@ -45,7 +45,7 @@ const inactiveClasses =
 const activeClasses = 'bg-brand/10 border-brand/50 text-brand';
 
 export const Header = () => {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
 
   return (
     <header
