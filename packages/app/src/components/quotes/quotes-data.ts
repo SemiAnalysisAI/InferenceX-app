@@ -99,7 +99,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'InferenceMAX\u2122 benchmark is pogchamp & W in chat',
     name: 'Kaichao You',
-    title: 'vLLM Project Co-Lead',
+    title: 'vLLM Project Co-Lead & PhD Student @ Tsinghua University',
     org: 'vLLM',
     logo: 'vllm.svg',
     link: 'https://www.linkedin.com/in/youkaichao/',
@@ -264,11 +264,26 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/xanderdunn/',
   },
   {
-    text: 'InferenceX\u2122 makes that gap visible across every major accelerator, continuously and transparently. For anyone working on ML systems research, having an open, reproducible baseline that tracks how inference software continuously improves over time is incredibly valuable. This is the kind of open source data the research community needs.',
+    text: 'For researchers working on inference optimizations, understanding how new techniques interact across the software and hardware stack is critical yet incredibly hard to measure. InferenceX\u2122 provides much-needed insights into how inference performance evolves across major hardware platforms, moving the field forward with open, reproducible data that makes the gaps and progress visible.',
     name: 'Simon Guo',
-    title: 'PhD Student, Stanford Scaling Intelligence',
+    title: 'PhD Student, Stanford CS',
     org: 'Stanford',
     logo: 'stanford.svg',
     link: 'https://simonguo.tech/',
+  },
+  {
+    text: 'As AI infrastructure scales globally, no single vendor or region can define the benchmarks that matter for everyone. InferenceX is an important step toward a shared, transparent view of inference performance and TCO, enabling more rational investments for sovereign AI Cloud operators, as well as healthier competition, and ultimately more accessible AI capacity worldwide.',
+    name: 'Talal M. Al Kaissi',
+    title: 'CEO',
+    org: 'Core42',
+    logo: 'core42.png',
+  },
+  {
+    text: 'PyTorch was built on the belief that open tools accelerate the entire AI ecosystem. InferenceX\u2122 embodies that same philosophy\u2014open, reproducible, and vendor-neutral benchmarks that give the community real data on real hardware. As inference workloads scale to serve billions of users, having a continuously updated, transparent performance baseline across accelerators is essential for practitioners and platform teams making critical infrastructure decisions.',
+    name: 'Joseph Spisak',
+    title: 'Product Director, Meta Super Intelligence Lab',
+    org: 'Meta Superintelligence Labs',
+    logo: 'meta.svg',
+    link: 'https://www.linkedin.com/in/jspisak',
   },
 ];
