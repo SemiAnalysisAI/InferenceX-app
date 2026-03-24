@@ -15,6 +15,11 @@ const FAKE_POSTS: BlogPostMeta[] = [
 
 vi.mock('@/lib/blog', () => ({
   getAllPosts: () => FAKE_POSTS,
+  getPostBySlug: (slug: string) => {
+    const post = FAKE_POSTS.find((p) => p.slug === slug);
+    if (!post) return null;
+    return { meta: post, raw: '# Test\n\nSome content.' };
+  },
 }));
 
 const { GET } = await import('./route');
