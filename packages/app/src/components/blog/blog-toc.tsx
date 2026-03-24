@@ -148,7 +148,10 @@ export function BlogToc({ headings }: BlogTocProps) {
         <nav
           ref={sidebarRef}
           className="fixed w-52 max-h-[calc(100vh-4rem)] overflow-y-auto"
-          style={{ left: sidebarLeftRef.current, top: 32 }}
+          style={{
+            left: sidebarLeftRef.current,
+            top: Math.max(32, sectionTopRef.current - window.scrollY),
+          }}
           aria-label="Table of contents"
         >
           <p className="text-sm font-medium mb-2">On this page</p>
