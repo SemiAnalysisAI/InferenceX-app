@@ -66,7 +66,7 @@ export function IntroSection() {
                 'WEKA',
                 'Stanford',
                 'Core42',
-                'Meta MSL',
+                'Meta Superintelligence Labs',
               ].includes(q.org),
             )}
             overrides={{
