@@ -4,7 +4,10 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
   images: {
-    remotePatterns: [{ hostname: 'placehold.co' }],
+    remotePatterns: [
+      { hostname: 'placehold.co' },
+      { hostname: 'substack-post-media.s3.amazonaws.com' },
+    ],
   },
 };
 
