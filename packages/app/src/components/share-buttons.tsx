@@ -13,7 +13,7 @@ function getShareUrl(): string {
   return window.location.href;
 }
 
-export function ShareTwitterButton() {
+export function ShareTwitterButton({ text }: { text?: string }) {
   return (
     <Button
       variant="outline"
@@ -24,7 +24,7 @@ export function ShareTwitterButton() {
       onClick={() => {
         const url = getShareUrl();
         window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_TEXT)}&url=${encodeURIComponent(url)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? SHARE_TEXT)}&url=${encodeURIComponent(url)}`,
           '_blank',
           'noopener,noreferrer,width=600,height=400',
         );

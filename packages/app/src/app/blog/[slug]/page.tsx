@@ -164,7 +164,7 @@ export default async function BlogPostPage({ params }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-4">
-                <ShareTwitterButton />
+                <ShareTwitterButton text={meta.title} />
                 <ShareLinkedInButton />
               </div>
             </header>
