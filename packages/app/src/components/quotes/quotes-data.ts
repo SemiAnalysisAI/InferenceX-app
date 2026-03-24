@@ -286,4 +286,12 @@ export const QUOTES: Quote[] = [
     logo: 'meta.svg',
     link: 'https://www.linkedin.com/in/jspisak',
   },
+  {
+    text: 'Hugging Face exists to make AI open and accessible to everyone. InferenceX\u2122 extends that mission to ai chip performance, pulling models directly from the Hub and benchmarking them across every major accelerator, continuously and transparently. When the community can see exactly how frontier open models perform on real hardware in real time, it raises the bar for the entire ecosystem.',
+    name: 'Clement Delangue',
+    title: 'CEO, Hugging Face',
+    org: 'Hugging Face',
+    logo: 'huggingface.svg',
+    link: 'https://www.linkedin.com/in/cdelangue/',
+  },
 ];
