@@ -95,6 +95,13 @@ export function BlogToc({ headings }: BlogTocProps) {
     [headings, activeId],
   );
 
+  // Auto-scroll the sidebar TOC to keep the active item visible
+  const activeItemRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    if (!showSidebar || !activeItemRef.current) return;
+    activeItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [activeId, showSidebar]);
+
   if (headings.length === 0) return null;
 
   function handleClick(heading: TocHeading) {
@@ -115,7 +122,7 @@ export function BlogToc({ headings }: BlogTocProps) {
   const list = (
     <ul className="flex flex-col gap-1.5 text-sm">
       {headings.map((h, i) => (
-        <li key={h.id}>
+        <li key={h.id} ref={h.id === activeId ? activeItemRef : undefined}>
           <button
             type="button"
             className={`text-left transition-colors ${itemClass(h, i)}`}
