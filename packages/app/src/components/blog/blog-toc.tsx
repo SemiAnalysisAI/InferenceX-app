@@ -31,9 +31,13 @@ export function BlogToc({ headings }: BlogTocProps) {
   }, []);
 
   useEffect(() => {
-    updatePosition();
+    // Delay to ensure DOM is fully rendered after hydration
+    const raf = requestAnimationFrame(updatePosition);
     window.addEventListener('resize', updatePosition);
-    return () => window.removeEventListener('resize', updatePosition);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [updatePosition]);
 
   useEffect(() => {
