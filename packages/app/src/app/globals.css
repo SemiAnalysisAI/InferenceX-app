@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Allow hash navigation to clear the fixed navbar */
+.blog-prose h2[id],
+.blog-prose h3[id] {
+  scroll-margin-top: 6rem;
+}
+
 /* Remove auto-inserted curly quotes from blockquotes in blog prose */
 .blog-prose blockquote p:first-of-type::before,
 .blog-prose blockquote p:last-of-type::after {

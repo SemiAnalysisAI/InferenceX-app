@@ -8,7 +8,8 @@ import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 import { BlogBackLink } from '@/components/blog/blog-back-link';
 import { BlogPostNav } from '@/components/blog/blog-post-nav';
 import { BlogToc } from '@/components/blog/blog-toc';
-import { mdxComponents } from '@/components/blog/mdx-components';
+import { HashScroll } from '@/components/blog/hash-scroll';
+import { createMdxComponents } from '@/components/blog/mdx-components';
 import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
@@ -99,7 +100,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   const { content } = await compileMDX({
     source: raw,
-    components: mdxComponents,
+    components: createMdxComponents(),
     options: {
       mdxOptions: {
         rehypePlugins: [
@@ -132,6 +133,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <main className="relative">
+      <HashScroll />
       <ReadingProgressBar slug={slug} />
       <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">

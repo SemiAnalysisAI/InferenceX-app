@@ -13,22 +13,6 @@ function childrenToText(children: ReactNode): string {
   return '';
 }
 
-/** Tracks seen heading slugs and parent context for deduplication. */
-const headingSeen = new Set<string>();
-const headingParents: string[] = [];
-
-function uniqueHeadingId(text: string, level: number): string {
-  const base = slugify(text);
-  headingParents[level] = base;
-  let id = base;
-  if (headingSeen.has(id)) {
-    const parent = headingParents.slice(1, level).findLast((p) => p);
-    id = parent ? `${parent}-${base}` : `${base}-${level}`;
-  }
-  headingSeen.add(id);
-  return id;
-}
-
 function CustomLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   const { href, children, ...rest } = props;
   if (href?.startsWith('/')) {
@@ -59,21 +43,6 @@ function CustomImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   );
 }
 
-function Heading1(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  const id = uniqueHeadingId(childrenToText(props.children), 1);
-  return <h2 id={id} {...props} />;
-}
-
-function Heading2(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  const id = uniqueHeadingId(childrenToText(props.children), 2);
-  return <h2 id={id} {...props} />;
-}
-
-function Heading3(props: React.HTMLAttributes<HTMLHeadingElement>) {
-  const id = uniqueHeadingId(childrenToText(props.children), 3);
-  return <h3 id={id} {...props} />;
-}
-
 function Figure(props: { src: string; alt?: string; caption?: string }) {
   return (
     <figure className="my-6 flex flex-col items-center">
@@ -92,12 +61,39 @@ function Blur(props: { children?: ReactNode }) {
   return <div className="blur-sm select-none pointer-events-none">{props.children}</div>;
 }
 
-export const mdxComponents: Record<string, React.ComponentType<any>> = {
-  h1: Heading1,
-  h2: Heading2,
-  h3: Heading3,
-  a: CustomLink,
-  img: CustomImage,
-  Figure,
-  Blur,
-};
+/** Creates a fresh set of MDX components with clean heading dedup state per render. */
+export function createMdxComponents(): Record<string, React.ComponentType<any>> {
+  const seen = new Set<string>();
+  const parents: string[] = [];
+
+  function uniqueId(text: string, level: number): string {
+    const base = slugify(text);
+    parents[level] = base;
+    let id = base;
+    if (seen.has(id)) {
+      const parent = parents.slice(1, level).findLast((p) => p);
+      id = parent ? `${parent}-${base}` : `${base}-${level}`;
+    }
+    seen.add(id);
+    return id;
+  }
+
+  return {
+    h1: (props: React.HTMLAttributes<HTMLHeadingElement>) => {
+      const id = uniqueId(childrenToText(props.children), 1);
+      return <h2 id={id} {...props} />;
+    },
+    h2: (props: React.HTMLAttributes<HTMLHeadingElement>) => {
+      const id = uniqueId(childrenToText(props.children), 2);
+      return <h2 id={id} {...props} />;
+    },
+    h3: (props: React.HTMLAttributes<HTMLHeadingElement>) => {
+      const id = uniqueId(childrenToText(props.children), 3);
+      return <h3 id={id} {...props} />;
+    },
+    a: CustomLink,
+    img: CustomImage,
+    Figure,
+    Blur,
+  };
+}
