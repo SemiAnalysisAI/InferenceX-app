@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Remove auto-inserted curly quotes from blockquotes in blog prose */
+.blog-prose blockquote p:first-of-type::before,
+.blog-prose blockquote p:last-of-type::after {
+  content: none;
+}
+
 /* Shiki dual-theme: light by default, dark when .dark class is active */
 .shiki,
 .shiki span {

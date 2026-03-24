@@ -175,7 +175,7 @@ export default async function BlogPostPage({ params }: Props) {
           <Card>
             <article
               data-blog-article
-              className="prose prose-neutral dark:prose-invert max-w-none mx-4 md:mx-8"
+              className="prose prose-neutral dark:prose-invert max-w-none mx-4 md:mx-8 blog-prose"
             >
               {content}
             </article>
