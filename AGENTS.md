@@ -34,13 +34,15 @@ pnpm test:e2e             # Cypress E2E tests
 ```
 packages/
 ├── app/                  # Next.js frontend (@semianalysisai/inferencex-app)
+│   ├── content/blog/     # MDX blog posts (frontmatter + content)
 │   └── src/
 │       ├── app/          # Pages, layouts, API routes (/api/v1/*)
+│       │   └── blog/     # Blog list + [slug] post pages, OG image generation
 │       ├── components/   # Tab sections: inference/, evaluation/, historical-trends/,
-│       │                 #   throughput-calculator/, reliability/, gpu-specs/, ui/
+│       │                 #   throughput-calculator/, reliability/, gpu-specs/, blog/, ui/
 │       ├── hooks/api/    # React Query hooks (use-benchmarks, use-availability, etc.)
-│       └── lib/          # Utilities, constants, d3-chart/, chart-utils, data-mappings
-├── constants/            # Shared constants (GPU keys, model mappings)
+│       └── lib/          # Utilities, constants, d3-chart/, chart-utils, blog, data-mappings
+├── constants/            # Shared constants (GPU keys, model mappings, SEO)
 └── db/                   # DB layer, ETL, migrations, queries, ingest scripts
 ```
 
@@ -66,6 +68,15 @@ API routes (`packages/app/src/app/api/v1/`):
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
 
+Static content routes (no DB):
+
+- `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
+- `/blog/[slug]` — blog post page with MDX rendering and OG image generation
+- `/feed.xml` — RSS 2.0 feed
+- `/llms.txt` — LLM-readable site index
+- `/llms-full.txt` — full article content for LLM ingestion
+- `/sitemap.xml` — dynamic sitemap (includes blog posts)
+
 ## Code Style & Tooling
 
 - **Linter**: oxlint — `pnpm lint` / `pnpm lint:fix`
@@ -87,7 +98,7 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
-**Prefixes**: `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`
+**Prefixes**: `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `social_`
 
 ## Tab Structure
 
@@ -118,6 +129,25 @@ Order: `inference` → `evaluation` → `historical` → `calculator` → `relia
 6. Add disagg caveat banner in `ChartDisplay.tsx` for per-GPU or per-MW metrics (animated amber `border-l-2` banner pattern)
 7. Expose in UI state: `InferenceContext.tsx`
 
+### Add a new blog post
+
+1. Create `packages/app/content/blog/<slug>.mdx` with frontmatter: `title`, `subtitle`, `date` (required), `tags`, `modifiedDate` (optional)
+2. Write content using Markdown + custom MDX components (`Figure`, `Blur`)
+3. No code changes needed — the post automatically appears in the blog list, sitemap, RSS feed, llms.txt, and gets a generated OG image
+
+See [Blog](./docs/blog.md) for content format, available MDX components, and design details.
+
+### Modify blog components
+
+- Blog library (posts, headings, reading time): `src/lib/blog.ts`
+- Blog list page: `src/app/blog/page.tsx`
+- Blog post page: `src/app/blog/[slug]/page.tsx`
+- MDX components: `src/components/blog/mdx-components.tsx`
+- TOC sidebar: `src/components/blog/blog-toc.tsx`
+- OG image generation: `src/app/blog/[slug]/og-image-render.tsx`
+- RSS feed: `src/app/feed.xml/route.ts`
+- SEO constants: `packages/constants/src/seo.ts`
+
 ### Add a new model or GPU
 
 **First ask for the PR / GitHub Actions run URL** — see [Adding Entities](./docs/adding-entities.md) for the full workflow. Never ask other questions before getting the URL.
@@ -144,6 +174,7 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 - **[Testing](./docs/testing.md)** — Requirements, quality standards, pre-commit checklist
 - **[Data Transforms](./docs/data-transforms.md)** — BenchmarkRow → AggDataEntry → InferenceData pipeline, hardware key construction, derived metrics
 - **[State Ownership](./docs/state-ownership.md)** — Context provider state map, availability filtering cascade, comparison dates, URL params
+- **[Blog](./docs/blog.md)** — MDX content system, SEO features, TOC sidebar, reading progress, analytics events
 
 ## Claude AI Agents
 
