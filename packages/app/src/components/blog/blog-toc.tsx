@@ -100,7 +100,9 @@ export function BlogToc({ headings }: BlogTocProps) {
   function handleClick(heading: TocHeading) {
     track('blog_toc_clicked', { heading: heading.text });
     const el = document.getElementById(heading.id);
-    el?.scrollIntoView({ behavior: 'smooth' });
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - 32;
+    window.scrollTo({ top, behavior: 'smooth' });
   }
 
   function itemClass(h: TocHeading, index: number): string {
