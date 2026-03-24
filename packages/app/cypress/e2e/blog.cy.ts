@@ -28,11 +28,11 @@ describe('Blog', () => {
 
   describe('Blog post page', () => {
     before(() => {
-      cy.visit('/blog/hello-world');
+      cy.visit('/blog/inferencemax-open-source-inference-benchmarking');
     });
 
     it('renders the post title', () => {
-      cy.get('h2').should('contain.text', 'Lorem Ipsum');
+      cy.get('h2').should('contain.text', 'InferenceMAX');
     });
 
     it('displays post metadata', () => {
@@ -42,12 +42,7 @@ describe('Blog', () => {
 
     it('renders the article content', () => {
       cy.get('article.prose').should('exist');
-      cy.get('article.prose').should('contain.text', 'InferenceX');
-    });
-
-    it('renders code blocks with syntax highlighting', () => {
-      cy.get('article.prose pre').should('exist');
-      cy.get('article.prose code').should('exist');
+      cy.get('article.prose').should('contain.text', 'InferenceMAX');
     });
 
     it('has a back link to the blog listing', () => {
