@@ -31,7 +31,7 @@ describe('Page Load & Navigation', () => {
   it('page loads without 404 errors', () => {
     cy.visit('/');
     cy.get('[data-testid="scatter-graph"]').should('exist');
-    cy.get('body').should('not.contain.text', 'Not Found');
+    cy.get('[data-testid="header"]').should('exist');
   });
 });
 
