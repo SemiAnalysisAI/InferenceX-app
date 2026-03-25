@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { Card } from '@/components/ui/card';
 import { QuoteCarousel } from '@/components/quote-carousel';
 import { QUOTES } from '@/components/quotes/quotes-data';
@@ -26,25 +28,21 @@ export function IntroSection() {
           Our open data & insights are widely adopted by the ML community, capacity planning
           strategy teams at trillion dollar token factories & AI Labs & at multiple billion dollar
           NeoClouds. Learn more in our articles:{' '}
-          <a
+          <Link
             data-testid="intro-link-v1"
-            href="https://newsletter.semianalysis.com/p/inferencemax-open-source-inference"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/blog/inferencemax-open-source-inference-benchmarking"
             className="text-brand hover:underline font-medium"
           >
-            v1
-          </a>
+            InferenceX v1
+          </Link>
           ,{' '}
-          <a
+          <Link
             data-testid="intro-link-v2"
-            href="https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
             className="text-brand hover:underline font-medium"
           >
-            v2
-          </a>
+            InferenceX v2
+          </Link>
           .
         </p>
         <div className="mt-4 pt-4 border-t border-foreground">

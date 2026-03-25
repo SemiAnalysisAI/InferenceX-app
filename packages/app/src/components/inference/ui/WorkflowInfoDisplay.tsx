@@ -152,7 +152,7 @@ export default function WorkflowInfoDisplay({
           >
             <SelectTrigger
               id="run-select"
-              className="w-full border-0 shadow-none font-bold [&_[data-external-link]_svg]:pointer-events-auto"
+              className="w-full border-0 shadow-none font-bold hover:bg-accent hover:text-accent-foreground rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
               onPointerDown={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-external-link]')) {
