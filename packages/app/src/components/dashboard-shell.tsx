@@ -21,7 +21,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit pt-4"
             >
               <ChevronLeft className="h-3 w-3" />
               InferenceX Home

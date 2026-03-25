@@ -1,35 +1,13 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { cn } from '@/lib/utils';
-
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 
 import { StarButton } from './footer-star-cta';
 
 export const Footer = ({ starCount }: { starCount?: number | null }) => {
   return (
-    <footer
-      data-testid="footer"
-      className={cn(
-        'relative w-full overflow-visible mt-auto pt-32',
-        'before:absolute',
-        'before:bg-muted/50',
-        'dark:before:bg-muted',
-        'before:bottom-0',
-        'before:content-[""]',
-        'before:hidden lg:before:block',
-        'before:w-1/2',
-        'before:h-[200%]',
-        'before:right-0',
-        "before:mask-[url('/brand/left-pattern-full.svg')]",
-        'before:mask-no-repeat',
-        'before:mask-position-[top_right]',
-        'before:mask-size-[100%]',
-        'before:rotate-180',
-        'before:-z-10',
-      )}
-    >
+    <footer data-testid="footer" className="relative w-full overflow-visible mt-auto pt-32">
       <div className="container mx-auto px-4 lg:px-8 py-12">
         {/* Main grid */}
         <div className="flex flex-col md:flex-row md:justify-between gap-10 md:gap-8 mb-10">
