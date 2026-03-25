@@ -28,7 +28,7 @@ describe('Header', () => {
 
   it('shows Dashboard nav link', () => {
     cy.get('[data-testid="nav-link-dashboard"]').should('be.visible');
-    cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/');
+    cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
   });
 
   it('shows Media nav link', () => {
