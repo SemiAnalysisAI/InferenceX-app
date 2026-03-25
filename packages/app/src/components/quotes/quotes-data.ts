@@ -212,7 +212,7 @@ export const QUOTES: Quote[] = [
     name: 'Mingyi Lu',
     title: 'SGLang Product Lead',
     org: 'SGLang',
-    logo: 'sglang.png',
+    logo: 'sglang.webp',
     link: 'https://www.linkedin.com/in/mingyi-lu/',
   },
   {
@@ -276,7 +276,7 @@ export const QUOTES: Quote[] = [
     name: 'Talal M. Al Kaissi',
     title: 'CEO',
     org: 'Core42',
-    logo: 'core42.png',
+    logo: 'core42.webp',
   },
   {
     text: 'PyTorch was built on the belief that open tools accelerate the entire AI ecosystem. InferenceX\u2122 embodies that same philosophy\u2014open, reproducible, and vendor-neutral benchmarks that give the community real data on real hardware. As inference workloads scale to serve billions of users, having a continuously updated, transparent performance baseline across accelerators is essential for practitioners and platform teams making critical infrastructure decisions.',
@@ -299,6 +299,6 @@ export const QUOTES: Quote[] = [
     name: 'Cao Shiyi',
     title: 'Researcher, Sky Computing Lab',
     org: 'UC Berkeley',
-    logo: 'sky-berkeley.png',
+    logo: 'sky-berkeley.webp',
   },
 ];
