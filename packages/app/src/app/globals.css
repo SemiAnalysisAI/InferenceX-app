@@ -10,8 +10,9 @@
   scroll-margin-top: 6rem;
 }
 
-/* Allow long inline code to wrap on mobile */
-.blog-prose code {
+/* Allow long inline code and links to wrap on mobile */
+.blog-prose code,
+.blog-prose a {
   overflow-wrap: break-word;
   word-break: break-all;
 }
