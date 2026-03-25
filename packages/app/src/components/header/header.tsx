@@ -23,6 +23,7 @@ const DASHBOARD_TABS = [
 ];
 
 const NAV_LINKS = [
+  { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
     href: '/inference',
     label: 'Dashboard',
@@ -40,6 +41,7 @@ const NAV_LINKS = [
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
   if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
   return pathname.startsWith(href);
 }
@@ -79,7 +81,10 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   }, []);
 
   return (
-    <header data-testid="header" className="border-b border-border/40">
+    <header
+      data-testid="header"
+      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/50 backdrop-blur-[2px]"
+    >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
