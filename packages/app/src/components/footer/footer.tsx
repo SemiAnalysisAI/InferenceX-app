@@ -44,7 +44,13 @@ export const Footer = () => {
               href="https://semianalysis.com/"
               className="inline-block w-35 h-14.5"
             >
-              <Image width={140} height={58} src="/brand/logo-color.png" alt="SemiAnalysis logo" />
+              <Image
+                width={140}
+                height={58}
+                src="/brand/logo-color.png"
+                alt="SemiAnalysis logo"
+                className="h-auto w-auto"
+              />
             </Link>
             <p
               data-testid="footer-brand-description"

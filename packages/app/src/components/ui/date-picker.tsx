@@ -280,6 +280,7 @@ export function DatePicker({
           onClick={handleGoPrevious}
           disabled={!canGoPrevious() || !!isCheckingAvailableDates}
           className="h-8 w-8"
+          suppressHydrationWarning
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
