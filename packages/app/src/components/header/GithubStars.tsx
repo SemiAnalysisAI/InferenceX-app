@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/components/github-star-modal';
+import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
 import { useGitHubStars } from '@/hooks/api/use-github-stars';
 
 interface GitHubStarsProps {

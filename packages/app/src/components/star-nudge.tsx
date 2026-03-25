@@ -5,7 +5,7 @@ import { Star } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
-import { STARRED_EVENT } from '@/components/github-star-modal';
+import { STARRED_EVENT } from '@/lib/star-storage';
 import { BottomToast } from '@/components/ui/bottom-toast';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;

@@ -1,6 +1,14 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import {
+  DISMISS_DURATION_MS,
+  DISMISS_KEY,
+  STARRED_EVENT,
+  STARRED_KEY,
+  saveDismissTimestamp,
+  saveStarred,
+} from '@/lib/star-storage';
 import { Star } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -16,18 +24,14 @@ import {
 } from '@/components/ui/dialog';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
-export const STORAGE_KEY = 'inferencex-star-modal-dismissed';
-export const STARRED_KEY = 'inferencex-starred';
-export const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
-export const STARRED_EVENT = 'inferencex:starred';
 
 let sessionDismissed = false;
 
-export function shouldShowModal(): boolean {
+function shouldShowModal(): boolean {
   if (sessionDismissed) return false;
   try {
     if (localStorage.getItem(STARRED_KEY)) return false;
-    const value = localStorage.getItem(STORAGE_KEY);
+    const value = localStorage.getItem(DISMISS_KEY);
     if (!value) return true;
     const dismissedAt = Number(value);
     if (Number.isNaN(dismissedAt)) return true;
@@ -35,23 +39,6 @@ export function shouldShowModal(): boolean {
   } catch {
     return false;
   }
-}
-
-export function saveDismissTimestamp(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(Date.now()));
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-export function saveStarred(): void {
-  try {
-    localStorage.setItem(STARRED_KEY, '1');
-  } catch {
-    // localStorage unavailable
-  }
-  window.dispatchEvent(new Event(STARRED_EVENT));
 }
 
 export function GitHubStarModal() {

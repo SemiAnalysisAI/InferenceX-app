@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/components/github-star-modal';
+import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
 import { track } from '@/lib/analytics';
 import { Star } from 'lucide-react';
 
