@@ -14,7 +14,7 @@ export function BlogPostCard({ slug, title, children }: BlogPostCardProps) {
   return (
     <Link
       href={`/blog/${slug}`}
-      className="group block rounded-lg border border-border p-6 transition-colors hover:bg-muted/50"
+      className="group block rounded-xl border border-border/40 bg-background/20 backdrop-blur-[2px] p-4 md:p-8 transition-colors hover:bg-muted/50"
       onClick={() => track('blog_post_clicked', { slug, title })}
     >
       {children}
