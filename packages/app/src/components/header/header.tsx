@@ -10,9 +10,20 @@ import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
 
+/** Dashboard tab paths that should highlight the "Dashboard" nav link. */
+const DASHBOARD_TABS = [
+  '/inference',
+  '/evaluation',
+  '/historical',
+  '/calculator',
+  '/reliability',
+  '/gpu-specs',
+  '/gpu-metrics',
+];
+
 const NAV_LINKS = [
   {
-    href: '/',
+    href: '/inference',
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
@@ -28,13 +39,7 @@ const NAV_LINKS = [
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/')
-    return (
-      pathname === '/' ||
-      (!pathname.startsWith('/media') &&
-        !pathname.startsWith('/quotes') &&
-        !pathname.startsWith('/blog'))
-    );
+  if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
   return pathname.startsWith(href);
 }
 
