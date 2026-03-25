@@ -242,14 +242,14 @@ export default function GpuMetricsDisplay() {
       {runInfo && artifacts.length > 0 && (
         <>
           <Card className="mb-4">
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4">
               <span>
                 <span className="text-muted-foreground">Run:</span>{' '}
                 <a
                   href={runInfo.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline font-medium"
+                  className="text-brand hover:underline font-medium"
                 >
                   {runInfo.name} #{runInfo.id}
                 </a>
@@ -269,9 +269,7 @@ export default function GpuMetricsDisplay() {
                 {currentData.length.toLocaleString()}
               </span>
             </div>
-          </Card>
 
-          <Card className="mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-end gap-3">
               {artifacts.length > 1 && (
                 <div className="space-y-1 min-w-0">
