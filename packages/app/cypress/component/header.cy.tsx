@@ -52,11 +52,12 @@ describe('Header', () => {
     cy.get('[data-testid="theme-toggle"]').should('be.visible');
   });
 
-  it('shows mobile nav links on small viewports', () => {
+  it('shows mobile hamburger menu on small viewports', () => {
     cy.viewport(375, 812);
-    cy.get('[data-testid="mobile-nav"]').should('be.visible');
-    cy.get('[data-testid="mobile-nav"]').contains('Dashboard').should('be.visible');
-    cy.get('[data-testid="mobile-nav"]').contains('Media').should('be.visible');
-    cy.get('[data-testid="mobile-nav"]').contains('Supporters').should('be.visible');
+    cy.get('[data-testid="mobile-menu-toggle"]').should('be.visible');
+    cy.get('[data-testid="mobile-menu-toggle"]').click();
+    cy.contains('Dashboard').should('be.visible');
+    cy.contains('Media').should('be.visible');
+    cy.contains('Supporters').should('be.visible');
   });
 });
