@@ -5,7 +5,7 @@ const PATTERN_CLASSES = cn(
   'bg-muted/50 dark:bg-muted',
   "mask-[url('/brand/left-pattern-full.svg')]",
   'mask-no-repeat mask-position-[top_right] mask-size-[100%]',
-  'w-full sm:w-3/4 md:w-1/2 h-screen',
+  'w-full sm:w-3/4 md:w-1/2 lg:w-1/3 h-screen',
 );
 
 export function CircuitBackground() {
