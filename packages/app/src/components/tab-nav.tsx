@@ -131,12 +131,13 @@ export function TabNav() {
                   className={cn(
                     'relative inline-flex items-center justify-center',
                     'text-base font-medium whitespace-nowrap',
-                    'text-foreground hover:text-foreground/80',
-                    'dark:hover:text-primary/80',
+                    'text-muted-foreground',
+                    'border-b-2 border-transparent',
                     'transition-colors duration-200',
                     'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring',
-                    current === tab.href.slice(1) &&
-                      'border-b-2 border-secondary dark:border-primary',
+                    current === tab.href.slice(1)
+                      ? 'border-secondary dark:border-primary text-secondary dark:text-primary'
+                      : 'hover:border-muted-foreground/30',
                   )}
                 >
                   {tab.label}
