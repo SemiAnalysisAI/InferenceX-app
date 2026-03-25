@@ -5,6 +5,7 @@ import { Star } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
+import { STARRED_EVENT } from '@/lib/star-storage';
 import { BottomToast } from '@/components/ui/bottom-toast';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -58,11 +59,15 @@ export function StarNudge() {
       setTimeout(() => showNudge(), 1500);
     };
 
+    const handleStarred = () => setVisible(false);
+
     window.addEventListener('inferencex:tab-change', handleTabChange);
     window.addEventListener('inferencex:action', handleAction);
+    window.addEventListener(STARRED_EVENT, handleStarred);
     return () => {
       window.removeEventListener('inferencex:tab-change', handleTabChange);
       window.removeEventListener('inferencex:action', handleAction);
+      window.removeEventListener(STARRED_EVENT, handleStarred);
     };
   }, [showNudge]);
 

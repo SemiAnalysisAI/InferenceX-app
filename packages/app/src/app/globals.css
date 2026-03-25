@@ -339,17 +339,27 @@
   fill: var(--foreground);
 }
 
-/* Subtle star button glow animation - loops forever */
+/* Subtle star button glow animation - uses opacity for GPU compositing */
 @keyframes star-glow {
   0%,
   100% {
-    box-shadow: none;
+    opacity: 0;
   }
   50% {
-    box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
+    opacity: 1;
   }
 }
 
 .star-button-glow {
+  position: relative;
+}
+
+.star-button-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
   animation: star-glow 2s ease-in-out infinite;
+  pointer-events: none;
 }

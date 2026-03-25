@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-import { STARRED_KEY, saveStarred } from '@/components/github-star-modal';
+import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
 import { useGitHubStars } from '@/hooks/api/use-github-stars';
 
 interface GitHubStarsProps {
@@ -20,6 +20,10 @@ export function GitHubStars({ owner, repo }: GitHubStarsProps) {
     try {
       setHasStarred(!!localStorage.getItem(STARRED_KEY));
     } catch {}
+
+    const handleStarred = () => setHasStarred(true);
+    window.addEventListener(STARRED_EVENT, handleStarred);
+    return () => window.removeEventListener(STARRED_EVENT, handleStarred);
   }, []);
 
   return (
