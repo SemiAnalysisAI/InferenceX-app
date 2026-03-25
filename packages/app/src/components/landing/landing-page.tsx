@@ -46,7 +46,7 @@ export function LandingPage() {
             </h2>
             <p className="text-muted-foreground text-sm">
               Independent, vendor-neutral benchmarks comparing AI inference performance across GPUs
-              and frameworks. Trusted by operators of trillion-dollar-scale token factories.
+              and frameworks.
             </p>
 
             {/* Quote Carousel */}

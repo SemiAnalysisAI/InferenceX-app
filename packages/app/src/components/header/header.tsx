@@ -73,6 +73,10 @@ export const Header = () => {
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <span className="text-lg font-bold tracking-tight">InferenceX</span>
+            <span className="hidden lg:inline text-xs text-muted-foreground">
+              Open Source Continuous Inference Benchmark trusted by Operators of Trillion Dollar
+              GigaWatt Scale Token Factories
+            </span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image
