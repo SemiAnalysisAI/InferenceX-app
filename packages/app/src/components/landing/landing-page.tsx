@@ -72,7 +72,7 @@ export function LandingPage() {
           <Button
             asChild
             size="lg"
-            className="text-base px-8 py-6 font-semibold"
+            className="text-base px-8 py-6 font-semibold bg-brand text-white hover:bg-brand/90"
             data-testid="landing-cta"
           >
             <Link href="/inference" onClick={() => track('landing_explore_clicked')}>
