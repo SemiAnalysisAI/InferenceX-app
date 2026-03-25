@@ -178,8 +178,8 @@ export default function RootLayout({
               <Footer />
             </ThemeProvider>
           </QueryProvider>
-          <Analytics />
-          <SpeedInsights />
+          {process.env.VERCEL && <Analytics />}
+          {process.env.VERCEL && <SpeedInsights />}
         </PostHogProvider>
       </body>
     </html>
