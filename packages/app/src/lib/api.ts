@@ -135,13 +135,3 @@ export function fetchReliability() {
 export function fetchEvaluations() {
   return fetchJson<EvalRow[]>('/api/v1/evaluations');
 }
-
-export interface GitHubStarsResponse {
-  owner: string;
-  repo: string;
-  stars: number;
-}
-
-export function fetchGitHubStars() {
-  return fetchJson<GitHubStarsResponse>('/api/v1/github-stars');
-}

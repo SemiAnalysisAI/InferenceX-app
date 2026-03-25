@@ -19,6 +19,7 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
+import { fetchStarCount } from '@/lib/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
 
@@ -152,11 +153,12 @@ const jsonLd = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const starCount = await fetchStarCount();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -184,9 +186,9 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <Header />
+              <Header starCount={starCount} />
               <div className="grow flex flex-col">{children}</div>
-              <Footer />
+              <Footer starCount={starCount} />
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}

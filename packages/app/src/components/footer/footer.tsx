@@ -7,7 +7,7 @@ import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-butt
 
 import { StarButton } from './footer-star-cta';
 
-export const Footer = () => {
+export const Footer = ({ starCount }: { starCount?: number | null }) => {
   return (
     <footer
       data-testid="footer"
@@ -142,7 +142,7 @@ export const Footer = () => {
           <div data-testid="footer-cta" className="flex flex-col gap-4 items-center md:items-end">
             <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
               <div className="rounded-md bg-background/80 w-fit">
-                <StarButton />
+                <StarButton starCount={starCount} />
               </div>
               <div className="rounded-md bg-background/80 w-fit">
                 <ShareTwitterButton />

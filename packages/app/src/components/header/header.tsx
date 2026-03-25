@@ -44,7 +44,7 @@ function isActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href);
 }
 
-export const Header = () => {
+export const Header = ({ starCount }: { starCount?: number | null }) => {
   const pathname = usePathname() ?? '/';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -120,7 +120,7 @@ export const Header = () => {
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-2">
-            <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
+            <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             <ModeToggle />
 
             {/* Mobile hamburger */}

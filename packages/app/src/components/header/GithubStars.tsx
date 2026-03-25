@@ -4,16 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
-import { useGitHubStars } from '@/hooks/api/use-github-stars';
 
 interface GitHubStarsProps {
   owner: string;
   repo: string;
+  starCount?: number | null;
 }
 
-export function GitHubStars({ owner, repo }: GitHubStarsProps) {
-  const { data } = useGitHubStars();
-  const stars = data?.owner === owner && data?.repo === repo ? data.stars : null;
+export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
+  const stars = starCount ?? null;
   const [hasStarred, setHasStarred] = useState(false);
 
   useEffect(() => {
