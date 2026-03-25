@@ -17,7 +17,7 @@ import {
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 export const STORAGE_KEY = 'inferencex-star-modal-dismissed';
-export const STARRED_KEY = 'inferencex-star-modal-starred';
+export const STARRED_KEY = 'inferencex-starred';
 export const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 export const STARRED_EVENT = 'inferencex:starred';
 
