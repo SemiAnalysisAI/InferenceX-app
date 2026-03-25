@@ -11,7 +11,7 @@ describe('URL Parameter Persistence', () => {
   });
 
   it('page loads without error with unknown params', () => {
-    cy.visit('/?unknown_param=test');
+    cy.visit('/inference?unknown_param=test');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 

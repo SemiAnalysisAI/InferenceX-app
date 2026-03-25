@@ -18,8 +18,8 @@ describe('Favorite Presets', () => {
     cy.get('[data-testid="favorites-panel"]').should('be.visible');
   });
 
-  it('shows all 6 preset cards', () => {
-    cy.get('[data-testid^="favorite-preset-"]').should('have.length', 6);
+  it('shows all 9 preset cards', () => {
+    cy.get('[data-testid^="favorite-preset-"]').should('have.length', 9);
   });
 
   it('each preset card has a title and description', () => {
