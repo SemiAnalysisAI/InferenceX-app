@@ -2,7 +2,6 @@
 
 import { track } from '@/lib/analytics';
 
-import FavoritePresetsDropdown from '@/components/favorites/FavoritePresetsDropdown';
 import { useInference } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
@@ -193,7 +192,6 @@ export default function ChartControls({
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex flex-col gap-4">
-        <FavoritePresetsDropdown />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <ModelSelector
             value={selectedModel}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -20,23 +20,47 @@ export function LandingPage() {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
         <IntroSection />
 
-        {/* CTA */}
-        <section className="flex justify-center">
-          <Link href="/inference" onClick={() => track('landing_full_dashboard_clicked')}>
-            <Button size="lg" className="text-sm sm:text-base px-8 h-12 gap-2">
-              Explore Full Dashboard
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </section>
+        {/* Split: Dashboard vs Presets */}
+        <section className="flex flex-col gap-4 pb-8">
+          {/* Left - Full Dashboard */}
+          <div className="flex flex-col rounded-xl border border-border bg-card/90 p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Full Dashboard</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">
+              Every model, GPU, framework, and metric. Fully configurable inference benchmark charts
+              with date ranges, concurrency sweeps, and raw data export.
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              Compare NVIDIA GB200, B200, H200, AMD MI355X, MI325X, MI300X and more across DeepSeek,
+              Llama, Qwen, and other models.
+            </p>
+            <div className="mt-auto">
+              <Link href="/inference" onClick={() => track('landing_full_dashboard_clicked')}>
+                <Button size="lg" className="text-sm sm:text-base h-12 gap-2 px-8">
+                  Open Dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </div>
 
-        {/* Curated Views */}
-        <section className="pb-8">
-          <h2 className="text-lg font-semibold mb-5 text-center">Popular Comparisons</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {FAVORITE_PRESETS.map((preset) => (
-              <CuratedViewCard key={preset.id} preset={preset} />
-            ))}
+          {/* Right - Curated Presets */}
+          <div className="flex flex-col rounded-xl border border-border bg-card/90 p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Quick Comparisons</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Jump straight into the most popular GPU inference benchmark comparisons, curated and
+              ready to explore.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {FAVORITE_PRESETS.map((preset) => (
+                <CuratedViewCard key={preset.id} preset={preset} />
+              ))}
+            </div>
           </div>
         </section>
       </div>
