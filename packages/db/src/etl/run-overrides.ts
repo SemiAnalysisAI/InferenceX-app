@@ -9,17 +9,20 @@
  * PURGED_RUNS — runs to skip on ingest and delete from the DB,
  *   e.g. typically due to experimental runs or features which generate lots of broken data.
  *
- * Note: GitHub deletes old workflow runs over time, so links to older runs
- * may return 404.
+ * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
+ *       but we should keep them around for historical reference. You can find these on github (if available) by filling
+ *       in the run id into the following link: https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id_here}
  */
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
-  [22806827144, 'success'], // 2026-03-07 — dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump, upload step failed — https://github.com/SemiAnalysisAI/InferenceX/actions/runs/22806827144
-  [22792161490, 'success'], // 2026-03-07 — GLM-5 fp8 mi355x SGLang benchmark add, upload step failed — https://github.com/SemiAnalysisAI/InferenceX/actions/runs/22792161490
+  [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
+  [22792161490, 'success'], // 2026-03-07 | GLM-5 fp8 mi355x SGLang benchmark add | Reason: database upload step failed
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
-  20286769842, // very long ago — broken run — https://github.com/SemiAnalysisAI/InferenceX/actions/runs/20286769842
-  20789830797, // very long ago — broken run — https://github.com/SemiAnalysisAI/InferenceX/actions/runs/20789830797
-  21427451958, // 2026-01-28 — for initial gsm8k evals baseline data collection, performance data ignored for this run — https://github.com/SemiAnalysisAI/InferenceX/actions/runs/21427451958
+  20286769842, // very long ago | Reason: broken run
+  20789830797, // very long ago | Reason: broken run
+  21427451958, // 2026-01-28 | Reason: for initial gsm8k evals baseline data collection, performance data ignored for this run
+  22911224698, // 2026-03-10 | Reason: flaky run, re-ran in run //TODO: find run id and link it
+  23445026367, // 2026-03-23 | Reason: change to MI355X cluster was unnecessary
 ]);
