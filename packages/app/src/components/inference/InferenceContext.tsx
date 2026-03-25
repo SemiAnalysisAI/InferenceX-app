@@ -453,10 +453,14 @@ export function InferenceProvider({
 
   // ── Side effects ──────────────────────────────────────────────────────────
 
-  // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes
+  // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes.
+  // Use a stable string key for precisions so array reference changes don't trigger a reset.
+  // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
+  const precisionsKey = effectivePrecisions.join(',');
   useEffect(() => {
+    if (pendingHwFilterRef.current) return;
     if (hwTypesWithData.size > 0) setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, effectivePrecisions]);
+  }, [selectedModel, effectiveSequence, precisionsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- precisionsKey is a stable proxy for effectivePrecisions
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {

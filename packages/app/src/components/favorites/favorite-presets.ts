@@ -98,21 +98,19 @@ export function findConfigChangeDates(
   const dates = [...byDate.keys()].sort();
   if (dates.length === 0) return [];
 
-  // Track cumulative configs — flag dates that introduce net-new keys
-  const seen = new Set<string>();
+  // Flag dates where the config set differs from the previous date
+  let prevConfigs: Set<string> | null = null;
   const result: string[] = [];
   for (const date of dates) {
     const configs = byDate.get(date)!;
-    let hasNew = false;
-    for (const key of configs) {
-      if (!seen.has(key)) {
-        hasNew = true;
-        seen.add(key);
-      }
-    }
-    if (result.length === 0 || hasNew) {
+    if (
+      prevConfigs === null ||
+      configs.size !== prevConfigs.size ||
+      [...configs].some((k) => !prevConfigs!.has(k))
+    ) {
       result.push(date);
     }
+    prevConfigs = configs;
   }
 
   return result;
@@ -172,7 +170,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'b200-trt-timeline',
     title: 'B200 TensorRT-LLM Over Time — DeepSeek (FP4)',
     description:
-      'B200 TensorRT-LLM config expansion on DeepSeek R1 (1k/8k) FP4. Shows 4 waves of new configs from Oct 2025 to Feb 2026.',
+      'B200 TensorRT-LLM config expansion on DeepSeek R1 (1k/8k) FP4. All available config waves over time.',
     tags: ['DeepSeek', 'B200', 'TensorRT-LLM', 'FP4', 'Timeline'],
     category: 'improvements',
     config: {
@@ -182,7 +180,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       yAxisMetric: 'y_tpPerGpu',
       gpus: ['b200_trt'],
       useDateRange: true,
-      dateRangeMonths: 5,
     },
   },
   // 5 — AMD
@@ -206,7 +203,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'mi355x-atom-timeline',
     title: 'MI355X Atom Over Time — DeepSeek (FP4)',
     description:
-      'MI355X Atom config expansion on DeepSeek R1 (1k/8k) FP4. Tracks new configs from Jan to Feb 2026.',
+      'MI355X Atom config expansion on DeepSeek R1 (1k/8k) FP4. Tracks all available configs over time.',
     tags: ['DeepSeek', 'MI355X', 'Atom', 'FP4', 'Timeline'],
     category: 'improvements',
     config: {
@@ -216,7 +213,6 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       yAxisMetric: 'y_tpPerGpu',
       gpus: ['mi355x_atom'],
       useDateRange: true,
-      dateRangeMonths: 2,
     },
   },
 ];
