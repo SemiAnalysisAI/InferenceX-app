@@ -153,10 +153,11 @@ export function BlogToc({ headings }: BlogTocProps) {
         createPortal(
           <nav
             ref={sidebarRef}
-            className="fixed w-52 pt-12 max-h-[calc(100vh-4rem)] overflow-y-auto"
+            className="fixed pt-12 max-w-100 max-h-[calc(100vh-6rem)] overflow-y-auto"
             style={{
               left: sidebarLeftRef.current,
               top: Math.max(32, sectionTopRef.current - window.scrollY),
+              scrollbarWidth: 'none',
             }}
             aria-label="Table of contents"
           >
