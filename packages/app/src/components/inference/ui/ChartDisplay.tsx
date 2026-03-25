@@ -652,7 +652,7 @@ export default function ChartDisplay() {
         ));
 
   return (
-    <div data-testid="inference-chart-display">
+    <div data-testid="inference-chart-display" className="flex flex-col gap-4">
       <section>
         <Card>
           <div className="flex flex-col gap-4">
@@ -698,7 +698,7 @@ export default function ChartDisplay() {
           <CustomPowers loading={loading} />
         </section>
       )}
-      <div className="flex flex-col gap-10">{displayGraphs}</div>
+      <div className="flex flex-col gap-4">{displayGraphs}</div>
 
       {/* Performance Over Time — Modal Drill-Down */}
       <Dialog

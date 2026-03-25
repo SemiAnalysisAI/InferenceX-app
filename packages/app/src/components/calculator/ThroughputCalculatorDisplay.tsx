@@ -486,7 +486,7 @@ export default function ThroughputCalculatorDisplay() {
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
         <Card>
           <div className="flex flex-col gap-4">
@@ -1007,6 +1007,6 @@ export default function ThroughputCalculatorDisplay() {
           </Card>
         </section>
       )}
-    </>
+    </div>
   );
 }

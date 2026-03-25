@@ -23,7 +23,7 @@ export default function ReliabilityChartDisplay() {
   }, [chartData]);
 
   return (
-    <div data-testid="reliability-chart-display">
+    <div data-testid="reliability-chart-display" className="flex flex-col gap-4">
       <section>
         <Card>
           <div className="flex flex-col gap-4">

@@ -25,7 +25,7 @@ export default function EvaluationChartDisplay() {
   }, [chartData]);
 
   return (
-    <div data-testid="evaluation-chart-display">
+    <div data-testid="evaluation-chart-display" className="flex flex-col gap-4">
       <section>
         <Card>
           <div className="flex flex-col gap-4">

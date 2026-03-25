@@ -280,7 +280,7 @@ export function GpuSpecsContent() {
   };
 
   return (
-    <div data-testid="gpu-specs-content">
+    <div data-testid="gpu-specs-content" className="flex flex-col gap-4">
       <section>
         <Card>
           <div className="flex items-start justify-between">

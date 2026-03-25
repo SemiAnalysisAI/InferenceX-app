@@ -189,7 +189,7 @@ export default function HistoricalTrendsDisplay() {
   }
 
   return (
-    <section data-testid="historical-trends-display">
+    <section data-testid="historical-trends-display" className="flex flex-col gap-4">
       {/* Controls card — same selectors as Inference Performance tab */}
       <Card>
         <div className="flex flex-col gap-4">
