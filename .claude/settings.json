@@ -2,15 +2,19 @@
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true
   },
+  "worktree": {
+    "symlinkDirectories": ["node_modules", ".env"]
+  },
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
             "command": "pnpm fmt:fix; pnpm lint:fix; true",
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           }
         ]
       }
