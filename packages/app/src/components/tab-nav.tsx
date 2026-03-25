@@ -114,7 +114,7 @@ export function TabNav() {
 
       {/* Desktop: Nav links */}
       <div className="hidden lg:flex flex-col mb-4">
-        <Card className="overflow-x-auto">
+        <Card className="overflow-x-auto py-6 md:py-6">
           <nav
             data-testid="chart-section-tabs"
             className="relative flex items-center justify-evenly min-w-0"
