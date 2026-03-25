@@ -72,14 +72,14 @@ export function MediaContent() {
               Coverage and mentions of InferenceX&trade; (formerly InferenceMAX) across industry
               publications, blogs, and media outlets.
             </p>
-          </Card>
-          <Card>
-            <div className="flex flex-col gap-3 md:pl-6">
-              {[...MEDIA_ITEMS]
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .map((item) => (
-                  <MediaCard key={item.url} {...item} />
-                ))}
+            <div className="mt-6 pt-6 border-t border-border/40">
+              <div className="flex flex-col gap-3">
+                {[...MEDIA_ITEMS]
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map((item) => (
+                    <MediaCard key={item.url} {...item} />
+                  ))}
+              </div>
             </div>
           </Card>
         </section>

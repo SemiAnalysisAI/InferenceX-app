@@ -67,20 +67,20 @@ export function QuotesContent() {
               of compute and prominent members of the ML community including those from OpenAI,
               Microsoft, vLLM, PyTorch Foundation, Oracle and more.
             </p>
-          </Card>
-          <Card>
-            <div className="flex flex-col gap-10 md:gap-12 mx-4 md:mx-8">
-              {QUOTES.map((quote) => (
-                <QuoteCard
-                  key={quote.name}
-                  text={quote.text}
-                  name={quote.name}
-                  title={quote.title}
-                  org={quote.org}
-                  logo={quote.logo}
-                  link={quote.link}
-                />
-              ))}
+            <div className="mt-6 pt-6 border-t border-border/40">
+              <div className="flex flex-col gap-10 md:gap-12">
+                {QUOTES.map((quote) => (
+                  <QuoteCard
+                    key={quote.name}
+                    text={quote.text}
+                    name={quote.name}
+                    title={quote.title}
+                    org={quote.org}
+                    logo={quote.logo}
+                    link={quote.link}
+                  />
+                ))}
+              </div>
             </div>
           </Card>
         </section>

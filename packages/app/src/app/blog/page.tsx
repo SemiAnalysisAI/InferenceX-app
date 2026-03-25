@@ -66,50 +66,50 @@ export default async function BlogPage({
                 ))}
               </div>
             )}
-          </Card>
-          <Card>
-            {filtered.length === 0 ? (
-              <p className="text-muted-foreground">
-                {activeTag ? `No articles tagged "${activeTag}".` : 'Coming soon.'}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-8 mx-4 md:mx-8">
-                {filtered.map((post) => (
-                  <BlogPostCard key={post.slug} slug={post.slug} title={post.title}>
-                    <article className="min-w-0">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
-                        <time dateTime={post.date}>
-                          {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            timeZone: 'UTC',
-                          })}
-                        </time>
-                        <span>&middot;</span>
-                        <span>{post.readingTime} min read</span>
-                      </div>
-                      <h2 className="text-2xl font-semibold mb-2 group-hover:underline group-hover:text-brand">
-                        {post.title}
-                      </h2>
-                      <p className="text-muted-foreground mb-3">{post.subtitle}</p>
-                      {post.tags && post.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {post.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+            <div className="mt-6 pt-6 border-t border-border/40">
+              {filtered.length === 0 ? (
+                <p className="text-muted-foreground">
+                  {activeTag ? `No articles tagged "${activeTag}".` : 'Coming soon.'}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-8">
+                  {filtered.map((post) => (
+                    <BlogPostCard key={post.slug} slug={post.slug} title={post.title}>
+                      <article className="min-w-0">
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
+                          <time dateTime={post.date}>
+                            {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              timeZone: 'UTC',
+                            })}
+                          </time>
+                          <span>&middot;</span>
+                          <span>{post.readingTime} min read</span>
                         </div>
-                      )}
-                    </article>
-                  </BlogPostCard>
-                ))}
-              </div>
-            )}
+                        <h2 className="text-2xl font-semibold mb-2 group-hover:underline group-hover:text-brand">
+                          {post.title}
+                        </h2>
+                        <p className="text-muted-foreground mb-3">{post.subtitle}</p>
+                        {post.tags && post.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {post.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    </BlogPostCard>
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
         </section>
       </div>
