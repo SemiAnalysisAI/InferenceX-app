@@ -19,6 +19,7 @@ const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 export const STORAGE_KEY = 'inferencex-star-modal-dismissed';
 export const STARRED_KEY = 'inferencex-star-modal-starred';
 export const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+export const STARRED_EVENT = 'inferencex:starred';
 
 let sessionDismissed = false;
 
@@ -50,6 +51,7 @@ export function saveStarred(): void {
   } catch {
     // localStorage unavailable
   }
+  window.dispatchEvent(new Event(STARRED_EVENT));
 }
 
 export function GitHubStarModal() {
@@ -62,6 +64,15 @@ export function GitHubStarModal() {
       track('github_star_modal_shown');
     }
     setReady(true);
+  }, []);
+
+  useEffect(() => {
+    const handleStarred = () => {
+      setOpen(false);
+      sessionDismissed = true;
+    };
+    window.addEventListener(STARRED_EVENT, handleStarred);
+    return () => window.removeEventListener(STARRED_EVENT, handleStarred);
   }, []);
 
   const handleDismiss = useCallback(() => {

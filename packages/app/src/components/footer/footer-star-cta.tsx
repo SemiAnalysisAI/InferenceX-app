@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { STARRED_KEY, saveStarred } from '@/components/github-star-modal';
+import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/components/github-star-modal';
 import { track } from '@/lib/analytics';
 import { Star } from 'lucide-react';
 
@@ -20,6 +20,10 @@ export function StarButton() {
     try {
       setHasStarred(!!localStorage.getItem(STARRED_KEY));
     } catch {}
+
+    const handleStarred = () => setHasStarred(true);
+    window.addEventListener(STARRED_EVENT, handleStarred);
+    return () => window.removeEventListener(STARRED_EVENT, handleStarred);
   }, []);
 
   return (
