@@ -17,7 +17,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
           preset_title: preset.title,
         })
       }
-      className="group relative block rounded-xl border border-border/40 bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
+      className="group relative block rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
       data-testid={`curated-view-${preset.id}`}
     >
       <div className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-brand/60 transition-all duration-200 group-hover:bg-brand group-hover:inset-y-2" />
