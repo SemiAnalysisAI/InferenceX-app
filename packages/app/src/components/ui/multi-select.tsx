@@ -149,7 +149,7 @@ function MultiSelect({
             selectedLabels.map((label, index) => (
               <span
                 key={value[index]}
-                className="bg-transparent text-foreground border border-border dark:bg-secondary dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
+                className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
               >
                 {label}
                 <span

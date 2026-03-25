@@ -155,10 +155,8 @@ export function QuoteCarousel({
             key={e.org}
             type="button"
             onClick={() => goTo(i)}
-            className={`text-xs font-semibold tracking-wide uppercase transition-opacity duration-200 ${
-              i === activeIndex
-                ? 'opacity-100 text-foreground'
-                : 'opacity-40 text-muted-foreground hover:opacity-70'
+            className={`text-xs font-semibold tracking-wide uppercase transition-colors duration-200 ${
+              i === activeIndex ? 'text-foreground' : 'text-[#9ca0a4] hover:text-muted-foreground'
             }`}
           >
             {labels[e.org] ?? e.org}
