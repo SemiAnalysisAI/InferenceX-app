@@ -47,7 +47,7 @@ async function previewConclusions(): Promise<StaleRow[]> {
 
   const stale: StaleRow[] = [];
   for (const r of rows) {
-    const expected = CONCLUSION_OVERRIDES.get(r.github_run_id as number);
+    const expected = CONCLUSION_OVERRIDES.get(Number(r.github_run_id));
     if (expected && r.conclusion !== expected) {
       stale.push({
         githubRunId: r.github_run_id as number,
@@ -173,7 +173,7 @@ async function purge(githubRunId: number, wrIds: number[]): Promise<void> {
       const hardwares = availKeys.map((r) => r.hardware as string);
       const frameworks = availKeys.map((r) => r.framework as string);
       const specMethods = availKeys.map((r) => r.spec_method as string);
-      const disaggs = availKeys.map((r) => r.disagg as boolean);
+      const disaggs = availKeys.map((r) => String(r.disagg));
       const dates = availKeys.map((r) => r.date as string);
 
       await tx`
@@ -181,11 +181,11 @@ async function purge(githubRunId: number, wrIds: number[]): Promise<void> {
         WHERE (a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.date)
           IN (
             SELECT t.model, t.isl::int, t.osl::int, t.precision, t.hardware,
-                   t.framework, t.spec_method, t.disagg, t.date::date
+                   t.framework, t.spec_method, t.disagg::boolean, t.date::date
             FROM unnest(
               ${models}::text[], ${isls}::int[], ${osls}::int[],
               ${precisions}::text[], ${hardwares}::text[], ${frameworks}::text[],
-              ${specMethods}::text[], ${disaggs}::bool[], ${dates}::text[]
+              ${specMethods}::text[], ${disaggs}::text[], ${dates}::text[]
             ) AS t(model, isl, osl, precision, hardware, framework, spec_method, disagg, date)
           )
           AND NOT EXISTS (

@@ -148,8 +148,8 @@ export function QuoteCarousel({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Company logo strip — single wrapping row on mobile, two balanced rows on desktop */}
-      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mx-4 md:hidden">
+      {/* Org name strip */}
+      <div className="flex flex-wrap justify-center gap-x-6 md:gap-x-8 gap-y-2 mx-4">
         {entries.map((e, i) => (
           <button
             key={e.org}
@@ -158,37 +158,11 @@ export function QuoteCarousel({
             className={`text-xs font-semibold tracking-wide uppercase transition-opacity duration-200 ${
               i === activeIndex
                 ? 'opacity-100 text-foreground'
-                : 'opacity-40 text-muted-foreground hover:opacity-70'
+                : 'opacity-60 text-muted-foreground hover:opacity-80'
             }`}
           >
             {labels[e.org] ?? e.org}
           </button>
-        ))}
-      </div>
-      <div className="hidden md:flex flex-col items-center gap-y-2 mx-4">
-        {[
-          entries.slice(0, Math.ceil(entries.length / 2)),
-          entries.slice(Math.ceil(entries.length / 2)),
-        ].map((row, rowIdx) => (
-          <div key={rowIdx} className="flex flex-wrap justify-center gap-x-10">
-            {row.map((e) => {
-              const idx = entries.indexOf(e);
-              return (
-                <button
-                  key={e.org}
-                  type="button"
-                  onClick={() => goTo(idx)}
-                  className={`text-xs font-semibold tracking-wide uppercase transition-opacity duration-200 ${
-                    idx === activeIndex
-                      ? 'opacity-100 text-foreground'
-                      : 'opacity-40 text-muted-foreground hover:opacity-70'
-                  }`}
-                >
-                  {labels[e.org] ?? e.org}
-                </button>
-              );
-            })}
-          </div>
         ))}
       </div>
 

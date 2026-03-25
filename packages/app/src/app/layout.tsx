@@ -159,10 +159,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href={SITE_URL} />
-        <link rel="dns-prefetch" href={SITE_URL} />
-        <link rel="preconnect" href="https://substack-post-media.s3.amazonaws.com" />
-        <link rel="dns-prefetch" href="https://substack-post-media.s3.amazonaws.com" />
+        <link rel="preconnect" href="https://us-assets.i.posthog.com" />
+        <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <PostHogProvider>
