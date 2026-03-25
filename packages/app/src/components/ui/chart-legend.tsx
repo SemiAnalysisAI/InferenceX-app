@@ -405,7 +405,7 @@ export default function ChartLegend({
       <div
         ref={scrollRef}
         style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={scrollClasses}
+        className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {rows.map((row, i) => {
           const allHidden =
@@ -456,7 +456,7 @@ export default function ChartLegend({
       <ul
         ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
         style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={scrollClasses}
+        className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {(isSidebar ? sortedItems : legendItems).map((item) =>
           renderItem(item, isSidebar && hiddenNames.has(item.name)),
