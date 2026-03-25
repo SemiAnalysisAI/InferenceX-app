@@ -49,16 +49,23 @@ export const Header = () => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Close menu on click outside
+  // Close menu on click outside or Escape
   useEffect(() => {
     if (!mobileMenuOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMobileMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [mobileMenuOpen]);
 
   const toggleMenu = useCallback(() => {
@@ -80,7 +87,7 @@ export const Header = () => {
                 alt="SemiAnalysis logo"
                 width={64}
                 height={27}
-                className="inline w-[48px]"
+                className="inline w-12"
                 priority
               />
             </span>
@@ -146,7 +153,7 @@ export const Header = () => {
                 </svg>
               </button>
               {mobileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-[160px]">
+                <div className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40">
                   {NAV_LINKS.map(({ href, label, event }) => (
                     <Link
                       key={href}
