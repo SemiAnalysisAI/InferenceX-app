@@ -377,6 +377,7 @@ describe('filterRunsByModel', () => {
       runId: '123',
       runDate: '2025-12-15',
       runUrl: 'https://github.com/example',
+      conclusion: 'success' as string | null,
       changelog: {
         base_ref: 'abc',
         head_ref: 'def',
@@ -399,7 +400,7 @@ describe('filterRunsByModel', () => {
     expect(filterRunsByModel(runs, [])).toBe(runs);
   });
 
-  it('filters out runs with no matching model prefix', () => {
+  it('returns null when no model prefix matches', () => {
     const runs = { '123': makeRun([['dsr1-fp8-h200-trt']]) };
     expect(filterRunsByModel(runs, ['gptoss'])).toBeNull();
   });
@@ -420,12 +421,19 @@ describe('filterRunsByModel', () => {
     expect(result!['123'].changelog!.entries[0].config_keys).toEqual(['gptoss-fp8-h200-trt']);
   });
 
-  it('skips runs without changelog', () => {
-    const runs = { '123': { runId: '123', runDate: '2025-12-15', runUrl: 'https://github.com' } };
+  it('returns null when no runs have changelog', () => {
+    const runs = {
+      '123': {
+        runId: '123',
+        runDate: '2025-12-15',
+        runUrl: 'https://github.com',
+        conclusion: null as string | null,
+      },
+    };
     expect(filterRunsByModel(runs, ['gptoss'])).toBeNull();
   });
 
-  it('returns null when all runs are filtered out', () => {
+  it('returns null when no runs match model filter', () => {
     const runs = {
       '123': makeRun([['dsr1-fp8-h200-trt']]),
       '456': makeRun([['dsr1-fp8-b200-sglang']]),
@@ -460,7 +468,7 @@ describe('filterRunsByModel', () => {
   });
 
   // Precision filtering
-  it('returns null when run only has entries for a different precision', () => {
+  it('returns null when no entries match precision', () => {
     const runs = { '123': makeRun([['gptoss-fp4-h200-trt']]) };
     expect(filterRunsByModel(runs, ['gptoss'], ['fp8'])).toBeNull();
   });
@@ -522,7 +530,7 @@ describe('filterRunsByModel', () => {
     ]);
   });
 
-  it('GPU filter: non-MTP entry excluded when only MTP GPU is selected', () => {
+  it('GPU filter: returns null when non-MTP entry excluded by MTP GPU', () => {
     const runs = {
       '123': makeRun([['dsr1-fp8-mi355x-mori-sglang']]),
     };

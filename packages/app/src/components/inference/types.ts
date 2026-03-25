@@ -424,6 +424,7 @@ export interface RunInfo {
   runId: string;
   runDate: string;
   runUrl: string;
+  conclusion: string | null;
   changelog?: ChangelogMetadata;
 }
 
