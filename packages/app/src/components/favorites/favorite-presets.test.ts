@@ -114,7 +114,6 @@ describe('FAVORITE_PRESETS data integrity', () => {
     for (const preset of timelinePresets) {
       expect(preset.config.gpus).toBeDefined();
       expect(preset.config.gpus!.length).toBeGreaterThan(0);
-      expect(preset.config.dateRangeMonths).toBeGreaterThan(0);
     }
   });
 
@@ -210,21 +209,21 @@ describe('findConfigChangeDates', () => {
     ).toEqual(['2025-10-01']);
   });
 
-  it('returns only dates where net-new configs appear', () => {
+  it('returns dates where config set differs from previous date', () => {
     const rows = [
       // Oct 1: config A
       row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      // Oct 2: same config A → should be skipped (not new)
+      // Oct 2: same config A → should be skipped (no change)
       row('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
-      // Oct 3: config A + new config B → has new config
+      // Oct 3: config A + new config B → config set changed
       row('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
       row('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
-      // Oct 4: same as Oct 3 → should be skipped (both already seen)
+      // Oct 4: same as Oct 3 → should be skipped (no change)
       row('2025-10-04', 'b200', 'sglang', 1, 8, 8, false),
       row('2025-10-04', 'b200', 'sglang', 2, 16, 16, true),
-      // Oct 5: only config B (subset) → should be skipped (already seen)
+      // Oct 5: only config B (subset of Oct 4) → config set changed (removal)
       row('2025-10-05', 'b200', 'sglang', 2, 16, 16, true),
-      // Oct 6: new config C → has new config
+      // Oct 6: new config C → config set changed
       row('2025-10-06', 'b200', 'sglang', 4, 32, 32, true),
     ];
     const result = findConfigChangeDates(
@@ -234,18 +233,18 @@ describe('findConfigChangeDates', () => {
       '2025-10-01',
       '2025-10-06',
     );
-    expect(result).toEqual(['2025-10-01', '2025-10-03', '2025-10-06']);
+    expect(result).toEqual(['2025-10-01', '2025-10-03', '2025-10-05', '2025-10-06']);
   });
 
-  it('skips partial run days that are subsets of previously seen configs', () => {
+  it('detects config removals as changes', () => {
     const rows = [
       // Oct 1: full run with configs A, B, C
       row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
       row('2025-10-01', 'b200', 'sglang', 2, 16, 16, true),
       row('2025-10-01', 'b200', 'sglang', 4, 32, 32, false),
-      // Oct 2: partial run with only config A → subset, no new configs
+      // Oct 2: partial run with only config A → config set changed (B, C removed)
       row('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
-      // Oct 3: partial run with configs A, B → subset, no new configs
+      // Oct 3: partial run with configs A, B → config set changed (B added back)
       row('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
       row('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
     ];
@@ -256,7 +255,7 @@ describe('findConfigChangeDates', () => {
       '2025-10-01',
       '2025-10-03',
     );
-    expect(result).toEqual(['2025-10-01']);
+    expect(result).toEqual(['2025-10-01', '2025-10-02', '2025-10-03']);
   });
 
   it('filters by GPU prefix', () => {

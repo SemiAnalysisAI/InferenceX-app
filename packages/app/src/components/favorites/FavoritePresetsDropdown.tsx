@@ -2,21 +2,12 @@
 
 import { track } from '@/lib/analytics';
 import { ChevronDown, Star } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useInference } from '@/components/inference/InferenceContext';
-import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { Badge } from '@/components/ui/badge';
 
-import {
-  FAVORITE_PRESETS,
-  FavoritePreset,
-  findClosestDate,
-  findConfigChangeDates,
-  subtractMonths,
-} from './favorite-presets';
+import { FAVORITE_PRESETS, FavoritePreset } from './favorite-presets';
 
 export default function FavoritePresetsDropdown() {
   const {
@@ -29,7 +20,7 @@ export default function FavoritePresetsDropdown() {
     setSelectedDateRange,
     setHwFilter,
     selectAllHwTypes,
-    availableDates,
+    dateRangeAvailableDates,
     activePresetId,
     setActivePresetId,
     presetGuardRef,
@@ -44,67 +35,32 @@ export default function FavoritePresetsDropdown() {
   // Async effects capture the version at start and bail if it's stale.
   const versionRef = useRef(0);
 
-  // Pending preset waiting for history data to resolve config change dates
+  // Pending preset waiting for dateRangeAvailableDates to resolve
   const [pendingTimelinePreset, setPendingTimelinePreset] = useState<
     FavoritePreset['config'] | null
   >(null);
   const pendingVersionRef = useRef(0);
 
-  // Fetch history data when a timeline preset is pending
-  const historyIslOsl = useMemo(
-    () => (pendingTimelinePreset ? sequenceToIslOsl(pendingTimelinePreset.sequence) : null),
-    [pendingTimelinePreset],
-  );
-  const { data: historyRows } = useBenchmarkHistory(
-    pendingTimelinePreset?.model ?? '',
-    historyIslOsl?.isl ?? 0,
-    historyIslOsl?.osl ?? 0,
-  );
-
-  // Once history data arrives, compute config change dates and apply.
-  // Guard prevents the wrapped setters from clearing the active preset.
+  // Once dateRangeAvailableDates resolves for a timeline preset, set the full range.
   useEffect(() => {
-    if (!pendingTimelinePreset || !historyRows || !availableDates.length) return;
-    // Bail if a newer preset was applied while we were waiting
+    if (!pendingTimelinePreset || dateRangeAvailableDates.length === 0) return;
     if (pendingVersionRef.current !== versionRef.current) {
       setPendingTimelinePreset(null);
       return;
     }
 
-    const months = pendingTimelinePreset.dateRangeMonths ?? 2;
-    const latestDate = availableDates[availableDates.length - 1];
-    const targetStart = subtractMonths(latestDate, months);
-    const startDate = findClosestDate(availableDates, targetStart);
-
-    const changeDates = findConfigChangeDates(
-      historyRows,
-      pendingTimelinePreset.gpus ?? [],
-      pendingTimelinePreset.precisions,
-      startDate,
-      latestDate,
-    );
+    const first = dateRangeAvailableDates[0];
+    const last = dateRangeAvailableDates[dateRangeAvailableDates.length - 1];
 
     presetGuardRef.current = true;
-    if (changeDates.length >= 2) {
-      const first = changeDates[0];
-      const last = changeDates[changeDates.length - 1];
-      const intermediary = changeDates.slice(1, -1);
-      setSelectedDateRange({ startDate: first, endDate: last });
-      setSelectedDates(intermediary);
-    } else if (changeDates.length === 1) {
-      setSelectedDateRange({ startDate: changeDates[0], endDate: latestDate });
-      setSelectedDates([]);
-    } else {
-      setSelectedDateRange({ startDate, endDate: latestDate });
-      setSelectedDates([]);
-    }
+    setSelectedDateRange({ startDate: first, endDate: last });
+    setSelectedDates([]);
     presetGuardRef.current = false;
 
     setPendingTimelinePreset(null);
   }, [
     pendingTimelinePreset,
-    historyRows,
-    availableDates,
+    dateRangeAvailableDates,
     setSelectedDateRange,
     setSelectedDates,
     presetGuardRef,
@@ -126,7 +82,7 @@ export default function FavoritePresetsDropdown() {
       if (config.gpus && config.gpus.length > 0) {
         setSelectedGPUs(config.gpus);
 
-        if (config.useDateRange && config.dateRangeMonths) {
+        if (config.useDateRange) {
           setSelectedDateRange({ startDate: '', endDate: '' });
           setSelectedDates([]);
           pendingVersionRef.current = version;
