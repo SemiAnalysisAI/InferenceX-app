@@ -121,7 +121,7 @@ export default function WorkflowInfoDisplay({
   })();
 
   return (
-    <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 text-muted-foreground">
+    <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
       {/* <div className="flex items-center gap-2">
         <CalendarRange size={16} />
         <strong>Run Date:</strong> {workflowInfo[0].run_date} UTC
@@ -152,7 +152,7 @@ export default function WorkflowInfoDisplay({
           >
             <SelectTrigger
               id="run-select"
-              className="w-full border-0 shadow-none font-bold hover:bg-accent hover:text-accent-foreground rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
+              className="w-full border-0 shadow-none font-bold px-4 hover:bg-accent hover:text-accent-foreground dark:bg-input/90 dark:hover:bg-input/50 rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
               onPointerDown={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-external-link]')) {
@@ -213,7 +213,7 @@ export default function WorkflowInfoDisplay({
         <div>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost">
+              <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
                 <strong>Changelog</strong>
                 <ChevronDownIcon />
               </Button>

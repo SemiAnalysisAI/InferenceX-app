@@ -286,10 +286,15 @@ export function DatePicker({
         </Button>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button variant="ghost">
+            <Button
+              variant="ghost"
+              className="!px-5 min-w-[200px] dark:bg-input/90 dark:hover:bg-input/50"
+            >
               <Calendar className="mr-0 h-4 w-4" />
               <strong>Run Date:</strong>
-              {getDisplayText()}
+              <span className="tabular-nums inline-block w-[6.5em] text-left">
+                {getDisplayText()}
+              </span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
