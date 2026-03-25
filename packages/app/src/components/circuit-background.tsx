@@ -1,11 +1,11 @@
 import { cn } from '@/lib/utils';
 
 const PATTERN_CLASSES = cn(
-  'pointer-events-none absolute -z-10 block',
+  'pointer-events-none fixed -z-10 block',
   'bg-muted/50 dark:bg-muted',
   "mask-[url('/brand/left-pattern-full.svg')]",
   'mask-no-repeat mask-position-[top_right] mask-size-[100%]',
-  'w-full sm:w-3/4 md:w-1/2 h-full',
+  'w-full sm:w-3/4 md:w-1/2 h-screen',
 );
 
 export function CircuitBackground() {
