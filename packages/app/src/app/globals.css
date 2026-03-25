@@ -361,7 +361,7 @@
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 12px 3px oklch(65% 0.15 250 / 50%);
+    box-shadow: 0 0 20px 6px oklch(65% 0.18 250 / 60%);
   }
 }
 
