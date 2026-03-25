@@ -25,4 +25,5 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   21427451958, // 2026-01-28 | Reason: for initial gsm8k evals baseline data collection, performance data ignored for this run
   22911224698, // 2026-03-10 | Reason: flaky run, re-ran in run //TODO: find run id and link it
   23445026367, // 2026-03-23 | Reason: change to MI355X cluster was unnecessary
+  23444121669, // 2026-03-23 | Reason: change to MI355X cluster was unnecessary
 ]);
