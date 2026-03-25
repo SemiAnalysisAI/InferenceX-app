@@ -1,4 +1,6 @@
-import { AUTHOR_NAME, SITE_NAME } from '@semianalysisai/inferencex-constants';
+import type { Metadata } from 'next';
+
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const LANDING_META = {
   title: 'Open Source AI Inference Benchmark',
@@ -65,4 +67,24 @@ export function isValidTab(value: string): value is TabKey {
 export function getTabTitle(tab: string): string {
   const meta = TAB_META[tab as TabKey];
   return meta ? `${meta.title} | ${TITLE_SUFFIX}` : TITLE_SUFFIX;
+}
+
+/** Generate Next.js Metadata for a tab page. */
+export function tabMetadata(tab: TabKey): Metadata {
+  const meta = TAB_META[tab];
+  const url = tab === 'inference' ? SITE_URL : `${SITE_URL}/${tab}`;
+  return {
+    title: meta.title,
+    description: meta.description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: `${meta.title} | InferenceX`,
+      description: meta.description,
+      url,
+    },
+    twitter: {
+      title: `${meta.title} | InferenceX`,
+      description: meta.description,
+    },
+  };
 }
