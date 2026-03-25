@@ -26,7 +26,7 @@ export function LandingPage() {
           {/* Left - Full Dashboard */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="h-5 w-5 text-primary" />
+              <BarChart3 className="h-5 w-5 text-brand" />
               <h2 className="text-lg font-semibold">Full Dashboard</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-2">
@@ -39,7 +39,10 @@ export function LandingPage() {
             </p>
             <div className="mt-auto">
               <Link href="/inference" onClick={() => track('landing_full_dashboard_clicked')}>
-                <Button size="lg" className="text-sm sm:text-base h-12 gap-2 px-8">
+                <Button
+                  size="lg"
+                  className="text-sm sm:text-base h-12 gap-2 px-8 bg-brand hover:bg-brand/90"
+                >
                   Open Dashboard
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -50,7 +53,7 @@ export function LandingPage() {
           {/* Right - Curated Presets */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <Sparkles className="h-5 w-5 text-brand" />
               <h2 className="text-lg font-semibold">Quick Comparisons</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
