@@ -1,5 +1,11 @@
 import { AUTHOR_NAME, SITE_NAME } from '@semianalysisai/inferencex-constants';
 
+export const LANDING_META = {
+  title: 'Open Source AI Inference Benchmark',
+  description:
+    'Compare AI inference performance across GPUs and frameworks. Real benchmarks on NVIDIA GB200, B200, AMD MI355X, and more. Free, open-source, continuously updated.',
+};
+
 export const VALID_TABS = [
   'inference',
   'evaluation',

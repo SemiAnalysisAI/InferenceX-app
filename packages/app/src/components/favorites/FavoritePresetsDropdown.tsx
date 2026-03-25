@@ -37,6 +37,9 @@ export default function FavoritePresetsDropdown() {
 
   const [isOpen, setIsOpen] = useState(false);
 
+  // Track whether a URL-based preset has already been consumed
+  const urlPresetAppliedRef = useRef(false);
+
   // Version counter — increments on every preset apply/clear.
   // Async effects capture the version at start and bail if it's stale.
   const versionRef = useRef(0);
@@ -178,6 +181,32 @@ export default function FavoritePresetsDropdown() {
     setHwFilter,
     selectAllHwTypes,
   ]);
+
+  // Auto-apply preset from URL param (e.g. /inference?preset=gb200-vs-b200)
+  useEffect(() => {
+    if (urlPresetAppliedRef.current) return;
+    if (typeof window === 'undefined') return;
+
+    const sp = new URLSearchParams(window.location.search);
+    const presetId = sp.get('preset');
+    if (!presetId) return;
+
+    const preset = FAVORITE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+
+    urlPresetAppliedRef.current = true;
+
+    // Remove preset param from URL
+    sp.delete('preset');
+    const search = sp.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${search ? `?${search}` : ''}`,
+    );
+
+    applyPreset(preset);
+  }, [applyPreset]);
 
   const handlePresetClick = useCallback(
     (preset: FavoritePreset) => {

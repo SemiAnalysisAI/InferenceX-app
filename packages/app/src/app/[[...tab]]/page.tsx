@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { LandingPage } from '@/components/landing/landing-page';
 import { PageContent } from '@/components/page-content';
-import { TAB_META, VALID_TABS } from '@/lib/tab-meta';
+import { LANDING_META, TAB_META, VALID_TABS } from '@/lib/tab-meta';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const dynamicParams = true;
@@ -17,7 +18,26 @@ export async function generateMetadata({
   params: Promise<{ tab?: string[] }>;
 }): Promise<Metadata> {
   const { tab } = await params;
-  const activeTab = tab?.[0] ?? 'inference';
+  const activeTab = tab?.[0];
+
+  // Landing page (root /)
+  if (!activeTab) {
+    return {
+      title: LANDING_META.title,
+      description: LANDING_META.description,
+      alternates: { canonical: SITE_URL },
+      openGraph: {
+        title: `${LANDING_META.title} | InferenceX`,
+        description: LANDING_META.description,
+        url: SITE_URL,
+      },
+      twitter: {
+        title: `${LANDING_META.title} | InferenceX`,
+        description: LANDING_META.description,
+      },
+    };
+  }
+
   const meta = TAB_META[activeTab as keyof typeof TAB_META];
   if (!meta) return {};
 
@@ -41,9 +61,14 @@ export async function generateMetadata({
 
 export default async function Page({ params }: { params: Promise<{ tab?: string[] }> }) {
   const { tab } = await params;
-  const activeTab = tab?.[0] ?? 'inference';
+  const activeTab = tab?.[0];
 
-  if (!VALID_TABS.includes(activeTab as (typeof VALID_TABS)[number]) || (tab && tab.length > 1)) {
+  // Landing page (root /)
+  if (!activeTab) {
+    return <LandingPage />;
+  }
+
+  if (!VALID_TABS.includes(activeTab as (typeof VALID_TABS)[number]) || tab.length > 1) {
     notFound();
   }
 
