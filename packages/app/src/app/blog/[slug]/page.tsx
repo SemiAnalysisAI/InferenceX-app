@@ -138,8 +138,8 @@ export default async function BlogPostPage({ params }: Props) {
       <HashScroll />
       <ReadingProgressBar slug={slug} />
       <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-16 lg:gap-4">
-        <section data-blog-section="true">
+      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
+        <section data-blog-section="true" className="flex flex-col gap-4">
           <Card>
             <BlogBackLink />
             <header>
@@ -174,19 +174,23 @@ export default async function BlogPostPage({ params }: Props) {
                 <ShareLinkedInButton />
               </div>
             </header>
-          </Card>
-          {headings.length > 0 && <BlogToc headings={headings} />}
-          <Card>
-            <article
-              data-blog-article
-              className="prose prose-neutral dark:prose-invert max-w-none mx-4 md:mx-8 blog-prose"
-            >
-              {content}
-              <p className="text-xs text-muted-foreground">
-                All articles and posts are &copy; SemiAnalysis. All rights reserved. The AGPL-3.0
-                license covering the application source code does not apply to article content.
-              </p>
-            </article>
+            {headings.length > 0 && (
+              <div className="mt-4">
+                <BlogToc headings={headings} />
+              </div>
+            )}
+            <div className="mt-6 pt-6 border-t border-border/40">
+              <article
+                data-blog-article
+                className="prose prose-neutral dark:prose-invert max-w-none blog-prose"
+              >
+                {content}
+                <p className="text-xs text-muted-foreground">
+                  All articles and posts are &copy; SemiAnalysis. All rights reserved. The AGPL-3.0
+                  license covering the application source code does not apply to article content.
+                </p>
+              </article>
+            </div>
           </Card>
           <BlogPostNav
             prev={adjacent.prev ? { slug: adjacent.prev.slug, title: adjacent.prev.title } : null}

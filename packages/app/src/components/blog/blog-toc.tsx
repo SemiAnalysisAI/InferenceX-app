@@ -139,7 +139,7 @@ export function BlogToc({ headings }: BlogTocProps) {
     <>
       {/* Inline: when sidebar doesn't fit */}
       {!showSidebar && (
-        <Card>
+        <Card className="py-6!">
           <details aria-label="Table of contents">
             <summary className="text-sm font-medium cursor-pointer">
               On this page{' '}
