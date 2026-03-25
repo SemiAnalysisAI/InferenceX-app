@@ -32,6 +32,8 @@ export interface BenchmarkRow {
 export interface WorkflowRunRow {
   github_run_id: number;
   name: string;
+  conclusion: string | null;
+  run_attempt: number;
   html_url: string | null;
   created_at: string;
   date: string;

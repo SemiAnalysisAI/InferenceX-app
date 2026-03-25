@@ -3,6 +3,8 @@ import type { NeonClient } from '../connection.js';
 export interface WorkflowRunRow {
   github_run_id: number;
   name: string;
+  conclusion: string | null;
+  run_attempt: number;
   html_url: string | null;
   created_at: string;
   date: string;
@@ -29,17 +31,17 @@ export interface DateConfigRow {
   disagg: boolean;
 }
 
-/** Get successful benchmark workflow runs for a specific date. */
+/** Get benchmark workflow runs for a specific date (latest attempt per run, any completed conclusion). */
 export async function getWorkflowRunsByDate(
   sql: NeonClient,
   date: string,
 ): Promise<WorkflowRunRow[]> {
   const rows = await sql`
-    SELECT github_run_id, name, html_url, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at, date::text
+    SELECT github_run_id, name, conclusion, run_attempt, html_url, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at, date::text
     FROM latest_workflow_runs
     WHERE date = ${date}::date
-      AND conclusion = 'success'
-    ORDER BY created_at DESC
+      AND conclusion IS NOT NULL
+    ORDER BY created_at ASC
   `;
   return rows as unknown as WorkflowRunRow[];
 }
@@ -102,8 +104,19 @@ export async function getAvailabilityData(sql: NeonClient): Promise<Availability
     SELECT a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.date::text
     FROM availability a
     WHERE EXISTS (
-      SELECT 1 FROM latest_workflow_runs wr
-      WHERE wr.date = a.date AND wr.conclusion = 'success'
+      SELECT 1
+      FROM benchmark_results br
+      JOIN configs c ON c.id = br.config_id
+      JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+      WHERE c.model = a.model
+        AND c.hardware = a.hardware
+        AND c.framework = a.framework
+        AND c.precision = a.precision
+        AND br.isl = a.isl
+        AND br.osl = a.osl
+        AND br.date = a.date
+        AND br.error IS NULL
+        AND wr.conclusion IS NOT NULL
     )
     ORDER BY a.date ASC
   `;

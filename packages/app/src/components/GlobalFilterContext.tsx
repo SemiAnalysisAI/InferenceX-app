@@ -30,6 +30,7 @@ interface RunInfo {
   runId: string;
   runDate: string;
   runUrl: string;
+  conclusion: string | null;
   changelog?: {
     entries: {
       config_keys: string[];
@@ -89,7 +90,8 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
     runs[runId] = {
       runId,
       runDate: run.created_at,
-      runUrl: run.html_url ?? '',
+      runUrl: run.html_url ? `${run.html_url}/attempts/${run.run_attempt}` : '',
+      conclusion: run.conclusion,
       ...(runChangelogs.length > 0 && {
         changelog: {
           entries: runChangelogs.map((c) => ({

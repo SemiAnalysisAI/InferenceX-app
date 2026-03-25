@@ -47,7 +47,7 @@ async function previewConclusions(): Promise<StaleRow[]> {
 
   const stale: StaleRow[] = [];
   for (const r of rows) {
-    const expected = CONCLUSION_OVERRIDES.get(r.github_run_id as number);
+    const expected = CONCLUSION_OVERRIDES.get(Number(r.github_run_id));
     if (expected && r.conclusion !== expected) {
       stale.push({
         githubRunId: r.github_run_id as number,

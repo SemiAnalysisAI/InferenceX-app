@@ -6,7 +6,6 @@ import { BarChart3, Download, FileSpreadsheet, Image, RotateCcw, Table2 } from '
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import { WorkflowInfo } from '@/components/inference/types';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -369,7 +368,7 @@ export default function ThroughputCalculatorDisplay() {
   // Derive runUrl from workflowInfo for the selected sequence
   const runUrl = useMemo(() => {
     if (!Array.isArray(workflowInfo) || workflowInfo.length === 0) return undefined;
-    const wf = workflowInfo[0] as WorkflowInfo;
+    const wf = workflowInfo[0];
     return wf?.runInfoBySequence?.[selectedSequence]?.runUrl;
   }, [workflowInfo, selectedSequence]);
 
@@ -742,14 +741,7 @@ export default function ThroughputCalculatorDisplay() {
                           .map((p) => getPrecisionLabel(p as Precision))
                           .join(', ')}{' '}
                         • {getSequenceLabel(selectedSequence)} • Source: SemiAnalysis InferenceX™
-                        {workflowInfo &&
-                          workflowInfo.length > 0 &&
-                          (workflowInfo[0] as WorkflowInfo)?.run_date && (
-                            <>
-                              {' '}
-                              • Updated: {(workflowInfo[0] as WorkflowInfo).run_date.split(',')[0]}
-                            </>
-                          )}
+                        {selectedRunDate && <> • Updated: {selectedRunDate}</>}
                       </p>
                       {barMetric === 'power' && results.length > 0 && (
                         <>

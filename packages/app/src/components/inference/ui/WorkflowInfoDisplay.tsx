@@ -22,6 +22,32 @@ import {
   formatConfigKeys,
 } from '@/components/inference/utils/changelogFormatters';
 
+const CONCLUSION_LABELS: Record<string, string> = {
+  success: 'Run succeeded',
+  failure: 'Run failed',
+  cancelled: 'Run cancelled',
+};
+
+function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
+  if (!conclusion) return null;
+  const color =
+    conclusion === 'success'
+      ? 'bg-green-500'
+      : conclusion === 'failure'
+        ? 'bg-red-500'
+        : conclusion === 'cancelled'
+          ? 'bg-yellow-500'
+          : 'bg-gray-400';
+  const label = CONCLUSION_LABELS[conclusion] ?? conclusion;
+  return (
+    <span
+      className={`inline-block h-2 w-2 mr-1 rounded-full ${color} cursor-help`}
+      aria-label={label}
+      role="img"
+    />
+  );
+}
+
 export default function WorkflowInfoDisplay({
   workflowInfo,
 }: {
@@ -158,6 +184,7 @@ export default function WorkflowInfoDisplay({
                     }}
                   >
                     <span className="flex items-center gap-1">
+                      <RunConclusionDot conclusion={availableRuns[run].conclusion} />
                       Run {index + 1}/{runIds.length}
                       <span
                         data-external-link
