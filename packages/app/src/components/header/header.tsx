@@ -83,7 +83,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   return (
     <header
       data-testid="header"
-      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/50 backdrop-blur-[2px]"
+      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/20 backdrop-blur-[2px]"
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
