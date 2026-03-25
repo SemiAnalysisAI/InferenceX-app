@@ -52,3 +52,6 @@
 **/cypress/videos/
 **/cypress/screenshots/
 **/cypress/downloads/
+
+# wsl shenanigans
+C:*
