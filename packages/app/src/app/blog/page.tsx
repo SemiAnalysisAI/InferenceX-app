@@ -76,7 +76,7 @@ export default async function BlogPage({
               <div className="flex flex-col gap-8 mx-4 md:mx-8">
                 {filtered.map((post) => (
                   <BlogPostCard key={post.slug} slug={post.slug} title={post.title}>
-                    <article>
+                    <article className="min-w-0">
                       <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
                         <time dateTime={post.date}>
                           {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
@@ -94,7 +94,7 @@ export default async function BlogPage({
                       </h2>
                       <p className="text-muted-foreground mb-3">{post.subtitle}</p>
                       {post.tags && post.tags.length > 0 && (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           {post.tags.map((tag) => (
                             <span
                               key={tag}
