@@ -42,7 +42,8 @@ export function LandingPage() {
         <section>
           <Card data-testid="landing-hero">
             <h2 className="text-lg font-semibold mb-2">
-              Open Source Continuous Inference Benchmark
+              Open Source Continuous Inference Benchmark trusted by Operators of Trillion Dollar
+              GigaWatt Scale Token Factories
             </h2>
             <p className="text-muted-foreground text-sm">
               Independent, vendor-neutral benchmarks comparing AI inference performance across GPUs
