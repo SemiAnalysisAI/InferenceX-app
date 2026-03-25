@@ -17,7 +17,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
           preset_title: preset.title,
         })
       }
-      className="group block rounded-xl border border-border bg-card/90 p-5 transition-all duration-200 hover:border-primary/40 hover:bg-accent/50 hover:shadow-md"
+      className="group block rounded-xl border border-border/40 bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-primary/40 hover:bg-accent/50 hover:shadow-md"
       data-testid={`curated-view-${preset.id}`}
     >
       <div className="flex items-start justify-between gap-2">

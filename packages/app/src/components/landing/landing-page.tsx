@@ -5,6 +5,7 @@ import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { IntroSection } from '@/components/intro-section';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
@@ -23,7 +24,7 @@ export function LandingPage() {
         {/* Split: Dashboard vs Presets */}
         <section className="flex flex-col gap-4 pb-8">
           {/* Left - Full Dashboard */}
-          <div className="flex flex-col rounded-xl border border-border bg-card/90 p-6">
+          <Card>
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-semibold">Full Dashboard</h2>
@@ -44,10 +45,10 @@ export function LandingPage() {
                 </Button>
               </Link>
             </div>
-          </div>
+          </Card>
 
           {/* Right - Curated Presets */}
-          <div className="flex flex-col rounded-xl border border-border bg-card/90 p-6">
+          <Card>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-semibold">Quick Comparisons</h2>
@@ -61,7 +62,7 @@ export function LandingPage() {
                 <CuratedViewCard key={preset.id} preset={preset} />
               ))}
             </div>
-          </div>
+          </Card>
         </section>
       </div>
     </main>
