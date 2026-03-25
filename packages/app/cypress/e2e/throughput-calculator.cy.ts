@@ -8,7 +8,7 @@ describe('TCO Calculator', () => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
-      cy.visit('/');
+      cy.visit('/inference');
     });
 
     it('shows the TCO Calculator tab trigger', () => {

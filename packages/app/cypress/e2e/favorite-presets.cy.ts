@@ -1,6 +1,6 @@
 describe('Favorite Presets', () => {
   before(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

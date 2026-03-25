@@ -50,6 +50,12 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
   },
 };
 
+export const LANDING_META = {
+  title: `${SITE_NAME} — Open Source AI Inference Benchmark by ${AUTHOR_NAME}`,
+  description:
+    'Compare AI inference performance across NVIDIA and AMD GPUs. Open-source benchmark covering GB300, B200, MI355X, and more.',
+};
+
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
 
 export function isValidTab(value: string): value is TabKey {

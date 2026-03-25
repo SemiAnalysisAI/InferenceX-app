@@ -1,6 +1,6 @@
 describe('Gradient Labels Toggle', () => {
   before(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -117,7 +117,7 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
   };
 
   before(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

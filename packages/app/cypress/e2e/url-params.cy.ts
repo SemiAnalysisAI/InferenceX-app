@@ -39,7 +39,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
-      cy.visit('/');
+      cy.visit('/inference');
 
       cy.get('[data-testid="scatter-graph"]')
         .first()
@@ -59,7 +59,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('selecting a Y-axis metric updates the displayed value', () => {
-      cy.visit('/');
+      cy.visit('/inference');
       cy.get('[data-testid="yaxis-metric-selector"]').click();
       cy.get('[role="option"]')
         .eq(1)
@@ -73,7 +73,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('switching to energy metric updates SVG axis label to joules', () => {
-      cy.visit('/');
+      cy.visit('/inference');
       cy.get('[data-testid="scatter-graph"]').first().should('be.visible');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click();

@@ -219,4 +219,62 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       dateRangeMonths: 2,
     },
   },
+  // 7 — NVIDIA Generations
+  {
+    id: 'nvidia-generations',
+    title: 'H100 → H200 → B200 — NVIDIA Generations',
+    description:
+      'Three generations of NVIDIA datacenter GPUs compared on DeepSeek R1 (1k/8k) at FP8.',
+    tags: ['DeepSeek', 'H100', 'H200', 'B200', 'FP8'],
+    category: 'comparison',
+    config: {
+      model: Model.DeepSeek_R1,
+      sequence: Sequence.OneK_EightK,
+      precisions: ['fp8'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['h100', 'h200', 'b200'],
+    },
+  },
+  // 8 — GB300 vs GB200
+  {
+    id: 'gb300-vs-gb200',
+    title: 'GB300 vs GB200 — NVL72 Comparison',
+    description:
+      'GB300 NVL72 vs GB200 NVL72 disaggregated multi-node performance on DeepSeek R1 (1k/1k) at FP4.',
+    tags: ['DeepSeek', 'GB300', 'GB200', 'NVL72', 'FP4'],
+    category: 'comparison',
+    config: {
+      model: Model.DeepSeek_R1,
+      sequence: Sequence.OneK_OneK,
+      precisions: ['fp4'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['gb300', 'gb200'],
+    },
+  },
+  // 9 — Cross-vendor: GB200 vs MI355X
+  {
+    id: 'gb200-vs-mi355x',
+    title: 'GB200 NVL72 vs MI355X — NVIDIA vs AMD',
+    description:
+      'Cross-vendor flagship comparison on DeepSeek R1 (1k/8k) at FP8. Multi-node NVL72 vs single-node MI355X.',
+    tags: ['DeepSeek', 'GB200', 'MI355X', 'FP8', 'NVL72'],
+    category: 'comparison',
+    config: {
+      model: Model.DeepSeek_R1,
+      sequence: Sequence.OneK_EightK,
+      precisions: ['fp8'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['gb200', 'mi355x'],
+    },
+  },
+];
+
+/** Curated presets shown on the landing page. */
+export const LANDING_PRESETS: FavoritePreset[] = [
+  FAVORITE_PRESETS.find((p) => p.id === 'nvidia-generations')!,
+  FAVORITE_PRESETS.find((p) => p.id === 'amd-generations')!,
+  FAVORITE_PRESETS.find((p) => p.id === 'gb300-vs-gb200')!,
+  FAVORITE_PRESETS.find((p) => p.id === 'gb200-vs-mi355x')!,
+  FAVORITE_PRESETS.find((p) => p.id === 'gb200-vs-b200')!,
+  FAVORITE_PRESETS.find((p) => p.id === 'b200-vs-h200')!,
 ];

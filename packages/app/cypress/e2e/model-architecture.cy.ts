@@ -2,7 +2,7 @@ describe('Model Architecture Diagram', () => {
   before(() => {
     // Use desktop viewport to ensure all UI elements are visible
     cy.viewport(1280, 800);
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

@@ -1,7 +1,7 @@
 describe('Performance', () => {
   it('page loads quickly', () => {
     const startTime = Date.now();
-    cy.visit('/');
+    cy.visit('/inference');
     cy.document().then(() => {
       const loadTime = Date.now() - startTime;
       const threshold = 5_000;
@@ -18,7 +18,7 @@ describe('Performance', () => {
   });
 
   it('no excessive layout shift issues', () => {
-    cy.visit('/');
+    cy.visit('/inference');
     cy.wait(5000);
 
     // Measure CLS using PerformanceObserver

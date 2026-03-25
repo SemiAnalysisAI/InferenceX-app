@@ -3,7 +3,7 @@
 
 describe('Page Load & Navigation', () => {
   before(() => {
-    cy.visit('/');
+    cy.visit('/inference');
   });
 
   it('page loads with correct title', () => {
@@ -23,13 +23,13 @@ describe('Page Load & Navigation', () => {
     });
 
     // Re-visit to capture errors from a fresh load
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="scatter-graph"]').should('exist');
     cy.wrap(errors).should('have.length', 0);
   });
 
   it('page loads without 404 errors', () => {
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="scatter-graph"]').should('exist');
     cy.get('h1').should('not.contain.text', '404');
     cy.get('h1').should('not.contain.text', 'Not Found');
@@ -45,7 +45,7 @@ describe('Theme Toggle', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       win.localStorage.setItem('theme', 'light');
     });
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="theme-toggle"]').click();
     cy.get('html').should('have.class', 'dark');
     cy.reload();

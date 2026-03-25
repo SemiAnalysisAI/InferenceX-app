@@ -371,7 +371,7 @@ describe('GPU Specs Radar Chart View', () => {
 
 describe('GPU Specs Navigation', () => {
   it('tab switcher activates GPU Specs', () => {
-    cy.visit('/');
+    cy.visit('/inference');
     // Wait for tabs to be rendered and page to be interactive
     cy.get('[role="tablist"]').should('be.visible');
     // Use force:true to handle potential pointer-events:none from modals/overlays

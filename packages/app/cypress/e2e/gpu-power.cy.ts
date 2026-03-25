@@ -5,7 +5,7 @@ function unlockPowerX() {
 
 describe('PowerX', () => {
   beforeEach(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -32,7 +32,7 @@ describe('PowerX', () => {
 
   describe('(unlocked)', () => {
     beforeEach(() => {
-      cy.visit('/', {
+      cy.visit('/inference', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
           win.localStorage.setItem('inferencex-powerx-unlocked', '1');

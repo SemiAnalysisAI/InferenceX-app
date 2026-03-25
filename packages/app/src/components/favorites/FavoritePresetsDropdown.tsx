@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { ChevronDown, Star } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -189,6 +190,25 @@ export default function FavoritePresetsDropdown() {
     },
     [activePresetId, applyPreset, clearPreset],
   );
+
+  // Auto-apply preset from URL param (e.g., /inference?g_preset=gb200-vs-b200)
+  const searchParams = useSearchParams();
+  const urlPresetAppliedRef = useRef(false);
+  useEffect(() => {
+    if (urlPresetAppliedRef.current) return;
+    const presetId = searchParams.get('g_preset');
+    if (!presetId) return;
+    const preset = FAVORITE_PRESETS.find((p) => p.id === presetId);
+    if (preset) {
+      urlPresetAppliedRef.current = true;
+      applyPreset(preset);
+      track('preset_applied_from_url', { preset_id: presetId });
+      // Strip g_preset from URL to keep it clean
+      const url = new URL(window.location.href);
+      url.searchParams.delete('g_preset');
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }
+  }, [searchParams, applyPreset]);
 
   const activePreset = activePresetId
     ? FAVORITE_PRESETS.find((p) => p.id === activePresetId)

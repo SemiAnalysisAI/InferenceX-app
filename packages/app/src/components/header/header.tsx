@@ -12,7 +12,7 @@ import { GitHubStars } from './GithubStars';
 
 const NAV_LINKS = [
   {
-    href: '/',
+    href: '/inference',
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
@@ -28,12 +28,12 @@ const NAV_LINKS = [
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/')
+  if (href === '/inference')
     return (
-      pathname === '/' ||
-      (!pathname.startsWith('/media') &&
-        !pathname.startsWith('/quotes') &&
-        !pathname.startsWith('/blog'))
+      pathname !== '/' &&
+      !pathname.startsWith('/media') &&
+      !pathname.startsWith('/quotes') &&
+      !pathname.startsWith('/blog')
     );
   return pathname.startsWith(href);
 }
@@ -72,9 +72,11 @@ export const Header = () => {
         <div className="flex flex-col gap-2 p-4 lg:p-8">
           <div className="flex flex-row gap-4 lg:gap-8">
             <div className="flex flex-col justify-center">
-              <h1 className="scroll-m-20 text-2xl md:text-3xl lg:text-5xl font-bold tracking-tight text-balance">
-                InferenceX
-              </h1>
+              <Link href="/" className="hover:opacity-80 transition-opacity w-fit">
+                <h1 className="scroll-m-20 text-2xl md:text-3xl lg:text-5xl font-bold tracking-tight text-balance">
+                  InferenceX
+                </h1>
+              </Link>
               <p className="text-xs md:text-sm text-muted-foreground italic pl-2">
                 (formerly InferenceMAX)
               </p>
