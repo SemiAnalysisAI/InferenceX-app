@@ -24,14 +24,15 @@ describe('Page Load & Navigation', () => {
 
     // Re-visit to capture errors from a fresh load
     cy.visit('/');
-    cy.get('[data-testid="scatter-graph"]').should('exist');
+    cy.get('[data-testid="header"]').should('exist');
+    cy.get('[data-testid="footer"]').should('exist');
     cy.wrap(errors).should('have.length', 0);
   });
 
   it('page loads without 404 errors', () => {
     cy.visit('/');
-    cy.get('[data-testid="scatter-graph"]').should('exist');
     cy.get('[data-testid="header"]').should('exist');
+    cy.get('[data-testid="footer"]').should('exist');
   });
 });
 
