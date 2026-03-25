@@ -92,7 +92,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 alt="SemiAnalysis logo"
                 width={64}
                 height={27}
-                className="inline w-12"
+                className="inline lg:w-20"
                 priority
               />
             </span>
