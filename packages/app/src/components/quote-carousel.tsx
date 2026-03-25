@@ -158,7 +158,7 @@ export function QuoteCarousel({
             className={`text-xs font-semibold tracking-wide uppercase transition-opacity duration-200 ${
               i === activeIndex
                 ? 'opacity-100 text-foreground'
-                : 'opacity-40 text-muted-foreground hover:opacity-70'
+                : 'opacity-60 text-muted-foreground hover:opacity-80'
             }`}
           >
             {labels[e.org] ?? e.org}

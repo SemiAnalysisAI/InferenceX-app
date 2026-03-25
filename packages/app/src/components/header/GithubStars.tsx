@@ -54,11 +54,9 @@ export function GitHubStars({ owner, repo }: GitHubStarsProps) {
         />
       </svg>
       <span className="text-sm font-medium">Star</span>
-      {stars !== null && (
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 self-center">
-          {stars.toLocaleString()}
-        </span>
-      )}
+      <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 self-center min-w-[2ch]">
+        {stars !== null ? stars.toLocaleString() : '\u00A0'}
+      </span>
     </Link>
   );
 }
