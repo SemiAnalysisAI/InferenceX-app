@@ -129,27 +129,18 @@ export const Header = () => {
                 aria-label="Navigation menu"
               >
                 <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 20 20"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2"
+                  strokeWidth="1"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  {mobileMenuOpen ? (
-                    <>
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </>
-                  ) : (
-                    <>
-                      <line x1="4" y1="6" x2="20" y2="6" />
-                      <line x1="4" y1="12" x2="20" y2="12" />
-                      <line x1="4" y1="18" x2="20" y2="18" />
-                    </>
-                  )}
+                  <line x1="1" y1="4" x2="19" y2="4" />
+                  <line x1="1" y1="10" x2="19" y2="10" />
+                  <line x1="1" y1="16" x2="19" y2="16" />
                 </svg>
               </button>
               {mobileMenuOpen && (
