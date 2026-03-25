@@ -72,7 +72,7 @@ export function LandingPage() {
           <Button
             asChild
             size="lg"
-            className="text-base px-8 py-6 font-semibold bg-brand text-white hover:bg-brand/90"
+            className="cta-button-glow text-base px-8 py-6 font-semibold bg-brand text-white hover:bg-brand/90"
             data-testid="landing-cta"
           >
             <Link href="/inference" onClick={() => track('landing_explore_clicked')}>
@@ -85,7 +85,7 @@ export function LandingPage() {
         {/* Curated Views */}
         <section>
           <h3 className="text-base font-semibold mb-3">Popular Comparisons</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {LANDING_PRESETS.map((preset) => (
               <PresetCard key={preset.id} preset={preset} />
             ))}

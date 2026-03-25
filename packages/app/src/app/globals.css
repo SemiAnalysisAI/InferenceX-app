@@ -353,3 +353,18 @@
 .star-button-glow {
   animation: star-glow 2s ease-in-out infinite;
 }
+
+/* CTA button glow animation - brand colored */
+@keyframes cta-glow {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  50% {
+    box-shadow: 0 0 12px 3px var(--color-brand, oklch(65% 0.15 250)) / 50%;
+  }
+}
+
+.cta-button-glow {
+  animation: cta-glow 2s ease-in-out infinite;
+}
