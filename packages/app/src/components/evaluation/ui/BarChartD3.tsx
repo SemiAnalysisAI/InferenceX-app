@@ -129,7 +129,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         isActive: enabledHardware.has(hwKey),
         onClick: () => {
           toggleHardware(hwKey);
-          track('eval_hw_toggled', { hw: hwKey });
+          track('evaluation_hw_toggled', { hw: hwKey });
         },
       })),
     [configurations, enabledHardware, highlightedConfigs, toggleHardware, resolveColor],
@@ -370,7 +370,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           isLegendExpanded={isLegendExpanded}
           onExpandedChange={(expanded) => {
             setIsLegendExpanded(expanded);
-            track('eval_legend_expanded', { expanded });
+            track('evaluation_legend_expanded', { expanded });
           }}
           switches={[
             {
@@ -379,7 +379,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               checked: showLabels,
               onCheckedChange: (checked) => {
                 setShowLabels(checked);
-                track('eval_show_labels_toggled', { enabled: checked });
+                track('evaluation_show_labels_toggled', { enabled: checked });
               },
             },
             {
@@ -388,7 +388,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               checked: highContrast,
               onCheckedChange: (checked) => {
                 setHighContrast(checked);
-                track('eval_high_contrast_toggled', { enabled: checked });
+                track('evaluation_high_contrast_toggled', { enabled: checked });
               },
             },
           ]}
@@ -396,7 +396,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           allSelected={enabledHardware.size === hwTypesWithData.size}
           onResetFilter={() => {
             selectAllHwTypes();
-            track('eval_filter_reset');
+            track('evaluation_filter_reset');
           }}
           enableTooltips={true}
         />

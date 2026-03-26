@@ -48,7 +48,7 @@ export function GitHubStarModal() {
   useEffect(() => {
     if (shouldShowModal()) {
       setOpen(true);
-      track('github_star_modal_shown');
+      track('star_modal_shown');
     }
     setReady(true);
   }, []);
@@ -66,7 +66,7 @@ export function GitHubStarModal() {
     setOpen(false);
     sessionDismissed = true;
     saveDismissTimestamp();
-    track('github_star_modal_dismissed');
+    track('star_modal_dismissed');
   }, []);
 
   const handleStar = useCallback(() => {
@@ -74,7 +74,7 @@ export function GitHubStarModal() {
     setOpen(false);
     sessionDismissed = true;
     saveStarred();
-    track('github_star_modal_starred');
+    track('star_modal_starred');
   }, []);
 
   return (

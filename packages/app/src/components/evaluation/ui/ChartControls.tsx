@@ -40,7 +40,7 @@ export default function EvaluationChartControls() {
           value={selectedModel || ''}
           onChange={(value) => {
             setSelectedModel(value);
-            track('eval_model_selected', { model: value });
+            track('evaluation_model_selected', { model: value });
           }}
           availableModels={availableModels}
         />
@@ -56,7 +56,7 @@ export default function EvaluationChartControls() {
             value={selectedBenchmark || ''}
             onValueChange={(value) => {
               setSelectedBenchmark(value);
-              track('eval_benchmark_selected', { benchmark: value });
+              track('evaluation_benchmark_selected', { benchmark: value });
             }}
           >
             <SelectTrigger
@@ -86,7 +86,7 @@ export default function EvaluationChartControls() {
           date={selectedRunDate}
           onChange={(date) => {
             setSelectedRunDate(date);
-            track('eval_date_selected', { date });
+            track('evaluation_date_selected', { date });
           }}
           placeholder="Select run date"
           availableDates={availableDates}

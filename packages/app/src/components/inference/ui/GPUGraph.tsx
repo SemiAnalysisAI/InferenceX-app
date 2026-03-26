@@ -438,7 +438,7 @@ const GPUGraph = React.memo(
                 checked: highContrast,
                 onCheckedChange: (c) => {
                   setHighContrast(c);
-                  track('gpu_timeseries_high_contrast_toggled', { enabled: c });
+                  track('interactivity_high_contrast_toggled', { enabled: c });
                 },
               },
               {
@@ -477,7 +477,7 @@ const GPUGraph = React.memo(
                       label: 'Shuffle Colors',
                       onClick: () => {
                         shuffleColors();
-                        track('gpu_timeseries_shuffle_colors');
+                        track('interactivity_shuffle_colors');
                       },
                     },
                   ]
