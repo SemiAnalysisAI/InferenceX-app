@@ -653,7 +653,7 @@ export default function ChartDisplay() {
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">
-      <section>
+      <section className="relative z-10">
         <Card>
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between">
