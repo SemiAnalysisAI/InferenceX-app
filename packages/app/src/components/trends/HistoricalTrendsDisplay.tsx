@@ -281,7 +281,7 @@ export default function HistoricalTrendsDisplay() {
           </p>
         </Card>
       ) : (
-        <section className="pt-4">
+        <section>
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="historical-trend"
