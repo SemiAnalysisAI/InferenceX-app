@@ -128,10 +128,10 @@ export default function HistoricalTrendsDisplay() {
   });
 
   // High contrast color support
-  const hwKeys = useMemo(() => Object.keys(hardwareConfig), [hardwareConfig]);
+  const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
   const { resolveColor } = useThemeColors({
     highContrast,
-    identifiers: hwKeys,
+    identifiers: activeHwKeys,
     colorShuffleSeed,
   });
 

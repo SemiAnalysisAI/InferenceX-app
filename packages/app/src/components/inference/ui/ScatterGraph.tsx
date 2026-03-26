@@ -170,10 +170,14 @@ const ScatterGraph = React.memo(
 
     // --- Theme ---
     const hardwareConfig = hardwareConfigOverride || contextHardwareConfig;
-    const hwKeys = useMemo(() => Object.keys(hardwareConfig), [hardwareConfig]);
+    const activeHwKeys = useMemo(() => {
+      const keys = [...effectiveOfficialHwTypes];
+      activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
+      return keys;
+    }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
-      identifiers: hwKeys,
+      identifiers: activeHwKeys,
       colorShuffleSeed,
     });
 
