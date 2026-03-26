@@ -56,6 +56,13 @@ function MultiSelect({
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       searchRef.current?.focus();
+    } else {
+      // Track search usage when dropdown closes
+      if (searchUsedRef.current) {
+        track('multi_select_searched', { query: search });
+        searchUsedRef.current = false;
+      }
+      setSearch('');
     }
 
     return () => {
@@ -111,6 +118,8 @@ function MultiSelect({
     const newValue = value.filter((v) => v !== optionValue);
     onChange?.(newValue);
   };
+
+  const searchUsedRef = React.useRef(false);
 
   const handleClearAll = (e: React.SyntheticEvent) => {
     e.stopPropagation();
@@ -222,7 +231,10 @@ function MultiSelect({
                   ref={searchRef}
                   type="text"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    if (e.target.value) searchUsedRef.current = true;
+                  }}
                   placeholder="Search..."
                   className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
                 />

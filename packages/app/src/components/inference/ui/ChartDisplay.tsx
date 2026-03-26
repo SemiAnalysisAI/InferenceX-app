@@ -709,7 +709,11 @@ export default function ChartDisplay() {
         onOpenChange={(open) => {
           if (!open) {
             clearTrackedConfigs();
-            track('inference_trend_cleared');
+            track('inference_trend_cleared', {
+              configCount: trackedConfigs.length,
+              model: selectedModel,
+              metric: selectedYAxisMetric,
+            });
           }
         }}
       >

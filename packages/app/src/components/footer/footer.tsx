@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { track } from '@/lib/analytics';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 
 import { StarButton } from './footer-star-cta';
@@ -21,6 +22,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
               target="_blank"
               href="https://semianalysis.com/"
               className="inline-block w-35 h-14.5"
+              onClick={() => track('footer_link_clicked', { label: 'brand_logo' })}
             >
               <Image
                 width={140}
@@ -50,6 +52,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'main_site' })}
               >
                 Main Site
               </a>
@@ -59,6 +62,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'newsletter' })}
               >
                 Newsletter
               </a>
@@ -68,6 +72,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'about' })}
               >
                 About
               </a>
@@ -80,6 +85,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'privacy_policy' })}
               >
                 Privacy Policy
               </a>
@@ -89,6 +95,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'cookie_policy' })}
               >
                 Cookie Policy
               </a>
@@ -101,6 +108,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'benchmarks_repo' })}
               >
                 Benchmarks
               </a>
@@ -110,6 +118,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => track('footer_link_clicked', { label: 'frontend_repo' })}
               >
                 Frontend
               </a>

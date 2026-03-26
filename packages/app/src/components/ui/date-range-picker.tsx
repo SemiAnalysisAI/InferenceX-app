@@ -520,13 +520,25 @@ function CalendarGrid({
       secondMonth.getMonth() < latestMonth.getMonth());
 
   const goToPreviousMonth = () => {
-    if (canGoPrev)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    if (canGoPrev) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
+      track('date_range_picker_month_navigated', {
+        direction: 'previous',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   const goToNextMonth = () => {
-    if (canGoNext)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    if (canGoNext) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
+      track('date_range_picker_month_navigated', {
+        direction: 'next',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   const handleDateHover = (date: Date | null) => {

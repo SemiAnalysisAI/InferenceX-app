@@ -378,7 +378,7 @@ export default function ThroughputCalculatorDisplay() {
 
   const handleResetGpus = useCallback(() => {
     setVisibleHwKeys(new Set(availableHwKeys));
-    track('calculator_gpu_reset');
+    track('calculator_gpu_reset', { gpuCount: availableHwKeys.length });
   }, [availableHwKeys]);
 
   // Derive runUrl from workflowInfo for the selected sequence
@@ -394,8 +394,10 @@ export default function ThroughputCalculatorDisplay() {
       const next = new Set(prev);
       if (next.has(resultKey)) {
         next.delete(resultKey);
+        track('calculator_bar_deselected', { resultKey });
       } else {
         next.add(resultKey);
+        track('calculator_bar_selected', { resultKey, totalSelected: next.size });
       }
       return next;
     });
@@ -1022,8 +1024,8 @@ export default function ThroughputCalculatorDisplay() {
               <button
                 type="button"
                 onClick={() => {
+                  track('calculator_selection_cleared', { clearedCount: selectedBars.size });
                   setSelectedBars(new Set());
-                  track('calculator_selection_cleared');
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
               >

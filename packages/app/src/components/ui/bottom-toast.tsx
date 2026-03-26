@@ -3,6 +3,8 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { track } from '@/lib/analytics';
+
 const DISMISS_EVENT = 'inferencex:dismiss-toast';
 
 interface BottomToastProps {
@@ -40,11 +42,12 @@ export function BottomToast({
 
   const dismiss = useCallback(() => {
     setAnimate(false);
+    track('toast_dismissed', { title });
     setTimeout(() => {
       setVisible(false);
       if (!actionClickedRef.current) onDismissRef.current?.();
     }, 300);
-  }, []);
+  }, [title]);
 
   // On mount: dismiss any existing toast, then animate in
   useEffect(() => {
@@ -58,9 +61,10 @@ export function BottomToast({
 
   const handleAction = useCallback(() => {
     actionClickedRef.current = true;
+    track('toast_action_clicked', { title, actionLabel: action?.label });
     action?.onClick();
     dismiss();
-  }, [action, dismiss]);
+  }, [action, dismiss, title]);
 
   if (!visible) return null;
 

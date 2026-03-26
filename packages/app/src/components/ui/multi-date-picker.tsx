@@ -100,6 +100,7 @@ export function MultiDatePicker({
 
   // Remove a specific date from temp selection
   const handleRemoveTempDate = (dateStr: string) => {
+    track('multi_date_picker_date_removed', { date: dateStr });
     setTempDates(tempDates.filter((d) => d !== dateStr));
   };
 
@@ -176,7 +177,10 @@ export function MultiDatePicker({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setTempDates([])}
+                    onClick={() => {
+                      track('multi_date_picker_cleared', { dateCount: tempDates.length });
+                      setTempDates([]);
+                    }}
                     className="h-6 px-2 text-xs"
                   >
                     Clear All
@@ -366,13 +370,25 @@ function CalendarGrid({
       currentMonth.getMonth() < latestMonth.getMonth());
 
   const goToPreviousMonth = () => {
-    if (canGoPrev)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    if (canGoPrev) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
+      track('multi_date_picker_month_navigated', {
+        direction: 'previous',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   const goToNextMonth = () => {
-    if (canGoNext)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    if (canGoNext) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
+      track('multi_date_picker_month_navigated', {
+        direction: 'next',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   return (

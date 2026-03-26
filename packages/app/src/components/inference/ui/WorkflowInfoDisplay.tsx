@@ -79,14 +79,17 @@ export default function WorkflowInfoDisplay({
 
   const handleGoPreviousRun = () => {
     if (canGoPreviousRun()) {
-      track('inference_run_previous');
+      track('inference_run_previous', {
+        toRun: runIds[currentRunIndex - 1],
+        totalRuns: runIds.length,
+      });
       setSelectedRunId(runIds[currentRunIndex - 1]);
     }
   };
 
   const handleGoNextRun = () => {
     if (canGoNextRun()) {
-      track('inference_run_next');
+      track('inference_run_next', { toRun: runIds[currentRunIndex + 1], totalRuns: runIds.length });
       setSelectedRunId(runIds[currentRunIndex + 1]);
     }
   };

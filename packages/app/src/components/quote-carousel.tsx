@@ -141,7 +141,10 @@ export function QuoteCarousel({
         setFading(false);
       }, 300);
       timerRef.current = setInterval(advance, intervalMs);
-      track('quote_carousel_navigated');
+      track('quote_carousel_navigated', {
+        toOrg: entries[index]?.org,
+        fromOrg: entries[activeIndex]?.org,
+      });
     },
     [advance, intervalMs],
   );
@@ -191,7 +194,11 @@ export function QuoteCarousel({
 
       {moreHref && (
         <div className="flex justify-end">
-          <a href={moreHref} className="text-xs font-bold text-brand hover:underline">
+          <a
+            href={moreHref}
+            className="text-xs font-bold text-brand hover:underline"
+            onClick={() => track('quote_carousel_see_more_clicked')}
+          >
             See more supporters &rarr;
           </a>
         </div>

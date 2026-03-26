@@ -235,7 +235,7 @@ export function DatePicker({
   const handleGoPrevious = () => {
     const index = getCurrentDateIndex();
     if (index > 0 && availableDates) {
-      track('date_picker_previous');
+      track('date_picker_previous', { date: availableDates[index - 1] });
       onChange(availableDates[index - 1]);
     }
   };
@@ -244,7 +244,7 @@ export function DatePicker({
   const handleGoNext = () => {
     const index = getCurrentDateIndex();
     if (availableDates && index >= 0 && index < availableDates.length - 1) {
-      track('date_picker_next');
+      track('date_picker_next', { date: availableDates[index + 1] });
       onChange(availableDates[index + 1]);
     }
   };
@@ -512,13 +512,25 @@ function CalendarGrid({
       currentMonth.getMonth() < latestMonth.getMonth());
 
   const goToPreviousMonth = () => {
-    if (canGoPrev)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    if (canGoPrev) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
+      track('date_picker_month_navigated', {
+        direction: 'previous',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   const goToNextMonth = () => {
-    if (canGoNext)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    if (canGoNext) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
+      track('date_picker_month_navigated', {
+        direction: 'next',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   return (
