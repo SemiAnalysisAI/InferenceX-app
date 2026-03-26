@@ -51,6 +51,7 @@ import {
   computeParetoPointLabels,
   computeGradientStops,
   PARETO_LABEL_COLORS,
+  buildGradientColorMap,
 } from '@/components/inference/utils/paretoLabels';
 
 // X-shape path for overlay (unofficial) data points
@@ -371,6 +372,12 @@ const ScatterGraph = React.memo(
       });
       return result;
     }, [rooflines]);
+
+    // Point → gradient color lookup (for coloring points by parallelism strategy)
+    const gradientColorByPoint = useMemo(
+      () => buildGradientColorMap(allPointLabelsByKey),
+      [allPointLabelsByKey],
+    );
 
     // Ref for trackedConfigIds (needs to be current at event time inside D3 handlers)
     const trackedConfigIdsRef = useRef(trackedConfigIds);
@@ -911,7 +918,9 @@ const ScatterGraph = React.memo(
         key: 'points',
         data: pointsData,
         config: {
-          getColor: (d) => getCssColor(resolveColor(d.hwKey as string)),
+          getColor: (d) =>
+            (showGradientLabels && gradientColorByPoint.get(d)) ||
+            getCssColor(resolveColor(d.hwKey as string)),
           getOpacity: (d) => (isPointVisible(d) ? 1 : 0),
           getPointerEvents: (d) => (isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: hidePointLabels || showGradientLabels,
@@ -1139,6 +1148,7 @@ const ScatterGraph = React.memo(
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
+      gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
       selectedPrecisions,

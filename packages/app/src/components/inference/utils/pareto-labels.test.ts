@@ -7,6 +7,7 @@ import {
   computeParetoPointLabels,
   computeGradientStops,
   PARETO_LABEL_COLORS,
+  buildGradientColorMap,
   type ParetoPointLabel,
 } from './paretoLabels';
 
@@ -299,5 +300,32 @@ describe('PARETO_LABEL_COLORS', () => {
     for (const color of PARETO_LABEL_COLORS) {
       expect(color).toMatch(/^#[0-9a-f]{6}$/i);
     }
+  });
+});
+
+// ===========================================================================
+// buildGradientColorMap
+// ===========================================================================
+describe('buildGradientColorMap', () => {
+  const ptA = { tp: 4 } as InferenceData;
+  const ptB = { tp: 8 } as InferenceData;
+  const ptC = { tp: 16 } as InferenceData;
+
+  it('maps each point reference to its gradient color', () => {
+    const labelsByKey: Record<string, ParetoPointLabel[]> = {
+      h200_trt_fp8: [
+        { point: ptA, label: 'TP4', color: '#aaa' },
+        { point: ptB, label: 'TP8', color: '#bbb' },
+      ],
+      b200_trt_fp8: [{ point: ptC, label: 'TP16', color: '#ccc' }],
+    };
+    const map = buildGradientColorMap(labelsByKey);
+    expect(map.get(ptA)).toBe('#aaa');
+    expect(map.get(ptB)).toBe('#bbb');
+    expect(map.get(ptC)).toBe('#ccc');
+  });
+
+  it('returns empty map for empty input', () => {
+    expect(buildGradientColorMap({}).size).toBe(0);
   });
 });
