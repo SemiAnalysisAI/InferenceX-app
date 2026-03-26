@@ -25,9 +25,9 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
               <Image
                 width={140}
                 height={58}
-                src="/brand/logo-color.png"
+                src="/brand/logo-color.webp"
                 alt="SemiAnalysis logo"
-                className="h-auto w-auto"
+                className="h-auto"
               />
             </Link>
             <p
