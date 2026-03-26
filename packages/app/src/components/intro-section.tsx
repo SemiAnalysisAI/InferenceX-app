@@ -6,6 +6,11 @@ import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quot
 
 const carouselQuotes = QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org));
 
+const CAROUSEL_OVERRIDES = {
+  order: ['OpenAI'] as string[],
+  labels: CAROUSEL_LABELS,
+};
+
 /** Deduplicated logos from all quote orgs. */
 const orgLogos: { org: string; logo: string }[] = [];
 const seen = new Set<string>();
@@ -40,10 +45,7 @@ export function IntroSection() {
         <div className="pt-4 border-t border-border">
           <QuoteCarousel
             quotes={carouselQuotes}
-            overrides={{
-              order: ['OpenAI'],
-              labels: CAROUSEL_LABELS,
-            }}
+            overrides={CAROUSEL_OVERRIDES}
             moreHref="/quotes"
           />
         </div>
