@@ -33,7 +33,7 @@ export function StarButton({ starCount }: { starCount?: number | null }) {
       onClick={() => {
         saveStarred();
         setHasStarred(true);
-        track('footer_star_cta_clicked', { stars: stars ?? 0 });
+        track('footer_star_starred');
         window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
       }}
     >
