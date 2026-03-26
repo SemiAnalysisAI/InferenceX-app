@@ -253,7 +253,7 @@ export default function ChartLegend({
 
   const actionElements =
     actions && actions.length > 0 ? (
-      <div className="w-full no-export">
+      <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
         {actions.map((action) => (
           <button
             key={action.id}
