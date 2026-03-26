@@ -546,7 +546,6 @@ export interface HardwareConfig {
     label: string;
     suffix: string;
     gpu: string;
-    color: string;
     framework?: string;
   };
 }

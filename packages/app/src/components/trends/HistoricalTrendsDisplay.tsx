@@ -133,6 +133,7 @@ export default function HistoricalTrendsDisplay() {
     highContrast,
     identifiers: activeHwKeys,
     colorShuffleSeed,
+    activeKeys: activeHwKeys,
   });
 
   // Line configs for TrendChart — one per visible GPU+precision combo

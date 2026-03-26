@@ -38,6 +38,7 @@ import {
   Sequence,
 } from '@/lib/data-mappings';
 import { getModelSortIndex, GPU_SPECS, HARDWARE_CONFIG } from '@/lib/constants';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useChartExport } from '@/hooks/useChartExport';
@@ -221,6 +222,13 @@ export default function ThroughputCalculatorDisplay() {
 
   const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
+
+  // Dynamic vendor-aware colors for visible GPUs
+  const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
+  const { resolveColor } = useThemeColors({
+    highContrast: false,
+    activeKeys: visibleKeysArray,
+  });
 
   // Track previous available keys to detect when the GPU set changes
   const prevAvailableKeyRef = useRef<string>('');
@@ -468,13 +476,13 @@ export default function ThroughputCalculatorDisplay() {
       .map(([key, config]) => ({
         name: config.name,
         label: getDisplayLabel(config),
-        color: config?.color || 'var(--foreground)',
+        color: resolveColor(key),
         title: config.gpu,
         hw: key,
         isActive: visibleHwKeys.has(key),
         onClick: () => toggleGpuVisibility(key),
       }));
-  }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility]);
+  }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
 
   const getBarMetricLabel = (metric: BarMetric) => {
     if (metric === 'throughput') return 'Throughput';
@@ -855,6 +863,7 @@ export default function ThroughputCalculatorDisplay() {
                       runUrl={runUrl}
                       selectedBars={selectedBars}
                       onBarSelect={handleBarSelect}
+                      colorResolver={resolveColor}
                       legendElement={
                         availableHwKeys.length > 0 ? (
                           <ChartLegend

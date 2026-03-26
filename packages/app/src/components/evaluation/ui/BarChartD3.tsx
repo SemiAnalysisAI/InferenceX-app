@@ -112,9 +112,14 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     () => configurations.map((c) => c.configLabel),
     [configurations],
   );
+  const activeHwKeys = useMemo(
+    () => configurations.filter((c) => enabledHardware.has(c.hwKey)).map((c) => c.hwKey),
+    [configurations, enabledHardware],
+  );
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast,
     identifiers: sortedConfigLabels,
+    activeKeys: activeHwKeys,
   });
 
   const legendItems = useMemo(

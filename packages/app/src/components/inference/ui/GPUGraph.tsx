@@ -3,10 +3,12 @@
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTheme } from 'next-themes';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
-import { getColorFamily, getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
+import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
+import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -30,11 +32,6 @@ import {
 } from '@/components/inference/utils/tooltipUtils';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
-
-const getGPUColor = (hwKey: string, dateIndex: number): string => {
-  const colorFamily = getColorFamily(hwKey);
-  return colorFamily[dateIndex % colorFamily.length];
-};
 
 const GPUGraph = React.memo(
   ({ chartId, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
@@ -64,6 +61,7 @@ const GPUGraph = React.memo(
       shuffleColors,
       selectAllActiveDates,
     } = useInference();
+    const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
 
     // Shared date+GPU pairs
@@ -94,22 +92,33 @@ const GPUGraph = React.memo(
       colorShuffleSeed,
     });
 
+    // Dynamic GPU×date color map
+    const gpuDateColorMap = useMemo(() => {
+      const { dates, sortedGPUs } = gpuDatePairs;
+      if (sortedGPUs.length === 0 || dates.length === 0) return {};
+      const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+      return generateGpuDateColors(sortedGPUs, dates.length, theme);
+    }, [gpuDatePairs, resolvedTheme]);
+
     const allGraphs = useMemo(() => {
       const { dates, sortedGPUs } = gpuDatePairs;
       const result: { date: string; color: string; hwKey: string; id: string }[] = [];
       sortedGPUs.forEach((gpu) => {
         dates.forEach((date, dateIndex) => {
           const id = `${date}_${gpu}`;
+          const dynamicColor = gpuDateColorMap[`${dateIndex}_${gpu}`];
           result.push({
             date,
             hwKey: gpu,
             id,
-            color: highContrast ? getCssColor(resolveColor(id)) : getGPUColor(gpu, dateIndex),
+            color: highContrast
+              ? getCssColor(resolveColor(id))
+              : dynamicColor || 'var(--foreground)',
           });
         });
       });
       return result;
-    }, [gpuDatePairs, highContrast, resolveColor, getCssColor]);
+    }, [gpuDatePairs, gpuDateColorMap, highContrast, resolveColor, getCssColor]);
 
     const groupedData = useMemo(
       () =>

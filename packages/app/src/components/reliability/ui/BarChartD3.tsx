@@ -98,9 +98,14 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [filteredReliabilityData],
   );
 
+  const activeModelKeys = useMemo(
+    () => sortedModels.filter((m) => enabledModels.has(m)),
+    [sortedModels, enabledModels],
+  );
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast,
     identifiers: sortedModels,
+    activeKeys: activeModelKeys,
   });
 
   const legendItems = useMemo(

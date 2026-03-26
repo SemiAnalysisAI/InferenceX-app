@@ -176,10 +176,15 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
       return keys;
     }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
+    const activeOfficialKeys = useMemo(
+      () => [...effectiveOfficialHwTypes],
+      [effectiveOfficialHwTypes],
+    );
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
       colorShuffleSeed,
+      activeKeys: activeOfficialKeys,
     });
 
     // --- Changelog ---
@@ -963,9 +968,7 @@ const ScatterGraph = React.memo(
                   ovEntries.push({
                     key,
                     points: pts,
-                    stroke: hardwareConfig[hw]
-                      ? getCssColor(resolveColor(hw))
-                      : getCssColor(hwCfg.color),
+                    stroke: getCssColor(resolveColor(hw)),
                   });
                 }
               });
@@ -1012,12 +1015,9 @@ const ScatterGraph = React.memo(
                 });
 
               overlayPoints.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
-              overlayPoints.select('.overlay-x').attr('stroke', (d) => {
-                const hwCfg = overlayData.hardwareConfig[d.hwKey as string];
-                return hardwareConfig[d.hwKey as string]
-                  ? getCssColor(resolveColor(d.hwKey as string))
-                  : getCssColor(hwCfg?.color ?? '#888');
-              });
+              overlayPoints
+                .select('.overlay-x')
+                .attr('stroke', (d) => getCssColor(resolveColor(d.hwKey as string)));
 
               // Labels
               const showLabels = !hidePointLabels && !showGradientLabels;
@@ -1186,7 +1186,7 @@ const ScatterGraph = React.memo(
             .attr('class', 'tracked-ring')
             .attr('r', POINT_SIZE + 5)
             .attr('fill', 'none')
-            .attr('stroke', hardwareConfig[d.hwKey]?.color || '#888')
+            .attr('stroke', getCssColor(resolveColor(d.hwKey)))
             .attr('stroke-width', 2)
             .attr('opacity', 0.7)
             .attr('pointer-events', 'none');
@@ -1212,7 +1212,7 @@ const ScatterGraph = React.memo(
               .attr('class', 'tracked-ring')
               .attr('r', POINT_SIZE + 5)
               .attr('fill', 'none')
-              .attr('stroke', hardwareConfig[d.hwKey]?.color || '#888')
+              .attr('stroke', getCssColor(resolveColor(d.hwKey)))
               .attr('stroke-width', 2)
               .attr('opacity', 0.7)
               .attr('pointer-events', 'none');
@@ -1357,7 +1357,7 @@ const ScatterGraph = React.memo(
                       return {
                         name: `✕ ${key}`,
                         label: `✕ ${parsed.label}`,
-                        color: hardwareConfig[key] ? resolveColor(key) : hwConfig.color,
+                        color: resolveColor(key),
                         title: `UNOFFICIAL: ${hwConfig.framework || parsed.label}`,
                         isHighlighted: true,
                         hw: `overlay-${key}`,

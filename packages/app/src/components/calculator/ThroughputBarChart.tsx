@@ -31,6 +31,8 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  /** Optional color resolver — when provided, overrides static HARDWARE_CONFIG colors. */
+  colorResolver?: (hwKey: string) => string;
 }
 
 /** Get the throughput value for the selected token type. */
@@ -265,9 +267,8 @@ function getLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string
   return baseName;
 }
 
-function getColor(hwKey: string, hardwareConfig: HardwareConfig): string {
-  const config = hardwareConfig[hwKey] || HARDWARE_CONFIG[hwKey];
-  return config?.color || 'var(--foreground)';
+function getColor(): string {
+  return 'var(--foreground)';
 }
 
 /** Position value + overlay labels together, flipping both when the longer one doesn't fit. */
@@ -322,8 +323,12 @@ export default function ThroughputBarChart({
   onBarSelect,
   legendElement,
   caption,
+  colorResolver,
 }: ThroughputBarChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
+
+  // Color resolution: prefer dynamic colorResolver, fall back to static config
+  const resolveBarColor = (hwKey: string) => (colorResolver ? colorResolver(hwKey) : getColor());
 
   // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
@@ -381,7 +386,7 @@ export default function ThroughputBarChart({
       config: {
         getY: (d) => d.resultKey,
         getX: (d) => getMetricValue(d, barMetric, costType),
-        getColor: (d) => getColor(d.hwKey, hardwareConfig),
+        getColor: (d) => resolveBarColor(d.hwKey),
         rx: 4,
         opacity: 0.85,
         keyFn: (d) => d.resultKey,
@@ -433,12 +438,12 @@ export default function ThroughputBarChart({
           });
 
         // Position both labels together using the longer text width
-        const barColor = (d: InterpolatedResult) => getColor(d.hwKey, hardwareConfig);
+        const barColor = (d: InterpolatedResult) => resolveBarColor(d.hwKey);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-        const barColor = (d: InterpolatedResult) => getColor(d.hwKey, hardwareConfig);
+        const barColor = (d: InterpolatedResult) => resolveBarColor(d.hwKey);
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
       },
     };
