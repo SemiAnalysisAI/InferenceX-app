@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import {
   formatNumber,
-  parseRunDate,
   updateRepoUrl,
   calculateCostsForGpus,
   calculatePowerForGpus,
@@ -100,25 +99,6 @@ describe('formatNumber', () => {
     expect(formatNumber(10000)).toBe('10,000');
     expect(formatNumber(1000000)).toBe('1,000,000');
     expect(formatNumber(123456789)).toBe('123,456,789');
-  });
-});
-
-// ===========================================================================
-// parseRunDate
-// ===========================================================================
-describe('parseRunDate', () => {
-  it('rearranges M/D/YYYY into YYYY-M-D (no zero-padding added)', () => {
-    // the function does a direct string split/reassemble, no padding is applied
-    expect(parseRunDate('1/5/2024, 14:30:00')).toBe('2024-1-5');
-    expect(parseRunDate('12/31/2023, 00:00:00')).toBe('2023-12-31');
-  });
-
-  it('preserves zero-padded month and day from input', () => {
-    expect(parseRunDate('01/05/2024, 09:15:00')).toBe('2024-01-05');
-  });
-
-  it('ignores the time portion after the comma', () => {
-    expect(parseRunDate('6/15/2025, 23:59:59')).toBe('2025-6-15');
   });
 });
 
@@ -400,9 +380,11 @@ describe('filterRunsByModel', () => {
     expect(filterRunsByModel(runs, [])).toBe(runs);
   });
 
-  it('returns null when no model prefix matches', () => {
+  it('returns runs without changelogs when no model prefix matches', () => {
     const runs = { '123': makeRun([['dsr1-fp8-h200-trt']]) };
-    expect(filterRunsByModel(runs, ['gptoss'])).toBeNull();
+    const result = filterRunsByModel(runs, ['gptoss']);
+    expect(result).not.toBeNull();
+    expect(result!['123'].changelog).toBeUndefined();
   });
 
   it('keeps runs with matching model prefix', () => {
@@ -421,7 +403,7 @@ describe('filterRunsByModel', () => {
     expect(result!['123'].changelog!.entries[0].config_keys).toEqual(['gptoss-fp8-h200-trt']);
   });
 
-  it('returns null when no runs have changelog', () => {
+  it('returns runs without changelogs when no runs have changelog', () => {
     const runs = {
       '123': {
         runId: '123',
@@ -430,15 +412,21 @@ describe('filterRunsByModel', () => {
         conclusion: null as string | null,
       },
     };
-    expect(filterRunsByModel(runs, ['gptoss'])).toBeNull();
+    const result = filterRunsByModel(runs, ['gptoss']);
+    expect(result).not.toBeNull();
+    expect(result!['123'].changelog).toBeUndefined();
   });
 
-  it('returns null when no runs match model filter', () => {
+  it('returns runs without changelogs when no runs match model filter', () => {
     const runs = {
       '123': makeRun([['dsr1-fp8-h200-trt']]),
       '456': makeRun([['dsr1-fp8-b200-sglang']]),
     };
-    expect(filterRunsByModel(runs, ['gptoss'])).toBeNull();
+    const result = filterRunsByModel(runs, ['gptoss']);
+    expect(result).not.toBeNull();
+    expect(Object.keys(result!)).toHaveLength(2);
+    expect(result!['123'].changelog).toBeUndefined();
+    expect(result!['456'].changelog).toBeUndefined();
   });
 
   it('keeps multiple runs that all match', () => {
@@ -468,9 +456,11 @@ describe('filterRunsByModel', () => {
   });
 
   // Precision filtering
-  it('returns null when no entries match precision', () => {
+  it('returns runs without changelogs when no entries match precision', () => {
     const runs = { '123': makeRun([['gptoss-fp4-h200-trt']]) };
-    expect(filterRunsByModel(runs, ['gptoss'], ['fp8'])).toBeNull();
+    const result = filterRunsByModel(runs, ['gptoss'], ['fp8']);
+    expect(result).not.toBeNull();
+    expect(result!['123'].changelog).toBeUndefined();
   });
 
   it('keeps run when entry matches both model and selected precision', () => {
@@ -530,12 +520,13 @@ describe('filterRunsByModel', () => {
     ]);
   });
 
-  it('GPU filter: returns null when non-MTP entry excluded by MTP GPU', () => {
+  it('GPU filter: returns runs without changelogs when non-MTP entry excluded by MTP GPU', () => {
     const runs = {
       '123': makeRun([['dsr1-fp8-mi355x-mori-sglang']]),
     };
     const result = filterRunsByModel(runs, ['dsr1'], ['fp8'], ['mi355x_mori-sglang_mtp']);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!['123'].changelog).toBeUndefined();
   });
 
   it('GPU filter: falls back to no GPU filter when selectedGPUs is empty', () => {
