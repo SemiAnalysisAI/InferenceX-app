@@ -385,11 +385,8 @@ export function InferenceProvider({
       // Preset filter is active: evaluate updater to get all available items, then filter.
       // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
       const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
-      const filtered = new Set(
-        Array.from(base).filter((hwKey: string) =>
-          filter.some((prefix: string) => hwKey.startsWith(prefix)),
-        ),
-      );
+      const filterSet = new Set(filter);
+      const filtered = new Set(Array.from(base).filter((hwKey: string) => filterSet.has(hwKey)));
       if (filtered.size > 0) {
         setActiveHwTypes(filtered);
         setPendingHwFilter(null);
@@ -410,11 +407,8 @@ export function InferenceProvider({
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
     if (!pendingHwFilter || hwTypesWithData.size === 0) return;
-    const filtered = new Set(
-      Array.from(hwTypesWithData).filter((hwKey) =>
-        pendingHwFilter.some((prefix) => hwKey.startsWith(prefix)),
-      ),
-    );
+    const filterSet = new Set(pendingHwFilter);
+    const filtered = new Set(Array.from(hwTypesWithData).filter((hwKey) => filterSet.has(hwKey)));
     if (filtered.size > 0) {
       setActiveHwTypes(filtered);
       setPendingHwFilter(null);

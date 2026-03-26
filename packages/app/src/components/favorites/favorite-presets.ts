@@ -121,16 +121,15 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   {
     id: 'gb200-vs-b200',
     title: 'GB200 NVL72 vs B200 — Multi vs Single Node',
-    description:
-      'GB200 NVL72 Dynamo prefill-decode disaggregation vs B200 single-node on DeepSeek R1 (1k/1k) at FP4.',
+    description: 'GB200 NVL72 Dynamo TRT vs B200 Dynamo TRT on DeepSeek R1 (8k/1k) at FP4.',
     tags: ['DeepSeek', 'GB200', 'B200', 'Dynamo', 'FP4', 'NVL72'],
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_OneK,
+      sequence: Sequence.EightK_OneK,
       precisions: ['fp4'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['gb200', 'b200'],
+      hwFilter: ['gb200_dynamo-trt', 'b200_dynamo-trt'],
     },
   },
   // 2 — NVIDIA
@@ -138,15 +137,15 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'b200-vs-h200',
     title: 'B200 vs H200 — Blackwell vs Hopper',
     description:
-      'Blackwell B200 vs Hopper H200 single-node throughput per GPU on DeepSeek R1 (1k/8k) at FP8.',
-    tags: ['DeepSeek', 'B200', 'H200', 'FP8'],
+      'Blackwell B200 vs Hopper H200 Dynamo TRT throughput per GPU on DeepSeek R1 (8k/1k) at FP8.',
+    tags: ['DeepSeek', 'B200', 'H200', 'Dynamo', 'FP8'],
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_EightK,
+      sequence: Sequence.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['b200', 'h200'],
+      hwFilter: ['b200_dynamo-trt', 'h200_dynamo-trt'],
     },
   },
   // 3 — AMD
@@ -154,15 +153,15 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'amd-generations',
     title: 'AMD MI300X → MI325X → MI355X',
     description:
-      'Three generations of AMD Instinct on SGLang at FP8. Generational throughput scaling on DeepSeek R1 (1k/8k).',
+      'Three generations of AMD Instinct on SGLang at FP8. Generational throughput scaling on DeepSeek R1 (8k/1k).',
     tags: ['DeepSeek', 'MI300X', 'MI325X', 'MI355X', 'SGLang', 'FP8'],
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_EightK,
+      sequence: Sequence.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['mi300x', 'mi325x', 'mi355x'],
+      hwFilter: ['mi300x_sglang', 'mi325x_sglang', 'mi355x_sglang'],
     },
   },
   // 4 — NVIDIA
@@ -170,32 +169,32 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'b200-trt-timeline',
     title: 'B200 TensorRT-LLM Over Time — DeepSeek (FP4)',
     description:
-      'B200 TensorRT-LLM config expansion on DeepSeek R1 (1k/8k) FP4. All available config waves over time.',
+      'B200 TensorRT-LLM config expansion on DeepSeek R1 (8k/1k) FP4. All available config waves over time.',
     tags: ['DeepSeek', 'B200', 'TensorRT-LLM', 'FP4', 'Timeline'],
     category: 'improvements',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_EightK,
+      sequence: Sequence.EightK_OneK,
       precisions: ['fp4'],
       yAxisMetric: 'y_tpPerGpu',
       gpus: ['b200_trt'],
       useDateRange: true,
     },
   },
-  // 5 — AMD
+  // 5 — Disagg cross-vendor
   {
-    id: 'mi355x-sglang-vs-atom',
-    title: 'MI355X — SGLang vs Atom Framework',
+    id: 'disagg-b200-vs-mi355x',
+    title: 'Disagg B200 SGLang vs MI355X vs B200 TRT',
     description:
-      'Compare SGLang and Atom runtimes on MI355X at FP8. Same hardware, different frameworks on DeepSeek R1 (1k/8k).',
-    tags: ['DeepSeek', 'MI355X', 'SGLang', 'Atom', 'FP8'],
+      'Disaggregated B200 Dynamo SGLang vs MI355X MoRI SGLang vs B200 Dynamo TRT on DeepSeek R1 (8k/1k) at FP8.',
+    tags: ['DeepSeek', 'B200', 'MI355X', 'Dynamo', 'MoRI', 'FP8', 'Disagg'],
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_EightK,
+      sequence: Sequence.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['mi355x'],
+      hwFilter: ['b200_dynamo-sglang', 'mi355x_mori-sglang', 'b200_dynamo-trt'],
     },
   },
   // 6 — AMD
@@ -203,12 +202,12 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'mi355x-atom-timeline',
     title: 'MI355X Atom Over Time — DeepSeek (FP4)',
     description:
-      'MI355X Atom config expansion on DeepSeek R1 (1k/8k) FP4. Tracks all available configs over time.',
+      'MI355X Atom config expansion on DeepSeek R1 (8k/1k) FP4. Tracks all available configs over time.',
     tags: ['DeepSeek', 'MI355X', 'Atom', 'FP4', 'Timeline'],
     category: 'improvements',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_EightK,
+      sequence: Sequence.EightK_OneK,
       precisions: ['fp4'],
       yAxisMetric: 'y_tpPerGpu',
       gpus: ['mi355x_atom'],
