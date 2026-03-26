@@ -65,6 +65,7 @@
     "smallint",
     "smallserial",
     "timestamptz",
+    "togglable",
     "tput",
     "trtllm",
     "ttft",
