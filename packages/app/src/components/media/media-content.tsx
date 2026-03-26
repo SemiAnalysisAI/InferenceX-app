@@ -56,8 +56,8 @@ export function MediaContent() {
               InferenceX&trade; In the Media
             </h2>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
-              Coverage and mentions of InferenceX&trade; (formerly InferenceMAX) across industry
-              publications, blogs, and media outlets.
+              Coverage and mentions of InferenceX&trade; across industry publications, blogs, and
+              media outlets.
             </p>
             <div className="mt-6 pt-6 border-t border-border/40">
               <div className="flex flex-col gap-8">
