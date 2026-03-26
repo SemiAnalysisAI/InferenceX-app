@@ -283,7 +283,15 @@ export function filterRunsByModel(
     }
   }
 
-  return Object.keys(filtered).length > 0 ? filtered : null;
+  if (Object.keys(filtered).length > 0) return filtered;
+
+  // No changelog matches — return all runs without changelogs so the run
+  // selector still renders (e.g. Llama has runs but no changelog entries).
+  const fallback: { [runId: string]: RunInfo } = {};
+  for (const [runId, runInfo] of Object.entries(availableRuns)) {
+    fallback[runId] = { ...runInfo, changelog: undefined };
+  }
+  return Object.keys(fallback).length > 0 ? fallback : null;
 }
 
 /**

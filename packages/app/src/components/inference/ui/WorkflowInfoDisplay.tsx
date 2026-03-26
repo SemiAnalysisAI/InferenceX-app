@@ -209,53 +209,57 @@ export default function WorkflowInfoDisplay({
           </Button>
         </div>
       ) : null}
-      {changelog && (
-        <div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
-                <strong>Changelog</strong>
-                <ChevronDownIcon />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[400px]">
-              <div className="break-words">
-                {changelog.entries.length > 0 ? (
-                  <>
-                    {changelog.entries.map((entry, index) => (
-                      <div key={index}>
-                        {index > 0 && <hr className="my-3" />}
-                        <div className="flex flex-col gap-2 text-xs line-break-words">
-                          <div className="text-xs font-bold">Description</div>
-                          {formatChangelogDescription(entry.description)}
-                          <div className="text-xs font-bold">Updated Configs</div>
-                          <ul className="list-disc pl-4">
-                            {entry.config_keys.map((key: string) => (
-                              <li key={key}>{formatConfigKeys(key)}</li>
-                            ))}
-                          </ul>
-                        </div>
+      <div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
+              <strong>Changelog</strong>
+              <ChevronDownIcon />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[400px]">
+            <div className="break-words">
+              {changelog && changelog.entries.length > 0 ? (
+                <>
+                  {changelog.entries.map((entry, index) => (
+                    <div key={index}>
+                      {index > 0 && <hr className="my-3" />}
+                      <div className="flex flex-col gap-2 text-xs line-break-words">
+                        <div className="text-xs font-bold">Description</div>
+                        {formatChangelogDescription(entry.description)}
+                        <div className="text-xs font-bold">Updated Configs</div>
+                        <ul className="list-disc pl-4">
+                          {entry.config_keys.map((key: string) => (
+                            <li key={key}>{formatConfigKeys(key)}</li>
+                          ))}
+                        </ul>
                       </div>
-                    ))}
-                    {changelog.entries[0]?.head_ref && (
-                      <a
-                        href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs hover:underline text-foreground underline"
-                      >
-                        Git Commit
-                      </a>
-                    )}
-                  </>
-                ) : (
-                  'No runs found'
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
+                    </div>
+                  ))}
+                  {changelog.entries[0]?.head_ref && (
+                    <a
+                      href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs hover:underline text-foreground underline"
+                    >
+                      Git Commit
+                    </a>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 text-xs">
+                  <div className="text-xs font-bold">Description</div>
+                  <span className="text-muted-foreground">No changelog data available.</span>
+                  <span className="text-muted-foreground">
+                    This date predates changelog tracking.
+                  </span>
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }
