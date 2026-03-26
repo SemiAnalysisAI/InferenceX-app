@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { IntroSection } from '@/components/intro-section';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
@@ -38,16 +37,14 @@ export function LandingPage() {
               Llama, Qwen, and other models.
             </p>
             <div className="mt-auto">
-              <Button
-                asChild
-                size="lg"
-                className="text-sm sm:text-base h-12 gap-2 px-8 bg-brand hover:bg-brand/90"
+              <Link
+                href="/inference"
+                onClick={() => track('landing_full_dashboard_clicked')}
+                className="inline-flex items-center justify-center gap-2 rounded-md text-sm sm:text-base font-medium h-12 px-8 bg-brand text-primary-foreground hover:bg-brand/90 transition-colors"
               >
-                <Link href="/inference" onClick={() => track('landing_full_dashboard_clicked')}>
-                  Open Dashboard
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
+                Open Dashboard
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </Card>
 
