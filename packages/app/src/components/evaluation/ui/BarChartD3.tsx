@@ -75,6 +75,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     unfilteredChartData,
     enabledHardware,
     toggleHardware,
+    removeHardware,
     hwTypesWithData,
     selectAllHwTypes,
     highContrast,
@@ -365,6 +366,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         <ChartLegend
           variant="sidebar"
           legendItems={legendItems}
+          onItemRemove={removeHardware}
           isLegendExpanded={isLegendExpanded}
           onExpandedChange={(expanded) => {
             setIsLegendExpanded(expanded);

@@ -352,6 +352,14 @@ export default function ThroughputCalculatorDisplay() {
     [availableHwKeys],
   );
 
+  const removeGpu = useCallback((hwKey: string) => {
+    setVisibleHwKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(hwKey);
+      return next;
+    });
+  }, []);
+
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = calculatorChartToCsv(results, targetValue, (hwKey) => {
       const config = hardwareConfig[hwKey] || HARDWARE_CONFIG[hwKey];
@@ -852,6 +860,7 @@ export default function ThroughputCalculatorDisplay() {
                           <ChartLegend
                             variant="sidebar"
                             legendItems={legendItems}
+                            onItemRemove={removeGpu}
                             isLegendExpanded={isLegendExpanded}
                             onExpandedChange={(expanded) => {
                               setIsLegendExpanded(expanded);

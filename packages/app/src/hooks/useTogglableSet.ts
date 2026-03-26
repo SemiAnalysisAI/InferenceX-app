@@ -33,7 +33,7 @@ export function computeToggle(prev: Set<string>, item: string, allItems: Set<str
 }
 
 /**
- * Hook for managing a toggleable set with "click to solo, click again to restore all" behavior.
+ * Hook for managing a togglable set with "click to solo, click again to restore all" behavior.
  */
 export function useTogglableSet() {
   const [activeSet, setActiveSet] = useState<Set<string>>(new Set());
@@ -46,5 +46,13 @@ export function useTogglableSet() {
     setActiveSet(allItems);
   }, []);
 
-  return { activeSet, setActiveSet, toggle, selectAll };
+  const remove = useCallback((item: string) => {
+    setActiveSet((prev) => {
+      const next = new Set(prev);
+      next.delete(item);
+      return next;
+    });
+  }, []);
+
+  return { activeSet, setActiveSet, toggle, selectAll, remove };
 }

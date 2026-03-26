@@ -47,6 +47,7 @@ export default function HistoricalTrendsDisplay() {
     activeHwTypes,
     hwTypesWithData,
     toggleHwType,
+    removeHwType,
     selectAllHwTypes,
     availableDates,
     logScale,
@@ -529,6 +530,7 @@ export default function HistoricalTrendsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)
                       .filter(([key]) => hwTypesWithData.has(key))
                       .sort(

@@ -78,6 +78,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     setActiveSet: setEnabledHardware,
     toggle: toggleHwRaw,
     selectAll: selectAllHwRaw,
+    remove: removeHwRaw,
   } = useChartToggleSet();
 
   const availableBenchmarks = useMemo(() => {
@@ -360,6 +361,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     (hwKey: string) => toggleHwRaw(hwKey, hwTypesWithData),
     [toggleHwRaw, hwTypesWithData],
   );
+  const removeHardware = useCallback((hwKey: string) => removeHwRaw(hwKey), [removeHwRaw]);
 
   const handleSetSelectedModel = useCallback(
     (model: string | undefined) => {
@@ -396,6 +398,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       unfilteredChartData,
       enabledHardware,
       toggleHardware,
+      removeHardware,
       highContrast,
       setHighContrast,
       showLabels,
@@ -423,6 +426,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       unfilteredChartData,
       enabledHardware,
       toggleHardware,
+      removeHardware,
       highContrast,
       showLabels,
       isLegendExpanded,

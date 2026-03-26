@@ -152,6 +152,14 @@ export default function GpuMetricsDisplay() {
     });
   }, []);
 
+  const removeGpu = useCallback((hw: string) => {
+    setVisibleGpus((prev) => {
+      const next = new Set(prev);
+      next.delete(Number(hw));
+      return next;
+    });
+  }, []);
+
   const handleShare = useCallback(async () => {
     const params = new URLSearchParams();
     params.set('gm_runId', runIdInput.trim());
@@ -423,6 +431,7 @@ export default function GpuMetricsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
                       name: `GPU ${gpuIndex}`,
                       hw: String(gpuIndex),
@@ -465,6 +474,7 @@ export default function GpuMetricsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
                       name: `GPU ${gpuIndex}`,
                       hw: String(gpuIndex),

@@ -88,6 +88,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     setActiveSet: setEnabledModels,
     toggle: toggleModelRaw,
     selectAll: selectAllModelsRaw,
+    remove: removeModelRaw,
   } = useChartToggleSet();
 
   const dateRangeSuccessRateData = useMemo(
@@ -141,6 +142,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     (model: string) => toggleModelRaw(model, modelsWithData),
     [toggleModelRaw, modelsWithData],
   );
+  const removeModel = useCallback((model: string) => removeModelRaw(model), [removeModelRaw]);
 
   useEffect(() => {
     if (modelsWithData.size > 0) setEnabledModels(modelsWithData);
@@ -177,6 +179,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
       setHighContrast,
       enabledModels,
       toggleModel,
+      removeModel,
       isLegendExpanded,
       setIsLegendExpanded,
       modelsWithData,
@@ -194,6 +197,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
       highContrast,
       enabledModels,
       toggleModel,
+      removeModel,
       isLegendExpanded,
       modelsWithData,
       selectAllModels,

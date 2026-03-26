@@ -46,6 +46,7 @@ const GPUGraph = React.memo(
       selectedDateRange,
       selectedDates,
       toggleActiveDate,
+      removeActiveDate,
       activeDates,
       hideNonOptimal,
       setHideNonOptimal,
@@ -401,6 +402,7 @@ const GPUGraph = React.memo(
             disableActiveSort={true}
             onItemHover={handleLegendHover}
             onItemHoverEnd={handleLegendHoverEnd}
+            onItemRemove={removeActiveDate}
             legendItems={allGraphs
               .filter(({ id }) => idsWithData.has(id))
               .map(({ date, color, hwKey, id }) => ({

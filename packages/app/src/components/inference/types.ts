@@ -449,10 +449,12 @@ export interface RunInfo {
 export interface InferenceChartContextType {
   activeHwTypes: Set<string>;
   toggleActiveDate: (date: string) => void;
+  removeActiveDate: (date: string) => void;
   selectAllActiveDates: () => void;
   activeDates: Set<string>;
   hwTypesWithData: Set<string>;
   toggleHwType: (hw: string) => void;
+  removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];

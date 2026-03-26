@@ -85,6 +85,7 @@ const ScatterGraph = React.memo(
       activeHwTypes,
       hardwareConfig: contextHardwareConfig,
       toggleHwType,
+      removeHwType,
       hwTypesWithData,
       selectedPrecisions,
       selectedYAxisMetric,
@@ -1328,6 +1329,7 @@ const ScatterGraph = React.memo(
             variant="sidebar"
             onItemHover={handleLegendHover}
             onItemHoverEnd={handleLegendHoverEnd}
+            onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
             legendItems={[
               ...(overlayData
                 ? Object.entries(overlayData.hardwareConfig)

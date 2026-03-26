@@ -92,6 +92,14 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
     });
   }, []);
 
+  const removeGpu = useCallback((name: string) => {
+    setSelectedGpus((prev) => {
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
+  }, []);
+
   const selectAll = useCallback(() => {
     setSelectedGpus(new Set(GPU_SPECS.map((s) => s.name)));
     track('gpu_specs_radar_select_all');
@@ -186,6 +194,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
           <ChartLegend
             variant="sidebar"
             legendItems={legendItems}
+            onItemRemove={removeGpu}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);

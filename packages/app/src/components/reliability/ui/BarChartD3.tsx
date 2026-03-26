@@ -79,6 +79,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     filteredReliabilityData,
     enabledModels,
     toggleModel,
+    removeModel,
     modelsWithData,
     selectAllModels,
     isLegendExpanded,
@@ -306,6 +307,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
           <ChartLegend
             variant="sidebar"
             legendItems={legendItems}
+            onItemRemove={removeModel}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);

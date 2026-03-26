@@ -54,6 +54,7 @@ export interface ChartLegendProps {
   disableActiveSort?: boolean;
   onItemHover?: (id: string) => void;
   onItemHoverEnd?: () => void;
+  onItemRemove?: (name: string) => void;
 }
 
 export default function ChartLegend({
@@ -74,6 +75,7 @@ export default function ChartLegend({
   disableActiveSort = false,
   onItemHover,
   onItemHoverEnd,
+  onItemRemove,
 }: ChartLegendProps) {
   const isSidebar = variant === 'sidebar';
   const [hasLongText, setHasLongText] = useState(false);
@@ -82,6 +84,11 @@ export default function ChartLegend({
   const [searchQuery, setSearchQuery] = useState('');
 
   const effectiveExpanded = isLegendExpanded;
+  const activeCount = useMemo(
+    () => legendItems.filter((item) => item.isActive).length,
+    [legendItems],
+  );
+  const effectiveRemove = onItemRemove && activeCount > 1 ? onItemRemove : undefined;
 
   useLayoutEffect(() => {
     setHasLongText(legendItems.some((item) => item.label && item.label.length > 8));
@@ -349,6 +356,7 @@ export default function ChartLegend({
         onClick={item.onClick}
         onHover={onItemHover}
         onHoverEnd={onItemHoverEnd}
+        onRemove={effectiveRemove}
         asFragment
         isLegendExpanded={effectiveExpanded}
         sidebarMode={isSidebar}
@@ -441,6 +449,7 @@ export default function ChartLegend({
                         onClick={item.onClick}
                         onHover={onItemHover}
                         onHoverEnd={onItemHoverEnd}
+                        onRemove={effectiveRemove}
                         sidebarMode={isSidebar}
                         asFragment
                       />

@@ -56,6 +56,7 @@ export interface EvaluationChartContextType {
   unfilteredChartData: EvaluationChartData[];
   enabledHardware: Set<string>;
   toggleHardware: (hwKey: string) => void;
+  removeHardware: (hwKey: string) => void;
   highContrast: boolean;
   setHighContrast: (value: boolean) => void;
   showLabels: boolean;

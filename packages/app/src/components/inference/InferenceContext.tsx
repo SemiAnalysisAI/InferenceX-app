@@ -343,12 +343,14 @@ export function InferenceProvider({
     setActiveSet: setActiveHwTypes,
     toggle: toggleHwRaw,
     selectAll: selectAllHwRaw,
+    remove: removeHwRaw,
   } = useChartToggleSet();
   const {
     activeSet: activeDates,
     setActiveSet: setActiveDates,
     toggle: toggleDateRaw,
     selectAll: selectAllDatesRaw,
+    remove: removeDateRaw,
   } = useChartToggleSet();
 
   const hwFilteredPoints = useMemo(
@@ -425,6 +427,14 @@ export function InferenceProvider({
     [toggleHwRaw, hwTypesWithData],
   );
 
+  const removeHwType = useCallback(
+    (hw: string) => {
+      removeHwRaw(hw);
+      setActivePresetId(null);
+    },
+    [removeHwRaw],
+  );
+
   const allDateIds = useMemo(() => {
     const dates: string[] = [];
     if (selectedDateRange.startDate && selectedDateRange.endDate) {
@@ -442,6 +452,7 @@ export function InferenceProvider({
     (id: string) => toggleDateRaw(id, allDateIds),
     [toggleDateRaw, allDateIds],
   );
+  const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(
     () => selectAllHwRaw(hwTypesWithData),
     [selectAllHwRaw, hwTypesWithData],
@@ -578,6 +589,7 @@ export function InferenceProvider({
       activeHwTypes,
       hwTypesWithData,
       toggleHwType,
+      removeHwType,
       selectAllHwTypes,
       hardwareConfig,
       graphs,
@@ -620,6 +632,7 @@ export function InferenceProvider({
       activeDates,
       setActiveDates,
       toggleActiveDate,
+      removeActiveDate,
       selectAllActiveDates,
       selectedRunDate,
       setSelectedRunDate,
@@ -653,6 +666,7 @@ export function InferenceProvider({
       activeHwTypes,
       hwTypesWithData,
       toggleHwType,
+      removeHwType,
       selectAllHwTypes,
       hardwareConfig,
       graphs,
@@ -671,6 +685,7 @@ export function InferenceProvider({
       selectedDateRange,
       activeDates,
       toggleActiveDate,
+      removeActiveDate,
       selectAllActiveDates,
       selectedRunDate,
       availableDates,
