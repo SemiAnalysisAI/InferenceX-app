@@ -38,6 +38,7 @@ const NAV_LINKS = [
     event: 'header_supporters_clicked',
   },
   { href: '/blog', label: 'Articles', testId: 'nav-link-blog', event: 'header_blog_clicked' },
+  { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
@@ -104,7 +105,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {NAV_LINKS.map(({ href, label, testId, event }) => (
               <Link
                 key={href}
@@ -129,7 +130,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <ModeToggle />
 
             {/* Mobile hamburger */}
-            <div ref={menuRef} className="relative md:hidden">
+            <div ref={menuRef} className="relative lg:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"

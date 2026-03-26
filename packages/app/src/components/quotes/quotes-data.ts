@@ -310,3 +310,32 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/sbalaban/',
   },
 ];
+
+/** Orgs featured in the landing page carousel. */
+export const CAROUSEL_ORGS = [
+  'OpenAI',
+  'Microsoft',
+  'Together AI',
+  'vLLM',
+  'GPU Mode',
+  'PyTorch Foundation',
+  'Oracle',
+  'CoreWeave',
+  'Nebius',
+  'Crusoe',
+  'TensorWave',
+  'SGLang',
+  'WEKA',
+  'Stanford',
+  'Core42',
+  'Meta Superintelligence Labs',
+  'Hugging Face',
+  'UC Berkeley',
+  'Lambda',
+] as const;
+
+/** Display label overrides for carousel orgs. */
+export const CAROUSEL_LABELS: Record<string, string> = {
+  'Together AI': 'Tri Dao',
+  'PyTorch Foundation': 'PyTorch',
+};
