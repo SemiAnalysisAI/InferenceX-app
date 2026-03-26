@@ -17,7 +17,7 @@ export function IntroSection() {
       <Card data-testid="intro-section">
         <div className="flex items-center gap-2 mb-4">
           <Quote className="h-5 w-5 text-brand" />
-          <h2 className="text-lg font-semibold">Open Source Continuous Inference Benchmark Trusted by the Token Factories</h2>
+          <h2 className="text-lg font-semibold">Open Source Continuous Inference Benchmark Trusted by GigaWatt Token Factories</h2>
         </div>
         <div>
           <QuoteCarousel
