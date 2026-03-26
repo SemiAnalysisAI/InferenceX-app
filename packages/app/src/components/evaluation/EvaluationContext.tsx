@@ -109,24 +109,40 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [availableBenchmarks, availableModels, selectedBenchmark, setSelectedModel]);
 
   useEffect(() => {
-    if (availableDates.length > 0) {
-      const latestDate = availableDates[availableDates.length - 1];
-      const prevAvailableDates = prevAvailableDatesRef.current;
-      const wasOnLatest =
-        prevAvailableDates.length > 0 &&
-        selectedRunDate === prevAvailableDates[prevAvailableDates.length - 1];
-      if (!selectedRunDate || wasOnLatest) {
-        setSelectedRunDate(latestDate);
-      }
-      prevAvailableDatesRef.current = availableDates;
+    if (availableDates.length === 0) return;
+    const latestDate = availableDates[availableDates.length - 1];
+    const prevAvailableDates = prevAvailableDatesRef.current;
+    const wasOnLatest =
+      prevAvailableDates.length > 0 &&
+      selectedRunDate === prevAvailableDates[prevAvailableDates.length - 1];
+    if (!selectedRunDate || wasOnLatest || !availableDates.includes(selectedRunDate)) {
+      setSelectedRunDate(latestDate);
     }
+    prevAvailableDatesRef.current = availableDates;
   }, [availableDates, selectedRunDate, setSelectedRunDate]);
 
   useEffect(() => {
     if (!globalRunDate) return;
-    if (availableDates.length === 0 || availableDates.includes(globalRunDate)) {
+    if (availableDates.length === 0) {
       setSelectedRunDate(globalRunDate);
+      return;
     }
+    if (availableDates.includes(globalRunDate)) {
+      setSelectedRunDate(globalRunDate);
+      return;
+    }
+    // Snap to the nearest valid date
+    const target = new Date(globalRunDate).getTime();
+    let closest = availableDates[0];
+    let minDiff = Math.abs(new Date(closest).getTime() - target);
+    for (const d of availableDates) {
+      const diff = Math.abs(new Date(d).getTime() - target);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = d;
+      }
+    }
+    setSelectedRunDate(closest);
   }, [globalRunDate, availableDates, selectedRunDateRev]);
 
   const availableHardware = useMemo(() => {
