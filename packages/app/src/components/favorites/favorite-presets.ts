@@ -164,21 +164,19 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       hwFilter: ['mi300x_sglang', 'mi325x_sglang', 'mi355x_sglang'],
     },
   },
-  // 4 — NVIDIA
+  // 4 — NVIDIA disagg generational
   {
-    id: 'b200-trt-timeline',
-    title: 'B200 TensorRT-LLM Over Time — DeepSeek (FP4)',
-    description:
-      'B200 TensorRT-LLM config expansion on DeepSeek R1 (8k/1k) FP4. All available config waves over time.',
-    tags: ['DeepSeek', 'B200', 'TensorRT-LLM', 'FP4', 'Timeline'],
-    category: 'improvements',
+    id: 'h100-vs-gb300-disagg',
+    title: 'H100 vs GB300 Disagg — DeepSeek',
+    description: 'H100 FP8 disagg vs GB300 FP8 disagg vs GB300 FP4 disagg on DeepSeek R1 (8k/1k).',
+    tags: ['DeepSeek', 'H100', 'GB300', 'Disagg', 'FP8', 'FP4'],
+    category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
       sequence: Sequence.EightK_OneK,
-      precisions: ['fp4'],
+      precisions: ['fp4', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      gpus: ['b200_trt'],
-      useDateRange: true,
+      hwFilter: ['h100_dynamo-trt_mtp', 'gb300_dynamo-trt_mtp'],
     },
   },
   // 5 — Disagg cross-vendor
@@ -199,18 +197,18 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   },
   // 6 — AMD
   {
-    id: 'mi355x-atom-timeline',
-    title: 'MI355X Atom Over Time — DeepSeek (FP4)',
+    id: 'mi355x-sglang-disagg-timeline',
+    title: 'MI355X SGLang Disagg Over Time — DeepSeek (FP8)',
     description:
-      'MI355X Atom config expansion on DeepSeek R1 (8k/1k) FP4. Tracks all available configs over time.',
-    tags: ['DeepSeek', 'MI355X', 'Atom', 'FP4', 'Timeline'],
+      'MI355X SGLang disaggregated inference on DeepSeek R1 (8k/1k) FP8. Tracks throughput improvements over time.',
+    tags: ['DeepSeek', 'MI355X', 'SGLang', 'FP8', 'Disagg', 'Timeline'],
     category: 'improvements',
     config: {
       model: Model.DeepSeek_R1,
       sequence: Sequence.EightK_OneK,
-      precisions: ['fp4'],
+      precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      gpus: ['mi355x_atom'],
+      gpus: ['mi355x_mori-sglang'],
       useDateRange: true,
     },
   },
