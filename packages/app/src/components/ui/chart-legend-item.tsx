@@ -103,7 +103,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   const wrapperClassName = cn(
     'transition-opacity duration-300',
     isActive ? 'opacity-100' : sidebarMode ? 'no-export' : 'opacity-50 no-export',
-    isHighlighted && 'text-red-900 font-bold',
+    isHighlighted && 'text-red-900 dark:text-red-400 font-bold',
   );
 
   if (asFragment) {

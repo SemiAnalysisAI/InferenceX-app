@@ -337,7 +337,6 @@ export default function ChartLegend({
         : item.isActive
           ? 'opacity-100'
           : 'opacity-50 no-export',
-      item.isHighlighted ? 'text-red-900 font-bold' : '',
       effectiveExpanded && 'md:w-full md:block',
       isHidden && 'h-0 m-0! p-0! overflow-hidden',
     );
