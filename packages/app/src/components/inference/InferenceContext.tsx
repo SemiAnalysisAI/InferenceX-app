@@ -515,12 +515,14 @@ export function InferenceProvider({
   );
 
   // ── Debounced GPU selection tracking ─────────────────────────────────────
-  // Fire after 3s of no activeHwTypes changes so we capture the "settled" selection.
+  // Fire after 3s of no changes so we capture the "settled" selection.
   // Skip the first render (initial data load) to avoid noise.
-  const gpuTrackingMounted = useRef(false);
+
+  // Scatter chart — tracks activeHwTypes
+  const scatterTrackMounted = useRef(false);
   useEffect(() => {
-    if (!gpuTrackingMounted.current) {
-      gpuTrackingMounted.current = true;
+    if (!scatterTrackMounted.current) {
+      scatterTrackMounted.current = true;
       return;
     }
     if (activeHwTypes.size === 0) return;
@@ -536,6 +538,27 @@ export function InferenceProvider({
     }, 3000);
     return () => clearTimeout(timer);
   }, [activeHwTypes]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on GPU set changes
+
+  // Interactivity / E2E chart — tracks activeDates (date+gpu pairs)
+  const e2eTrackMounted = useRef(false);
+  useEffect(() => {
+    if (!e2eTrackMounted.current) {
+      e2eTrackMounted.current = true;
+      return;
+    }
+    if (activeDates.size === 0) return;
+    const timer = setTimeout(() => {
+      const pairs = [...activeDates].sort();
+      track('interactivity_selection_settled', {
+        date_gpu_pairs: pairs,
+        pair_count: pairs.length,
+        gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].sort(),
+        model: selectedModel,
+        sequence: effectiveSequence,
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [activeDates]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on date selection changes
 
   // ── URL sync ──────────────────────────────────────────────────────────────
 

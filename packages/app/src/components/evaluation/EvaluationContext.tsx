@@ -12,6 +12,7 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { track } from '@/lib/analytics';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import {
@@ -385,6 +386,26 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     },
     [setSelectedModel],
   );
+
+  // ── Debounced hardware selection tracking ────────────────────────────────
+  const evalTrackMounted = useRef(false);
+  useEffect(() => {
+    if (!evalTrackMounted.current) {
+      evalTrackMounted.current = true;
+      return;
+    }
+    if (enabledHardware.size === 0) return;
+    const timer = setTimeout(() => {
+      const gpus = [...enabledHardware].sort();
+      track('evaluation_hw_selection_settled', {
+        gpus,
+        gpu_count: gpus.length,
+        model: selectedModel,
+        benchmark: selectedBenchmark,
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [enabledHardware]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on hw set changes
 
   useUrlStateSync(
     {
