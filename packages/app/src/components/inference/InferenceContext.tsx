@@ -12,6 +12,8 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { track } from '@/lib/analytics';
+import { FAVORITE_PRESETS, type FavoritePreset } from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import {
@@ -555,6 +557,98 @@ export function InferenceProvider({
       showGradientLabels,
     ],
   );
+
+  // ── URL preset loading ───────────────────────────────────────────────────
+  // Reads ?preset= from the URL on mount and applies it. This is the only
+  // place preset URL params are consumed — the landing page links here.
+
+  const urlPresetAppliedRef = useRef(false);
+  const presetVersionRef = useRef(0);
+  const [pendingTimelinePreset, setPendingTimelinePreset] = useState<
+    FavoritePreset['config'] | null
+  >(null);
+  const pendingPresetVersionRef = useRef(0);
+
+  // Once dateRangeAvailableDates resolves for a timeline preset, set the full range.
+  useEffect(() => {
+    if (!pendingTimelinePreset || dateRangeAvailableDates.length === 0) return;
+    if (pendingPresetVersionRef.current !== presetVersionRef.current) {
+      setPendingTimelinePreset(null);
+      return;
+    }
+    const first = dateRangeAvailableDates[0];
+    const last = dateRangeAvailableDates[dateRangeAvailableDates.length - 1];
+    presetGuardRef.current = true;
+    setSelectedDateRange({ startDate: first, endDate: last });
+    setSelectedDates([]);
+    presetGuardRef.current = false;
+    setPendingTimelinePreset(null);
+  }, [pendingTimelinePreset, dateRangeAvailableDates, setSelectedDateRange, setSelectedDates]);
+
+  const applyPreset = useCallback(
+    (preset: FavoritePreset) => {
+      const version = ++presetVersionRef.current;
+      const { config } = preset;
+      presetGuardRef.current = true;
+      setSelectedModel(config.model);
+      setSelectedSequence(config.sequence);
+      setSelectedPrecisions(config.precisions);
+      setSelectedYAxisMetric(config.yAxisMetric);
+      setPendingHwFilter(config.hwFilter ?? null);
+      setActivePresetId(preset.id);
+      if (config.gpus && config.gpus.length > 0) {
+        setSelectedGPUs(config.gpus);
+        if (config.useDateRange) {
+          setSelectedDateRange({ startDate: '', endDate: '' });
+          setSelectedDates([]);
+          pendingPresetVersionRef.current = version;
+          setPendingTimelinePreset(config);
+        } else {
+          setSelectedDateRange({ startDate: '', endDate: '' });
+          setSelectedDates([]);
+        }
+      } else {
+        setSelectedGPUs([]);
+        setSelectedDateRange({ startDate: '', endDate: '' });
+        setSelectedDates([]);
+      }
+      presetGuardRef.current = false;
+      track('favorite_preset_applied', {
+        preset_id: preset.id,
+        preset_title: preset.title,
+        category: preset.category,
+      });
+    },
+    [
+      setSelectedModel,
+      setSelectedSequence,
+      setSelectedPrecisions,
+      setSelectedYAxisMetric,
+      setSelectedGPUs,
+      setSelectedDates,
+      setSelectedDateRange,
+      setActivePresetId,
+    ],
+  );
+
+  useEffect(() => {
+    if (urlPresetAppliedRef.current) return;
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const presetId = sp.get('preset');
+    if (!presetId) return;
+    const preset = FAVORITE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    urlPresetAppliedRef.current = true;
+    sp.delete('preset');
+    const search = sp.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${search ? `?${search}` : ''}`,
+    );
+    applyPreset(preset);
+  }, [applyPreset]);
 
   // ── Filtered runs ─────────────────────────────────────────────────────────
 
