@@ -107,6 +107,7 @@ export function QuoteCarousel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hovering = useRef(false);
 
   // Build shuffled org order on mount (client only)
   useEffect(() => {
@@ -114,6 +115,7 @@ export function QuoteCarousel({
   }, [quotes, order]);
 
   const advance = useCallback(() => {
+    if (hovering.current) return;
     setFading(true);
     setTimeout(() => {
       setActiveIndex((prev) => (prev + 1) % (entries.length || 1));
@@ -147,7 +149,15 @@ export function QuoteCarousel({
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="flex flex-col gap-4"
+      onMouseEnter={() => {
+        hovering.current = true;
+      }}
+      onMouseLeave={() => {
+        hovering.current = false;
+      }}
+    >
       {/* Org name strip */}
       <div className="flex flex-wrap justify-center gap-x-6 md:gap-x-8 gap-y-2 mx-4">
         {entries.map((e, i) => (
