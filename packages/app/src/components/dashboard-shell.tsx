@@ -1,7 +1,6 @@
 'use client';
 
 import { ExportNudge } from '@/components/export-nudge';
-import { GitHubStarModal } from '@/components/github-star-modal';
 import { GlobalFilterProvider } from '@/components/GlobalFilterContext';
 import { StarNudge } from '@/components/star-nudge';
 import { TabNav } from '@/components/tab-nav';
@@ -10,7 +9,6 @@ import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <GitHubStarModal />
       <StarNudge />
       <ExportNudge />
       <UnofficialRunProvider>
