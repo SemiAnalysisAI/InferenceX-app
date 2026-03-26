@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -37,14 +36,14 @@ export function LandingPage() {
               Llama, Qwen, and other models.
             </p>
             <div className="mt-auto">
-              <Link
+              <a
                 href="/inference"
                 onClick={() => track('landing_full_dashboard_clicked')}
                 className="inline-flex items-center justify-center gap-2 rounded-md text-sm sm:text-base font-medium h-12 px-8 bg-brand text-primary-foreground hover:bg-brand/90 transition-colors"
               >
                 Open Dashboard
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </div>
           </Card>
 

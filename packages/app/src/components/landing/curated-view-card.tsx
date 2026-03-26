@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +8,7 @@ import type { FavoritePreset } from '@/components/favorites/favorite-presets';
 
 export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
   return (
-    <Link
+    <a
       href={`/inference?preset=${preset.id}`}
       onClick={() =>
         track('landing_curated_view_clicked', {
@@ -41,6 +40,6 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
           </Badge>
         ))}
       </div>
-    </Link>
+    </a>
   );
 }
