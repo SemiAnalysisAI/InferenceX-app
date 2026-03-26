@@ -301,4 +301,12 @@ export const QUOTES: Quote[] = [
     org: 'UC Berkeley',
     logo: 'sky-berkeley.webp',
   },
+  {
+    text: 'Lambda exists to make GPU compute simple and accessible for AI teams, from individual researchers to the largest labs. InferenceX\u2122 aligns with that mission by giving the community open, reproducible benchmarks that measure what actually matters: real-world throughput, cost efficiency, and performance per watt across the latest hardware and software stacks. Teams can make informed compute choices grounded in transparent, continuously updated data.',
+    name: 'Stephen Balaban',
+    title: 'Co-founder and CEO, Lambda',
+    org: 'Lambda',
+    logo: 'lambda.svg',
+    link: 'https://www.linkedin.com/in/sbalaban/',
+  },
 ];

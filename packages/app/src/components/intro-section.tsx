@@ -69,6 +69,7 @@ export function IntroSection() {
                 'Meta Superintelligence Labs',
                 'Hugging Face',
                 'UC Berkeley',
+                'Lambda',
               ].includes(q.org),
             )}
             overrides={{
