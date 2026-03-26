@@ -514,6 +514,29 @@ export function InferenceProvider({
     [selectedModel],
   );
 
+  // ── Debounced GPU selection tracking ─────────────────────────────────────
+  // Fire after 3s of no activeHwTypes changes so we capture the "settled" selection.
+  // Skip the first render (initial data load) to avoid noise.
+  const gpuTrackingMounted = useRef(false);
+  useEffect(() => {
+    if (!gpuTrackingMounted.current) {
+      gpuTrackingMounted.current = true;
+      return;
+    }
+    if (activeHwTypes.size === 0) return;
+    const timer = setTimeout(() => {
+      const gpus = [...activeHwTypes].sort();
+      track('inference_gpu_selection_settled', {
+        gpus,
+        gpu_count: gpus.length,
+        model: selectedModel,
+        sequence: effectiveSequence,
+        preset_id: activePresetId,
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [activeHwTypes]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on GPU set changes
+
   // ── URL sync ──────────────────────────────────────────────────────────────
 
   useUrlStateSync(
