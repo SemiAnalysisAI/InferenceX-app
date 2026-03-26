@@ -2,7 +2,8 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { BarChart3, Check, Link as LinkIcon, Loader2, ScatterChart } from 'lucide-react';
+import { BarChart3, Check, Link as LinkIcon, Lock, Loader2, ScatterChart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -30,8 +31,10 @@ import type {
 import { ALL_METRIC_OPTIONS, getAvailableMetrics } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
+const FEATURE_GATE_KEY = 'inferencex-feature-gate';
 
 export default function GpuMetricsDisplay() {
+  const router = useRouter();
   const [runIdInput, setRunIdInput] = useState('22806827144');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,7 +207,24 @@ export default function GpuMetricsDisplay() {
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">PowerX</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">PowerX</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs text-muted-foreground"
+              onClick={() => {
+                localStorage.removeItem(FEATURE_GATE_KEY);
+                window.dispatchEvent(new Event('inferencex:powerx:locked'));
+                track('powerx_relocked');
+                router.push('/inference');
+              }}
+              title="Re-lock PowerX"
+            >
+              <Lock className="h-3 w-3" />
+              Lock
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">
             Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
             <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.

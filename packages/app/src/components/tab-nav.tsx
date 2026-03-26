@@ -16,15 +16,15 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-const POWERX_STORAGE_KEY = 'inferencex-powerx-unlocked';
+const FEATURE_GATE_KEY = 'inferencex-feature-gate';
 const UNLOCK_SEQUENCE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
 
-function usePowerXGate(): boolean {
+function useFeatureGate(): boolean {
   const [unlocked, setUnlocked] = useState(false);
   const sequenceRef = useRef<string[]>([]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem(POWERX_STORAGE_KEY) === '1') {
+    if (typeof window !== 'undefined' && localStorage.getItem(FEATURE_GATE_KEY) === '1') {
       setUnlocked(true);
     }
   }, []);
@@ -40,14 +40,26 @@ function usePowerXGate(): boolean {
         sequenceRef.current.length === UNLOCK_SEQUENCE.length &&
         sequenceRef.current.every((k, i) => k === UNLOCK_SEQUENCE[i])
       ) {
-        localStorage.setItem(POWERX_STORAGE_KEY, '1');
+        localStorage.setItem(FEATURE_GATE_KEY, '1');
         setUnlocked(true);
+        window.dispatchEvent(new Event('inferencex:powerx:unlocked'));
         track('powerx_unlocked');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [unlocked]);
+
+  useEffect(() => {
+    const handleLock = () => setUnlocked(false);
+    const handleUnlock = () => setUnlocked(true);
+    window.addEventListener('inferencex:powerx:locked', handleLock);
+    window.addEventListener('inferencex:powerx:unlocked', handleUnlock);
+    return () => {
+      window.removeEventListener('inferencex:powerx:locked', handleLock);
+      window.removeEventListener('inferencex:powerx:unlocked', handleUnlock);
+    };
+  }, []);
 
   return unlocked;
 }
@@ -70,7 +82,7 @@ function activeTab(pathname: string): string {
 export function TabNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const powerXUnlocked = usePowerXGate();
+  const featureGateUnlocked = useFeatureGate();
   const current = activeTab(pathname);
 
   const handleMobileChange = (value: string) => {
@@ -98,7 +110,7 @@ export function TabNav() {
               </SelectTrigger>
               <SelectContent>
                 {TAB_LINKS.map((tab) => {
-                  if ('gated' in tab && tab.gated && !powerXUnlocked) return null;
+                  if ('gated' in tab && tab.gated && !featureGateUnlocked) return null;
                   const value = tab.href.slice(1);
                   return (
                     <SelectItem key={value} value={value} data-ph-capture-attribute-tab={value}>
@@ -120,7 +132,7 @@ export function TabNav() {
             className="relative flex items-center justify-evenly min-w-0"
           >
             {TAB_LINKS.map((tab) => {
-              if ('gated' in tab && tab.gated && !powerXUnlocked) return null;
+              if ('gated' in tab && tab.gated && !featureGateUnlocked) return null;
               return (
                 <Link
                   key={tab.href}
