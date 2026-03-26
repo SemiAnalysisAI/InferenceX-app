@@ -47,8 +47,14 @@ function isActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href);
 }
 
-function isDashboard(path: string): boolean {
-  return DASHBOARD_TABS.some((tab) => path.startsWith(tab));
+/**
+ * Layout group for a path. Next.js soft navigation breaks when crossing
+ * layout boundaries, so we use plain <a> tags for those transitions.
+ */
+function layoutGroup(path: string): 'dashboard' | 'blog' | 'root' {
+  if (DASHBOARD_TABS.some((tab) => path.startsWith(tab))) return 'dashboard';
+  if (path.startsWith('/blog')) return 'blog';
+  return 'root';
 }
 
 /**
@@ -61,7 +67,7 @@ function NavLink({
   currentPath,
   ...props
 }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; currentPath: string }) {
-  if (isDashboard(currentPath) && isDashboard(href)) {
+  if (layoutGroup(currentPath) === layoutGroup(href)) {
     return <Link href={href} {...props} />;
   }
   return <a href={href} {...props} />;
