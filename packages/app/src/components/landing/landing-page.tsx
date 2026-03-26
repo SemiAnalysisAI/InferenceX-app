@@ -4,6 +4,7 @@ import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { GitHubStarModal } from '@/components/github-star-modal';
 import { IntroSection } from '@/components/intro-section';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
@@ -16,6 +17,7 @@ export function LandingPage() {
 
   return (
     <main className="relative">
+      <GitHubStarModal />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
         <IntroSection />
 
