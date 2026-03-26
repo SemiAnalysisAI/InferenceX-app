@@ -38,15 +38,16 @@ export function LandingPage() {
               Llama, Qwen, and other models.
             </p>
             <div className="mt-auto">
-              <Link href="/inference" onClick={() => track('landing_full_dashboard_clicked')}>
-                <Button
-                  size="lg"
-                  className="text-sm sm:text-base h-12 gap-2 px-8 bg-brand hover:bg-brand/90"
-                >
+              <Button
+                asChild
+                size="lg"
+                className="text-sm sm:text-base h-12 gap-2 px-8 bg-brand hover:bg-brand/90"
+              >
+                <Link href="/inference" onClick={() => track('landing_full_dashboard_clicked')}>
                   Open Dashboard
                   <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </Card>
 
