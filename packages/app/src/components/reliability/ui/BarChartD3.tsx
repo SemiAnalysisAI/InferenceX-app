@@ -324,12 +324,20 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
                 },
               },
             ]}
-            showResetFilter={true}
-            allSelected={enabledModels.size === modelsWithData.size}
-            onResetFilter={() => {
-              selectAllModels();
-              track('reliability_filter_reset');
-            }}
+            actions={
+              enabledModels.size < modelsWithData.size
+                ? [
+                    {
+                      id: 'reliability-reset-filter',
+                      label: 'Reset filter',
+                      onClick: () => {
+                        selectAllModels();
+                        track('reliability_filter_reset');
+                      },
+                    },
+                  ]
+                : []
+            }
             enableTooltips={true}
           />
         }

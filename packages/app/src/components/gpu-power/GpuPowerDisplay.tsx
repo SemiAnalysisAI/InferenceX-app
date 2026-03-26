@@ -465,9 +465,17 @@ export default function GpuMetricsDisplay() {
                       setIsLegendExpanded(expanded);
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
-                    showResetFilter
-                    allSelected={allGpusSelected}
-                    onResetFilter={selectAllGpus}
+                    actions={
+                      !allGpusSelected
+                        ? [
+                            {
+                              id: 'gpu-metrics-reset-filter',
+                              label: 'Reset filter',
+                              onClick: selectAllGpus,
+                            },
+                          ]
+                        : []
+                    }
                     switches={[
                       {
                         id: 'gpu-metrics-downsample',
@@ -508,9 +516,17 @@ export default function GpuMetricsDisplay() {
                       setIsLegendExpanded(expanded);
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
-                    showResetFilter
-                    allSelected={allGpusSelected}
-                    onResetFilter={selectAllGpus}
+                    actions={
+                      !allGpusSelected
+                        ? [
+                            {
+                              id: 'gpu-metrics-reset-filter-2',
+                              label: 'Reset filter',
+                              onClick: selectAllGpus,
+                            },
+                          ]
+                        : []
+                    }
                     switches={[
                       {
                         id: 'gpu-metrics-downsample-corr',

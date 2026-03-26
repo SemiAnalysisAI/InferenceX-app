@@ -43,9 +43,6 @@ export interface ChartLegendProps {
   actions?: LegendActionConfig[];
   grouped?: boolean;
   showFpShapeIndicators?: boolean;
-  showResetFilter?: boolean;
-  allSelected?: boolean;
-  onResetFilter?: () => void;
   enableTooltips?: boolean;
   maxHeight?: number;
   /** Override styles on the outer legend container (e.g. maxHeight to constrain scrollable area) */
@@ -65,9 +62,6 @@ export default function ChartLegend({
   actions,
   grouped = false,
   showFpShapeIndicators = false,
-  showResetFilter = false,
-  allSelected = true,
-  onResetFilter,
   enableTooltips = false,
   maxHeight,
   containerStyle,
@@ -186,8 +180,7 @@ export default function ChartLegend({
     (showFpShapeIndicators ||
       (switches && switches.length > 0) ||
       (actions && actions.length > 0) ||
-      hasLongText ||
-      (showResetFilter && !allSelected));
+      hasLongText);
   const scrollClasses = isSidebar
     ? cn(
         'overflow-y-auto flex-1 min-h-0 space-y-0.5',
@@ -313,19 +306,6 @@ export default function ChartLegend({
     </div>
   ) : null;
 
-  const resetFilter =
-    showResetFilter && !allSelected ? (
-      <div className="no-export mt-2">
-        <button
-          onClick={onResetFilter}
-          className="text-xs text-muted-foreground hover:text-foreground underline"
-          aria-label="Reset filter"
-        >
-          Reset filter
-        </button>
-      </div>
-    ) : null;
-
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
   const itemClassName = (item: CommonLegendItemProps, isHidden: boolean) =>
     cn(
@@ -382,19 +362,13 @@ export default function ChartLegend({
     );
   };
 
-  // Bottom controls (switches, FP indicators, expand button, reset filter)
+  // Bottom controls (switches, FP indicators, expand button, actions)
   const hasBottomControls =
-    resetFilter ||
-    switchElements ||
-    actionElements ||
-    fpIndicators ||
-    expandButton ||
-    hasAtomFootnote;
+    switchElements || actionElements || fpIndicators || expandButton || hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
     <div className="shrink-0 grow-0">
-      {resetFilter}
-      {switchElements}
       {actionElements}
+      {switchElements}
       {fpIndicators}
       {expandButton}
       {hasAtomFootnote && (

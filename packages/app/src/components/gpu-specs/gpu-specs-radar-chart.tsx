@@ -201,12 +201,20 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
               track('gpu_specs_radar_legend_expanded', { expanded });
             }}
             grouped={false}
-            showResetFilter={true}
-            allSelected={selectedGpus.size === GPU_SPECS.length}
-            onResetFilter={() => {
-              selectAll();
-              track('gpu_specs_radar_reset_filter');
-            }}
+            actions={
+              selectedGpus.size < GPU_SPECS.length
+                ? [
+                    {
+                      id: 'radar-reset-filter',
+                      label: 'Reset filter',
+                      onClick: () => {
+                        selectAll();
+                        track('gpu_specs_radar_reset_filter');
+                      },
+                    },
+                  ]
+                : []
+            }
             disableActiveSort={true}
           />
         }

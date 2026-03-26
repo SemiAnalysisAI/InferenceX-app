@@ -866,9 +866,17 @@ export default function ThroughputCalculatorDisplay() {
                               setIsLegendExpanded(expanded);
                               track('calculator_legend_expanded', { expanded });
                             }}
-                            showResetFilter={true}
-                            allSelected={visibleHwKeys.size === availableHwKeys.length}
-                            onResetFilter={handleResetGpus}
+                            actions={
+                              visibleHwKeys.size < availableHwKeys.length
+                                ? [
+                                    {
+                                      id: 'calc-reset-filter',
+                                      label: 'Reset filter',
+                                      onClick: handleResetGpus,
+                                    },
+                                  ]
+                                : []
+                            }
                             enableTooltips={true}
                           />
                         ) : undefined

@@ -574,8 +574,8 @@ export default function HistoricalTrendsDisplay() {
                         },
                       },
                     ]}
-                    actions={
-                      highContrast
+                    actions={[
+                      ...(highContrast
                         ? [
                             {
                               id: 'historical-shuffle-colors',
@@ -586,14 +586,20 @@ export default function HistoricalTrendsDisplay() {
                               },
                             },
                           ]
-                        : undefined
-                    }
-                    showResetFilter={true}
-                    allSelected={activeHwTypes.size === hwTypesWithData.size}
-                    onResetFilter={() => {
-                      selectAllHwTypes();
-                      track('historical_legend_filter_reset');
-                    }}
+                        : []),
+                      ...(activeHwTypes.size < hwTypesWithData.size
+                        ? [
+                            {
+                              id: 'historical-reset-filter',
+                              label: 'Reset filter',
+                              onClick: () => {
+                                selectAllHwTypes();
+                                track('historical_legend_filter_reset');
+                              },
+                            },
+                          ]
+                        : []),
+                    ]}
                     enableTooltips={true}
                     showFpShapeIndicators={true}
                   />

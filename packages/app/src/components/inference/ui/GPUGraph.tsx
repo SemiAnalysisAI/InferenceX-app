@@ -469,8 +469,8 @@ const GPUGraph = React.memo(
                 },
               },
             ]}
-            actions={
-              highContrast
+            actions={[
+              ...(highContrast
                 ? [
                     {
                       id: 'gpu-shuffle-colors',
@@ -481,14 +481,17 @@ const GPUGraph = React.memo(
                       },
                     },
                   ]
-                : undefined
-            }
+                : []),
+              {
+                id: 'gpu-reset-filter',
+                label: 'Reset filter',
+                onClick: () => {
+                  selectAllActiveDates();
+                  track('gpu_timeseries_reset_filter');
+                },
+              },
+            ]}
             showFpShapeIndicators={selectedPrecisions.length > 1}
-            showResetFilter={true}
-            onResetFilter={() => {
-              selectAllActiveDates();
-              track('gpu_timeseries_reset_filter');
-            }}
           />
         }
       />

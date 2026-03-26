@@ -1465,8 +1465,8 @@ const ScatterGraph = React.memo(
                 },
               },
             ]}
-            actions={
-              highContrast
+            actions={[
+              ...(highContrast
                 ? [
                     {
                       id: 'scatter-shuffle-colors',
@@ -1477,20 +1477,24 @@ const ScatterGraph = React.memo(
                       },
                     },
                   ]
-                : undefined
-            }
+                : []),
+              ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+              activeOverlayHwTypes.size < allOverlayHwTypes.size
+                ? [
+                    {
+                      id: 'scatter-reset-filter',
+                      label: 'Reset filter',
+                      onClick: () => {
+                        selectAllHwTypes();
+                        setLocalOfficialOverride(null);
+                        resetOverlayHwTypes();
+                        track('latency_legend_filter_reset');
+                      },
+                    },
+                  ]
+                : []),
+            ]}
             showFpShapeIndicators={selectedPrecisions.length > 1}
-            showResetFilter={true}
-            allSelected={
-              effectiveOfficialHwTypes.size === hwTypesWithData.size &&
-              activeOverlayHwTypes.size === allOverlayHwTypes.size
-            }
-            onResetFilter={() => {
-              selectAllHwTypes();
-              setLocalOfficialOverride(null);
-              resetOverlayHwTypes();
-              track('latency_legend_filter_reset');
-            }}
             enableTooltips={true}
           />
         }

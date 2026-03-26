@@ -392,12 +392,20 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               },
             },
           ]}
-          showResetFilter={true}
-          allSelected={enabledHardware.size === hwTypesWithData.size}
-          onResetFilter={() => {
-            selectAllHwTypes();
-            track('evaluation_filter_reset');
-          }}
+          actions={
+            enabledHardware.size < hwTypesWithData.size
+              ? [
+                  {
+                    id: 'eval-reset-filter',
+                    label: 'Reset filter',
+                    onClick: () => {
+                      selectAllHwTypes();
+                      track('evaluation_filter_reset');
+                    },
+                  },
+                ]
+              : []
+          }
           enableTooltips={true}
         />
       }
