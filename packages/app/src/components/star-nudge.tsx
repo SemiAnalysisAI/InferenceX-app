@@ -5,7 +5,7 @@ import { Star } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
-import { STARRED_EVENT } from '@/lib/star-storage';
+import { STARRED_EVENT, STARRED_KEY } from '@/lib/star-storage';
 import { BottomToast } from '@/components/ui/bottom-toast';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -15,8 +15,8 @@ const TAB_CHANGE_THRESHOLD = 2;
 
 export function shouldShowNudge(): boolean {
   try {
-    const modalDismissed = sessionStorage.getItem(NUDGE_SESSION_KEY);
-    if (modalDismissed) return false;
+    if (localStorage.getItem(STARRED_KEY)) return false;
+    if (sessionStorage.getItem(NUDGE_SESSION_KEY)) return false;
     return true;
   } catch {
     return false;
