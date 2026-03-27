@@ -230,7 +230,7 @@ function createServer(): McpServer {
           .array(z.string())
           .optional()
           .describe(
-            'Metric keys to include. Defaults to [median_tpot, median_ttft, p99_tpot, p99_ttft, tput_per_gpu, output_tput_per_gpu]. Pass ["all"] for full JSONB.',
+            'Metric keys to include. Defaults to [median_tpot, median_ttft, p99_tpot, p99_ttft, tput_per_gpu, output_tput_per_gpu, median_itl, median_e2el]. Pass ["all"] for full JSONB.',
           ),
         limit: z.number().optional().describe('Max rows (default 200, max 5000)'),
       },
@@ -298,6 +298,8 @@ function createServer(): McpServer {
         'p99_ttft',
         'tput_per_gpu',
         'output_tput_per_gpu',
+        'median_itl',
+        'median_e2el',
       ];
       const wantFull = requestedMetrics?.includes('all');
       const extractKeys = wantFull
