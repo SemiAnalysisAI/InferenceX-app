@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { fetchBenchmarks } from '@/lib/api';
 
@@ -17,8 +17,5 @@ export function benchmarkQueryOptions(
 }
 
 export function useBenchmarks(model: string, date?: string, enabled: boolean = true) {
-  return useQuery({
-    ...benchmarkQueryOptions(model, date ?? 'latest', enabled),
-    placeholderData: keepPreviousData,
-  });
+  return useQuery(benchmarkQueryOptions(model, date ?? 'latest', enabled));
 }
