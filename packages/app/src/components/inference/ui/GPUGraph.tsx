@@ -9,7 +9,7 @@ import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
-import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { D3ChartHandle, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
@@ -384,6 +384,7 @@ const GPUGraph = React.memo(
               yLabel,
               selectedYAxisMetric,
               hardwareConfig,
+              runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),

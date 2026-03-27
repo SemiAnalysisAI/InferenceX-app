@@ -86,6 +86,8 @@ export interface AggDataEntry {
   date: string;
   /** Actual benchmark run date from the DB (before date-picker override). */
   actualDate?: string;
+  /** URL to the GitHub Actions workflow run that produced this data point. */
+  run_url?: string;
 }
 
 /**

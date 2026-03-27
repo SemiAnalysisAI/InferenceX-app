@@ -53,6 +53,7 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
       std_e2el: 0.3,
     },
     date: '2026-03-01',
+    run_url: null,
     ...overrides,
   };
 }

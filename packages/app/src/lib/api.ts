@@ -27,6 +27,7 @@ export interface BenchmarkRow {
   image: string | null;
   metrics: Record<string, number>;
   date: string;
+  run_url: string | null;
 }
 
 export interface WorkflowRunRow {

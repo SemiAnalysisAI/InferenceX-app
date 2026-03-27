@@ -24,6 +24,7 @@ export interface BenchmarkRow {
   image: string | null;
   metrics: Record<string, number>;
   date: string;
+  run_url: string | null;
 }
 
 /**
@@ -69,7 +70,8 @@ export async function getLatestBenchmarks(
         br.conc,
         br.image,
         br.metrics,
-        br.date::text
+        br.date::text,
+        CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
       FROM benchmark_results br
       JOIN configs c ON c.id = br.config_id
       JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
@@ -106,9 +108,11 @@ export async function getLatestBenchmarks(
       lb.conc,
       lb.image,
       lb.metrics,
-      lb.date::text
+      lb.date::text,
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM latest_benchmarks lb
     JOIN configs c ON c.id = lb.config_id
+    JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
     WHERE c.model = ${modelKey}
     ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
   `;
@@ -149,7 +153,8 @@ export async function getAllBenchmarksForHistory(
       br.osl,
       br.conc,
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
-      br.date::text
+      br.date::text,
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM configs c
     JOIN benchmark_results br ON br.config_id = c.id
       AND br.isl = ${isl}

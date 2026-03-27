@@ -10,7 +10,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -599,6 +599,7 @@ const ScatterGraph = React.memo(
             selectedYAxisMetric,
             hardwareConfig,
             isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
+            runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),

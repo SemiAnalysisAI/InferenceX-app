@@ -17,6 +17,8 @@ export interface TooltipConfig {
   hardwareConfig: HardwareConfig;
   /** Whether this config is already being tracked */
   isTracked?: boolean;
+  /** URL to the GitHub Actions workflow run */
+  runUrl?: string;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
@@ -72,6 +74,13 @@ export const getPointLabel = (d: InferenceData): string => {
   return configSegmentLabel(d.tp, d.ep, d.dp_attention);
 };
 
+const runLinkHTML = (runUrl?: string) =>
+  runUrl
+    ? `<div style="font-size: 11px; margin-top: 4px;">
+        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">GitHub Actions Run</a>
+      </div>`
+    : '';
+
 const tooltipLine = (label: string, value: string | number) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
@@ -115,7 +124,7 @@ const generateParallelismHTML = (d: InferenceData): string => {
  * @returns HTML string for the tooltip content
  */
 export const generateTooltipContent = (config: TooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, hardwareConfig } = config;
+  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, runUrl } = config;
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -164,6 +173,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       <div style="color: var(--muted-foreground); font-size: 11px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${runLinkHTML(runUrl)}
       ${
         isPinned
           ? `<button data-action="track-over-time" style="
@@ -229,7 +239,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
  * @returns HTML string for the tooltip content
  */
 export const generateGPUGraphTooltipContent = (config: TooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, hardwareConfig } = config;
+  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, runUrl } = config;
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -278,6 +288,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       <div style="color: var(--muted-foreground); font-size: 11px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${runLinkHTML(runUrl)}
     </div>
   `;
 };
