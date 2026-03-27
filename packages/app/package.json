@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@jpinsonneau/html-to-image": "^1.11.13",
+    "@modelcontextprotocol/sdk": "^1.28.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
@@ -57,7 +58,8 @@
     "react-dom": "19.2.4",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.0.2",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@bahmutov/cypress-esbuild-preprocessor": "^2.2.8",
