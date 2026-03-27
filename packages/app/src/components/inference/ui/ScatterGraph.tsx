@@ -4,6 +4,7 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { GRADIENT_NUDGE_EVENT } from '@/components/gradient-label-nudge';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
@@ -1463,6 +1464,22 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setUseAdvancedLabels(checked);
                   track('latency_advanced_labels_toggled', { enabled: checked });
+                  if (checked && !showGradientLabels) {
+                    window.dispatchEvent(
+                      new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                        detail: {
+                          enableGradient: () => {
+                            setShowGradientLabels(true);
+                            setUseAdvancedLabels(false);
+                            track('latency_gradient_labels_toggled', {
+                              enabled: true,
+                              source: 'nudge',
+                            });
+                          },
+                        },
+                      }),
+                    );
+                  }
                 },
               },
               {
