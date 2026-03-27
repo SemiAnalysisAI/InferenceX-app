@@ -5,7 +5,7 @@ import { ChevronDownIcon } from 'lucide-react';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import { Button } from '@/components/ui/button';
-import { ModelSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
 import { DatePicker } from '@/components/ui/date-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -30,6 +30,9 @@ export default function EvaluationChartControls() {
     availableModels,
     availableDates,
     changelogEntries,
+    selectedPrecisions,
+    setSelectedPrecisions,
+    availablePrecisions,
   } = useEvaluation();
 
   return (
@@ -76,8 +79,20 @@ export default function EvaluationChartControls() {
           </Select>
         </div>
 
+        {/* Precision Multiselect */}
+        <PrecisionSelector
+          id="eval-precision-select"
+          value={selectedPrecisions}
+          onChange={(value) => {
+            setSelectedPrecisions(value);
+            track('evaluation_precision_selected', { precision: value.join(',') });
+          }}
+          availablePrecisions={availablePrecisions}
+          data-testid="evaluation-precision-selector"
+        />
+
         {/* Spacer */}
-        <div className="flex flex-col space-y-1.5 lg:col-span-3" />
+        <div className="flex flex-col space-y-1.5 lg:col-span-2" />
       </div>
       <div className="flex flex-col md:flex-row gap-2 md:items-center text-muted-foreground">
         {/* Date picker */}

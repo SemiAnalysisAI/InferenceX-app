@@ -43,6 +43,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     setSelectedRunDate: setGlobalRunDate,
     availableModels,
     availableDates: inferenceAvailableDates,
+    effectivePrecisions,
+    setSelectedPrecisions,
+    availablePrecisions: globalAvailablePrecisions,
   } = useGlobalFilters();
   const { getUrlParam } = useUrlState();
   const { data: rawRows, isLoading: loading, error: queryError } = useEvaluations();
@@ -171,13 +174,22 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     if (specMethod && specMethod !== 'none') headerSuffixes.push(getFrameworkLabel(specMethod));
 
     const detailSuffixes: string[] = [];
-    if (precision) detailSuffixes.push(precision.toUpperCase());
+    if (precision && effectivePrecisions.length > 1) detailSuffixes.push(precision.toUpperCase());
     if (conc) detailSuffixes.push(`C${conc}`);
     if (tp !== undefined) detailSuffixes.push(`TP${tp}`);
 
     const line1 = headerSuffixes.length > 0 ? `${hwLabel} (${headerSuffixes.join(', ')})` : hwLabel;
     return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(', ')}` : line1;
   }
+
+  const availablePrecisions = useMemo(() => {
+    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
+    if (!dbModelKey) return globalAvailablePrecisions;
+    const precs = [
+      ...new Set(rawData.filter((r) => r.model === dbModelKey).map((r) => r.precision)),
+    ].sort();
+    return precs.length > 0 ? precs : globalAvailablePrecisions;
+  }, [rawData, selectedModel, globalAvailablePrecisions]);
 
   const unfilteredChartData: EvaluationChartData[] = useMemo(() => {
     if (!selectedBenchmark || !selectedModel || !selectedRunDate) return [];
@@ -191,7 +203,8 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         return (
           item.task === selectedBenchmark &&
           item.model === dbModelKey &&
-          itemDate <= selectedRunDate
+          itemDate <= selectedRunDate &&
+          effectivePrecisions.includes(item.precision)
         );
       })
       .map((item): EvaluationChartData | null => {
@@ -264,7 +277,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     });
 
     return result.sort((a, b) => a.configLabel.localeCompare(b.configLabel));
-  }, [rawData, selectedBenchmark, selectedModel, selectedRunDate]);
+  }, [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions]);
 
   const chartData = useMemo(() => {
     const filtered = unfilteredChartData.filter((data) => {
@@ -447,6 +460,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       highlightedConfigs,
       changelogEntries,
       modelHasEvalData,
+      selectedPrecisions: effectivePrecisions,
+      setSelectedPrecisions,
+      availablePrecisions,
     }),
     [
       loading,
@@ -472,6 +488,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       highlightedConfigs,
       changelogEntries,
       modelHasEvalData,
+      effectivePrecisions,
+      setSelectedPrecisions,
+      availablePrecisions,
     ],
   );
 

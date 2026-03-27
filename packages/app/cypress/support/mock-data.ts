@@ -317,6 +317,9 @@ export function createMockEvaluationContext(
     highlightedConfigs: new Set<string>(),
     changelogEntries: [],
     modelHasEvalData: true,
+    selectedPrecisions: ['fp4'],
+    setSelectedPrecisions: namedStub('setSelectedPrecisions_eval'),
+    availablePrecisions: ['fp4', 'fp8', 'bf16'],
     ...overrides,
   };
 }

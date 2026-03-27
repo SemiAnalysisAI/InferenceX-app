@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { ChartSection } from '@/components/ui/chart-section';
 import { ShareButton } from '@/components/ui/share-button';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
-import { isModelExperimental, Model } from '@/lib/data-mappings';
+import { getPrecisionLabel, isModelExperimental, Model, Precision } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
 
@@ -16,8 +16,14 @@ import EvalBarChartD3 from './BarChartD3';
 
 export default function EvaluationChartDisplay() {
   const CHART_ID = 'evaluation-chart';
-  const { selectedModel, selectedRunDate, selectedBenchmark, setIsLegendExpanded, chartData } =
-    useEvaluation();
+  const {
+    selectedModel,
+    selectedRunDate,
+    selectedBenchmark,
+    setIsLegendExpanded,
+    chartData,
+    selectedPrecisions,
+  } = useEvaluation();
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = evaluationChartToCsv(chartData);
@@ -26,7 +32,7 @@ export default function EvaluationChartDisplay() {
 
   return (
     <div data-testid="evaluation-chart-display" className="flex flex-col gap-4">
-      <section>
+      <section className="relative z-10">
         <Card>
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between">
@@ -62,7 +68,9 @@ export default function EvaluationChartDisplay() {
             <>
               <h3 className="text-lg font-semibold">Evaluation Score by Hardware Configuration</h3>
               <p className="text-sm text-muted-foreground mb-2">
-                {selectedModel} • {selectedBenchmark} • Source: SemiAnalysis InferenceX™
+                {selectedModel} •{' '}
+                {selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')} •{' '}
+                {selectedBenchmark} • Source: SemiAnalysis InferenceX™
                 {selectedRunDate && (
                   <>
                     {' '}

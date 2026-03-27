@@ -197,8 +197,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             getColor: (d: EvaluationChartData) =>
               getCssColor(resolveColor(d.configLabel, d.hwKey as string)),
             getRadius: () => 6,
-            stroke: 'var(--foreground)',
-            strokeWidth: 1,
+            stroke: 'none',
+            strokeWidth: 0,
           });
         },
         onZoom: (group, ctx) => {

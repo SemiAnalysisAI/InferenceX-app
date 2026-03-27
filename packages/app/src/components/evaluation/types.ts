@@ -68,4 +68,7 @@ export interface EvaluationChartContextType {
   highlightedConfigs: Set<string>; // Configurations that have new data from selected run date
   changelogEntries: EvalChangelogEntry[];
   modelHasEvalData: boolean;
+  selectedPrecisions: string[];
+  setSelectedPrecisions: (precisions: string[]) => void;
+  availablePrecisions: string[];
 }
