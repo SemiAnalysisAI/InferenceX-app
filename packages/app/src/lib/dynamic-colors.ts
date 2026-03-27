@@ -7,6 +7,7 @@
  * → more perceptual distance between colors → easier to distinguish.
  */
 
+import { GPU_VENDORS, VENDOR_OKLCH_ZONES } from '@semianalysisai/inferencex-constants';
 import { getModelSortIndex } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
@@ -15,46 +16,19 @@ import { getModelSortIndex } from '@/lib/constants';
 
 export type Vendor = 'nvidia' | 'amd' | 'unknown';
 
-/** Determine vendor from a hardware key prefix. */
+/** Determine vendor from a hardware key by looking up GPU_VENDORS. */
 export function getVendor(hwKey: string): Vendor {
-  if (hwKey.startsWith('mi')) return 'amd';
-  if (hwKey.startsWith('h') || hwKey.startsWith('b') || hwKey.startsWith('gb')) return 'nvidia';
+  // hwKey may have a framework suffix (e.g. "h100_vllm") — strip it to get the GPU base key
+  const base = hwKey.split('_')[0];
+  const vendor = GPU_VENDORS[base];
+  if (vendor === 'NVIDIA') return 'nvidia';
+  if (vendor === 'AMD') return 'amd';
   return 'unknown';
 }
 
-// ---------------------------------------------------------------------------
-// Vendor hue zones (OKLch hue degrees)
-// ---------------------------------------------------------------------------
-
-interface HueZone {
-  start: number;
-  end: number;
-  /** Chroma per theme — higher chroma = more saturated */
-  chroma: { light: number; dark: number };
-}
-
-/**
- * Hue zones carved out of the OKLch wheel.
- *
- * Zones are chosen so each vendor's brand identity is recognizable at a glance.
- * The fallback ("unknown") covers purples — unlikely to collide with any vendor.
- *
- * Layout (approximate):
- *   0-10    (gap)
- *   10-45   AMD reds/oranges
- *   45-55   (gap)
- *   55-85   (gap)
- *   85-175  NVIDIA greens
- *   175-220 (gap)
- *   220-265 (gap)
- *   265-330 unknown / fallback (purples)
- *   330-360 (gap)
- */
-const VENDOR_HUE_ZONES: Record<Vendor, HueZone> = {
-  amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
-  nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
-  unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
-};
+// Vendor color zones are defined in @semianalysisai/inferencex-constants (gpu-keys.ts).
+// VENDOR_OKLCH_ZONES — OKLch hue zones for normal-mode vendor colors.
+// VENDOR_HSL_BANDS   — HSL hue bands for high-contrast mode.
 
 // ---------------------------------------------------------------------------
 // Lightness ranges
@@ -112,7 +86,7 @@ export function generateVendorColors(
     // Stable sort: model sort index first, then alphabetical
     keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
 
-    const zone = VENDOR_HUE_ZONES[vendor];
+    const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const count = keys.length;
 
@@ -167,7 +141,7 @@ export function generateGpuDateColors(
   for (const [vendor, keys] of groups) {
     keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
 
-    const zone = VENDOR_HUE_ZONES[vendor];
+    const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const gpuCount = keys.length;
 

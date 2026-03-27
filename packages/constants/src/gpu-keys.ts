@@ -23,3 +23,44 @@ export const GPU_VENDORS: Record<string, string> = {
   mi325x: 'AMD',
   mi355x: 'AMD',
 };
+
+// ---------------------------------------------------------------------------
+// Vendor color zones
+//
+// To add a new vendor: add entries to GPU_VENDORS above, then add color
+// zones to both maps below (OKLch for normal mode, HSL for high-contrast).
+// ---------------------------------------------------------------------------
+
+/**
+ * OKLch hue zones for normal-mode vendor-aware colors.
+ * Narrow, precise bands for assigning brand-matching color shades.
+ *
+ * Layout (approximate):
+ *   0-12    (gap)
+ *   12-42   AMD reds/oranges
+ *   42-120  (gap)
+ *   120-170 NVIDIA greens
+ *   170-275 (gap)
+ *   275-330 unknown / fallback (purples)
+ *   330-360 (gap)
+ */
+export const VENDOR_OKLCH_ZONES: Record<
+  string,
+  { start: number; end: number; chroma: { light: number; dark: number } }
+> = {
+  amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
+  nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
+  unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
+};
+
+/**
+ * HSL hue bands for high-contrast mode.
+ * Wide perceptual zones — used to avoid confusing color associations
+ * (e.g. NVIDIA keys should not get red hues, AMD keys should not get green).
+ * Bands can wrap around 360° (e.g. AMD reds: 310→30 goes through 0°).
+ * With 10+ keys per vendor, high-contrast mode ignores these and uses the full wheel.
+ */
+export const VENDOR_HSL_BANDS: Record<string, { start: number; end: number }> = {
+  nvidia: { start: 70, end: 180 }, // greens (yellow-green through cyan)
+  amd: { start: 310, end: 30 }, // perceptual reds (pink, rose, red, red-orange)
+};

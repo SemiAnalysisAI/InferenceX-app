@@ -86,12 +86,13 @@ export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsRe
   }, [resolvedTheme]);
 
   // generate high contrast color map if enabled
+  // Use activeKeys when available so only visible items get hues — fewer items = more separation
   const colorMap = useMemo(() => {
-    if (!highContrast || identifiers.length === 0) {
-      return null;
-    }
-    return generateHighContrastColors(identifiers, resolvedTheme || 'light', colorShuffleSeed);
-  }, [highContrast, identifiers, resolvedTheme, colorShuffleSeed]);
+    if (!highContrast) return null;
+    const keysForHc = activeKeys && activeKeys.length > 0 ? activeKeys : identifiers;
+    if (keysForHc.length === 0) return null;
+    return generateHighContrastColors(keysForHc, resolvedTheme || 'light', colorShuffleSeed);
+  }, [highContrast, activeKeys, identifiers, resolvedTheme, colorShuffleSeed]);
 
   // generate dynamic vendor-aware colors for active keys
   const vendorColorMap = useMemo(() => {
