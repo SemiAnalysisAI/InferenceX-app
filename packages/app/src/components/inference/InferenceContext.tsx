@@ -534,6 +534,7 @@ export function InferenceProvider({
         model: selectedModel,
         sequence: effectiveSequence,
         preset_id: activePresetId,
+        yAxisMetric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
@@ -555,10 +556,19 @@ export function InferenceProvider({
         gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].sort(),
         model: selectedModel,
         sequence: effectiveSequence,
+        yAxisMetric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
   }, [activeDates]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on date selection changes
+
+  // Fire once on mount to capture the initial y-axis metric (default or URL-restored)
+  useEffect(() => {
+    track('inference_chart_view', {
+      yAxisMetric: selectedYAxisMetric,
+      source: getUrlParam('i_metric') ? 'url' : 'default',
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- fire once on mount
 
   // ── URL sync ──────────────────────────────────────────────────────────────
 
