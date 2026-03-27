@@ -226,6 +226,12 @@ function createServer(): McpServer {
           .enum(['asc', 'desc'] as [string, ...string[]])
           .optional()
           .describe('Sort direction (default: asc for latency, desc for throughput)'),
+        metrics: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'Extract only these metric keys as top-level fields instead of returning full metrics JSONB. E.g. ["median_tpot", "tput_per_gpu"]',
+          ),
         limit: z.number().optional().describe('Max rows (default 200, max 5000)'),
       },
       annotations: { readOnlyHint: true },
@@ -242,6 +248,7 @@ function createServer(): McpServer {
       conc,
       sort_by,
       sort_order,
+      metrics: requestedMetrics,
       limit,
     }) => {
       const db = getDb();
@@ -281,7 +288,21 @@ function createServer(): McpServer {
         ORDER BY ${db.unsafe(orderClause)}
         LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
-      const truncated = rows.length >= rowLimit;
+
+      // If specific metrics requested, extract them as top-level fields and drop the full JSONB
+      const processedRows = requestedMetrics?.length
+        ? rows.map((row) => {
+            const m = row.metrics as Record<string, unknown> | null;
+            const extracted: Record<string, unknown> = {};
+            for (const key of requestedMetrics) {
+              extracted[key] = m?.[key] ?? null;
+            }
+            const { metrics: _, ...rest } = row;
+            return { ...rest, ...extracted };
+          })
+        : rows;
+
+      const truncated = processedRows.length >= rowLimit;
       const hint = truncated
         ? 'Results truncated. Add more filters (hardware, model, conc, isl, osl) or increase limit.'
         : undefined;
@@ -290,7 +311,12 @@ function createServer(): McpServer {
           {
             type: 'text' as const,
             text: JSON.stringify(
-              { rows, count: rows.length, truncated, ...(hint ? { hint } : {}) },
+              {
+                rows: processedRows,
+                count: processedRows.length,
+                truncated,
+                ...(hint ? { hint } : {}),
+              },
               null,
               2,
             ),
