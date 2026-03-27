@@ -157,7 +157,9 @@ describe('cachedJson', () => {
   it('returns the data as JSON body', async () => {
     const data = { users: [1, 2, 3] };
     const res = cachedJson(data);
-    expect(await res.json()).toEqual(data);
+    const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
+    const text = await new Response(decompressed).text();
+    expect(JSON.parse(text)).toEqual(data);
   });
 
   it('streams large payloads across multiple chunks', async () => {
@@ -172,6 +174,8 @@ describe('cachedJson', () => {
   it('preserves non-BMP characters (emoji, surrogate pairs)', async () => {
     const data = { branch: 'feat/\u{1F680}-rocket', msg: '\u{1F4A9}\u{1F30D}\u{1F525}' };
     const res = cachedJson(data);
-    expect(await res.json()).toEqual(data);
+    const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
+    const text = await new Response(decompressed).text();
+    expect(JSON.parse(text)).toEqual(data);
   });
 });
