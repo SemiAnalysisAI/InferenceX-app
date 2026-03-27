@@ -4,11 +4,10 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { getGpuSpecs, HARDWARE_CONFIG } from '@/lib/constants';
-import { VENDOR_HSL_BANDS } from '@semianalysisai/inferencex-constants';
 import { getVendor } from '@/lib/dynamic-colors';
 
 /**
@@ -40,98 +39,8 @@ export function seededShuffle<T>(array: T[], seed: number): T[] {
 }
 
 // ---------------------------------------------------------------------------
-// High-contrast vendor color config
-//
-// Vendor detection and HSL brand hue bands are defined in dynamic-colors.ts
-// (single source of truth). See VENDOR_HSL_BANDS and getVendor().
+// High-contrast color generation
 // ---------------------------------------------------------------------------
-
-/**
- * Build allowed hue ranges for a vendor, ordered by preference:
- *   1. Own brand band (preferred)
- *   2. Neutral zones (not claimed by any vendor)
- * Other vendors' brand bands are excluded. With 10+ keys per vendor,
- * this is bypassed and the full 360° wheel is used for maximum separation.
- */
-function getAllowedRanges(vendor: string): { start: number; span: number }[] {
-  const config = VENDOR_HSL_BANDS[vendor];
-
-  // Unknown vendor: full wheel
-  if (!config) return [{ start: 0, span: 360 }];
-
-  // Collect all brand bands to avoid (other vendors' bands)
-  const avoidBands = Object.entries(VENDOR_HSL_BANDS)
-    .filter(([v]) => v !== vendor)
-    .map(([, c]) => c);
-
-  // Build "forbidden" set as sorted non-overlapping intervals on 0–360
-  // Then allowed = own brand + everything not forbidden
-  const forbidden: { start: number; end: number }[] = [];
-  for (const band of avoidBands) {
-    if (band.start < band.end) {
-      forbidden.push({ start: band.start, end: band.end });
-    } else {
-      // Wraps around — split into two
-      forbidden.push({ start: band.start, end: 360 });
-      forbidden.push({ start: 0, end: band.end });
-    }
-  }
-  forbidden.sort((a, b) => a.start - b.start);
-
-  // Merge overlapping
-  const merged: { start: number; end: number }[] = [];
-  for (const f of forbidden) {
-    const last = merged[merged.length - 1];
-    if (last && f.start <= last.end) {
-      last.end = Math.max(last.end, f.end);
-    } else {
-      merged.push({ ...f });
-    }
-  }
-
-  // Allowed = gaps between forbidden intervals within 0–360
-  const allowed: { start: number; span: number }[] = [];
-  let cursor = 0;
-  for (const f of merged) {
-    if (f.start > cursor) {
-      allowed.push({ start: cursor, span: f.start - cursor });
-    }
-    cursor = f.end;
-  }
-  if (cursor < 360) {
-    allowed.push({ start: cursor, span: 360 - cursor });
-  }
-
-  if (allowed.length === 0) return [{ start: 0, span: 360 }];
-
-  // Sort: own brand band first (by overlap with brand hue range), then rest
-  allowed.sort((a, b) => {
-    const aOverlap = rangeOverlapsBand(a, config);
-    const bOverlap = rangeOverlapsBand(b, config);
-    if (aOverlap && !bOverlap) return -1;
-    if (!aOverlap && bOverlap) return 1;
-    return 0;
-  });
-
-  return allowed;
-}
-
-/** Check if a linear hue range [start, start+span) overlaps a brand band (may wrap). */
-function rangeOverlapsBand(
-  range: { start: number; span: number },
-  band: { start: number; end: number },
-): boolean {
-  const rStart = range.start;
-  const rEnd = (range.start + range.span) % 360 || 360;
-
-  if (band.start < band.end) {
-    // Non-wrapping band: any point in range falls within [band.start, band.end]
-    return rStart < band.end && rEnd > band.start;
-  }
-  // Wrapping band (e.g. 310→30): overlaps if range touches [310,360) or [0,30]
-  return rStart < band.end || rEnd > band.start;
-}
-
 /**
  * Generates high contrast colors for chart elements using HSL color space.
  * Each vendor's keys are distributed across allowed hue ranges (excluding
@@ -150,7 +59,7 @@ export const generateHighContrastColors = (
   const colors: { [key: string]: string } = {};
   const lightness = theme === 'dark' ? 65 : 35;
 
-  // Group keys by vendor
+  // Group keys by vendor, sort within each group for stability
   const groups = new Map<string, string[]>();
   for (const key of keys) {
     const vendor = getVendor(key);
@@ -162,21 +71,14 @@ export const generateHighContrastColors = (
     list.push(key);
   }
 
-  // For each vendor group, distribute hues across their allowed ranges.
-  // With 10+ keys, hue separation matters more than brand identity — use the full wheel.
-  const MAX_VENDOR_AWARE = 10;
   for (const [vendor, vendorKeys] of groups) {
-    const ranges =
-      vendorKeys.length >= MAX_VENDOR_AWARE ? [{ start: 0, span: 360 }] : getAllowedRanges(vendor);
+    const ranges = VENDOR_HSL_ZONES[vendor] ?? [{ start: 0, span: 360 }];
     const totalSpan = ranges.reduce((s, r) => s + r.span, 0);
     const count = vendorKeys.length;
 
-    // Generate evenly-spaced hues across the concatenated allowed ranges
     let hues: number[] = [];
     for (let i = 0; i < count; i++) {
-      // Position within the total allowed span
       const pos = count <= 1 ? totalSpan / 2 : ((i + 0.5) / count) * totalSpan;
-      // Map position to actual hue by walking through ranges
       let remaining = pos;
       let hue = 0;
       for (const range of ranges) {

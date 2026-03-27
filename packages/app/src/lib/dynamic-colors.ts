@@ -28,7 +28,7 @@ export function getVendor(hwKey: string): Vendor {
 
 // Vendor color zones are defined in @semianalysisai/inferencex-constants (gpu-keys.ts).
 // VENDOR_OKLCH_ZONES — OKLch hue zones for normal-mode vendor colors.
-// VENDOR_HSL_BANDS   — HSL hue bands for high-contrast mode.
+// VENDOR_HSL_ZONES   — HSL hue zones for high-contrast mode.
 
 // ---------------------------------------------------------------------------
 // Lightness ranges

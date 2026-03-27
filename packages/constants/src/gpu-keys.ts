@@ -54,13 +54,24 @@ export const VENDOR_OKLCH_ZONES: Record<
 };
 
 /**
- * HSL hue bands for high-contrast mode.
- * Wide perceptual zones — used to avoid confusing color associations
- * (e.g. NVIDIA keys should not get red hues, AMD keys should not get green).
- * Bands can wrap around 360° (e.g. AMD reds: 310→30 goes through 0°).
- * With 10+ keys per vendor, high-contrast mode ignores these and uses the full wheel.
+ * Exclusive HSL hue zones for high-contrast mode.
+ * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
+ * from different vendors are always visually distinct and vendor-appropriate
+ * (NVIDIA = greens, AMD = reds/oranges, unknown = blues/purples).
+ *
+ * Layout (360° wheel):
+ *   NVIDIA:  60–195  (135°) — greens through cyans
+ *   AMD:     300–360 + 0–60  (120°, wraps) — magentas through oranges
+ *   unknown: 195–300 (105°) — blues/purples
+ *
+ * Each entry is an array of linear {start, span} segments (wrapping bands
+ * are split into two segments).
  */
-export const VENDOR_HSL_BANDS: Record<string, { start: number; end: number }> = {
-  nvidia: { start: 70, end: 180 }, // greens (yellow-green through cyan)
-  amd: { start: 310, end: 30 }, // perceptual reds (pink, rose, red, red-orange)
+export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
+  nvidia: [{ start: 60, span: 135 }],
+  amd: [
+    { start: 300, span: 60 },
+    { start: 0, span: 60 },
+  ],
+  unknown: [{ start: 195, span: 105 }],
 };
