@@ -11,6 +11,7 @@ export interface ChangelogEntry {
   configKeys: string[];
   description: string;
   prLink: string | null;
+  evalsOnly: boolean;
 }
 
 /**
@@ -37,9 +38,18 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
       (item['pr-link'] ? String(item['pr-link']) : null) ??
       description.match(/\bPR:\s*(https?:\/\/\S+)/)?.[1] ??
       null;
-    out.push({ configKeys, description, prLink });
+    const evalsOnly = item['evals-only'] === true;
+    out.push({ configKeys, description, prLink, evalsOnly });
   }
   return out;
+}
+
+/**
+ * Returns true if any changelog entry in the given arrays is marked `evals-only: true`.
+ * When a run is evals-only, its benchmark/perf data should be skipped during ingest.
+ */
+export function hasEvalsOnlyFlag(changelogs: Array<{ entries: ChangelogEntry[] }>): boolean {
+  return changelogs.some((c) => c.entries.some((e) => e.evalsOnly));
 }
 
 /**

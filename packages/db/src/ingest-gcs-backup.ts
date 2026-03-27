@@ -46,7 +46,11 @@ import {
 } from './etl/benchmark-ingest';
 import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
-import { parseChangelogEntries, ingestChangelogEntries } from './etl/changelog-ingest';
+import {
+  parseChangelogEntries,
+  ingestChangelogEntries,
+  hasEvalsOnlyFlag,
+} from './etl/changelog-ingest';
 import { readZipJson, readZipJsonMap, readZipText } from './etl/zip-reader';
 
 const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
@@ -82,6 +86,8 @@ interface WorkflowMapResult {
   statsRows: Array<{ hardware: string; nSuccess: number; total: number }>;
   evalRows: EvalParams[];
   changelogs: Array<{ baseRef: string; headRef: string; entries: ChangelogEntry[] }>;
+  /** True when the changelog declares evals-only — benchmark/stats data is dropped. */
+  evalsOnly: boolean;
   /** Skip counts from mapping phase (dbError is tracked separately in phase 2). */
   localSkips: Omit<Skips, 'dbError'>;
   localUnmappedModels: Set<string>;
@@ -372,6 +378,13 @@ async function mapWorkflowDir(
     if (entries.length > 0) changelogs.push({ baseRef, headRef, entries });
   }
 
+  const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  if (evalsOnly) {
+    console.log(
+      `  [${dateDir}] evals-only run ${githubRunId} — skipping ${bmkZips.length} benchmark ZIP(s) and ${statsRows.length} stats row(s)`,
+    );
+  }
+
   return {
     dateDir,
     workflowDir,
@@ -381,10 +394,11 @@ async function mapWorkflowDir(
     headSha,
     createdAt,
     ghInfo,
-    bmkZips,
-    statsRows,
+    bmkZips: evalsOnly ? [] : bmkZips,
+    statsRows: evalsOnly ? [] : statsRows,
     evalRows,
     changelogs,
+    evalsOnly,
     localSkips: {
       badZip: local.skips.badZip,
       unmappedModel: local.skips.unmappedModel,
