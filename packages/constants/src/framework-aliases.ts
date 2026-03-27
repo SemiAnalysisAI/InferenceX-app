@@ -1,3 +1,17 @@
+/** Canonical set of framework key strings used across all packages. */
+export const FRAMEWORK_KEYS = new Set([
+  'atom',
+  'dynamo-sglang',
+  'dynamo-trt',
+  'mori-sglang',
+  'sglang',
+  'trt',
+  'vllm',
+]);
+
+/** Canonical set of speculative decoding method strings. */
+export const SPEC_METHOD_KEYS = new Set(['mtp', 'none']);
+
 /**
  * Canonical mapping of legacy/renamed framework identifiers.
  * Single source of truth — consumed by ETL, frontend, and changelog processing.
