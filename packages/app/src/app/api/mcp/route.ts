@@ -188,7 +188,7 @@ function createServer(): McpServer {
         ORDER BY model, hardware, framework
       `) as Record<string, unknown>[];
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(rows, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(rows) }],
       };
     },
   );
@@ -230,7 +230,7 @@ function createServer(): McpServer {
           .array(z.string())
           .optional()
           .describe(
-            'Extract only these metric keys as top-level fields instead of returning full metrics JSONB. E.g. ["median_tpot", "tput_per_gpu"]',
+            'Metric keys to include. Defaults to [median_tpot, median_ttft, p99_tpot, p99_ttft, tput_per_gpu, output_tput_per_gpu]. Pass ["all"] for full JSONB.',
           ),
         limit: z.number().optional().describe('Max rows (default 200, max 5000)'),
       },
@@ -289,37 +289,70 @@ function createServer(): McpServer {
         LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
 
-      // If specific metrics requested, extract them as top-level fields and drop the full JSONB
-      const processedRows = requestedMetrics?.length
-        ? rows.map((row) => {
-            const m = row.metrics as Record<string, unknown> | null;
-            const extracted: Record<string, unknown> = {};
-            for (const key of requestedMetrics) {
-              extracted[key] = m?.[key] ?? null;
-            }
-            const { metrics: _, ...rest } = row;
-            return { ...rest, ...extracted };
-          })
-        : rows;
+      // Default metrics to extract when no specific metrics requested.
+      // Keeps response compact — agents can pass metrics=["all"] to get full JSONB.
+      const DEFAULT_METRICS = [
+        'median_tpot',
+        'median_ttft',
+        'p99_tpot',
+        'p99_ttft',
+        'tput_per_gpu',
+        'output_tput_per_gpu',
+      ];
+      const wantFull = requestedMetrics?.includes('all');
+      const extractKeys = wantFull
+        ? null
+        : requestedMetrics?.length
+          ? requestedMetrics
+          : DEFAULT_METRICS;
+
+      // Build filter set for stripping redundant fields
+      const appliedFilters: Record<string, unknown> = {};
+      if (hardware) appliedFilters.hardware = hardware;
+      if (model) appliedFilters.model = model;
+      if (framework) appliedFilters.framework = framework;
+      if (precision) appliedFilters.precision = precision;
+      if (spec_method) appliedFilters.spec_method = spec_method;
+      if (disagg !== undefined) appliedFilters.disagg = disagg;
+      if (isl) appliedFilters.isl = isl;
+      if (osl) appliedFilters.osl = osl;
+      if (conc) appliedFilters.conc = conc;
+
+      const round = (v: unknown) => (typeof v === 'number' ? Math.round(v * 10000) / 10000 : v);
+
+      const processedRows = rows.map((row) => {
+        const m = row.metrics as Record<string, number> | null;
+        // Extract and round selected metrics
+        const extracted: Record<string, unknown> = {};
+        if (extractKeys) {
+          for (const key of extractKeys) extracted[key] = round(m?.[key] ?? null);
+        }
+        // Strip filtered fields and full metrics blob (unless wantFull)
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(row)) {
+          if (k === 'metrics') {
+            if (wantFull) out.metrics = v;
+            continue;
+          }
+          if (k in appliedFilters) continue;
+          out[k] = v;
+        }
+        return { ...out, ...extracted };
+      });
 
       const truncated = processedRows.length >= rowLimit;
-      const hint = truncated
-        ? 'Results truncated. Add more filters (hardware, model, conc, isl, osl) or increase limit.'
-        : undefined;
+      const hint = truncated ? 'Results truncated. Add more filters or increase limit.' : undefined;
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(
-              {
-                rows: processedRows,
-                count: processedRows.length,
-                truncated,
-                ...(hint ? { hint } : {}),
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify({
+              ...(Object.keys(appliedFilters).length ? { filters: appliedFilters } : {}),
+              rows: processedRows,
+              count: processedRows.length,
+              truncated,
+              ...(hint ? { hint } : {}),
+            }),
           },
         ],
       };
@@ -359,7 +392,7 @@ function createServer(): McpServer {
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify({ rows: result, count: result.length, truncated }, null, 2),
+              text: JSON.stringify({ rows: result, count: result.length, truncated }),
             },
           ],
         };
@@ -436,7 +469,7 @@ function createServer(): McpServer {
       }
 
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(grouped, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(grouped) }],
       };
     },
   );
@@ -459,7 +492,7 @@ function createServer(): McpServer {
         ORDER BY name
       `) as Record<string, unknown>[];
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(views, null, 2) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(views) }],
       };
     },
   );
