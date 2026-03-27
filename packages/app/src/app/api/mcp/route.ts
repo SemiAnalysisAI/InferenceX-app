@@ -56,8 +56,13 @@ const DOMAIN_OVERVIEW = `InferenceX benchmark database — ML inference performa
 
 ## Key Views
 
-- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, concurrency, ISL, OSL). This is the primary view for current performance data — prefer this over benchmark_results for most queries.
+- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, concurrency, ISL, OSL). This is the primary view for current performance data — prefer this over benchmark_results for most queries. Columns: id, workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, image, metrics, error, server_log_id.
 - **latest_workflow_runs** — Latest attempt per GitHub run ID.
+
+## Key Column Names
+
+- **configs**: id, hardware, framework, model, precision, spec_method, disagg, is_multinode, prefill_tp, prefill_ep, decode_tp, decode_ep, num_prefill_gpu, num_decode_gpu
+- **benchmark_results / latest_benchmarks**: config_id, date, isl (input sequence length), osl (output sequence length), conc (concurrency), metrics (JSONB)
 
 ## Enum Values
 
@@ -87,10 +92,10 @@ Full set: ${sorted(METRIC_KEYS)}
 - Extract a metric: \`(lb.metrics->>'median_ttft')::numeric\``;
 
 function createServer(): McpServer {
-  const server = new McpServer({
-    name: 'InferenceX',
-    version: '1.0.0',
-  });
+  const server = new McpServer(
+    { name: 'InferenceX', version: '1.0.0' },
+    { instructions: DOMAIN_OVERVIEW },
+  );
 
   // ── Domain overview ──────────────────────────────────────────────────
 
@@ -159,8 +164,7 @@ function createServer(): McpServer {
     'list_configs',
     {
       title: 'List Configs',
-      description:
-        'List distinct (hardware, framework, model, precision) config combos. Optionally filter by hardware or model.',
+      description: `List distinct (hardware, framework, model, precision) config combos. Optionally filter by hardware or model.`,
       inputSchema: {
         hardware: z.string().optional().describe('Filter by hardware (e.g. "h100")'),
         model: z.string().optional().describe('Filter by model (e.g. "llama70b")'),
@@ -186,18 +190,41 @@ function createServer(): McpServer {
     'get_latest_benchmarks',
     {
       title: 'Get Latest Benchmarks',
-      description:
-        'Get the latest benchmark results joined with config details. Returns perf metrics (TTFT, TPOT, throughput, latency) for each config/concurrency/sequence-length combo. Filter by hardware, model, or both.',
+      description: `Get the latest benchmark results joined with config details. Returns perf metrics for each config/concurrency/sequence-length combo. Filter by hardware, model, or both.`,
       inputSchema: {
         hardware: z.string().optional().describe('Filter by hardware (e.g. "h100")'),
         model: z.string().optional().describe('Filter by model (e.g. "llama70b")'),
-        isl: z.number().optional().describe('Filter by input sequence length'),
-        osl: z.number().optional().describe('Filter by output sequence length'),
+        framework: z.string().optional().describe('Filter by framework (e.g. "vllm")'),
+        precision: z.string().optional().describe('Filter by precision (e.g. "fp8")'),
+        spec_method: z
+          .string()
+          .optional()
+          .describe('Filter by speculative decoding method ("mtp" or "none")'),
+        disagg: z.boolean().optional().describe('Filter by disaggregated serving (true/false)'),
+        isl: z.number().optional().describe('Filter by input sequence length (e.g. 1024)'),
+        osl: z.number().optional().describe('Filter by output sequence length (e.g. 1024)'),
+        conc: z.number().optional().describe('Filter by concurrency level (e.g. 64)'),
+        limit: z
+          .number()
+          .optional()
+          .describe('Max rows to return (default 200). Use lower values for faster responses.'),
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ hardware, model, isl, osl }) => {
+    async ({
+      hardware,
+      model,
+      framework,
+      precision,
+      spec_method,
+      disagg,
+      isl,
+      osl,
+      conc,
+      limit,
+    }) => {
       const db = getDb();
+      const rowLimit = Math.min(limit ?? 200, MAX_ROWS);
       const rows = (await db`
         SELECT
           c.hardware, c.framework, c.model, c.precision, c.spec_method, c.disagg,
@@ -206,17 +233,22 @@ function createServer(): McpServer {
         JOIN configs c ON c.id = lb.config_id
         WHERE (${hardware ?? null}::text IS NULL OR c.hardware = ${hardware ?? null})
           AND (${model ?? null}::text IS NULL OR c.model = ${model ?? null})
+          AND (${framework ?? null}::text IS NULL OR c.framework = ${framework ?? null})
+          AND (${precision ?? null}::text IS NULL OR c.precision = ${precision ?? null})
+          AND (${spec_method ?? null}::text IS NULL OR c.spec_method = ${spec_method ?? null})
+          AND (${disagg ?? null}::bool IS NULL OR c.disagg = ${disagg ?? null})
           AND (${isl ?? null}::int IS NULL OR lb.isl = ${isl ?? null})
           AND (${osl ?? null}::int IS NULL OR lb.osl = ${osl ?? null})
+          AND (${conc ?? null}::int IS NULL OR lb.conc = ${conc ?? null})
         ORDER BY c.model, c.hardware, c.framework, lb.conc
+        LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
-      const truncated = rows.length > MAX_ROWS;
-      const result = truncated ? rows.slice(0, MAX_ROWS) : rows;
+      const truncated = rows.length >= rowLimit;
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify({ rows: result, count: result.length, truncated }, null, 2),
+            text: JSON.stringify({ rows, count: rows.length, truncated }, null, 2),
           },
         ],
       };
@@ -229,8 +261,7 @@ function createServer(): McpServer {
     'query_sql',
     {
       title: 'Query SQL',
-      description:
-        'Run a read-only SQL query against the InferenceX benchmark database. Returns up to 5,000 rows as JSON. Only SELECT queries are allowed. Prefer the high-level tools (get_latest_benchmarks, list_configs, etc.) when possible — use this for custom joins, aggregations, or queries not covered by other tools.',
+      description: `Run a read-only SQL query against the InferenceX benchmark database. Returns up to 5,000 rows as JSON. Only SELECT queries are allowed. Prefer get_latest_benchmarks for simple lookups — use this for custom joins, aggregations, or queries not covered by other tools. Example: SELECT c.hardware, (lb.metrics->>'median_ttft')::numeric AS ttft FROM latest_benchmarks lb JOIN configs c ON c.id = lb.config_id WHERE c.model = 'dsr1' AND lb.conc = 64.`,
       inputSchema: {
         sql: z.string().describe('The SQL SELECT query to execute'),
       },
