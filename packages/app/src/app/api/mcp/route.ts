@@ -198,7 +198,7 @@ function createServer(): McpServer {
     {
       title: 'Get Latest Benchmarks',
       description:
-        'Get latest benchmark results with config details and metrics JSONB. This is the primary query tool — use it before falling back to query_sql. All filters are optional; combine any subset.',
+        'Get latest benchmark results with config details and metrics JSONB. This is the primary query tool — use it before falling back to query_sql. All filters are optional; combine any subset. Use sort_by with limit to get top-N results by a metric.',
       inputSchema: {
         hardware: z.enum(HW_ENUM).optional().describe('GPU type'),
         model: z.enum(MODEL_ENUM).optional().describe('Model key'),
@@ -209,6 +209,23 @@ function createServer(): McpServer {
         isl: z.number().optional().describe('Input sequence length (e.g. 1024, 8192)'),
         osl: z.number().optional().describe('Output sequence length (e.g. 1024, 8192)'),
         conc: z.number().optional().describe('Concurrency level'),
+        sort_by: z
+          .enum([
+            'median_ttft',
+            'p99_ttft',
+            'median_tpot',
+            'p99_tpot',
+            'tput_per_gpu',
+            'output_tput_per_gpu',
+            'median_itl',
+            'median_e2el',
+          ] as [string, ...string[]])
+          .optional()
+          .describe('Sort results by this metric key'),
+        sort_order: z
+          .enum(['asc', 'desc'] as [string, ...string[]])
+          .optional()
+          .describe('Sort direction (default: asc for latency, desc for throughput)'),
         limit: z.number().optional().describe('Max rows (default 200, max 5000)'),
       },
       annotations: { readOnlyHint: true },
@@ -223,10 +240,29 @@ function createServer(): McpServer {
       isl,
       osl,
       conc,
+      sort_by,
+      sort_order,
       limit,
     }) => {
       const db = getDb();
       const rowLimit = Math.min(limit ?? 200, MAX_ROWS);
+      // Allowlisted sort keys to prevent SQL injection via JSONB key
+      const SORT_KEYS = new Set([
+        'median_ttft',
+        'p99_ttft',
+        'median_tpot',
+        'p99_tpot',
+        'tput_per_gpu',
+        'output_tput_per_gpu',
+        'median_itl',
+        'median_e2el',
+      ]);
+      const safeSortKey = sort_by && SORT_KEYS.has(sort_by) ? sort_by : null;
+      const throughputKeys = new Set(['tput_per_gpu', 'output_tput_per_gpu']);
+      const dir = sort_order ?? (safeSortKey && throughputKeys.has(safeSortKey) ? 'desc' : 'asc');
+      const orderClause = safeSortKey
+        ? `(lb.metrics->>'${safeSortKey}')::numeric ${dir === 'desc' ? 'DESC' : 'ASC'} NULLS LAST, c.model, c.hardware`
+        : 'c.model, c.hardware, c.framework, lb.conc';
       const rows = (await db`
         SELECT
           c.hardware, c.framework, c.model, c.precision, c.spec_method, c.disagg,
@@ -242,7 +278,7 @@ function createServer(): McpServer {
           AND (${isl ?? null}::int IS NULL OR lb.isl = ${isl ?? null})
           AND (${osl ?? null}::int IS NULL OR lb.osl = ${osl ?? null})
           AND (${conc ?? null}::int IS NULL OR lb.conc = ${conc ?? null})
-        ORDER BY c.model, c.hardware, c.framework, lb.conc
+        ORDER BY ${db.unsafe(orderClause)}
         LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
       const truncated = rows.length >= rowLimit;
