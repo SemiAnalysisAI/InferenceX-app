@@ -646,7 +646,7 @@ export function InferenceProvider({
       setSelectedYAxisMetric(config.yAxisMetric);
       setPendingHwFilter(config.hwFilter ?? null);
       setActivePresetId(preset.id);
-      setHighContrast(false);
+      setHighContrast(true);
       if (config.gpus && config.gpus.length > 0) {
         setSelectedGPUs(config.gpus);
         if (config.useDateRange) {
