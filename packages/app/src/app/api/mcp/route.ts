@@ -4,7 +4,6 @@ import {
   DB_MODEL_TO_DISPLAY,
   FRAMEWORK_KEYS,
   GPU_KEYS,
-  METRIC_KEYS,
   PRECISION_KEYS,
   SPEC_METHOD_KEYS,
 } from '@semianalysisai/inferencex-constants';
@@ -35,66 +34,73 @@ function isRateLimited(ip: string): boolean {
 const BLOCKED_PATTERN =
   /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXEC)\b/i;
 
-const sorted = (s: Set<string>) => [...s].sort().join(', ');
-const modelEnums = Object.entries(DB_MODEL_TO_DISPLAY)
+// ── Enum arrays for JSON Schema constraints ──────────────────────────────
+const HW_ENUM = [...GPU_KEYS].sort() as [string, ...string[]];
+const MODEL_ENUM = Object.keys(DB_MODEL_TO_DISPLAY).sort() as [string, ...string[]];
+const FW_ENUM = [...FRAMEWORK_KEYS].sort() as [string, ...string[]];
+const PREC_ENUM = [...PRECISION_KEYS].sort() as [string, ...string[]];
+const SPEC_ENUM = [...SPEC_METHOD_KEYS].sort() as [string, ...string[]];
+
+const modelMapping = Object.entries(DB_MODEL_TO_DISPLAY)
   .sort(([a], [b]) => a.localeCompare(b))
-  .map(([k, v]) => `${k} (${v})`)
+  .map(([k, v]) => `${k}=${v}`)
   .join(', ');
 
+/**
+ * Server instructions — compact (<2KB) so Claude Code doesn't truncate.
+ * Contains only what agents need to pick the right tool on the first call.
+ */
+const SERVER_INSTRUCTIONS = `InferenceX: ML inference benchmark database. Query GPU performance across hardware and frameworks.
+Models: ${modelMapping}.
+Key tool: get_latest_benchmarks — filters by hardware, model, framework, precision, spec_method, disagg, isl, osl, conc. Returns metrics JSONB with keys: median_ttft, p99_ttft, median_tpot, p99_tpot, tput_per_gpu, output_tput_per_gpu, median_itl, median_e2el (all in seconds; throughput in tok/s/GPU).
+For aggregations or custom queries use query_sql against the latest_benchmarks view joined to configs.`;
+
+/**
+ * Full overview returned by get_overview tool — no length constraint.
+ */
 const DOMAIN_OVERVIEW = `InferenceX benchmark database — ML inference performance data across GPU hardware and serving frameworks.
 
 ## Tables
-
-- **configs** — Unique serving configurations. Each row is a (hardware, framework, model, precision, spec_method, disagg) combo with parallelism settings (TP/EP/DP per prefill/decode phase).
-- **benchmark_results** — Performance metrics (TTFT, TPOT, throughput, latency percentiles) per config/concurrency/sequence-length/date. Joined to configs via config_id. The \`metrics\` JSONB column holds all perf numbers.
-- **availability** — Denormalized date x config availability lookup. Use this to find which dates have data for a given model/hardware combo.
-- **eval_results** — Model evaluation results (e.g. gsm8k accuracy). Joined to configs via config_id.
-- **workflow_runs** — GitHub Actions workflow run metadata (one run = one benchmark suite execution).
-- **run_stats** — Per-hardware reliability stats (n_success / total) per workflow run.
-- **changelog_entries** — Configuration change descriptions tied to workflow runs.
-- **server_logs** / **benchmark_server_logs** — Raw server output for debugging.
+- **configs** — Serving configs: (hardware, framework, model, precision, spec_method, disagg) + parallelism (TP/EP/DP per prefill/decode).
+- **benchmark_results** — Perf metrics per config/concurrency/sequence-length/date. \`metrics\` JSONB holds all numbers.
+- **availability** — Denormalized date×config availability.
+- **eval_results** — Eval accuracy (e.g. gsm8k). Joined to configs via config_id.
+- **workflow_runs** — GitHub Actions run metadata.
+- **run_stats** — Per-hardware reliability (n_success/total).
 
 ## Key Views
+- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, conc, isl, osl). Use this for current data.
 
-- **latest_benchmarks** (materialized) — Latest successful benchmark per (config, concurrency, ISL, OSL). This is the primary view for current performance data — prefer this over benchmark_results for most queries. Columns: id, workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, image, metrics, error, server_log_id.
-- **latest_workflow_runs** — Latest attempt per GitHub run ID.
-
-## Key Column Names
-
+## Column Names
 - **configs**: id, hardware, framework, model, precision, spec_method, disagg, is_multinode, prefill_tp, prefill_ep, decode_tp, decode_ep, num_prefill_gpu, num_decode_gpu
-- **benchmark_results / latest_benchmarks**: config_id, date, isl (input sequence length), osl (output sequence length), conc (concurrency), metrics (JSONB)
+- **latest_benchmarks**: config_id, date, isl, osl, conc, metrics (JSONB)
 
 ## Enum Values
+- **hardware**: ${HW_ENUM.join(', ')}
+- **model**: ${modelMapping}
+- **framework**: ${FW_ENUM.join(', ')}
+- **precision**: ${PREC_ENUM.join(', ')}
+- **spec_method**: ${SPEC_ENUM.join(', ')}
 
-- **hardware**: ${sorted(GPU_KEYS)}
-- **model**: ${modelEnums}
-- **framework**: ${sorted(FRAMEWORK_KEYS)}
-- **precision**: ${sorted(PRECISION_KEYS)}
-- **spec_method**: ${sorted(SPEC_METHOD_KEYS)}
-
-## Metrics JSONB Keys (benchmark_results.metrics)
-
-All latency values are in seconds. Throughput values are tokens/sec/GPU.
-
+## Metrics JSONB Keys (seconds; throughput in tok/s/GPU)
 - **Throughput**: tput_per_gpu, output_tput_per_gpu, input_tput_per_gpu
-- **TTFT** (time to first token): median_ttft, mean_ttft, p99_ttft, std_ttft
-- **TPOT** (time per output token): median_tpot, mean_tpot, p99_tpot, std_tpot
-- **ITL** (inter-token latency): median_itl, mean_itl, p99_itl, std_itl
-- **E2EL** (end-to-end latency): median_e2el, mean_e2el, p99_e2el, std_e2el
+- **TTFT**: median_ttft, mean_ttft, p99_ttft, std_ttft
+- **TPOT**: median_tpot, mean_tpot, p99_tpot, std_tpot
+- **ITL**: median_itl, mean_itl, p99_itl, std_itl
+- **E2EL**: median_e2el, mean_e2el, p99_e2el, std_e2el
 - **Interactivity**: median_intvty, mean_intvty, p99_intvty, std_intvty
 
-Full set: ${sorted(METRIC_KEYS)}
-
-## Common Patterns
-
-- Join benchmark_results or latest_benchmarks to configs: \`JOIN configs c ON c.id = lb.config_id\`
-- Filter by hardware: \`WHERE c.hardware = 'h100'\`
-- Extract a metric: \`(lb.metrics->>'median_ttft')::numeric\``;
+## Common SQL
+\`\`\`sql
+SELECT c.hardware, (lb.metrics->>'median_ttft')::numeric AS ttft
+FROM latest_benchmarks lb JOIN configs c ON c.id = lb.config_id
+WHERE c.model = 'dsr1' AND lb.conc = 64
+\`\`\``;
 
 function createServer(): McpServer {
   const server = new McpServer(
     { name: 'InferenceX', version: '1.0.0' },
-    { instructions: DOMAIN_OVERVIEW },
+    { instructions: SERVER_INSTRUCTIONS },
   );
 
   // ── Domain overview ──────────────────────────────────────────────────
@@ -104,7 +110,7 @@ function createServer(): McpServer {
     {
       title: 'Get Overview',
       description:
-        'Get a domain overview of the InferenceX database: table descriptions, relationships, enum values, and common query patterns. Call this first before writing any queries.',
+        'Get full schema overview: tables, column names, enum values, metric keys, and example SQL. Call this if you need details beyond what the server instructions provide.',
       annotations: { readOnlyHint: true },
     },
     async () => ({
@@ -118,7 +124,7 @@ function createServer(): McpServer {
     'list_hardware',
     {
       title: 'List Hardware',
-      description: 'List all distinct GPU hardware types that have benchmark configs.',
+      description: 'List all GPU hardware types with benchmark data.',
       annotations: { readOnlyHint: true },
     },
     async () => {
@@ -141,7 +147,7 @@ function createServer(): McpServer {
     'list_models',
     {
       title: 'List Models',
-      description: 'List all distinct models that have benchmark configs.',
+      description: 'List all models with benchmark data.',
       annotations: { readOnlyHint: true },
     },
     async () => {
@@ -164,10 +170,11 @@ function createServer(): McpServer {
     'list_configs',
     {
       title: 'List Configs',
-      description: `List distinct (hardware, framework, model, precision) config combos. Optionally filter by hardware or model.`,
+      description:
+        'List distinct (hardware, framework, model, precision, spec_method, disagg) config combos. Use to see what configurations exist before querying benchmarks.',
       inputSchema: {
-        hardware: z.string().optional().describe('Filter by hardware (e.g. "h100")'),
-        model: z.string().optional().describe('Filter by model (e.g. "llama70b")'),
+        hardware: z.enum(HW_ENUM).optional().describe('Filter by GPU'),
+        model: z.enum(MODEL_ENUM).optional().describe('Filter by model'),
       },
       annotations: { readOnlyHint: true },
     },
@@ -190,24 +197,19 @@ function createServer(): McpServer {
     'get_latest_benchmarks',
     {
       title: 'Get Latest Benchmarks',
-      description: `Get the latest benchmark results joined with config details. Returns perf metrics for each config/concurrency/sequence-length combo. Filter by hardware, model, or both.`,
+      description:
+        'Get latest benchmark results with config details and metrics JSONB. This is the primary query tool — use it before falling back to query_sql. All filters are optional; combine any subset.',
       inputSchema: {
-        hardware: z.string().optional().describe('Filter by hardware (e.g. "h100")'),
-        model: z.string().optional().describe('Filter by model (e.g. "llama70b")'),
-        framework: z.string().optional().describe('Filter by framework (e.g. "vllm")'),
-        precision: z.string().optional().describe('Filter by precision (e.g. "fp8")'),
-        spec_method: z
-          .string()
-          .optional()
-          .describe('Filter by speculative decoding method ("mtp" or "none")'),
-        disagg: z.boolean().optional().describe('Filter by disaggregated serving (true/false)'),
-        isl: z.number().optional().describe('Filter by input sequence length (e.g. 1024)'),
-        osl: z.number().optional().describe('Filter by output sequence length (e.g. 1024)'),
-        conc: z.number().optional().describe('Filter by concurrency level (e.g. 64)'),
-        limit: z
-          .number()
-          .optional()
-          .describe('Max rows to return (default 200). Use lower values for faster responses.'),
+        hardware: z.enum(HW_ENUM).optional().describe('GPU type'),
+        model: z.enum(MODEL_ENUM).optional().describe('Model key'),
+        framework: z.enum(FW_ENUM).optional().describe('Serving framework'),
+        precision: z.enum(PREC_ENUM).optional().describe('Quantization precision'),
+        spec_method: z.enum(SPEC_ENUM).optional().describe('Speculative decoding method'),
+        disagg: z.boolean().optional().describe('Disaggregated prefill/decode'),
+        isl: z.number().optional().describe('Input sequence length (e.g. 1024, 8192)'),
+        osl: z.number().optional().describe('Output sequence length (e.g. 1024, 8192)'),
+        conc: z.number().optional().describe('Concurrency level'),
+        limit: z.number().optional().describe('Max rows (default 200, max 5000)'),
       },
       annotations: { readOnlyHint: true },
     },
@@ -244,11 +246,18 @@ function createServer(): McpServer {
         LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
       const truncated = rows.length >= rowLimit;
+      const hint = truncated
+        ? 'Results truncated. Add more filters (hardware, model, conc, isl, osl) or increase limit.'
+        : undefined;
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify({ rows, count: rows.length, truncated }, null, 2),
+            text: JSON.stringify(
+              { rows, count: rows.length, truncated, ...(hint ? { hint } : {}) },
+              null,
+              2,
+            ),
           },
         ],
       };
@@ -261,9 +270,14 @@ function createServer(): McpServer {
     'query_sql',
     {
       title: 'Query SQL',
-      description: `Run a read-only SQL query against the InferenceX benchmark database. Returns up to 5,000 rows as JSON. Only SELECT queries are allowed. Prefer get_latest_benchmarks for simple lookups — use this for custom joins, aggregations, or queries not covered by other tools. Example: SELECT c.hardware, (lb.metrics->>'median_ttft')::numeric AS ttft FROM latest_benchmarks lb JOIN configs c ON c.id = lb.config_id WHERE c.model = 'dsr1' AND lb.conc = 64.`,
+      description:
+        'Run a read-only SQL SELECT. Do NOT use for simple benchmark lookups — use get_latest_benchmarks instead. Use this only for aggregations, GROUP BY, custom joins, or queries the other tools cannot handle.',
       inputSchema: {
-        sql: z.string().describe('The SQL SELECT query to execute'),
+        sql: z
+          .string()
+          .describe(
+            "SQL SELECT query. Key tables: latest_benchmarks (join to configs via config_id). Columns: isl, osl, conc, metrics (JSONB). Extract metrics: (metrics->>'median_ttft')::numeric",
+          ),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
@@ -308,7 +322,7 @@ function createServer(): McpServer {
     {
       title: 'Get Schema',
       description:
-        'Get the full database schema grouped by table: columns, types, nullability, defaults, and descriptions. For a quicker orientation, use get_overview instead.',
+        'Get full database schema grouped by table. Use get_overview for a quicker orientation.',
       annotations: { readOnlyHint: true },
     },
     async () => {
