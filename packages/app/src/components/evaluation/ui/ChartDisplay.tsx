@@ -21,7 +21,7 @@ export default function EvaluationChartDisplay() {
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = evaluationChartToCsv(chartData);
-    exportToCsv(`evaluation-${Date.now()}`, headers, rows);
+    exportToCsv(`InferenceX_evaluation_${selectedModel}_${selectedBenchmark}`, headers, rows);
   }, [chartData]);
 
   return (
@@ -55,6 +55,7 @@ export default function EvaluationChartDisplay() {
         analyticsPrefix="evaluation"
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}
+        exportFileName={`InferenceX_evaluation_${selectedModel}_${selectedBenchmark}`}
       >
         <EvalBarChartD3
           caption={

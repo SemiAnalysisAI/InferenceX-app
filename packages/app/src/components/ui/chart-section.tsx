@@ -20,6 +20,8 @@ interface ChartSectionProps {
   setIsLegendExpanded?: (expanded: boolean) => void;
   /** Optional callback to export chart data as CSV */
   onExportCsv?: () => void;
+  /** Human-readable base name for exported files. Falls back to chartId. */
+  exportFileName?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ChartSection({
   className = 'pt-8 md:pt-0',
   setIsLegendExpanded,
   onExportCsv,
+  exportFileName,
 }: ChartSectionProps) {
   return (
     <section className={className}>
@@ -48,6 +51,7 @@ export function ChartSection({
           zoomResetEvent={zoomResetEvent}
           setIsLegendExpanded={setIsLegendExpanded}
           onExportCsv={onExportCsv}
+          exportFileName={exportFileName}
         />
 
         <Card>{children}</Card>

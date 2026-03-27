@@ -78,14 +78,20 @@ function CalculatorChartButtons({
   chartId,
   onExportCsv,
   setIsLegendExpanded,
+  exportFileName,
 }: {
   viewMode: 'chart' | 'table';
   setViewMode: (v: 'chart' | 'table') => void;
   chartId: string;
   onExportCsv: () => void;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  exportFileName?: string;
 }) {
-  const { isExporting, exportToImage } = useChartExport({ chartId, setIsLegendExpanded });
+  const { isExporting, exportToImage } = useChartExport({
+    chartId,
+    setIsLegendExpanded,
+    exportFileName,
+  });
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
 
   const handleExportPng = () => {
@@ -373,7 +379,7 @@ export default function ThroughputCalculatorDisplay() {
       const config = hardwareConfig[hwKey] || HARDWARE_CONFIG[hwKey];
       return config ? getDisplayLabel(config) : hwKey;
     });
-    exportToCsv(`calculator-${Date.now()}`, headers, rows);
+    exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
   }, [results, targetValue, hardwareConfig]);
 
   const handleResetGpus = useCallback(() => {
@@ -695,6 +701,7 @@ export default function ThroughputCalculatorDisplay() {
             chartId="calculator-chart"
             onExportCsv={handleExportCsv}
             setIsLegendExpanded={setIsLegendExpanded}
+            exportFileName={`InferenceX_calculator_${selectedModel}`}
           />
           <Card>
             {loading ? (

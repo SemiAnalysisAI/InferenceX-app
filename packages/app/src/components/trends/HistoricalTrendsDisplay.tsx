@@ -289,6 +289,7 @@ export default function HistoricalTrendsDisplay() {
               analyticsPrefix="historical"
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
+              exportFileName={`InferenceX_historical_${selectedModel}`}
               onExportCsv={() => {
                 const { headers, rows } = historicalTrendToCsv(
                   trendLines,
@@ -296,7 +297,7 @@ export default function HistoricalTrendsDisplay() {
                   currentYLabel,
                   targetInteractivity,
                 );
-                exportToCsv(`historical-trend-${Date.now()}`, headers, rows);
+                exportToCsv(`InferenceX_historical_${selectedModel}`, headers, rows);
               }}
             />
             <Card>

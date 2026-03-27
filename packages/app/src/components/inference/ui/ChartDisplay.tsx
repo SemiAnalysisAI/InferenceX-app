@@ -264,6 +264,7 @@ export default function ChartDisplay() {
                       : 'interactivity'
                 }
                 setIsLegendExpanded={setIsLegendExpanded}
+                exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                 onExportCsv={() => {
                   const visibleData = graph.data.filter(
                     (d) =>
@@ -275,7 +276,11 @@ export default function ChartDisplay() {
                     graph.model,
                     graph.sequence,
                   );
-                  exportToCsv(`chart-${graphIndex}-${Date.now()}`, headers, rows);
+                  exportToCsv(
+                    `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+                    headers,
+                    rows,
+                  );
                 }}
               />
               <Card>
