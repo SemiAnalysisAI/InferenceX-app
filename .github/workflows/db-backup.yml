@@ -1,4 +1,4 @@
-name: Database Backup
+name: Database Dump
 
 on:
   schedule:
@@ -29,7 +29,7 @@ jobs:
         run: |
           DUMP_DIR="inferencex-dump-$(date -u +%Y-%m-%d)"
           pnpm admin:db:dump "$DUMP_DIR"
-          tar -czf "${DUMP_DIR}.tar.gz" "$DUMP_DIR"
+          tar -czf "${DUMP_DIR}.tar.gz" -C packages/db "$DUMP_DIR"
           echo "DUMP_ARCHIVE=${DUMP_DIR}.tar.gz" >> "$GITHUB_ENV"
           echo "TAG=db-dump/$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
