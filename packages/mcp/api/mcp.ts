@@ -1,12 +1,10 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { createServer } from '@semianalysisai/inferencex-mcp/server';
-
-export const dynamic = 'force-dynamic';
+import { createServer } from '../src/server.js';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 250;
 
-/** Simple in-memory IP rate limiter. Resets on cold start. */
+/** Per-instance rate limiter. Persists while the serverless function stays warm. */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function isRateLimited(ip: string): boolean {
@@ -53,31 +51,34 @@ async function handleMcpRequest(request: Request): Promise<Response> {
   }
 }
 
-export async function POST(request: Request): Promise<Response> {
-  return handleMcpRequest(request);
-}
+export default async function handler(request: Request): Promise<Response> {
+  const secret = process.env.MCP_SECRET;
+  if (secret) {
+    const auth = request.headers.get('authorization');
+    if (auth !== `Bearer ${secret}`) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+  }
 
-export async function GET(request: Request): Promise<Response> {
-  const accept = request.headers.get('accept') ?? '';
-  if (accept.includes('text/html') || !request.headers.get('content-type')) {
-    const url = new URL('/api/mcp', request.url);
-    return Response.json(
-      {
-        error: 'This is an MCP (Model Context Protocol) endpoint, not a REST API.',
-        setup: {
-          description:
-            'Add this to your Claude Code settings (.claude/settings.json) or MCP client config:',
-          mcpServers: {
-            inferencex: { url: url.href },
+  if (request.method === 'GET') {
+    const accept = request.headers.get('accept') ?? '';
+    if (accept.includes('text/html') || !request.headers.get('content-type')) {
+      const url = new URL('/api/mcp', request.url);
+      return Response.json(
+        {
+          error: 'This is an MCP (Model Context Protocol) endpoint, not a REST API.',
+          setup: {
+            description:
+              'Add this to your Claude Code settings (.claude/settings.json) or MCP client config:',
+            mcpServers: {
+              inferencex: { url: url.href },
+            },
           },
         },
-      },
-      { status: 400 },
-    );
+        { status: 400 },
+      );
+    }
   }
-  return handleMcpRequest(request);
-}
 
-export async function DELETE(request: Request): Promise<Response> {
   return handleMcpRequest(request);
 }

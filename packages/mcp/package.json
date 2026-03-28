@@ -7,6 +7,8 @@
     "./server": "./src/server.ts"
   },
   "scripts": {
+    "mcp": "dotenv -e ../../.env -- tsx watch src/dev.ts",
+    "test:unit": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,6 +19,9 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "typescript": "^6.0.2"
+    "dotenv-cli": "^11.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
   }
 }

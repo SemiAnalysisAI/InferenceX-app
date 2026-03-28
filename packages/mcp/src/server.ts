@@ -39,7 +39,7 @@ const modelMapping = Object.entries(DB_MODEL_TO_DISPLAY)
  */
 const SERVER_INSTRUCTIONS = `InferenceX: ML inference benchmark database. Query GPU performance across hardware and frameworks.
 Models: ${modelMapping}.
-Key tool: get_latest_benchmarks — filters by hardware, model, framework, precision, spec_method, disagg, isl, osl, conc. Returns metrics JSONB with keys: median_ttft, p99_ttft, median_tpot, p99_tpot, tput_per_gpu, output_tput_per_gpu, median_itl, median_e2el (all in seconds; throughput in tok/s/GPU).
+Key tool: get_latest_benchmarks — filters by hardware, model, framework, precision, spec_method, disagg, num_gpu, isl, osl, conc. Returns config details (incl. num_prefill_gpu, num_decode_gpu) and metrics JSONB with keys: median_ttft, p99_ttft, median_tpot, p99_tpot, tput_per_gpu, output_tput_per_gpu, median_itl, median_e2el (all in seconds; throughput in tok/s/GPU).
 For aggregations or custom queries use query_sql against the latest_benchmarks view joined to configs.`;
 
 /**
@@ -204,6 +204,12 @@ export function createServer(): McpServer {
         isl: z.number().optional().describe('Input sequence length (e.g. 1024, 8192)'),
         osl: z.number().optional().describe('Output sequence length (e.g. 1024, 8192)'),
         conc: z.number().optional().describe('Concurrency level'),
+        num_gpu: z
+          .number()
+          .optional()
+          .describe(
+            'Total GPU count. Filters configs where num_prefill_gpu + num_decode_gpu = value (disagg) or num_decode_gpu = value (non-disagg).',
+          ),
         sort_by: z
           .enum([
             'median_ttft',
@@ -241,6 +247,7 @@ export function createServer(): McpServer {
       isl,
       osl,
       conc,
+      num_gpu,
       sort_by,
       sort_order,
       metrics: requestedMetrics,
@@ -268,6 +275,7 @@ export function createServer(): McpServer {
       const rows = (await db`
         SELECT
           c.hardware, c.framework, c.model, c.precision, c.spec_method, c.disagg,
+          c.num_prefill_gpu, c.num_decode_gpu,
           lb.date, lb.isl, lb.osl, lb.conc, lb.metrics
         FROM latest_benchmarks lb
         JOIN configs c ON c.id = lb.config_id
@@ -280,6 +288,9 @@ export function createServer(): McpServer {
           AND (${isl ?? null}::int IS NULL OR lb.isl = ${isl ?? null})
           AND (${osl ?? null}::int IS NULL OR lb.osl = ${osl ?? null})
           AND (${conc ?? null}::int IS NULL OR lb.conc = ${conc ?? null})
+          AND (${num_gpu ?? null}::int IS NULL OR
+            CASE WHEN c.disagg THEN c.num_prefill_gpu + c.num_decode_gpu
+                 ELSE c.num_decode_gpu END = ${num_gpu ?? null})
         ORDER BY ${db.unsafe(orderClause)}
         LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
