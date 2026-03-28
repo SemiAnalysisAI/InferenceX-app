@@ -29,8 +29,8 @@ jobs:
         run: |
           DUMP_DIR="inferencex-dump-$(date -u +%Y-%m-%d)"
           pnpm admin:db:dump "$DUMP_DIR"
-          tar -czf "${DUMP_DIR}.tar.gz" -C packages/db "$DUMP_DIR"
-          echo "DUMP_ARCHIVE=${DUMP_DIR}.tar.gz" >> "$GITHUB_ENV"
+          cd packages/db && zip -r "${GITHUB_WORKSPACE}/${DUMP_DIR}.zip" "$DUMP_DIR" && cd -
+          echo "DUMP_ARCHIVE=${DUMP_DIR}.zip" >> "$GITHUB_ENV"
           echo "TAG=db-dump/$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
       - name: Create release
@@ -39,5 +39,5 @@ jobs:
         run: |
           gh release create "$TAG" "$DUMP_ARCHIVE" \
             --title "DB Dump $(date -u +%Y-%m-%d)" \
-            --notes "Weekly database backup." \
+            --notes "Weekly database dump." \
             --latest=false
