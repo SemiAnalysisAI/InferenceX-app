@@ -7,7 +7,7 @@
     "./server": "./src/server.ts"
   },
   "scripts": {
-    "mcp": "dotenv -e ../../.env -- tsx watch src/dev.ts",
+    "mcp": "dotenv -e ../../.env -- tsx watch src/mcp.ts",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit"
   },
