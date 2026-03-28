@@ -1,0 +1,43 @@
+name: Database Dump
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Every Monday at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --filter @semianalysisai/inferencex-db...
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Dump database
+        env:
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+        run: |
+          DUMP_DIR="inferencex-dump-$(date -u +%Y-%m-%d)"
+          pnpm admin:db:dump "$DUMP_DIR"
+          cd packages/db && zip -r "${GITHUB_WORKSPACE}/${DUMP_DIR}.zip" "$DUMP_DIR" && cd -
+          echo "DUMP_ARCHIVE=${DUMP_DIR}.zip" >> "$GITHUB_ENV"
+          echo "TAG=db-dump/$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "$DUMP_ARCHIVE" \
+            --title "DB Dump $(date -u +%Y-%m-%d)" \
+            --notes "Weekly database dump." \
+            --latest=false
