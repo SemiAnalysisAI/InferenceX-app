@@ -51,7 +51,7 @@ num_prefill_gpu, num_decode_gpu
 - `tp`: tensor parallelism, `ep`: expert parallelism, `dp_attention`: data parallel attention, `num_workers`: pipeline parallel workers
 - `spec_method`: speculative decoding method. `mtp` = multi-token prediction, `none` = standard autoregressive
 - `disagg=true` means prefill and decode run on separate GPU pools (disaggregated serving). When `disagg=false`, prefill and decode fields are identical
-- Total GPU count = `num_prefill_gpu + num_decode_gpu` for disagg, or just `num_prefill_gpu` for non-disagg
+- Total GPU count = `num_prefill_gpu + num_decode_gpu` for disagg, or just `num_prefill_gpu` for non-disagg. When not explicitly set, defaults to `tp * ep`
 
 ## Benchmark Result Fields
 
@@ -72,12 +72,14 @@ image, metrics, error, server_log_id
 
 All latency values in seconds. `tput_per_gpu` is total throughput (input+output tokens) per second per GPU.
 
-**Throughput**: `tput_per_gpu`
+**Throughput**: `tput_per_gpu`, `output_tput_per_gpu` (optional), `input_tput_per_gpu` (optional)
 **TTFT** (time to first token): `median_ttft`, `mean_ttft`, `p99_ttft`, `std_ttft`
 **TPOT** (time per output token): `median_tpot`, `mean_tpot`, `p99_tpot`, `std_tpot`
 **ITL** (inter-token latency): `median_itl`, `mean_itl`, `p99_itl`, `std_itl`
 **E2EL** (end-to-end latency): `median_e2el`, `mean_e2el`, `p99_e2el`, `std_e2el`
 **Interactivity**: `median_intvty`, `mean_intvty`, `p99_intvty`, `std_intvty`
+
+New numeric metrics may appear in future dumps without schema changes — the ETL auto-captures any numeric field not reserved for config dimensions.
 
 ## Eval Result Fields
 
