@@ -41,6 +41,10 @@
 **/*.tsbuildinfo
 **/next-env.d.ts
 
+# database dumps
+**/inferencex-dump-*
+**/inferencex-backup-*.dump
+
 # local data
 **/gcs
 **/logs

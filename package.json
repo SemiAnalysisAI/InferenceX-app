@@ -32,6 +32,7 @@
     "admin:db:ingest:ci": "pnpm --filter *db db:ingest:ci",
     "admin:db:ingest:gcs": "pnpm --filter *db db:ingest:gcs",
     "admin:db:ingest:supplemental": "pnpm --filter *db db:ingest:supplemental",
+    "admin:db:dump": "pnpm --filter *db db:dump",
     "admin:db:migrate": "pnpm --filter *db db:migrate",
     "admin:db:apply-overrides": "pnpm --filter *db db:apply-overrides",
     "admin:db:reset": "pnpm --filter *db db:reset",
