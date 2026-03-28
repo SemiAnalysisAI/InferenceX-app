@@ -1,41 +1,18 @@
 # InferenceX MCP Server
 
-MCP (Model Context Protocol) server for querying the InferenceX benchmark database. Deployable as a standalone Vercel serverless function.
+Local MCP (Model Context Protocol) server for querying the InferenceX benchmark database via stdio transport.
 
-## Deploy to Vercel
-
-1. Create a new Vercel project from this monorepo
-2. Set **Root Directory** to `packages/mcp`
-3. Add environment variables:
-   - `DATABASE_READONLY_URL` — Neon read-only connection string
-   - `MCP_SECRET` — Bearer token for authentication (optional for local dev)
-
-## Local Development
+## Setup
 
 ```bash
-pnpm dev:mcp
+pnpm mcp
 ```
 
-Starts the server on `http://localhost:3001/api/mcp`.
+Or add to Claude Code:
 
-## Connect from Claude Code
-
-Add to your `.claude/settings.json` or project settings:
-
-```json
-{
-  "mcpServers": {
-    "inferencex": {
-      "url": "https://<your-deployment>.vercel.app/api/mcp",
-      "headers": {
-        "Authorization": "Bearer <MCP_SECRET>"
-      }
-    }
-  }
-}
+```bash
+claude mcp add --transport stdio inferencex -- pnpm mcp
 ```
-
-For local development, omit the `headers` (auth is skipped when `MCP_SECRET` is not set).
 
 ## Tools
 
