@@ -72,19 +72,23 @@ async function dump(): Promise<void> {
     console.log(` ${count} rows`);
   }
 
-  // Generate skills.md
-  const skillsMd = generateSkills();
-  writeFileSync(resolve(outDir, 'skills.md'), skillsMd);
-  console.log('  skills.md');
+  const skillMd = generateSkillMd();
+  writeFileSync(resolve(outDir, 'SKILL.md'), skillMd);
+  console.log('  SKILL.md');
 
   console.log('\n=== db:dump complete ===');
 }
 
-function generateSkills(): string {
-  return `# InferenceX Database Dump
+function generateSkillMd(): string {
+  return `---
+name: inferencex-data
+description: ML inference benchmark dataset from InferenceX — GPU performance metrics across hardware, frameworks, and models
+---
+
+# InferenceX Database Dump
 
 ML inference benchmark data exported from the InferenceX Neon PostgreSQL database.
-Each \`.json\` file corresponds to one database table. All files are in this directory.
+Each \`.json\` file corresponds to one database table.
 
 ## Files
 
