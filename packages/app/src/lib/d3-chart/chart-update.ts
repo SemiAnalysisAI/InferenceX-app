@@ -102,7 +102,11 @@ export function renderGrid(
         (exit) => exit.remove(),
       );
     const vTarget = dur > 0 ? (vJoin as any).transition().duration(dur) : vJoin;
-    vTarget.attr('x1', (d: number) => tickScale(d)).attr('x2', (d: number) => tickScale(d));
+    vTarget
+      .attr('x1', (d: number) => tickScale(d))
+      .attr('x2', (d: number) => tickScale(d))
+      .attr('y1', 0)
+      .attr('y2', height);
   }
 
   // Horizontal grid lines — reuse existing group
@@ -137,6 +141,10 @@ export function renderGrid(
         (exit) => exit.remove(),
       );
     const hTarget = dur > 0 ? (hJoin as any).transition().duration(dur) : hJoin;
-    hTarget.attr('y1', (d: number) => yScale(d)).attr('y2', (d: number) => yScale(d));
+    hTarget
+      .attr('x1', 0)
+      .attr('x2', width)
+      .attr('y1', (d: number) => yScale(d))
+      .attr('y2', (d: number) => yScale(d));
   }
 }
