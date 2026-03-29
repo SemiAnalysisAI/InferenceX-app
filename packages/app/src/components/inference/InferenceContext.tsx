@@ -142,6 +142,9 @@ export function InferenceProvider({
   // --- Favorite presets state ---
   const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  // Persists the preset's desired hw filter beyond pendingHwFilter consumption.
+  // Cleared when the user manually changes filters (clearing the preset).
+  const presetHwFilterRef = useRef<string[] | null>(null);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate =
@@ -284,6 +287,7 @@ export function InferenceProvider({
   const clearPresetOnChange = useCallback(() => {
     if (presetGuardRef.current) return;
     setActivePresetId((prev) => (prev !== null ? null : prev));
+    presetHwFilterRef.current = null;
   }, []);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
@@ -419,6 +423,7 @@ export function InferenceProvider({
     (hw: string) => {
       toggleHwRaw(hw, hwTypesWithData);
       setActivePresetId(null);
+      presetHwFilterRef.current = null;
     },
     [toggleHwRaw, hwTypesWithData],
   );
@@ -427,6 +432,7 @@ export function InferenceProvider({
     (hw: string) => {
       removeHwRaw(hw);
       setActivePresetId(null);
+      presetHwFilterRef.current = null;
     },
     [removeHwRaw],
   );
@@ -463,10 +469,22 @@ export function InferenceProvider({
   // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes.
   // Use a stable string key for precisions so array reference changes don't trigger a reset.
   // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
+  // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
+  // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
   const precisionsKey = effectivePrecisions.join(',');
   useEffect(() => {
     if (pendingHwFilterRef.current) return;
-    if (hwTypesWithData.size > 0) setActiveHwTypes(hwTypesWithData);
+    if (hwTypesWithData.size === 0) return;
+    const presetFilter = presetHwFilterRef.current;
+    if (presetFilter) {
+      const filterSet = new Set(presetFilter);
+      const filtered = new Set(Array.from(hwTypesWithData).filter((k) => filterSet.has(k)));
+      if (filtered.size > 0) {
+        setActiveHwTypes(filtered);
+        return;
+      }
+    }
+    setActiveHwTypes(hwTypesWithData);
   }, [selectedModel, effectiveSequence, precisionsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- precisionsKey is a stable proxy for effectivePrecisions
 
   // Remove selected GPUs that no longer have data for current filters
@@ -645,6 +663,7 @@ export function InferenceProvider({
       setSelectedPrecisions(config.precisions);
       setSelectedYAxisMetric(config.yAxisMetric);
       setPendingHwFilter(config.hwFilter ?? null);
+      presetHwFilterRef.current = config.hwFilter ?? null;
       setActivePresetId(preset.id);
       setHighContrast(true);
       if (config.gpus && config.gpus.length > 0) {
