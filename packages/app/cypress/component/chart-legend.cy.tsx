@@ -58,9 +58,11 @@ function ChartLegendWrapper({ items = MOCK_ITEMS }: { items?: CommonLegendItemPr
       isLegendExpanded={expanded}
       onExpandedChange={setExpanded}
       variant="sidebar"
-      showResetFilter={itemsWithHandler.some((i) => !i.isActive)}
-      allSelected={itemsWithHandler.every((i) => i.isActive)}
-      onResetFilter={() => setLegendItems(items)}
+      actions={
+        itemsWithHandler.some((i) => !i.isActive)
+          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
+          : []
+      }
     />
   );
 }

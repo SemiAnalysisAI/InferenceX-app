@@ -4,16 +4,16 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
-import { useGitHubStars } from '@/hooks/api/use-github-stars';
+import { track } from '@/lib/analytics';
 
 interface GitHubStarsProps {
   owner: string;
   repo: string;
+  starCount?: number | null;
 }
 
-export function GitHubStars({ owner, repo }: GitHubStarsProps) {
-  const { data } = useGitHubStars();
-  const stars = data?.owner === owner && data?.repo === repo ? data.stars : null;
+export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
+  const stars = starCount ?? null;
   const [hasStarred, setHasStarred] = useState(false);
 
   useEffect(() => {
@@ -35,8 +35,9 @@ export function GitHubStars({ owner, repo }: GitHubStarsProps) {
       onClick={() => {
         saveStarred();
         setHasStarred(true);
+        track('header_star_starred');
       }}
-      className={`${hasStarred ? '' : 'star-button-glow '}flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-colors`}
+      className={`${hasStarred ? '' : 'star-button-glow hover:border-primary/50 dark:hover:border-primary/50 '}flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-400 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
     >
       {/* Star Icon */}
       <svg

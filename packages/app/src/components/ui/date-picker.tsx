@@ -235,7 +235,7 @@ export function DatePicker({
   const handleGoPrevious = () => {
     const index = getCurrentDateIndex();
     if (index > 0 && availableDates) {
-      track('date_picker_previous');
+      track('date_picker_previous', { date: availableDates[index - 1] });
       onChange(availableDates[index - 1]);
     }
   };
@@ -244,7 +244,7 @@ export function DatePicker({
   const handleGoNext = () => {
     const index = getCurrentDateIndex();
     if (availableDates && index >= 0 && index < availableDates.length - 1) {
-      track('date_picker_next');
+      track('date_picker_next', { date: availableDates[index + 1] });
       onChange(availableDates[index + 1]);
     }
   };
@@ -280,15 +280,21 @@ export function DatePicker({
           onClick={handleGoPrevious}
           disabled={!canGoPrevious() || !!isCheckingAvailableDates}
           className="h-8 w-8"
+          suppressHydrationWarning
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button variant="ghost">
+            <Button
+              variant="ghost"
+              className="!px-5 min-w-[200px] dark:bg-input/90 dark:hover:bg-input/50"
+            >
               <Calendar className="mr-0 h-4 w-4" />
               <strong>Run Date:</strong>
-              {getDisplayText()}
+              <span className="tabular-nums inline-block w-[6.5em] text-left">
+                {getDisplayText()}
+              </span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
@@ -506,13 +512,25 @@ function CalendarGrid({
       currentMonth.getMonth() < latestMonth.getMonth());
 
   const goToPreviousMonth = () => {
-    if (canGoPrev)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    if (canGoPrev) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
+      track('date_picker_month_navigated', {
+        direction: 'previous',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   const goToNextMonth = () => {
-    if (canGoNext)
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    if (canGoNext) {
+      const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
+      track('date_picker_month_navigated', {
+        direction: 'next',
+        month: newMonth.toISOString().slice(0, 7),
+      });
+      setCurrentMonth(newMonth);
+    }
   };
 
   return (

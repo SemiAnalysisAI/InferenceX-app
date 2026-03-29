@@ -11,9 +11,21 @@ import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
 
+/** Dashboard tab paths that should highlight the "Dashboard" nav link. */
+const DASHBOARD_TABS = [
+  '/inference',
+  '/evaluation',
+  '/historical',
+  '/calculator',
+  '/reliability',
+  '/gpu-specs',
+  '/gpu-metrics',
+];
+
 const NAV_LINKS = [
+  { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
-    href: '/',
+    href: '/inference',
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
@@ -25,15 +37,42 @@ const NAV_LINKS = [
     event: 'header_supporters_clicked',
   },
   { href: '/blog', label: 'Articles', testId: 'nav-link-blog', event: 'header_blog_clicked' },
+  { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/')
-    return pathname === '/' || (!pathname.startsWith('/quotes') && !pathname.startsWith('/blog'));
+  if (href === '/') return pathname === '/';
+  if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
   return pathname.startsWith(href);
 }
 
-export const Header = () => {
+/**
+ * Layout group for a path. Next.js soft navigation breaks when crossing
+ * layout boundaries, so we use plain <a> tags for those transitions.
+ */
+function layoutGroup(path: string): 'dashboard' | 'blog' | 'root' {
+  if (DASHBOARD_TABS.some((tab) => path.startsWith(tab))) return 'dashboard';
+  if (path.startsWith('/blog')) return 'blog';
+  return 'root';
+}
+
+/**
+ * Use Next.js Link for same-layout-group navigation (soft nav),
+ * plain <a> when crossing layout boundaries (full page nav)
+ * to work around Next.js soft navigation bugs between route groups.
+ */
+function NavLink({
+  href,
+  currentPath,
+  ...props
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; currentPath: string }) {
+  if (layoutGroup(currentPath) === layoutGroup(href)) {
+    return <Link href={href} {...props} />;
+  }
+  return <a href={href} {...props} />;
+}
+
+export const Header = ({ starCount }: { starCount?: number | null }) => {
   const pathname = usePathname() ?? '/';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -68,11 +107,14 @@ export const Header = () => {
   }, []);
 
   return (
-    <header data-testid="header" className="border-b border-border/40">
+    <header
+      data-testid="header"
+      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
+    >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <a href="/" className="flex items-center gap-2 shrink-0">
             <span className="text-lg font-bold tracking-tight">InferenceX</span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
@@ -81,19 +123,20 @@ export const Header = () => {
                 alt="SemiAnalysis logo"
                 width={64}
                 height={27}
-                className="inline w-12"
+                className="inline h-auto lg:w-20"
                 priority
               />
             </span>
-          </Link>
+          </a>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {NAV_LINKS.map(({ href, label, testId, event }) => (
-              <Link
+              <NavLink
                 key={href}
                 data-testid={testId}
                 href={href}
+                currentPath={pathname}
                 className={cn(
                   'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
@@ -103,17 +146,17 @@ export const Header = () => {
                 onClick={() => track(event)}
               >
                 {label}
-              </Link>
+              </NavLink>
             ))}
           </nav>
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-2">
-            <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
+            <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             <ModeToggle />
 
             {/* Mobile hamburger */}
-            <div ref={menuRef} className="relative md:hidden">
+            <div ref={menuRef} className="relative lg:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"
@@ -140,9 +183,10 @@ export const Header = () => {
               {mobileMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40">
                   {NAV_LINKS.map(({ href, label, event }) => (
-                    <Link
+                    <NavLink
                       key={href}
                       href={href}
+                      currentPath={pathname}
                       className={cn(
                         'px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         isActive(pathname, href)
@@ -152,7 +196,7 @@ export const Header = () => {
                       onClick={() => track(event)}
                     >
                       {label}
-                    </Link>
+                    </NavLink>
                   ))}
                 </div>
               )}

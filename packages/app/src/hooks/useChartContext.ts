@@ -74,11 +74,17 @@ export function useChartUIState(config: UseChartStateConfig) {
 }
 
 /**
- * Manages toggleable set state (e.g., enabled models, enabled hardware)
+ * Manages togglable set state (e.g., enabled models, enabled hardware)
  * with automatic initialization and callbacks.
  */
 export function useChartToggleSet<T extends string = string>() {
-  const { activeSet, setActiveSet, toggle: toggleRaw, selectAll: selectAllRaw } = useTogglableSet();
+  const {
+    activeSet,
+    setActiveSet,
+    toggle: toggleRaw,
+    selectAll: selectAllRaw,
+    remove: removeRaw,
+  } = useTogglableSet();
 
   // memoize callbacks to prevent unnecessary re-renders
   const toggle = useCallback(
@@ -91,16 +97,19 @@ export function useChartToggleSet<T extends string = string>() {
     [selectAllRaw],
   );
 
+  const remove = useCallback((item: T) => removeRaw(item), [removeRaw]);
+
   return {
     activeSet: activeSet as Set<T>,
     setActiveSet: setActiveSet as (set: Set<T>) => void,
     toggle,
     selectAll,
+    remove,
   };
 }
 
 /**
- * Automatically initializes a toggleable set when available items change.
+ * Automatically initializes a togglable set when available items change.
  * Prevents unnecessary reinitialization when the set is already populated.
  */
 export function useAutoInitializeToggleSet<T>(

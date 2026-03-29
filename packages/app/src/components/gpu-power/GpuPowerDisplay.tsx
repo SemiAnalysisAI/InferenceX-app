@@ -2,7 +2,8 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { BarChart3, Check, Link as LinkIcon, Loader2, ScatterChart } from 'lucide-react';
+import { BarChart3, Check, Link as LinkIcon, Lock, Loader2, ScatterChart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -30,8 +31,10 @@ import type {
 import { ALL_METRIC_OPTIONS, getAvailableMetrics } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
+const FEATURE_GATE_KEY = 'inferencex-feature-gate';
 
 export default function GpuMetricsDisplay() {
+  const router = useRouter();
   const [runIdInput, setRunIdInput] = useState('22806827144');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +155,14 @@ export default function GpuMetricsDisplay() {
     });
   }, []);
 
+  const removeGpu = useCallback((hw: string) => {
+    setVisibleGpus((prev) => {
+      const next = new Set(prev);
+      next.delete(Number(hw));
+      return next;
+    });
+  }, []);
+
   const handleShare = useCallback(async () => {
     const params = new URLSearchParams();
     params.set('gm_runId', runIdInput.trim());
@@ -196,7 +207,24 @@ export default function GpuMetricsDisplay() {
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">PowerX</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">PowerX</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs text-muted-foreground"
+              onClick={() => {
+                localStorage.removeItem(FEATURE_GATE_KEY);
+                window.dispatchEvent(new Event('inferencex:powerx:locked'));
+                track('powerx_relocked');
+                router.push('/inference');
+              }}
+              title="Re-lock PowerX"
+            >
+              <Lock className="h-3 w-3" />
+              Lock
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">
             Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
             <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
@@ -242,14 +270,14 @@ export default function GpuMetricsDisplay() {
       {runInfo && artifacts.length > 0 && (
         <>
           <Card className="mb-4">
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4">
               <span>
                 <span className="text-muted-foreground">Run:</span>{' '}
                 <a
                   href={runInfo.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline font-medium"
+                  className="text-brand hover:underline font-medium"
                 >
                   {runInfo.name} #{runInfo.id}
                 </a>
@@ -269,9 +297,7 @@ export default function GpuMetricsDisplay() {
                 {currentData.length.toLocaleString()}
               </span>
             </div>
-          </Card>
 
-          <Card className="mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-end gap-3">
               {artifacts.length > 1 && (
                 <div className="space-y-1 min-w-0">
@@ -425,6 +451,7 @@ export default function GpuMetricsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
                       name: `GPU ${gpuIndex}`,
                       hw: String(gpuIndex),
@@ -438,9 +465,17 @@ export default function GpuMetricsDisplay() {
                       setIsLegendExpanded(expanded);
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
-                    showResetFilter
-                    allSelected={allGpusSelected}
-                    onResetFilter={selectAllGpus}
+                    actions={
+                      !allGpusSelected
+                        ? [
+                            {
+                              id: 'gpu-metrics-reset-filter',
+                              label: 'Reset filter',
+                              onClick: selectAllGpus,
+                            },
+                          ]
+                        : []
+                    }
                     switches={[
                       {
                         id: 'gpu-metrics-downsample',
@@ -467,6 +502,7 @@ export default function GpuMetricsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    onItemRemove={removeGpu}
                     legendItems={allGpuIndices.map((gpuIndex) => ({
                       name: `GPU ${gpuIndex}`,
                       hw: String(gpuIndex),
@@ -480,9 +516,17 @@ export default function GpuMetricsDisplay() {
                       setIsLegendExpanded(expanded);
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
-                    showResetFilter
-                    allSelected={allGpusSelected}
-                    onResetFilter={selectAllGpus}
+                    actions={
+                      !allGpusSelected
+                        ? [
+                            {
+                              id: 'gpu-metrics-reset-filter-2',
+                              label: 'Reset filter',
+                              onClick: selectAllGpus,
+                            },
+                          ]
+                        : []
+                    }
                     switches={[
                       {
                         id: 'gpu-metrics-downsample-corr',

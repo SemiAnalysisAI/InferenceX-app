@@ -37,7 +37,7 @@ export async function ingestEvalRow(
       ${p.isl}, ${p.osl}, ${p.conc}, ${p.lmEvalVersion},
       ${sql.json(p.metrics)}
     )
-    on conflict (workflow_run_id, config_id, task)
+    on conflict (workflow_run_id, config_id, task, isl, osl, conc)
     do update set metrics = excluded.metrics
     returning (xmax = 0) as inserted
   `;

@@ -13,7 +13,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
   const [client, setClient] = useState<PostHog | null>(null);
 
   useEffect(() => {
-    if (!POSTHOG_KEY || window.location.hostname === 'localhost') return;
+    if (!POSTHOG_KEY || process.env.NODE_ENV !== 'production') return;
     import('posthog-js')
       .then(({ default: posthog }) => {
         posthog.init(POSTHOG_KEY, {

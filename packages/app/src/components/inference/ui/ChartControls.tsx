@@ -2,7 +2,6 @@
 
 import { track } from '@/lib/analytics';
 
-import FavoritePresetsDropdown from '@/components/favorites/FavoritePresetsDropdown';
 import { useInference } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
@@ -50,21 +49,29 @@ const METRIC_GROUPS = [
   { label: 'Custom User Values', metrics: ['y_costUser', 'y_powerUser'] },
 ];
 
-const GROUPED_Y_AXIS_OPTIONS = (() => {
+/** Map from metric key → human-readable title (e.g. "Token Throughput per GPU") */
+const METRIC_TITLE_MAP = (() => {
   const chartDef = (chartDefinitions as ChartDefinition[])[0];
-  const metricMap = new Map<string, string>();
+  const map = new Map<string, string>();
   for (const key of Object.keys(chartDef)) {
     if (key.startsWith('y_') && key.endsWith('_title')) {
-      metricMap.set(key.replace('_title', ''), chartDef[key as keyof ChartDefinition] as string);
+      map.set(key.replace('_title', ''), chartDef[key as keyof ChartDefinition] as string);
     }
   }
-  return METRIC_GROUPS.map((group) => ({
-    groupLabel: group.label,
-    options: group.metrics
-      .filter((m) => metricMap.has(m))
-      .map((m) => ({ value: m, label: metricMap.get(m)! })),
-  })).filter((g) => g.options.length > 0);
+  return map;
 })();
+
+/** Map from metric key → group label (e.g. "Throughput", "Cost per Million Total Tokens") */
+const METRIC_GROUP_MAP = new Map<string, string>(
+  METRIC_GROUPS.flatMap((g) => g.metrics.map((m) => [m, g.label] as const)),
+);
+
+const GROUPED_Y_AXIS_OPTIONS = METRIC_GROUPS.map((group) => ({
+  groupLabel: group.label,
+  options: group.metrics
+    .filter((m) => METRIC_TITLE_MAP.has(m))
+    .map((m) => ({ value: m, label: METRIC_TITLE_MAP.get(m)! })),
+})).filter((g) => g.options.length > 0);
 
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
@@ -115,6 +122,8 @@ export default function ChartControls({
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
         yAxisMetric: selectedYAxisMetric,
+        yAxisMetricLabel: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
+        yAxisMetricGroup: METRIC_GROUP_MAP.get(selectedYAxisMetric) ?? 'Unknown',
       });
     }
   };
@@ -148,6 +157,8 @@ export default function ChartControls({
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
       metric: value,
+      metric_label: METRIC_TITLE_MAP.get(value) ?? value,
+      metric_group: METRIC_GROUP_MAP.get(value) ?? 'Unknown',
     });
     setTimeout(trackCombinedFilters, 0);
   };
@@ -193,7 +204,6 @@ export default function ChartControls({
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex flex-col gap-4">
-        <FavoritePresetsDropdown />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <ModelSelector
             value={selectedModel}

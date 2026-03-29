@@ -35,6 +35,7 @@ function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
     image: null,
     metrics: { tput_per_gpu: 100, mean_ttft: 0.5, mean_tpot: 0.01, mean_e2el: 1, mean_intvty: 50 },
     date: '2026-03-01',
+    run_url: null,
     ...overrides,
   };
 }

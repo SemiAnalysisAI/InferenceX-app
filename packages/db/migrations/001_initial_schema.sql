@@ -174,7 +174,7 @@ create table eval_results (
   constraint eval_results_osl_positive   check (osl  is null or osl  > 0),
   constraint eval_results_conc_positive  check (conc is null or conc > 0),
 
-  constraint eval_results_unique unique (workflow_run_id, config_id, task)
+  constraint eval_results_unique unique (workflow_run_id, config_id, task, isl, osl, conc)
 );
 
 create index eval_results_config_id_idx on eval_results (config_id);

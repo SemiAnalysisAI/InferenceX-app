@@ -264,6 +264,7 @@ export default function ChartDisplay() {
                       : 'interactivity'
                 }
                 setIsLegendExpanded={setIsLegendExpanded}
+                exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                 onExportCsv={() => {
                   const visibleData = graph.data.filter(
                     (d) =>
@@ -275,7 +276,11 @@ export default function ChartDisplay() {
                     graph.model,
                     graph.sequence,
                   );
-                  exportToCsv(`chart-${graphIndex}-${Date.now()}`, headers, rows);
+                  exportToCsv(
+                    `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+                    headers,
+                    rows,
+                  );
                 }}
               />
               <Card>
@@ -652,8 +657,8 @@ export default function ChartDisplay() {
         ));
 
   return (
-    <div data-testid="inference-chart-display">
-      <section>
+    <div data-testid="inference-chart-display" className="flex flex-col gap-4">
+      <section className="relative z-10">
         <Card>
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between">
@@ -698,7 +703,7 @@ export default function ChartDisplay() {
           <CustomPowers loading={loading} />
         </section>
       )}
-      <div className="flex flex-col gap-10">{displayGraphs}</div>
+      <div className="flex flex-col gap-4">{displayGraphs}</div>
 
       {/* Performance Over Time — Modal Drill-Down */}
       <Dialog
@@ -709,7 +714,11 @@ export default function ChartDisplay() {
         onOpenChange={(open) => {
           if (!open) {
             clearTrackedConfigs();
-            track('inference_trend_cleared');
+            track('inference_trend_cleared', {
+              configCount: trackedConfigs.length,
+              model: selectedModel,
+              metric: selectedYAxisMetric,
+            });
           }
         }}
       >

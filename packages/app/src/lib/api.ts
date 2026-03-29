@@ -27,6 +27,7 @@ export interface BenchmarkRow {
   image: string | null;
   metrics: Record<string, number>;
   date: string;
+  run_url: string | null;
 }
 
 export interface WorkflowRunRow {
@@ -88,6 +89,7 @@ export interface EvalRow {
   conc: number | null;
   metrics: Record<string, number>;
   timestamp: string;
+  run_url: string | null;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -134,14 +136,4 @@ export function fetchReliability() {
 
 export function fetchEvaluations() {
   return fetchJson<EvalRow[]>('/api/v1/evaluations');
-}
-
-export interface GitHubStarsResponse {
-  owner: string;
-  repo: string;
-  stars: number;
-}
-
-export function fetchGitHubStars() {
-  return fetchJson<GitHubStarsResponse>('/api/v1/github-stars');
 }

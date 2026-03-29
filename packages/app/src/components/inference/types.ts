@@ -86,6 +86,8 @@ export interface AggDataEntry {
   date: string;
   /** Actual benchmark run date from the DB (before date-picker override). */
   actualDate?: string;
+  /** URL to the GitHub Actions workflow run that produced this data point. */
+  run_url?: string;
 }
 
 /**
@@ -449,10 +451,12 @@ export interface RunInfo {
 export interface InferenceChartContextType {
   activeHwTypes: Set<string>;
   toggleActiveDate: (date: string) => void;
+  removeActiveDate: (date: string) => void;
   selectAllActiveDates: () => void;
   activeDates: Set<string>;
   hwTypesWithData: Set<string>;
   toggleHwType: (hw: string) => void;
+  removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
@@ -544,7 +548,6 @@ export interface HardwareConfig {
     label: string;
     suffix: string;
     gpu: string;
-    color: string;
     framework?: string;
   };
 }

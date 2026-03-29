@@ -83,6 +83,22 @@ export const computeParetoPointLabels = (
 };
 
 /**
+ * Builds a lookup from data point reference → gradient label color.
+ * Used to color scatter points by their parallelism strategy when gradient labels are enabled.
+ */
+export const buildGradientColorMap = (
+  labelsByKey: Record<string, ParetoPointLabel[]>,
+): Map<InferenceData, string> => {
+  const map = new Map<InferenceData, string>();
+  for (const labels of Object.values(labelsByKey)) {
+    for (const { point, color } of labels) {
+      map.set(point, color);
+    }
+  }
+  return map;
+};
+
+/**
  * Builds SVG gradient stops for a roofline path, coloring each segment
  * by its parallelism strategy. Uses the ±0.5-to-neighbor territory rule
  * and blends at boundaries when adjacent labels share sub-strategies.

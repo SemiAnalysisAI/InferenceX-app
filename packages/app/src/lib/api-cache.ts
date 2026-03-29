@@ -47,11 +47,11 @@ const CDN_HEADERS = {
   'Vercel-Cache-Tag': 'db',
 };
 
-/** CDN-cached streamed JSON response — supports up to 20 MB on Vercel CDN. */
+/** CDN-cached streamed + gzip-compressed JSON response — supports up to 20 MB on Vercel CDN. */
 export function cachedJson<T>(data: T): Response {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
   const CHUNK = 64 * 1024;
-  const stream = new ReadableStream({
+  const raw = new ReadableStream({
     start(controller) {
       for (let i = 0; i < bytes.length; i += CHUNK) {
         controller.enqueue(bytes.subarray(i, i + CHUNK));
@@ -59,7 +59,12 @@ export function cachedJson<T>(data: T): Response {
       controller.close();
     },
   });
-  return new Response(stream, {
-    headers: { 'Content-Type': 'application/json', ...CDN_HEADERS },
+  const compressed = raw.pipeThrough(new CompressionStream('gzip'));
+  return new Response(compressed, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Encoding': 'gzip',
+      ...CDN_HEADERS,
+    },
   });
 }

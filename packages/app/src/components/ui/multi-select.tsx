@@ -56,6 +56,13 @@ function MultiSelect({
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       searchRef.current?.focus();
+    } else {
+      // Track search usage when dropdown closes
+      if (searchUsedRef.current) {
+        track('multi_select_searched', { query: search });
+        searchUsedRef.current = false;
+      }
+      setSearch('');
     }
 
     return () => {
@@ -112,6 +119,8 @@ function MultiSelect({
     onChange?.(newValue);
   };
 
+  const searchUsedRef = React.useRef(false);
+
   const handleClearAll = (e: React.SyntheticEvent) => {
     e.stopPropagation();
     if (disabled) {
@@ -149,7 +158,7 @@ function MultiSelect({
             selectedLabels.map((label, index) => (
               <span
                 key={value[index]}
-                className="bg-transparent text-foreground border border-border dark:bg-secondary dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
+                className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
               >
                 {label}
                 <span
@@ -222,7 +231,10 @@ function MultiSelect({
                   ref={searchRef}
                   type="text"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    if (e.target.value) searchUsedRef.current = true;
+                  }}
                   placeholder="Search..."
                   className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
                 />

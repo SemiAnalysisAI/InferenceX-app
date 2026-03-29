@@ -19,11 +19,11 @@ export default function ReliabilityChartDisplay() {
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = reliabilityChartToCsv(chartData);
-    exportToCsv(`reliability-${Date.now()}`, headers, rows);
+    exportToCsv('InferenceX_reliability', headers, rows);
   }, [chartData]);
 
   return (
-    <div data-testid="reliability-chart-display">
+    <div data-testid="reliability-chart-display" className="flex flex-col gap-4">
       <section>
         <Card>
           <div className="flex flex-col gap-4">
@@ -54,6 +54,7 @@ export default function ReliabilityChartDisplay() {
         zoomResetEvent={`d3chart_zoom_reset_${CHART_ID}`}
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}
+        exportFileName="InferenceX_reliability"
       >
         <ReliabilityBarChartD3
           caption={

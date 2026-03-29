@@ -4,10 +4,11 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { getGpuSpecs, HARDWARE_CONFIG } from '@/lib/constants';
+import { getVendor } from '@/lib/dynamic-colors';
 
 /**
  * Simple seeded pseudo-random number generator (mulberry32).
@@ -37,9 +38,14 @@ export function seededShuffle<T>(array: T[], seed: number): T[] {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// High-contrast color generation
+// ---------------------------------------------------------------------------
 /**
  * Generates high contrast colors for chart elements using HSL color space.
- * Colors are evenly distributed across the hue spectrum for maximum distinction.
+ * Each vendor's keys are distributed across allowed hue ranges (excluding
+ * other vendors' brand bands) for maximum distinction without confusing
+ * color associations. With 10+ keys per vendor, uses the full hue wheel.
  * @param keys - Array of keys (hardware types, models, etc.) to generate colors for
  * @param theme - Current theme ('dark' or 'light') to adjust lightness
  * @param shuffleSeed - Optional seed for shuffling hue assignments. 0 = no shuffle.
@@ -51,19 +57,48 @@ export const generateHighContrastColors = (
   shuffleSeed: number = 0,
 ): { [key: string]: string } => {
   const colors: { [key: string]: string } = {};
-  const numKeys = keys.length;
-  // adjust lightness based on theme for better contrast
   const lightness = theme === 'dark' ? 65 : 35;
 
-  // Generate evenly spaced hues
-  const hues = keys.map((_, index) => (index * 360) / numKeys);
+  // Group keys by vendor, sort within each group for stability
+  const groups = new Map<string, string[]>();
+  for (const key of keys) {
+    const vendor = getVendor(key);
+    let list = groups.get(vendor);
+    if (!list) {
+      list = [];
+      groups.set(vendor, list);
+    }
+    list.push(key);
+  }
 
-  // Shuffle hue assignments if seed is non-zero
-  const assignedHues = shuffleSeed !== 0 ? seededShuffle(hues, shuffleSeed) : hues;
+  for (const [vendor, vendorKeys] of groups) {
+    const ranges = VENDOR_HSL_ZONES[vendor] ?? [{ start: 0, span: 360 }];
+    const totalSpan = ranges.reduce((s, r) => s + r.span, 0);
+    const count = vendorKeys.length;
 
-  keys.forEach((key, index) => {
-    colors[key] = `hsl(${assignedHues[index]}, 70%, ${lightness}%)`;
-  });
+    let hues: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const pos = count <= 1 ? totalSpan / 2 : ((i + 0.5) / count) * totalSpan;
+      let remaining = pos;
+      let hue = 0;
+      for (const range of ranges) {
+        if (remaining <= range.span) {
+          hue = (range.start + remaining) % 360;
+          break;
+        }
+        remaining -= range.span;
+      }
+      hues.push(hue);
+    }
+
+    if (shuffleSeed !== 0) {
+      hues = seededShuffle(hues, shuffleSeed);
+    }
+
+    vendorKeys.forEach((key, i) => {
+      colors[key] = `hsl(${hues[i].toFixed(1)}, 70%, ${lightness}%)`;
+    });
+  }
   return colors;
 };
 

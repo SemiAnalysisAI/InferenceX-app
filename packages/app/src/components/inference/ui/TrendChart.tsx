@@ -213,8 +213,9 @@ const TrendChart = React.memo(
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'crosshair' as const,
-        content: (d: PreparedPoint, _isPinned: boolean) =>
-          `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px">
+        content: (d: PreparedPoint, isPinned: boolean) =>
+          `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
+            ${isPinned ? '<div class="text-muted-foreground text-[10px] mb-1 italic">Click elsewhere to dismiss</div>' : ''}
             <div class="font-semibold mb-1" style="color: ${getPointConfig(d)?.color ?? '#888'}">${getPointConfig(d)?.label ?? ''}</div>
             <div class="text-muted-foreground">${d.raw.date}</div>
             <div class="mt-1 font-medium">${yLabel}: ${formatLargeNumber(d.value)}</div>

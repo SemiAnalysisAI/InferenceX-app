@@ -161,12 +161,6 @@ export function getDisplayLabel(config: { label: string; suffix?: string }): str
   return config.suffix ? `${config.label} ${config.suffix}` : config.label;
 }
 
-export const parseRunDate = (dateStr: string) => {
-  const [datePart] = dateStr.split(', ');
-  const [month, day, year] = datePart.split('/');
-  return `${year}-${month}-${day}`;
-};
-
 /**
  * Computes missing output cost fields (costhOutput, costnOutput, costrOutput) for data points.
  * This handles backwards compatibility with historical data that doesn't have these fields.
@@ -283,7 +277,15 @@ export function filterRunsByModel(
     }
   }
 
-  return Object.keys(filtered).length > 0 ? filtered : null;
+  if (Object.keys(filtered).length > 0) return filtered;
+
+  // No changelog matches — return all runs without changelogs so the run
+  // selector still renders (e.g. Llama has runs but no changelog entries).
+  const fallback: { [runId: string]: RunInfo } = {};
+  for (const [runId, runInfo] of Object.entries(availableRuns)) {
+    fallback[runId] = { ...runInfo, changelog: undefined };
+  }
+  return Object.keys(fallback).length > 0 ? fallback : null;
 }
 
 /**

@@ -21,6 +21,8 @@ interface ChartButtonsProps {
   hideZoomReset?: boolean;
   /** Optional callback to export chart data as CSV */
   onExportCsv?: () => void;
+  /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
+  exportFileName?: string;
 }
 
 /**
@@ -38,8 +40,13 @@ export function ChartButtons({
   setIsLegendExpanded,
   hideZoomReset,
   onExportCsv,
+  exportFileName,
 }: ChartButtonsProps) {
-  const { isExporting, exportToImage } = useChartExport({ chartId, setIsLegendExpanded });
+  const { isExporting, exportToImage } = useChartExport({
+    chartId,
+    setIsLegendExpanded,
+    exportFileName,
+  });
   const [popoverOpen, setPopoverOpen] = useState(false);
   // always include chartId in event name for consistency
   const resetEventName = zoomResetEvent || `${analyticsPrefix}_zoom_reset_${chartId}`;

@@ -92,6 +92,14 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
     });
   }, []);
 
+  const removeGpu = useCallback((name: string) => {
+    setSelectedGpus((prev) => {
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
+  }, []);
+
   const selectAll = useCallback(() => {
     setSelectedGpus(new Set(GPU_SPECS.map((s) => s.name)));
     track('gpu_specs_radar_select_all');
@@ -186,18 +194,27 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
           <ChartLegend
             variant="sidebar"
             legendItems={legendItems}
+            onItemRemove={removeGpu}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
               track('gpu_specs_radar_legend_expanded', { expanded });
             }}
             grouped={false}
-            showResetFilter={true}
-            allSelected={selectedGpus.size === GPU_SPECS.length}
-            onResetFilter={() => {
-              selectAll();
-              track('gpu_specs_radar_reset_filter');
-            }}
+            actions={
+              selectedGpus.size < GPU_SPECS.length
+                ? [
+                    {
+                      id: 'radar-reset-filter',
+                      label: 'Reset filter',
+                      onClick: () => {
+                        selectAll();
+                        track('gpu_specs_radar_reset_filter');
+                      },
+                    },
+                  ]
+                : []
+            }
             disableActiveSort={true}
           />
         }

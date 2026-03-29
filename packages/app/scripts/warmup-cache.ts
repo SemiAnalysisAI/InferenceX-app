@@ -51,7 +51,6 @@ async function warmupCaches() {
     hit('/api/v1/availability'),
     hit('/api/v1/reliability'),
     hit('/api/v1/evaluations'),
-    hit('/api/v1/github-stars'),
   ]);
 
   // --- Benchmarks (latest) per model ---

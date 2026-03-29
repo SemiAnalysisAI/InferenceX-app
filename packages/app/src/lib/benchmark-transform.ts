@@ -67,6 +67,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     image: row.image ?? undefined,
     date: row.date,
     actualDate: (row as any).actualDate ?? row.date,
+    run_url: row.run_url ?? undefined,
   };
 }
 

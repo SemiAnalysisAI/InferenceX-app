@@ -31,6 +31,8 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  /** Optional color resolver — when provided, overrides static HARDWARE_CONFIG colors. */
+  colorResolver?: (hwKey: string) => string;
 }
 
 /** Get the throughput value for the selected token type. */
@@ -179,6 +181,7 @@ export function generateTooltipHTML(
   barMetric: BarMetric,
   costType: CostType,
   runUrl?: string,
+  isPinned?: boolean,
 ): string {
   const config = hardwareConfig[d.hwKey] || HARDWARE_CONFIG[d.hwKey];
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
@@ -232,7 +235,8 @@ export function generateTooltipHTML(
     : '';
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto;">
+    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
+      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
       </div>
@@ -265,9 +269,8 @@ function getLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string
   return baseName;
 }
 
-function getColor(hwKey: string, hardwareConfig: HardwareConfig): string {
-  const config = hardwareConfig[hwKey] || HARDWARE_CONFIG[hwKey];
-  return config?.color || 'var(--foreground)';
+function getColor(): string {
+  return 'var(--foreground)';
 }
 
 /** Position value + overlay labels together, flipping both when the longer one doesn't fit. */
@@ -322,8 +325,12 @@ export default function ThroughputBarChart({
   onBarSelect,
   legendElement,
   caption,
+  colorResolver,
 }: ThroughputBarChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
+
+  // Color resolution: prefer dynamic colorResolver, fall back to static config
+  const resolveBarColor = (hwKey: string) => (colorResolver ? colorResolver(hwKey) : getColor());
 
   // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
@@ -381,7 +388,7 @@ export default function ThroughputBarChart({
       config: {
         getY: (d) => d.resultKey,
         getX: (d) => getMetricValue(d, barMetric, costType),
-        getColor: (d) => getColor(d.hwKey, hardwareConfig),
+        getColor: (d) => resolveBarColor(d.hwKey),
         rx: 4,
         opacity: 0.85,
         keyFn: (d) => d.resultKey,
@@ -433,12 +440,12 @@ export default function ThroughputBarChart({
           });
 
         // Position both labels together using the longer text width
-        const barColor = (d: InterpolatedResult) => getColor(d.hwKey, hardwareConfig);
+        const barColor = (d: InterpolatedResult) => resolveBarColor(d.hwKey);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-        const barColor = (d: InterpolatedResult) => getColor(d.hwKey, hardwareConfig);
+        const barColor = (d: InterpolatedResult) => resolveBarColor(d.hwKey);
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
       },
     };
@@ -451,8 +458,8 @@ export default function ThroughputBarChart({
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (d: InterpolatedResult, _isPinned: boolean) =>
-        generateTooltipHTML(d, hardwareConfig, mode, barMetric, costType, runUrl),
+      content: (d: InterpolatedResult, isPinned: boolean) =>
+        generateTooltipHTML(d, hardwareConfig, mode, barMetric, costType, runUrl, isPinned),
       getRulerX: () => hoveredBarXRef.current,
       onHoverStart: (sel: d3.Selection<any, InterpolatedResult, any, any>) => {
         hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');

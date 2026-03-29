@@ -4,12 +4,13 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { GRADIENT_NUDGE_EVENT } from '@/components/gradient-label-nudge';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -51,6 +52,7 @@ import {
   computeParetoPointLabels,
   computeGradientStops,
   PARETO_LABEL_COLORS,
+  buildGradientColorMap,
 } from '@/components/inference/utils/paretoLabels';
 
 // X-shape path for overlay (unofficial) data points
@@ -85,6 +87,7 @@ const ScatterGraph = React.memo(
       activeHwTypes,
       hardwareConfig: contextHardwareConfig,
       toggleHwType,
+      removeHwType,
       hwTypesWithData,
       selectedPrecisions,
       selectedYAxisMetric,
@@ -169,11 +172,20 @@ const ScatterGraph = React.memo(
 
     // --- Theme ---
     const hardwareConfig = hardwareConfigOverride || contextHardwareConfig;
-    const hwKeys = useMemo(() => Object.keys(hardwareConfig), [hardwareConfig]);
+    const activeHwKeys = useMemo(() => {
+      const keys = [...effectiveOfficialHwTypes];
+      activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
+      return keys;
+    }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
+    const activeOfficialKeys = useMemo(
+      () => [...effectiveOfficialHwTypes],
+      [effectiveOfficialHwTypes],
+    );
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
-      identifiers: hwKeys,
+      identifiers: activeHwKeys,
       colorShuffleSeed,
+      activeKeys: activeOfficialKeys,
     });
 
     // --- Changelog ---
@@ -366,6 +378,12 @@ const ScatterGraph = React.memo(
       });
       return result;
     }, [rooflines]);
+
+    // Point → gradient color lookup (for coloring points by parallelism strategy)
+    const gradientColorByPoint = useMemo(
+      () => buildGradientColorMap(allPointLabelsByKey),
+      [allPointLabelsByKey],
+    );
 
     // Ref for trackedConfigIds (needs to be current at event time inside D3 handlers)
     const trackedConfigIdsRef = useRef(trackedConfigIds);
@@ -581,6 +599,7 @@ const ScatterGraph = React.memo(
             selectedYAxisMetric,
             hardwareConfig,
             isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
+            runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
@@ -906,7 +925,9 @@ const ScatterGraph = React.memo(
         key: 'points',
         data: pointsData,
         config: {
-          getColor: (d) => getCssColor(resolveColor(d.hwKey as string)),
+          getColor: (d) =>
+            (showGradientLabels && gradientColorByPoint.get(d)) ||
+            getCssColor(resolveColor(d.hwKey as string)),
           getOpacity: (d) => (isPointVisible(d) ? 1 : 0),
           getPointerEvents: (d) => (isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: hidePointLabels || showGradientLabels,
@@ -949,9 +970,7 @@ const ScatterGraph = React.memo(
                   ovEntries.push({
                     key,
                     points: pts,
-                    stroke: hardwareConfig[hw]
-                      ? getCssColor(resolveColor(hw))
-                      : getCssColor(hwCfg.color),
+                    stroke: getCssColor(resolveColor(hw)),
                   });
                 }
               });
@@ -998,12 +1017,9 @@ const ScatterGraph = React.memo(
                 });
 
               overlayPoints.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
-              overlayPoints.select('.overlay-x').attr('stroke', (d) => {
-                const hwCfg = overlayData.hardwareConfig[d.hwKey as string];
-                return hardwareConfig[d.hwKey as string]
-                  ? getCssColor(resolveColor(d.hwKey as string))
-                  : getCssColor(hwCfg?.color ?? '#888');
-              });
+              overlayPoints
+                .select('.overlay-x')
+                .attr('stroke', (d) => getCssColor(resolveColor(d.hwKey as string)));
 
               // Labels
               const showLabels = !hidePointLabels && !showGradientLabels;
@@ -1134,6 +1150,7 @@ const ScatterGraph = React.memo(
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
+      gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
       selectedPrecisions,
@@ -1171,7 +1188,7 @@ const ScatterGraph = React.memo(
             .attr('class', 'tracked-ring')
             .attr('r', POINT_SIZE + 5)
             .attr('fill', 'none')
-            .attr('stroke', hardwareConfig[d.hwKey]?.color || '#888')
+            .attr('stroke', getCssColor(resolveColor(d.hwKey)))
             .attr('stroke-width', 2)
             .attr('opacity', 0.7)
             .attr('pointer-events', 'none');
@@ -1197,7 +1214,7 @@ const ScatterGraph = React.memo(
               .attr('class', 'tracked-ring')
               .attr('r', POINT_SIZE + 5)
               .attr('fill', 'none')
-              .attr('stroke', hardwareConfig[d.hwKey]?.color || '#888')
+              .attr('stroke', getCssColor(resolveColor(d.hwKey)))
               .attr('stroke-width', 2)
               .attr('opacity', 0.7)
               .attr('pointer-events', 'none');
@@ -1328,6 +1345,7 @@ const ScatterGraph = React.memo(
             variant="sidebar"
             onItemHover={handleLegendHover}
             onItemHoverEnd={handleLegendHoverEnd}
+            onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
             legendItems={[
               ...(overlayData
                 ? Object.entries(overlayData.hardwareConfig)
@@ -1341,7 +1359,7 @@ const ScatterGraph = React.memo(
                       return {
                         name: `✕ ${key}`,
                         label: `✕ ${parsed.label}`,
-                        color: hardwareConfig[key] ? resolveColor(key) : hwConfig.color,
+                        color: resolveColor(key),
                         title: `UNOFFICIAL: ${hwConfig.framework || parsed.label}`,
                         isHighlighted: true,
                         hw: `overlay-${key}`,
@@ -1447,6 +1465,22 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setUseAdvancedLabels(checked);
                   track('latency_advanced_labels_toggled', { enabled: checked });
+                  if (checked && !showGradientLabels) {
+                    window.dispatchEvent(
+                      new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                        detail: {
+                          enableGradient: () => {
+                            setShowGradientLabels(true);
+                            setUseAdvancedLabels(false);
+                            track('latency_gradient_labels_toggled', {
+                              enabled: true,
+                              source: 'nudge',
+                            });
+                          },
+                        },
+                      }),
+                    );
+                  }
                 },
               },
               {
@@ -1459,8 +1493,8 @@ const ScatterGraph = React.memo(
                 },
               },
             ]}
-            actions={
-              highContrast
+            actions={[
+              ...(highContrast
                 ? [
                     {
                       id: 'scatter-shuffle-colors',
@@ -1471,20 +1505,24 @@ const ScatterGraph = React.memo(
                       },
                     },
                   ]
-                : undefined
-            }
+                : []),
+              ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+              activeOverlayHwTypes.size < allOverlayHwTypes.size
+                ? [
+                    {
+                      id: 'scatter-reset-filter',
+                      label: 'Reset filter',
+                      onClick: () => {
+                        selectAllHwTypes();
+                        setLocalOfficialOverride(null);
+                        resetOverlayHwTypes();
+                        track('latency_legend_filter_reset');
+                      },
+                    },
+                  ]
+                : []),
+            ]}
             showFpShapeIndicators={selectedPrecisions.length > 1}
-            showResetFilter={true}
-            allSelected={
-              effectiveOfficialHwTypes.size === hwTypesWithData.size &&
-              activeOverlayHwTypes.size === allOverlayHwTypes.size
-            }
-            onResetFilter={() => {
-              selectAllHwTypes();
-              setLocalOfficialOverride(null);
-              resetOverlayHwTypes();
-              track('latency_legend_filter_reset');
-            }}
             enableTooltips={true}
           />
         }

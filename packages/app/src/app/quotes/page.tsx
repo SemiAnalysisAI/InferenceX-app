@@ -6,7 +6,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 export const metadata: Metadata = {
   title: 'Supporters',
   description:
-    'InferenceX (formerly InferenceMAX) initiative is supported by major buyers of compute and prominent members of the ML community including those from OpenAI, Microsoft, PyTorch Foundation, and more.',
+    'InferenceX initiative is supported by major buyers of compute and prominent members of the ML community including those from OpenAI, Microsoft, PyTorch Foundation, and more.',
   alternates: { canonical: `${SITE_URL}/quotes` },
   openGraph: {
     title: 'Supporters | InferenceX by SemiAnalysis',

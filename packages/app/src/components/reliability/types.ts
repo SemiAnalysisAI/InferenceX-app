@@ -92,6 +92,7 @@ export interface ReliabilityChartContextType {
   setHighContrast: (value: boolean) => void;
   enabledModels: Set<string>;
   toggleModel: (model: string) => void;
+  removeModel: (model: string) => void;
   isLegendExpanded: boolean;
   setIsLegendExpanded: (value: boolean) => void;
   modelsWithData: Set<string>;

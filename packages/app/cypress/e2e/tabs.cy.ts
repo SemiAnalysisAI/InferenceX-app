@@ -3,7 +3,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/');
+    cy.visit('/inference');
   });
 
   it('updates the URL path when switching tabs', () => {
@@ -28,7 +28,7 @@ describe('Chart Section Tabs — E2E', () => {
 
   it('shows mobile chart select dropdown on small viewport', () => {
     cy.viewport(375, 812);
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
   });
 });

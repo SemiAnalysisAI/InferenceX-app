@@ -79,6 +79,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     filteredReliabilityData,
     enabledModels,
     toggleModel,
+    removeModel,
     modelsWithData,
     selectAllModels,
     isLegendExpanded,
@@ -97,9 +98,14 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [filteredReliabilityData],
   );
 
+  const activeModelKeys = useMemo(
+    () => sortedModels.filter((m) => enabledModels.has(m)),
+    [sortedModels, enabledModels],
+  );
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast,
     identifiers: sortedModels,
+    activeKeys: activeModelKeys,
   });
 
   const legendItems = useMemo(
@@ -306,6 +312,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
           <ChartLegend
             variant="sidebar"
             legendItems={legendItems}
+            onItemRemove={removeModel}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
@@ -322,12 +329,20 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
                 },
               },
             ]}
-            showResetFilter={true}
-            allSelected={enabledModels.size === modelsWithData.size}
-            onResetFilter={() => {
-              selectAllModels();
-              track('reliability_filter_reset');
-            }}
+            actions={
+              enabledModels.size < modelsWithData.size
+                ? [
+                    {
+                      id: 'reliability-reset-filter',
+                      label: 'Reset filter',
+                      onClick: () => {
+                        selectAllModels();
+                        track('reliability_filter_reset');
+                      },
+                    },
+                  ]
+                : []
+            }
             enableTooltips={true}
           />
         }

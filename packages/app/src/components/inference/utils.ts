@@ -65,29 +65,6 @@ export const filterDataByCostLimit = (
 };
 
 /**
- * Filters data points based on latency limits defined in the chart definition.
- * Only applies filtering for latency-related metrics.
- *
- * @param {InferenceData[]} data - The data points to filter
- * @param {ChartDefinition} chartDefinition - The chart definition containing latency limits
- * @param {string} selectedYAxisMetric - The currently selected Y-axis metric
- * @returns {InferenceData[]} The filtered data points
- */
-export const filterDataByLatencyLimit = (
-  data: InferenceData[],
-  chartDefinition: ChartDefinition,
-): InferenceData[] => {
-  // Only apply filtering for latency-related metrics
-  const isLatencyMetric = chartDefinition.chartType === 'e2e';
-
-  if (!isLatencyMetric || !chartDefinition.y_latency_limit) {
-    return data;
-  }
-
-  return data.filter((point) => point.x <= chartDefinition.y_latency_limit!);
-};
-
-/**
  * Process overlay (unofficial run) data to match the same pipeline as official data.
  *
  * Applies: metric field filtering, x/y remapping (including x-axis overrides for

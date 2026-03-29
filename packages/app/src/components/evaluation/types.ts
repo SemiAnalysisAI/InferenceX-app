@@ -25,6 +25,7 @@ export interface EvaluationChartData {
   ep: number; // expert parallelism
   dp_attention: boolean; // data parallel attention
   conc: number; // concurrency
+  runUrl?: string; // GitHub Actions run URL
 }
 
 export interface EvalChangelogEntry {
@@ -56,6 +57,7 @@ export interface EvaluationChartContextType {
   unfilteredChartData: EvaluationChartData[];
   enabledHardware: Set<string>;
   toggleHardware: (hwKey: string) => void;
+  removeHardware: (hwKey: string) => void;
   highContrast: boolean;
   setHighContrast: (value: boolean) => void;
   showLabels: boolean;
@@ -67,4 +69,7 @@ export interface EvaluationChartContextType {
   highlightedConfigs: Set<string>; // Configurations that have new data from selected run date
   changelogEntries: EvalChangelogEntry[];
   modelHasEvalData: boolean;
+  selectedPrecisions: string[];
+  setSelectedPrecisions: (precisions: string[]) => void;
+  availablePrecisions: string[];
 }

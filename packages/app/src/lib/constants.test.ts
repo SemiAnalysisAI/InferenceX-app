@@ -102,12 +102,11 @@ describe('getHardwareConfig', () => {
     expect(config).toBe(HARDWARE_CONFIG.unknown);
   });
 
-  it('always returns an object with required fields (name, label, color)', () => {
+  it('always returns an object with required fields (name, label)', () => {
     for (const hwKey of ['h100', 'h200', 'unknown', 'b200', 'gb200']) {
       const config = getHardwareConfig(hwKey);
       expect(typeof config.name).toBe('string');
       expect(typeof config.label).toBe('string');
-      expect(typeof config.color).toBe('string');
     }
   });
 
@@ -170,98 +169,6 @@ describe('getGpuSpecs', () => {
       const result = getGpuSpecs(base);
       expect(result).toBe(specs);
     }
-  });
-});
-
-// ===========================================================================
-// getColorFamily
-// each test uses vi.resetModules() + dynamic import to get a fresh module
-// instance, preventing vendor counter / cache state from leaking between tests.
-// ===========================================================================
-describe('getColorFamily', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  // Helper to assert a palette is a non-empty array of CSS color strings
-  function isColorPalette(palette: unknown): void {
-    expect(Array.isArray(palette)).toBe(true);
-    expect((palette as string[]).length).toBeGreaterThan(0);
-    for (const color of palette as string[]) {
-      expect(typeof color).toBe('string');
-      expect(color.length).toBeGreaterThan(0);
-    }
-  }
-
-  it('returns a non-empty color array for h-prefixed (NVIDIA) GPUs', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    isColorPalette(getColorFamily('h100'));
-  });
-
-  it('returns a non-empty color array for b-prefixed (NVIDIA) GPUs', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    isColorPalette(getColorFamily('b200'));
-  });
-
-  it('returns a non-empty color array for gb-prefixed (NVIDIA) GPUs', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    isColorPalette(getColorFamily('gb200'));
-  });
-
-  it('returns a non-empty color array for mi-prefixed (AMD) GPUs', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    isColorPalette(getColorFamily('mi300x'));
-  });
-
-  it('returns a non-empty color array for unrecognized GPU vendor prefixes', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    isColorPalette(getColorFamily('custom-gpu'));
-  });
-
-  it('AMD and NVIDIA palettes are distinct (vendor detection routes correctly)', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    const nvidia = getColorFamily('h100');
-    const amd = getColorFamily('mi300x');
-    // palettes from different vendors must not be identical arrays
-    expect(nvidia).not.toEqual(amd);
-  });
-
-  it('NVIDIA and unknown palettes are distinct', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    const nvidia = getColorFamily('h100');
-    const unknown = getColorFamily('custom-gpu');
-    expect(nvidia).not.toEqual(unknown);
-  });
-
-  it('returns the same array reference for the same GPU key (caching)', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    const first = getColorFamily('h100');
-    const second = getColorFamily('h100');
-    expect(first).toBe(second); // strict reference equality
-  });
-
-  it('does not share cached assignment across different GPU keys', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    const a = getColorFamily('h100');
-    const b = getColorFamily('h200');
-    expect(a).not.toBe(b);
-  });
-
-  it('rotates through palettes: two different NVIDIA GPUs get different arrays', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    const first = getColorFamily('h100');
-    const second = getColorFamily('h200');
-    // rotation means the second assignment cycles to the next palette
-    expect(first).not.toBe(second);
-    expect(first).not.toEqual(second);
-  });
-
-  it('rotates through palettes: two different AMD GPUs get different arrays', async () => {
-    const { getColorFamily } = await import('@/lib/constants');
-    const first = getColorFamily('mi300x');
-    const second = getColorFamily('mi300a');
-    expect(first).not.toBe(second);
-    expect(first).not.toEqual(second);
   });
 });
 

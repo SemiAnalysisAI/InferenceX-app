@@ -12,6 +12,8 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { track } from '@/lib/analytics';
+import { FAVORITE_PRESETS, type FavoritePreset } from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import {
@@ -140,6 +142,9 @@ export function InferenceProvider({
   // --- Favorite presets state ---
   const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  // Persists the preset's desired hw filter beyond pendingHwFilter consumption.
+  // Cleared when the user manually changes filters (clearing the preset).
+  const presetHwFilterRef = useRef<string[] | null>(null);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate =
@@ -282,6 +287,7 @@ export function InferenceProvider({
   const clearPresetOnChange = useCallback(() => {
     if (presetGuardRef.current) return;
     setActivePresetId((prev) => (prev !== null ? null : prev));
+    presetHwFilterRef.current = null;
   }, []);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
@@ -343,12 +349,14 @@ export function InferenceProvider({
     setActiveSet: setActiveHwTypes,
     toggle: toggleHwRaw,
     selectAll: selectAllHwRaw,
+    remove: removeHwRaw,
   } = useChartToggleSet();
   const {
     activeSet: activeDates,
     setActiveSet: setActiveDates,
     toggle: toggleDateRaw,
     selectAll: selectAllDatesRaw,
+    remove: removeDateRaw,
   } = useChartToggleSet();
 
   const hwFilteredPoints = useMemo(
@@ -381,11 +389,8 @@ export function InferenceProvider({
       // Preset filter is active: evaluate updater to get all available items, then filter.
       // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
       const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
-      const filtered = new Set(
-        Array.from(base).filter((hwKey: string) =>
-          filter.some((prefix: string) => hwKey.startsWith(prefix)),
-        ),
-      );
+      const filterSet = new Set(filter);
+      const filtered = new Set(Array.from(base).filter((hwKey: string) => filterSet.has(hwKey)));
       if (filtered.size > 0) {
         setActiveHwTypes(filtered);
         setPendingHwFilter(null);
@@ -406,11 +411,8 @@ export function InferenceProvider({
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
     if (!pendingHwFilter || hwTypesWithData.size === 0) return;
-    const filtered = new Set(
-      Array.from(hwTypesWithData).filter((hwKey) =>
-        pendingHwFilter.some((prefix) => hwKey.startsWith(prefix)),
-      ),
-    );
+    const filterSet = new Set(pendingHwFilter);
+    const filtered = new Set(Array.from(hwTypesWithData).filter((hwKey) => filterSet.has(hwKey)));
     if (filtered.size > 0) {
       setActiveHwTypes(filtered);
       setPendingHwFilter(null);
@@ -421,8 +423,18 @@ export function InferenceProvider({
     (hw: string) => {
       toggleHwRaw(hw, hwTypesWithData);
       setActivePresetId(null);
+      presetHwFilterRef.current = null;
     },
     [toggleHwRaw, hwTypesWithData],
+  );
+
+  const removeHwType = useCallback(
+    (hw: string) => {
+      removeHwRaw(hw);
+      setActivePresetId(null);
+      presetHwFilterRef.current = null;
+    },
+    [removeHwRaw],
   );
 
   const allDateIds = useMemo(() => {
@@ -442,6 +454,7 @@ export function InferenceProvider({
     (id: string) => toggleDateRaw(id, allDateIds),
     [toggleDateRaw, allDateIds],
   );
+  const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(
     () => selectAllHwRaw(hwTypesWithData),
     [selectAllHwRaw, hwTypesWithData],
@@ -456,10 +469,22 @@ export function InferenceProvider({
   // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes.
   // Use a stable string key for precisions so array reference changes don't trigger a reset.
   // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
+  // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
+  // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
   const precisionsKey = effectivePrecisions.join(',');
   useEffect(() => {
     if (pendingHwFilterRef.current) return;
-    if (hwTypesWithData.size > 0) setActiveHwTypes(hwTypesWithData);
+    if (hwTypesWithData.size === 0) return;
+    const presetFilter = presetHwFilterRef.current;
+    if (presetFilter) {
+      const filterSet = new Set(presetFilter);
+      const filtered = new Set(Array.from(hwTypesWithData).filter((k) => filterSet.has(k)));
+      if (filtered.size > 0) {
+        setActiveHwTypes(filtered);
+        return;
+      }
+    }
+    setActiveHwTypes(hwTypesWithData);
   }, [selectedModel, effectiveSequence, precisionsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- precisionsKey is a stable proxy for effectivePrecisions
 
   // Remove selected GPUs that no longer have data for current filters
@@ -507,6 +532,62 @@ export function InferenceProvider({
     [selectedModel],
   );
 
+  // ── Debounced GPU selection tracking ─────────────────────────────────────
+  // Fire after 3s of no changes so we capture the "settled" selection.
+  // Skip the first render (initial data load) to avoid noise.
+
+  // Scatter chart — tracks activeHwTypes
+  const scatterTrackMounted = useRef(false);
+  useEffect(() => {
+    if (!scatterTrackMounted.current) {
+      scatterTrackMounted.current = true;
+      return;
+    }
+    if (activeHwTypes.size === 0) return;
+    const timer = setTimeout(() => {
+      const gpus = [...activeHwTypes].sort();
+      track('inference_gpu_selection_settled', {
+        gpus,
+        gpu_count: gpus.length,
+        model: selectedModel,
+        sequence: effectiveSequence,
+        preset_id: activePresetId,
+        yAxisMetric: selectedYAxisMetric,
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [activeHwTypes]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on GPU set changes
+
+  // Interactivity / E2E chart — tracks activeDates (date+gpu pairs)
+  const e2eTrackMounted = useRef(false);
+  useEffect(() => {
+    if (!e2eTrackMounted.current) {
+      e2eTrackMounted.current = true;
+      return;
+    }
+    if (activeDates.size === 0) return;
+    const timer = setTimeout(() => {
+      const pairs = [...activeDates].sort();
+      track('interactivity_selection_settled', {
+        date_gpu_pairs: pairs,
+        pair_count: pairs.length,
+        gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].sort(),
+        model: selectedModel,
+        sequence: effectiveSequence,
+        yAxisMetric: selectedYAxisMetric,
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [activeDates]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on date selection changes
+
+  // Fire once on mount to capture the initial y-axis metric (default or URL-restored)
+  useEffect(() => {
+    track('inference_chart_view', {
+      yAxisMetric: selectedYAxisMetric,
+      source: getUrlParam('i_metric') ? 'url' : 'default',
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- fire once on mount
+
   // ── URL sync ──────────────────────────────────────────────────────────────
 
   useUrlStateSync(
@@ -545,6 +626,101 @@ export function InferenceProvider({
     ],
   );
 
+  // ── URL preset loading ───────────────────────────────────────────────────
+  // Reads ?preset= from the URL on mount and applies it. This is the only
+  // place preset URL params are consumed — the landing page links here.
+
+  const urlPresetAppliedRef = useRef(false);
+  const presetVersionRef = useRef(0);
+  const [pendingTimelinePreset, setPendingTimelinePreset] = useState<
+    FavoritePreset['config'] | null
+  >(null);
+  const pendingPresetVersionRef = useRef(0);
+
+  // Once dateRangeAvailableDates resolves for a timeline preset, set the full range.
+  useEffect(() => {
+    if (!pendingTimelinePreset || dateRangeAvailableDates.length === 0) return;
+    if (pendingPresetVersionRef.current !== presetVersionRef.current) {
+      setPendingTimelinePreset(null);
+      return;
+    }
+    const first = dateRangeAvailableDates[0];
+    const last = dateRangeAvailableDates[dateRangeAvailableDates.length - 1];
+    presetGuardRef.current = true;
+    setSelectedDateRange({ startDate: first, endDate: last });
+    setSelectedDates([]);
+    presetGuardRef.current = false;
+    setPendingTimelinePreset(null);
+  }, [pendingTimelinePreset, dateRangeAvailableDates, setSelectedDateRange, setSelectedDates]);
+
+  const applyPreset = useCallback(
+    (preset: FavoritePreset) => {
+      const version = ++presetVersionRef.current;
+      const { config } = preset;
+      presetGuardRef.current = true;
+      setSelectedModel(config.model);
+      setSelectedSequence(config.sequence);
+      setSelectedPrecisions(config.precisions);
+      setSelectedYAxisMetric(config.yAxisMetric);
+      setPendingHwFilter(config.hwFilter ?? null);
+      presetHwFilterRef.current = config.hwFilter ?? null;
+      setActivePresetId(preset.id);
+      setHighContrast(true);
+      if (config.gpus && config.gpus.length > 0) {
+        setSelectedGPUs(config.gpus);
+        if (config.useDateRange) {
+          setSelectedDateRange({ startDate: '', endDate: '' });
+          setSelectedDates([]);
+          pendingPresetVersionRef.current = version;
+          setPendingTimelinePreset(config);
+        } else {
+          setSelectedDateRange({ startDate: '', endDate: '' });
+          setSelectedDates([]);
+        }
+      } else {
+        setSelectedGPUs([]);
+        setSelectedDateRange({ startDate: '', endDate: '' });
+        setSelectedDates([]);
+      }
+      presetGuardRef.current = false;
+      track('favorite_preset_applied', {
+        preset_id: preset.id,
+        preset_title: preset.title,
+        category: preset.category,
+      });
+    },
+    [
+      setSelectedModel,
+      setSelectedSequence,
+      setSelectedPrecisions,
+      setSelectedYAxisMetric,
+      setSelectedGPUs,
+      setSelectedDates,
+      setSelectedDateRange,
+      setActivePresetId,
+      setHighContrast,
+    ],
+  );
+
+  useEffect(() => {
+    if (urlPresetAppliedRef.current) return;
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const presetId = sp.get('preset');
+    if (!presetId) return;
+    const preset = FAVORITE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    urlPresetAppliedRef.current = true;
+    sp.delete('preset');
+    const search = sp.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${search ? `?${search}` : ''}`,
+    );
+    applyPreset(preset);
+  }, [applyPreset]);
+
   // ── Filtered runs ─────────────────────────────────────────────────────────
 
   const filteredAvailableRuns = useMemo(
@@ -578,6 +754,7 @@ export function InferenceProvider({
       activeHwTypes,
       hwTypesWithData,
       toggleHwType,
+      removeHwType,
       selectAllHwTypes,
       hardwareConfig,
       graphs,
@@ -620,6 +797,7 @@ export function InferenceProvider({
       activeDates,
       setActiveDates,
       toggleActiveDate,
+      removeActiveDate,
       selectAllActiveDates,
       selectedRunDate,
       setSelectedRunDate,
@@ -653,6 +831,7 @@ export function InferenceProvider({
       activeHwTypes,
       hwTypesWithData,
       toggleHwType,
+      removeHwType,
       selectAllHwTypes,
       hardwareConfig,
       graphs,
@@ -671,6 +850,7 @@ export function InferenceProvider({
       selectedDateRange,
       activeDates,
       toggleActiveDate,
+      removeActiveDate,
       selectAllActiveDates,
       selectedRunDate,
       availableDates,

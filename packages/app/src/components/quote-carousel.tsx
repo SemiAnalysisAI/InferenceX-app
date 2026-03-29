@@ -107,6 +107,7 @@ export function QuoteCarousel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hovering = useRef(false);
 
   // Build shuffled org order on mount (client only)
   useEffect(() => {
@@ -114,6 +115,7 @@ export function QuoteCarousel({
   }, [quotes, order]);
 
   const advance = useCallback(() => {
+    if (hovering.current) return;
     setFading(true);
     setTimeout(() => {
       setActiveIndex((prev) => (prev + 1) % (entries.length || 1));
@@ -139,7 +141,10 @@ export function QuoteCarousel({
         setFading(false);
       }, 300);
       timerRef.current = setInterval(advance, intervalMs);
-      track('quote_carousel_navigated');
+      track('quote_carousel_navigated', {
+        toOrg: entries[index]?.org,
+        fromOrg: entries[activeIndex]?.org,
+      });
     },
     [advance, intervalMs],
   );
@@ -147,7 +152,15 @@ export function QuoteCarousel({
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="flex flex-col gap-4"
+      onMouseEnter={() => {
+        hovering.current = true;
+      }}
+      onMouseLeave={() => {
+        hovering.current = false;
+      }}
+    >
       {/* Org name strip */}
       <div className="flex flex-wrap justify-center gap-x-6 md:gap-x-8 gap-y-2 mx-4">
         {entries.map((e, i) => (
@@ -155,10 +168,8 @@ export function QuoteCarousel({
             key={e.org}
             type="button"
             onClick={() => goTo(i)}
-            className={`text-xs font-semibold tracking-wide uppercase transition-opacity duration-200 ${
-              i === activeIndex
-                ? 'opacity-100 text-foreground'
-                : 'opacity-60 text-muted-foreground hover:opacity-80'
+            className={`text-xs font-semibold tracking-wide uppercase transition-colors duration-200 ${
+              i === activeIndex ? 'text-foreground' : 'text-[#808488] hover:text-muted-foreground'
             }`}
           >
             {labels[e.org] ?? e.org}
@@ -183,7 +194,11 @@ export function QuoteCarousel({
 
       {moreHref && (
         <div className="flex justify-end">
-          <a href={moreHref} className="text-xs font-bold text-brand hover:underline">
+          <a
+            href={moreHref}
+            className="text-xs font-bold text-brand hover:underline"
+            onClick={() => track('quote_carousel_see_more_clicked')}
+          >
             See more supporters &rarr;
           </a>
         </div>

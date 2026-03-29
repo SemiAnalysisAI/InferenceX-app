@@ -11,6 +11,7 @@
     "clean": "pnpm -r --parallel clean",
     "clean:all": "pnpm -r --parallel clean:all && rimraf node_modules \"packages/*/node_modules\"",
     "dev": "pnpm --filter *app --color dev",
+    "mcp": "pnpm --filter *mcp --color mcp",
     "build": "pnpm --filter *app --color build",
     "start": "pnpm --filter *app --color start",
     "preview": "pnpm --filter *app --color preview",

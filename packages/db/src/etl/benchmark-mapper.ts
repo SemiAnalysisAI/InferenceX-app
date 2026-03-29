@@ -5,11 +5,12 @@
 
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
-import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
+import { METRIC_KEYS, PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import {
   resolveModelKey,
   hwToGpuKey,
   normalizeFramework,
+  normalizePrecision,
   normalizeSpecMethod,
   parseBool,
   parseNum,
@@ -59,35 +60,10 @@ const NON_METRIC_KEYS = new Set([
 ]);
 
 /**
- * Raw metric keys seen in production. Any numeric field outside this set and
- * `NON_METRIC_KEYS` is auto-captured but triggers a one-time process warning
- * so new schema fields don't go unnoticed.
+ * METRIC_KEYS from constants is the canonical set of known metric keys.
+ * Any numeric field outside this set and `NON_METRIC_KEYS` is auto-captured
+ * but triggers a one-time process warning so new schema fields don't go unnoticed.
  */
-const KNOWN_METRIC_RAW_KEYS = new Set([
-  'tput_per_gpu',
-  'output_tput_per_gpu',
-  'input_tput_per_gpu',
-  'median_ttft',
-  'mean_ttft',
-  'p99_ttft',
-  'std_ttft',
-  'median_tpot',
-  'mean_tpot',
-  'p99_tpot',
-  'std_tpot',
-  'median_itl',
-  'mean_itl',
-  'p99_itl',
-  'std_itl',
-  'median_e2el',
-  'mean_e2el',
-  'p99_e2el',
-  'std_e2el',
-  'median_intvty',
-  'mean_intvty',
-  'p99_intvty',
-  'std_intvty',
-]);
 
 // Deduplicate warnings: each unexpected key only prints once per process.
 const _warnedMetricKeys = new Set<string>();
@@ -148,7 +124,7 @@ export function mapBenchmarkRow(
 
   const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
   const isMultinode = parseBool(row.is_multinode);
-  const precision = String(row.precision ?? '').toLowerCase();
+  const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }
@@ -184,7 +160,7 @@ export function mapBenchmarkRow(
 
   // Auto-capture all numeric fields not reserved for config/routing dimensions.
   // Fields in METRIC_RENAMES are stored under their canonical name; all others
-  // use the raw key. Any key outside KNOWN_METRIC_RAW_KEYS triggers a one-time
+  // use the raw key. Any key outside METRIC_KEYS triggers a one-time
   // warning so new schema additions don't go silently unnoticed.
   const metrics: Record<string, number> = {};
   for (const [rawKey, val] of Object.entries(row)) {
@@ -193,10 +169,10 @@ export function mapBenchmarkRow(
     if (n === undefined) continue;
     const storedKey = METRIC_RENAMES[rawKey] ?? rawKey;
     metrics[storedKey] = n;
-    if (!KNOWN_METRIC_RAW_KEYS.has(rawKey) && !_warnedMetricKeys.has(rawKey)) {
+    if (!METRIC_KEYS.has(rawKey) && !_warnedMetricKeys.has(rawKey)) {
       _warnedMetricKeys.add(rawKey);
       console.warn(
-        `  [WARN] auto-captured unexpected metric '${rawKey}' — add to KNOWN_METRIC_RAW_KEYS or NON_METRIC_KEYS in benchmark-mapper.ts`,
+        `  [WARN] auto-captured unexpected metric '${rawKey}' — add to METRIC_KEYS in constants/src/metric-keys.ts or NON_METRIC_KEYS in benchmark-mapper.ts`,
       );
     }
   }

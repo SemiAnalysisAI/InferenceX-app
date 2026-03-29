@@ -12,6 +12,7 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { track } from '@/lib/analytics';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import {
@@ -42,6 +43,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     setSelectedRunDate: setGlobalRunDate,
     availableModels,
     availableDates: inferenceAvailableDates,
+    effectivePrecisions,
+    setSelectedPrecisions,
+    availablePrecisions: globalAvailablePrecisions,
   } = useGlobalFilters();
   const { getUrlParam } = useUrlState();
   const { data: rawRows, isLoading: loading, error: queryError } = useEvaluations();
@@ -78,6 +82,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     setActiveSet: setEnabledHardware,
     toggle: toggleHwRaw,
     selectAll: selectAllHwRaw,
+    remove: removeHwRaw,
   } = useChartToggleSet();
 
   const availableBenchmarks = useMemo(() => {
@@ -108,24 +113,42 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [availableBenchmarks, availableModels, selectedBenchmark, setSelectedModel]);
 
   useEffect(() => {
-    if (availableDates.length > 0) {
-      const latestDate = availableDates[availableDates.length - 1];
-      const prevAvailableDates = prevAvailableDatesRef.current;
-      const wasOnLatest =
-        prevAvailableDates.length > 0 &&
-        selectedRunDate === prevAvailableDates[prevAvailableDates.length - 1];
-      if (!selectedRunDate || wasOnLatest) {
-        setSelectedRunDate(latestDate);
-      }
-      prevAvailableDatesRef.current = availableDates;
+    if (availableDates.length === 0) return;
+    const latestDate = availableDates[availableDates.length - 1];
+    const prevAvailableDates = prevAvailableDatesRef.current;
+    const wasOnLatest =
+      prevAvailableDates.length > 0 &&
+      selectedRunDate === prevAvailableDates[prevAvailableDates.length - 1];
+    if (!selectedRunDate || wasOnLatest || !availableDates.includes(selectedRunDate)) {
+      setSelectedRunDate(latestDate);
+      // If no global date yet (evals loaded first), set it so inference syncs to us.
+      if (!globalRunDate) setGlobalRunDate(latestDate);
     }
-  }, [availableDates, selectedRunDate, setSelectedRunDate]);
+    prevAvailableDatesRef.current = availableDates;
+  }, [availableDates, selectedRunDate, setSelectedRunDate, globalRunDate, setGlobalRunDate]);
 
   useEffect(() => {
     if (!globalRunDate) return;
-    if (availableDates.length === 0 || availableDates.includes(globalRunDate)) {
+    if (availableDates.length === 0) {
       setSelectedRunDate(globalRunDate);
+      return;
     }
+    if (availableDates.includes(globalRunDate)) {
+      setSelectedRunDate(globalRunDate);
+      return;
+    }
+    // Snap to the nearest valid date
+    const target = new Date(globalRunDate).getTime();
+    let closest = availableDates[0];
+    let minDiff = Math.abs(new Date(closest).getTime() - target);
+    for (const d of availableDates) {
+      const diff = Math.abs(new Date(d).getTime() - target);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = d;
+      }
+    }
+    setSelectedRunDate(closest);
   }, [globalRunDate, availableDates, selectedRunDateRev]);
 
   const availableHardware = useMemo(() => {
@@ -153,7 +176,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     if (specMethod && specMethod !== 'none') headerSuffixes.push(getFrameworkLabel(specMethod));
 
     const detailSuffixes: string[] = [];
-    if (precision) detailSuffixes.push(precision.toUpperCase());
+    if (precision && effectivePrecisions.length > 1) detailSuffixes.push(precision.toUpperCase());
     if (conc) detailSuffixes.push(`C${conc}`);
     if (tp !== undefined) detailSuffixes.push(`TP${tp}`);
 
@@ -161,19 +184,29 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(', ')}` : line1;
   }
 
+  const availablePrecisions = useMemo(() => {
+    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
+    if (!dbModelKey) return globalAvailablePrecisions;
+    const precs = [
+      ...new Set(rawData.filter((r) => r.model === dbModelKey).map((r) => r.precision)),
+    ].sort();
+    return precs.length > 0 ? precs : globalAvailablePrecisions;
+  }, [rawData, selectedModel, globalAvailablePrecisions]);
+
   const unfilteredChartData: EvaluationChartData[] = useMemo(() => {
     if (!selectedBenchmark || !selectedModel || !selectedRunDate) return [];
 
     const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
     if (!dbModelKey) return [];
 
-    const filteredData = rawData
+    // Map all rows up to selected date
+    const allData = rawData
       .filter((item) => {
-        const itemDate = item.date;
         return (
           item.task === selectedBenchmark &&
           item.model === dbModelKey &&
-          itemDate <= selectedRunDate
+          item.date <= selectedRunDate &&
+          effectivePrecisions.includes(item.precision)
         );
       })
       .map((item): EvaluationChartData | null => {
@@ -187,9 +220,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         ) as keyof typeof HARDWARE_CONFIG;
         if (hwKey === 'unknown') return null;
 
-        const itemDate = item.date;
-        const itemDateTime = item.timestamp ?? '';
-
         return {
           configId: item.config_id,
           hwKey,
@@ -199,54 +229,54 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
           model: item.model,
           benchmark: item.task,
           specDecode: item.spec_method,
-          date: itemDate,
-          datetime: itemDateTime,
+          date: item.date,
+          datetime: item.timestamp ?? '',
           precision: item.precision,
           framework: item.framework,
           tp: item.decode_tp,
           ep: item.decode_ep,
           dp_attention: item.decode_dp_attention,
           conc: item.conc ?? 0,
+          runUrl: item.run_url ?? undefined,
         };
       })
       .filter((item): item is EvaluationChartData => item !== null);
 
-    // Group by config_id and keep most recent per TP+conc combination
-    const groupMap = new Map<number, EvaluationChartData[]>();
-    filteredData.forEach((item) => {
-      if (!groupMap.has(item.configId)) groupMap.set(item.configId, []);
-      groupMap.get(item.configId)!.push(item);
-    });
+    // Group by hw-framework-specmethod-precision. Find the latest date for each
+    // group (up to selectedRunDate), then keep ALL rows from that date for the
+    // group. This means if parallelism (conc/tp/ep) changes between runs, we
+    // only show the latest run's parallelism — old combos don't leak in.
+    const groupKeyFn = (item: EvaluationChartData) =>
+      `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
+
+    const latestDateForGroup = new Map<string, string>();
+    for (const item of allData) {
+      const key = groupKeyFn(item);
+      const existing = latestDateForGroup.get(key);
+      if (!existing || item.date > existing) latestDateForGroup.set(key, item.date);
+    }
 
     const result: EvaluationChartData[] = [];
-    groupMap.forEach((groupItems) => {
-      // Dedup by TP+conc, keeping most recent date for each combination
-      const dedupMap = new Map<string, EvaluationChartData>();
-      groupItems.forEach((item) => {
-        const key = `${item.tp}_${item.conc}`;
-        const existing = dedupMap.get(key);
-        if (!existing || item.date > existing.date) dedupMap.set(key, item);
+    for (const item of allData) {
+      const key = groupKeyFn(item);
+      if (item.date !== latestDateForGroup.get(key)) continue;
+      const hwConfig = HARDWARE_CONFIG[item.hwKey];
+      const hwLabel = String(hwConfig?.label || item.hwKey);
+      result.push({
+        ...item,
+        configLabel: buildConfigLabel(
+          hwLabel,
+          item.framework,
+          item.specDecode,
+          item.precision,
+          item.conc,
+          item.tp,
+        ),
       });
-
-      dedupMap.forEach((item) => {
-        const hwConfig = HARDWARE_CONFIG[item.hwKey];
-        const hwLabel = String(hwConfig?.label || item.hwKey);
-        result.push({
-          ...item,
-          configLabel: buildConfigLabel(
-            hwLabel,
-            item.framework,
-            item.specDecode,
-            item.precision,
-            item.conc,
-            item.tp,
-          ),
-        });
-      });
-    });
+    }
 
     return result.sort((a, b) => a.configLabel.localeCompare(b.configLabel));
-  }, [rawData, selectedBenchmark, selectedModel, selectedRunDate]);
+  }, [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions]);
 
   const chartData = useMemo(() => {
     const filtered = unfilteredChartData.filter((data) => {
@@ -360,6 +390,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     (hwKey: string) => toggleHwRaw(hwKey, hwTypesWithData),
     [toggleHwRaw, hwTypesWithData],
   );
+  const removeHardware = useCallback((hwKey: string) => removeHwRaw(hwKey), [removeHwRaw]);
 
   const handleSetSelectedModel = useCallback(
     (model: string | undefined) => {
@@ -367,6 +398,26 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     },
     [setSelectedModel],
   );
+
+  // ── Debounced hardware selection tracking ────────────────────────────────
+  const evalTrackMounted = useRef(false);
+  useEffect(() => {
+    if (!evalTrackMounted.current) {
+      evalTrackMounted.current = true;
+      return;
+    }
+    if (enabledHardware.size === 0) return;
+    const timer = setTimeout(() => {
+      const gpus = [...enabledHardware].sort();
+      track('evaluation_hw_selection_settled', {
+        gpus,
+        gpu_count: gpus.length,
+        model: selectedModel,
+        benchmark: selectedBenchmark,
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [enabledHardware]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on hw set changes
 
   useUrlStateSync(
     {
@@ -396,6 +447,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       unfilteredChartData,
       enabledHardware,
       toggleHardware,
+      removeHardware,
       highContrast,
       setHighContrast,
       showLabels,
@@ -407,6 +459,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       highlightedConfigs,
       changelogEntries,
       modelHasEvalData,
+      selectedPrecisions: effectivePrecisions,
+      setSelectedPrecisions,
+      availablePrecisions,
     }),
     [
       loading,
@@ -423,6 +478,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       unfilteredChartData,
       enabledHardware,
       toggleHardware,
+      removeHardware,
       highContrast,
       showLabels,
       isLegendExpanded,
@@ -431,6 +487,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       highlightedConfigs,
       changelogEntries,
       modelHasEvalData,
+      effectivePrecisions,
+      setSelectedPrecisions,
+      availablePrecisions,
     ],
   );
 

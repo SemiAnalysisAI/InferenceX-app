@@ -119,7 +119,10 @@ export interface ChartTooltipHandlers<TData> {
       | d3.ScaleBand<string>
       | d3.ScaleLinear<number, number, never>
       | d3.ScaleLogarithmic<number, number, never>,
-    yScale?: d3.ScaleLinear<number, number, never> | d3.ScaleLogarithmic<number, number, never>,
+    yScale?:
+      | d3.ScaleBand<string>
+      | d3.ScaleLinear<number, number, never>
+      | d3.ScaleLogarithmic<number, number, never>,
     svgRef?: React.RefObject<SVGSVGElement | null>,
     zoomAxes?: 'x' | 'y' | 'both',
   ) => void;
@@ -206,7 +209,10 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         | d3.ScaleBand<string>
         | d3.ScaleLinear<number, number, never>
         | d3.ScaleLogarithmic<number, number, never>,
-      yScale?: d3.ScaleLinear<number, number, never> | d3.ScaleLogarithmic<number, number, never>,
+      yScale?:
+        | d3.ScaleBand<string>
+        | d3.ScaleLinear<number, number, never>
+        | d3.ScaleLogarithmic<number, number, never>,
       svgRef?: React.RefObject<SVGSVGElement | null>,
       zoomAxes?: 'x' | 'y' | 'both',
     ) => {

@@ -163,13 +163,15 @@ describe('precision compatibility', () => {
 // ── Description/config alignment ─────────────────────────────────────
 
 describe('description/config alignment', () => {
-  it('hwFilter entries are mentioned in title, description, or tags', () => {
+  it('hwFilter GPU base names are mentioned in title, description, or tags', () => {
     for (const preset of FAVORITE_PRESETS) {
-      const hwPrefixes = preset.config.hwFilter ?? [];
+      const hwKeys = preset.config.hwFilter ?? [];
       const searchText =
         `${preset.title} ${preset.description} ${preset.tags.join(' ')}`.toLowerCase();
-      for (const hw of hwPrefixes) {
-        expect(searchText).toContain(hw.toLowerCase());
+      for (const hw of hwKeys) {
+        // Extract base GPU name (e.g. 'b200' from 'b200_dynamo-trt')
+        const base = hw.split('_')[0];
+        expect(searchText).toContain(base.toLowerCase());
       }
     }
   });

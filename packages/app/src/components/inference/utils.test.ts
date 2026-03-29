@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import {
-  filterDataByCostLimit,
-  filterDataByLatencyLimit,
-  processOverlayChartData,
-} from '@/components/inference/utils';
+import { filterDataByCostLimit, processOverlayChartData } from '@/components/inference/utils';
 
 // ---------------------------------------------------------------------------
 // fixture factories
@@ -134,51 +130,6 @@ describe('filterDataByCostLimit', () => {
     const data = [pt({ costh: { y: 0.5, roof: false } }), pt({ costh: { y: 0.9, roof: false } })];
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.0 }), 'y_costh');
     expect(result).toHaveLength(2);
-  });
-});
-
-// ===========================================================================
-// filterDataByLatencyLimit
-// ===========================================================================
-describe('filterDataByLatencyLimit', () => {
-  it('returns data unchanged when chartType is not "e2e"', () => {
-    const data = [pt({ x: 100 }), pt({ x: 200 })];
-    const def = chartDef({ chartType: 'interactivity', y_latency_limit: 50 });
-    expect(filterDataByLatencyLimit(data, def)).toHaveLength(2);
-  });
-
-  it('returns data unchanged when chartType is "e2e" but y_latency_limit is absent', () => {
-    const data = [pt({ x: 100 }), pt({ x: 200 })];
-    const def = chartDef({ chartType: 'e2e' }); // no y_latency_limit
-    expect(filterDataByLatencyLimit(data, def)).toHaveLength(2);
-  });
-
-  it('filters out points where x > y_latency_limit', () => {
-    const data = [pt({ x: 50 }), pt({ x: 150 }), pt({ x: 200 })];
-    const def = chartDef({ chartType: 'e2e', y_latency_limit: 100 });
-    const result = filterDataByLatencyLimit(data, def);
-    expect(result).toHaveLength(1);
-    expect(result[0].x).toBe(50);
-  });
-
-  it('includes points where x === y_latency_limit (boundary is inclusive)', () => {
-    const data = [pt({ x: 100 }), pt({ x: 101 })];
-    const def = chartDef({ chartType: 'e2e', y_latency_limit: 100 });
-    const result = filterDataByLatencyLimit(data, def);
-    expect(result).toHaveLength(1);
-    expect(result[0].x).toBe(100);
-  });
-
-  it('returns empty array when all points exceed the latency limit', () => {
-    const data = [pt({ x: 500 }), pt({ x: 1000 })];
-    const def = chartDef({ chartType: 'e2e', y_latency_limit: 100 });
-    expect(filterDataByLatencyLimit(data, def)).toHaveLength(0);
-  });
-
-  it('returns all points when all are within the latency limit', () => {
-    const data = [pt({ x: 10 }), pt({ x: 50 }), pt({ x: 99 })];
-    const def = chartDef({ chartType: 'e2e', y_latency_limit: 100 });
-    expect(filterDataByLatencyLimit(data, def)).toHaveLength(3);
   });
 });
 

@@ -162,7 +162,10 @@ const CustomCosts = memo(({ loading }: { loading: boolean }) => {
 
   // Handle reset button click
   const handleReset = useCallback(() => {
-    track('inference_custom_costs_reset');
+    track('inference_custom_costs_reset', {
+      metric: selectedYAxisMetric,
+      gpuCount: stableGpus.length,
+    });
     const defaultInputs: { [gpuKey: string]: number } = {};
 
     stableGpus.forEach((gpu) => {
@@ -183,7 +186,10 @@ const CustomCosts = memo(({ loading }: { loading: boolean }) => {
     if (hasErrors) {
       return;
     }
-    track('inference_custom_costs_calculated');
+    track('inference_custom_costs_calculated', {
+      metric: selectedYAxisMetric,
+      gpuCount: stableGpus.length,
+    });
 
     // Store the current values as the last calculated values before calculating
     const currentValues: { [gpuKey: string]: number } = {};

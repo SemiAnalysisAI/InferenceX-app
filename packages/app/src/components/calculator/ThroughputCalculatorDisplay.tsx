@@ -38,6 +38,7 @@ import {
   Sequence,
 } from '@/lib/data-mappings';
 import { getModelSortIndex, GPU_SPECS, HARDWARE_CONFIG } from '@/lib/constants';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useChartExport } from '@/hooks/useChartExport';
@@ -77,14 +78,20 @@ function CalculatorChartButtons({
   chartId,
   onExportCsv,
   setIsLegendExpanded,
+  exportFileName,
 }: {
   viewMode: 'chart' | 'table';
   setViewMode: (v: 'chart' | 'table') => void;
   chartId: string;
   onExportCsv: () => void;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  exportFileName?: string;
 }) {
-  const { isExporting, exportToImage } = useChartExport({ chartId, setIsLegendExpanded });
+  const { isExporting, exportToImage } = useChartExport({
+    chartId,
+    setIsLegendExpanded,
+    exportFileName,
+  });
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
 
   const handleExportPng = () => {
@@ -222,6 +229,13 @@ export default function ThroughputCalculatorDisplay() {
   const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
 
+  // Dynamic vendor-aware colors for visible GPUs
+  const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
+  const { resolveColor } = useThemeColors({
+    highContrast: false,
+    activeKeys: visibleKeysArray,
+  });
+
   // Track previous available keys to detect when the GPU set changes
   const prevAvailableKeyRef = useRef<string>('');
 
@@ -352,17 +366,25 @@ export default function ThroughputCalculatorDisplay() {
     [availableHwKeys],
   );
 
+  const removeGpu = useCallback((hwKey: string) => {
+    setVisibleHwKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(hwKey);
+      return next;
+    });
+  }, []);
+
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = calculatorChartToCsv(results, targetValue, (hwKey) => {
       const config = hardwareConfig[hwKey] || HARDWARE_CONFIG[hwKey];
       return config ? getDisplayLabel(config) : hwKey;
     });
-    exportToCsv(`calculator-${Date.now()}`, headers, rows);
+    exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
   }, [results, targetValue, hardwareConfig]);
 
   const handleResetGpus = useCallback(() => {
     setVisibleHwKeys(new Set(availableHwKeys));
-    track('calculator_gpu_reset');
+    track('calculator_gpu_reset', { gpuCount: availableHwKeys.length });
   }, [availableHwKeys]);
 
   // Derive runUrl from workflowInfo for the selected sequence
@@ -378,8 +400,10 @@ export default function ThroughputCalculatorDisplay() {
       const next = new Set(prev);
       if (next.has(resultKey)) {
         next.delete(resultKey);
+        track('calculator_bar_deselected', { resultKey });
       } else {
         next.add(resultKey);
+        track('calculator_bar_selected', { resultKey, totalSelected: next.size });
       }
       return next;
     });
@@ -460,13 +484,13 @@ export default function ThroughputCalculatorDisplay() {
       .map(([key, config]) => ({
         name: config.name,
         label: getDisplayLabel(config),
-        color: config?.color || 'var(--foreground)',
+        color: resolveColor(key),
         title: config.gpu,
         hw: key,
         isActive: visibleHwKeys.has(key),
         onClick: () => toggleGpuVisibility(key),
       }));
-  }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility]);
+  }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
 
   const getBarMetricLabel = (metric: BarMetric) => {
     if (metric === 'throughput') return 'Throughput';
@@ -486,7 +510,7 @@ export default function ThroughputCalculatorDisplay() {
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
         <Card>
           <div className="flex flex-col gap-4">
@@ -677,6 +701,7 @@ export default function ThroughputCalculatorDisplay() {
             chartId="calculator-chart"
             onExportCsv={handleExportCsv}
             setIsLegendExpanded={setIsLegendExpanded}
+            exportFileName={`InferenceX_calculator_${selectedModel}`}
           />
           <Card>
             {loading ? (
@@ -847,19 +872,29 @@ export default function ThroughputCalculatorDisplay() {
                       runUrl={runUrl}
                       selectedBars={selectedBars}
                       onBarSelect={handleBarSelect}
+                      colorResolver={resolveColor}
                       legendElement={
                         availableHwKeys.length > 0 ? (
                           <ChartLegend
                             variant="sidebar"
                             legendItems={legendItems}
+                            onItemRemove={removeGpu}
                             isLegendExpanded={isLegendExpanded}
                             onExpandedChange={(expanded) => {
                               setIsLegendExpanded(expanded);
                               track('calculator_legend_expanded', { expanded });
                             }}
-                            showResetFilter={true}
-                            allSelected={visibleHwKeys.size === availableHwKeys.length}
-                            onResetFilter={handleResetGpus}
+                            actions={
+                              visibleHwKeys.size < availableHwKeys.length
+                                ? [
+                                    {
+                                      id: 'calc-reset-filter',
+                                      label: 'Reset filter',
+                                      onClick: handleResetGpus,
+                                    },
+                                  ]
+                                : []
+                            }
                             enableTooltips={true}
                           />
                         ) : undefined
@@ -996,8 +1031,8 @@ export default function ThroughputCalculatorDisplay() {
               <button
                 type="button"
                 onClick={() => {
+                  track('calculator_selection_cleared', { clearedCount: selectedBars.size });
                   setSelectedBars(new Set());
-                  track('calculator_selection_cleared');
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
               >
@@ -1007,6 +1042,6 @@ export default function ThroughputCalculatorDisplay() {
           </Card>
         </section>
       )}
-    </>
+    </div>
   );
 }

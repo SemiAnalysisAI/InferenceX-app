@@ -9,14 +9,21 @@ describe('StarNudge constants', () => {
 });
 
 describe('shouldShowNudge', () => {
-  const mockStorage = new Map<string, string>();
+  const mockSession = new Map<string, string>();
+  const mockLocal = new Map<string, string>();
 
   beforeEach(() => {
-    mockStorage.clear();
+    mockSession.clear();
+    mockLocal.clear();
     vi.stubGlobal('sessionStorage', {
-      getItem: (key: string) => mockStorage.get(key) ?? null,
-      setItem: (key: string, value: string) => mockStorage.set(key, value),
-      removeItem: (key: string) => mockStorage.delete(key),
+      getItem: (key: string) => mockSession.get(key) ?? null,
+      setItem: (key: string, value: string) => mockSession.set(key, value),
+      removeItem: (key: string) => mockSession.delete(key),
+    });
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => mockLocal.get(key) ?? null,
+      setItem: (key: string, value: string) => mockLocal.set(key, value),
+      removeItem: (key: string) => mockLocal.delete(key),
     });
   });
 
@@ -30,16 +37,18 @@ describe('shouldShowNudge', () => {
   });
 
   it('returns false when nudge was already shown this session', () => {
-    mockStorage.set(NUDGE_SESSION_KEY, '1');
+    mockSession.set(NUDGE_SESSION_KEY, '1');
     expect(shouldShowNudge()).toBe(false);
   });
 
-  it('returns false when sessionStorage throws', () => {
-    vi.stubGlobal('sessionStorage', {
+  it('returns false when user has already starred', () => {
+    mockLocal.set('inferencex-starred', '1');
+    expect(shouldShowNudge()).toBe(false);
+  });
+
+  it('returns false when storage throws', () => {
+    vi.stubGlobal('localStorage', {
       getItem: () => {
-        throw new Error('SecurityError');
-      },
-      setItem: () => {
         throw new Error('SecurityError');
       },
     });
@@ -48,14 +57,21 @@ describe('shouldShowNudge', () => {
 });
 
 describe('saveNudgeShown', () => {
-  const mockStorage = new Map<string, string>();
+  const mockSession = new Map<string, string>();
+  const mockLocal = new Map<string, string>();
 
   beforeEach(() => {
-    mockStorage.clear();
+    mockSession.clear();
+    mockLocal.clear();
     vi.stubGlobal('sessionStorage', {
-      getItem: (key: string) => mockStorage.get(key) ?? null,
-      setItem: (key: string, value: string) => mockStorage.set(key, value),
-      removeItem: (key: string) => mockStorage.delete(key),
+      getItem: (key: string) => mockSession.get(key) ?? null,
+      setItem: (key: string, value: string) => mockSession.set(key, value),
+      removeItem: (key: string) => mockSession.delete(key),
+    });
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => mockLocal.get(key) ?? null,
+      setItem: (key: string, value: string) => mockLocal.set(key, value),
+      removeItem: (key: string) => mockLocal.delete(key),
     });
   });
 
@@ -66,7 +82,7 @@ describe('saveNudgeShown', () => {
 
   it('stores a value in sessionStorage', () => {
     saveNudgeShown();
-    const stored = mockStorage.get(NUDGE_SESSION_KEY);
+    const stored = mockSession.get(NUDGE_SESSION_KEY);
     expect(stored).toBe('1');
   });
 

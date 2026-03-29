@@ -7,7 +7,7 @@ import { DM_Sans } from 'next/font/google';
 
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
-import { cn } from '@/lib/utils';
+import { CircuitBackground } from '@/components/circuit-background';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -19,6 +19,7 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
+import { fetchStarCount } from '@/lib/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
 
@@ -152,11 +153,12 @@ const jsonLd = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const starCount = await fetchStarCount();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -164,16 +166,7 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute top-0 left-0 -z-10 hidden lg:block',
-            'bg-muted/50 dark:bg-muted',
-            "mask-[url('/brand/left-pattern-full.svg')]",
-            'mask-no-repeat mask-position-[top_right] mask-size-[100%]',
-            'w-1/2 h-full',
-          )}
-        />
+        <CircuitBackground />
         <PostHogProvider>
           <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
           <QueryProvider>
@@ -184,13 +177,13 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <Header />
+              <Header starCount={starCount} />
               <div className="grow flex flex-col">{children}</div>
-              <Footer />
+              <Footer starCount={starCount} />
             </ThemeProvider>
           </QueryProvider>
-          <Analytics />
-          <SpeedInsights />
+          {process.env.VERCEL && <Analytics />}
+          {process.env.VERCEL && <SpeedInsights />}
         </PostHogProvider>
       </body>
     </html>

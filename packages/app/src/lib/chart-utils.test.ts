@@ -271,23 +271,27 @@ describe('buildAvailabilityHwKey', () => {
 // generateHighContrastColors
 // ===========================================================================
 describe('generateHighContrastColors', () => {
+  /** Extract hue from an "hsl(H, S%, L%)" string */
+  function parseHue(hsl: string): number {
+    return parseFloat(hsl.match(/hsl\(([\d.]+)/)![1]);
+  }
+
+  /** Angular distance between two hues on the 360° wheel */
+  function hueDist(a: number, b: number): number {
+    const d = Math.abs(a - b) % 360;
+    return Math.min(d, 360 - d);
+  }
+
+  // ---------- Basics ----------
+
   it('returns an empty object for an empty keys array', () => {
     expect(generateHighContrastColors([], 'dark')).toEqual({});
   });
 
-  it('returns one color for a single key', () => {
+  it('returns one HSL color for a single key', () => {
     const result = generateHighContrastColors(['gpu-a'], 'dark');
     expect(Object.keys(result)).toHaveLength(1);
-    expect(result['gpu-a']).toBe('hsl(0, 70%, 65%)'); // hue=0/1*360=0, dark lightness=65
-  });
-
-  it('distributes hues evenly across the spectrum', () => {
-    const result = generateHighContrastColors(['a', 'b', 'c', 'd'], 'dark');
-    // 4 keys → hues at 0, 90, 180, 270
-    expect(result['a']).toBe('hsl(0, 70%, 65%)');
-    expect(result['b']).toBe('hsl(90, 70%, 65%)');
-    expect(result['c']).toBe('hsl(180, 70%, 65%)');
-    expect(result['d']).toBe('hsl(270, 70%, 65%)');
+    expect(result['gpu-a']).toMatch(/^hsl\(\d/);
   });
 
   it('uses lightness 65% for dark theme', () => {
@@ -305,42 +309,130 @@ describe('generateHighContrastColors', () => {
     expect(result['x']).toContain('35%');
   });
 
-  it('returns the same colors when shuffleSeed is 0 (default)', () => {
-    const keys = ['h100', 'h200', 'b200', 'mi300x'];
-    const result = generateHighContrastColors(keys, 'dark', 0);
-    // hue 0, 90, 180, 270 in order
-    expect(result['h100']).toBe('hsl(0, 70%, 65%)');
-    expect(result['h200']).toBe('hsl(90, 70%, 65%)');
-    expect(result['b200']).toBe('hsl(180, 70%, 65%)');
-    expect(result['mi300x']).toBe('hsl(270, 70%, 65%)');
+  it('evenly spaces items within a single vendor zone', () => {
+    // 3 unknown-vendor items in the unknown zone (195-300, 105° span)
+    const result = generateHighContrastColors(['a', 'b', 'c'], 'dark');
+    const hues = Object.values(result).map(parseHue);
+    for (let i = 0; i < hues.length - 1; i++) {
+      expect(hueDist(hues[i], hues[i + 1])).toBeCloseTo(35, 0);
+    }
   });
 
+  // ---------- Vendor zone constraints ----------
+
+  it('NVIDIA items stay in green zone (60-195)', () => {
+    const keys = [
+      'b200_dynamo-sglang',
+      'b200_dynamo-trt',
+      'gb200_dynamo-trt',
+      'h100_dynamo-trt',
+      'h200_dynamo-trt',
+    ];
+    const result = generateHighContrastColors(keys, 'dark');
+    for (const hsl of Object.values(result)) {
+      const hue = parseHue(hsl);
+      expect(hue).toBeGreaterThanOrEqual(60);
+      expect(hue).toBeLessThanOrEqual(195);
+    }
+  });
+
+  it('AMD items stay in red/orange zone (300-360 or 0-60)', () => {
+    const keys = ['mi300x_sglang', 'mi325x_sglang', 'mi355x_mori-sglang'];
+    const result = generateHighContrastColors(keys, 'dark');
+    for (const hsl of Object.values(result)) {
+      const hue = parseHue(hsl);
+      expect(hue >= 300 || hue <= 60).toBe(true);
+    }
+  });
+
+  it('NVIDIA never gets red hues and AMD never gets green hues', () => {
+    const combos = [
+      ['b200_dynamo-sglang', 'b200_dynamo-trt', 'mi355x_mori-sglang'],
+      ['gb200_dynamo-trt', 'h100_dynamo-trt', 'mi300x_sglang', 'mi355x_mori-sglang'],
+      [
+        'b200_dynamo-sglang',
+        'b200_dynamo-trt',
+        'gb200_dynamo-trt',
+        'mi300x_sglang',
+        'mi355x_mori-sglang',
+      ],
+    ];
+    for (const keys of combos) {
+      const result = generateHighContrastColors(keys, 'dark');
+      for (const key of keys) {
+        const vendor = key.startsWith('mi') ? 'amd' : 'nvidia';
+        const hue = parseHue(result[key]);
+        if (vendor === 'nvidia') {
+          expect(hue >= 60 && hue <= 195).toBe(true);
+        } else {
+          expect(hue >= 300 || hue <= 60).toBe(true);
+        }
+      }
+    }
+  });
+
+  // ---------- Cross-vendor visual distinction ----------
+
+  it('2 NVIDIA + 1 AMD: all pairs ≥60° apart', () => {
+    const result = generateHighContrastColors(
+      ['b200_dynamo-sglang', 'b200_dynamo-trt', 'mi355x_mori-sglang'],
+      'dark',
+    );
+    const hues = Object.values(result).map(parseHue);
+    for (let i = 0; i < hues.length; i++) {
+      for (let j = i + 1; j < hues.length; j++) {
+        expect(hueDist(hues[i], hues[j])).toBeGreaterThanOrEqual(60);
+      }
+    }
+  });
+
+  it('mixed vendors never produce near-identical hues (≥30° min)', () => {
+    const combos = [
+      ['h100_vllm', 'mi300x_sglang'],
+      ['b200_dynamo-trt', 'mi355x_mori-sglang'],
+      ['h200_dynamo-trt', 'b200_dynamo-sglang', 'mi325x_sglang'],
+      ['gb200_dynamo-trt', 'h100_dynamo-trt', 'mi300x_sglang', 'mi355x_mori-sglang'],
+    ];
+    for (const keys of combos) {
+      const result = generateHighContrastColors(keys, 'dark');
+      const hues = Object.values(result).map(parseHue);
+      for (let i = 0; i < hues.length; i++) {
+        for (let j = i + 1; j < hues.length; j++) {
+          expect(hueDist(hues[i], hues[j])).toBeGreaterThanOrEqual(30);
+        }
+      }
+    }
+  });
+
+  // ---------- Shuffle ----------
+
   it('shuffles hue assignments when shuffleSeed is non-zero', () => {
-    const keys = ['h100', 'h200', 'b200', 'mi300x'];
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang'];
     const unshuffled = generateHighContrastColors(keys, 'dark', 0);
     const shuffled = generateHighContrastColors(keys, 'dark', 42);
-    // The shuffled result should have the same set of hue values but differently assigned
-    const unshuffledHues = Object.values(unshuffled).sort();
-    const shuffledHues = Object.values(shuffled).sort();
-    // Same set of colors overall (same hues, just reassigned)
-    expect(shuffledHues).toEqual(unshuffledHues);
-    // At least one key should get a different color
-    const sameCount = keys.filter((k) => unshuffled[k] === shuffled[k]).length;
-    expect(sameCount).toBeLessThan(keys.length);
+    const unshuffledNv = ['h100_vllm', 'h200_vllm', 'b200_vllm'].map((k) => unshuffled[k]).sort();
+    const shuffledNv = ['h100_vllm', 'h200_vllm', 'b200_vllm'].map((k) => shuffled[k]).sort();
+    expect(shuffledNv).toEqual(unshuffledNv);
+  });
+
+  it('returns stable colors when shuffleSeed is 0', () => {
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang'];
+    const r1 = generateHighContrastColors(keys, 'dark', 0);
+    const r2 = generateHighContrastColors(keys, 'dark', 0);
+    expect(r1).toEqual(r2);
   });
 
   it('produces deterministic results for the same seed', () => {
-    const keys = ['h100', 'h200', 'b200', 'mi300x', 'mi325x'];
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang', 'mi325x_sglang'];
     const result1 = generateHighContrastColors(keys, 'dark', 7);
     const result2 = generateHighContrastColors(keys, 'dark', 7);
     expect(result1).toEqual(result2);
   });
 
   it('produces different results for different seeds', () => {
-    const keys = ['h100', 'h200', 'b200', 'mi300x', 'mi325x'];
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang', 'mi325x_sglang'];
     const result1 = generateHighContrastColors(keys, 'dark', 1);
     const result2 = generateHighContrastColors(keys, 'dark', 2);
-    // At least one key should differ
     const sameCount = keys.filter((k) => result1[k] === result2[k]).length;
     expect(sameCount).toBeLessThan(keys.length);
   });

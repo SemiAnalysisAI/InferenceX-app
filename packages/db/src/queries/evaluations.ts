@@ -15,6 +15,7 @@ export interface EvalRow {
   conc: number | null;
   metrics: Record<string, number>;
   timestamp: string;
+  run_url: string | null;
 }
 
 /** Get all evaluation results (latest attempt only). */
@@ -34,7 +35,8 @@ export async function getAllEvalResults(sql: NeonClient): Promise<EvalRow[]> {
       er.date::text,
       er.conc,
       er.metrics,
-      to_char(wr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as timestamp
+      to_char(wr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as timestamp,
+      wr.html_url as run_url
     FROM eval_results er
     JOIN configs c ON c.id = er.config_id
     JOIN latest_workflow_runs wr ON wr.id = er.workflow_run_id

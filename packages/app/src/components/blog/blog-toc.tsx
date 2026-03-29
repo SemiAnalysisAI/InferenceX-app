@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { track } from '@/lib/analytics';
-import { Card } from '@/components/ui/card';
 import type { TocHeading } from '@/lib/blog';
 
 interface BlogTocProps {
@@ -139,32 +139,33 @@ export function BlogToc({ headings }: BlogTocProps) {
     <>
       {/* Inline: when sidebar doesn't fit */}
       {!showSidebar && (
-        <Card>
-          <details aria-label="Table of contents">
-            <summary className="text-sm font-medium cursor-pointer">
-              On this page{' '}
-              <span className="text-muted-foreground font-normal">(click to expand)</span>
-            </summary>
-            <div className="mt-2">{list}</div>
-          </details>
-        </Card>
+        <details aria-label="Table of contents">
+          <summary className="text-sm font-medium cursor-pointer">
+            On this page{' '}
+            <span className="text-muted-foreground font-normal">(click to expand)</span>
+          </summary>
+          <div className="mt-2">{list}</div>
+        </details>
       )}
 
-      {/* Sidebar: aligned with title, follows scroll */}
-      {showSidebar && (
-        <nav
-          ref={sidebarRef}
-          className="fixed w-52 max-h-[calc(100vh-4rem)] overflow-y-auto"
-          style={{
-            left: sidebarLeftRef.current,
-            top: Math.max(32, sectionTopRef.current - window.scrollY),
-          }}
-          aria-label="Table of contents"
-        >
-          <p className="text-sm font-medium mb-2">On this page</p>
-          {list}
-        </nav>
-      )}
+      {/* Sidebar */}
+      {showSidebar &&
+        createPortal(
+          <nav
+            ref={sidebarRef}
+            className="fixed pt-12 max-w-100 max-h-[calc(100vh-6rem)] overflow-y-auto"
+            style={{
+              left: sidebarLeftRef.current,
+              top: Math.max(32, sectionTopRef.current - window.scrollY),
+              scrollbarWidth: 'none',
+            }}
+            aria-label="Table of contents"
+          >
+            <p className="text-sm font-medium mb-2">On this page</p>
+            {list}
+          </nav>,
+          document.body,
+        )}
     </>
   );
 }

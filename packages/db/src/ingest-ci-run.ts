@@ -87,7 +87,7 @@ if (isDownloadMode) {
   console.log(`\n--- Downloading artifacts to ${artifactsDir} ---`);
 
   const artifactListJson = execSync(
-    `gh api "repos/${REPO}/actions/runs/${runIdStr}/artifacts" --paginate`,
+    `gh api "repos/${REPO}/actions/runs/${runIdStr}/artifacts" --paginate --jq '.artifacts[]'`,
     { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
   );
 
@@ -97,7 +97,7 @@ if (isDownloadMode) {
     if (!line) continue;
     try {
       const parsed = JSON.parse(line);
-      if (parsed.artifacts) allArtifacts.push(...parsed.artifacts);
+      allArtifacts.push(parsed);
     } catch {}
   }
 

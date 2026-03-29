@@ -43,9 +43,6 @@ export interface ChartLegendProps {
   actions?: LegendActionConfig[];
   grouped?: boolean;
   showFpShapeIndicators?: boolean;
-  showResetFilter?: boolean;
-  allSelected?: boolean;
-  onResetFilter?: () => void;
   enableTooltips?: boolean;
   maxHeight?: number;
   /** Override styles on the outer legend container (e.g. maxHeight to constrain scrollable area) */
@@ -54,6 +51,7 @@ export interface ChartLegendProps {
   disableActiveSort?: boolean;
   onItemHover?: (id: string) => void;
   onItemHoverEnd?: () => void;
+  onItemRemove?: (name: string) => void;
 }
 
 export default function ChartLegend({
@@ -64,9 +62,6 @@ export default function ChartLegend({
   actions,
   grouped = false,
   showFpShapeIndicators = false,
-  showResetFilter = false,
-  allSelected = true,
-  onResetFilter,
   enableTooltips = false,
   maxHeight,
   containerStyle,
@@ -74,6 +69,7 @@ export default function ChartLegend({
   disableActiveSort = false,
   onItemHover,
   onItemHoverEnd,
+  onItemRemove,
 }: ChartLegendProps) {
   const isSidebar = variant === 'sidebar';
   const [hasLongText, setHasLongText] = useState(false);
@@ -82,6 +78,11 @@ export default function ChartLegend({
   const [searchQuery, setSearchQuery] = useState('');
 
   const effectiveExpanded = isLegendExpanded;
+  const activeCount = useMemo(
+    () => legendItems.filter((item) => item.isActive).length,
+    [legendItems],
+  );
+  const effectiveRemove = onItemRemove && activeCount > 1 ? onItemRemove : undefined;
 
   useLayoutEffect(() => {
     setHasLongText(legendItems.some((item) => item.label && item.label.length > 8));
@@ -179,8 +180,7 @@ export default function ChartLegend({
     (showFpShapeIndicators ||
       (switches && switches.length > 0) ||
       (actions && actions.length > 0) ||
-      hasLongText ||
-      (showResetFilter && !allSelected));
+      hasLongText);
   const scrollClasses = isSidebar
     ? cn(
         'overflow-y-auto flex-1 min-h-0 space-y-0.5',
@@ -253,7 +253,7 @@ export default function ChartLegend({
 
   const actionElements =
     actions && actions.length > 0 ? (
-      <div className="w-full no-export">
+      <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
         {actions.map((action) => (
           <button
             key={action.id}
@@ -306,19 +306,6 @@ export default function ChartLegend({
     </div>
   ) : null;
 
-  const resetFilter =
-    showResetFilter && !allSelected ? (
-      <div className="no-export mt-2">
-        <button
-          onClick={onResetFilter}
-          className="text-xs text-muted-foreground hover:text-foreground underline"
-          aria-label="Reset filter"
-        >
-          Reset filter
-        </button>
-      </div>
-    ) : null;
-
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
   const itemClassName = (item: CommonLegendItemProps, isHidden: boolean) =>
     cn(
@@ -330,7 +317,6 @@ export default function ChartLegend({
         : item.isActive
           ? 'opacity-100'
           : 'opacity-50 no-export',
-      item.isHighlighted ? 'text-red-900 font-bold' : '',
       effectiveExpanded && 'md:w-full md:block',
       isHidden && 'h-0 m-0! p-0! overflow-hidden',
     );
@@ -349,6 +335,7 @@ export default function ChartLegend({
         onClick={item.onClick}
         onHover={onItemHover}
         onHoverEnd={onItemHoverEnd}
+        onRemove={effectiveRemove}
         asFragment
         isLegendExpanded={effectiveExpanded}
         sidebarMode={isSidebar}
@@ -375,19 +362,13 @@ export default function ChartLegend({
     );
   };
 
-  // Bottom controls (switches, FP indicators, expand button, reset filter)
+  // Bottom controls (switches, FP indicators, expand button, actions)
   const hasBottomControls =
-    resetFilter ||
-    switchElements ||
-    actionElements ||
-    fpIndicators ||
-    expandButton ||
-    hasAtomFootnote;
+    switchElements || actionElements || fpIndicators || expandButton || hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
     <div className="shrink-0 grow-0">
-      {resetFilter}
-      {switchElements}
       {actionElements}
+      {switchElements}
       {fpIndicators}
       {expandButton}
       {hasAtomFootnote && (
@@ -405,7 +386,7 @@ export default function ChartLegend({
       <div
         ref={scrollRef}
         style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={scrollClasses}
+        className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {rows.map((row, i) => {
           const allHidden =
@@ -441,6 +422,7 @@ export default function ChartLegend({
                         onClick={item.onClick}
                         onHover={onItemHover}
                         onHoverEnd={onItemHoverEnd}
+                        onRemove={effectiveRemove}
                         sidebarMode={isSidebar}
                         asFragment
                       />
@@ -456,7 +438,7 @@ export default function ChartLegend({
       <ul
         ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
         style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={scrollClasses}
+        className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {(isSidebar ? sortedItems : legendItems).map((item) =>
           renderItem(item, isSidebar && hiddenNames.has(item.name)),

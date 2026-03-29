@@ -22,7 +22,7 @@ export function BlogPostNav({ prev, next }: BlogPostNavProps) {
       {prev ? (
         <Link
           href={`/blog/${prev.slug}`}
-          className="group flex items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-muted/50 flex-1"
+          className="group relative flex items-center gap-3 rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-4 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01] flex-1"
           onClick={() => track('blog_nav_prev', { slug: prev.slug, title: prev.title })}
         >
           <ChevronLeft className="w-5 h-5 text-muted-foreground shrink-0" />
@@ -37,7 +37,7 @@ export function BlogPostNav({ prev, next }: BlogPostNavProps) {
       {next ? (
         <Link
           href={`/blog/${next.slug}`}
-          className="group flex items-center justify-end gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-muted/50 flex-1 text-right"
+          className="group relative flex items-center justify-end gap-3 rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-4 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01] flex-1 text-right"
           onClick={() => track('blog_nav_next', { slug: next.slug, title: next.title })}
         >
           <div className="min-w-0">

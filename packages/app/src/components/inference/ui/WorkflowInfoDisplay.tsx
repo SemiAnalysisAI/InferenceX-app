@@ -79,14 +79,17 @@ export default function WorkflowInfoDisplay({
 
   const handleGoPreviousRun = () => {
     if (canGoPreviousRun()) {
-      track('inference_run_previous');
+      track('inference_run_previous', {
+        toRun: runIds[currentRunIndex - 1],
+        totalRuns: runIds.length,
+      });
       setSelectedRunId(runIds[currentRunIndex - 1]);
     }
   };
 
   const handleGoNextRun = () => {
     if (canGoNextRun()) {
-      track('inference_run_next');
+      track('inference_run_next', { toRun: runIds[currentRunIndex + 1], totalRuns: runIds.length });
       setSelectedRunId(runIds[currentRunIndex + 1]);
     }
   };
@@ -121,7 +124,7 @@ export default function WorkflowInfoDisplay({
   })();
 
   return (
-    <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 text-muted-foreground">
+    <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
       {/* <div className="flex items-center gap-2">
         <CalendarRange size={16} />
         <strong>Run Date:</strong> {workflowInfo[0].run_date} UTC
@@ -152,7 +155,7 @@ export default function WorkflowInfoDisplay({
           >
             <SelectTrigger
               id="run-select"
-              className="w-full border-0 shadow-none font-bold [&_[data-external-link]_svg]:pointer-events-auto"
+              className="w-full border-0 shadow-none font-bold px-4 hover:bg-accent hover:text-accent-foreground dark:bg-input/90 dark:hover:bg-input/50 rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
               onPointerDown={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-external-link]')) {
@@ -209,53 +212,57 @@ export default function WorkflowInfoDisplay({
           </Button>
         </div>
       ) : null}
-      {changelog && (
-        <div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost">
-                <strong>Changelog</strong>
-                <ChevronDownIcon />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[400px]">
-              <div className="break-words">
-                {changelog.entries.length > 0 ? (
-                  <>
-                    {changelog.entries.map((entry, index) => (
-                      <div key={index}>
-                        {index > 0 && <hr className="my-3" />}
-                        <div className="flex flex-col gap-2 text-xs line-break-words">
-                          <div className="text-xs font-bold">Description</div>
-                          {formatChangelogDescription(entry.description)}
-                          <div className="text-xs font-bold">Updated Configs</div>
-                          <ul className="list-disc pl-4">
-                            {entry.config_keys.map((key: string) => (
-                              <li key={key}>{formatConfigKeys(key)}</li>
-                            ))}
-                          </ul>
-                        </div>
+      <div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
+              <strong>Changelog</strong>
+              <ChevronDownIcon />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[400px]">
+            <div className="break-words">
+              {changelog && changelog.entries.length > 0 ? (
+                <>
+                  {changelog.entries.map((entry, index) => (
+                    <div key={index}>
+                      {index > 0 && <hr className="my-3" />}
+                      <div className="flex flex-col gap-2 text-xs line-break-words">
+                        <div className="text-xs font-bold">Description</div>
+                        {formatChangelogDescription(entry.description)}
+                        <div className="text-xs font-bold">Updated Configs</div>
+                        <ul className="list-disc pl-4">
+                          {entry.config_keys.map((key: string) => (
+                            <li key={key}>{formatConfigKeys(key)}</li>
+                          ))}
+                        </ul>
                       </div>
-                    ))}
-                    {changelog.entries[0]?.head_ref && (
-                      <a
-                        href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs hover:underline text-foreground underline"
-                      >
-                        Git Commit
-                      </a>
-                    )}
-                  </>
-                ) : (
-                  'No runs found'
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
+                    </div>
+                  ))}
+                  {changelog.entries[0]?.head_ref && (
+                    <a
+                      href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs hover:underline text-foreground underline"
+                    >
+                      Git Commit
+                    </a>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 text-xs">
+                  <div className="text-xs font-bold">Description</div>
+                  <span className="text-muted-foreground">No changelog data available.</span>
+                  <span className="text-muted-foreground">
+                    This date predates changelog tracking.
+                  </span>
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

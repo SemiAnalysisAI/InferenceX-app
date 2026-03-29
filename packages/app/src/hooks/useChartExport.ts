@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 interface UseChartExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
+  exportFileName?: string;
 }
 
 /** Apply inline styles to an element */
@@ -161,7 +163,11 @@ async function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
 /**
  * Custom hook for exporting charts as PNG images.
  */
-export function useChartExport({ chartId, setIsLegendExpanded }: UseChartExportOptions) {
+export function useChartExport({
+  chartId,
+  setIsLegendExpanded,
+  exportFileName,
+}: UseChartExportOptions) {
   const [isExporting, setIsExporting] = useState(false);
 
   const exportToImage = useCallback(async () => {
@@ -386,7 +392,7 @@ export function useChartExport({ chartId, setIsLegendExpanded }: UseChartExportO
       const dataUrl = await addWatermark(chartDataUrl, bgColor);
 
       const link = document.createElement('a');
-      link.download = `${chartId}-${Date.now()}.png`;
+      link.download = `${exportFileName || chartId}-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
 

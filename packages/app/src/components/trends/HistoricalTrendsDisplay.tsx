@@ -47,6 +47,7 @@ export default function HistoricalTrendsDisplay() {
     activeHwTypes,
     hwTypesWithData,
     toggleHwType,
+    removeHwType,
     selectAllHwTypes,
     availableDates,
     logScale,
@@ -116,7 +117,7 @@ export default function HistoricalTrendsDisplay() {
   }, [interactivityInput, targetInteractivity, interactivityRange]);
 
   // Interpolated trend data
-  const { trendLines } = useInterpolatedTrendData({
+  const { trendLines, loading: trendLoading } = useInterpolatedTrendData({
     selectedModel: selectedModel as Model,
     selectedSequence: selectedSequence as Sequence,
     selectedPrecisions,
@@ -127,11 +128,12 @@ export default function HistoricalTrendsDisplay() {
   });
 
   // High contrast color support
-  const hwKeys = useMemo(() => Object.keys(hardwareConfig), [hardwareConfig]);
+  const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
   const { resolveColor } = useThemeColors({
     highContrast,
-    identifiers: hwKeys,
+    identifiers: activeHwKeys,
     colorShuffleSeed,
+    activeKeys: activeHwKeys,
   });
 
   // Line configs for TrendChart — one per visible GPU+precision combo
@@ -161,7 +163,7 @@ export default function HistoricalTrendsDisplay() {
     [trendLines, activeHwTypes, hardwareConfig, selectedPrecisions, resolveColor],
   );
 
-  if (loading && graphs.length === 0) {
+  if (loading || graphs.length === 0 || trendLoading) {
     return (
       <section data-testid="historical-trends-display">
         <Card>
@@ -189,7 +191,7 @@ export default function HistoricalTrendsDisplay() {
   }
 
   return (
-    <section data-testid="historical-trends-display">
+    <section data-testid="historical-trends-display" className="flex flex-col gap-4">
       {/* Controls card — same selectors as Inference Performance tab */}
       <Card>
         <div className="flex flex-col gap-4">
@@ -280,13 +282,14 @@ export default function HistoricalTrendsDisplay() {
           </p>
         </Card>
       ) : (
-        <section className="pt-4">
+        <section>
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="historical-trend"
               analyticsPrefix="historical"
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
+              exportFileName={`InferenceX_historical_${selectedModel}`}
               onExportCsv={() => {
                 const { headers, rows } = historicalTrendToCsv(
                   trendLines,
@@ -294,7 +297,7 @@ export default function HistoricalTrendsDisplay() {
                   currentYLabel,
                   targetInteractivity,
                 );
-                exportToCsv(`historical-trend-${Date.now()}`, headers, rows);
+                exportToCsv(`InferenceX_historical_${selectedModel}`, headers, rows);
               }}
             />
             <Card>
@@ -529,6 +532,7 @@ export default function HistoricalTrendsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)
                       .filter(([key]) => hwTypesWithData.has(key))
                       .sort(
@@ -572,8 +576,8 @@ export default function HistoricalTrendsDisplay() {
                         },
                       },
                     ]}
-                    actions={
-                      highContrast
+                    actions={[
+                      ...(highContrast
                         ? [
                             {
                               id: 'historical-shuffle-colors',
@@ -584,14 +588,20 @@ export default function HistoricalTrendsDisplay() {
                               },
                             },
                           ]
-                        : undefined
-                    }
-                    showResetFilter={true}
-                    allSelected={activeHwTypes.size === hwTypesWithData.size}
-                    onResetFilter={() => {
-                      selectAllHwTypes();
-                      track('historical_legend_filter_reset');
-                    }}
+                        : []),
+                      ...(activeHwTypes.size < hwTypesWithData.size
+                        ? [
+                            {
+                              id: 'historical-reset-filter',
+                              label: 'Reset filter',
+                              onClick: () => {
+                                selectAllHwTypes();
+                                track('historical_legend_filter_reset');
+                              },
+                            },
+                          ]
+                        : []),
+                    ]}
                     enableTooltips={true}
                     showFpShapeIndicators={true}
                   />

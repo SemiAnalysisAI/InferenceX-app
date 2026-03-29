@@ -1,6 +1,6 @@
 describe('Gradient Labels Toggle', () => {
   before(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -78,7 +78,7 @@ describe('Gradient Labels Toggle', () => {
   });
 
   it('URL param i_gradlabel=1 enables gradient labels on load', () => {
-    cy.visit('/?i_gradlabel=1', {
+    cy.visit('/inference?i_gradlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -88,7 +88,7 @@ describe('Gradient Labels Toggle', () => {
   });
 
   it('URL param i_advlabel=1 enables parallelism labels on load', () => {
-    cy.visit('/?i_advlabel=1', {
+    cy.visit('/inference?i_advlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -104,8 +104,8 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
 
   const selectMetricAndEnableGradient = (metricLabel: string) => {
     // Switch to the target Y-axis metric
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
-    cy.contains('[role="option"]', metricLabel).click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+    cy.contains('[role="option"]', metricLabel).click({ force: true });
 
     // Wait for chart to re-render with new metric
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
@@ -117,7 +117,7 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
   };
 
   before(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
