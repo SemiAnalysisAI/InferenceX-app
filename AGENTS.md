@@ -189,7 +189,3 @@ Same as `@frontend-claude` but uses Chrome DevTools MCP instead of Playwright fo
 ### `@pr-claude` (`.github/workflows/pr-claude.yml`)
 
 Auto-runs on PR open/sync. Code review only. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
-
-### `claude-cron-media` (`.github/workflows/claude-cron-media.yml`)
-
-Weekly cron (Mondays 10 AM UTC). Searches for new media mentions of InferenceMAX/InferenceX and opens PRs to add them to `packages/app/src/components/media/media-data.ts`.

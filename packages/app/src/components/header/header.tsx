@@ -18,7 +18,6 @@ const NAV_LINKS = [
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
   },
-  { href: '/media', label: 'Media', testId: 'nav-link-media', event: 'header_media_clicked' },
   {
     href: '/quotes',
     label: 'Supporters',
@@ -30,12 +29,7 @@ const NAV_LINKS = [
 
 function isActive(pathname: string, href: string): boolean {
   if (href === '/')
-    return (
-      pathname === '/' ||
-      (!pathname.startsWith('/media') &&
-        !pathname.startsWith('/quotes') &&
-        !pathname.startsWith('/blog'))
-    );
+    return pathname === '/' || (!pathname.startsWith('/quotes') && !pathname.startsWith('/blog'));
   return pathname.startsWith(href);
 }
 
