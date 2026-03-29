@@ -206,7 +206,7 @@ jobs:
 
             Data pipeline: Neon PostgreSQL → API routes (`/api/v1/*`) → React Query hooks (`src/hooks/api/`) → Context providers → D3 charts.
             - DB layer: `packages/db/` (schema, migrations, ETL, queries)
-            - API routes: `packages/app/src/app/api/v1/` (benchmarks, availability, workflow-info, reliability, evaluations, github-stars, invalidate)
+            - API routes: `packages/app/src/app/api/v1/` (benchmarks, availability, workflow-info, reliability, evaluations, invalidate)
             - React Query hooks: `packages/app/src/hooks/api/` (use-benchmarks, use-availability, use-workflow-info, etc.)
             - UI state lives in per-section Context providers (InferenceChartContext, EvaluationChartContext, ReliabilityChartContext), rendering in D3 components.
 
@@ -229,7 +229,6 @@ jobs:
                 ├── workflow-info/route.ts          # Workflow runs, changelogs, configs
                 ├── reliability/route.ts           # Reliability data
                 ├── evaluations/route.ts           # Evaluation data
-                ├── github-stars/route.ts          # GitHub star count
                 ├── invalidate/route.ts            # Cache invalidation (admin)
                 └── server-log/route.ts            # Client error logging
 
@@ -240,7 +239,6 @@ jobs:
             ├── use-workflow-info.ts
             ├── use-evaluations.ts
             ├── use-reliability.ts
-            └── use-github-stars.ts
 
             packages/app/src/components/
             ├── page-content.tsx                   # Tab layout: VALID_TABS, desktop TabsTrigger + mobile Select

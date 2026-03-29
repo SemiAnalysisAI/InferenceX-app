@@ -63,7 +63,6 @@ API routes (`packages/app/src/app/api/v1/`):
 - `reliability` — raw `ReliabilityRow[]`
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
-- `github-stars` — star count for the repo
 - `invalidate` — invalidate API cache (admin)
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
