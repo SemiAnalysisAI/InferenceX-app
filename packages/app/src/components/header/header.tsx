@@ -41,13 +41,8 @@ const NAV_LINKS = [
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/')
-    return (
-      pathname === '/' ||
-      (!pathname.startsWith('/media') &&
-        !pathname.startsWith('/quotes') &&
-        !pathname.startsWith('/blog'))
-    );
+  if (href === '/') return pathname === '/';
+  if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
   return pathname.startsWith(href);
 }
 
