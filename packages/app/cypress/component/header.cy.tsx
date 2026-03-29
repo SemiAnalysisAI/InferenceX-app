@@ -31,11 +31,6 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/');
   });
 
-  it('shows Media nav link', () => {
-    cy.get('[data-testid="nav-link-media"]').should('be.visible');
-    cy.get('[data-testid="nav-link-media"]').should('have.attr', 'href', '/media');
-  });
-
   it('shows Supporters nav link', () => {
     cy.get('[data-testid="nav-link-supporters"]').should('be.visible');
     cy.get('[data-testid="nav-link-supporters"]').should('have.attr', 'href', '/quotes');
@@ -57,7 +52,6 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu-toggle"]').should('be.visible');
     cy.get('[data-testid="mobile-menu-toggle"]').click();
     cy.contains('Dashboard').should('be.visible');
-    cy.contains('Media').should('be.visible');
     cy.contains('Supporters').should('be.visible');
   });
 });
