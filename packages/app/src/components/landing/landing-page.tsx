@@ -27,7 +27,7 @@ export function LandingPage() {
           <Card>
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="h-5 w-5 text-brand" />
-              <h2 className="text-lg font-semibold">Full Dashboard</h2>
+              <h2 className="text-lg font-semibold dark:text-primary">Full Dashboard</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-2">
               Every model, GPU, framework, and metric. Fully configurable inference benchmark charts
@@ -53,7 +53,7 @@ export function LandingPage() {
           <Card>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-brand" />
-              <h2 className="text-lg font-semibold">Quick Comparisons</h2>
+              <h2 className="text-lg font-semibold dark:text-primary">Quick Comparisons</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               Jump straight into the most popular GPU inference benchmark comparisons, curated and

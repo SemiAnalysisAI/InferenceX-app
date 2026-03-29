@@ -109,13 +109,15 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   return (
     <header
       data-testid="header"
-      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px]"
+      className="sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/60 backdrop-blur-[2px] brand-gradient-border"
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
           <a href="/" className="flex items-center gap-2 shrink-0">
-            <span className="text-lg font-bold tracking-tight">InferenceX</span>
+            <span className="text-lg font-bold tracking-tight dark:bg-gradient-to-r dark:from-[#E8A830] dark:to-[#1A84C6] dark:bg-clip-text dark:text-transparent">
+              InferenceX
+            </span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image

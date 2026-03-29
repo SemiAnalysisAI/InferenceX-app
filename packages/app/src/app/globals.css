@@ -226,13 +226,14 @@
     outline: none;
   }
 }
-/* Brand gradient bottom-border on cards (dark mode) */
+/* Brand gradient bottom-border on cards and header (dark mode) */
 .dark [data-slot='card'] {
   position: relative;
   overflow: hidden;
 }
 
-.dark [data-slot='card']::after {
+.dark [data-slot='card']::after,
+.dark .brand-gradient-border::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -240,6 +241,10 @@
   right: 0;
   height: 2px;
   background: linear-gradient(90deg, #e8a830, #1a84c6);
+}
+
+.dark .brand-gradient-border {
+  position: relative;
 }
 
 /* Custom scrollbar styling */

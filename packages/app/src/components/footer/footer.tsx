@@ -139,7 +139,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
         {/* Bottom bar */}
         <div
           data-testid="footer-bottom-bar"
-          className="border-t border-border/40 pt-6 flex flex-col md:flex-row items-center justify-between gap-4"
+          className="border-t border-border/40 dark:border-t-0 relative pt-6 flex flex-col md:flex-row items-center justify-between gap-4 before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:hidden dark:before:block before:bg-gradient-to-r before:from-[#E8A830] before:to-[#1A84C6]"
         >
           <p data-testid="footer-copyright" className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} semianalysis.com. All rights reserved.
