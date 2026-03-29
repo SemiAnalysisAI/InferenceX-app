@@ -34,8 +34,8 @@ export function LandingPage() {
               with date ranges, concurrency sweeps, and raw data export.
             </p>
             <p className="text-sm text-muted-foreground mb-6">
-              Compare NVIDIA GB200, B200, H200, AMD MI355X, MI325X, MI300X and more across DeepSeek,
-              Llama, Qwen, and other models.
+              Compare NVIDIA B200, H200, H100, AMD MI355X, MI325X, MI300X and more across DeepSeek,
+              gpt-oss, Llama, Qwen, and other models.
             </p>
             <div className="mt-auto">
               <a
