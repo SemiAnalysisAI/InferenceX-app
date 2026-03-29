@@ -12,6 +12,7 @@ import {
   resolveModelKey,
   hwToGpuKey,
   normalizeFramework,
+  normalizePrecision,
   normalizeSpecMethod,
   parseBool,
   parseNum,
@@ -86,7 +87,7 @@ export function mapEvalRow(
   const tp = parseInt2(meta.tp) ?? 1;
   const ep = parseInt2(meta.ep) ?? 1;
   const dpAttn = parseBool(meta.dp_attention);
-  const precision = String(meta.precision ?? '').toLowerCase();
+  const precision = normalizePrecision(String(meta.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }
@@ -180,7 +181,7 @@ export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): E
   const tp = parseInt2(row.tp) ?? 1;
   const ep = parseInt2(row.ep) ?? 1;
   const dpAttn = parseBool(row.dp_attention);
-  const precision = String(row.precision ?? '').toLowerCase();
+  const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }

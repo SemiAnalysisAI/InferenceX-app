@@ -145,6 +145,21 @@ export function normalizeFramework(
   return { framework: alias?.canonical ?? lower, disagg };
 }
 
+/** Vendor-specific precision aliases → canonical DB key. */
+const PRECISION_ALIASES: Record<string, string> = {
+  nvfp4: 'fp4',
+  mxfp4: 'fp4',
+};
+
+/**
+ * Normalize a precision string to a canonical lowercase key.
+ * Vendor-specific formats (e.g. `nvfp4`, `mxfp4`) are mapped to their canonical form.
+ */
+export function normalizePrecision(raw: string): string {
+  const lower = raw.toLowerCase();
+  return PRECISION_ALIASES[lower] ?? lower;
+}
+
 /**
  * Normalize a speculative decoding method to a lowercase string.
  * Absent, empty, or null values are canonicalized to `'none'`.

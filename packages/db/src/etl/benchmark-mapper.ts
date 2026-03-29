@@ -10,6 +10,7 @@ import {
   resolveModelKey,
   hwToGpuKey,
   normalizeFramework,
+  normalizePrecision,
   normalizeSpecMethod,
   parseBool,
   parseNum,
@@ -123,7 +124,7 @@ export function mapBenchmarkRow(
 
   const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
   const isMultinode = parseBool(row.is_multinode);
-  const precision = String(row.precision ?? '').toLowerCase();
+  const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }
