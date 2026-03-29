@@ -220,7 +220,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             tooltip,
             rulers,
             xScale as any,
-            isBandScale(yScale) ? undefined : (yScale as any),
+            yScale as any,
             svgRef,
             zoomConfig?.axes,
           );
