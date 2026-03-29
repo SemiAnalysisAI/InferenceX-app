@@ -117,7 +117,7 @@ export default function HistoricalTrendsDisplay() {
   }, [interactivityInput, targetInteractivity, interactivityRange]);
 
   // Interpolated trend data
-  const { trendLines } = useInterpolatedTrendData({
+  const { trendLines, loading: trendLoading } = useInterpolatedTrendData({
     selectedModel: selectedModel as Model,
     selectedSequence: selectedSequence as Sequence,
     selectedPrecisions,
@@ -163,7 +163,7 @@ export default function HistoricalTrendsDisplay() {
     [trendLines, activeHwTypes, hardwareConfig, selectedPrecisions, resolveColor],
   );
 
-  if (loading && graphs.length === 0) {
+  if (loading || graphs.length === 0 || trendLoading) {
     return (
       <section data-testid="historical-trends-display">
         <Card>
