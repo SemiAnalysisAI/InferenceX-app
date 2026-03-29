@@ -10,34 +10,6 @@ import { AggDataEntry, ChartDefinition, InferenceData } from '@/components/infer
 import { getGpuSpecs, HARDWARE_CONFIG } from '@/lib/constants';
 import { getVendor } from '@/lib/dynamic-colors';
 
-/**
- * Simple seeded pseudo-random number generator (mulberry32).
- * Returns a function that produces deterministic values in [0, 1) for a given seed.
- */
-export function seededRandom(seed: number): () => number {
-  let state = seed | 0;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/**
- * Fisher-Yates shuffle using a seeded PRNG for deterministic results.
- * Returns a new shuffled array (does not mutate the original).
- */
-export function seededShuffle<T>(array: T[], seed: number): T[] {
-  const result = [...array];
-  const rng = seededRandom(seed);
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
 // ---------------------------------------------------------------------------
 // High-contrast color generation
 // ---------------------------------------------------------------------------
@@ -48,13 +20,11 @@ export function seededShuffle<T>(array: T[], seed: number): T[] {
  * color associations. With 10+ keys per vendor, uses the full hue wheel.
  * @param keys - Array of keys (hardware types, models, etc.) to generate colors for
  * @param theme - Current theme ('dark' or 'light') to adjust lightness
- * @param shuffleSeed - Optional seed for shuffling hue assignments. 0 = no shuffle.
  * @returns Object mapping each key to its high contrast HSL color
  */
 export const generateHighContrastColors = (
   keys: string[],
   theme: string,
-  shuffleSeed: number = 0,
 ): { [key: string]: string } => {
   const colors: { [key: string]: string } = {};
   const lightness = theme === 'dark' ? 65 : 35;
@@ -76,7 +46,7 @@ export const generateHighContrastColors = (
     const totalSpan = ranges.reduce((s, r) => s + r.span, 0);
     const count = vendorKeys.length;
 
-    let hues: number[] = [];
+    const hues: number[] = [];
     for (let i = 0; i < count; i++) {
       const pos = count <= 1 ? totalSpan / 2 : ((i + 0.5) / count) * totalSpan;
       let remaining = pos;
@@ -89,10 +59,6 @@ export const generateHighContrastColors = (
         remaining -= range.span;
       }
       hues.push(hue);
-    }
-
-    if (shuffleSeed !== 0) {
-      hues = seededShuffle(hues, shuffleSeed);
     }
 
     vendorKeys.forEach((key, i) => {

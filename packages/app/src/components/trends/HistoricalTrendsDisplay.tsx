@@ -57,8 +57,6 @@ export default function HistoricalTrendsDisplay() {
     workflowInfo,
     highContrast,
     setHighContrast,
-    colorShuffleSeed,
-    shuffleColors,
   } = useInference();
 
   // Check if interactivity chart data exists
@@ -132,7 +130,6 @@ export default function HistoricalTrendsDisplay() {
   const { resolveColor } = useThemeColors({
     highContrast,
     identifiers: activeHwKeys,
-    colorShuffleSeed,
     activeKeys: activeHwKeys,
   });
 
@@ -576,20 +573,8 @@ export default function HistoricalTrendsDisplay() {
                         },
                       },
                     ]}
-                    actions={[
-                      ...(highContrast
-                        ? [
-                            {
-                              id: 'historical-shuffle-colors',
-                              label: 'Shuffle Colors',
-                              onClick: () => {
-                                shuffleColors();
-                                track('historical_shuffle_colors');
-                              },
-                            },
-                          ]
-                        : []),
-                      ...(activeHwTypes.size < hwTypesWithData.size
+                    actions={
+                      activeHwTypes.size < hwTypesWithData.size
                         ? [
                             {
                               id: 'historical-reset-filter',
@@ -600,8 +585,8 @@ export default function HistoricalTrendsDisplay() {
                               },
                             },
                           ]
-                        : []),
-                    ]}
+                        : []
+                    }
                     enableTooltips={true}
                     showFpShapeIndicators={true}
                   />

@@ -100,8 +100,6 @@ const ScatterGraph = React.memo(
       selectAllHwTypes,
       highContrast,
       setHighContrast,
-      colorShuffleSeed,
-      shuffleColors,
       logScale,
       setLogScale,
       scaleType,
@@ -184,7 +182,6 @@ const ScatterGraph = React.memo(
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
-      colorShuffleSeed,
       activeKeys: activeOfficialKeys,
     });
 
@@ -1493,20 +1490,8 @@ const ScatterGraph = React.memo(
                 },
               },
             ]}
-            actions={[
-              ...(highContrast
-                ? [
-                    {
-                      id: 'scatter-shuffle-colors',
-                      label: 'Shuffle Colors',
-                      onClick: () => {
-                        shuffleColors();
-                        track(`${eventPrefix}_shuffle_colors`);
-                      },
-                    },
-                  ]
-                : []),
-              ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+            actions={
+              effectiveOfficialHwTypes.size < hwTypesWithData.size ||
               activeOverlayHwTypes.size < allOverlayHwTypes.size
                 ? [
                     {
@@ -1520,8 +1505,8 @@ const ScatterGraph = React.memo(
                       },
                     },
                   ]
-                : []),
-            ]}
+                : []
+            }
             showFpShapeIndicators={selectedPrecisions.length > 1}
             enableTooltips={true}
           />

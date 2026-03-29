@@ -17,12 +17,6 @@ export interface UseThemeColorsOptions {
   identifiers?: string[];
 
   /**
-   * Seed for shuffling high contrast color assignments.
-   * 0 (default) means no shuffle; any other value produces a deterministic shuffle.
-   */
-  colorShuffleSeed?: number;
-
-  /**
    * Hardware keys that are currently checked / active in the legend.
    * When provided, dynamic vendor-aware colors are generated for these keys
    * instead of falling back to static HARDWARE_CONFIG.color values.
@@ -71,7 +65,7 @@ export interface UseThemeColorsResult {
  * Consolidates common theme color patterns across all D3 charts
  */
 export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsResult {
-  const { highContrast, identifiers = [], colorShuffleSeed = 0, activeKeys } = options;
+  const { highContrast, identifiers = [], activeKeys } = options;
   const { resolvedTheme } = useTheme();
 
   // get base theme colors
@@ -91,8 +85,8 @@ export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsRe
     if (!highContrast) return null;
     const keysForHc = activeKeys && activeKeys.length > 0 ? activeKeys : identifiers;
     if (keysForHc.length === 0) return null;
-    return generateHighContrastColors(keysForHc, resolvedTheme || 'light', colorShuffleSeed);
-  }, [highContrast, activeKeys, identifiers, resolvedTheme, colorShuffleSeed]);
+    return generateHighContrastColors(keysForHc, resolvedTheme || 'light');
+  }, [highContrast, activeKeys, identifiers, resolvedTheme]);
 
   // generate dynamic vendor-aware colors for active keys
   const vendorColorMap = useMemo(() => {

@@ -117,10 +117,6 @@ export function InferenceProvider({
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
   });
-  const [colorShuffleSeed, setColorShuffleSeed] = useState(0);
-  const shuffleColors = useCallback(() => {
-    setColorShuffleSeed((prev) => prev + 1);
-  }, []);
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
   const [hidePointLabels, setHidePointLabels] = useState(() => getUrlParam('i_nolabel') === '1');
@@ -772,8 +768,6 @@ export function InferenceProvider({
       setHidePointLabels,
       highContrast,
       setHighContrast,
-      colorShuffleSeed,
-      shuffleColors,
       logScale,
       setLogScale,
       selectedXAxisMetric,
@@ -865,7 +859,6 @@ export function InferenceProvider({
       hideNonOptimal,
       hidePointLabels,
       highContrast,
-      colorShuffleSeed,
       logScale,
       isLegendExpanded,
       useAdvancedLabels,

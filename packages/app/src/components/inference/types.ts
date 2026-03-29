@@ -485,8 +485,6 @@ export interface InferenceChartContextType {
   setHidePointLabels: (hide: boolean) => void;
   highContrast: boolean;
   setHighContrast: (highContrast: boolean) => void;
-  colorShuffleSeed: number;
-  shuffleColors: () => void;
   logScale: boolean;
   setLogScale: (logScale: boolean) => void;
   useAdvancedLabels: boolean;

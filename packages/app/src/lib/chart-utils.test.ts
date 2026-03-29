@@ -4,8 +4,6 @@ import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/
 import {
   buildAvailabilityHwKey,
   generateHighContrastColors,
-  seededRandom,
-  seededShuffle,
   getNestedYValue,
   getHardwareKey,
   normalizeEvalHardwareKey,
@@ -402,110 +400,6 @@ describe('generateHighContrastColors', () => {
         }
       }
     }
-  });
-
-  // ---------- Shuffle ----------
-
-  it('shuffles hue assignments when shuffleSeed is non-zero', () => {
-    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang'];
-    const unshuffled = generateHighContrastColors(keys, 'dark', 0);
-    const shuffled = generateHighContrastColors(keys, 'dark', 42);
-    const unshuffledNv = ['h100_vllm', 'h200_vllm', 'b200_vllm'].map((k) => unshuffled[k]).sort();
-    const shuffledNv = ['h100_vllm', 'h200_vllm', 'b200_vllm'].map((k) => shuffled[k]).sort();
-    expect(shuffledNv).toEqual(unshuffledNv);
-  });
-
-  it('returns stable colors when shuffleSeed is 0', () => {
-    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang'];
-    const r1 = generateHighContrastColors(keys, 'dark', 0);
-    const r2 = generateHighContrastColors(keys, 'dark', 0);
-    expect(r1).toEqual(r2);
-  });
-
-  it('produces deterministic results for the same seed', () => {
-    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang', 'mi325x_sglang'];
-    const result1 = generateHighContrastColors(keys, 'dark', 7);
-    const result2 = generateHighContrastColors(keys, 'dark', 7);
-    expect(result1).toEqual(result2);
-  });
-
-  it('produces different results for different seeds', () => {
-    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'mi300x_sglang', 'mi325x_sglang'];
-    const result1 = generateHighContrastColors(keys, 'dark', 1);
-    const result2 = generateHighContrastColors(keys, 'dark', 2);
-    const sameCount = keys.filter((k) => result1[k] === result2[k]).length;
-    expect(sameCount).toBeLessThan(keys.length);
-  });
-});
-
-// ===========================================================================
-// seededRandom
-// ===========================================================================
-describe('seededRandom', () => {
-  it('produces deterministic sequences for the same seed', () => {
-    const rng1 = seededRandom(123);
-    const rng2 = seededRandom(123);
-    const seq1 = Array.from({ length: 10 }, () => rng1());
-    const seq2 = Array.from({ length: 10 }, () => rng2());
-    expect(seq1).toEqual(seq2);
-  });
-
-  it('produces values in [0, 1)', () => {
-    const rng = seededRandom(42);
-    for (let i = 0; i < 100; i++) {
-      const val = rng();
-      expect(val).toBeGreaterThanOrEqual(0);
-      expect(val).toBeLessThan(1);
-    }
-  });
-
-  it('produces different sequences for different seeds', () => {
-    const rng1 = seededRandom(1);
-    const rng2 = seededRandom(2);
-    const seq1 = Array.from({ length: 5 }, () => rng1());
-    const seq2 = Array.from({ length: 5 }, () => rng2());
-    expect(seq1).not.toEqual(seq2);
-  });
-});
-
-// ===========================================================================
-// seededShuffle
-// ===========================================================================
-describe('seededShuffle', () => {
-  it('returns a new array with the same elements', () => {
-    const input = [1, 2, 3, 4, 5];
-    const result = seededShuffle(input, 42);
-    expect(result).toHaveLength(input.length);
-    expect(result.sort()).toEqual([...input].sort());
-  });
-
-  it('does not mutate the original array', () => {
-    const input = [1, 2, 3, 4, 5];
-    const copy = [...input];
-    seededShuffle(input, 42);
-    expect(input).toEqual(copy);
-  });
-
-  it('produces deterministic results for the same seed', () => {
-    const input = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    const result1 = seededShuffle(input, 99);
-    const result2 = seededShuffle(input, 99);
-    expect(result1).toEqual(result2);
-  });
-
-  it('produces different orderings for different seeds', () => {
-    const input = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    const result1 = seededShuffle(input, 1);
-    const result2 = seededShuffle(input, 2);
-    expect(result1).not.toEqual(result2);
-  });
-
-  it('handles empty array', () => {
-    expect(seededShuffle([], 42)).toEqual([]);
-  });
-
-  it('handles single-element array', () => {
-    expect(seededShuffle([1], 42)).toEqual([1]);
   });
 });
 

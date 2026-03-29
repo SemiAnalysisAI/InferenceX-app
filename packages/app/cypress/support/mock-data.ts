@@ -203,8 +203,6 @@ export function createMockInferenceContext(
     setHidePointLabels: namedStub('setHidePointLabels'),
     highContrast: false,
     setHighContrast: namedStub('setHighContrast'),
-    colorShuffleSeed: 0,
-    shuffleColors: namedStub('shuffleColors'),
     logScale: false,
     setLogScale: namedStub('setLogScale'),
     useAdvancedLabels: false,

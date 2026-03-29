@@ -57,8 +57,6 @@ const GPUGraph = React.memo(
       setUseAdvancedLabels,
       highContrast,
       setHighContrast,
-      colorShuffleSeed,
-      shuffleColors,
       selectAllActiveDates,
     } = useInference();
     const { resolvedTheme } = useTheme();
@@ -89,7 +87,6 @@ const GPUGraph = React.memo(
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: graphIdentifiers,
-      colorShuffleSeed,
     });
 
     // Dynamic GPU×date color map
@@ -480,18 +477,6 @@ const GPUGraph = React.memo(
               },
             ]}
             actions={[
-              ...(highContrast
-                ? [
-                    {
-                      id: 'gpu-shuffle-colors',
-                      label: 'Shuffle Colors',
-                      onClick: () => {
-                        shuffleColors();
-                        track('interactivity_shuffle_colors');
-                      },
-                    },
-                  ]
-                : []),
               {
                 id: 'gpu-reset-filter',
                 label: 'Reset filter',
