@@ -451,7 +451,7 @@ export default function ThroughputBarChart({
     };
 
     return [barLayer, labelLayer];
-  }, [sortedResults, barMetric, costType, hardwareConfig, mode]);
+  }, [sortedResults, barMetric, costType, hardwareConfig, mode, colorResolver]);
 
   // ── Tooltip ──
 

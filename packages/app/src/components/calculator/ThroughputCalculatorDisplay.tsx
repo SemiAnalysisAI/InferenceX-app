@@ -224,6 +224,7 @@ export default function ThroughputCalculatorDisplay() {
   const [visibleHwKeys, setVisibleHwKeys] = useState<Set<string>>(new Set());
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
 
   const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
@@ -232,7 +233,7 @@ export default function ThroughputCalculatorDisplay() {
   // Dynamic vendor-aware colors for visible GPUs
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const { resolveColor } = useThemeColors({
-    highContrast: false,
+    highContrast,
     activeKeys: visibleKeysArray,
   });
 
@@ -884,6 +885,17 @@ export default function ThroughputCalculatorDisplay() {
                               setIsLegendExpanded(expanded);
                               track('calculator_legend_expanded', { expanded });
                             }}
+                            switches={[
+                              {
+                                id: 'calc-high-contrast',
+                                label: 'High Contrast',
+                                checked: highContrast,
+                                onCheckedChange: (checked: boolean) => {
+                                  setHighContrast(checked);
+                                  track('calculator_high_contrast_toggled', { enabled: checked });
+                                },
+                              },
+                            ]}
                             actions={
                               visibleHwKeys.size < availableHwKeys.length
                                 ? [
