@@ -167,13 +167,13 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
     if (!dbModelKey) return [];
 
-    const filteredData = rawData
+    // Map all rows up to selected date
+    const allData = rawData
       .filter((item) => {
-        const itemDate = item.date;
         return (
           item.task === selectedBenchmark &&
           item.model === dbModelKey &&
-          itemDate <= selectedRunDate
+          item.date <= selectedRunDate
         );
       })
       .map((item): EvaluationChartData | null => {
@@ -187,9 +187,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         ) as keyof typeof HARDWARE_CONFIG;
         if (hwKey === 'unknown') return null;
 
-        const itemDate = item.date;
-        const itemDateTime = item.timestamp ?? '';
-
         return {
           configId: item.config_id,
           hwKey,
@@ -199,8 +196,8 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
           model: item.model,
           benchmark: item.task,
           specDecode: item.spec_method,
-          date: itemDate,
-          datetime: itemDateTime,
+          date: item.date,
+          datetime: item.timestamp ?? '',
           precision: item.precision,
           framework: item.framework,
           tp: item.decode_tp,
@@ -211,39 +208,38 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       })
       .filter((item): item is EvaluationChartData => item !== null);
 
-    // Group by config_id and keep most recent per TP+conc combination
-    const groupMap = new Map<number, EvaluationChartData[]>();
-    filteredData.forEach((item) => {
-      if (!groupMap.has(item.configId)) groupMap.set(item.configId, []);
-      groupMap.get(item.configId)!.push(item);
-    });
+    // Group by hw-framework-specmethod-precision. Find the latest date for each
+    // group (up to selectedRunDate), then keep ALL rows from that date for the
+    // group. This means if parallelism (conc/tp/ep) changes between runs, we
+    // only show the latest run's parallelism — old combos don't leak in.
+    const groupKeyFn = (item: EvaluationChartData) =>
+      `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
+
+    const latestDateForGroup = new Map<string, string>();
+    for (const item of allData) {
+      const key = groupKeyFn(item);
+      const existing = latestDateForGroup.get(key);
+      if (!existing || item.date > existing) latestDateForGroup.set(key, item.date);
+    }
 
     const result: EvaluationChartData[] = [];
-    groupMap.forEach((groupItems) => {
-      // Dedup by TP+conc, keeping most recent date for each combination
-      const dedupMap = new Map<string, EvaluationChartData>();
-      groupItems.forEach((item) => {
-        const key = `${item.tp}_${item.conc}`;
-        const existing = dedupMap.get(key);
-        if (!existing || item.date > existing.date) dedupMap.set(key, item);
+    for (const item of allData) {
+      const key = groupKeyFn(item);
+      if (item.date !== latestDateForGroup.get(key)) continue;
+      const hwConfig = HARDWARE_CONFIG[item.hwKey];
+      const hwLabel = String(hwConfig?.label || item.hwKey);
+      result.push({
+        ...item,
+        configLabel: buildConfigLabel(
+          hwLabel,
+          item.framework,
+          item.specDecode,
+          item.precision,
+          item.conc,
+          item.tp,
+        ),
       });
-
-      dedupMap.forEach((item) => {
-        const hwConfig = HARDWARE_CONFIG[item.hwKey];
-        const hwLabel = String(hwConfig?.label || item.hwKey);
-        result.push({
-          ...item,
-          configLabel: buildConfigLabel(
-            hwLabel,
-            item.framework,
-            item.specDecode,
-            item.precision,
-            item.conc,
-            item.tp,
-          ),
-        });
-      });
-    });
+    }
 
     return result.sort((a, b) => a.configLabel.localeCompare(b.configLabel));
   }, [rawData, selectedBenchmark, selectedModel, selectedRunDate]);
