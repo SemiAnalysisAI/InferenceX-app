@@ -181,6 +181,7 @@ export function generateTooltipHTML(
   barMetric: BarMetric,
   costType: CostType,
   runUrl?: string,
+  isPinned?: boolean,
 ): string {
   const config = hardwareConfig[d.hwKey] || HARDWARE_CONFIG[d.hwKey];
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
@@ -234,7 +235,8 @@ export function generateTooltipHTML(
     : '';
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto;">
+    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
+      ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
       </div>
@@ -456,8 +458,8 @@ export default function ThroughputBarChart({
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (d: InterpolatedResult, _isPinned: boolean) =>
-        generateTooltipHTML(d, hardwareConfig, mode, barMetric, costType, runUrl),
+      content: (d: InterpolatedResult, isPinned: boolean) =>
+        generateTooltipHTML(d, hardwareConfig, mode, barMetric, costType, runUrl, isPinned),
       getRulerX: () => hoveredBarXRef.current,
       onHoverStart: (sel: d3.Selection<any, InterpolatedResult, any, any>) => {
         hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
