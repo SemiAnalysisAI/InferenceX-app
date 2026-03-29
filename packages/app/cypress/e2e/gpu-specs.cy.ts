@@ -1,5 +1,8 @@
 describe('GPU Specs Tab', () => {
   before(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
     cy.visit('/gpu-specs');
     // Wait for GPU Specs tab content to be present in the DOM
     cy.get('h2').contains('GPU Specifications').should('exist');
@@ -206,6 +209,9 @@ describe('GPU Specs Tab', () => {
 
 describe('GPU Specs Bar Chart View', () => {
   before(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('GPU Specifications').should('exist');
     // Dismiss any Radix Dialog scroll locks from topology diagram components
@@ -277,6 +283,9 @@ describe('GPU Specs Bar Chart View', () => {
 
 describe('GPU Specs Radar Chart View', () => {
   before(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('GPU Specifications').should('exist');
     cy.get('body').then(($body) => {
@@ -370,12 +379,16 @@ describe('GPU Specs Radar Chart View', () => {
 });
 
 describe('GPU Specs Navigation', () => {
-  it('tab switcher activates GPU Specs', () => {
+  before(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
     cy.visit('/inference');
-    // Wait for tab nav to be rendered and page to be interactive
     cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
-    // Use force:true to handle potential pointer-events:none from modals/overlays
-    cy.get('[data-testid="tab-trigger-gpu-specs"]').click({ force: true });
+  });
+
+  it('tab switcher activates GPU Specs', () => {
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
     cy.url().should('include', '/gpu-specs');
     cy.get('h2').should('contain.text', 'GPU Specifications');
   });
@@ -383,6 +396,9 @@ describe('GPU Specs Navigation', () => {
 
 describe('Topology Dialog Navigation', () => {
   before(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('GPU Specifications').should('exist');
   });
