@@ -25,6 +25,7 @@ export interface EvaluationChartData {
   ep: number; // expert parallelism
   dp_attention: boolean; // data parallel attention
   conc: number; // concurrency
+  runUrl?: string; // GitHub Actions run URL
 }
 
 export interface EvalChangelogEntry {

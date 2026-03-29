@@ -89,6 +89,7 @@ export interface EvalRow {
   conc: number | null;
   metrics: Record<string, number>;
   timestamp: string;
+  run_url: string | null;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

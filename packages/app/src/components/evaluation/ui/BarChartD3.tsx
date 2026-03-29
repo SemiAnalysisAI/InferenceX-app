@@ -24,6 +24,13 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 
 const CHART_MARGIN = { top: 24, right: 24, bottom: 52, left: 160 };
 
+const runLinkHTML = (runUrl?: string) =>
+  runUrl
+    ? `<div style="font-size: 11px; margin-top: 4px;">
+        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">GitHub Actions Run</a>
+      </div>`
+    : '';
+
 const generateEvaluationTooltipContent = (data: EvaluationChartData, isPinned: boolean): string => {
   const minScore = data.minScore ?? data.score;
   const maxScore = data.maxScore ?? data.score;
@@ -40,6 +47,7 @@ const generateEvaluationTooltipContent = (data: EvaluationChartData, isPinned: b
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Tensor Parallelism:</strong> ${data.tp}</div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Expert Parallelism:</strong> ${data.ep}</div>
       <div style="color: var(--muted-foreground); font-size: 11px;"><strong>Data Parallel Attention:</strong> ${data.dp_attention ? 'True' : 'False'}</div>
+      ${runLinkHTML(data.runUrl)}
     </div>
   `;
 };

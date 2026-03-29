@@ -121,9 +121,11 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       selectedRunDate === prevAvailableDates[prevAvailableDates.length - 1];
     if (!selectedRunDate || wasOnLatest || !availableDates.includes(selectedRunDate)) {
       setSelectedRunDate(latestDate);
+      // If no global date yet (evals loaded first), set it so inference syncs to us.
+      if (!globalRunDate) setGlobalRunDate(latestDate);
     }
     prevAvailableDatesRef.current = availableDates;
-  }, [availableDates, selectedRunDate, setSelectedRunDate]);
+  }, [availableDates, selectedRunDate, setSelectedRunDate, globalRunDate, setGlobalRunDate]);
 
   useEffect(() => {
     if (!globalRunDate) return;
@@ -235,6 +237,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
           ep: item.decode_ep,
           dp_attention: item.decode_dp_attention,
           conc: item.conc ?? 0,
+          runUrl: item.run_url ?? undefined,
         };
       })
       .filter((item): item is EvaluationChartData => item !== null);
