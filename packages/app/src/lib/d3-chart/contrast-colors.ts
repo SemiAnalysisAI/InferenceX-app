@@ -40,5 +40,5 @@ export function contrastColors(bgColor: string): string {
   const rgb = parseRgb(resolved);
   if (!rgb) return 'white';
   const lum = relativeLuminance(...rgb);
-  return lum > 0.3 ? '#131416' : 'white';
+  return lum > 0.3 ? '#080c12' : 'white';
 }

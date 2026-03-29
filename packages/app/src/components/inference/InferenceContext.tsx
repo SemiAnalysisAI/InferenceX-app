@@ -39,7 +39,7 @@ import {
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getModelSortIndex, HARDWARE_CONFIG, TABLEAU_10 } from '@/lib/constants';
+import { getModelSortIndex, HARDWARE_CONFIG, BRAND_SERIES } from '@/lib/constants';
 import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
@@ -245,7 +245,7 @@ export function InferenceProvider({
           ? `${getDisplayLabel(hwConfig)} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`
           : `${point.hwKey} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`;
 
-        const color = TABLEAU_10[prev.length % TABLEAU_10.length];
+        const color = BRAND_SERIES[prev.length % BRAND_SERIES.length];
         return [
           ...prev,
           {

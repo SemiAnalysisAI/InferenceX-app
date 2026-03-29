@@ -25,8 +25,8 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
           justifyContent: 'center',
           width: '100%',
           height: '100%',
-          backgroundColor: '#18181b',
-          color: '#fafafa',
+          backgroundColor: '#080c12',
+          color: '#f2f4f7',
           fontSize: 48,
           fontWeight: 700,
         }}

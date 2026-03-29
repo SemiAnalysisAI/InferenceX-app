@@ -1,17 +1,15 @@
 import { HardwareConfig } from '@/components/inference/types';
 
-/** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
-export const TABLEAU_10 = [
-  '#4e79a7',
-  '#f28e2c',
-  '#e15759',
-  '#76b7b2',
-  '#59a14f',
-  '#edc949',
-  '#af7aa1',
-  '#ff9da7',
-  '#9c755f',
-  '#bab0ab',
+/** SemiAnalysis brand 8-color chart series palette. */
+export const BRAND_SERIES = [
+  '#E8A830',
+  '#1A84C6',
+  '#2EAD8E',
+  '#E06347',
+  '#8B6CC1',
+  '#3BBFD9',
+  '#D4853A',
+  '#5C9E4B',
 ] as const;
 
 export interface GpuSpecs {

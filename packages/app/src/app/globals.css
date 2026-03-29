@@ -146,70 +146,70 @@
   /* Setup variables */
   --radius: 0.625rem;
 
-  /* Base Theme Colors */
-  --background: #eaebec;
-  --foreground: #131416;
-  --card: #eaebec;
-  --card-foreground: #131416;
-  --popover: #fafafa;
-  --popover-foreground: #171717;
-  --primary: #f7b041;
-  --primary-foreground: #fafafa;
-  --secondary: #0b86d1;
-  --secondary-foreground: #fafafa;
+  /* Base Theme Colors — SemiAnalysis brand (blue-tinted neutrals) */
+  --background: #f2f4f7;
+  --foreground: #080c12;
+  --card: #f2f4f7;
+  --card-foreground: #080c12;
+  --popover: #f2f4f7;
+  --popover-foreground: #111820;
+  --primary: #e8a830;
+  --primary-foreground: #f2f4f7;
+  --secondary: #1a84c6;
+  --secondary-foreground: #f2f4f7;
   --brand: var(--secondary);
-  --muted: #b4b9bc;
-  --muted-foreground: #27272a;
-  --accent: #fafafa;
-  --accent-foreground: #1d1f21;
+  --muted: #c8d0da;
+  --muted-foreground: #3a4a5c;
+  --accent: #f2f4f7;
+  --accent-foreground: #111820;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #656b72;
-  --border-alt: #c2ccd7;
-  --input: #656b72;
-  --ring: #27272a;
+  --border: #7a8a9c;
+  --border-alt: #c8d0da;
+  --input: #7a8a9c;
+  --ring: #1e2a38;
 
   /* Sidebar */
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar: #080c12;
+  --sidebar-foreground: #f2f4f7;
+  --sidebar-primary: #1a84c6;
+  --sidebar-primary-foreground: #f2f4f7;
+  --sidebar-accent: #111820;
+  --sidebar-accent-foreground: #f2f4f7;
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: #3a4a5c;
 }
 
 .dark {
-  /* Base Theme Colors */
-  --background: #131416;
-  --foreground: #eaebec;
-  --card: #131416;
-  --card-foreground: #eaebec;
-  --popover: #171717;
-  --popover-foreground: #fafafa;
-  --primary: #f7b041;
-  --primary-foreground: #131416;
-  --secondary: #0b86d1;
-  --secondary-foreground: #fafafa;
+  /* Base Theme Colors — SemiAnalysis brand (blue-tinted neutrals) */
+  --background: #080c12;
+  --foreground: #f2f4f7;
+  --card: #080c12;
+  --card-foreground: #f2f4f7;
+  --popover: #111820;
+  --popover-foreground: #f2f4f7;
+  --primary: #e8a830;
+  --primary-foreground: #080c12;
+  --secondary: #1a84c6;
+  --secondary-foreground: #f2f4f7;
   --brand: var(--primary);
-  --muted: #27272a;
-  --muted-foreground: #b4b9bc;
-  --accent: #1d1f21;
-  --accent-foreground: #fafafa;
+  --muted: #1e2a38;
+  --muted-foreground: #c8d0da;
+  --accent: #111820;
+  --accent-foreground: #f2f4f7;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #656b72;
-  --border-alt: #222426;
+  --border: #3a4a5c;
+  --border-alt: #1e2a38;
   --input: oklch(1 0 0 / 15%);
-  --ring: #fafafa;
+  --ring: #f2f4f7;
 
   /* Sidebar */
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-foreground: #f2f4f7;
+  --sidebar-primary: #1a84c6;
+  --sidebar-primary-foreground: #f2f4f7;
+  --sidebar-accent: #111820;
+  --sidebar-accent-foreground: #f2f4f7;
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: #3a4a5c;
 }
 
 @layer base {
@@ -226,6 +226,22 @@
     outline: none;
   }
 }
+/* Brand gradient bottom-border on cards (dark mode) */
+.dark [data-slot='card'] {
+  position: relative;
+  overflow: hidden;
+}
+
+.dark [data-slot='card']::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #e8a830, #1a84c6);
+}
+
 /* Custom scrollbar styling */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -302,7 +318,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
+  box-shadow: 0 0 8px 2px oklch(75% 0.16 75 / 40%);
   animation: star-glow 2s ease-in-out infinite;
   pointer-events: none;
 }

@@ -77,7 +77,7 @@ function renderDiagram(
   const width = Math.min(containerWidth, 640);
 
   // Theme colors
-  const fg = isDark ? '#eaebec' : '#131416';
+  const fg = isDark ? '#f2f4f7' : '#080c12';
   const mutedFg = isDark ? '#9ca3af' : '#6b7280';
   const borderColor = isDark ? '#374151' : '#d1d5db';
   const bgSubtle = isDark ? '#1f2937' : '#f9fafb';
@@ -1737,7 +1737,7 @@ function renderDiagram(
         drawArrow(altBlockEnd[0] + 2, altBlockStart[1]);
 
         // Opaque background rect behind the label so it doesn't overlap the arrow
-        const cardBg = isDark ? '#131416' : '#eaebec';
+        const cardBg = isDark ? '#080c12' : '#f2f4f7';
         const labelText = '\u21C5 alternating every layer';
         const labelPadX = 6;
         const labelPadY = 4;

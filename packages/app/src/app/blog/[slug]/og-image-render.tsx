@@ -10,9 +10,9 @@ import type { BlogPostMeta } from '@/lib/blog';
 
 export const size = { width: 1200, height: 630 };
 
-const BLUE = '#0B86D1';
-const BG = '#131416';
-const PANEL_BG = '#0F1214';
+const BLUE = '#1A84C6';
+const BG = '#080c12';
+const PANEL_BG = '#0a1018';
 
 // Tile grid layout (row-major, 2 cols). rotate: degrees to apply at render time.
 const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
