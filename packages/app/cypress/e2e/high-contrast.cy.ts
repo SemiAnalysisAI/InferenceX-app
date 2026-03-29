@@ -3,7 +3,7 @@ describe('High Contrast Mode', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="scatter-graph"]').should('exist');
   });
 
@@ -16,7 +16,7 @@ describe('High Contrast Mode', () => {
   });
 
   it('visiting with i_hc=1 applies high contrast on load', () => {
-    cy.visit('/?i_hc=1');
+    cy.visit('/inference?i_hc=1');
     cy.get('[data-testid="scatter-graph"]').should('exist');
     cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
   });
@@ -42,7 +42,7 @@ describe('High Contrast Mode', () => {
   });
 
   it('multiple high contrast params can coexist in URL', () => {
-    cy.visit('/?i_hc=1&r_hc=1&e_hc=1');
+    cy.visit('/inference?i_hc=1&r_hc=1&e_hc=1');
     cy.get('[data-testid="scatter-graph"]').should('exist');
     cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
   });

@@ -371,11 +371,11 @@ describe('GPU Specs Radar Chart View', () => {
 
 describe('GPU Specs Navigation', () => {
   it('tab switcher activates GPU Specs', () => {
-    cy.visit('/');
-    // Wait for tabs to be rendered and page to be interactive
-    cy.get('[role="tablist"]').should('be.visible');
+    cy.visit('/inference');
+    // Wait for tab nav to be rendered and page to be interactive
+    cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
     // Use force:true to handle potential pointer-events:none from modals/overlays
-    cy.get('[role="tablist"]').contains('GPU Specs').click({ force: true });
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').click({ force: true });
     cy.url().should('include', '/gpu-specs');
     cy.get('h2').should('contain.text', 'GPU Specifications');
   });

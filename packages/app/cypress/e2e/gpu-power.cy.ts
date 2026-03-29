@@ -5,7 +5,7 @@ function unlockPowerX() {
 
 describe('PowerX', () => {
   beforeEach(() => {
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -32,17 +32,17 @@ describe('PowerX', () => {
 
   describe('(unlocked)', () => {
     beforeEach(() => {
-      cy.visit('/', {
+      cy.visit('/inference', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          win.localStorage.setItem('inferencex-powerx-unlocked', '1');
+          win.localStorage.setItem('inferencex-feature-gate', '1');
         },
       });
     });
 
     it('clicking the gpu-metrics tab activates it and shows content', () => {
       cy.get('[data-testid="tab-trigger-gpu-metrics"]').click();
-      cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('have.attr', 'data-state', 'active');
+      cy.url().should('include', '/gpu-metrics');
       cy.get('[data-testid="gpu-metrics-display"]').find('h2').should('contain.text', 'PowerX');
     });
 

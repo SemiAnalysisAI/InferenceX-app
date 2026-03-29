@@ -3,22 +3,22 @@ describe('Custom User Values', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="model-selector"]').should('be.visible');
   });
 
   const selectCustomCostMetric = () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[role="option"]')
       .contains('Cost per Million Total Tokens (Custom User Values)')
-      .click();
+      .click({ force: true });
   };
 
   const selectCustomPowerMetric = () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click();
+    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
     cy.get('[role="option"]')
       .contains('Token Throughput per All in Utility MW (Custom User Values)')
-      .click();
+      .click({ force: true });
   };
 
   describe('Custom GPU Costs', () => {

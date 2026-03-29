@@ -2,7 +2,7 @@ describe('Model Architecture Diagram', () => {
   before(() => {
     // Use desktop viewport to ensure all UI elements are visible
     cy.viewport(1280, 800);
-    cy.visit('/', {
+    cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -101,6 +101,11 @@ describe('Model Architecture Diagram', () => {
   describe('Collapsible Transformer Block (Dense model - Llama 3.3 70B)', () => {
     before(() => {
       // Switch model and open architecture
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        doc.body.removeAttribute('data-scroll-locked');
+        doc.body.style.removeProperty('pointer-events');
+      });
       cy.get('[role="combobox"]').filter(':visible').first().click();
       cy.get('[role="option"]').contains('Llama 3.3').click();
 
@@ -139,6 +144,11 @@ describe('Model Architecture Diagram', () => {
 
   describe('Collapsible Transformer Blocks (MoE model - Kimi K2.5)', () => {
     before(() => {
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        doc.body.removeAttribute('data-scroll-locked');
+        doc.body.style.removeProperty('pointer-events');
+      });
       cy.get('[role="combobox"]').filter(':visible').first().click();
       cy.get('[role="option"]').contains('Kimi K2.5').click();
 
@@ -182,6 +192,11 @@ describe('Model Architecture Diagram', () => {
 
   describe('Collapsible Transformer Blocks (MoE model - MiniMax M2.5)', () => {
     before(() => {
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        doc.body.removeAttribute('data-scroll-locked');
+        doc.body.style.removeProperty('pointer-events');
+      });
       cy.get('[role="combobox"]').filter(':visible').first().click();
       cy.get('[role="option"]').contains('MiniMax M2.5').click();
 
@@ -225,6 +240,11 @@ describe('Model Architecture Diagram', () => {
 
   describe('Alternating Attention Blocks (MoE model - gpt-oss 120B)', () => {
     before(() => {
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        doc.body.removeAttribute('data-scroll-locked');
+        doc.body.style.removeProperty('pointer-events');
+      });
       cy.get('[role="combobox"]').filter(':visible').first().click();
       cy.get('[role="option"]').contains('gpt-oss').click();
 

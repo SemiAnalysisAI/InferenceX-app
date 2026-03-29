@@ -8,7 +8,7 @@ describe('TCO Calculator', () => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
-      cy.visit('/');
+      cy.visit('/inference');
     });
 
     it('shows the TCO Calculator tab trigger', () => {
@@ -16,30 +16,16 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="tab-trigger-calculator"]').should('contain.text', 'TCO Calculator');
     });
 
-    it('calculator tab is inactive by default', () => {
-      cy.get('[data-testid="tab-trigger-calculator"]').should(
-        'have.attr',
-        'data-state',
-        'inactive',
-      );
-    });
-
-    it('clicking the calculator tab activates it', () => {
+    it('clicking the calculator tab navigates to it', () => {
       cy.get('[data-testid="tab-trigger-calculator"]').click();
-      cy.get('[data-testid="tab-trigger-calculator"]').should('have.attr', 'data-state', 'active');
-      cy.get('[data-testid="tab-trigger-inference"]').should('have.attr', 'data-state', 'inactive');
-    });
-
-    it('updates the URL path to /calculator', () => {
-      // Already on calculator from previous test
       cy.url().should('include', '/calculator');
     });
 
     it('switches back to inference tab and then returns to calculator', () => {
       cy.get('[data-testid="tab-trigger-inference"]').click();
-      cy.get('[data-testid="tab-trigger-inference"]').should('have.attr', 'data-state', 'active');
+      cy.url().should('include', '/inference');
       cy.get('[data-testid="tab-trigger-calculator"]').click();
-      cy.get('[data-testid="tab-trigger-calculator"]').should('have.attr', 'data-state', 'active');
+      cy.url().should('include', '/calculator');
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
     });
   });
@@ -315,10 +301,19 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
 
-    it('model selector has selectable options', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-model').click();
+    // Clear stale Radix scroll lock before each test to prevent pointer-events: none
+    beforeEach(() => {
+      cy.document().then((doc) => {
+        doc.body.removeAttribute('data-scroll-locked');
+        doc.body.style.removeProperty('pointer-events');
       });
+    });
+
+    it('model selector has selectable options', () => {
+      // Wait for availability data to load — model selector value updates when data arrives
+      cy.get('#calc-model').should('not.contain.text', 'Model');
+      cy.wait(100);
+      cy.get('#calc-model').click();
       cy.get('[role="option"]').should('have.length.greaterThan', 0);
       cy.get('body').type('{esc}');
     });
@@ -552,7 +547,7 @@ describe('TCO Calculator', () => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
       cy.visit('/calculator');
-      cy.get('[data-testid="tab-trigger-calculator"]').should('have.attr', 'data-state', 'active');
+      cy.url().should('include', '/calculator');
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });

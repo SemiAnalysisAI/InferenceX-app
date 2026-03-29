@@ -3,7 +3,7 @@ describe('CSV Export', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="chart-figure"]').should('exist');
   });
 

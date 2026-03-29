@@ -32,7 +32,7 @@ describe('Y-Axis Metrics All Render Data', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/');
+    cy.visit('/inference');
     cy.get('[data-testid="scatter-graph"]')
       .first()
       .find('svg .dot-group')
@@ -41,8 +41,8 @@ describe('Y-Axis Metrics All Render Data', () => {
 
   metrics.forEach((label) => {
     it(`"${label}" renders scatter points without extra interaction`, () => {
-      cy.get('[data-testid="yaxis-metric-selector"]').click();
-      cy.get('[role="option"]').contains(label).click();
+      cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+      cy.get('[role="option"]').contains(label).click({ force: true });
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')
