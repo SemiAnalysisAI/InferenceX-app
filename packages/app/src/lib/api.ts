@@ -271,3 +271,25 @@ export interface FeedbackListRow {
 export function fetchFeedbackList(signal?: AbortSignal) {
   return fetchJson<{ rows: FeedbackListRow[] }>('/api/v1/feedback/list', signal);
 }
+
+export interface LatestImageRow {
+  model: string;
+  hardware: string;
+  framework: string;
+  precision: string;
+  spec_method: string;
+  isl: number;
+  osl: number;
+  image: string;
+  date: string;
+}
+
+export function fetchLatestImages() {
+  return fetchJson<LatestImageRow[]>('/api/v1/latest-images');
+}
+
+export type FrameworkReleases = Record<string, string | null>;
+
+export function fetchFrameworkReleases() {
+  return fetchJson<FrameworkReleases>('/api/v1/framework-releases');
+}
