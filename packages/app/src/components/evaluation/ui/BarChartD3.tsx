@@ -7,7 +7,7 @@ import * as d3 from 'd3';
 import { getModelSortIndex } from '@/lib/constants';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart';
-import { renderErrorBars, updateErrorBarsOnZoom } from '@/lib/d3-chart/layers/error-bars';
+import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -22,7 +22,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 80, left: 60 };
+const CHART_MARGIN = { top: 24, right: 24, bottom: 52, left: 160 };
 
 const generateEvaluationTooltipContent = (data: EvaluationChartData, isPinned: boolean): string => {
   const minScore = data.minScore ?? data.score;
@@ -44,26 +44,23 @@ const generateEvaluationTooltipContent = (data: EvaluationChartData, isPinned: b
   `;
 };
 
-/** Custom x-axis label formatting: split on newline, rotate -36deg */
-function formatXAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {
+/** Custom y-axis label formatting for horizontal bar chart: split on newline, show multi-line */
+function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {
   axisGroup.selectAll('.tick text').each(function () {
     const el = d3.select(this);
     const label = el.text();
     const lines = label.split('\n');
+    const totalHeight = lines.length * 1.1; // em units
     el.text(null);
     lines.forEach((line: string, i: number) => {
       el.append('tspan')
         .text(line)
-        .attr('x', 0)
-        .attr('dy', i === 0 ? '0' : '1.1em')
+        .attr('x', -8)
+        .attr('dy', i === 0 ? `${-totalHeight / 2 + 0.9}em` : '1.1em')
         .attr('font-weight', i === 0 ? '600' : 'normal')
         .attr('font-size', i === 0 ? '10px' : '9px');
     });
-    el.attr('transform', 'rotate(-36)')
-      .attr('text-anchor', 'end')
-      .attr('dx', '-.8em')
-      .attr('dy', '1em')
-      .attr('font-size', '10px');
+    el.attr('text-anchor', 'end');
   });
 }
 
@@ -134,60 +131,98 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     [configurations, enabledHardware, highlightedConfigs, toggleHardware, resolveColor],
   );
 
-  const yDomain = useMemo((): [number, number] => {
+  const xDomain = useMemo((): [number, number] => {
     if (chartData.length === 0) return [0, 1];
-    const yMin = d3.min(chartData, (d) => d.score - (d.scoreError || 0)) || 0;
-    const yMax = d3.max(chartData, (d) => d.score + (d.scoreError || 0)) || 1;
-    const yPadding = (yMax - yMin) * 0.3;
-    return [Math.max(0, yMin - yPadding), Math.min(1, yMax + yPadding)];
+    const xMin = d3.min(chartData, (d) => d.score - (d.scoreError || 0)) || 0;
+    const xMax = d3.max(chartData, (d) => d.score + (d.scoreError || 0)) || 1;
+    const xPadding = (xMax - xMin) * 0.3;
+    return [Math.max(0, xMin - xPadding), Math.min(1, xMax + xPadding)];
   }, [chartData]);
+
+  const chartHeight = Math.max(400, chartData.length * 40 + CHART_MARGIN.top + CHART_MARGIN.bottom);
 
   const errorData = useMemo(
     () => chartData.filter((d) => d.errorMin !== undefined && d.errorMax !== undefined),
     [chartData],
   );
 
-  // Use custom layers since error bars + points need band-scale-aware positioning
+  // Horizontal bar chart: yScale = band (config labels), xScale = linear (scores)
   const layers = useMemo(
     (): LayerConfig<EvaluationChartData>[] => [
       {
         type: 'custom',
         key: 'error-bars',
         render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleBand<string>;
-          const yScale = ys as d3.ScaleLinear<number, number>;
+          const xScale = xs as d3.ScaleLinear<number, number>;
+          const yScale = ys as d3.ScaleBand<string>;
+          // Horizontal error bars: swap x/y semantics
+          // getCx = y center, getYMin = x left, getYMax = x right, capWidth = vertical cap height
           renderErrorBars(group, errorData, {
             getCx: (d: EvaluationChartData) =>
-              (xScale(d.configLabel) || 0) + xScale.bandwidth() / 2,
-            getYMin: (d: EvaluationChartData) => yScale(d.errorMin!),
-            getYMax: (d: EvaluationChartData) => yScale(d.errorMax!),
-            capWidth: xScale.bandwidth() / 3,
+              (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
+            getYMin: (d: EvaluationChartData) => xScale(d.errorMin!),
+            getYMax: (d: EvaluationChartData) => xScale(d.errorMax!),
+            capWidth: yScale.bandwidth() / 3,
             stroke: 'var(--foreground)',
           });
+          // Rotate error bars 90 degrees — the render draws vertical, we need horizontal.
+          // Instead, manually position: stem is horizontal, caps are vertical.
+          const bars = group.selectAll<SVGGElement, EvaluationChartData>('.error-bar');
+          bars
+            .select('.eb-stem')
+            .attr('x1', (d) => xScale(d.errorMin!))
+            .attr('x2', (d) => xScale(d.errorMax!))
+            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
+            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
+          const capH = yScale.bandwidth() / 6;
+          bars
+            .select('.eb-cap-top')
+            .attr('x1', (d) => xScale(d.errorMin!))
+            .attr('x2', (d) => xScale(d.errorMin!))
+            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
+            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+          bars
+            .select('.eb-cap-bot')
+            .attr('x1', (d) => xScale(d.errorMax!))
+            .attr('x2', (d) => xScale(d.errorMax!))
+            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
+            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
         },
         onZoom: (group, ctx) => {
-          const xScale = ctx.xScale as d3.ScaleBand<string>;
-          const newYScale = ctx.newYScale as d3.ScaleLinear<number, number>;
-          updateErrorBarsOnZoom(group, {
-            getCx: (d: EvaluationChartData) =>
-              (xScale(d.configLabel) || 0) + xScale.bandwidth() / 2,
-            getYMin: (d: EvaluationChartData) => newYScale(d.errorMin!),
-            getYMax: (d: EvaluationChartData) => newYScale(d.errorMax!),
-            capWidth: xScale.bandwidth() / 3,
-            stroke: 'var(--foreground)',
-          });
+          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          const yScale = ctx.yScale as d3.ScaleBand<string>;
+          const bars = group.selectAll<SVGGElement, EvaluationChartData>('.error-bar');
+          bars
+            .select('.eb-stem')
+            .attr('x1', (d) => newXScale(d.errorMin!))
+            .attr('x2', (d) => newXScale(d.errorMax!))
+            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
+            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
+          const capH = yScale.bandwidth() / 6;
+          bars
+            .select('.eb-cap-top')
+            .attr('x1', (d) => newXScale(d.errorMin!))
+            .attr('x2', (d) => newXScale(d.errorMin!))
+            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
+            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+          bars
+            .select('.eb-cap-bot')
+            .attr('x1', (d) => newXScale(d.errorMax!))
+            .attr('x2', (d) => newXScale(d.errorMax!))
+            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
+            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
         },
       },
       {
         type: 'custom',
         key: 'mean-points',
         render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleBand<string>;
-          const yScale = ys as d3.ScaleLinear<number, number>;
+          const xScale = xs as d3.ScaleLinear<number, number>;
+          const yScale = ys as d3.ScaleBand<string>;
           return renderPoints(group, chartData, {
-            getCx: (d: EvaluationChartData) =>
-              (xScale(d.configLabel) || 0) + xScale.bandwidth() / 2,
-            getCy: (d: EvaluationChartData) => yScale(d.score),
+            getCx: (d: EvaluationChartData) => xScale(d.score),
+            getCy: (d: EvaluationChartData) =>
+              (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
             getColor: (d: EvaluationChartData) =>
               getCssColor(resolveColor(d.configLabel, d.hwKey as string)),
             getRadius: () => 6,
@@ -196,12 +231,12 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           });
         },
         onZoom: (group, ctx) => {
-          const xScale = ctx.xScale as d3.ScaleBand<string>;
-          const newYScale = ctx.newYScale as d3.ScaleLinear<number, number>;
+          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          const yScale = ctx.yScale as d3.ScaleBand<string>;
           updatePointsOnZoom<EvaluationChartData>(
             group,
-            (d) => (xScale(d.configLabel) || 0) + xScale.bandwidth() / 2,
-            (d) => newYScale(d.score),
+            (d) => newXScale(d.score),
+            (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
           );
         },
       },
@@ -211,8 +246,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         render: (group, { xScale: xs, yScale: ys }) => {
           group.selectAll('.score-label-group').remove();
           if (!showLabels) return;
-          const xScale = xs as d3.ScaleBand<string>;
-          const yScale = ys as d3.ScaleLinear<number, number>;
+          const xScale = xs as d3.ScaleLinear<number, number>;
+          const yScale = ys as d3.ScaleBand<string>;
           const labelGroups = group
             .selectAll('.score-label-group')
             .data(chartData)
@@ -221,7 +256,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .attr(
               'transform',
               (d) =>
-                `translate(${(xScale(d.configLabel) || 0) + xScale.bandwidth() / 2},${yScale(d.score) - 16})`,
+                `translate(${xScale(d.score) + 12},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
             );
           labelGroups
             .append('rect')
@@ -234,7 +269,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           labelGroups
             .append('text')
             .attr('class', 'score-label')
-            .attr('text-anchor', 'middle')
+            .attr('text-anchor', 'start')
             .style('fill', 'var(--foreground)')
             .attr('font-size', '10px')
             .attr('font-weight', '600')
@@ -252,14 +287,14 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         },
         onZoom: (group, ctx) => {
           if (!showLabels) return;
-          const xScale = ctx.xScale as d3.ScaleBand<string>;
-          const newYScale = ctx.newYScale as d3.ScaleLinear<number, number>;
+          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          const yScale = ctx.yScale as d3.ScaleBand<string>;
           group
             .selectAll<SVGGElement, EvaluationChartData>('.score-label-group')
             .attr(
               'transform',
               (d) =>
-                `translate(${(xScale(d.configLabel) || 0) + xScale.bandwidth() / 2},${newYScale(d.score) - 16})`,
+                `translate(${newXScale(d.score) + 12},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
             );
         },
       },
@@ -318,45 +353,46 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     <D3Chart<EvaluationChartData>
       chartId="evaluation-chart"
       data={chartData}
-      height={600}
+      height={chartHeight}
       margin={CHART_MARGIN}
       watermark="logo"
       grabCursor={false}
       caption={caption}
-      xScale={{ type: 'band', domain: chartData.map((d) => d.configLabel), padding: 0.1 }}
-      yScale={{ type: 'linear', domain: yDomain }}
-      xAxis={{ customize: formatXAxisLabels }}
-      yAxis={{
+      xScale={{ type: 'linear', domain: xDomain }}
+      yScale={{ type: 'band', domain: chartData.map((d) => d.configLabel), padding: 0.1 }}
+      xAxis={{
         label: `${getEvalBenchmarkLabel(selectedBenchmark as EvalBenchmark)} Score`,
         tickFormat: (d) => Number(d).toFixed(2),
         tickCount: 5,
       }}
+      yAxis={{ customize: formatYAxisLabels }}
       layers={layers}
       zoom={{
         enabled: true,
-        axes: 'y',
-        scaleExtent: [0.25, 20],
+        axes: 'x',
+        scaleExtent: [1, 20],
         resetEventName: 'evaluation_zoom_reset_evaluation-chart',
         constrain: (transform) => {
           const k = transform.k;
-          const yScale = d3
-            .scaleLinear()
-            .domain(yDomain)
-            .range([600 - CHART_MARGIN.top - CHART_MARGIN.bottom, 0]);
-          const minTy = 600 - CHART_MARGIN.top - CHART_MARGIN.bottom - yScale(0) * k;
-          const maxTy = -yScale(1) * k;
-          const ty = minTy < maxTy ? Math.max(minTy, Math.min(maxTy, transform.y)) : transform.y;
-          return d3.zoomIdentity.translate(transform.x, ty).scale(k);
+          const innerWidth =
+            (typeof window !== 'undefined' ? window.innerWidth : 800) -
+            CHART_MARGIN.left -
+            CHART_MARGIN.right;
+          const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
+          const minTx = -xScale(1) * k + innerWidth;
+          const maxTx = -xScale(0) * k;
+          const tx = minTx < maxTx ? Math.max(minTx, Math.min(maxTx, transform.x)) : transform.x;
+          return d3.zoomIdentity.translate(tx, transform.y).scale(k);
         },
       }}
       tooltip={{
         rulerType: 'crosshair',
         content: generateEvaluationTooltipContent,
-        getRulerX: (d, xs) => {
-          const bs = xs as d3.ScaleBand<string>;
+        getRulerX: (d, xs) => (xs as d3.ScaleLinear<number, number>)(d.score),
+        getRulerY: (d, ys) => {
+          const bs = ys as unknown as d3.ScaleBand<string>;
           return (bs(d.configLabel) || 0) + bs.bandwidth() / 2;
         },
-        getRulerY: (d, ys) => ys(d.score),
         onHoverStart: (sel) => sel.attr('r', 8),
         onHoverEnd: (sel) => sel.attr('r', 6),
         attachToLayer: 1,
