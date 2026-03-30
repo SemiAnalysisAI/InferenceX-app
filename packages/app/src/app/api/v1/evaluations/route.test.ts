@@ -7,6 +7,7 @@ const { mockGetAllEvalResults, mockGetDb } = vi.hoisted(() => ({
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
+  JSON_MODE: false,
 }));
 
 vi.mock('@semianalysisai/inferencex-db/queries/evaluations', () => ({
