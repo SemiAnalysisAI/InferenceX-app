@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import { getServerLog } from '@semianalysisai/inferencex-db/queries/server-logs';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
@@ -9,8 +10,8 @@ export const dynamic = 'force-dynamic';
 
 const getCachedServerLog = cachedQuery(
   async (id: number) => {
-    const sql = getDb();
-    return getServerLog(sql, id);
+    if (JSON_MODE) return jsonProvider.getServerLog(id);
+    return getServerLog(getDb(), id);
   },
   'server-log',
   { blobOnly: true },

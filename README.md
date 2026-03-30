@@ -49,13 +49,30 @@ cd InferenceX-app
 pnpm install
 ```
 
-### 2. Set Up Environment Variables
+### 2. Set Up Data Source
+
+You can run the dashboard against either a live database or a static JSON dump. The JSON dump approach requires no database setup and is the easiest way to get started.
+
+#### Option A: JSON Dump (no database required, local dev only)
+
+Download the latest DB dump from [GitHub Releases](https://github.com/SemiAnalysisAI/InferenceX-app/releases), unzip it, and point `DUMP_DIR` at the directory. This only works with `pnpm dev` — production builds require a live database.
 
 ```bash
 cp .env.example .env
+
+# Download and unzip the latest dump
+gh release download db-dump/2026-03-30 -p '*.zip'
+unzip inferencex-dump-2026-03-30.zip -d inferencex-dump
+
+# Add to .env
+echo 'DUMP_DIR=./inferencex-dump/inferencex-dump-2026-03-30' >> .env
 ```
 
-See [`.env.example`](.env.example) for all variables and descriptions.
+Make sure `DATABASE_READONLY_URL` is not set (or is commented out) in your `.env`.
+
+#### Option B: Live Database
+
+Set `DATABASE_READONLY_URL` in your `.env` to a Neon PostgreSQL connection string. See [`.env.example`](.env.example) for details.
 
 ### 3. Run the Development Server
 

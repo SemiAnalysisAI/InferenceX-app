@@ -6,6 +6,10 @@ vi.mock('next/cache', () => ({
   unstable_cache: vi.fn((fn: Function, _keys: string[], _opts: unknown) => fn),
 }));
 
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  JSON_MODE: false,
+}));
+
 vi.mock('./blob-cache', () => ({
   blobGet: vi.fn(),
   blobSet: vi.fn(),
