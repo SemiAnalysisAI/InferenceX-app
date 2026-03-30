@@ -58,7 +58,7 @@ export const generateHighContrastColors = (
   if (keys.length === 0) return {};
 
   const colors: { [key: string]: string } = {};
-  const [lmin, lmax] = theme === 'dark' ? [50, 80] : [25, 50];
+  const [lmin, lmax] = theme === 'dark' ? [50, 100] : [30, 65];
 
   // Group keys by vendor
   const groups = new Map<Vendor, string[]>();
@@ -90,6 +90,8 @@ export const generateHighContrastColors = (
       ...(useBan &&
         isBanned && {
           colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
+            // Enforce lightness bounds — force-vector can drift outside colorSpace
+            if (lab[0] < lmin || lab[0] > lmax) return false;
             const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;
             return !isBanned(hue);
           },

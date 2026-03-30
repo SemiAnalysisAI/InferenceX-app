@@ -283,17 +283,18 @@ describe('generateHighContrastColors', () => {
     return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
   }
 
-  /** Check that the green channel dominates — a simple "looks green" heuristic. */
-  function isGreenish(rgb: [number, number, number]): boolean {
+  /** Not red/pink — green, teal, yellow-green, cyan all count. */
+  function isNotReddish(rgb: [number, number, number]): boolean {
     const [r, g, b] = rgb;
-    return g > r && g > b;
+    // Reject if red-dominant with low green (the "looks red/pink" zone)
+    return !(r > g * 1.2 && r > b);
   }
 
-  /** Check that the red channel dominates or it's in the magenta/orange family. */
-  function isReddish(rgb: [number, number, number]): boolean {
+  /** Not green — red, magenta, orange, pink all count. */
+  function isNotGreenish(rgb: [number, number, number]): boolean {
     const [r, g, b] = rgb;
-    // Red-dominant or magenta (r high, g low)
-    return r > g && r > b * 0.8;
+    // Reject if green-dominant with low red and blue
+    return !(g > r * 1.2 && g > b * 1.2);
   }
 
   /** Assert every pair has at least `min` RGB distance. */
@@ -347,32 +348,32 @@ describe('generateHighContrastColors', () => {
 
   // ---------- Tier 1: few items → brand zone ----------
 
-  it('3 NVIDIA GPUs are all greenish', () => {
+  it('3 NVIDIA GPUs are not red', () => {
     const result = generateHighContrastColors(['h100_vllm', 'h200_vllm', 'b200_vllm'], 'dark');
     for (const color of Object.values(result)) {
-      expect(isGreenish(parseRgb(color))).toBe(true);
+      expect(isNotReddish(parseRgb(color))).toBe(true);
     }
     assertMinDist(result, 30);
   });
 
-  it('2 AMD GPUs are all reddish', () => {
+  it('2 AMD GPUs are not green', () => {
     const result = generateHighContrastColors(['mi300x_sglang', 'mi325x_sglang'], 'dark');
     for (const color of Object.values(result)) {
-      expect(isReddish(parseRgb(color))).toBe(true);
+      expect(isNotGreenish(parseRgb(color))).toBe(true);
     }
     assertMinDist(result, 30);
   });
 
-  it('4 NVIDIA GPUs stay in green zone and are distinguishable', () => {
+  it('4 NVIDIA GPUs stay in brand zone and are distinguishable', () => {
     const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm'];
     const result = generateHighContrastColors(keys, 'dark');
     for (const color of Object.values(result)) {
-      expect(isGreenish(parseRgb(color))).toBe(true);
+      expect(isNotReddish(parseRgb(color))).toBe(true);
     }
     assertMinDist(result, 25);
   });
 
-  it('3 NVIDIA + 3 AMD: greens and reds, all distinguishable', () => {
+  it('3 NVIDIA + 3 AMD: no color confusion, all distinguishable', () => {
     const keys = [
       'h100_vllm',
       'h200_vllm',
@@ -382,13 +383,13 @@ describe('generateHighContrastColors', () => {
       'mi355x_sglang',
     ];
     const result = generateHighContrastColors(keys, 'dark');
-    // NVIDIA keys should be green (3 ≤ PREFERRED_MAX)
+    // NVIDIA keys should not be red (3 ≤ PREFERRED_MAX)
     for (const k of keys.slice(0, 3)) {
-      expect(isGreenish(parseRgb(result[k]))).toBe(true);
+      expect(isNotReddish(parseRgb(result[k]))).toBe(true);
     }
-    // AMD keys should be red (3 ≤ PREFERRED_MAX)
+    // AMD keys should not be green (3 ≤ PREFERRED_MAX)
     for (const k of keys.slice(3)) {
-      expect(isReddish(parseRgb(result[k]))).toBe(true);
+      expect(isNotGreenish(parseRgb(result[k]))).toBe(true);
     }
     assertMinDist(result, 25);
   });
@@ -431,10 +432,10 @@ describe('generateHighContrastColors', () => {
     assertMinDist(result, 20);
   });
 
-  it('single GPU per vendor: one green, one red', () => {
+  it('single GPU per vendor: NVIDIA not red, AMD not green', () => {
     const result = generateHighContrastColors(['h100_vllm', 'mi300x_sglang'], 'dark');
-    expect(isGreenish(parseRgb(result['h100_vllm']))).toBe(true);
-    expect(isReddish(parseRgb(result['mi300x_sglang']))).toBe(true);
+    expect(isNotReddish(parseRgb(result['h100_vllm']))).toBe(true);
+    expect(isNotGreenish(parseRgb(result['mi300x_sglang']))).toBe(true);
   });
 });
 
