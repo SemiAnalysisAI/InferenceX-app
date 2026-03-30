@@ -262,15 +262,19 @@ async function mapWorkflowDir(
 
   const bmkZips: WorkflowMapResult['bmkZips'] = [];
   for (const zipFile of bmkSources) {
-    const data = readZipJson(path.join(artifactsPath, zipFile));
-    if (!data) {
+    // bmk_ ZIPs can contain multiple JSON files (one per concurrency level).
+    // Read all of them, not just the first, so every concurrency is ingested.
+    const allJsons = readZipJsonMap(path.join(artifactsPath, zipFile));
+    if (!allJsons || allJsons.size === 0) {
       local.skips.badZip++;
       warnings.push(`  [WARN] ${dateDir}/${zipFile}: bad/empty zip — skipped`);
       continue;
     }
-    const rawRows: Record<string, any>[] = Array.isArray(data)
-      ? data
-      : [data as Record<string, any>];
+    const rawRows: Record<string, any>[] = [];
+    for (const data of allJsons.values()) {
+      if (Array.isArray(data)) rawRows.push(...data);
+      else if (typeof data === 'object' && data !== null) rawRows.push(data as Record<string, any>);
+    }
     const snap = local.snapshot();
     const rows: BenchmarkParams[] = [];
     for (const row of rawRows) {
