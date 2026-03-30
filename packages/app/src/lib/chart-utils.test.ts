@@ -351,6 +351,19 @@ describe('generateHighContrastColors', () => {
     }
   });
 
+  it('6 NVIDIA items in preferred green zone are distinguishable', () => {
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm', 'gb200_vllm', 'gb300_vllm'];
+    const result = generateHighContrastColors(keys, 'dark');
+    const rgbs = Object.values(result).map(parseRgb);
+    let minDist = Infinity;
+    for (let i = 0; i < rgbs.length; i++) {
+      for (let j = i + 1; j < rgbs.length; j++) {
+        minDist = Math.min(minDist, rgbDist(rgbs[i], rgbs[j]));
+      }
+    }
+    expect(minDist).toBeGreaterThanOrEqual(30);
+  });
+
   it('many same-vendor items are still distinguishable', () => {
     // 10 NVIDIA items — tests that expansion works
     const gpus = ['h100', 'h200', 'b200', 'b300', 'gb200'];

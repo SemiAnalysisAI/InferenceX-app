@@ -38,7 +38,7 @@ const PREFERRED_HUE: Record<Vendor, { hmin: number; hmax: number } | null> = {
 };
 
 /** Max items that fit distinctly in the preferred zone before we open up. */
-const PREFERRED_MAX = 5;
+const PREFERRED_MAX = 6;
 
 /**
  * Generates high-contrast colors using iwanthue (k-means in CIELab space).
