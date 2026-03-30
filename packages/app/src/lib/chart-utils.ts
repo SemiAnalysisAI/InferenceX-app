@@ -35,7 +35,7 @@ const PREFERRED_ZONE: Record<
   Vendor,
   { hmin: number; hmax: number; cmin?: number; lmin?: number } | null
 > = {
-  nvidia: { hmin: 100, hmax: 195 }, // greens/cyans
+  nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
   unknown: null,
 };
