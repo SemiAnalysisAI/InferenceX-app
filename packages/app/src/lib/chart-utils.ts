@@ -31,9 +31,12 @@ const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
  * Preferred hue ranges (CIELab) — used when a vendor has few items so they
  * cluster in the brand-appropriate zone. NVIDIA = greens, AMD = reds/oranges.
  */
-const PREFERRED_HUE: Record<Vendor, { hmin: number; hmax: number } | null> = {
+const PREFERRED_ZONE: Record<
+  Vendor,
+  { hmin: number; hmax: number; cmin?: number; lmin?: number } | null
+> = {
   nvidia: { hmin: 100, hmax: 195 }, // greens/cyans
-  amd: { hmin: 320, hmax: 400 }, // reds/oranges (wraps: 320-360 + 0-40)
+  amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
   unknown: null,
 };
 
@@ -75,7 +78,7 @@ export const generateHighContrastColors = (
   for (const [vendor, vendorKeys] of groups) {
     const count = vendorKeys.length;
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
-    const preferred = PREFERRED_HUE[vendor] ?? null;
+    const preferred = PREFERRED_ZONE[vendor] ?? null;
 
     // Tier 1: few items → brand zone only
     // Tier 2: moderate  → full wheel minus rival color
@@ -85,7 +88,14 @@ export const generateHighContrastColors = (
 
     const palette = iwanthue(count, {
       colorSpace: usePreferred
-        ? { hmin: preferred.hmin, hmax: preferred.hmax, cmin: 30, cmax: 100, lmin, lmax }
+        ? {
+            hmin: preferred.hmin,
+            hmax: preferred.hmax,
+            cmin: preferred.cmin ?? 30,
+            cmax: 100,
+            lmin: Math.max(lmin, preferred.lmin ?? 0),
+            lmax,
+          }
         : { hmin: 0, hmax: 360, cmin: 30, cmax: 100, lmin, lmax },
       ...(useBan &&
         isBanned && {
