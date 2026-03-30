@@ -8,8 +8,9 @@
  * Set DUMP_DIR in .env to enable (e.g. DUMP_DIR=./inferencex-dump-2026-03-30).
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { BenchmarkRow } from './queries/benchmarks.js';
 import type { EvalRow } from './queries/evaluations.js';
@@ -131,6 +132,7 @@ interface RawServerLog {
 // ---------------------------------------------------------------------------
 
 interface Store {
+  dumpDir: string;
   configs: Map<number, RawConfig>;
   /** Only the latest attempt per github_run_id (replicates latest_workflow_runs view) */
   latestRuns: Map<number, RawWorkflowRun>;
@@ -141,7 +143,8 @@ interface Store {
   evalResults: RawEvalResult[];
   availability: RawAvailability[];
   changelog: RawChangelogEntry[];
-  serverLogs: Map<number, string>;
+  /** Lazy-loaded: server_logs.json can be multiple GB */
+  serverLogs: Map<number, string> | null;
   /** benchmark_result.id → server_log_id (for server-log lookups) */
   benchmarkServerLogMap: Map<number, number>;
 }
@@ -163,7 +166,12 @@ function getStore(): Store {
 
   const dir = process.env.DUMP_DIR;
   if (!dir) throw new Error('DUMP_DIR is not set');
-  const resolvedDir = resolve(dir);
+
+  // Resolve relative paths from the monorepo root (packages/db/../../), not CWD,
+  // since Next.js runs from packages/app/ but .env paths are repo-root-relative.
+  const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const monoRoot = resolve(pkgRoot, '../..');
+  const resolvedDir = existsSync(resolve(dir)) ? resolve(dir) : resolve(monoRoot, dir);
 
   console.log(`json-provider: loading dump from ${resolvedDir}`);
 
@@ -175,7 +183,29 @@ function getStore(): Store {
   const rawEvals = loadTable<RawEvalResult>(resolvedDir, 'eval_results.json');
   const rawAvailability = loadTable<RawAvailability>(resolvedDir, 'availability.json');
   const rawChangelog = loadTable<RawChangelogEntry>(resolvedDir, 'changelog_entries.json');
-  const rawServerLogs = loadTable<RawServerLog>(resolvedDir, 'server_logs.json');
+
+  // Postgres bigserial columns serialize as strings in JSON — coerce to numbers.
+  for (const wr of rawRuns) {
+    wr.id = Number(wr.id);
+    wr.github_run_id = Number(wr.github_run_id);
+  }
+  for (const br of rawBenchmarks) {
+    br.id = Number(br.id);
+    br.workflow_run_id = Number(br.workflow_run_id);
+    if (br.server_log_id != null) br.server_log_id = Number(br.server_log_id);
+  }
+  for (const rs of rawRunStats) {
+    rs.id = Number(rs.id);
+    rs.workflow_run_id = Number(rs.workflow_run_id);
+  }
+  for (const er of rawEvals) {
+    er.id = Number(er.id);
+    er.workflow_run_id = Number(er.workflow_run_id);
+  }
+  for (const cl of rawChangelog) {
+    cl.id = Number(cl.id);
+    cl.workflow_run_id = Number(cl.workflow_run_id);
+  }
 
   // Build configs index
   const configs = new Map<number, RawConfig>();
@@ -194,10 +224,6 @@ function getStore(): Store {
     latestRunsById.set(wr.id, wr);
   }
 
-  // Build server logs index
-  const serverLogs = new Map<number, string>();
-  for (const sl of rawServerLogs) serverLogs.set(sl.id, sl.server_log);
-
   // Build benchmark → server_log_id map
   const benchmarkServerLogMap = new Map<number, number>();
   for (const br of rawBenchmarks) {
@@ -207,6 +233,7 @@ function getStore(): Store {
   }
 
   store = {
+    dumpDir: resolvedDir,
     configs,
     latestRuns: latestByGithubId,
     latestRunsById,
@@ -215,7 +242,7 @@ function getStore(): Store {
     evalResults: rawEvals,
     availability: rawAvailability,
     changelog: rawChangelog,
-    serverLogs,
+    serverLogs: null, // lazy-loaded on first getServerLog() call (can be multiple GB)
     benchmarkServerLogMap,
   };
 
@@ -532,5 +559,15 @@ export function getServerLog(benchmarkResultId: number): string | null {
   const s = getStore();
   const logId = s.benchmarkServerLogMap.get(benchmarkResultId);
   if (logId == null) return null;
+
+  // Lazy-load server_logs.json on first access (can be multiple GB)
+  if (!s.serverLogs) {
+    console.log('json-provider: loading server_logs.json (this may take a moment)...');
+    const raw = loadTable<RawServerLog>(s.dumpDir, 'server_logs.json');
+    s.serverLogs = new Map<number, string>();
+    for (const sl of raw) s.serverLogs.set(sl.id, sl.server_log);
+    console.log(`json-provider: loaded ${s.serverLogs.size} server logs`);
+  }
+
   return s.serverLogs.get(logId) ?? null;
 }
