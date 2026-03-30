@@ -252,8 +252,16 @@ async function mapWorkflowDir(
     return tsA.localeCompare(tsB);
   });
 
+  // Skip compiled results_ ZIPs when individual bmk_ ZIPs exist.
+  // The compiled ZIPs aggregate all job artifacts (including carried-over ones
+  // from prior attempts) into a single array with no per-artifact timestamps,
+  // so duplicate rows for the same config can appear in arbitrary order and the
+  // wrong one can win the within-batch dedup. Individual bmk_ ZIPs are sorted
+  // by created_at above, guaranteeing the latest attempt's result wins.
+  const bmkSources = sortedBmkZips.length > 0 ? sortedBmkZips : resultZips;
+
   const bmkZips: WorkflowMapResult['bmkZips'] = [];
-  for (const zipFile of [...sortedBmkZips, ...resultZips]) {
+  for (const zipFile of bmkSources) {
     const data = readZipJson(path.join(artifactsPath, zipFile));
     if (!data) {
       local.skips.badZip++;
