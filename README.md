@@ -53,9 +53,9 @@ pnpm install
 
 You can run the dashboard against either a live database or a static JSON dump. The JSON dump approach requires no database setup and is the easiest way to get started.
 
-#### Option A: JSON Dump (no database required)
+#### Option A: JSON Dump (no database required, local dev only)
 
-Download the latest DB dump from [GitHub Releases](https://github.com/SemiAnalysisAI/InferenceX-app/releases), unzip it, and point `DUMP_DIR` at the directory:
+Download the latest DB dump from [GitHub Releases](https://github.com/SemiAnalysisAI/InferenceX-app/releases), unzip it, and point `DUMP_DIR` at the directory. This only works with `pnpm dev` — production builds require a live database.
 
 ```bash
 cp .env.example .env
