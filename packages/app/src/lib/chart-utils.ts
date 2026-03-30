@@ -38,13 +38,18 @@ const PREFERRED_HUE: Record<Vendor, { hmin: number; hmax: number } | null> = {
 };
 
 /** Max items that fit distinctly in the preferred zone before we open up. */
-const PREFERRED_MAX = 6;
+const PREFERRED_MAX = 4;
+
+/** Beyond this count per vendor, drop the hue ban entirely for best spacing. */
+const BAN_MAX = 10;
 
 /**
  * Generates high-contrast colors using iwanthue (k-means in CIELab space).
  *
- * Two rules: NVIDIA is never red, AMD is never green. Beyond that, iwanthue
- * picks maximally distinguishable colors in perceptual color space.
+ * Tiered strategy per vendor:
+ *   ≤ PREFERRED_MAX → constrain to brand zone (NVIDIA=green, AMD=red)
+ *   ≤ BAN_MAX       → full wheel minus rival's brand color
+ *   > BAN_MAX       → full wheel, no restrictions, best spacing wins
  */
 export const generateHighContrastColors = (
   keys: string[],
@@ -68,16 +73,21 @@ export const generateHighContrastColors = (
   }
 
   for (const [vendor, vendorKeys] of groups) {
+    const count = vendorKeys.length;
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
     const preferred = PREFERRED_HUE[vendor] ?? null;
-    const usePreferred = preferred && vendorKeys.length <= PREFERRED_MAX;
 
-    const palette = iwanthue(vendorKeys.length, {
+    // Tier 1: few items → brand zone only
+    // Tier 2: moderate  → full wheel minus rival color
+    // Tier 3: many      → full wheel, no restrictions
+    const usePreferred = preferred && count <= PREFERRED_MAX;
+    const useBan = !usePreferred && isBanned && count <= BAN_MAX;
+
+    const palette = iwanthue(count, {
       colorSpace: usePreferred
         ? { hmin: preferred.hmin, hmax: preferred.hmax, cmin: 30, cmax: 100, lmin, lmax }
         : { hmin: 0, hmax: 360, cmin: 30, cmax: 100, lmin, lmax },
-      // When using full wheel, exclude the banned hue range
-      ...(!usePreferred &&
+      ...(useBan &&
         isBanned && {
           colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
             const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;

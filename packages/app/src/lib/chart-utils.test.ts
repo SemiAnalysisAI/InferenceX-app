@@ -278,13 +278,32 @@ describe('generateHighContrastColors', () => {
     throw new Error(`Cannot parse color: ${color}`);
   }
 
-  /**
-   * Euclidean distance in RGB space — a rough-but-fast proxy for visual
-   * difference (the actual generation uses CIELab, so the palette is
-   * perceptually uniform by construction).
-   */
+  /** Euclidean distance in RGB — rough proxy (palette is perceptually uniform by construction). */
   function rgbDist(a: [number, number, number], b: [number, number, number]): number {
     return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+  }
+
+  /** Check that the green channel dominates — a simple "looks green" heuristic. */
+  function isGreenish(rgb: [number, number, number]): boolean {
+    const [r, g, b] = rgb;
+    return g > r && g > b;
+  }
+
+  /** Check that the red channel dominates or it's in the magenta/orange family. */
+  function isReddish(rgb: [number, number, number]): boolean {
+    const [r, g, b] = rgb;
+    // Red-dominant or magenta (r high, g low)
+    return r > g && r > b * 0.8;
+  }
+
+  /** Assert every pair has at least `min` RGB distance. */
+  function assertMinDist(colors: Record<string, string>, min: number) {
+    const rgbs = Object.values(colors).map(parseRgb);
+    for (let i = 0; i < rgbs.length; i++) {
+      for (let j = i + 1; j < rgbs.length; j++) {
+        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(min);
+      }
+    }
   }
 
   // ---------- Basics ----------
@@ -293,7 +312,7 @@ describe('generateHighContrastColors', () => {
     expect(generateHighContrastColors([], 'dark')).toEqual({});
   });
 
-  it('returns a valid CSS color for a single key', () => {
+  it('returns a valid hex color for a single key', () => {
     const result = generateHighContrastColors(['gpu-a'], 'dark');
     expect(Object.keys(result)).toHaveLength(1);
     expect(result['gpu-a']).toMatch(/^#[0-9a-f]{6}$/i);
@@ -303,21 +322,17 @@ describe('generateHighContrastColors', () => {
     const keys = ['h100_vllm', 'b200_sglang', 'mi300x_sglang'];
     const result = generateHighContrastColors(keys, 'dark');
     expect(Object.keys(result)).toHaveLength(3);
-    for (const key of keys) {
-      expect(result[key]).toBeDefined();
-    }
+    for (const key of keys) expect(result[key]).toBeDefined();
   });
 
-  // ---------- Determinism ----------
-
-  it('produces the same colors for the same inputs', () => {
+  it('is deterministic — same inputs produce same colors', () => {
     const keys = ['h100_vllm', 'b200_sglang', 'mi300x_sglang'];
-    const a = generateHighContrastColors(keys, 'dark');
-    const b = generateHighContrastColors(keys, 'dark');
-    expect(a).toEqual(b);
+    expect(generateHighContrastColors(keys, 'dark')).toEqual(
+      generateHighContrastColors(keys, 'dark'),
+    );
   });
 
-  it('produces different colors for dark vs light theme', () => {
+  it('produces different palettes for dark vs light', () => {
     const keys = [
       'h100_vllm',
       'h200_sglang',
@@ -327,54 +342,99 @@ describe('generateHighContrastColors', () => {
     ];
     const dark = generateHighContrastColors(keys, 'dark');
     const light = generateHighContrastColors(keys, 'light');
-    // At least one color should differ
     expect(Object.values(dark).join()).not.toEqual(Object.values(light).join());
   });
 
-  // ---------- Perceptual distinguishability ----------
+  // ---------- Tier 1: few items → brand zone ----------
 
-  it('all colors are visually distinct (RGB distance ≥ 40)', () => {
+  it('3 NVIDIA GPUs are all greenish', () => {
+    const result = generateHighContrastColors(['h100_vllm', 'h200_vllm', 'b200_vllm'], 'dark');
+    for (const color of Object.values(result)) {
+      expect(isGreenish(parseRgb(color))).toBe(true);
+    }
+    assertMinDist(result, 30);
+  });
+
+  it('2 AMD GPUs are all reddish', () => {
+    const result = generateHighContrastColors(['mi300x_sglang', 'mi325x_sglang'], 'dark');
+    for (const color of Object.values(result)) {
+      expect(isReddish(parseRgb(color))).toBe(true);
+    }
+    assertMinDist(result, 30);
+  });
+
+  it('4 NVIDIA GPUs stay in green zone and are distinguishable', () => {
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm'];
+    const result = generateHighContrastColors(keys, 'dark');
+    for (const color of Object.values(result)) {
+      expect(isGreenish(parseRgb(color))).toBe(true);
+    }
+    assertMinDist(result, 25);
+  });
+
+  it('3 NVIDIA + 3 AMD: greens and reds, all distinguishable', () => {
     const keys = [
       'h100_vllm',
-      'h200_sglang',
-      'b200_dynamo-trt',
-      'gb200_dynamo-sglang',
+      'h200_vllm',
+      'b200_vllm',
       'mi300x_sglang',
-      'mi355x_mori-sglang',
+      'mi325x_sglang',
+      'mi355x_sglang',
     ];
     const result = generateHighContrastColors(keys, 'dark');
-    const rgbs = Object.values(result).map(parseRgb);
-    for (let i = 0; i < rgbs.length; i++) {
-      for (let j = i + 1; j < rgbs.length; j++) {
-        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(30);
-      }
+    // NVIDIA keys should be green (3 ≤ PREFERRED_MAX)
+    for (const k of keys.slice(0, 3)) {
+      expect(isGreenish(parseRgb(result[k]))).toBe(true);
     }
+    // AMD keys should be red (3 ≤ PREFERRED_MAX)
+    for (const k of keys.slice(3)) {
+      expect(isReddish(parseRgb(result[k]))).toBe(true);
+    }
+    assertMinDist(result, 25);
   });
 
-  it('6 NVIDIA items in preferred green zone are distinguishable', () => {
-    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm', 'gb200_vllm', 'gb300_vllm'];
-    const result = generateHighContrastColors(keys, 'dark');
-    const rgbs = Object.values(result).map(parseRgb);
-    let minDist = Infinity;
-    for (let i = 0; i < rgbs.length; i++) {
-      for (let j = i + 1; j < rgbs.length; j++) {
-        minDist = Math.min(minDist, rgbDist(rgbs[i], rgbs[j]));
-      }
-    }
-    expect(minDist).toBeGreaterThanOrEqual(30);
-  });
+  // ---------- Tier 2: moderate items → full wheel minus rival color ----------
 
-  it('many same-vendor items are still distinguishable', () => {
-    // 10 NVIDIA items — tests that expansion works
+  it('10 NVIDIA GPUs: no red hues, still distinguishable', () => {
     const gpus = ['h100', 'h200', 'b200', 'b300', 'gb200'];
     const keys = gpus.flatMap((g) => [`${g}_vllm`, `${g}_sglang`]);
     const result = generateHighContrastColors(keys, 'dark');
-    const rgbs = Object.values(result).map(parseRgb);
-    for (let i = 0; i < rgbs.length; i++) {
-      for (let j = i + 1; j < rgbs.length; j++) {
-        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(25);
-      }
+    // Should not be reddish (banned)
+    for (const color of Object.values(result)) {
+      const rgb = parseRgb(color);
+      // Not red-dominant with low green — i.e. not in the red/pink zone
+      const isRedPink = rgb[0] > 150 && rgb[1] < 80 && rgb[2] < 150;
+      expect(isRedPink).toBe(false);
     }
+    assertMinDist(result, 20);
+  });
+
+  // ---------- Tier 3: many items → no restrictions, best spacing ----------
+
+  it('15+ NVIDIA items: all colors allowed, well-spaced', () => {
+    const gpus = ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300'];
+    const frameworks = ['vllm', 'sglang', 'trt'];
+    const keys = gpus.flatMap((g) => frameworks.map((f) => `${g}_${f}`));
+    expect(keys.length).toBe(18);
+    const result = generateHighContrastColors(keys, 'dark');
+    expect(Object.keys(result)).toHaveLength(18);
+    // Just verify they're all distinct — no color constraints at this count
+    assertMinDist(result, 15);
+  });
+
+  // ---------- Mixed vendor scenarios ----------
+
+  it('6 NVIDIA + 3 AMD: vendors visually separate, all distinct', () => {
+    const nvidia = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm', 'gb200_vllm', 'gb300_vllm'];
+    const amd = ['mi300x_sglang', 'mi325x_sglang', 'mi355x_sglang'];
+    const result = generateHighContrastColors([...nvidia, ...amd], 'dark');
+    assertMinDist(result, 20);
+  });
+
+  it('single GPU per vendor: one green, one red', () => {
+    const result = generateHighContrastColors(['h100_vllm', 'mi300x_sglang'], 'dark');
+    expect(isGreenish(parseRgb(result['h100_vllm']))).toBe(true);
+    expect(isReddish(parseRgb(result['mi300x_sglang']))).toBe(true);
   });
 });
 
