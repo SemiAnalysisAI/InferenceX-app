@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '24'
           cache: pnpm
-      - uses: browser-actions/setup-firefox@6d143ba54fa4f34583c4071d6f1e07bad7a90e52 # v1.7.1
+      - uses: browser-actions/setup-firefox@fcf821c621167805dd63a29662bd7cb5676c81a8 # v1.7.1
         if: matrix.browser == 'firefox'
         with:
           firefox-version: latest
