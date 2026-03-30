@@ -127,6 +127,7 @@ export function InferenceProvider({
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
   );
+  const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
   const [userCosts, setUserCosts] = useState<{ [gpuKey: string]: number | undefined } | null>(null);
   const [userPowers, setUserPowers] = useState<{ [gpuKey: string]: number | undefined } | null>(
     null,
@@ -603,6 +604,7 @@ export function InferenceProvider({
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
+      i_linelabel: showLineLabels ? '1' : '',
     },
     [
       selectedYAxisMetric,
@@ -619,6 +621,7 @@ export function InferenceProvider({
       isLegendExpanded,
       useAdvancedLabels,
       showGradientLabels,
+      showLineLabels,
     ],
   );
 
@@ -812,6 +815,8 @@ export function InferenceProvider({
       setUseAdvancedLabels,
       showGradientLabels,
       setShowGradientLabels,
+      showLineLabels,
+      setShowLineLabels,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -863,6 +868,7 @@ export function InferenceProvider({
       isLegendExpanded,
       useAdvancedLabels,
       showGradientLabels,
+      showLineLabels,
       userCosts,
       userPowers,
       trackedConfigs,

@@ -209,6 +209,8 @@ export function createMockInferenceContext(
     setUseAdvancedLabels: namedStub('setUseAdvancedLabels'),
     showGradientLabels: false,
     setShowGradientLabels: namedStub('setShowGradientLabels'),
+    showLineLabels: false,
+    setShowLineLabels: namedStub('setShowLineLabels'),
     selectedGPUs: [],
     setSelectedGPUs: namedStub('setSelectedGPUs'),
     availableGPUs: [

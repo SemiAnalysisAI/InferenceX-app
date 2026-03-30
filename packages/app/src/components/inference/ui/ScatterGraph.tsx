@@ -109,6 +109,8 @@ const ScatterGraph = React.memo(
       setUseAdvancedLabels,
       showGradientLabels,
       setShowGradientLabels,
+      showLineLabels,
+      setShowLineLabels,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -516,6 +518,15 @@ const ScatterGraph = React.memo(
             if (!isRooflineVisible(this)) return 0;
             return this.getAttribute('data-hw-key') === hwKey ? null : '0.15';
           });
+        root
+          .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
+          .transition('legend-hover')
+          .duration(150)
+          .style('opacity', function () {
+            const hw = (this as SVGGElement).getAttribute('data-hw-key');
+            if (!hw) return 0;
+            return hw === hwKey ? 1 : 0;
+          });
       },
       [isPointVisible, isRooflineVisible],
     );
@@ -536,7 +547,19 @@ const ScatterGraph = React.memo(
         .style('opacity', function () {
           return isRooflineVisible(this) ? 1 : 0;
         });
-    }, [isPointVisible, isRooflineVisible]);
+      root
+        .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
+        .transition('legend-hover')
+        .duration(150)
+        .style('opacity', function () {
+          const hw = (this as SVGGElement).getAttribute('data-hw-key');
+          const prec = (this as SVGGElement).getAttribute('data-precision');
+          if (!hw) return 0;
+          // Line labels have no precision attr — always visible if hw is active
+          if (!prec) return effectiveActiveHwTypes.has(hw) ? 1 : 0;
+          return effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(prec) ? 1 : 0;
+        });
+    }, [isPointVisible, isRooflineVisible, effectiveActiveHwTypes, selectedPrecisions]);
 
     // --- Zoom config ---
     const eventPrefix = chartDefinition.chartType === 'e2e' ? 'latency' : 'interactivity';
@@ -845,6 +868,192 @@ const ScatterGraph = React.memo(
                 .attr('height', bbox.height + py * 2)
                 .attr('fill', d.color);
             });
+
+          // ── Line labels (run name along each roofline) ──
+          type LineLabel = {
+            key: string;
+            hw: string;
+            label: string;
+            color: string;
+            x: number;
+            y: number;
+            visible: boolean;
+          };
+          const lineLabels: LineLabel[] = [];
+
+          if (showLineLabels) {
+            const isInteractivity = chartDefinition.chartType === 'interactivity';
+            const LABEL_H = 18;
+            const LABEL_W = 120; // approximate label width for overlap check
+
+            if (isInteractivity) {
+              // Greedy placement: try top-left → midpoint → right-side → hide
+              const placed: { x: number; y: number }[] = [];
+
+              const collides = (cx: number, cy: number) =>
+                placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+
+              // Deduplicate by hw key — pick the roofline with most points per hw
+              const bestByHw = new Map<string, (typeof entries)[0]>();
+              for (const e of entries) {
+                if (!e.visible || e.points.length < 2) continue;
+                const prev = bestByHw.get(e.hw);
+                if (!prev || e.points.length > prev.points.length) bestByHw.set(e.hw, e);
+              }
+
+              // Sort entries by highest y-value first (top of chart) for priority
+              const sorted = [...bestByHw.values()].sort((a, b) => {
+                const ay = yScale(a.points[0].y);
+                const by = yScale(b.points[0].y);
+                return ay - by; // smaller pixel y = higher on chart
+              });
+
+              for (const entry of sorted) {
+                const pts = entry.points;
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)], // top-left (near start)
+                  pts[Math.floor(pts.length / 2)], // midpoint
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))], // right-third
+                  pts[pts.length - 1], // endpoint
+                ];
+
+                const { label } = parseHwKeyToLabel(entry.hw);
+                let foundPlacement = false;
+                for (const pt of candidates) {
+                  const px = xScale(pt.x);
+                  const py = yScale(pt.y);
+                  if (!collides(px, py)) {
+                    lineLabels.push({
+                      key: entry.key,
+                      hw: entry.hw,
+                      label,
+                      color: getCssColor(resolveColor(entry.hw)),
+                      x: px,
+                      y: py,
+                      visible: true,
+                    });
+                    placed.push({ x: px, y: py });
+                    foundPlacement = true;
+                    break;
+                  }
+                }
+                // If all candidates collide, hide this label
+                if (!foundPlacement) {
+                  const pt = pts[0];
+                  lineLabels.push({
+                    key: entry.key,
+                    hw: entry.hw,
+                    label,
+                    color: getCssColor(resolveColor(entry.hw)),
+                    x: xScale(pt.x),
+                    y: yScale(pt.y),
+                    visible: false,
+                  });
+                }
+              }
+
+              // Also add hidden entries for non-visible hw (so D3 data-join is clean)
+              const labeledHw = new Set(lineLabels.map((l) => l.hw));
+              for (const entry of entries) {
+                if (entry.points.length >= 2 && !labeledHw.has(entry.hw)) {
+                  const { label } = parseHwKeyToLabel(entry.hw);
+                  lineLabels.push({
+                    key: entry.key,
+                    hw: entry.hw,
+                    label,
+                    color: getCssColor(resolveColor(entry.hw)),
+                    x: xScale(entry.points[0].x),
+                    y: yScale(entry.points[0].y),
+                    visible: false,
+                  });
+                  labeledHw.add(entry.hw);
+                }
+              }
+            } else {
+              // TTFT / E2EL: endpoint labels, one per hw key
+              const seenHw = new Set<string>();
+              for (const entry of entries) {
+                if (entry.points.length < 2 || seenHw.has(entry.hw)) continue;
+                seenHw.add(entry.hw);
+                const pt = entry.points[entry.points.length - 1];
+                const { label } = parseHwKeyToLabel(entry.hw);
+                lineLabels.push({
+                  key: entry.key,
+                  hw: entry.hw,
+                  label,
+                  color: getCssColor(resolveColor(entry.hw)),
+                  x: xScale(pt.x),
+                  y: yScale(pt.y),
+                  visible: entry.visible,
+                });
+              }
+              const visible = lineLabels.filter((l) => l.visible);
+              if (visible.length > 1) {
+                const yRange = yScale.range();
+                const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
+                const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
+                visible.sort((a, b) => a.y - b.y);
+                for (let pass = 0; pass < 5; pass++) {
+                  for (let i = 1; i < visible.length; i++) {
+                    const overlap = visible[i - 1].y + LABEL_H - visible[i].y;
+                    if (overlap > 0) {
+                      const half = overlap / 2;
+                      visible[i - 1].y -= half;
+                      visible[i].y += half;
+                    }
+                  }
+                  for (const l of visible) {
+                    l.y = Math.max(top, Math.min(bottom, l.y));
+                  }
+                }
+              }
+            }
+          }
+
+          zoomGroup
+            .selectAll<SVGGElement, LineLabel>('.line-label')
+            .data(lineLabels, (d) => d.key)
+            .join(
+              (enter) => {
+                const g = enter
+                  .append('g')
+                  .attr('class', 'line-label')
+                  .style('pointer-events', 'none')
+                  .attr('transform', (d) => `translate(${d.x},${d.y})`);
+                g.append('rect')
+                  .attr('class', 'll-bg')
+                  .attr('rx', 4)
+                  .attr('ry', 4)
+                  .attr('opacity', 0.95);
+                g.append('text')
+                  .attr('class', 'll-text')
+                  .attr('text-anchor', 'start')
+                  .attr('dominant-baseline', 'central')
+                  .attr('fill', 'white')
+                  .attr('font-size', '10px')
+                  .attr('font-weight', '600');
+                return g;
+              },
+              (update) => update,
+              (exit) => exit.remove(),
+            )
+            .attr('data-line-key', (d) => d.key)
+            .attr('data-hw-key', (d) => d.hw)
+            .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
+            .style('opacity', (d) => (d.visible ? 1 : 0))
+            .each(function (d) {
+              const g = d3.select(this);
+              const text = g.select<SVGTextElement>('.ll-text').text(d.label);
+              const bbox = (text.node() as SVGTextElement).getBBox();
+              const px = 5;
+              const py = 3;
+              g.select('.ll-bg')
+                .attr('x', bbox.x - px)
+                .attr('y', bbox.y - py)
+                .attr('width', bbox.width + px * 2)
+                .attr('height', bbox.height + py * 2)
+                .attr('fill', d.color);
+            });
         },
         onZoom: (zoomGroup, ctx) => {
           const newXScale = ctx.newXScale as ContinuousScale;
@@ -912,6 +1121,114 @@ const ScatterGraph = React.memo(
                 }
               });
             });
+          }
+
+          // Update line label positions on zoom
+          if (showLineLabels) {
+            const isInteractivity = chartDefinition.chartType === 'interactivity';
+            const LABEL_H = 18;
+            const LABEL_W = 120;
+
+            if (isInteractivity) {
+              // Re-run greedy placement with zoomed scales
+              const placed: { x: number; y: number }[] = [];
+              const collides = (cx: number, cy: number) =>
+                placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+
+              // Deduplicate by hw key — pick roofline with most points per hw
+              const bestByHw = new Map<string, [string, InferenceData[]]>();
+              for (const [key, pts] of Object.entries(rooflines)) {
+                if (pts.length < 2) continue;
+                const hw = key.split('_').slice(0, -1).join('_');
+                const prec = key.split('_').pop()!;
+                if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisions.includes(prec)) continue;
+                const prev = bestByHw.get(hw);
+                if (!prev || pts.length > prev[1].length) bestByHw.set(hw, [key, pts]);
+              }
+              const visibleEntries = [...bestByHw.values()].sort(
+                ([, a], [, b]) => newYScale(a[0].y) - newYScale(b[0].y),
+              );
+
+              const zoomResults = new Map<string, { x: number; y: number; vis: boolean }>();
+              for (const [key, pts] of visibleEntries) {
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)],
+                  pts[Math.floor(pts.length / 2)],
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                  pts[pts.length - 1],
+                ];
+                let found = false;
+                for (const pt of candidates) {
+                  const px = newXScale(pt.x);
+                  const py = newYScale(pt.y);
+                  if (!collides(px, py)) {
+                    zoomResults.set(key, { x: px, y: py, vis: true });
+                    placed.push({ x: px, y: py });
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  zoomResults.set(key, {
+                    x: newXScale(pts[0].x),
+                    y: newYScale(pts[0].y),
+                    vis: false,
+                  });
+                }
+              }
+
+              zoomGroup.selectAll<SVGGElement, unknown>('.line-label').each(function () {
+                const el = d3.select(this);
+                const k = el.attr('data-line-key');
+                const zl = zoomResults.get(k);
+                if (zl) {
+                  el.attr('transform', `translate(${zl.x + 8},${zl.y - 14})`);
+                  el.style('opacity', zl.vis ? 1 : 0);
+                } else {
+                  el.style('opacity', 0);
+                }
+              });
+            } else {
+              // TTFT / E2EL: endpoint with bidirectional nudge, one per hw
+              type ZoomLabel = { key: string; x: number; y: number };
+              const zoomLabels: ZoomLabel[] = [];
+              const seenHw = new Set<string>();
+              Object.entries(rooflines).forEach(([key, pts]) => {
+                if (pts.length < 2) return;
+                const hw = key.split('_').slice(0, -1).join('_');
+                if (seenHw.has(hw)) return;
+                seenHw.add(hw);
+                const pt = pts[pts.length - 1];
+                zoomLabels.push({ key, x: newXScale(pt.x), y: newYScale(pt.y) });
+              });
+              if (zoomLabels.length > 1) {
+                const yRange = newYScale.range();
+                const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
+                const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
+                zoomLabels.sort((a, b) => a.y - b.y);
+                for (let pass = 0; pass < 5; pass++) {
+                  for (let i = 1; i < zoomLabels.length; i++) {
+                    const overlap = zoomLabels[i - 1].y + LABEL_H - zoomLabels[i].y;
+                    if (overlap > 0) {
+                      const half = overlap / 2;
+                      zoomLabels[i - 1].y -= half;
+                      zoomLabels[i].y += half;
+                    }
+                  }
+                  for (const l of zoomLabels) {
+                    l.y = Math.max(top, Math.min(bottom, l.y));
+                  }
+                }
+              }
+              for (const zl of zoomLabels) {
+                const labelGroup = zoomGroup.select<SVGGElement>(
+                  `.line-label[data-line-key="${zl.key}"]`,
+                );
+                if (!labelGroup.empty()) {
+                  labelGroup.attr('transform', `translate(${zl.x + 8},${zl.y - 14})`);
+                }
+              }
+            }
           }
         },
       };
@@ -1147,6 +1464,7 @@ const ScatterGraph = React.memo(
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
+      showLineLabels,
       gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
@@ -1165,6 +1483,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      chartDefinition.chartType,
     ]);
 
     // --- onRender: tracked rings, CSS transitions, log tick formatting, dblclick ---
@@ -1487,6 +1806,15 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setShowGradientLabels(checked);
                   track('latency_gradient_labels_toggled', { enabled: checked });
+                },
+              },
+              {
+                id: 'scatter-line-labels',
+                label: 'Line Labels',
+                checked: showLineLabels,
+                onCheckedChange: (checked: boolean) => {
+                  setShowLineLabels(checked);
+                  track('latency_line_labels_toggled', { enabled: checked });
                 },
               },
             ]}
