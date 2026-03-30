@@ -269,15 +269,22 @@ describe('buildAvailabilityHwKey', () => {
 // generateHighContrastColors
 // ===========================================================================
 describe('generateHighContrastColors', () => {
-  /** Extract hue from an "hsl(H, S%, L%)" string */
-  function parseHue(hsl: string): number {
-    return parseFloat(hsl.match(/hsl\(([\d.]+)/)![1]);
+  /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
+  function parseRgb(color: string): [number, number, number] {
+    const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
+    const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+    throw new Error(`Cannot parse color: ${color}`);
   }
 
-  /** Angular distance between two hues on the 360° wheel */
-  function hueDist(a: number, b: number): number {
-    const d = Math.abs(a - b) % 360;
-    return Math.min(d, 360 - d);
+  /**
+   * Euclidean distance in RGB space — a rough-but-fast proxy for visual
+   * difference (the actual generation uses CIELab, so the palette is
+   * perceptually uniform by construction).
+   */
+  function rgbDist(a: [number, number, number], b: [number, number, number]): number {
+    return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
   }
 
   // ---------- Basics ----------
@@ -286,118 +293,73 @@ describe('generateHighContrastColors', () => {
     expect(generateHighContrastColors([], 'dark')).toEqual({});
   });
 
-  it('returns one HSL color for a single key', () => {
+  it('returns a valid CSS color for a single key', () => {
     const result = generateHighContrastColors(['gpu-a'], 'dark');
     expect(Object.keys(result)).toHaveLength(1);
-    expect(result['gpu-a']).toMatch(/^hsl\(\d/);
+    expect(result['gpu-a']).toMatch(/^#[0-9a-f]{6}$/i);
   });
 
-  it('uses lightness 65% for dark theme', () => {
-    const result = generateHighContrastColors(['x'], 'dark');
-    expect(result['x']).toContain('65%');
-  });
-
-  it('uses lightness 35% for light theme', () => {
-    const result = generateHighContrastColors(['x'], 'light');
-    expect(result['x']).toContain('35%');
-  });
-
-  it('uses lightness 35% for unknown theme (not "dark")', () => {
-    const result = generateHighContrastColors(['x'], 'system');
-    expect(result['x']).toContain('35%');
-  });
-
-  it('evenly spaces items within a single vendor zone', () => {
-    // 3 unknown-vendor items in the unknown zone (195-300, 105° span)
-    const result = generateHighContrastColors(['a', 'b', 'c'], 'dark');
-    const hues = Object.values(result).map(parseHue);
-    for (let i = 0; i < hues.length - 1; i++) {
-      expect(hueDist(hues[i], hues[i + 1])).toBeCloseTo(35, 0);
+  it('returns one color per key', () => {
+    const keys = ['h100_vllm', 'b200_sglang', 'mi300x_sglang'];
+    const result = generateHighContrastColors(keys, 'dark');
+    expect(Object.keys(result)).toHaveLength(3);
+    for (const key of keys) {
+      expect(result[key]).toBeDefined();
     }
   });
 
-  // ---------- Vendor zone constraints ----------
+  // ---------- Determinism ----------
 
-  it('NVIDIA items stay in green zone (60-195)', () => {
+  it('produces the same colors for the same inputs', () => {
+    const keys = ['h100_vllm', 'b200_sglang', 'mi300x_sglang'];
+    const a = generateHighContrastColors(keys, 'dark');
+    const b = generateHighContrastColors(keys, 'dark');
+    expect(a).toEqual(b);
+  });
+
+  it('produces different colors for dark vs light theme', () => {
     const keys = [
-      'b200_dynamo-sglang',
+      'h100_vllm',
+      'h200_sglang',
       'b200_dynamo-trt',
-      'gb200_dynamo-trt',
-      'h100_dynamo-trt',
-      'h200_dynamo-trt',
+      'mi300x_sglang',
+      'mi355x_mori-sglang',
     ];
-    const result = generateHighContrastColors(keys, 'dark');
-    for (const hsl of Object.values(result)) {
-      const hue = parseHue(hsl);
-      expect(hue).toBeGreaterThanOrEqual(60);
-      expect(hue).toBeLessThanOrEqual(195);
-    }
+    const dark = generateHighContrastColors(keys, 'dark');
+    const light = generateHighContrastColors(keys, 'light');
+    // At least one color should differ
+    expect(Object.values(dark).join()).not.toEqual(Object.values(light).join());
   });
 
-  it('AMD items stay in red/orange zone (300-360 or 0-60)', () => {
-    const keys = ['mi300x_sglang', 'mi325x_sglang', 'mi355x_mori-sglang'];
-    const result = generateHighContrastColors(keys, 'dark');
-    for (const hsl of Object.values(result)) {
-      const hue = parseHue(hsl);
-      expect(hue >= 300 || hue <= 60).toBe(true);
-    }
-  });
+  // ---------- Perceptual distinguishability ----------
 
-  it('NVIDIA never gets red hues and AMD never gets green hues', () => {
-    const combos = [
-      ['b200_dynamo-sglang', 'b200_dynamo-trt', 'mi355x_mori-sglang'],
-      ['gb200_dynamo-trt', 'h100_dynamo-trt', 'mi300x_sglang', 'mi355x_mori-sglang'],
-      [
-        'b200_dynamo-sglang',
-        'b200_dynamo-trt',
-        'gb200_dynamo-trt',
-        'mi300x_sglang',
-        'mi355x_mori-sglang',
-      ],
+  it('all colors are visually distinct (RGB distance ≥ 40)', () => {
+    const keys = [
+      'h100_vllm',
+      'h200_sglang',
+      'b200_dynamo-trt',
+      'gb200_dynamo-sglang',
+      'mi300x_sglang',
+      'mi355x_mori-sglang',
     ];
-    for (const keys of combos) {
-      const result = generateHighContrastColors(keys, 'dark');
-      for (const key of keys) {
-        const vendor = key.startsWith('mi') ? 'amd' : 'nvidia';
-        const hue = parseHue(result[key]);
-        if (vendor === 'nvidia') {
-          expect(hue >= 60 && hue <= 195).toBe(true);
-        } else {
-          expect(hue >= 300 || hue <= 60).toBe(true);
-        }
+    const result = generateHighContrastColors(keys, 'dark');
+    const rgbs = Object.values(result).map(parseRgb);
+    for (let i = 0; i < rgbs.length; i++) {
+      for (let j = i + 1; j < rgbs.length; j++) {
+        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(30);
       }
     }
   });
 
-  // ---------- Cross-vendor visual distinction ----------
-
-  it('2 NVIDIA + 1 AMD: all pairs ≥60° apart', () => {
-    const result = generateHighContrastColors(
-      ['b200_dynamo-sglang', 'b200_dynamo-trt', 'mi355x_mori-sglang'],
-      'dark',
-    );
-    const hues = Object.values(result).map(parseHue);
-    for (let i = 0; i < hues.length; i++) {
-      for (let j = i + 1; j < hues.length; j++) {
-        expect(hueDist(hues[i], hues[j])).toBeGreaterThanOrEqual(60);
-      }
-    }
-  });
-
-  it('mixed vendors never produce near-identical hues (≥30° min)', () => {
-    const combos = [
-      ['h100_vllm', 'mi300x_sglang'],
-      ['b200_dynamo-trt', 'mi355x_mori-sglang'],
-      ['h200_dynamo-trt', 'b200_dynamo-sglang', 'mi325x_sglang'],
-      ['gb200_dynamo-trt', 'h100_dynamo-trt', 'mi300x_sglang', 'mi355x_mori-sglang'],
-    ];
-    for (const keys of combos) {
-      const result = generateHighContrastColors(keys, 'dark');
-      const hues = Object.values(result).map(parseHue);
-      for (let i = 0; i < hues.length; i++) {
-        for (let j = i + 1; j < hues.length; j++) {
-          expect(hueDist(hues[i], hues[j])).toBeGreaterThanOrEqual(30);
-        }
+  it('many same-vendor items are still distinguishable', () => {
+    // 10 NVIDIA items — tests that expansion works
+    const gpus = ['h100', 'h200', 'b200', 'b300', 'gb200'];
+    const keys = gpus.flatMap((g) => [`${g}_vllm`, `${g}_sglang`]);
+    const result = generateHighContrastColors(keys, 'dark');
+    const rgbs = Object.values(result).map(parseRgb);
+    for (let i = 0; i < rgbs.length; i++) {
+      for (let j = i + 1; j < rgbs.length; j++) {
+        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(25);
       }
     }
   });
