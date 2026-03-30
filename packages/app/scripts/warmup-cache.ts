@@ -74,14 +74,55 @@ async function warmupCaches() {
     await Promise.all(historyPaths.slice(i, i + 4).map((p) => hit(p)));
   }
 
-  // --- Workflow info for recent dates ---
-  console.log('\nWorkflow info (last 3 dates):');
-  const today = new Date();
-  for (let i = 0; i < 3; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const date = d.toISOString().split('T')[0];
-    await hit(`/api/v1/workflow-info?date=${date}`);
+  // --- Discover all available dates from the availability endpoint ---
+  let availableDates: string[] = [];
+  try {
+    const res = await fetch(`${origin}/api/v1/availability`);
+    if (res.ok) {
+      const rows = (await res.json()) as { date: string }[];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 60);
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+      availableDates = [...new Set(rows.map((r) => r.date))]
+        .filter((d) => d >= cutoffStr)
+        .sort()
+        .reverse();
+    }
+  } catch {
+    // fall through — dates will be empty, skip date-specific sections
+  }
+
+  // --- Benchmarks per model × date (exact) ---
+  if (availableDates.length > 0) {
+    console.log('\nBenchmarks per model × date (exact):');
+    const datePaths: string[] = [];
+    for (const model of MODELS) {
+      for (const date of availableDates) {
+        datePaths.push(
+          `/api/v1/benchmarks?model=${encodeURIComponent(model)}&date=${date}&exact=true`,
+        );
+      }
+    }
+    for (let i = 0; i < datePaths.length; i += 4) {
+      await Promise.all(datePaths.slice(i, i + 4).map((p) => hit(p)));
+    }
+  }
+
+  // --- Workflow info for all available dates ---
+  if (availableDates.length > 0) {
+    console.log(`\nWorkflow info (${availableDates.length} dates from availability):`);
+    for (const date of availableDates) {
+      await hit(`/api/v1/workflow-info?date=${date}`);
+    }
+  } else {
+    console.log('\nWorkflow info (fallback — last 3 dates):');
+    const today = new Date();
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const date = d.toISOString().split('T')[0];
+      await hit(`/api/v1/workflow-info?date=${date}`);
+    }
   }
 
   const elapsed = ((performance.now() - start) / 1000).toFixed(1);
