@@ -1,6 +1,8 @@
 import { revalidateTag } from 'next/cache';
 import { unstable_cache } from 'next/cache';
 
+import { JSON_MODE } from '@semianalysisai/inferencex-db/connection';
+
 import { blobGet, blobPurge, blobSet } from './blob-cache';
 
 interface CachedQueryOptions {
@@ -11,12 +13,16 @@ interface CachedQueryOptions {
 /**
  * Cache a function's result using unstable_cache (fast, local).
  * Set `blobOnly: true` for payloads known to exceed Next.js's 2MB unstable_cache limit.
+ * In JSON_MODE, skip all caching — data is already in memory.
  */
 export function cachedQuery<T, Args extends unknown[]>(
   fn: (...args: Args) => Promise<T>,
   keyPrefix: string,
   options?: CachedQueryOptions,
 ): (...args: Args) => Promise<T> {
+  // JSON dump mode: data is in-memory, no blob/cache needed
+  if (JSON_MODE) return fn;
+
   if (options?.blobOnly) {
     return async (...args: Args): Promise<T> => {
       const blobKey = args.length > 0 ? `${keyPrefix}:${args.join(':')}` : keyPrefix;

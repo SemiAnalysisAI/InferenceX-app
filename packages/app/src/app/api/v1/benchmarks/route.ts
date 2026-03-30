@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import { getLatestBenchmarks } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
@@ -10,8 +11,8 @@ export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarks = cachedQuery(
   async (dbModelKey: string, date?: string, exact?: boolean) => {
-    const sql = getDb();
-    return getLatestBenchmarks(sql, dbModelKey, date, exact);
+    if (JSON_MODE) return jsonProvider.getLatestBenchmarks(dbModelKey, date, exact);
+    return getLatestBenchmarks(getDb(), dbModelKey, date, exact);
   },
   'benchmarks',
   { blobOnly: true },

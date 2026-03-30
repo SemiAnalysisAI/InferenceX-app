@@ -6,6 +6,7 @@
   "exports": {
     "./connection": "./src/connection.ts",
     "./etl/*": "./src/etl/*.ts",
+    "./json-provider": "./src/json-provider.ts",
     "./migrate": "./src/migrate.ts",
     "./queries/*": "./src/queries/*.ts"
   },
