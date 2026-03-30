@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 
 export type NeonClient = ReturnType<typeof neon>;
 
-/** True when running off a JSON dump directory instead of a live database. */
+/** True when running off a JSON dump directory instead of a live database (local dev only). */
 export const JSON_MODE = !process.env.DATABASE_READONLY_URL && !!process.env.DUMP_DIR;
 
 let cached: NeonClient | null = null;
