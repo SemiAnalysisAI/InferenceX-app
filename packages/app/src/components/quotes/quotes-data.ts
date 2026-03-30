@@ -309,6 +309,14 @@ export const QUOTES: Quote[] = [
     logo: 'lambda.svg',
     link: 'https://www.linkedin.com/in/sbalaban/',
   },
+  {
+    text: 'When we introduced DistServe, the thesis was simple: split prefill and decode and optimize each on its own terms. Eighteen months later, disaggregation is the default architecture across the industry. InferenceX\u2122 is the benchmark that comparing disaggregated and aggregated serving across the whole pareto curve. InferenceX shows exactly when and where P/D separation pays off in TTFT, TPOT, throughput, and cost.',
+    name: 'Hao Zhang',
+    title: 'Assistant Professor, UC San Diego & Co-Creator of DistServe, vLLM, and FastVideo',
+    org: 'UC San Diego',
+    logo: 'uc-san-diego.svg',
+    link: 'https://haozhang.ai/',
+  },
 ];
 
 /** Orgs featured in the landing page carousel. */
@@ -332,10 +340,12 @@ export const CAROUSEL_ORGS = [
   'Hugging Face',
   'UC Berkeley',
   'Lambda',
+  'UC San Diego',
 ] as const;
 
 /** Display label overrides for carousel orgs. */
 export const CAROUSEL_LABELS: Record<string, string> = {
   'Together AI': 'Tri Dao',
   'PyTorch Foundation': 'PyTorch',
+  'UC San Diego': 'Inventor of DistServe',
 };
