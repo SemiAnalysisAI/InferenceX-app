@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.28.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "@semianalysisai/inferencex-db": "workspace:*",
     "zod": "^4.3.6"
