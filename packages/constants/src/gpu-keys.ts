@@ -54,10 +54,12 @@ export const VENDOR_OKLCH_ZONES: Record<
 };
 
 /**
- * Exclusive HSL hue zones for high-contrast mode.
+ * Preferred HSL hue zones for high-contrast mode.
  * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
- * from different vendors are always visually distinct and vendor-appropriate
+ * from different vendors are visually distinct and vendor-appropriate
  * (NVIDIA = greens, AMD = reds/oranges, unknown = blues/purples).
+ * When a vendor has too many items to fit with sufficient spacing, the zone
+ * expands symmetrically — these are preferred zones, not hard constraints.
  *
  * Layout (360° wheel):
  *   NVIDIA:  60–195  (135°) — greens through cyans
