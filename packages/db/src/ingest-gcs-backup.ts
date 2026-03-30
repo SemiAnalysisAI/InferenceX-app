@@ -154,15 +154,27 @@ async function mapWorkflowDir(
   let headSha: string | undefined;
   let createdAt = `${dateDir}T00:00:00Z`;
 
+  // Build artifact-id → created_at index so we can sort ZIPs by creation time.
+  // When multiple artifacts map to the same DB config (e.g. same benchmark re-run
+  // across attempts on different runners), processing newest last ensures the
+  // ON CONFLICT DO UPDATE keeps the latest attempt's result.
+  const artifactCreatedAt = new Map<number, string>();
   const metaPath = path.join(artifactsPath, 'artifacts_metadata.json');
   if (fs.existsSync(metaPath)) {
     try {
       const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-      if (Array.isArray(meta) && meta[0]?.workflow_run?.id) {
-        githubRunId = meta[0].workflow_run.id;
-        headBranch = meta[0].workflow_run.head_branch ?? undefined;
-        headSha = meta[0].workflow_run.head_sha ?? undefined;
-        createdAt = meta[0].created_at ?? createdAt;
+      if (Array.isArray(meta)) {
+        for (const a of meta) {
+          if (typeof a?.id === 'number' && typeof a?.created_at === 'string') {
+            artifactCreatedAt.set(a.id, a.created_at);
+          }
+        }
+        if (meta[0]?.workflow_run?.id) {
+          githubRunId = meta[0].workflow_run.id;
+          headBranch = meta[0].workflow_run.head_branch ?? undefined;
+          headSha = meta[0].workflow_run.head_sha ?? undefined;
+          createdAt = meta[0].created_at ?? createdAt;
+        }
       }
     } catch {
       /* ignore malformed metadata */
@@ -229,8 +241,19 @@ async function mapWorkflowDir(
   }
 
   // ── Map benchmark ZIPs ────────────────────────────────────────────────────
+  // Sort bmk ZIPs by artifact created_at ascending so that when multiple
+  // artifacts map to the same DB conflict key, the newest is processed last
+  // and wins the ON CONFLICT DO UPDATE (latest-attempt-wins).
+  const sortedBmkZips = [...bmkZipFiles].sort((a, b) => {
+    const idA = a.match(/_(\d{10,})\.zip$/)?.[1];
+    const idB = b.match(/_(\d{10,})\.zip$/)?.[1];
+    const tsA = idA ? (artifactCreatedAt.get(Number(idA)) ?? '') : '';
+    const tsB = idB ? (artifactCreatedAt.get(Number(idB)) ?? '') : '';
+    return tsA.localeCompare(tsB);
+  });
+
   const bmkZips: WorkflowMapResult['bmkZips'] = [];
-  for (const zipFile of [...bmkZipFiles, ...resultZips]) {
+  for (const zipFile of [...sortedBmkZips, ...resultZips]) {
     const data = readZipJson(path.join(artifactsPath, zipFile));
     if (!data) {
       local.skips.badZip++;
