@@ -6,6 +6,7 @@ pre-commit:
       stage_fixed: true
 
     - name: format
+      glob: '*.{ts,tsx,js,jsx,json,css}'
       run: pnpm fmt:fix -- {staged_files}
       stage_fixed: true
 
