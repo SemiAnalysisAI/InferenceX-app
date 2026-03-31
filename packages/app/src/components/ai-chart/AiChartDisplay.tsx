@@ -101,6 +101,8 @@ export default function AiChartDisplay() {
                 placeholder={`${getProviderLabel(provider)} API Key`}
                 value={apiKey}
                 onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))}
+                data-ph-no-capture
+                autoComplete="off"
               />
               <button
                 type="button"
