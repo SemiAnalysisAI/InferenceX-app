@@ -65,7 +65,7 @@ export default function AiChartDisplay() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       {/* Title, description & API Key */}
       <Card>
         <CardHeader className="pb-4">
