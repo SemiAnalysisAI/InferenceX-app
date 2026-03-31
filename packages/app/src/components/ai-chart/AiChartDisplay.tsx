@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
@@ -23,33 +23,19 @@ import type { AiProvider } from './types';
 import { EXAMPLE_PROMPTS } from './example-prompts';
 import AiChartResult from './AiChartResult';
 
-const STORAGE_PREFIX = 'inferencex-ai-key-';
-
-function getStoredKey(provider: AiProvider): string {
-  if (typeof window === 'undefined') return '';
-  return sessionStorage.getItem(`${STORAGE_PREFIX}${provider}`) ?? '';
-}
-
-function storeKey(provider: AiProvider, key: string) {
-  if (typeof window === 'undefined') return;
-  if (key) {
-    sessionStorage.setItem(`${STORAGE_PREFIX}${provider}`, key);
-  } else {
-    sessionStorage.removeItem(`${STORAGE_PREFIX}${provider}`);
-  }
-}
-
 export default function AiChartDisplay() {
   const [provider, setProvider] = useState<AiProvider>('openai');
-  const [apiKey, setApiKey] = useState('');
+  const [apiKeys, setApiKeys] = useState<Record<AiProvider, string>>({
+    openai: '',
+    anthropic: '',
+    xai: '',
+    google: '',
+  });
   const [prompt, setPrompt] = useState('');
   const [showKey, setShowKey] = useState(false);
   const { result, isLoading, error, generate, reset } = useAiChart();
 
-  // Load stored key on provider change
-  useEffect(() => {
-    setApiKey(getStoredKey(provider));
-  }, [provider]);
+  const apiKey = apiKeys[provider];
 
   const handleProviderChange = useCallback((value: string) => {
     const newProvider = value as AiProvider;
@@ -59,7 +45,6 @@ export default function AiChartDisplay() {
 
   const handleSubmit = useCallback(() => {
     if (!apiKey.trim() || !prompt.trim()) return;
-    storeKey(provider, apiKey);
     track('ai_chart_prompt_submitted', { provider, prompt_length: prompt.length });
     generate(prompt, provider, apiKey);
   }, [apiKey, prompt, provider, generate]);
@@ -115,7 +100,7 @@ export default function AiChartDisplay() {
                 type={showKey ? 'text' : 'password'}
                 placeholder={`${getProviderLabel(provider)} API Key`}
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))}
               />
               <Button
                 variant="outline"
