@@ -108,7 +108,7 @@ export default function AiChartDisplay() {
                 onClick={() => setShowKey((s) => !s)}
                 aria-label={showKey ? 'Hide API key' : 'Show API key'}
               >
-                {showKey ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
           </div>
