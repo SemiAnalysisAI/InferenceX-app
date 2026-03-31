@@ -165,9 +165,12 @@ async function resetSequences(): Promise<void> {
 }
 
 async function load(): Promise<void> {
-  const dumpDir = resolve(process.argv[2] ?? '');
+  const args = process.argv.slice(2).filter((a) => a !== '--');
+  // INIT_CWD is the original cwd before pnpm --filter changes to packages/db/
+  const base = process.env.INIT_CWD ?? process.cwd();
+  const dumpDir = resolve(base, args[0] ?? '');
 
-  if (!process.argv[2]) {
+  if (!args[0]) {
     console.error('Usage: pnpm admin:db:load-dump <dump-dir> [--yes]');
     process.exit(1);
   }

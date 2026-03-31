@@ -9,7 +9,7 @@ export type Sql = ReturnType<typeof postgres>;
 /**
  * Create a postgres client for admin scripts.
  * Reads DATABASE_WRITE_URL by default, or DATABASE_READONLY_URL with `readonly: true`.
- * Respects DATABASE_NO_SSL=1 for local Postgres (no TLS).
+ * Respects DATABASE_NO_SSL=1 or --no-ssl flag for local Postgres (no TLS).
  */
 export function createAdminSql(
   opts: Omit<Options<Record<string, postgres.PostgresType>>, 'ssl'> & { readonly?: boolean } = {},
@@ -21,7 +21,7 @@ export function createAdminSql(
     console.error(`${envVar} is required`);
     process.exit(1);
   }
-  const noSsl = !!process.env.DATABASE_NO_SSL;
+  const noSsl = !!process.env.DATABASE_NO_SSL || process.argv.includes('--no-ssl');
   return postgres(url, { ...pgOpts, ssl: noSsl ? false : 'require' });
 }
 
