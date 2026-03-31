@@ -44,7 +44,11 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
   );
 
   const maxLabelLen = useMemo(() => Math.max(...data.map((d) => d.label.length), 0), [data]);
-  const bottomMargin = Math.max(50, Math.min(maxLabelLen * 4.5, 120));
+  const firstLabelLen = data[0]?.label.length ?? 0;
+  const sin32 = Math.sin((32 * Math.PI) / 180);
+  const charWidth = 6.5;
+  const bottomMargin = Math.max(50, Math.min(maxLabelLen * charWidth * sin32, 120));
+  const leftMargin = Math.max(60, Math.min(firstLabelLen * charWidth * sin32 + 20, 140));
 
   const xAxis = useMemo<AxisConfig>(
     () => ({
@@ -81,7 +85,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
       chartId="ai-chart-bar"
       data={data}
       height={450}
-      margin={{ top: 24, right: 10, bottom: bottomMargin, left: 60 }}
+      margin={{ top: 24, right: 10, bottom: bottomMargin, left: leftMargin }}
       xScale={xScale}
       yScale={yScale}
       xAxis={xAxis}
