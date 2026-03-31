@@ -11,9 +11,10 @@ import { resolve } from 'node:path';
 
 import { TABLE_INSERT_ORDER } from '@semianalysisai/inferencex-constants';
 
+import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 
-const sql = createAdminSql({ readonly: true, max: 1 });
+const sql = createAdminSql({ noSsl: hasNoSslFlag(), readonly: true, max: 1 });
 
 const CURSOR_BATCH = 100;
 

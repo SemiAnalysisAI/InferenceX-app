@@ -26,6 +26,7 @@ import path from 'path';
 
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
+import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
@@ -164,6 +165,7 @@ if (PURGED_RUNS.has(runIdNum)) {
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
 const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 5,
   idle_timeout: 60,
 });

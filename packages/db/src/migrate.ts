@@ -11,12 +11,13 @@
 import fs from 'fs';
 import path from 'path';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 
 const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
 const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {}, // suppress "relation already exists" notices
 });

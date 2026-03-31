@@ -30,7 +30,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
@@ -58,6 +58,7 @@ const CONCURRENCY = 20;
 const DB_CONCURRENCY = 10;
 
 const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 20,
   idle_timeout: 60,
 });

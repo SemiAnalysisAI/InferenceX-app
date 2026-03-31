@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
@@ -26,6 +26,7 @@ import { bulkIngestBenchmarkRows, bulkUpsertAvailability } from './etl/benchmark
 import { ingestEvalRow } from './etl/eval-ingest';
 
 const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 5,
   idle_timeout: 60,
 });

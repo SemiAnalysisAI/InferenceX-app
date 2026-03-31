@@ -12,9 +12,11 @@
 
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
+import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 
 const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });

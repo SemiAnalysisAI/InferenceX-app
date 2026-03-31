@@ -18,10 +18,10 @@ import { resolve } from 'node:path';
 
 import { TABLE_INSERT_ORDER, TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 
-const sql = createAdminSql({ max: 1 });
+const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1 });
 
 // Tables with serial/bigserial PKs that need sequence resets
 const SEQUENCES: Array<{ seq: string; table: string; col: string }> = [
@@ -185,7 +185,7 @@ async function load(): Promise<void> {
   console.log('=== db:load-dump ===\n');
   console.log(`  Source: ${dumpDir}`);
   console.log(`  Target: ${process.env.DATABASE_WRITE_URL?.replace(/:[^@]+@/, ':***@')}`);
-  console.log(`  SSL:    ${process.env.DATABASE_NO_SSL ? 'disabled' : 'required'}`);
+  console.log(`  SSL:    ${hasNoSslFlag() ? 'disabled' : 'required'}`);
   console.log();
 
   if (!hasYesFlag()) {

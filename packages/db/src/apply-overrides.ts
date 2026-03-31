@@ -10,11 +10,12 @@
  *   pnpm db:apply-overrides --yes      # skip confirmation
  */
 
-import { confirm, hasYesFlag } from './cli-utils.js';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './etl/run-overrides.js';
 
 const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });
