@@ -94,22 +94,22 @@ export default function AiChartDisplay() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-1 gap-2">
+            <div className="relative flex-1">
               <Input
-                className="flex-1"
+                className="pr-9"
                 type={showKey ? 'text' : 'password'}
                 placeholder={`${getProviderLabel(provider)} API Key`}
                 value={apiKey}
                 onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))}
               />
-              <Button
-                variant="outline"
-                size="icon"
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
                 onClick={() => setShowKey((s) => !s)}
                 aria-label={showKey ? 'Hide API key' : 'Show API key'}
               >
                 {showKey ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-              </Button>
+              </button>
             </div>
           </div>
 
