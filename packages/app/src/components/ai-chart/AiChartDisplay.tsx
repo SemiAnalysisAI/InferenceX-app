@@ -112,13 +112,7 @@ export default function AiChartDisplay() {
               </button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Prompt input */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-2">
+          <div className="mt-4 space-y-2">
             <Textarea
               placeholder="Describe the chart you want to see..."
               value={prompt}
