@@ -43,7 +43,22 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     [yMax],
   );
 
-  const xAxis = useMemo<AxisConfig>(() => ({ label: '' }), []);
+  const maxLabelLen = useMemo(() => Math.max(...data.map((d) => d.label.length), 0), [data]);
+  const bottomMargin = Math.max(50, Math.min(maxLabelLen * 4.5, 120));
+
+  const xAxis = useMemo<AxisConfig>(
+    () => ({
+      label: '',
+      customize: (g) => {
+        g.selectAll('text')
+          .attr('transform', 'rotate(-32)')
+          .attr('text-anchor', 'end')
+          .attr('dx', '-0.5em')
+          .attr('dy', '0.25em');
+      },
+    }),
+    [],
+  );
   const yAxis = useMemo<AxisConfig>(() => ({ label: spec.yAxisLabel }), [spec.yAxisLabel]);
 
   const layers = useMemo(() => {
@@ -66,6 +81,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
       chartId="ai-chart-bar"
       data={data}
       height={450}
+      margin={{ top: 24, right: 10, bottom: bottomMargin, left: 60 }}
       xScale={xScale}
       yScale={yScale}
       xAxis={xAxis}
