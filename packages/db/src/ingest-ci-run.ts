@@ -20,14 +20,13 @@
  */
 
 import { execSync } from 'child_process';
-import postgres from 'postgres';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
-import { refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
@@ -164,8 +163,7 @@ if (PURGED_RUNS.has(runIdNum)) {
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
-const sql = postgres(process.env.DATABASE_WRITE_URL!, {
-  ssl: 'require',
+const sql = createAdminSql({
   max: 5,
   idle_timeout: 60,
 });

@@ -10,17 +10,11 @@
  *   pnpm admin:db:verify
  */
 
-import postgres from 'postgres';
-
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
+import { createAdminSql } from './etl/db-utils';
 
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
   max: 1,
   onnotice: () => {},
 });

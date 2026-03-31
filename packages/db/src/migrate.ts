@@ -8,21 +8,15 @@
  *   pnpm admin:db:migrate
  */
 
-import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasYesFlag } from './cli-utils';
+import { createAdminSql } from './etl/db-utils';
 
 const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
   max: 1,
   onnotice: () => {}, // suppress "relation already exists" notices
 });

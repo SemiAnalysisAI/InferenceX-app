@@ -10,19 +10,11 @@
  *   pnpm db:apply-overrides --yes      # skip confirmation
  */
 
-import postgres from 'postgres';
-
 import { confirm, hasYesFlag } from './cli-utils.js';
-import { refreshLatestBenchmarks } from './etl/db-utils.js';
+import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './etl/run-overrides.js';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
   max: 1,
   onnotice: () => {},
 });
@@ -130,7 +122,6 @@ async function previewPurge(githubRunId: number): Promise<PurgeTarget | null> {
 /** Delete all data for a run within a transaction. */
 async function purge(githubRunId: number, wrIds: number[]): Promise<void> {
   // postgres TransactionSql Omit drops the call signature — cast to Sql type
-  type Sql = ReturnType<typeof postgres>;
   await sql.begin(async (_tx) => {
     const tx = _tx as unknown as Sql;
 

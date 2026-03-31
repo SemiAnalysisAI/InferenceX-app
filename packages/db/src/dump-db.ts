@@ -9,19 +9,11 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import postgres from 'postgres';
-
 import { TABLE_INSERT_ORDER } from '@semianalysisai/inferencex-constants';
 
-if (!process.env.DATABASE_READONLY_URL) {
-  console.error('DATABASE_READONLY_URL is required');
-  process.exit(1);
-}
+import { createAdminSql } from './etl/db-utils';
 
-const sql = postgres(process.env.DATABASE_READONLY_URL, {
-  ssl: 'require',
-  max: 1,
-});
+const sql = createAdminSql({ readonly: true, max: 1 });
 
 const CURSOR_BATCH = 100;
 

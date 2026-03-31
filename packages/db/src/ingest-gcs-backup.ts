@@ -27,12 +27,11 @@
  *   pnpm admin:db:ingest:gcs
  */
 
-import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasYesFlag } from './cli-utils';
-import { refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
@@ -58,13 +57,7 @@ const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
 const CONCURRENCY = 20;
 const DB_CONCURRENCY = 10;
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
   max: 20,
   idle_timeout: 60,
 });

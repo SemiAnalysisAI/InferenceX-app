@@ -8,12 +8,11 @@
  *   pnpm --filter *inferencex-db db:ingest:supplemental
  */
 
-import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasYesFlag } from './cli-utils';
-import { refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
 import {
@@ -26,13 +25,7 @@ import {
 import { bulkIngestBenchmarkRows, bulkUpsertAvailability } from './etl/benchmark-ingest';
 import { ingestEvalRow } from './etl/eval-ingest';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
   max: 5,
   idle_timeout: 60,
 });
