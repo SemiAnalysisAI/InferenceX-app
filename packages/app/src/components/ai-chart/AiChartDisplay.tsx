@@ -166,15 +166,7 @@ export default function AiChartDisplay() {
       )}
 
       {/* Result */}
-      {result && (
-        <AiChartResult
-          spec={result.spec}
-          barData={result.barData}
-          scatterData={result.scatterData}
-          colorMap={result.colorMap}
-          summary={result.summary}
-        />
-      )}
+      {result && <AiChartResult charts={result.charts} summary={result.summary} />}
 
       {/* Example prompts (shown when no result) */}
       {!result && !isLoading && !error && (

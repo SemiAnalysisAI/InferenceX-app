@@ -132,8 +132,13 @@ export async function callLlm(
   const json = await res.json();
 
   if (!res.ok) {
-    const msg =
+    const raw =
       json?.error?.message ?? json?.error?.type ?? `${provider} request failed (${res.status})`;
+    // Strip anything that looks like an API key to prevent accidental leaks in UI
+    const msg = String(raw)
+      .replace(/sk-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
+      .replace(/key-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
+      .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]');
     throw new Error(msg);
   }
 

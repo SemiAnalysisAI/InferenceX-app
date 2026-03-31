@@ -1,5 +1,5 @@
 /**
- * System prompt for the LLM that parses user natural language into an AiChartSpec.
+ * System prompt for the LLM that parses user natural language into AiChartSpec(s).
  * Kept compact to minimize token cost.
  */
 export function buildParsePrompt(): string {
@@ -39,23 +39,38 @@ Y-axis metrics for evaluations:
 Y-axis metrics for reliability:
 - reliability_rate → Success Rate (%)
 
-## Rules
+## Chart type selection rules
+
+Choose the chart type based on the user's intent:
+- **"bar"**: Use for comparing a single metric across GPUs/configs at a fixed operating point. Best for "compare X vs Y", "which GPU is best for...", "rank by...", direct comparisons. This is the DEFAULT for most queries.
+- **"scatter"**: Use ONLY when the user explicitly wants to see the full performance curve (all data points), trade-off relationships, or Pareto frontiers. Keywords: "scatter", "plot all points", "performance curve", "trade-off", "pareto".
+
+When in doubt, prefer "bar" — it produces cleaner, more readable charts.
+
+## Multi-chart comparisons
+
+If the user asks to compare two DIFFERENT models or two fundamentally different configurations side-by-side (e.g., "compare Kimi K2.5 vs DeepSeek R1" or "compare 1k/1k vs 8k/1k"), return an ARRAY of 2 chart specs — one for each. Each spec should have its own title clearly identifying what it shows.
+
+If the user is comparing GPUs/hardware within a single model (e.g., "H100 vs B200 for DeepSeek R1"), that's a single chart with multiple hardware keys — do NOT split into two charts.
+
+## General rules
 
 1. Map user intent to the closest available values. Be flexible with naming (e.g., "H100" → "h100", "deepseek r1" → "DeepSeek-R1-0528").
 2. Pick the correct dataSource based on what the user is asking about (performance → benchmarks, accuracy → evaluations, uptime/success → reliability, trends over time → history).
 3. hardwareKeys: list of GPU base names to compare. Empty array [] means "all GPUs".
 4. precisions: list of precisions. Empty array [] means "all precisions".
-5. chartType: "bar" for comparing specific values across GPUs/configs, "scatter" for plotting all data points.
-6. targetInteractivity: for benchmark bar charts, the interactivity level (tok/s/user) to read from. Default 40.
-7. If the user doesn't specify a model, default to "DeepSeek-R1-0528".
-8. If the user doesn't specify a sequence, default to "8k/1k".
-9. title: a short chart title describing the comparison.
-10. description: a one-sentence description of what the chart shows.
-11. For evaluations: yAxisMetric should be "eval_score". For reliability: yAxisMetric should be "reliability_rate".
+5. targetInteractivity: for benchmark bar charts, the interactivity level (tok/s/user) to read from. Default 40.
+6. If the user doesn't specify a model, default to "DeepSeek-R1-0528".
+7. If the user doesn't specify a sequence, default to "8k/1k".
+8. title: a short chart title describing the comparison.
+9. description: a one-sentence description of what the chart shows.
+10. For evaluations: yAxisMetric should be "eval_score". For reliability: yAxisMetric should be "reliability_rate".
 
 ## Output format
 
-Return ONLY valid JSON matching this schema (no markdown, no preamble):
+Return ONLY valid JSON (no markdown, no preamble).
+
+For a single chart, return one object:
 {
   "chartType": "bar" | "scatter",
   "dataSource": "benchmarks" | "evaluations" | "reliability" | "history",
@@ -68,18 +83,25 @@ Return ONLY valid JSON matching this schema (no markdown, no preamble):
   "targetInteractivity": number,
   "title": "string",
   "description": "string"
-}`;
+}
+
+For a comparison of two different models/configs, return an array of 2 objects:
+[{ ... }, { ... }]`;
 }
 
 export function buildSummaryPrompt(
-  spec: { title: string; yAxisLabel: string; model: string; sequence: string },
+  specs: { title: string; yAxisLabel: string; model: string; sequence: string }[],
   dataDescription: string,
 ): string {
+  const specSummary = specs
+    .map(
+      (s) => `Chart: ${s.title} | Metric: ${s.yAxisLabel} | Model: ${s.model}, Seq: ${s.sequence}`,
+    )
+    .join('\n');
+
   return `You are an expert performance analyst. Based on the following benchmark data, provide a concise 2-3 sentence summary highlighting the key takeaway.
 
-Chart: ${spec.title}
-Metric: ${spec.yAxisLabel}
-Model: ${spec.model}, Sequence: ${spec.sequence}
+${specSummary}
 
 Data:
 ${dataDescription}

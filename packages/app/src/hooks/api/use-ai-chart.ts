@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import type { AiChartBarPoint, AiChartSpec, AiProvider } from '@/components/ai-chart/types';
+import { validateSpec } from '@/components/ai-chart/types';
 import { buildParsePrompt, buildSummaryPrompt } from '@/components/ai-chart/prompt-templates';
 import type { InferenceData } from '@/components/inference/types';
 import { callLlm } from '@/lib/ai-providers';
@@ -20,11 +21,19 @@ import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 
-interface AiChartResult {
+// ---------------------------------------------------------------------------
+// Result types
+// ---------------------------------------------------------------------------
+
+export interface AiSingleChartResult {
   spec: AiChartSpec;
   barData: AiChartBarPoint[];
   scatterData: InferenceData[];
   colorMap: Record<string, string>;
+}
+
+export interface AiChartResult {
+  charts: AiSingleChartResult[];
   summary: string | null;
 }
 
@@ -36,12 +45,19 @@ interface UseAiChartReturn {
   reset: () => void;
 }
 
-function parseSpecFromLlm(raw: string): AiChartSpec {
+// ---------------------------------------------------------------------------
+// LLM response parsing
+// ---------------------------------------------------------------------------
+
+function parseSpecsFromLlm(raw: string): AiChartSpec[] {
   const cleaned = raw
     .replace(/```json\s*/g, '')
     .replace(/```/g, '')
     .trim();
-  return JSON.parse(cleaned);
+  const parsed = JSON.parse(cleaned);
+  const arr = Array.isArray(parsed) ? parsed : [parsed];
+  // Validate each spec and limit to 2
+  return arr.slice(0, 2).map((s: unknown) => validateSpec(s as Record<string, unknown>));
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +123,6 @@ function buildEvalBarData(
   spec: AiChartSpec,
   colorMap: Record<string, string>,
 ): AiChartBarPoint[] {
-  // Filter by model, hardware, precision
   let filtered = rows.filter((r) => r.model === spec.model || spec.model === '');
   if (spec.hardwareKeys.length > 0) {
     const allowed = new Set(spec.hardwareKeys);
@@ -121,7 +136,6 @@ function buildEvalBarData(
     filtered = filtered.filter((r) => allowed.has(r.precision.toLowerCase()));
   }
 
-  // Group by hardware key, take latest date per group, extract score
   const groups = new Map<string, EvalRow>();
   for (const row of filtered) {
     const hwKey = normalizeEvalHardwareKey(row.hardware, row.framework, row.spec_method);
@@ -133,7 +147,6 @@ function buildEvalBarData(
 
   const bars: AiChartBarPoint[] = [];
   for (const [hwKey, row] of groups) {
-    // GSM8K score is typically in metrics as "gsm8k" or first metric value
     const score = row.metrics.gsm8k ?? row.metrics.accuracy ?? Object.values(row.metrics)[0] ?? 0;
     if (score <= 0) continue;
 
@@ -159,7 +172,6 @@ function buildReliabilityBarData(
   spec: AiChartSpec,
   colorMap: Record<string, string>,
 ): AiChartBarPoint[] {
-  // Filter by hardware
   let filtered = rows;
   if (spec.hardwareKeys.length > 0) {
     const allowed = new Set(spec.hardwareKeys);
@@ -169,7 +181,6 @@ function buildReliabilityBarData(
     });
   }
 
-  // Aggregate across dates: total successes / total attempts per hardware
   const agg = new Map<string, { success: number; total: number }>();
   for (const row of filtered) {
     const hw = row.hardware;
@@ -197,6 +208,87 @@ function buildReliabilityBarData(
 }
 
 // ---------------------------------------------------------------------------
+// Resolve a single spec into chart data
+// ---------------------------------------------------------------------------
+
+async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
+  if (spec.dataSource === 'evaluations') {
+    const rows = await fetchEvaluations();
+    const hwKeys = [
+      ...new Set(rows.map((r) => normalizeEvalHardwareKey(r.hardware, r.framework, r.spec_method))),
+    ];
+    const colorMap = generateHighContrastColors(hwKeys, 'dark');
+    const barData = buildEvalBarData(rows, spec, colorMap);
+    // Re-color with final keys
+    const finalKeys = barData.map((b) => b.hwKey);
+    const finalColors = generateHighContrastColors(finalKeys, 'dark');
+    return {
+      spec,
+      barData: barData.map((b) => ({ ...b, color: finalColors[b.hwKey] ?? b.color })),
+      scatterData: [],
+      colorMap: finalColors,
+    };
+  }
+
+  if (spec.dataSource === 'reliability') {
+    const rows = await fetchReliability();
+    const hwKeys = [...new Set(rows.map((r) => r.hardware))];
+    const colorMap = generateHighContrastColors(hwKeys, 'dark');
+    const barData = buildReliabilityBarData(rows, spec, colorMap);
+    const finalKeys = barData.map((b) => b.hwKey);
+    const finalColors = generateHighContrastColors(finalKeys, 'dark');
+    return {
+      spec,
+      barData: barData.map((b) => ({ ...b, color: finalColors[b.hwKey] ?? b.color })),
+      scatterData: [],
+      colorMap: finalColors,
+    };
+  }
+
+  // Benchmarks or History
+  const { isl, osl } = sequenceToIslOsl(spec.sequence);
+  const rows =
+    spec.dataSource === 'history'
+      ? await fetchBenchmarkHistory(spec.model, isl, osl)
+      : await fetchBenchmarks(spec.model);
+
+  const { chartData } = transformBenchmarkRows(rows);
+  let points = chartData[0] ?? [];
+
+  if (spec.hardwareKeys.length > 0) {
+    const allowedGpus = new Set(spec.hardwareKeys);
+    points = points.filter((p) => {
+      const hwKey = p.hwKey ?? '';
+      return allowedGpus.has(hwKey) || [...allowedGpus].some((g) => hwKey.startsWith(g));
+    });
+  }
+  if (spec.precisions.length > 0) {
+    const allowedPrec = new Set(spec.precisions.map((p) => p.toLowerCase()));
+    points = points.filter((p) => p.precision && allowedPrec.has(p.precision.toLowerCase()));
+  }
+
+  if (spec.dataSource !== 'history') {
+    points = points.filter((p) => {
+      const entry = p as any;
+      if (entry.isl != null && entry.osl != null) {
+        return entry.isl === isl && entry.osl === osl;
+      }
+      return true;
+    });
+  }
+
+  const hwKeys = [...new Set(points.map((p) => p.hwKey ?? '').filter(Boolean))];
+  const colorMap = generateHighContrastColors(hwKeys, 'dark');
+
+  return {
+    spec,
+    barData: spec.chartType === 'bar' ? buildBenchmarkBarData(points, spec, colorMap) : [],
+    scatterData: spec.chartType === 'scatter' ? points : [],
+    colorMap,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main hook
 // ---------------------------------------------------------------------------
 
@@ -211,111 +303,54 @@ export function useAiChart(): UseAiChartReturn {
     setResult(null);
 
     try {
-      // Step 1: Parse prompt into spec
-      const rawSpec = await callLlm(provider, apiKey, buildParsePrompt(), prompt);
-      const spec = parseSpecFromLlm(rawSpec);
-      // Default dataSource for backwards compat
-      if (!spec.dataSource) spec.dataSource = 'benchmarks';
+      // Step 1: Parse prompt into validated spec(s)
+      const rawResponse = await callLlm(provider, apiKey, buildParsePrompt(), prompt);
+      const specs = parseSpecsFromLlm(rawResponse);
 
-      let barData: AiChartBarPoint[] = [];
-      let scatterData: InferenceData[] = [];
-      let hwKeys: string[] = [];
-
-      if (spec.dataSource === 'evaluations') {
-        // ---- Evaluations ----
-        const rows = await fetchEvaluations();
-        hwKeys = [
-          ...new Set(
-            rows.map((r) => normalizeEvalHardwareKey(r.hardware, r.framework, r.spec_method)),
-          ),
-        ];
-        const colorMap = generateHighContrastColors(hwKeys, 'dark');
-        barData = buildEvalBarData(rows, spec, colorMap);
-
-        if (barData.length === 0) {
-          setError('No evaluation data found for the requested configuration.');
-          setIsLoading(false);
-          return;
-        }
-
-        hwKeys = barData.map((b) => b.hwKey);
-        const finalColorMap = generateHighContrastColors(hwKeys, 'dark');
-        barData = barData.map((b) => ({ ...b, color: finalColorMap[b.hwKey] ?? b.color }));
-
-        await generateSummary(provider, apiKey, spec, barData, finalColorMap, setResult);
-        return;
-      }
-
-      if (spec.dataSource === 'reliability') {
-        // ---- Reliability ----
-        const rows = await fetchReliability();
-        hwKeys = [...new Set(rows.map((r) => r.hardware))];
-        const colorMap = generateHighContrastColors(hwKeys, 'dark');
-        barData = buildReliabilityBarData(rows, spec, colorMap);
-
-        if (barData.length === 0) {
-          setError('No reliability data found for the requested configuration.');
-          setIsLoading(false);
-          return;
-        }
-
-        hwKeys = barData.map((b) => b.hwKey);
-        const finalColorMap = generateHighContrastColors(hwKeys, 'dark');
-        barData = barData.map((b) => ({ ...b, color: finalColorMap[b.hwKey] ?? b.color }));
-
-        await generateSummary(provider, apiKey, spec, barData, finalColorMap, setResult);
-        return;
-      }
-
-      // ---- Benchmarks (default) & History ----
-      const { isl, osl } = sequenceToIslOsl(spec.sequence);
-      const rows =
-        spec.dataSource === 'history'
-          ? await fetchBenchmarkHistory(spec.model, isl, osl)
-          : await fetchBenchmarks(spec.model);
-
-      const { chartData } = transformBenchmarkRows(rows);
-      let points = chartData[0] ?? [];
-
-      // Filter by spec
-      if (spec.hardwareKeys.length > 0) {
-        const allowedGpus = new Set(spec.hardwareKeys);
-        points = points.filter((p) => {
-          const hwKey = p.hwKey ?? '';
-          return allowedGpus.has(hwKey) || [...allowedGpus].some((g) => hwKey.startsWith(g));
-        });
-      }
-      if (spec.precisions.length > 0) {
-        const allowedPrec = new Set(spec.precisions.map((p) => p.toLowerCase()));
-        points = points.filter((p) => p.precision && allowedPrec.has(p.precision.toLowerCase()));
-      }
-
-      // Filter by sequence (for non-history, where all sequences may be returned)
-      if (spec.dataSource !== 'history') {
-        points = points.filter((p) => {
-          const entry = p as any;
-          if (entry.isl != null && entry.osl != null) {
-            return entry.isl === isl && entry.osl === osl;
-          }
-          return true;
-        });
-      }
-
-      if (points.length === 0) {
-        setError(
-          `No data found for ${spec.model} (${spec.sequence}). Try a different model or configuration.`,
-        );
+      if (specs.length === 0) {
+        setError('Could not parse your request. Try rephrasing.');
         setIsLoading(false);
         return;
       }
 
-      hwKeys = [...new Set(points.map((p) => p.hwKey ?? '').filter(Boolean))];
-      const colorMap = generateHighContrastColors(hwKeys, 'dark');
+      // Step 2: Resolve each spec into chart data (parallel for multi-chart)
+      const charts = await Promise.all(specs.map(resolveSpec));
 
-      barData = spec.chartType === 'bar' ? buildBenchmarkBarData(points, spec, colorMap) : [];
-      scatterData = spec.chartType === 'scatter' ? points : [];
+      // Check if any chart has data
+      const hasData = charts.some((c) => c.barData.length > 0 || c.scatterData.length > 0);
+      if (!hasData) {
+        const models = [...new Set(specs.map((s) => s.model))].join(', ');
+        setError(`No data found for ${models}. Try a different model or configuration.`);
+        setIsLoading(false);
+        return;
+      }
 
-      await generateSummary(provider, apiKey, spec, barData, colorMap, setResult, scatterData);
+      // Step 3: Generate summary (best-effort)
+      let summary: string | null = null;
+      try {
+        const allBars = charts.flatMap((c) => c.barData);
+        const allScatter = charts.flatMap((c) => c.scatterData);
+        const hwKeys = [
+          ...new Set([...allBars.map((b) => b.hwKey), ...allScatter.map((p) => p.hwKey ?? '')]),
+        ].filter(Boolean);
+
+        const dataDesc =
+          allBars.length > 0
+            ? allBars.map((b) => `${b.label}: ${b.value.toFixed(2)}`).join('\n')
+            : `${allScatter.length} data points across ${hwKeys.length} hardware configs`;
+
+        const summaryRaw = await callLlm(
+          provider,
+          apiKey,
+          buildSummaryPrompt(specs, dataDesc),
+          'Provide the summary.',
+        );
+        summary = summaryRaw.trim();
+      } catch {
+        // Summary generation is non-critical
+      }
+
+      setResult({ charts, summary });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
@@ -329,43 +364,4 @@ export function useAiChart(): UseAiChartReturn {
   }, []);
 
   return { result, isLoading, error, generate, reset };
-}
-
-async function generateSummary(
-  provider: AiProvider,
-  apiKey: string,
-  spec: AiChartSpec,
-  barData: AiChartBarPoint[],
-  colorMap: Record<string, string>,
-  setResult: (r: AiChartResult) => void,
-  scatterData: InferenceData[] = [],
-) {
-  let summary: string | null = null;
-  try {
-    const hwKeys = [
-      ...new Set([...barData.map((b) => b.hwKey), ...scatterData.map((p) => p.hwKey ?? '')]),
-    ].filter(Boolean);
-    const dataDesc =
-      barData.length > 0
-        ? barData.map((b) => `${b.label}: ${b.value.toFixed(2)}`).join('\n')
-        : `${scatterData.length} data points across ${hwKeys.length} hardware configs`;
-
-    const summaryRaw = await callLlm(
-      provider,
-      apiKey,
-      buildSummaryPrompt(spec, dataDesc),
-      'Provide the summary.',
-    );
-    summary = summaryRaw.trim();
-  } catch {
-    // Summary generation is non-critical
-  }
-
-  setResult({
-    spec,
-    barData,
-    scatterData,
-    colorMap,
-    summary,
-  });
 }

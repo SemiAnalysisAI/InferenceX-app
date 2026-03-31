@@ -16,17 +16,20 @@ import type {
 import DOMPurify from 'dompurify';
 
 import type { AiChartBarPoint, AiChartSpec } from './types';
+import type { AiSingleChartResult } from '@/hooks/api/use-ai-chart';
 
 /** Sanitize tooltip HTML that may contain LLM-generated strings. */
 function sanitize(html: string): string {
-  return DOMPurify.sanitize(html);
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['div', 'span', 'strong', 'br'],
+    ALLOWED_ATTR: ['style'],
+  });
 }
 
+const CHART_INSTRUCTIONS = 'Hover for details';
+
 interface AiChartResultProps {
-  spec: AiChartSpec;
-  barData: AiChartBarPoint[];
-  scatterData: InferenceData[];
-  colorMap: Record<string, string>;
+  charts: AiSingleChartResult[];
   summary: string | null;
 }
 
@@ -109,7 +112,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     <D3Chart
       chartId="ai-chart-bar"
       data={data}
-      height={450}
+      height={Math.max(300, data.length * 40 + bottomMargin + 24)}
       margin={{ top: 24, right: 10, bottom: bottomMargin, left: leftMargin }}
       xScale={xScale}
       yScale={yScale}
@@ -118,6 +121,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
       layers={layers}
       tooltip={tooltip}
       watermark="logo"
+      instructions={CHART_INSTRUCTIONS}
     />
   );
 }
@@ -200,34 +204,32 @@ function ScatterChart({
       layers={layers}
       tooltip={tooltip}
       watermark="logo"
-      zoom={{ enabled: true, axes: 'both' }}
+      grabCursor
+      instructions={`${CHART_INSTRUCTIONS} • Scroll to zoom • Drag to pan`}
+      zoom={{ enabled: true, axes: 'both', scaleExtent: [0.7, 20] }}
     />
   );
 }
 
-export default function AiChartResult({
-  spec,
-  barData,
-  scatterData,
-  colorMap,
-  summary,
-}: AiChartResultProps) {
+export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>{spec.title}</CardTitle>
-          <CardDescription>{spec.description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {spec.chartType === 'bar' && barData.length > 0 && (
-            <BarChart data={barData} spec={spec} />
-          )}
-          {spec.chartType === 'scatter' && scatterData.length > 0 && (
-            <ScatterChart data={scatterData} spec={spec} colorMap={colorMap} />
-          )}
-        </CardContent>
-      </Card>
+      {charts.map((chart, i) => (
+        <Card key={i}>
+          <CardHeader>
+            <CardTitle>{chart.spec.title}</CardTitle>
+            <CardDescription>{chart.spec.description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {chart.spec.chartType === 'bar' && chart.barData.length > 0 && (
+              <BarChart data={chart.barData} spec={chart.spec} />
+            )}
+            {chart.spec.chartType === 'scatter' && chart.scatterData.length > 0 && (
+              <ScatterChart data={chart.scatterData} spec={chart.spec} colorMap={chart.colorMap} />
+            )}
+          </CardContent>
+        </Card>
+      ))}
 
       {summary && (
         <Card>
