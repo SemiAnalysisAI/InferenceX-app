@@ -24,7 +24,10 @@ export function createAdminSql(
     console.error(`${envVar} is required`);
     process.exit(1);
   }
-  return postgres(url, { ...pgOpts, ssl: noSsl ? false : 'require' });
+  return postgres(url, {
+    ...pgOpts,
+    ssl: noSsl ? false : 'require',
+  });
 }
 
 /** Refresh the `latest_benchmarks` materialized view, logging timing. */

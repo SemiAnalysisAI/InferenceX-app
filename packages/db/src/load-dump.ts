@@ -4,8 +4,7 @@
  * Reads each table's JSON file, streams rows in batches via the postgres
  * driver, resets sequences, and refreshes materialized views.
  *
- * Requires DATABASE_WRITE_URL. For local Postgres (no TLS), set
- * DATABASE_NO_SSL=1.
+ * Requires DATABASE_WRITE_URL. For local Postgres (no TLS), pass --no-ssl.
  *
  * Usage:
  *   pnpm admin:db:load-dump <dump-dir>
