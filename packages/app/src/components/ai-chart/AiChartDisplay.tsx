@@ -66,7 +66,7 @@ export default function AiChartDisplay() {
 
   return (
     <div className="space-y-6">
-      {/* Provider & API Key */}
+      {/* Title, description & API Key */}
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
@@ -78,7 +78,7 @@ export default function AiChartDisplay() {
             and only used by your selected provider. We never see it.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="w-full sm:w-48">
               <Select value={provider} onValueChange={handleProviderChange}>
@@ -112,7 +112,12 @@ export default function AiChartDisplay() {
               </button>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
+      {/* Prompt input */}
+      <Card>
+        <CardContent className="pt-6">
           <div className="space-y-2">
             <Textarea
               placeholder="Describe the chart you want to see..."
