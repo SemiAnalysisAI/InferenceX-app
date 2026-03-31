@@ -8,6 +8,7 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   BarLayerConfig,
   ScatterLayerConfig,
+  TooltipConfig,
   ScaleConfig,
   AxisConfig,
 } from '@/lib/d3-chart/D3Chart';
@@ -80,6 +81,23 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     return [barLayer];
   }, [data]);
 
+  const tooltip = useMemo<TooltipConfig<AiChartBarPoint>>(
+    () => ({
+      rulerType: 'none',
+      content: (d) =>
+        `<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
+            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
+          </div>
+          <div style="color: var(--muted-foreground); font-size: 11px;">
+            <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </div>
+        </div>`,
+    }),
+    [spec.yAxisLabel],
+  );
+
   return (
     <D3Chart
       chartId="ai-chart-bar"
@@ -91,6 +109,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
       xAxis={xAxis}
       yAxis={yAxis}
       layers={layers}
+      tooltip={tooltip}
       watermark="logo"
     />
   );
@@ -139,6 +158,29 @@ function ScatterChart({
     return [scatterLayer];
   }, [data, colorMap]);
 
+  const tooltip = useMemo<TooltipConfig<InferenceData>>(
+    () => ({
+      rulerType: 'crosshair',
+      content: (d) => {
+        const hwKey = d.hwKey ?? '';
+        const color = colorMap[hwKey] ?? '#888';
+        return `<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
+            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${hwKey}</span>
+          </div>
+          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
+            <strong>Interactivity:</strong> ${d.x.toFixed(1)} tok/s/user
+          </div>
+          <div style="color: var(--muted-foreground); font-size: 11px;">
+            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </div>
+        </div>`;
+      },
+    }),
+    [colorMap, spec.yAxisLabel],
+  );
+
   return (
     <D3Chart
       chartId="ai-chart-scatter"
@@ -149,6 +191,7 @@ function ScatterChart({
       xAxis={xAxis}
       yAxis={yAxis}
       layers={layers}
+      tooltip={tooltip}
       watermark="logo"
       zoom={{ enabled: true, axes: 'both' }}
     />
