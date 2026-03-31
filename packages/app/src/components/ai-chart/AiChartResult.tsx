@@ -13,7 +13,14 @@ import type {
   AxisConfig,
 } from '@/lib/d3-chart/D3Chart';
 
+import DOMPurify from 'dompurify';
+
 import type { AiChartBarPoint, AiChartSpec } from './types';
+
+/** Sanitize tooltip HTML that may contain LLM-generated strings. */
+function sanitize(html: string): string {
+  return DOMPurify.sanitize(html);
+}
 
 interface AiChartResultProps {
   spec: AiChartSpec;
@@ -85,7 +92,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     () => ({
       rulerType: 'none',
       content: (d) =>
-        `<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+        sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
             <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
             <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
@@ -93,7 +100,7 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
           <div style="color: var(--muted-foreground); font-size: 11px;">
             <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </div>
-        </div>`,
+        </div>`),
     }),
     [spec.yAxisLabel],
   );
@@ -164,7 +171,7 @@ function ScatterChart({
       content: (d) => {
         const hwKey = d.hwKey ?? '';
         const color = colorMap[hwKey] ?? '#888';
-        return `<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
             <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
             <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${hwKey}</span>
@@ -175,7 +182,7 @@ function ScatterChart({
           <div style="color: var(--muted-foreground); font-size: 11px;">
             <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </div>
-        </div>`;
+        </div>`);
       },
     }),
     [colorMap, spec.yAxisLabel],

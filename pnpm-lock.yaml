@@ -102,6 +102,9 @@ importers:
       d3:
         specifier: ^7.9.0
         version: 7.9.0
+      dompurify:
+        specifier: ^3.3.3
+        version: 3.3.3
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
