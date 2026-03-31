@@ -27,6 +27,7 @@ import path from 'path';
 
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
+import { refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
@@ -547,10 +548,7 @@ async function main(): Promise<void> {
     );
   }
 
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
 }

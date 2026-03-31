@@ -13,6 +13,7 @@
 import postgres from 'postgres';
 
 import { confirm, hasYesFlag } from './cli-utils.js';
+import { refreshLatestBenchmarks } from './etl/db-utils.js';
 import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './etl/run-overrides.js';
 
 if (!process.env.DATABASE_WRITE_URL) {
@@ -264,10 +265,7 @@ async function main(): Promise<void> {
   }
 
   // Phase 4: refresh mat view
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const t0 = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - t0) / 1000)}s`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
   console.log('  Invalidate API cache: pnpm admin:cache:invalidate');

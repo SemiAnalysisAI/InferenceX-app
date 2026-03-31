@@ -32,6 +32,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasYesFlag } from './cli-utils';
+import { refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
@@ -762,10 +763,7 @@ async function main(): Promise<void> {
 
   console.log('\n=== Maintenance ===');
 
-  process.stdout.write('  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s done`);
+  await refreshLatestBenchmarks(sql);
 
   process.stdout.write('  Vacuuming tables...');
   const vacuumEnd = Date.now();

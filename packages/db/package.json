@@ -18,6 +18,7 @@
     "db:migrate": "dotenv -e ../../.env -- tsx src/migrate.ts",
     "db:apply-overrides": "dotenv -e ../../.env -- tsx src/apply-overrides.ts",
     "db:dump": "dotenv -e ../../.env -- tsx src/dump-db.ts",
+    "db:load-dump": "dotenv -e ../../.env -- tsx src/load-dump.ts",
     "db:reset": "dotenv -e ../../.env -- tsx src/reset-db.ts",
     "db:verify": "dotenv -e ../../.env -- tsx src/verify-db.ts",
     "test:unit": "vitest run",

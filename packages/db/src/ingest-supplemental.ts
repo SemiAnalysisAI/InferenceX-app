@@ -13,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasYesFlag } from './cli-utils';
+import { refreshLatestBenchmarks } from './etl/db-utils';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
 import {
@@ -353,10 +354,7 @@ async function main(): Promise<void> {
   await ingestSupplementalEvals(configCache, getOrCreateWorkflowRun);
   await ingestSupplementalBmk(configCache, getOrCreateWorkflowRun);
 
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s done`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== db:ingest:supplemental complete ===');
 }
