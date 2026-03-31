@@ -71,6 +71,7 @@ const TAB_LINKS = [
   { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
   { href: '/reliability', label: 'GPU Reliability', testId: 'tab-trigger-reliability' },
   { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
+  { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart' },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
 ] as const;
 
