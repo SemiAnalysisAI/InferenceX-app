@@ -117,25 +117,39 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
   const flush = async () => {
     if (batch.length === 0 || !columns) return;
 
-    const values: (string | number | boolean | null)[][] = batch.map((row) =>
-      columns!.map((col) => {
+    // Track which columns have plain-object values (JSONB) for casting
+    const jsonbCols = new Set<number>();
+    const values: unknown[][] = batch.map((row) =>
+      columns!.map((col, colIdx) => {
         const val = row[col];
         if (val === null || val === undefined) return null;
         // Postgres text[] arrays: convert JSON ["a","b"] → Postgres {a,b} literal
         if (Array.isArray(val) && val.every((v) => typeof v === 'string'))
           return `{${(val as string[]).map((v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')}}`;
-        // JSONB columns: stringify objects
-        if (typeof val === 'object') return JSON.stringify(val);
+        // JSONB columns: pass objects as-is (sql.unsafe serializes them correctly with ::jsonb cast)
+        if (typeof val === 'object') {
+          jsonbCols.add(colIdx);
+          return val;
+        }
         return val as string | number | boolean;
       }),
     );
 
     const colsSql = columns.join(', ');
     const rows = values
-      .map((_, i) => `(${columns!.map((_, j) => `$${i * columns!.length + j + 1}`).join(', ')})`)
+      .map(
+        (_, i) =>
+          `(${columns!
+            .map((_, j) => {
+              const p = `$${i * columns!.length + j + 1}`;
+              return jsonbCols.has(j) ? `${p}::jsonb` : p;
+            })
+            .join(', ')})`,
+      )
       .join(', ');
 
-    await sql.unsafe(`INSERT INTO ${table} (${colsSql}) VALUES ${rows}`, values.flat());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await sql.unsafe(`INSERT INTO ${table} (${colsSql}) VALUES ${rows}`, values.flat() as any[]);
 
     total += batch.length;
     batch = [];
