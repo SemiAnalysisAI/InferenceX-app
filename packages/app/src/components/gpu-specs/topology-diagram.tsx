@@ -417,7 +417,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
       .attr('width', totalW)
       .attr('height', viewBoxH)
       .append('image')
-      .attr('href', '/brand/logo-color.png')
+      .attr('href', '/brand/logo-color.webp')
       .attr('width', totalW * 0.3)
       .attr('height', viewBoxH * 0.3)
       .attr('x', (totalW - totalW * 0.3) / 2)

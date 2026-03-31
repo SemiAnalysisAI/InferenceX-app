@@ -922,7 +922,7 @@ export default function ThroughputCalculatorDisplay() {
                             className="absolute inset-0 pointer-events-none flex items-center justify-center"
                             aria-hidden="true"
                           >
-                            <img src="/brand/logo-color.png" alt="" className="w-48 opacity-10" />
+                            <img src="/brand/logo-color.webp" alt="" className="w-48 opacity-10" />
                           </div>
                           <table className="w-full text-sm relative">
                             <thead>
