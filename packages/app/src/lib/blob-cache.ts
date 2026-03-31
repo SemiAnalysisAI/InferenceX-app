@@ -1,9 +1,7 @@
 import { del, head, list, put } from '@vercel/blob';
 
-const BLOB_ENABLED = !!process.env.BLOB_READ_WRITE_TOKEN && !!process.env.BLOB_CACHE_PREFIX;
-
-if (!BLOB_ENABLED) {
-  console.log('Blob cache disabled: BLOB_READ_WRITE_TOKEN or BLOB_CACHE_PREFIX not set');
+function blobEnabled(): boolean {
+  return !!process.env.BLOB_READ_WRITE_TOKEN && !!process.env.BLOB_CACHE_PREFIX;
 }
 
 function getPrefix(): string {
@@ -12,7 +10,7 @@ function getPrefix(): string {
 
 /** Read a cached value from blob storage. Returns null on miss or when blob is not configured. */
 export async function blobGet<T>(key: string): Promise<T | null> {
-  if (!BLOB_ENABLED) return null;
+  if (!blobEnabled()) return null;
   const path = `${getPrefix()}${key}.json`;
   try {
     const meta = await head(path);
@@ -26,7 +24,7 @@ export async function blobGet<T>(key: string): Promise<T | null> {
 
 /** Write a value to blob storage. No-ops when blob is not configured. */
 export async function blobSet(key: string, data: unknown): Promise<void> {
-  if (!BLOB_ENABLED) return;
+  if (!blobEnabled()) return;
   const path = `${getPrefix()}${key}.json`;
   try {
     await put(path, JSON.stringify(data), {
@@ -42,7 +40,7 @@ export async function blobSet(key: string, data: unknown): Promise<void> {
 
 /** Delete all cached blobs. Returns 0 when blob is not configured. */
 export async function blobPurge(): Promise<number> {
-  if (!BLOB_ENABLED) return 0;
+  if (!blobEnabled()) return 0;
   const prefix = getPrefix();
   let deleted = 0;
   let cursor: string | undefined;

@@ -34,25 +34,26 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('getPrefix (tested indirectly)', () => {
-  it('throws when BLOB_READ_WRITE_TOKEN is missing', async () => {
+describe('graceful no-op when credentials missing', () => {
+  it('blobGet returns null when BLOB_READ_WRITE_TOKEN is missing', async () => {
     delete process.env.BLOB_READ_WRITE_TOKEN;
-    await expect(blobGet('key')).rejects.toThrow('BLOB_READ_WRITE_TOKEN is required');
+    expect(await blobGet('key')).toBeNull();
   });
 
-  it('throws when BLOB_CACHE_PREFIX is missing', async () => {
+  it('blobGet returns null when BLOB_CACHE_PREFIX is missing', async () => {
     delete process.env.BLOB_CACHE_PREFIX;
-    await expect(blobGet('key')).rejects.toThrow('BLOB_CACHE_PREFIX is required');
+    expect(await blobGet('key')).toBeNull();
   });
 
-  it('throws from blobSet when BLOB_READ_WRITE_TOKEN is missing', async () => {
+  it('blobSet no-ops when BLOB_READ_WRITE_TOKEN is missing', async () => {
     delete process.env.BLOB_READ_WRITE_TOKEN;
-    await expect(blobSet('key', 'value')).rejects.toThrow('BLOB_READ_WRITE_TOKEN is required');
+    await blobSet('key', 'value');
+    expect(mockPut).not.toHaveBeenCalled();
   });
 
-  it('throws from blobPurge when BLOB_CACHE_PREFIX is missing', async () => {
+  it('blobPurge returns 0 when BLOB_CACHE_PREFIX is missing', async () => {
     delete process.env.BLOB_CACHE_PREFIX;
-    await expect(blobPurge()).rejects.toThrow('BLOB_CACHE_PREFIX is required');
+    expect(await blobPurge()).toBe(0);
   });
 });
 

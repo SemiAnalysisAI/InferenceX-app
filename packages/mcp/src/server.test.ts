@@ -5,27 +5,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from './server.js';
 
 // ── Mock DB ────────────────────────────────────────────────────────────
-// getDb() returns a postgres tagged-template function. We mock it as a
+// returns a postgres tagged-template function. We mock it as a
 // callable that captures the query and returns canned rows.
 
-let mockDbRows: Record<string, unknown>[] = [];
-let mockQueryRows: Record<string, unknown>[] = [];
-let mockQueryError: Error | null = null;
-
-const mockDb = Object.assign(
-  // Tagged template call: db`SELECT ...`
-  async () => mockDbRows,
-  {
-    unsafe: (s: string) => s,
-    query: async () => {
-      if (mockQueryError) throw mockQueryError;
-      return mockQueryRows;
+const { mockState, mockDb } = vi.hoisted(() => {
+  const mockState = {
+    dbRows: [] as Record<string, unknown>[],
+    queryError: null as Error | null,
+  };
+  const mockDb = Object.assign(
+    // Tagged template call: db`SELECT ...`
+    async () => mockState.dbRows,
+    {
+      unsafe: async () => {
+        if (mockState.queryError) throw mockState.queryError;
+        return mockState.dbRows;
+      },
     },
-  },
-);
+  );
+  return { mockState, mockDb };
+});
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getDb: () => mockDb,
+vi.mock('@semianalysisai/inferencex-db/etl/db-utils', () => ({
+  createAdminSql: () => mockDb,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -55,9 +57,8 @@ function parseText(result: Awaited<ReturnType<typeof callTool>>): unknown {
 }
 
 beforeEach(async () => {
-  mockDbRows = [];
-  mockQueryRows = [];
-  mockQueryError = null;
+  mockState.dbRows = [];
+  mockState.queryError = null;
   await setup();
 });
 
@@ -100,7 +101,7 @@ describe('get_overview', () => {
 
 describe('list_hardware', () => {
   it('returns hardware list from DB', async () => {
-    mockDbRows = [{ hardware: 'h100' }, { hardware: 'b200' }];
+    mockState.dbRows = [{ hardware: 'h100' }, { hardware: 'b200' }];
     const result = parseText(await callTool('list_hardware'));
     expect(result).toEqual(['h100', 'b200']);
   });
@@ -108,7 +109,7 @@ describe('list_hardware', () => {
 
 describe('list_models', () => {
   it('returns model list from DB', async () => {
-    mockDbRows = [{ model: 'dsr1' }, { model: 'llama70b' }];
+    mockState.dbRows = [{ model: 'dsr1' }, { model: 'llama70b' }];
     const result = parseText(await callTool('list_models'));
     expect(result).toEqual(['dsr1', 'llama70b']);
   });
@@ -116,7 +117,7 @@ describe('list_models', () => {
 
 describe('list_configs', () => {
   it('returns config combos', async () => {
-    mockDbRows = [
+    mockState.dbRows = [
       {
         hardware: 'h100',
         framework: 'vllm',
@@ -127,7 +128,7 @@ describe('list_configs', () => {
       },
     ];
     const result = parseText(await callTool('list_configs'));
-    expect(result).toEqual(mockDbRows);
+    expect(result).toEqual(mockState.dbRows);
   });
 });
 
@@ -159,7 +160,7 @@ describe('get_latest_benchmarks', () => {
   };
 
   it('extracts default metrics and rounds to 4 decimal places', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     const row = (result.rows as Record<string, unknown>[])[0];
 
@@ -174,7 +175,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('strips filtered fields from rows', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(
       await callTool('get_latest_benchmarks', { hardware: 'h100', model: 'dsr1' }),
     ) as Record<string, unknown>;
@@ -190,7 +191,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('includes num_prefill_gpu and num_decode_gpu in output', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     const row = (result.rows as Record<string, unknown>[])[0];
     expect(row.num_prefill_gpu).toBe(8);
@@ -198,7 +199,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('returns full metrics blob when metrics=["all"]', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(
       await callTool('get_latest_benchmarks', { metrics: ['all'] }),
     ) as Record<string, unknown>;
@@ -210,7 +211,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('extracts only requested metrics', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(
       await callTool('get_latest_benchmarks', { metrics: ['median_ttft', 'tput_per_gpu'] }),
     ) as Record<string, unknown>;
@@ -223,7 +224,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('returns null for missing metric keys', async () => {
-    mockDbRows = [{ ...baseRow, metrics: { median_ttft: 0.1 } }];
+    mockState.dbRows = [{ ...baseRow, metrics: { median_ttft: 0.1 } }];
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     const row = (result.rows as Record<string, unknown>[])[0];
 
@@ -233,7 +234,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('handles null metrics gracefully', async () => {
-    mockDbRows = [{ ...baseRow, metrics: null }];
+    mockState.dbRows = [{ ...baseRow, metrics: null }];
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     const row = (result.rows as Record<string, unknown>[])[0];
 
@@ -242,7 +243,7 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('reports truncated when rows hit limit', async () => {
-    mockDbRows = Array.from({ length: 3 }, (_, i) => ({
+    mockState.dbRows = Array.from({ length: 3 }, (_, i) => ({
       ...baseRow,
       conc: i + 1,
     }));
@@ -256,14 +257,14 @@ describe('get_latest_benchmarks', () => {
   });
 
   it('reports not truncated when under limit', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     expect(result.truncated).toBe(false);
     expect(result).not.toHaveProperty('hint');
   });
 
   it('omits filters key when no filters applied', async () => {
-    mockDbRows = [baseRow];
+    mockState.dbRows = [baseRow];
     const result = parseText(await callTool('get_latest_benchmarks')) as Record<string, unknown>;
     expect(result).not.toHaveProperty('filters');
   });
@@ -271,11 +272,11 @@ describe('get_latest_benchmarks', () => {
 
 describe('query_sql', () => {
   it('returns rows from valid SELECT', async () => {
-    mockQueryRows = [{ hardware: 'h100', ttft: 0.1 }];
+    mockState.dbRows = [{ hardware: 'h100', ttft: 0.1 }];
     const result = parseText(
       await callTool('query_sql', { sql: 'SELECT hardware FROM configs' }),
     ) as Record<string, unknown>;
-    expect(result.rows).toEqual(mockQueryRows);
+    expect(result.rows).toEqual(mockState.dbRows);
     expect(result.count).toBe(1);
     expect(result.truncated).toBe(false);
   });
@@ -300,7 +301,7 @@ describe('query_sql', () => {
   );
 
   it('returns SQL error as isError result', async () => {
-    mockQueryError = new Error('relation "foo" does not exist');
+    mockState.queryError = new Error('relation "foo" does not exist');
     const result = await callTool('query_sql', { sql: 'SELECT * FROM foo' });
     expect(result.isError).toBe(true);
     const content = result.content as { type: string; text: string }[];
