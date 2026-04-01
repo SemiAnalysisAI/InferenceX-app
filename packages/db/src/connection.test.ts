@@ -11,13 +11,13 @@ describe('shouldUseNeon', () => {
     expect(shouldUseNeon('postgres://user:pass@db.example.com/app')).toBe(false);
   });
 
-  it('honors DB_DRIVER=postgres override', () => {
+  it('honors DATABASE_DRIVER=postgres override', () => {
     expect(
       shouldUseNeon('postgres://user:pass@ep-test-123.us-east-1.aws.neon.tech/db', 'postgres'),
     ).toBe(false);
   });
 
-  it('honors DB_DRIVER=neon override', () => {
+  it('honors DATABASE_DRIVER=neon override', () => {
     expect(shouldUseNeon('postgres://user:pass@db.example.com/app', 'neon')).toBe(true);
   });
 });
@@ -48,14 +48,14 @@ describe('postgresOptionsForUrl', () => {
     });
   });
 
-  it('honors DB_SSL=false override for remote hosts', () => {
+  it('honors DATABASE_SSL=false override for remote hosts', () => {
     expect(postgresOptionsForUrl('postgres://user:pass@db.example.com/app', 'false')).toEqual({
       max: 5,
       ssl: false,
     });
   });
 
-  it('honors DB_SSL=true override for loopback hosts', () => {
+  it('honors DATABASE_SSL=true override for loopback hosts', () => {
     expect(postgresOptionsForUrl('postgres://user:pass@localhost:5432/app', 'true')).toEqual({
       max: 5,
       ssl: 'require',

@@ -29,10 +29,10 @@ function getDbHostname(url: string): string | null {
 }
 
 /**
- * DB_DRIVER=neon  → @neondatabase/serverless HTTP driver (default for *.neon.tech URLs)
- * DB_DRIVER=postgres → postgres.js TCP driver  (default for everything else)
+ * DATABASE_DRIVER=neon  → @neondatabase/serverless HTTP driver (default for *.neon.tech URLs)
+ * DATABASE_DRIVER=postgres → postgres.js TCP driver  (default for everything else)
  */
-export function shouldUseNeon(url: string, driver = process.env.DB_DRIVER): boolean {
+export function shouldUseNeon(url: string, driver = process.env.DATABASE_DRIVER): boolean {
   const normalizedDriver = driver?.toLowerCase();
   const hostname = getDbHostname(url);
 
@@ -42,12 +42,12 @@ export function shouldUseNeon(url: string, driver = process.env.DB_DRIVER): bool
 }
 
 /**
- * DB_SSL=false disables TLS unconditionally.
+ * DATABASE_SSL=false disables TLS unconditionally.
  * Otherwise: loopback → no TLS, remote → TLS required.
  */
 export function postgresOptionsForUrl(
   url: string,
-  sslEnv = process.env.DB_SSL,
+  sslEnv = process.env.DATABASE_SSL,
 ): PostgresConnectionOptions {
   const ssl = sslEnv?.toLowerCase();
   if (ssl === 'false') return { max: 5, ssl: false };
