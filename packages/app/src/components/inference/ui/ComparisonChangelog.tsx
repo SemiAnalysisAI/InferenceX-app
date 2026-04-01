@@ -40,25 +40,37 @@ export default function ComparisonChangelog({
 }: ComparisonChangelogProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Filter changelog entries to only show those matching selected GPUs and precisions
+  // Filter changelog entries to only show those matching selected GPUs and precisions.
+  // Always keep range endpoints visible even if they have no matching entries.
   const filteredChangelogs = useMemo(() => {
     const precSet = new Set(selectedPrecisions);
+    const rangeEndpoints = new Set<string>();
+    if (selectedDateRange.startDate) rangeEndpoints.add(selectedDateRange.startDate);
+    if (selectedDateRange.endDate) rangeEndpoints.add(selectedDateRange.endDate);
 
-    return changelogs
-      .map((item) => ({
-        ...item,
-        entries: item.entries.filter((entry) =>
-          entry.config_keys.some((key) => {
-            const precision = key.split('-')[1];
-            return (
-              precSet.has(precision) && selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
-            );
-          }),
-        ),
-      }))
-      .filter((item) => item.entries.length > 0)
+    const mapped = changelogs.map((item) => ({
+      ...item,
+      entries: item.entries.filter((entry) =>
+        entry.config_keys.some((key) => {
+          const precision = key.split('-')[1];
+          return (
+            precSet.has(precision) && selectedGPUs.some((gpu) => configKeyMatchesHwKey(key, gpu))
+          );
+        }),
+      ),
+    }));
+
+    // Ensure range endpoints are always present
+    for (const endpoint of rangeEndpoints) {
+      if (!mapped.some((item) => item.date === endpoint)) {
+        mapped.push({ date: endpoint, entries: [] });
+      }
+    }
+
+    return mapped
+      .filter((item) => item.entries.length > 0 || rangeEndpoints.has(item.date))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [changelogs, selectedGPUs, selectedPrecisions]);
+  }, [changelogs, selectedGPUs, selectedPrecisions, selectedDateRange]);
 
   const datesOnChart = useMemo(() => {
     const set = new Set(selectedDates);
