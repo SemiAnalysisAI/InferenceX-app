@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "inferencex": {
+      "command": "pnpm --silent mcp"
+    }
+  }
+}
