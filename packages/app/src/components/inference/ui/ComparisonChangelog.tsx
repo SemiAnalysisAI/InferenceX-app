@@ -121,7 +121,7 @@ export default function ComparisonChangelog({
               onAddAllDates(addableDates);
               track('inference_changelog_add_all_dates', { count: addableDates.length });
             }}
-            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+            className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-1"
           >
             <Plus className="h-3 w-3" />
             Add all to chart
@@ -171,7 +171,7 @@ export default function ComparisonChangelog({
                         onAddDate(item.date);
                         track('inference_changelog_add_date', { date: item.date });
                       }}
-                      className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5"
+                      className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                     >
                       <Plus className="h-3 w-3" />
                       Add to chart
