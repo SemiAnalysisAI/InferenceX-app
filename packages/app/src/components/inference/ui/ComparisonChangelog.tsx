@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown, ChevronUp, FileText, Lock, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Lock, Minus, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -190,8 +190,8 @@ export default function ComparisonChangelog({
                         }}
                         className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
                       >
-                        <Check className="h-3 w-3" />
-                        On chart
+                        <Minus className="h-3 w-3" />
+                        Remove from chart
                       </button>
                     ) : (
                       <span className="text-xs text-muted-foreground flex items-center gap-0.5">
