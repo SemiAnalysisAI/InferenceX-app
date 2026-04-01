@@ -17,6 +17,16 @@
   word-break: break-all;
 }
 
+/* Allow wide tables to scroll horizontally on narrow viewports */
+.blog-prose .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.blog-prose .table-scroll table {
+  min-width: 100%;
+}
+
 /* Remove auto-inserted curly quotes from blockquotes in blog prose */
 .blog-prose blockquote p:first-of-type::before,
 .blog-prose blockquote p:last-of-type::after {
