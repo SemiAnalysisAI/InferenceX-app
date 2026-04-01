@@ -10,24 +10,64 @@ export type DbClient = (
   ...values: unknown[]
 ) => Promise<Record<string, unknown>[]>;
 
-/** @deprecated Alias for DbClient — kept for backward compat with existing query files. */
-export type NeonClient = DbClient;
-
 /** True when running off a JSON dump directory instead of a live database (local dev only). */
 export const JSON_MODE = !process.env.DATABASE_READONLY_URL && !!process.env.DUMP_DIR;
 
-let cached: DbClient | null = null;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+type PostgresConnectionOptions = {
+  max: number;
+  ssl: false | 'require';
+};
+
+function getDbHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
+  } catch {
+    return null;
+  }
+}
 
 /**
  * DB_DRIVER=neon  → @neondatabase/serverless HTTP driver (default for *.neon.tech URLs)
  * DB_DRIVER=postgres → postgres.js TCP driver  (default for everything else)
  */
-function shouldUseNeon(url: string): boolean {
-  const driver = process.env.DB_DRIVER?.toLowerCase();
-  if (driver === 'postgres') return false;
-  if (driver === 'neon') return true;
-  return url.includes('.neon.tech');
+export function shouldUseNeon(url: string, driver = process.env.DB_DRIVER): boolean {
+  const normalizedDriver = driver?.toLowerCase();
+  const hostname = getDbHostname(url);
+
+  if (normalizedDriver === 'postgres') return false;
+  if (normalizedDriver === 'neon') return true;
+  return hostname?.endsWith('.neon.tech') ?? url.includes('.neon.tech');
 }
+
+/**
+ * DB_SSL=false disables TLS unconditionally.
+ * Otherwise: loopback → no TLS, remote → TLS required.
+ */
+export function postgresOptionsForUrl(
+  url: string,
+  sslEnv = process.env.DB_SSL,
+): PostgresConnectionOptions {
+  const ssl = sslEnv?.toLowerCase();
+  if (ssl === 'false') return { max: 5, ssl: false };
+  if (ssl === 'true') return { max: 5, ssl: 'require' };
+  const hostname = getDbHostname(url);
+  return {
+    max: 5,
+    ssl: hostname && LOOPBACK_HOSTS.has(hostname) ? false : 'require',
+  };
+}
+
+/** Wrap postgres.js Sql instance to match DbClient signature. */
+function wrapPostgres(sql: postgres.Sql): DbClient {
+  return ((strings: TemplateStringsArray, ...values: unknown[]) =>
+    sql(strings, ...(values as postgres.ParameterOrFragment<never>[]))) as DbClient;
+}
+
+// Survive Next.js HMR — without globalThis the module re-evaluates on each
+// hot reload, leaking the previous postgres.js TCP connection pool.
+const g = globalThis as unknown as { __dbClient?: DbClient };
 
 /**
  * Read-only SQL client for API routes.
@@ -35,13 +75,13 @@ function shouldUseNeon(url: string): boolean {
  * should skip this and use the json-provider instead.
  */
 export function getDb(): DbClient {
-  if (cached) return cached;
+  if (g.__dbClient) return g.__dbClient;
   const url = process.env.DATABASE_READONLY_URL;
   if (!url) throw new Error('DATABASE_READONLY_URL is not set');
 
-  cached = shouldUseNeon(url)
+  g.__dbClient = shouldUseNeon(url)
     ? (neon(url) as DbClient)
-    : (postgres(url, { ssl: false, max: 5 }) as unknown as DbClient);
+    : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
 
-  return cached;
+  return g.__dbClient;
 }

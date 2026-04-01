@@ -1,4 +1,4 @@
-import type { NeonClient } from '../connection.js';
+import type { DbClient } from '../connection.js';
 
 export interface BenchmarkRow {
   hardware: string;
@@ -36,7 +36,7 @@ export interface BenchmarkRow {
  * switching sequences — the data is already cached by React Query.
  */
 export async function getLatestBenchmarks(
-  sql: NeonClient,
+  sql: DbClient,
   modelKey: string,
   date?: string,
   exact?: boolean,
@@ -125,7 +125,7 @@ export async function getLatestBenchmarks(
  * Used by Historical Trends and Performance Over Time features.
  */
 export async function getAllBenchmarksForHistory(
-  sql: NeonClient,
+  sql: DbClient,
   modelKey: string,
   isl: number,
   osl: number,
