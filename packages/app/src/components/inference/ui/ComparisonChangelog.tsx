@@ -10,6 +10,7 @@ import type { ComparisonChangelog as ComparisonChangelogType } from '@/hooks/api
 import {
   configKeyMatchesHwKey,
   formatChangelogDescription,
+  formatConfigKeys,
 } from '@/components/inference/utils/changelogFormatters';
 import { updateRepoUrl } from '@/lib/utils';
 
@@ -216,6 +217,11 @@ export default function ComparisonChangelog({
                 {item.entries.length > 0 ? (
                   item.entries.map((entry, entryIndex) => (
                     <div key={entryIndex} className="text-sm text-muted-foreground pl-5">
+                      {selectedGPUs.length > 1 && (
+                        <span className="text-xs font-medium text-foreground/70">
+                          {entry.config_keys.map(formatConfigKeys).join(', ')}
+                        </span>
+                      )}
                       {formatChangelogDescription(entry.description)}
                     </div>
                   ))
