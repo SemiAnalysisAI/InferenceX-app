@@ -18,6 +18,7 @@ title: 'Best GPU for <DisplayName> Inference — Benchmarks & Comparison (<Month
 subtitle: '<write a natural, editorial subtitle — avoid formulaic patterns like "We benchmarked X across Y GPUs">'
 date: '<YYYY-MM-DD — preserve from existing file if updating, otherwise today>'
 modifiedDate: '<today YYYY-MM-DD>'
+publishDate: '<today YYYY-MM-DD — required for the post to be visible in production>'
 tags:
   - benchmark
   - inference
@@ -174,6 +175,7 @@ title: 'ML Inference Benchmark Roundup — GPU Comparison (<Month Year>)'
 subtitle: '<editorial subtitle, not formulaic>'
 date: '<preserve or today>'
 modifiedDate: '<today>'
+publishDate: '<today>'
 tags: [benchmark, inference, gpu, roundup]
 ```
 
