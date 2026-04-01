@@ -215,7 +215,9 @@ export default function ComparisonChangelog({
                   <span className="text-sm text-muted-foreground italic pl-5">
                     {item.date < '2025-12-30'
                       ? 'No changelog data (tracking began Dec 30, 2025)'
-                      : 'No config changes recorded'}
+                      : filteredChangelogs.some((c) => c.date < item.date && c.entries.length > 0)
+                        ? 'No config changes — same configuration as previous run'
+                        : 'Initial configuration — no changelog entry recorded'}
                   </span>
                 )}
               </div>
