@@ -24,18 +24,67 @@ function seqKey(isl: number, osl: number): string {
   return `${fmt(isl)}/${fmt(osl)}`;
 }
 
-/** Fetch benchmark data for a model from the API. */
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+function isRetryable(error: unknown): boolean {
+  // Network errors (fetch throws) are always retryable
+  if (error instanceof TypeError) return true;
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Fetch benchmark data for a model from the API (retries on network errors / 5xx). */
 export async function fetchBenchmarks(
   baseUrl: string,
   displayName: string,
 ): Promise<BenchmarkRow[]> {
   const url = `${baseUrl}/api/v1/benchmarks?model=${encodeURIComponent(displayName)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    console.warn(`  Failed to fetch ${displayName}: ${res.status} ${res.statusText}`);
-    return [];
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url);
+
+      // 4xx — not retryable, return immediately
+      if (res.status >= 400 && res.status < 500) {
+        console.warn(`  Failed to fetch ${displayName}: ${res.status} ${res.statusText}`);
+        return [];
+      }
+
+      // 5xx — retryable
+      if (!res.ok) {
+        const msg = `${res.status} ${res.statusText}`;
+        if (attempt < MAX_RETRIES) {
+          console.warn(
+            `  Fetch ${displayName} failed (${msg}), retrying (${attempt}/${MAX_RETRIES})...`,
+          );
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        console.warn(`  Failed to fetch ${displayName} after ${MAX_RETRIES} attempts: ${msg}`);
+        return [];
+      }
+
+      return (await res.json()) as BenchmarkRow[];
+    } catch (error: unknown) {
+      if (isRetryable(error) && attempt < MAX_RETRIES) {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `  Fetch ${displayName} error (${reason}), retrying (${attempt}/${MAX_RETRIES})...`,
+        );
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(`  Failed to fetch ${displayName} after ${MAX_RETRIES} attempts: ${reason}`);
+      return [];
+    }
   }
-  return (await res.json()) as BenchmarkRow[];
+
+  return [];
 }
 
 /**

@@ -87,11 +87,71 @@ function enrichConfig(c: BestConfig): SerializableBestConfig {
   };
 }
 
+interface FetchResult {
+  modelKey: string;
+  displayName: string;
+  status: 'included' | 'skipped_no_data' | 'skipped_few_gpus' | 'error';
+  reason?: string;
+}
+
+async function processModel(
+  baseUrl: string,
+  modelKey: string,
+  displayName: string,
+): Promise<{ result: FetchResult; entry?: SerializableModelData }> {
+  const rows = await fetchBenchmarks(baseUrl, displayName);
+  if (rows.length === 0) {
+    return {
+      result: { modelKey, displayName, status: 'skipped_no_data', reason: 'no benchmark data' },
+    };
+  }
+
+  const data = aggregateModelData(modelKey, displayName, rows);
+  const gpus = distinctGpus(data, PRIMARY_SEQ);
+
+  if (gpus.size < MIN_GPUS) {
+    return {
+      result: {
+        modelKey,
+        displayName,
+        status: 'skipped_few_gpus',
+        reason: `only ${gpus.size} GPU(s) at ${PRIMARY_SEQ} (need ${MIN_GPUS}+)`,
+      },
+    };
+  }
+
+  const primaryConfigs = data.bestBySequence.get(PRIMARY_SEQ) ?? [];
+
+  // Convert Map to plain object for JSON serialization
+  const sequences: Record<string, SerializableBestConfig[]> = {};
+  for (const [seq, configs] of data.bestBySequence) {
+    sequences[seq] = configs.map(enrichConfig);
+  }
+
+  const entry: SerializableModelData = {
+    modelKey,
+    displayName,
+    slug: `best-gpu-for-${modelKey}-inference`,
+    totalRows: rows.length,
+    sequences,
+    primarySequence: PRIMARY_SEQ,
+    gpuCount: new Set(primaryConfigs.map((c) => c.hardware)).size,
+    precisionCount: new Set(primaryConfigs.map((c) => c.precision)).size,
+    frameworkCount: new Set(primaryConfigs.map((c) => c.framework)).size,
+  };
+
+  return { result: { modelKey, displayName, status: 'included' }, entry };
+}
+
 async function main() {
   const { baseUrl, output } = parseArgs();
-  console.log(`Fetching benchmark data from: ${baseUrl}`);
-
   const models = allModels();
+  console.log(`Fetching benchmark data from: ${baseUrl} (${models.length} models in parallel)\n`);
+
+  const settled = await Promise.allSettled(
+    models.map(([modelKey, displayName]) => processModel(baseUrl, modelKey, displayName)),
+  );
+
   const result: SeoDataOutput = {
     generatedAt: new Date().toISOString(),
     baseUrl,
@@ -99,47 +159,56 @@ async function main() {
     models: [],
   };
 
-  for (const [modelKey, displayName] of models) {
-    console.log(`  Fetching: ${displayName} (${modelKey})`);
+  const fetchResults: FetchResult[] = [];
 
-    const rows = await fetchBenchmarks(baseUrl, displayName);
-    if (rows.length === 0) {
-      console.log('    Skipped: no benchmark data');
+  for (let i = 0; i < settled.length; i++) {
+    const outcome = settled[i];
+    const [modelKey, displayName] = models[i];
+
+    if (outcome.status === 'rejected') {
+      const reason =
+        outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      fetchResults.push({ modelKey, displayName, status: 'error', reason });
       continue;
     }
 
-    const data = aggregateModelData(modelKey, displayName, rows);
-    const gpus = distinctGpus(data, PRIMARY_SEQ);
-
-    if (gpus.size < MIN_GPUS) {
-      console.log(`    Skipped: only ${gpus.size} GPU(s) at ${PRIMARY_SEQ} (need ${MIN_GPUS}+)`);
-      continue;
+    fetchResults.push(outcome.value.result);
+    if (outcome.value.entry) {
+      result.models.push(outcome.value.entry);
     }
-
-    const primaryConfigs = data.bestBySequence.get(PRIMARY_SEQ) ?? [];
-
-    // Convert Map to plain object for JSON serialization
-    const sequences: Record<string, SerializableBestConfig[]> = {};
-    for (const [seq, configs] of data.bestBySequence) {
-      sequences[seq] = configs.map(enrichConfig);
-    }
-
-    result.models.push({
-      modelKey,
-      displayName,
-      slug: `best-gpu-for-${modelKey}-inference`,
-      totalRows: rows.length,
-      sequences,
-      primarySequence: PRIMARY_SEQ,
-      gpuCount: new Set(primaryConfigs.map((c) => c.hardware)).size,
-      precisionCount: new Set(primaryConfigs.map((c) => c.precision)).size,
-      frameworkCount: new Set(primaryConfigs.map((c) => c.framework)).size,
-    });
   }
 
   // Write output
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, JSON.stringify(result, null, 2), 'utf-8');
+
+  // Print summary
+  const included = fetchResults.filter((r) => r.status === 'included');
+  const skipped = fetchResults.filter(
+    (r) => r.status === 'skipped_no_data' || r.status === 'skipped_few_gpus',
+  );
+  const errors = fetchResults.filter((r) => r.status === 'error');
+
+  console.log('\n--- Summary ---');
+  console.log(`Total models: ${fetchResults.length}`);
+  console.log(`Included:     ${included.length}`);
+  console.log(`Skipped:      ${skipped.length}`);
+  console.log(`Errors:       ${errors.length}`);
+
+  if (skipped.length > 0) {
+    console.log('\nSkipped models:');
+    for (const r of skipped) {
+      console.log(`  ${r.displayName}: ${r.reason}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    console.log('\nFailed models:');
+    for (const r of errors) {
+      console.log(`  ${r.displayName}: ${r.reason}`);
+    }
+  }
+
   console.log(`\nWrote ${result.models.length} models to: ${output}`);
 }
 
