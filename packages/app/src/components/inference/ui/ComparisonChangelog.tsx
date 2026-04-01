@@ -203,19 +203,21 @@ export default function ComparisonChangelog({
                         </a>
                       )}
                     </>
-                  ) : (
-                    <span className="text-sm text-muted-foreground italic">
-                      {item.date < '2025-12-30'
-                        ? 'No changelog data (tracking began Dec 30, 2025)'
-                        : 'No config changes recorded'}
-                    </span>
-                  )}
+                  ) : null}
                 </div>
-                {item.entries.map((entry, entryIndex) => (
-                  <div key={entryIndex} className="text-sm text-muted-foreground pl-5">
-                    {formatChangelogDescription(entry.description)}
-                  </div>
-                ))}
+                {item.entries.length > 0 ? (
+                  item.entries.map((entry, entryIndex) => (
+                    <div key={entryIndex} className="text-sm text-muted-foreground pl-5">
+                      {formatChangelogDescription(entry.description)}
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground italic pl-5">
+                    {item.date < '2025-12-30'
+                      ? 'No changelog data (tracking began Dec 30, 2025)'
+                      : 'No config changes recorded'}
+                  </span>
+                )}
               </div>
             ))
           )}
