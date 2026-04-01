@@ -10,9 +10,9 @@ import type { ComparisonChangelog as ComparisonChangelogType } from '@/hooks/api
 import {
   configKeyMatchesHwKey,
   formatChangelogDescription,
-  formatConfigKeys,
 } from '@/components/inference/utils/changelogFormatters';
-import { updateRepoUrl } from '@/lib/utils';
+import { HARDWARE_CONFIG } from '@/lib/constants';
+import { getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 
 interface ComparisonChangelogProps {
   changelogs: ComparisonChangelogType[];
@@ -217,11 +217,20 @@ export default function ComparisonChangelog({
                 {item.entries.length > 0 ? (
                   item.entries.map((entry, entryIndex) => (
                     <div key={entryIndex} className="text-sm text-muted-foreground pl-5">
-                      {selectedGPUs.length > 1 && (
-                        <span className="text-xs font-medium text-foreground/70">
-                          {entry.config_keys.map(formatConfigKeys).join(', ')}
-                        </span>
-                      )}
+                      {selectedGPUs.length > 1 &&
+                        (() => {
+                          const matchingGpus = selectedGPUs.filter((gpu) =>
+                            entry.config_keys.some((key) => configKeyMatchesHwKey(key, gpu)),
+                          );
+                          const labels = matchingGpus.map((gpu) =>
+                            HARDWARE_CONFIG[gpu] ? getDisplayLabel(HARDWARE_CONFIG[gpu]) : gpu,
+                          );
+                          return labels.length > 0 ? (
+                            <span className="text-xs font-medium text-foreground/70">
+                              {labels.join(', ')}
+                            </span>
+                          ) : null;
+                        })()}
                       {formatChangelogDescription(entry.description)}
                     </div>
                   ))
