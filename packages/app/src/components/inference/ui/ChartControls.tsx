@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { MultiDatePicker } from '@/components/ui/multi-date-picker';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -76,14 +75,9 @@ const GROUPED_Y_AXIS_OPTIONS = METRIC_GROUPS.map((group) => ({
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
-  /** Intermediate dates within the comparison range that have changelog entries */
-  intermediateDates?: string[];
 }
 
-export default function ChartControls({
-  hideGpuComparison = false,
-  intermediateDates = [],
-}: ChartControlsProps) {
+export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
   const {
     selectedModel,
     setSelectedModel,
@@ -99,8 +93,6 @@ export default function ChartControls({
     availableGPUs,
     selectedDateRange,
     setSelectedDateRange,
-    selectedDates,
-    setSelectedDates,
     dateRangeAvailableDates,
     isCheckingAvailableDates,
     availablePrecisions,
@@ -345,32 +337,6 @@ export default function ChartControls({
               />
             </div>
           )}
-
-          {!hideGpuComparison &&
-            selectedGPUs.length > 0 &&
-            selectedDateRange.startDate &&
-            selectedDateRange.endDate &&
-            intermediateDates.length > 0 && (
-              <div className="flex flex-col space-y-1.5 lg:col-span-2">
-                <LabelWithTooltip
-                  htmlFor="intermediate-dates-select"
-                  label="Intermediate Dates"
-                  tooltip="Select up to 2 additional intermediate dates with config changelog entries. These dates will be added to the chart for comparison alongside the start and end dates."
-                />
-                <MultiDatePicker
-                  dates={selectedDates}
-                  onChange={(value) => {
-                    setSelectedDates(value);
-                    track('inference_intermediate_dates_selected', {
-                      dates: value.join(','),
-                    });
-                  }}
-                  availableDates={intermediateDates}
-                  maxDates={2}
-                  placeholder="Select intermediate dates"
-                />
-              </div>
-            )}
         </div>
       </div>
     </TooltipProvider>

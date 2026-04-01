@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, FileText, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -19,6 +19,10 @@ interface ComparisonChangelogProps {
   selectedPrecisions: string[];
   loading?: boolean;
   totalDatesQueried: number;
+  selectedDates: string[];
+  selectedDateRange: { startDate: string; endDate: string };
+  onAddDate: (date: string) => void;
+  onAddAllDates: (dates: string[]) => void;
 }
 
 export default function ComparisonChangelog({
@@ -27,6 +31,10 @@ export default function ComparisonChangelog({
   selectedPrecisions,
   loading,
   totalDatesQueried,
+  selectedDates,
+  selectedDateRange,
+  onAddDate,
+  onAddAllDates,
 }: ComparisonChangelogProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -50,6 +58,18 @@ export default function ComparisonChangelog({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [changelogs, selectedGPUs, selectedPrecisions]);
 
+  const datesOnChart = useMemo(() => {
+    const set = new Set(selectedDates);
+    if (selectedDateRange.startDate) set.add(selectedDateRange.startDate);
+    if (selectedDateRange.endDate) set.add(selectedDateRange.endDate);
+    return set;
+  }, [selectedDates, selectedDateRange]);
+
+  const addableDates = useMemo(
+    () => filteredChangelogs.map((c) => c.date).filter((d) => !datesOnChart.has(d)),
+    [filteredChangelogs, datesOnChart],
+  );
+
   const handleToggle = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
@@ -65,22 +85,35 @@ export default function ComparisonChangelog({
 
   return (
     <div className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden transition-all">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted/50 transition-colors"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-2">
+        <button
+          type="button"
+          onClick={handleToggle}
+          className="flex items-center gap-2 hover:bg-muted/50 transition-colors rounded px-1 -mx-1"
+          aria-expanded={isExpanded}
+        >
           <FileText className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">{label}</span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {isExpanded && addableDates.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              onAddAllDates(addableDates);
+              track('inference_changelog_add_all_dates', { count: addableDates.length });
+            }}
+            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+          >
+            <Plus className="h-3 w-3" />
+            Add all to chart
+          </button>
         )}
-      </button>
+      </div>
 
       <div
         className={`overflow-hidden transition-all duration-200 ease-in-out ${
@@ -98,6 +131,24 @@ export default function ComparisonChangelog({
               <div key={item.date} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{item.date}</span>
+                  {datesOnChart.has(item.date) ? (
+                    <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                      <Check className="h-3 w-3" />
+                      On chart
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onAddDate(item.date);
+                        track('inference_changelog_add_date', { date: item.date });
+                      }}
+                      className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add to chart
+                    </button>
+                  )}
                   {item.entries.length > 0 ? (
                     <>
                       <span className="text-muted-foreground">&mdash;</span>

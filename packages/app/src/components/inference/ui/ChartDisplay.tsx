@@ -111,6 +111,8 @@ export default function ChartDisplay() {
     selectedE2eXAxisMetric,
     selectedGPUs,
     selectedPrecisions,
+    selectedDates,
+    setSelectedDates,
     selectedDateRange,
     dateRangeAvailableDates,
     selectedModel,
@@ -127,7 +129,6 @@ export default function ChartDisplay() {
 
   const {
     changelogs,
-    intermediateDates,
     loading: changelogsLoading,
     totalDatesQueried,
   } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
@@ -677,7 +678,7 @@ export default function ChartDisplay() {
                 </div>
               </div>
             </div>
-            <ChartControls intermediateDates={intermediateDates} />
+            <ChartControls />
             <ModelArchitectureDiagram model={selectedModel} />
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
             {selectedGPUs.length > 0 && (
@@ -687,6 +688,17 @@ export default function ChartDisplay() {
                 selectedPrecisions={selectedPrecisions}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
+                selectedDates={selectedDates}
+                selectedDateRange={selectedDateRange}
+                onAddDate={(date) => {
+                  if (!selectedDates.includes(date)) {
+                    setSelectedDates([...selectedDates, date]);
+                  }
+                }}
+                onAddAllDates={(dates) => {
+                  const merged = [...new Set([...selectedDates, ...dates])];
+                  setSelectedDates(merged);
+                }}
               />
             )}
           </div>
