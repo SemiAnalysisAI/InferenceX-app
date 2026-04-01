@@ -6,10 +6,12 @@ import {
   PRECISION_KEYS,
   SPEC_METHOD_KEYS,
 } from '@semianalysisai/inferencex-constants';
-import { createAdminSql } from '@semianalysisai/inferencex-db/etl/db-utils';
+import { postgresOptionsForUrl } from '@semianalysisai/inferencex-db/connection';
+import postgres from 'postgres';
 import { z } from 'zod';
 
-const db = createAdminSql({ readonly: true, max: 5 });
+const url = process.env.DATABASE_READONLY_URL!;
+const db = postgres(url, postgresOptionsForUrl(url));
 const MAX_ROWS = 5_000;
 
 /**
