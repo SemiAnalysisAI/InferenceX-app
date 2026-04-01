@@ -54,7 +54,7 @@ export function getAllPosts(): BlogPostMeta[] {
   const now = new Date();
   const visible =
     process.env.NODE_ENV === 'production'
-      ? posts.filter((p) => !p.publishDate || new Date(p.publishDate + 'T00:00:00Z') <= now)
+      ? posts.filter((p) => !!p.publishDate && new Date(p.publishDate + 'T00:00:00Z') <= now)
       : posts;
 
   return visible.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

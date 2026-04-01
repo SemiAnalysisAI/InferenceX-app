@@ -24,7 +24,7 @@ tags?: string[] # Used for filtering on /blog and in RSS categories
 
 ### Scheduled Publishing (`publishDate`)
 
-If `publishDate` is set to a future date, the post is hidden from `getAllPosts()` in production but visible in development (for preview). This allows articles to be merged to `master` via PR and go live automatically when the date arrives. All downstream consumers (sitemap, RSS, llms.txt) automatically respect the filter since they call `getAllPosts()`. `getPostBySlug()` still returns the post regardless of `publishDate` (for direct URL preview).
+Posts without `publishDate` are hidden in production — this field is required for a post to be visible. If `publishDate` is set to a future date, the post is hidden until that date arrives. In development, all posts are visible regardless. This allows articles to be merged to `master` via PR and go live automatically when the date arrives. All downstream consumers (sitemap, RSS, llms.txt) automatically respect the filter since they call `getAllPosts()`. `getPostBySlug()` still returns the post regardless of `publishDate` (for direct URL preview).
 
 Slug is derived from the filename (e.g., `my-post.mdx` -> `my-post`), not from frontmatter. Reading time is calculated at 265 WPM.
 

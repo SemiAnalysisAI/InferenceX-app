@@ -191,7 +191,7 @@ describe('getAllPosts — publishDate filtering', () => {
     });
   }
 
-  it('filters out future-publishDate posts in production', () => {
+  it('filters out future-publishDate and missing-publishDate posts in production', () => {
     vi.stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
@@ -202,19 +202,18 @@ describe('getAllPosts — publishDate filtering', () => {
     const posts = getAllPosts();
     const slugs = posts.map((p) => p.slug);
     expect(slugs).toContain('past-publish');
-    expect(slugs).toContain('no-publish');
+    expect(slugs).not.toContain('no-publish');
     expect(slugs).not.toContain('future-post');
   });
 
-  it('keeps posts without publishDate in production', () => {
+  it('filters out posts without publishDate in production', () => {
     vi.stubEnv('NODE_ENV', 'production');
     mockPostFiles({
       'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
     });
 
     const posts = getAllPosts();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].slug).toBe('no-publish');
+    expect(posts).toHaveLength(0);
   });
 
   it('keeps posts with past publishDate in production', () => {
@@ -277,10 +276,9 @@ describe('getAllPosts — publishDate filtering', () => {
     });
 
     const posts = getAllPosts();
-    expect(posts).toHaveLength(2);
-    // no-publish date: 2025-08-01, past-publish date: 2025-06-01
-    expect(posts[0].slug).toBe('no-publish');
-    expect(posts[1].slug).toBe('past-publish');
+    // only past-publish has a valid publishDate <= now
+    expect(posts).toHaveLength(1);
+    expect(posts[0].slug).toBe('past-publish');
   });
 });
 
