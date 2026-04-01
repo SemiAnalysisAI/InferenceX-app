@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown, ChevronUp, FileText, Plus } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, FileText, Lock, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -148,7 +148,7 @@ export default function ComparisonChangelog({
                       </button>
                     ) : (
                       <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                        <Check className="h-3 w-3" />
+                        <Lock className="h-3 w-3" />
                         On chart
                       </span>
                     )
