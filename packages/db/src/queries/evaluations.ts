@@ -1,4 +1,4 @@
-import type { NeonClient } from '../connection.js';
+import type { DbClient } from '../connection.js';
 
 export interface EvalRow {
   config_id: number;
@@ -19,7 +19,7 @@ export interface EvalRow {
 }
 
 /** Get all evaluation results (latest attempt only). */
-export async function getAllEvalResults(sql: NeonClient): Promise<EvalRow[]> {
+export async function getAllEvalResults(sql: DbClient): Promise<EvalRow[]> {
   const rows = await sql`
     SELECT
       er.config_id,

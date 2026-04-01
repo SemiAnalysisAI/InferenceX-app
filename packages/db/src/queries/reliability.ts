@@ -1,4 +1,4 @@
-import type { NeonClient } from '../connection.js';
+import type { DbClient } from '../connection.js';
 
 export interface ReliabilityRow {
   hardware: string;
@@ -8,7 +8,7 @@ export interface ReliabilityRow {
 }
 
 /** Get all run_stats rows for reliability aggregation (latest attempt only). */
-export async function getReliabilityStats(sql: NeonClient): Promise<ReliabilityRow[]> {
+export async function getReliabilityStats(sql: DbClient): Promise<ReliabilityRow[]> {
   const rows = await sql`
     SELECT rs.hardware, rs.date::text, rs.n_success, rs.total
     FROM run_stats rs
