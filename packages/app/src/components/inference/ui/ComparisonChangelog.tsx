@@ -22,6 +22,7 @@ interface ComparisonChangelogProps {
   selectedDates: string[];
   selectedDateRange: { startDate: string; endDate: string };
   onAddDate: (date: string) => void;
+  onRemoveDate: (date: string) => void;
   onAddAllDates: (dates: string[]) => void;
 }
 
@@ -34,6 +35,7 @@ export default function ComparisonChangelog({
   selectedDates,
   selectedDateRange,
   onAddDate,
+  onRemoveDate,
   onAddAllDates,
 }: ComparisonChangelogProps) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -132,10 +134,24 @@ export default function ComparisonChangelog({
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{item.date}</span>
                   {datesOnChart.has(item.date) ? (
-                    <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                      <Check className="h-3 w-3" />
-                      On chart
-                    </span>
+                    selectedDates.includes(item.date) ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onRemoveDate(item.date);
+                          track('inference_changelog_remove_date', { date: item.date });
+                        }}
+                        className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
+                      >
+                        <Check className="h-3 w-3" />
+                        On chart
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                        <Check className="h-3 w-3" />
+                        On chart
+                      </span>
+                    )
                   ) : (
                     <button
                       type="button"

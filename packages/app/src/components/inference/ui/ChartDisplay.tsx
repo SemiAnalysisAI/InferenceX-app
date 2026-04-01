@@ -695,6 +695,9 @@ export default function ChartDisplay() {
                     setSelectedDates([...selectedDates, date]);
                   }
                 }}
+                onRemoveDate={(date) => {
+                  setSelectedDates(selectedDates.filter((d) => d !== date));
+                }}
                 onAddAllDates={(dates) => {
                   const merged = [...new Set([...selectedDates, ...dates])];
                   setSelectedDates(merged);
