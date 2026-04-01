@@ -173,9 +173,9 @@ Slug: `inference-benchmark-roundup`
 ```yaml
 title: 'ML Inference Benchmark Roundup — GPU Comparison (<Month Year>)'
 subtitle: '<editorial subtitle, not formulaic>'
-date: '<preserve or today>'
-modifiedDate: '<today>'
-publishDate: '<today>'
+date: '<YYYY-MM-DD — preserve from existing file if updating, otherwise today>'
+modifiedDate: '<today YYYY-MM-DD>'
+publishDate: '<today YYYY-MM-DD>'
 tags: [benchmark, inference, gpu, roundup]
 ```
 
