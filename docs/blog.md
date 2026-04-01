@@ -18,8 +18,13 @@ title: string
 subtitle: string
 date: YYYY-MM-DD
 modifiedDate?: YYYY-MM-DD # Used in sitemap and JSON-LD
+publishDate?: YYYY-MM-DD # Scheduled publishing, hidden in production until this date
 tags?: string[] # Used for filtering on /blog and in RSS categories
 ```
+
+### Scheduled Publishing (`publishDate`)
+
+If `publishDate` is set to a future date, the post is hidden from `getAllPosts()` in production but visible in development (for preview). This allows articles to be merged to `master` via PR and go live automatically when the date arrives. All downstream consumers (sitemap, RSS, llms.txt) automatically respect the filter since they call `getAllPosts()`. `getPostBySlug()` still returns the post regardless of `publishDate` (for direct URL preview).
 
 Slug is derived from the filename (e.g., `my-post.mdx` -> `my-post`), not from frontmatter. Reading time is calculated at 265 WPM.
 
@@ -32,6 +37,7 @@ Slug is derived from the filename (e.g., `my-post.mdx` -> `my-post`), not from f
 | `![alt](src)`                                  | Images                           | Rendered via `next/image` with lazy loading (first image is eager)                |
 | `<Figure src="..." alt="..." caption="..." />` | Captioned figures                | Uses `<img>` (not `next/image`) for external URLs                                 |
 | `<Blur>...</Blur>`                             | Paywall teaser blur overlay      | Content is blurred, unselectable, and not clickable                               |
+| `<JsonLd>{...}</JsonLd>`                       | Structured data (JSON-LD)        | Renders `<script type="application/ld+json">`. Validates JSON before rendering.   |
 
 Heading ID deduplication: if two headings share a slug, the second gets prefixed with its parent heading's slug (e.g., `overview-details`). If no parent exists, a level suffix is appended (`intro-2`).
 
@@ -111,7 +117,30 @@ All blog analytics use the `blog_` prefix per the `[section]_[action]` conventio
 ## Adding a New Blog Post
 
 1. Create `packages/app/content/blog/<slug>.mdx` with required frontmatter (`title`, `subtitle`, `date`)
-2. Add optional `tags` and `modifiedDate` frontmatter
+2. Add optional `tags`, `modifiedDate`, and `publishDate` frontmatter
 3. Write content using standard Markdown + available MDX components
 4. The post automatically appears in: blog list, sitemap, RSS feed, llms.txt, OG image generation
 5. No code changes needed — just the MDX file
+
+## Auto-Generated SEO Articles
+
+A weekly GitHub Action (`.github/workflows/seo-articles.yml`) generates per-model benchmark articles from InferenceX data:
+
+1. **Data script** (`packages/app/scripts/generate-seo-articles.ts`) fetches benchmark data from the production API and writes a JSON summary to `packages/app/tmp/seo-data.json`
+2. **Claude Code Action** reads the data + article template (`packages/app/scripts/seo/article-template.md`) and writes MDX files to `content/blog/`
+3. A PR is created for human review before merge
+
+### Running locally
+
+```bash
+pnpm admin:seo:data                                    # fetch data from production
+pnpm admin:seo:data --base-url http://localhost:3000    # fetch from local dev
+```
+
+### Article template
+
+The template at `packages/app/scripts/seo/article-template.md` defines the section order and formatting rules. Claude adapts depth and tone to each model's data richness — sparse-data models get shorter, honest articles; data-rich models get detailed analysis with framework and disagg comparisons.
+
+### Slugs
+
+Per-model articles use `best-gpu-for-<modelKey>-inference` slugs (e.g., `best-gpu-for-dsr1-inference`). The rollup uses `inference-benchmark-roundup`. Slugs are stable across updates to preserve SEO authority.
