@@ -702,6 +702,7 @@ export default function ChartDisplay() {
                   const merged = [...new Set([...selectedDates, ...dates])];
                   setSelectedDates(merged);
                 }}
+                firstAvailableDate={dateRangeAvailableDates[0]}
               />
             )}
           </div>

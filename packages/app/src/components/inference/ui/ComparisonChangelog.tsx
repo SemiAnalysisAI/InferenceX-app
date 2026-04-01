@@ -24,6 +24,8 @@ interface ComparisonChangelogProps {
   onAddDate: (date: string) => void;
   onRemoveDate: (date: string) => void;
   onAddAllDates: (dates: string[]) => void;
+  /** Earliest date the selected GPU config has benchmark data */
+  firstAvailableDate?: string;
 }
 
 export default function ComparisonChangelog({
@@ -37,16 +39,22 @@ export default function ComparisonChangelog({
   onAddDate,
   onRemoveDate,
   onAddAllDates,
+  firstAvailableDate,
 }: ComparisonChangelogProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Filter changelog entries to only show those matching selected GPUs and precisions.
-  // Always keep range endpoints visible even if they have no matching entries.
+  // Always keep range endpoints and first appearance date visible.
+  const pinnedDates = useMemo(() => {
+    const set = new Set<string>();
+    if (selectedDateRange.startDate) set.add(selectedDateRange.startDate);
+    if (selectedDateRange.endDate) set.add(selectedDateRange.endDate);
+    if (firstAvailableDate) set.add(firstAvailableDate);
+    return set;
+  }, [selectedDateRange, firstAvailableDate]);
+
   const filteredChangelogs = useMemo(() => {
     const precSet = new Set(selectedPrecisions);
-    const rangeEndpoints = new Set<string>();
-    if (selectedDateRange.startDate) rangeEndpoints.add(selectedDateRange.startDate);
-    if (selectedDateRange.endDate) rangeEndpoints.add(selectedDateRange.endDate);
 
     const mapped = changelogs.map((item) => ({
       ...item,
@@ -60,17 +68,17 @@ export default function ComparisonChangelog({
       ),
     }));
 
-    // Ensure range endpoints are always present
-    for (const endpoint of rangeEndpoints) {
-      if (!mapped.some((item) => item.date === endpoint)) {
-        mapped.push({ date: endpoint, entries: [] });
+    // Ensure pinned dates are always present
+    for (const date of pinnedDates) {
+      if (!mapped.some((item) => item.date === date)) {
+        mapped.push({ date, entries: [] });
       }
     }
 
     return mapped
-      .filter((item) => item.entries.length > 0 || rangeEndpoints.has(item.date))
+      .filter((item) => item.entries.length > 0 || pinnedDates.has(item.date))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [changelogs, selectedGPUs, selectedPrecisions, selectedDateRange]);
+  }, [changelogs, selectedGPUs, selectedPrecisions, pinnedDates]);
 
   const datesOnChart = useMemo(() => {
     const set = new Set(selectedDates);
@@ -145,6 +153,33 @@ export default function ComparisonChangelog({
               <div key={item.date} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{item.date}</span>
+                  {item.entries.length > 0 && (
+                    <>
+                      <span className="text-muted-foreground">&mdash;</span>
+                      {item.headRef && (
+                        <a
+                          href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${item.headRef}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm hover:underline text-foreground underline"
+                        >
+                          Git Commit
+                          <ExternalLinkIcon />
+                        </a>
+                      )}
+                      {item.runUrl && (
+                        <a
+                          href={updateRepoUrl(item.runUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm hover:underline text-foreground underline"
+                        >
+                          Workflow Run
+                          <ExternalLinkIcon />
+                        </a>
+                      )}
+                    </>
+                  )}
                   {datesOnChart.has(item.date) ? (
                     selectedDates.includes(item.date) ? (
                       <button
@@ -177,33 +212,6 @@ export default function ComparisonChangelog({
                       Add to chart
                     </button>
                   )}
-                  {item.entries.length > 0 ? (
-                    <>
-                      <span className="text-muted-foreground">&mdash;</span>
-                      {item.headRef && (
-                        <a
-                          href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${item.headRef}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm hover:underline text-foreground underline"
-                        >
-                          Git Commit
-                          <ExternalLinkIcon />
-                        </a>
-                      )}
-                      {item.runUrl && (
-                        <a
-                          href={updateRepoUrl(item.runUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm hover:underline text-foreground underline"
-                        >
-                          Workflow Run
-                          <ExternalLinkIcon />
-                        </a>
-                      )}
-                    </>
-                  ) : null}
                 </div>
                 {item.entries.length > 0 ? (
                   item.entries.map((entry, entryIndex) => (
@@ -213,11 +221,13 @@ export default function ComparisonChangelog({
                   ))
                 ) : (
                   <span className="text-sm text-muted-foreground italic pl-5">
-                    {item.date < '2025-12-30'
-                      ? 'No changelog data (tracking began Dec 30, 2025)'
-                      : filteredChangelogs.some((c) => c.date < item.date && c.entries.length > 0)
-                        ? 'No config changes — same configuration as previous run'
-                        : 'Initial configuration — no changelog entry recorded'}
+                    {item.date === firstAvailableDate
+                      ? 'First benchmark run for this configuration'
+                      : item.date < '2025-12-30'
+                        ? 'No changelog data (tracking began Dec 30, 2025)'
+                        : filteredChangelogs.some((c) => c.date < item.date && c.entries.length > 0)
+                          ? 'No config changes — same configuration as previous run'
+                          : 'Initial configuration — no changelog entry recorded'}
                   </span>
                 )}
               </div>
