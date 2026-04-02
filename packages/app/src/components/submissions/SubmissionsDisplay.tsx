@@ -17,13 +17,53 @@ import { computeTotalStats } from './submissions-utils';
 
 const CHART_ID = 'submissions-chart';
 
-function SubmissionsChartButtons({
+function SubmissionsModeToggle({
   chartMode,
   onModeChange,
 }: {
   chartMode: ChartMode;
   onModeChange: (mode: ChartMode) => void;
 }) {
+  return (
+    <div
+      className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
+      role="tablist"
+      aria-label="Chart mode"
+      data-testid="submissions-mode-toggle"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={chartMode === 'weekly'}
+        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+          chartMode === 'weekly'
+            ? 'bg-muted text-foreground'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        onClick={() => onModeChange('weekly')}
+        data-testid="submissions-weekly-btn"
+      >
+        Weekly
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={chartMode === 'cumulative'}
+        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+          chartMode === 'cumulative'
+            ? 'bg-muted text-foreground'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        onClick={() => onModeChange('cumulative')}
+        data-testid="submissions-cumulative-btn"
+      >
+        Cumulative
+      </button>
+    </div>
+  );
+}
+
+function SubmissionsChartOverlayButtons() {
   const { isExporting, exportToImage } = useChartExport({
     chartId: CHART_ID,
     exportFileName: 'InferenceX_submissions',
@@ -31,41 +71,6 @@ function SubmissionsChartButtons({
 
   return (
     <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10">
-      <div
-        className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
-        role="tablist"
-        aria-label="Chart mode"
-        data-testid="submissions-mode-toggle"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={chartMode === 'weekly'}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-            chartMode === 'weekly'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => onModeChange('weekly')}
-          data-testid="submissions-weekly-btn"
-        >
-          Weekly
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={chartMode === 'cumulative'}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-            chartMode === 'cumulative'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => onModeChange('cumulative')}
-          data-testid="submissions-cumulative-btn"
-        >
-          Cumulative
-        </button>
-      </div>
       <Button
         data-testid="export-button"
         variant="outline"
@@ -171,9 +176,13 @@ export default function SubmissionsDisplay() {
 
       {/* Activity chart */}
       <section>
-        <figure className="relative rounded-lg">
-          <SubmissionsChartButtons chartMode={chartMode} onModeChange={handleModeChange} />
-          <Card>
+        <Card>
+          <div className="flex items-center justify-between pb-4">
+            <div />
+            <SubmissionsModeToggle chartMode={chartMode} onModeChange={handleModeChange} />
+          </div>
+          <figure className="relative">
+            <SubmissionsChartOverlayButtons />
             {isLoading ? (
               <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
                 Loading chart data...
@@ -192,8 +201,8 @@ export default function SubmissionsDisplay() {
                 }
               />
             ) : null}
-          </Card>
-        </figure>
+          </figure>
+        </Card>
       </section>
 
       {/* Submissions table */}
