@@ -174,6 +174,14 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
             .attr('font-weight', '500');
           text.append('tspan').attr('x', 0).attr('dy', '0.8em').text('Switched to');
           text.append('tspan').attr('x', 0).attr('dy', '1.3em').text('on-change runs');
+          text
+            .append('tspan')
+            .attr('x', 0)
+            .attr('dy', '1.3em')
+            .attr('font-size', '9px')
+            .attr('font-weight', '400')
+            .attr('fill', 'var(--muted-foreground)')
+            .text('Dec 16, 2025');
           const bbox = (text.node() as SVGTextElement).getBBox();
           label
             .insert('rect', 'text')
