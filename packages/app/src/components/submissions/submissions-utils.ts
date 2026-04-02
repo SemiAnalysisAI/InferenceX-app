@@ -93,18 +93,19 @@ export function computeCumulative(volume: SubmissionVolumeRow[]): CumulativePoin
 /** Compute total stats from summary rows. */
 export function computeTotalStats(summary: SubmissionSummaryRow[]) {
   let totalDatapoints = 0;
-  let totalConfigs = summary.length;
-  let nvidiaDatapoints = 0;
-  let nonNvidiaDatapoints = 0;
+  const models = new Set<string>();
+  const gpus = new Set<string>();
 
   for (const row of summary) {
     totalDatapoints += row.total_datapoints;
-    if (isNonNvidia(row.hardware)) {
-      nonNvidiaDatapoints += row.total_datapoints;
-    } else {
-      nvidiaDatapoints += row.total_datapoints;
-    }
+    models.add(row.model);
+    gpus.add(row.hardware);
   }
 
-  return { totalDatapoints, totalConfigs, nvidiaDatapoints, nonNvidiaDatapoints };
+  return {
+    totalDatapoints,
+    totalConfigs: summary.length,
+    uniqueModels: models.size,
+    uniqueGpus: gpus.size,
+  };
 }

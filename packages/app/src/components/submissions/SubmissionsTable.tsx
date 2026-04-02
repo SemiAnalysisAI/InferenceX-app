@@ -1,15 +1,45 @@
 'use client';
 
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
+import { ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions-types';
 import { getFrameworkLabel } from '@/lib/utils';
+import {
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 
 import { getVendor } from './submissions-utils';
+
+function DetailItem({
+  label,
+  tip,
+  children,
+}: {
+  label: string;
+  tip: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-muted-foreground">{label}</span>
+      <TooltipRoot>
+        <TooltipTrigger asChild>
+          <Info className="h-3 w-3 text-muted-foreground/50 cursor-help shrink-0" />
+        </TooltipTrigger>
+        <TooltipContent side="top" collisionPadding={10}>
+          <span className="text-xs">{tip}</span>
+        </TooltipContent>
+      </TooltipRoot>
+      <span className="font-medium">{children}</span>
+    </div>
+  );
+}
 
 type SortKey =
   | 'hardware'
@@ -89,7 +119,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   }, []);
 
   const rowKey = (row: SubmissionSummaryRow) =>
-    `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}`;
+    `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}`;
 
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
     <th
@@ -196,41 +226,82 @@ function SubmissionRow({
         <tr className="bg-muted/20">
           <td />
           <td colSpan={6} className="px-3 py-3">
-            <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Vendor:</span>{' '}
-                <span className="font-medium">{vendor}</span>
+            <TooltipProvider>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
+                <DetailItem label="Vendor:" tip="GPU manufacturer">
+                  {vendor}
+                </DetailItem>
+                <DetailItem label="First Run:" tip="Date of the earliest benchmark for this config">
+                  <span className="tabular-nums">{row.first_date}</span>
+                </DetailItem>
+                <DetailItem
+                  label="Run Days:"
+                  tip="Number of distinct days this config was benchmarked"
+                >
+                  <span className="tabular-nums">{row.run_days}</span>
+                </DetailItem>
+                <DetailItem
+                  label="Spec Method:"
+                  tip="Speculative decoding method (e.g. MTP, Eagle)"
+                >
+                  {row.spec_method || 'none'}
+                </DetailItem>
+                <DetailItem
+                  label="Disaggregated:"
+                  tip="Prefill and decode run on separate GPU pools"
+                >
+                  {row.disagg ? 'Yes' : 'No'}
+                </DetailItem>
+                <DetailItem label="Multinode:" tip="Config spans multiple physical nodes">
+                  {row.is_multinode ? 'Yes' : 'No'}
+                </DetailItem>
+                <DetailItem
+                  label="Total GPUs:"
+                  tip="Total physical GPUs. When disaggregated, prefill + decode are separate pools"
+                >
+                  <span className="tabular-nums">
+                    {row.disagg ? row.num_prefill_gpu + row.num_decode_gpu : row.num_prefill_gpu}
+                  </span>
+                </DetailItem>
+                <DetailItem
+                  label="Prefill GPUs:"
+                  tip="GPUs for the prefill (prompt processing) phase"
+                >
+                  <span className="tabular-nums">{row.num_prefill_gpu}</span>
+                </DetailItem>
+                <DetailItem label="Decode GPUs:" tip="GPUs for the decode (token generation) phase">
+                  <span className="tabular-nums">{row.num_decode_gpu}</span>
+                </DetailItem>
+                <DetailItem
+                  label="Prefill TP/EP:"
+                  tip="Tensor parallelism / Expert parallelism for prefill"
+                >
+                  <span className="tabular-nums">
+                    {row.prefill_tp ?? '—'}/{row.prefill_ep ?? '—'}
+                  </span>
+                </DetailItem>
+                <DetailItem
+                  label="Decode TP/EP:"
+                  tip="Tensor parallelism / Expert parallelism for decode"
+                >
+                  <span className="tabular-nums">
+                    {row.decode_tp ?? '—'}/{row.decode_ep ?? '—'}
+                  </span>
+                </DetailItem>
+                <DetailItem
+                  label="Sequences:"
+                  tip="Distinct ISL/OSL sequence length combinations tested"
+                >
+                  <span className="tabular-nums">{row.distinct_sequences ?? '—'}</span>
+                </DetailItem>
+                <DetailItem label="Concurrencies:" tip="Distinct concurrency levels tested">
+                  <span className="tabular-nums">
+                    {row.distinct_concurrencies ?? '—'}
+                    {row.max_concurrency ? ` (max ${row.max_concurrency})` : ''}
+                  </span>
+                </DetailItem>
               </div>
-              <div>
-                <span className="text-muted-foreground">First Run:</span>{' '}
-                <span className="font-medium tabular-nums">{row.first_date}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Run Days:</span>{' '}
-                <span className="font-medium tabular-nums">{row.run_days}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Spec Method:</span>{' '}
-                <span className="font-medium">{row.spec_method || 'none'}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Disaggregated:</span>{' '}
-                <span className="font-medium">{row.disagg ? 'Yes' : 'No'}</span>
-              </div>
-              <Link
-                href={`/inference?i_gpus=${encodeURIComponent(row.hardware + '-' + row.framework)}`}
-                className="text-brand hover:text-brand/80 flex items-center gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  track('submissions_view_on_chart', {
-                    hardware: row.hardware,
-                    model: row.model,
-                  });
-                }}
-              >
-                View on chart <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
+            </TooltipProvider>
           </td>
         </tr>
       )}

@@ -180,6 +180,14 @@ export interface TooltipConfig<T = any> {
   onPointClick?: (d: T) => void;
   /** Which layer index to attach tooltip handlers to. Defaults to first renderable layer. */
   attachToLayer?: number;
+  /**
+   * When true, show ruler/tooltip on mousemove anywhere in the chart area,
+   * snapping to the nearest data point by x-position (bisect).
+   * Requires `getDataX` to extract the x-value from each data point.
+   */
+  proximityHover?: boolean;
+  /** Extract the numeric x-value from a data point for bisect. Required when `proximityHover` is true. */
+  getDataX?: (d: T) => number;
 }
 
 // ---------------------------------------------------------------------------

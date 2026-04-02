@@ -87,10 +87,20 @@ describe('computeTotalStats', () => {
       precision: 'fp8',
       spec_method: 'none',
       disagg: false,
+      is_multinode: false,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      prefill_tp: 4,
+      prefill_ep: 1,
+      decode_tp: 4,
+      decode_ep: 1,
       first_date: '2026-01-01',
       latest_date: '2026-01-10',
       run_days: 10,
       total_datapoints: 100,
+      distinct_sequences: 3,
+      distinct_concurrencies: 10,
+      max_concurrency: 30,
     },
     {
       model: 'dsr1',
@@ -99,10 +109,20 @@ describe('computeTotalStats', () => {
       precision: 'fp4',
       spec_method: 'none',
       disagg: false,
+      is_multinode: false,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 8,
+      prefill_tp: 8,
+      prefill_ep: 1,
+      decode_tp: 8,
+      decode_ep: 1,
       first_date: '2026-01-05',
       latest_date: '2026-01-10',
       run_days: 5,
       total_datapoints: 50,
+      distinct_sequences: 2,
+      distinct_concurrencies: 5,
+      max_concurrency: 15,
     },
   ];
 
@@ -110,7 +130,7 @@ describe('computeTotalStats', () => {
     const stats = computeTotalStats(summary);
     expect(stats.totalDatapoints).toBe(150);
     expect(stats.totalConfigs).toBe(2);
-    expect(stats.nvidiaDatapoints).toBe(100);
-    expect(stats.nonNvidiaDatapoints).toBe(50);
+    expect(stats.uniqueModels).toBe(1);
+    expect(stats.uniqueGpus).toBe(2);
   });
 });

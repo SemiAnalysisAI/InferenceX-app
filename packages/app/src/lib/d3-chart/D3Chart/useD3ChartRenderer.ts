@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
+import { computeTooltipPosition } from '../layers/scatter-points';
 import { setupChartStructure } from '../chart-setup';
 import { renderAxes, renderGrid } from '../chart-update';
 import type { AnyScale } from '../chart-update';
@@ -23,6 +24,7 @@ interface RendererDeps {
   zoomTransformRef: React.MutableRefObject<d3.ZoomTransform>;
   // Tooltip handlers
   isPinned: () => boolean;
+  pinTooltip: (data: any, isOverlay?: boolean) => void;
   dismissTooltip: (clearPinnedPoint?: boolean) => void;
   createRulers: (
     group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -77,6 +79,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     setupZoom,
     zoomTransformRef,
     isPinned,
+    pinTooltip,
     dismissTooltip,
     createRulers,
     attachHandlers,
@@ -192,11 +195,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
       // ── Tooltip ──
       if (tooltipConfig) {
-        const attachIdx =
-          tooltipConfig.attachToLayer ?? layerSelections.findIndex((s) => s != null);
-        const targetSelection = attachIdx >= 0 ? layerSelections[attachIdx] : null;
-
-        if (targetSelection) {
+        if (tooltipConfig.proximityHover && tooltipConfig.getDataX) {
+          // Proximity hover: overlay rect + bisect to nearest point
           const rulers = createRulers(
             renderGroup,
             tooltipConfig.rulerType,
@@ -204,26 +204,139 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             height,
             'var(--foreground)',
           );
+          const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
+          const containerEl = svgRef.current!.parentElement as HTMLDivElement;
+          const getDataX = tooltipConfig.getDataX;
+          const sortedData = [...data].sort((a, b) => getDataX(a) - getDataX(b));
+          const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
 
-          attachHandlers(
-            targetSelection,
-            {
-              rulerType: tooltipConfig.rulerType,
-              generateTooltipContent: tooltipConfig.content,
-              getRulerX: tooltipConfig.getRulerX,
-              getRulerY: tooltipConfig.getRulerY,
-              onHoverStart: tooltipConfig.onHoverStart,
-              onHoverEnd: tooltipConfig.onHoverEnd,
-              onPointClick: tooltipConfig.onPointClick,
-            },
-            svgRef.current!.parentElement as HTMLDivElement,
-            tooltip,
-            rulers,
-            xScale as any,
-            yScale as any,
-            svgRef,
-            zoomConfig?.axes,
-          );
+          // Remove any previous overlay to avoid duplicates
+          renderGroup.selectAll('.proximity-overlay').remove();
+
+          renderGroup
+            .append('rect')
+            .attr('class', 'proximity-overlay')
+            .attr('width', width)
+            .attr('height', height)
+            .attr('fill', 'none')
+            .attr('pointer-events', 'all')
+            .on('mousemove', (event: MouseEvent) => {
+              if (isPinned()) return;
+              const [mx] = d3.pointer(event);
+
+              // Get current (possibly zoomed) x scale
+              let currentXScale = xScale;
+              if (svgRef.current && zoomConfig?.axes !== 'y') {
+                const t = d3.zoomTransform(svgRef.current);
+                if (!isBandScale(xScale)) {
+                  currentXScale = zoomConfig?.rescaleX
+                    ? (zoomConfig.rescaleX(xScale as ContinuousScale, t) as BuiltScale)
+                    : (t.rescaleX(xScale as any) as BuiltScale);
+                }
+              }
+
+              const xVal = (currentXScale as any).invert ? (currentXScale as any).invert(mx) : mx;
+              const xNum = xVal instanceof Date ? xVal.getTime() : Number(xVal);
+              const idx = bisector(sortedData, xNum);
+              const d = sortedData[idx];
+              if (!d) return;
+
+              // Show tooltip content
+              tooltip
+                .style('opacity', 1)
+                .style('display', 'block')
+                .style('pointer-events', 'none')
+                .html(tooltipConfig.content(d, false));
+
+              // Position tooltip near mouse
+              const rect = containerEl.getBoundingClientRect();
+              const cmx = event.clientX - rect.left;
+              const cmy = event.clientY - rect.top;
+              const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl);
+              tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
+
+              // Position rulers
+              rulerGroup.style('display', 'block');
+              if (verticalRuler && tooltipConfig.getRulerX) {
+                const rx = tooltipConfig.getRulerX(d, currentXScale as any);
+                verticalRuler.attr('x1', rx).attr('x2', rx);
+              }
+              if (horizontalRuler && tooltipConfig.getRulerY) {
+                const ry = tooltipConfig.getRulerY(d, yScale as any);
+                horizontalRuler.attr('y1', ry).attr('y2', ry);
+              }
+            })
+            .on('mouseleave', () => {
+              if (isPinned()) return;
+              tooltip.style('opacity', 0).style('display', 'none');
+              rulerGroup.style('display', 'none');
+            })
+            .on('click', (event: MouseEvent) => {
+              const [mx] = d3.pointer(event);
+              let currentXScale = xScale;
+              if (svgRef.current && zoomConfig?.axes !== 'y') {
+                const t = d3.zoomTransform(svgRef.current);
+                if (!isBandScale(xScale)) {
+                  currentXScale = zoomConfig?.rescaleX
+                    ? (zoomConfig.rescaleX(xScale as ContinuousScale, t) as BuiltScale)
+                    : (t.rescaleX(xScale as any) as BuiltScale);
+                }
+              }
+              const xVal = (currentXScale as any).invert ? (currentXScale as any).invert(mx) : mx;
+              const xNum = xVal instanceof Date ? xVal.getTime() : Number(xVal);
+              const idx = bisector(sortedData, xNum);
+              const d = sortedData[idx];
+              if (!d) return;
+
+              event.stopPropagation();
+              const rect = containerEl.getBoundingClientRect();
+              const cmx = event.clientX - rect.left;
+              const cmy = event.clientY - rect.top;
+              tooltip.html(tooltipConfig.content(d, true));
+              const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl);
+              tooltip
+                .style('left', `${pos.left}px`)
+                .style('top', `${pos.top}px`)
+                .style('opacity', 1)
+                .style('display', 'block')
+                .style('pointer-events', 'auto');
+              pinTooltip(d);
+              tooltipConfig.onPointClick?.(d);
+            });
+        } else {
+          const attachIdx =
+            tooltipConfig.attachToLayer ?? layerSelections.findIndex((s) => s != null);
+          const targetSelection = attachIdx >= 0 ? layerSelections[attachIdx] : null;
+
+          if (targetSelection) {
+            const rulers = createRulers(
+              renderGroup,
+              tooltipConfig.rulerType,
+              width,
+              height,
+              'var(--foreground)',
+            );
+
+            attachHandlers(
+              targetSelection,
+              {
+                rulerType: tooltipConfig.rulerType,
+                generateTooltipContent: tooltipConfig.content,
+                getRulerX: tooltipConfig.getRulerX,
+                getRulerY: tooltipConfig.getRulerY,
+                onHoverStart: tooltipConfig.onHoverStart,
+                onHoverEnd: tooltipConfig.onHoverEnd,
+                onPointClick: tooltipConfig.onPointClick,
+              },
+              svgRef.current!.parentElement as HTMLDivElement,
+              tooltip,
+              rulers,
+              xScale as any,
+              yScale as any,
+              svgRef,
+              zoomConfig?.axes,
+            );
+          }
         }
       }
 
