@@ -72,16 +72,7 @@ export function useComparisonChangelogs(
     return results;
   }, [hasGPUs, datesToQuery, queries]);
 
-  // Intermediate dates with any changelog entries (excluding start/end when date range is set)
-  const intermediateDates = useMemo(() => {
-    if (!hasGPUs || !hasDateRange) return [];
-    return changelogs
-      .filter((c) => c.date !== selectedDateRange.startDate && c.date !== selectedDateRange.endDate)
-      .map((c) => c.date)
-      .sort();
-  }, [hasGPUs, hasDateRange, changelogs, selectedDateRange.startDate, selectedDateRange.endDate]);
-
   const loading = queries.some((q) => q.isLoading);
 
-  return { changelogs, intermediateDates, loading, totalDatesQueried: datesToQuery.length };
+  return { changelogs, loading, totalDatesQueried: datesToQuery.length };
 }

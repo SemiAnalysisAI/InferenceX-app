@@ -313,11 +313,29 @@ export const HARDWARE_CONFIG: HardwareConfig = {
     suffix: '',
     gpu: 'AMD MI325X',
   },
+  'mi325x_mori-sglang': {
+    name: 'mi325x-mori-sglang',
+    label: 'MI325X',
+    suffix: '(MoRI SGLang)',
+    gpu: 'AMD MI325X MoRI SGLang',
+  },
+  'mi325x_mori-sglang_mtp': {
+    name: 'mi325x-mori-sglang-mtp',
+    label: 'MI325X',
+    suffix: '(MoRI SGLang, MTP)',
+    gpu: 'AMD MI325X MoRI SGLang MTP',
+  },
   mi325x_sglang: {
     name: 'mi325x-sglang',
     label: 'MI325X',
     suffix: '(SGLang)',
     gpu: 'AMD MI325X SGLang',
+  },
+  mi325x_sglang_mtp: {
+    name: 'mi325x-sglang-mtp',
+    label: 'MI325X',
+    suffix: '(SGLang, MTP)',
+    gpu: 'AMD MI325X SGLang MTP',
   },
   mi325x_vllm: {
     name: 'mi325x-vllm',
