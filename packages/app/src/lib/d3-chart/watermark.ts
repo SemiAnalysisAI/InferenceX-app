@@ -20,7 +20,7 @@ export function createLogoWatermark(
     .attr('width', containerWidth)
     .attr('height', containerHeight)
     .append('image')
-    .attr('href', '/brand/logo-color.png')
+    .attr('href', '/brand/logo-color.webp')
     .attr('width', logoSize)
     .attr('height', logoSize)
     .attr('x', margin.left + (innerWidth - logoSize) / 2)

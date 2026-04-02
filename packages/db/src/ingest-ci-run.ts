@@ -20,13 +20,14 @@
  */
 
 import { execSync } from 'child_process';
-import postgres from 'postgres';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
+import { hasNoSslFlag } from './cli-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
@@ -163,8 +164,8 @@ if (PURGED_RUNS.has(runIdNum)) {
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
-const sql = postgres(process.env.DATABASE_WRITE_URL!, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 5,
   idle_timeout: 60,
 });
@@ -547,10 +548,7 @@ async function main(): Promise<void> {
     );
   }
 
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
 }

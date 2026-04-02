@@ -8,11 +8,11 @@
  *   pnpm --filter *inferencex-db db:ingest:supplemental
  */
 
-import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
 import {
@@ -25,13 +25,8 @@ import {
 import { bulkIngestBenchmarkRows, bulkUpsertAvailability } from './etl/benchmark-ingest';
 import { ingestEvalRow } from './etl/eval-ingest';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 5,
   idle_timeout: 60,
 });
@@ -353,10 +348,7 @@ async function main(): Promise<void> {
   await ingestSupplementalEvals(configCache, getOrCreateWorkflowRun);
   await ingestSupplementalBmk(configCache, getOrCreateWorkflowRun);
 
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s done`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== db:ingest:supplemental complete ===');
 }

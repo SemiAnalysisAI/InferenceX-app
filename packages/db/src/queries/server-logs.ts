@@ -1,10 +1,10 @@
-import type { NeonClient } from '../connection.js';
+import type { DbClient } from '../connection.js';
 
 /**
  * Fetch a server log by benchmark_result_id. Returns null if not found.
  */
 export async function getServerLog(
-  sql: NeonClient,
+  sql: DbClient,
   benchmarkResultId: number,
 ): Promise<string | null> {
   const rows = (await sql`

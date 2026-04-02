@@ -162,6 +162,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preload" as="image" href="/brand/left-pattern-full.svg" fetchPriority="high" />
         <link rel="preconnect" href="https://us-assets.i.posthog.com" />
         <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
       </head>

@@ -6,9 +6,12 @@ import {
   PRECISION_KEYS,
   SPEC_METHOD_KEYS,
 } from '@semianalysisai/inferencex-constants';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { postgresOptionsForUrl } from '@semianalysisai/inferencex-db/connection';
+import postgres from 'postgres';
 import { z } from 'zod';
 
+const url = process.env.DATABASE_READONLY_URL!;
+const db = postgres(url, postgresOptionsForUrl(url));
 const MAX_ROWS = 5_000;
 
 /**
@@ -123,7 +126,6 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const db = getDb();
       const rows = (await db`SELECT DISTINCT hardware FROM configs ORDER BY hardware`) as {
         hardware: string;
       }[];
@@ -146,7 +148,6 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const db = getDb();
       const rows = (await db`SELECT DISTINCT model FROM configs ORDER BY model`) as {
         model: string;
       }[];
@@ -174,7 +175,6 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true },
     },
     async ({ hardware, model }) => {
-      const db = getDb();
       const rows = (await db`
         SELECT DISTINCT hardware, framework, model, precision, spec_method, disagg
         FROM configs
@@ -253,7 +253,6 @@ export function createServer(): McpServer {
       metrics: requestedMetrics,
       limit,
     }) => {
-      const db = getDb();
       const rowLimit = Math.min(limit ?? 200, MAX_ROWS);
       // Allowlisted sort keys to prevent SQL injection via JSONB key
       const SORT_KEYS = new Set([
@@ -388,18 +387,14 @@ export function createServer(): McpServer {
           isError: true,
         };
       }
-      const db = getDb();
+
       try {
-        const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), QUERY_TIMEOUT_MS);
-        let rows: Record<string, unknown>[];
-        try {
-          rows = (await db.query(query, [], {
-            fetchOptions: { signal: ac.signal },
-          })) as Record<string, unknown>[];
-        } finally {
-          clearTimeout(timer);
-        }
+        const rows = (await Promise.race([
+          db.unsafe(query),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Query timed out')), QUERY_TIMEOUT_MS),
+          ),
+        ])) as Record<string, unknown>[];
         const truncated = rows.length > MAX_ROWS;
         const result = truncated ? rows.slice(0, MAX_ROWS) : rows;
         return {

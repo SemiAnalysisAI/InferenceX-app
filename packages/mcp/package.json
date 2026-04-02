@@ -7,7 +7,7 @@
     "./server": "./src/server.ts"
   },
   "scripts": {
-    "mcp": "dotenv -e ../../.env -- tsx watch src/mcp.ts",
+    "mcp": "dotenv -e ../../.env -- tsx src/mcp.ts",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -15,6 +15,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "@semianalysisai/inferencex-db": "workspace:*",
+    "postgres": "^3.4.8",
     "zod": "^4.3.6"
   },
   "devDependencies": {

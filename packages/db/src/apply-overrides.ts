@@ -10,18 +10,12 @@
  *   pnpm db:apply-overrides --yes      # skip confirmation
  */
 
-import postgres from 'postgres';
-
-import { confirm, hasYesFlag } from './cli-utils.js';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
+import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './etl/run-overrides.js';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });
@@ -129,7 +123,6 @@ async function previewPurge(githubRunId: number): Promise<PurgeTarget | null> {
 /** Delete all data for a run within a transaction. */
 async function purge(githubRunId: number, wrIds: number[]): Promise<void> {
   // postgres TransactionSql Omit drops the call signature — cast to Sql type
-  type Sql = ReturnType<typeof postgres>;
   await sql.begin(async (_tx) => {
     const tx = _tx as unknown as Sql;
 
@@ -264,10 +257,7 @@ async function main(): Promise<void> {
   }
 
   // Phase 4: refresh mat view
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const t0 = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - t0) / 1000)}s`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
   console.log('  Invalidate API cache: pnpm admin:cache:invalidate');

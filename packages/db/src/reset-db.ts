@@ -6,19 +6,13 @@
  *   pnpm admin:db:reset
  */
 
-import postgres from 'postgres';
-
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
+import { createAdminSql } from './etl/db-utils';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });
