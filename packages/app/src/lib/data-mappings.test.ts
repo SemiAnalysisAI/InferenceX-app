@@ -8,6 +8,7 @@ import {
   getPrecisionLabel,
   getEvalBenchmarkLabel,
   isModelDeprecated,
+  isSequenceDeprecated,
   Model,
   Sequence,
   Precision,
@@ -156,6 +157,23 @@ describe('isModelDeprecated', () => {
 
   it('returns false for non-deprecated model GptOss', () => {
     expect(isModelDeprecated(Model.GptOss)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// isSequenceDeprecated
+// ===========================================================================
+describe('isSequenceDeprecated', () => {
+  it('returns true for deprecated sequence OneK_EightK', () => {
+    expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
+  });
+
+  it('returns false for non-deprecated sequence OneK_OneK', () => {
+    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(false);
+  });
+
+  it('returns false for non-deprecated sequence EightK_OneK', () => {
+    expect(isSequenceDeprecated(Sequence.EightK_OneK)).toBe(false);
   });
 });
 
