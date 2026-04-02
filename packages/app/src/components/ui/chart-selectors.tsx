@@ -1,5 +1,7 @@
 'use client';
 
+import { Info } from 'lucide-react';
+
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -12,16 +14,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
 import {
+  getModelCategory,
   getModelLabel,
   getPrecisionLabel,
+  getSequenceCategory,
   getSequenceLabel,
-  isModelDeprecated,
-  isModelExperimental,
+  groupByCategory,
   Model,
   Precision,
   Sequence,
 } from '@/lib/data-mappings';
+
+function DeprecatedLabel({ reason }: { reason: string }) {
+  return (
+    <SelectLabel>
+      <span className="flex items-center gap-1">
+        Deprecated
+        <TooltipRoot>
+          <TooltipTrigger asChild>
+            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top" collisionPadding={10}>
+            <span>{reason}</span>
+          </TooltipContent>
+        </TooltipRoot>
+      </span>
+    </SelectLabel>
+  );
+}
 
 interface ModelSelectorProps {
   id?: string;
@@ -38,11 +60,7 @@ export function ModelSelector({
   availableModels,
   'data-testid': testId,
 }: ModelSelectorProps) {
-  const activeModels = availableModels.filter(
-    (m) => !isModelDeprecated(m as Model) && !isModelExperimental(m as Model),
-  );
-  const experimentalModels = availableModels.filter((m) => isModelExperimental(m as Model));
-  const deprecatedModels = availableModels.filter((m) => isModelDeprecated(m as Model));
+  const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-2">
@@ -62,25 +80,25 @@ export function ModelSelector({
           <SelectValue placeholder="Model" />
         </SelectTrigger>
         <SelectContent>
-          {activeModels.map((model) => (
+          {groups.default.map((model) => (
             <SelectItem key={model} value={model}>
               {getModelLabel(model as Model)}
             </SelectItem>
           ))}
-          {experimentalModels.length > 0 && (
+          {groups.experimental.length > 0 && (
             <SelectGroup>
               <SelectLabel>Experimental Support (WIP)</SelectLabel>
-              {experimentalModels.map((model) => (
+              {groups.experimental.map((model) => (
                 <SelectItem key={model} value={model}>
                   {getModelLabel(model as Model)}
                 </SelectItem>
               ))}
             </SelectGroup>
           )}
-          {deprecatedModels.length > 0 && (
+          {groups.deprecated.length > 0 && (
             <SelectGroup>
-              <SelectLabel>Deprecated</SelectLabel>
-              {deprecatedModels.map((model) => (
+              <DeprecatedLabel reason="Model is no longer actively benchmarked." />
+              {groups.deprecated.map((model) => (
                 <SelectItem key={model} value={model}>
                   {getModelLabel(model as Model)}
                 </SelectItem>
@@ -108,6 +126,8 @@ export function SequenceSelector({
   availableSequences,
   'data-testid': testId,
 }: SequenceSelectorProps) {
+  const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
+
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip
@@ -126,11 +146,21 @@ export function SequenceSelector({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {availableSequences.map((seq) => (
+          {groups.default.map((seq) => (
             <SelectItem key={seq} value={seq}>
               {getSequenceLabel(seq as Sequence)}
             </SelectItem>
           ))}
+          {groups.deprecated.length > 0 && (
+            <SelectGroup>
+              <DeprecatedLabel reason="CI capacity was reallocated to agentic coding and multi-turn chat scenarios." />
+              {groups.deprecated.map((seq) => (
+                <SelectItem key={seq} value={seq}>
+                  {getSequenceLabel(seq as Sequence)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          )}
         </SelectContent>
       </Select>
     </div>

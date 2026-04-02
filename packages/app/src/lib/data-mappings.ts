@@ -9,14 +9,33 @@ export enum Model {
   GLM_5 = 'GLM-5',
 }
 
-export type ModelCategory = 'default' | 'experimental' | 'deprecated' | 'hidden';
+export type CategoryTag = 'default' | 'experimental' | 'deprecated' | 'hidden';
+
+/**
+ * Partition a list of values by their category using a classifier function.
+ */
+export function groupByCategory<T>(
+  items: T[],
+  classify: (item: T) => CategoryTag,
+): Record<CategoryTag, T[]> {
+  const groups: Record<CategoryTag, T[]> = {
+    default: [],
+    experimental: [],
+    deprecated: [],
+    hidden: [],
+  };
+  for (const item of items) {
+    groups[classify(item)].push(item);
+  }
+  return groups;
+}
 
 /**
  * Single source of truth for model metadata. To add a model:
  * 1. Add an enum member to `Model` above.
  * 2. Add one entry here.
  */
-const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: ModelCategory }> = {
+const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: CategoryTag }> = {
   [Model.Llama3_3_70B]: { label: 'Llama 3.3 70B Instruct', prefix: '70b', category: 'deprecated' },
   [Model.Llama3_1_70B]: { label: 'Llama 3.1 70B Instruct', prefix: '', category: 'hidden' },
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
@@ -31,7 +50,7 @@ const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: Mod
   [Model.GLM_5]: { label: 'GLM 5', prefix: 'glm5', category: 'experimental' },
 };
 
-function modelsByCategory(cat: ModelCategory): ReadonlySet<Model> {
+function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
   return new Set(
     (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
       .filter(([, c]) => c.category === cat)
@@ -57,6 +76,10 @@ export function isModelExperimental(model: Model): boolean {
   return EXPERIMENTAL_MODELS.has(model);
 }
 
+export function getModelCategory(model: Model): CategoryTag {
+  return MODEL_CONFIG[model]?.category ?? 'default';
+}
+
 export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
 }
@@ -77,13 +100,28 @@ export enum Sequence {
   EightK_OneK = '8k/1k',
 }
 
-const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string }> = {
-  [Sequence.OneK_OneK]: { label: '1K / 1K', compact: '1k1k' },
-  [Sequence.OneK_EightK]: { label: '1K / 8K', compact: '1k8k' },
-  [Sequence.EightK_OneK]: { label: '8K / 1K', compact: '8k1k' },
-};
+const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string; category: CategoryTag }> =
+  {
+    [Sequence.OneK_OneK]: { label: '1K / 1K', compact: '1k1k', category: 'default' },
+    [Sequence.OneK_EightK]: { label: '1K / 8K', compact: '1k8k', category: 'deprecated' },
+    [Sequence.EightK_OneK]: { label: '8K / 1K', compact: '8k1k', category: 'default' },
+  };
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
+
+export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
+  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][])
+    .filter(([, c]) => c.category === 'deprecated')
+    .map(([s]) => s),
+);
+
+export function isSequenceDeprecated(sequence: Sequence): boolean {
+  return DEPRECATED_SEQUENCES.has(sequence);
+}
+
+export function getSequenceCategory(sequence: Sequence): CategoryTag {
+  return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
+}
 
 export function getSequenceLabel(sequence: Sequence): string {
   return SEQUENCE_CONFIG[sequence]?.label ?? sequence;
