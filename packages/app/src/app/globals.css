@@ -130,7 +130,10 @@
   --color-mi300x-sglang: var(--mi300x-sglang);
   --color-mi300x-vllm: var(--mi300x-vllm);
   --color-mi325x: var(--mi325x);
+  --color-mi325x-mori-sglang: var(--mi325x-mori-sglang);
+  --color-mi325x-mori-sglang-mtp: var(--mi325x-mori-sglang-mtp);
   --color-mi325x-sglang: var(--mi325x-sglang);
+  --color-mi325x-sglang-mtp: var(--mi325x-sglang-mtp);
   --color-mi325x-vllm: var(--mi325x-vllm);
   --color-mi355x: var(--mi355x);
   --color-mi355x-mori-sglang: var(--mi355x-mori-sglang);
