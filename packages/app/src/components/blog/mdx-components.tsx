@@ -117,6 +117,21 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
         </figure>
       );
     },
+    table: (props: React.TableHTMLAttributes<HTMLTableElement>) => (
+      <div className="table-scroll">
+        <table {...props} />
+      </div>
+    ),
     Blur,
+    JsonLd: (props: { children?: ReactNode }) => {
+      const raw = childrenToText(props.children).trim();
+      if (!raw) return null;
+      try {
+        JSON.parse(raw);
+      } catch {
+        return null;
+      }
+      return <script type="application/ld+json">{raw}</script>;
+    },
   };
 }

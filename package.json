@@ -38,7 +38,8 @@
     "admin:db:migrate": "pnpm --filter *db db:migrate",
     "admin:db:apply-overrides": "pnpm --filter *db db:apply-overrides",
     "admin:db:reset": "pnpm --filter *db db:reset",
-    "admin:db:verify": "pnpm --filter *db db:verify"
+    "admin:db:verify": "pnpm --filter *db db:verify",
+    "admin:seo:data": "pnpm --filter *app seo:data"
   },
   "devDependencies": {
     "audit-ci": "^7.1.0",

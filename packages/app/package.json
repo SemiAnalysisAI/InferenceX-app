@@ -21,7 +21,8 @@
     "clean": "rimraf .next out",
     "clean:all": "rimraf .next out cypress/videos cypress/screenshots coverage",
     "cache:invalidate": "dotenv -e ../../.env -- tsx scripts/invalidate-cache.ts",
-    "cache:warmup": "dotenv -e ../../.env -- tsx scripts/warmup-cache.ts"
+    "cache:warmup": "dotenv -e ../../.env -- tsx scripts/warmup-cache.ts",
+    "seo:data": "tsx scripts/generate-seo-articles.ts"
   },
   "dependencies": {
     "@jpinsonneau/html-to-image": "^1.11.13",

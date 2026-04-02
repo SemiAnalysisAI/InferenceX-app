@@ -8,6 +8,7 @@ export interface BlogFrontmatter {
   date: string;
   subtitle: string;
   modifiedDate?: string;
+  publishDate?: string;
   tags?: string[];
 }
 
@@ -50,7 +51,13 @@ export function getAllPosts(): BlogPostMeta[] {
     };
   });
 
-  return posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const now = new Date();
+  const visible =
+    process.env.NODE_ENV === 'production'
+      ? posts.filter((p) => !!p.publishDate && new Date(p.publishDate + 'T00:00:00Z') <= now)
+      : posts;
+
+  return visible.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export interface AdjacentPosts {

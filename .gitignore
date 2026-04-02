@@ -46,6 +46,7 @@
 **/inferencex-backup-*.dump
 
 # local data
+**/tmp
 **/gcs
 **/logs
 **/public/data/*

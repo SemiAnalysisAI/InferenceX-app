@@ -1,0 +1,100 @@
+name: SEO Articles
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.PAT }}
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --filter @semianalysisai/inferencex-app...
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Fetch benchmark data
+        run: pnpm admin:seo:data
+
+      - name: Generate articles with Claude
+        uses: anthropics/claude-code-action@88c168b39e7e64da0286d812b6e9fbebb6708185 # v1.0.82
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.PAT }}
+          direct_prompt: |
+            You are generating SEO blog articles for InferenceX from benchmark data.
+
+            ## Instructions
+            1. Read the article template at `packages/app/scripts/seo/article-template.md`
+            2. Read the benchmark data at `packages/app/tmp/seo-data.json`
+            3. For each model in the data, create or update an MDX file at
+               `packages/app/content/blog/best-gpu-for-<modelKey>-inference.mdx`
+            4. Create/update the rollup article at
+               `packages/app/content/blog/inference-benchmark-roundup.mdx`
+
+            Follow the template structure EXACTLY — same sections, same order, same table format.
+            Write natural, varied prose for each model (not copy-paste between articles).
+
+            ## Critical Rules
+            - ALL numbers MUST come from the data file. Never invent or estimate numbers.
+            - TTFT/TPOT/E2EL values in the data are in SECONDS — multiply by 1000 for display in ms.
+            - Use gpuDisplayName from the data (e.g. "NVIDIA B200", "AMD MI 355X").
+            - Preserve the `date` frontmatter from existing files (check if file exists first).
+            - The runner-up in Key Findings must be a DIFFERENT GPU than the winner.
+            - Skip the 1k/8k sequence entirely — it is deprecated.
+            - Format large numbers with commas (e.g. 18,131.6).
+          allowed_tools: 'Read,Write,Edit,Glob,Grep,Bash'
+          claude_args: '--model claude-sonnet-4-5-20250929'
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet -- 'packages/app/content/blog/'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          BRANCH="seo/update-articles-${DATE}"
+          git checkout -b "$BRANCH"
+          git add 'packages/app/content/blog/'
+          git commit -m "update SEO benchmark articles (${DATE})"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "update SEO benchmark articles (${DATE})" \
+            --body "$(cat <<'EOF'
+          ## Summary
+          - Auto-generated SEO blog articles from latest benchmark data
+          - Articles written by Claude using real data from `seo-data.json`
+
+          ## Review checklist
+          - [ ] Spot-check numbers against live dashboard
+          - [ ] Verify JSON-LD in page source
+          - [ ] Read prose for quality and accuracy
+          EOF
+          )" \
+            --base master
