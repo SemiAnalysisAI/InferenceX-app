@@ -141,3 +141,25 @@ export function fetchEvaluations() {
 export function fetchSubmissions() {
   return fetchJson<import('./submissions-types').SubmissionsResponse>('/api/v1/submissions');
 }
+
+export interface LatestImageRow {
+  model: string;
+  hardware: string;
+  framework: string;
+  precision: string;
+  spec_method: string;
+  isl: number;
+  osl: number;
+  image: string;
+  date: string;
+}
+
+export function fetchLatestImages() {
+  return fetchJson<LatestImageRow[]>('/api/v1/latest-images');
+}
+
+export type FrameworkReleases = Record<string, string | null>;
+
+export function fetchFrameworkReleases() {
+  return fetchJson<FrameworkReleases>('/api/v1/framework-releases');
+}
