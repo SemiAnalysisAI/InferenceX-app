@@ -71,6 +71,7 @@ function generateTooltipContent(d: ChartPoint, isPinned: boolean): string {
 export default function SubmissionsChart({ volume, mode, caption }: SubmissionsChartProps) {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [enabledLines, setEnabledLines] = useState<Set<LineKey>>(new Set(LINE_KEYS));
+  const [onChangeOnly, setOnChangeOnly] = useState(true);
 
   const toggleLine = useCallback((name: string) => {
     setEnabledLines((prev) => {
@@ -97,8 +98,14 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
     [enabledLines, toggleLine],
   );
 
-  const weeklyData = useMemo(() => groupVolumeByWeek(volume), [volume]);
-  const cumulativeData = useMemo(() => computeCumulative(volume), [volume]);
+  const filteredVolume = useMemo(() => {
+    if (!onChangeOnly || mode !== 'weekly') return volume;
+    const cutoff = '2025-12-16';
+    return volume.filter((r) => r.date >= cutoff);
+  }, [volume, onChangeOnly, mode]);
+
+  const weeklyData = useMemo(() => groupVolumeByWeek(filteredVolume), [filteredVolume]);
+  const cumulativeData = useMemo(() => computeCumulative(filteredVolume), [filteredVolume]);
 
   const { chartPoints, lineData, xDomain, yDomain } = useMemo(() => {
     const source =
@@ -271,6 +278,21 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
               setIsLegendExpanded(expanded);
               track('submissions_legend_expanded', { expanded });
             }}
+            switches={
+              mode === 'weekly'
+                ? [
+                    {
+                      id: 'submissions-on-change-only',
+                      label: 'On-change only',
+                      checked: onChangeOnly,
+                      onCheckedChange: (checked) => {
+                        setOnChangeOnly(checked);
+                        track('submissions_on_change_filter', { enabled: checked });
+                      },
+                    },
+                  ]
+                : undefined
+            }
           />
         }
       />

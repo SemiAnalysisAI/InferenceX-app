@@ -10,6 +10,7 @@ export interface SubmissionSummaryRow {
   distinct_sequences: number;
   distinct_concurrencies: number;
   max_concurrency: number;
+  image: string | null;
 }
 
 export interface SubmissionVolumeRow {
@@ -41,7 +42,8 @@ export async function getSubmissionSummary(sql: DbClient): Promise<SubmissionSum
       COUNT(*)::int AS total_datapoints,
       COUNT(DISTINCT (br.isl, br.osl))::int AS distinct_sequences,
       COUNT(DISTINCT br.conc)::int AS distinct_concurrencies,
-      MAX(br.conc)::int AS max_concurrency
+      MAX(br.conc)::int AS max_concurrency,
+      (ARRAY_AGG(br.image ORDER BY br.date DESC) FILTER (WHERE br.image IS NOT NULL))[1] AS image
     FROM benchmark_results br
     JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id

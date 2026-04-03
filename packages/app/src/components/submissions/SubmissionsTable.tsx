@@ -300,6 +300,14 @@ function SubmissionRow({
                     {row.max_concurrency ? ` (max ${row.max_concurrency})` : ''}
                   </span>
                 </DetailItem>
+                <div className="col-span-2 md:col-span-4">
+                  <DetailItem
+                    label="Image:"
+                    tip="Container image used for this benchmark configuration"
+                  >
+                    <span className="font-mono text-xs break-all">{row.image ?? '—'}</span>
+                  </DetailItem>
+                </div>
               </div>
             </TooltipProvider>
           </td>

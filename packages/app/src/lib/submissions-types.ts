@@ -19,6 +19,7 @@ export interface SubmissionSummaryRow {
   distinct_sequences: number;
   distinct_concurrencies: number;
   max_concurrency: number;
+  image: string | null;
 }
 
 export interface SubmissionVolumeRow {

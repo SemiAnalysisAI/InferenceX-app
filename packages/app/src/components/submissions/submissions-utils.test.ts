@@ -101,6 +101,7 @@ describe('computeTotalStats', () => {
       distinct_sequences: 3,
       distinct_concurrencies: 10,
       max_concurrency: 30,
+      image: null,
     },
     {
       model: 'dsr1',
@@ -123,6 +124,7 @@ describe('computeTotalStats', () => {
       distinct_sequences: 2,
       distinct_concurrencies: 5,
       max_concurrency: 15,
+      image: null,
     },
   ];
 
