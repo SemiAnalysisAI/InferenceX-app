@@ -2,67 +2,37 @@
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
  * It fetches live GitHub Actions artifacts which change while a run is in progress.
  */
-import AdmZip from 'adm-zip';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
-
 import { parseCsvData } from '@/components/gpu-power/types';
-
-interface GithubArtifact {
-  id: number;
-  name: string;
-  archive_download_url: string;
-}
-
-/** Paginated GitHub API fetch (same pattern as unofficial-run route). */
-async function githubFetchAll(url: string, token: string): Promise<unknown[]> {
-  const items: unknown[] = [];
-  let page = 1;
-  while (true) {
-    const sep = url.includes('?') ? '&' : '?';
-    const resp = await fetch(`${url}${sep}per_page=100&page=${page}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
-    });
-    if (!resp.ok) break;
-    const data = await resp.json();
-    const arr = Array.isArray(data) ? data : (data.artifacts ?? data.workflow_runs ?? []);
-    if (arr.length === 0) break;
-    items.push(...arr);
-    if (arr.length < 100) break;
-    page++;
-  }
-  return items;
-}
+import {
+  downloadGithubArtifact,
+  extractZipEntries,
+  fetchGithubRunArtifacts,
+  fetchGithubWorkflowRun,
+  getGithubToken,
+  normalizeGithubRunInfo,
+  type GithubWorkflowRun,
+} from '@/lib/github-artifacts';
 
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
 
 async function fetchGpuMetrics(runId: string) {
-  const githubToken = process.env.GITHUB_TOKEN;
+  const githubToken = getGithubToken();
   if (!githubToken) throw new Error('GitHub token not configured');
 
-  const runResp = await fetch(
-    `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}`,
-    {
-      headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github.v3+json' },
-    },
-  );
+  const runResp = await fetchGithubWorkflowRun(runId, githubToken);
   if (!runResp.ok) throw new Error(`Failed to fetch workflow run: ${runResp.status}`);
-  const run = await runResp.json();
+  const run = (await runResp.json()) as GithubWorkflowRun;
 
-  const artifacts = (await githubFetchAll(
-    `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts`,
-    githubToken,
-  )) as GithubArtifact[];
+  const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
 
   const gpuArtifacts = artifacts.filter((a) => a.name.startsWith('gpu_metrics'));
   if (gpuArtifacts.length === 0) throw new Error('No gpu_metrics artifacts found for this run');
 
   const parsedArtifacts: { name: string; data: ReturnType<typeof parseCsvData> }[] = [];
   for (const artifact of gpuArtifacts) {
-    const dlResp = await fetch(artifact.archive_download_url, {
-      headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github.v3+json' },
-    });
+    const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
     if (!dlResp.ok) {
       console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
       continue;
@@ -74,32 +44,21 @@ async function fetchGpuMetrics(runId: string) {
       continue;
     }
 
-    const zip = new AdmZip(Buffer.from(await dlResp.arrayBuffer()));
-    const rows = [];
-    for (const entry of zip.getEntries()) {
-      if (!entry.entryName.endsWith('.csv')) continue;
-      try {
-        rows.push(...parseCsvData(zip.readAsText(entry)));
-      } catch (e) {
-        console.warn(`Failed to parse CSV ${entry.entryName} from ${artifact.name}:`, e);
-      }
-    }
+    const rows = extractZipEntries(
+      Buffer.from(await dlResp.arrayBuffer()),
+      '.csv',
+      (_entryName, contents) => parseCsvData(contents),
+      (entryName, error) => {
+        console.warn(`Failed to parse CSV ${entryName} from ${artifact.name}:`, error);
+      },
+    );
     if (rows.length > 0) parsedArtifacts.push({ name: artifact.name, data: rows });
   }
 
   if (parsedArtifacts.length === 0) throw new Error('No GPU metrics data found in artifacts');
 
   return {
-    runInfo: {
-      id: run.id,
-      name: run.name,
-      branch: run.head_branch,
-      sha: run.head_sha,
-      createdAt: run.created_at,
-      url: run.html_url,
-      conclusion: run.conclusion,
-      status: run.status,
-    },
+    runInfo: normalizeGithubRunInfo(run),
     artifacts: parsedArtifacts,
   };
 }
