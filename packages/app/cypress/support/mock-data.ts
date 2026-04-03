@@ -441,6 +441,9 @@ export function createMockUnofficialRunContext(
     resetOverlayHwTypes: namedStub('resetOverlayHwTypes'),
     localOfficialOverride: null,
     setLocalOfficialOverride: namedStub('setLocalOfficialOverride'),
+    getUnofficialPrecisions: cy
+      .stub()
+      .returns([]) as unknown as UnofficialRunContextType['getUnofficialPrecisions'],
     ...overrides,
   };
 }

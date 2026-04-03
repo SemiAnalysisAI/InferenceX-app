@@ -25,6 +25,7 @@ import {
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 
 interface RunInfo {
   runId: string;
@@ -109,6 +110,7 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
 
 export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
+  const { getUnofficialPrecisions } = useUnofficialRun();
 
   // ── Core filter state ─────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<Model>(() => {
@@ -187,13 +189,17 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     return availableSequences[0] ?? selectedSequence;
   }, [availableSequences, selectedSequence]);
 
-  // Precisions available for the selected model + sequence
+  // Precisions available for the selected model + sequence (including unofficial run)
   const availablePrecisions = useMemo(() => {
-    if (!availabilityRows) return ['fp4'];
-    const rows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
-    const precs = [...new Set(rows.map((r) => r.precision))].sort();
+    const dbPrecs: string[] = [];
+    if (availabilityRows) {
+      const rows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
+      dbPrecs.push(...rows.map((r) => r.precision));
+    }
+    const unofficialPrecs = getUnofficialPrecisions(selectedModel, effectiveSequence);
+    const precs = [...new Set([...dbPrecs, ...unofficialPrecs])].sort();
     return precs.length > 0 ? precs : ['fp4'];
-  }, [availabilityRows, modelRows, effectiveSequence]);
+  }, [availabilityRows, modelRows, effectiveSequence, getUnofficialPrecisions, selectedModel]);
 
   // Synchronously validated precisions
   const effectivePrecisions = useMemo(() => {

@@ -61,6 +61,7 @@ export interface UnofficialRunContextType {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
   } | null;
+  getUnofficialPrecisions: (model: Model, sequence: Sequence) => string[];
   // Shared overlay toggle state — both charts read/write the same sets
   activeOverlayHwTypes: Set<string>;
   setActiveOverlayHwTypes: (v: Set<string>) => void;
@@ -213,6 +214,25 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     [unofficialChartData],
   );
 
+  const getUnofficialPrecisions = useCallback(
+    (model: Model, sequence: Sequence): string[] => {
+      if (!unofficialChartData) return [];
+      const dataKey = `${model}_${sequence}`;
+      const chartGroup = unofficialChartData[dataKey];
+      if (!chartGroup) return [];
+      // Collect precisions from both chart types
+      const precisions = new Set<string>();
+      for (const entry of chartGroup.e2e.data) {
+        if (entry.precision) precisions.add(entry.precision);
+      }
+      for (const entry of chartGroup.interactivity.data) {
+        if (entry.precision) precisions.add(entry.precision);
+      }
+      return [...precisions].sort();
+    },
+    [unofficialChartData],
+  );
+
   useEffect(() => {
     const load = () => {
       const unofficialRunId = new URLSearchParams(window.location.search).get('unofficialRun');
@@ -262,6 +282,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         clearUnofficialRun,
         availableModelsAndSequences,
         getOverlayData,
+        getUnofficialPrecisions,
         activeOverlayHwTypes,
         setActiveOverlayHwTypes: setActiveOverlayHwTypesStable,
         allOverlayHwTypes,
