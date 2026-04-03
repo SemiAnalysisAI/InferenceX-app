@@ -15,6 +15,7 @@ export const VALID_TABS = [
   'calculator',
   'reliability',
   'gpu-specs',
+  'ai-chart',
   'gpu-metrics',
   'submissions',
 ] as const;
@@ -51,6 +52,11 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
     title: 'GPU Specifications & Comparison',
     description:
       'Detailed GPU specifications for AI inference. Compare NVIDIA, AMD, and Intel GPUs — memory bandwidth, FLOPS, interconnects, and topology.',
+  },
+  'ai-chart': {
+    title: 'AI-Powered Chart Generation',
+    description:
+      'Generate custom inference benchmark charts using natural language prompts. Compare GPUs, costs, and performance with AI assistance.',
   },
   'gpu-metrics': {
     title: 'GPU Power & Efficiency Metrics',
