@@ -1,14 +1,17 @@
 'use client';
 
-import { Download, RotateCcw } from 'lucide-react';
+import { Download, FileSpreadsheet, Image, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ShareButton } from '@/components/ui/share-button';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { useChartExport } from '@/hooks/useChartExport';
+import { exportToCsv } from '@/lib/csv-export';
+import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
 
 import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
@@ -17,74 +20,103 @@ import { computeTotalStats } from './submissions-utils';
 
 const CHART_ID = 'submissions-chart';
 
-function SubmissionsModeToggle({
+function SubmissionsChartButtons({
   chartMode,
   onModeChange,
+  onExportCsv,
 }: {
   chartMode: ChartMode;
   onModeChange: (mode: ChartMode) => void;
+  onExportCsv: () => void;
 }) {
-  return (
-    <div
-      className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
-      role="tablist"
-      aria-label="Chart mode"
-      data-testid="submissions-mode-toggle"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={chartMode === 'weekly'}
-        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-          chartMode === 'weekly'
-            ? 'bg-muted text-foreground'
-            : 'text-muted-foreground hover:text-foreground'
-        }`}
-        onClick={() => onModeChange('weekly')}
-        data-testid="submissions-weekly-btn"
-      >
-        Weekly
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={chartMode === 'cumulative'}
-        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-          chartMode === 'cumulative'
-            ? 'bg-muted text-foreground'
-            : 'text-muted-foreground hover:text-foreground'
-        }`}
-        onClick={() => onModeChange('cumulative')}
-        data-testid="submissions-cumulative-btn"
-      >
-        Cumulative
-      </button>
-    </div>
-  );
-}
-
-function SubmissionsChartOverlayButtons() {
   const { isExporting, exportToImage } = useChartExport({
     chartId: CHART_ID,
     exportFileName: 'InferenceX_submissions',
   });
+  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
+
+  const handleExportPng = () => {
+    setExportPopoverOpen(false);
+    track('submissions_chart_exported');
+    exportToImage();
+  };
+
+  const handleExportCsv = () => {
+    setExportPopoverOpen(false);
+    track('submissions_csv_exported');
+    onExportCsv();
+    window.dispatchEvent(new CustomEvent('inferencex:action'));
+  };
 
   return (
     <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10">
-      <Button
-        data-testid="export-button"
-        variant="outline"
-        size={isExporting ? 'default' : 'icon'}
-        className={`h-7 shrink-0 ${isExporting ? '' : 'w-7'}`}
-        onClick={() => {
-          track('submissions_chart_exported');
-          exportToImage();
-        }}
-        disabled={isExporting}
+      <div
+        className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
+        role="tablist"
+        aria-label="Chart mode"
+        data-testid="submissions-mode-toggle"
       >
-        <Download className={isExporting ? 'mr-2' : ''} size={16} />
-        {isExporting && 'Exporting...'}
-      </Button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={chartMode === 'weekly'}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+            chartMode === 'weekly'
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          onClick={() => onModeChange('weekly')}
+          data-testid="submissions-weekly-btn"
+        >
+          Weekly
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={chartMode === 'cumulative'}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+            chartMode === 'cumulative'
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          onClick={() => onModeChange('cumulative')}
+          data-testid="submissions-cumulative-btn"
+        >
+          Cumulative
+        </button>
+      </div>
+      <Popover open={exportPopoverOpen} onOpenChange={setExportPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            data-testid="export-button"
+            variant="outline"
+            size={isExporting ? 'default' : 'icon'}
+            className={`h-7 shrink-0 ${isExporting ? '' : 'w-7'}`}
+            disabled={isExporting}
+          >
+            <Download className={isExporting ? 'mr-2' : ''} size={16} />
+            {isExporting && 'Exporting...'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-44 p-1">
+          <button
+            data-testid="export-png-button"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            onClick={handleExportPng}
+          >
+            <Image size={14} />
+            Download PNG
+          </button>
+          <button
+            data-testid="export-csv-button"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            onClick={handleExportCsv}
+          >
+            <FileSpreadsheet size={14} />
+            Download CSV
+          </button>
+        </PopoverContent>
+      </Popover>
       <Button
         data-testid="zoom-reset-button"
         variant="outline"
@@ -113,6 +145,12 @@ export default function SubmissionsDisplay() {
     setChartMode(mode);
     track('submissions_chart_toggled', { mode });
   }, []);
+
+  const handleExportCsv = useCallback(() => {
+    if (!data?.volume) return;
+    const { headers, rows } = submissionsVolumeToCsv(data.volume);
+    exportToCsv('InferenceX_submissions', headers, rows);
+  }, [data?.volume]);
 
   const stats = useMemo(() => {
     if (!data?.summary) return null;
@@ -176,13 +214,13 @@ export default function SubmissionsDisplay() {
 
       {/* Activity chart */}
       <section>
-        <Card>
-          <div className="flex items-center justify-between pb-4">
-            <div />
-            <SubmissionsModeToggle chartMode={chartMode} onModeChange={handleModeChange} />
-          </div>
-          <figure className="relative">
-            <SubmissionsChartOverlayButtons />
+        <figure className="relative rounded-lg">
+          <SubmissionsChartButtons
+            chartMode={chartMode}
+            onModeChange={handleModeChange}
+            onExportCsv={handleExportCsv}
+          />
+          <Card>
             {isLoading ? (
               <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
                 Loading chart data...
@@ -201,8 +239,8 @@ export default function SubmissionsDisplay() {
                 }
               />
             ) : null}
-          </figure>
-        </Card>
+          </Card>
+        </figure>
       </section>
 
       {/* Submissions table */}
