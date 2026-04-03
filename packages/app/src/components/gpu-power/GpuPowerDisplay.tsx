@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
@@ -35,6 +36,23 @@ import { ALL_METRIC_OPTIONS, getAvailableMetrics } from './types';
 const GPU_COLORS = d3.schemeTableau10;
 const FEATURE_GATE_KEY = 'inferencex-feature-gate';
 
+type GpuMetricsView = 'chart' | 'correlation';
+
+const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
+  {
+    value: 'chart',
+    icon: <BarChart3 className="h-3.5 w-3.5" />,
+    ariaLabel: 'Line chart',
+    title: 'Line chart',
+  },
+  {
+    value: 'correlation',
+    icon: <ScatterChart className="h-3.5 w-3.5" />,
+    ariaLabel: 'Correlation scatter',
+    title: 'Correlation scatter',
+  },
+];
+
 export default function GpuMetricsDisplay() {
   const router = useRouter();
   const [runIdInput, setRunIdInput] = useState('22806827144');
@@ -49,7 +67,7 @@ export default function GpuMetricsDisplay() {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [downsample, setDownsample] = useState(true);
   // View toggle + correlation
-  const [chartView, setChartView] = useState<'chart' | 'correlation'>('chart');
+  const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
   // URL state
@@ -204,6 +222,11 @@ export default function GpuMetricsDisplay() {
     setVisibleGpus(new Set(allGpuIndices));
     track('gpu_metrics_gpu_reset_filter');
   }, [allGpuIndices]);
+
+  const handleChartViewChange = useCallback((value: GpuMetricsView) => {
+    setChartView(value);
+    track('gpu_metrics_view_changed', { view: value });
+  }, []);
 
   return (
     <section data-testid="gpu-metrics-display">
@@ -360,33 +383,16 @@ export default function GpuMetricsDisplay() {
           >
             <div className="flex items-center justify-end mb-2">
               <div className="flex items-center gap-1.5 no-export">
-                {/* View toggle */}
-                <div className="flex items-center border rounded-md" role="tablist">
-                  <button
-                    role="tab"
-                    aria-selected={chartView === 'chart'}
-                    className={`p-1.5 ${chartView === 'chart' ? 'bg-muted' : 'hover:bg-muted/50'} rounded-l-md`}
-                    onClick={() => {
-                      setChartView('chart');
-                      track('gpu_metrics_view_changed', { view: 'chart' });
-                    }}
-                    title="Line chart"
-                  >
-                    <BarChart3 className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    role="tab"
-                    aria-selected={chartView === 'correlation'}
-                    className={`p-1.5 ${chartView === 'correlation' ? 'bg-muted' : 'hover:bg-muted/50'} rounded-r-md`}
-                    onClick={() => {
-                      setChartView('correlation');
-                      track('gpu_metrics_view_changed', { view: 'correlation' });
-                    }}
-                    title="Correlation scatter"
-                  >
-                    <ScatterChart className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <SegmentedToggle
+                  value={chartView}
+                  options={GPU_METRICS_VIEW_OPTIONS}
+                  onValueChange={handleChartViewChange}
+                  ariaLabel="View mode"
+                  className="rounded-md border p-0 gap-0"
+                  buttonClassName="p-1.5 rounded-none first:rounded-l-md last:rounded-r-md"
+                  activeButtonClassName="bg-muted text-foreground"
+                  inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                />
                 <Button
                   variant="outline"
                   size="sm"

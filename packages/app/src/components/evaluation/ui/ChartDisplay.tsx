@@ -4,9 +4,8 @@ import { useCallback } from 'react';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import { Card } from '@/components/ui/card';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
-import { ShareButton } from '@/components/ui/share-button';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { getPrecisionLabel, isModelExperimental, Model, Precision } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
@@ -43,13 +42,7 @@ export default function EvaluationChartDisplay() {
                   different GPUs, quantization levels, and inference configurations.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <ShareButton />
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <ShareTwitterButton />
-                  <ShareLinkedInButton />
-                </div>
-              </div>
+              <ChartShareActions />
             </div>
             <EvaluationChartControls />
           </div>
