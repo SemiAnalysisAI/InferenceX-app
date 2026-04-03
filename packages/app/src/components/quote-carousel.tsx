@@ -183,11 +183,24 @@ export function QuoteCarousel({
         ))}
       </div>
 
-      {/* Single quote block — fades out, swaps content, fades in */}
-      <div
-        className={`transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`}
-      >
-        <QuoteBlock quote={entries[activeIndex].quote} />
+      {/* All quotes stacked in same grid cell — tallest sets height */}
+      <div className="grid items-center">
+        {entries.map((e, i) => {
+          const isActive = i === activeIndex;
+          return (
+            <div
+              key={e.org}
+              className={`col-start-1 row-start-1 ${
+                isActive
+                  ? `transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`
+                  : 'opacity-0 invisible pointer-events-none'
+              }`}
+              aria-hidden={!isActive}
+            >
+              <QuoteBlock quote={e.quote} />
+            </div>
+          );
+        })}
       </div>
 
       {moreHref && (
