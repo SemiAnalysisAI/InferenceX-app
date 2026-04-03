@@ -2,11 +2,12 @@
 
 import { track } from '@/lib/analytics';
 import { Download, FileSpreadsheet, Image, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { useChartExport } from '@/hooks/useChartExport';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 interface ChartButtonsProps {
   /** Unique chart ID for export targeting */
@@ -23,6 +24,13 @@ interface ChartButtonsProps {
   onExportCsv?: () => void;
   /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
+  /**
+   * Optional controls rendered before export/reset buttons, such as a view toggle.
+   * These inherit this wrapper's desktop-only (`hidden md:flex`) and no-export behavior.
+   */
+  leadingControls?: ReactNode;
+  /** Optional container class override for positioning/layout variants. */
+  className?: string;
 }
 
 /**
@@ -41,6 +49,8 @@ export function ChartButtons({
   hideZoomReset,
   onExportCsv,
   exportFileName,
+  leadingControls,
+  className,
 }: ChartButtonsProps) {
   const { isExporting, exportToImage } = useChartExport({
     chartId,
@@ -65,7 +75,13 @@ export function ChartButtons({
   };
 
   return (
-    <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10">
+    <div
+      className={cn(
+        'hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10',
+        className,
+      )}
+    >
+      {leadingControls}
       {onExportCsv ? (
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>
