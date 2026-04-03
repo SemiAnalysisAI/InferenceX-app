@@ -11,7 +11,7 @@ import {
   type CustomGpuPanelFilters,
 } from '@/components/inference/ui/custom-gpu-value-panel-utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
   InputGroup,
   InputGroupAddon,
@@ -105,11 +105,11 @@ GpuValueInputGroup.displayName = 'GpuValueInputGroup';
 function renderSkeleton(title: string, description: string) {
   return (
     <Card className="gap-6">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex flex-col gap-4">
         <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={`skeleton-input-${index + 1}`} className="flex flex-col gap-2">
@@ -123,7 +123,7 @@ function renderSkeleton(title: string, description: string) {
           <Skeleton className="h-9 w-20" />
           <Skeleton className="h-9 w-28" />
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }
@@ -235,13 +235,13 @@ const CustomGpuValuePanel = memo(
     }
 
     return (
-      <Card data-testid={config.sectionTestId}>
-        <CardHeader>
-          <CardTitle>{config.title}</CardTitle>
-          <CardDescription>{config.description}</CardDescription>
-        </CardHeader>
+      <Card data-testid={config.sectionTestId} className="gap-6">
+        <div>
+          <h3 className="text-lg font-semibold">{config.title}</h3>
+          <p className="text-sm text-muted-foreground">{config.description}</p>
+        </div>
 
-        <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
             {stableGpus.map((gpu) => (
               <GpuValueInputGroup
@@ -281,7 +281,7 @@ const CustomGpuValuePanel = memo(
               )}
             </Button>
           </div>
-        </CardContent>
+        </div>
       </Card>
     );
   },
