@@ -41,13 +41,7 @@ function DetailItem({
   );
 }
 
-type SortKey =
-  | 'hardware'
-  | 'model'
-  | 'precision'
-  | 'framework'
-  | 'latest_date'
-  | 'total_datapoints';
+type SortKey = 'hardware' | 'model' | 'precision' | 'framework' | 'date' | 'total_datapoints';
 type SortDir = 'asc' | 'desc';
 
 interface SubmissionsTableProps {
@@ -62,7 +56,7 @@ function getModelDisplayName(dbModel: string): string {
 }
 
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
-  const [sortKey, setSortKey] = useState<SortKey>('latest_date');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -119,7 +113,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   }, []);
 
   const rowKey = (row: SubmissionSummaryRow) =>
-    `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}`;
+    `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}_${row.date}`;
 
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
     <th
@@ -156,7 +150,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
               <SortHeader label="Model" field="model" />
               <SortHeader label="Precision" field="precision" />
               <SortHeader label="Framework" field="framework" />
-              <SortHeader label="Latest Run" field="latest_date" />
+              <SortHeader label="Date" field="date" />
               <SortHeader label="Datapoints" field="total_datapoints" />
             </tr>
           </thead>
@@ -219,7 +213,7 @@ function SubmissionRow({
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
-        <td className="px-3 py-2 tabular-nums">{row.latest_date}</td>
+        <td className="px-3 py-2 tabular-nums">{row.date}</td>
         <td className="px-3 py-2 tabular-nums">{row.total_datapoints.toLocaleString()}</td>
       </tr>
       {isExpanded && (
@@ -230,15 +224,6 @@ function SubmissionRow({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                 <DetailItem label="Vendor:" tip="GPU manufacturer">
                   {vendor}
-                </DetailItem>
-                <DetailItem label="First Run:" tip="Date of the earliest benchmark for this config">
-                  <span className="tabular-nums">{row.first_date}</span>
-                </DetailItem>
-                <DetailItem
-                  label="Run Days:"
-                  tip="Number of distinct days this config was benchmarked"
-                >
-                  <span className="tabular-nums">{row.run_days}</span>
                 </DetailItem>
                 <DetailItem
                   label="Spec Method:"

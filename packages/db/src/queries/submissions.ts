@@ -7,6 +7,15 @@ export interface SubmissionSummaryRow {
   precision: string;
   spec_method: string;
   disagg: boolean;
+  is_multinode: boolean;
+  num_prefill_gpu: number;
+  num_decode_gpu: number;
+  prefill_tp: number;
+  prefill_ep: number;
+  decode_tp: number;
+  decode_ep: number;
+  date: string;
+  total_datapoints: number;
   distinct_sequences: number;
   distinct_concurrencies: number;
   max_concurrency: number;
@@ -19,8 +28,8 @@ export interface SubmissionVolumeRow {
   datapoints: number;
 }
 
-/** Get unique config submissions with first/latest date and datapoint counts.
- *  Uses latest_benchmarks (deduplicated: newest per config+conc+isl+osl, no errors). */
+/** Get per-run config submissions (one row per config × date).
+ *  Uses benchmark_results with error/workflow filters to include full history. */
 export async function getSubmissionSummary(sql: DbClient): Promise<SubmissionSummaryRow[]> {
   const rows = await sql`
     SELECT
@@ -37,34 +46,36 @@ export async function getSubmissionSummary(sql: DbClient): Promise<SubmissionSum
       c.prefill_ep,
       c.decode_tp,
       c.decode_ep,
-      MIN(lb.date)::text AS first_date,
-      MAX(lb.date)::text AS latest_date,
-      COUNT(DISTINCT lb.date)::int AS run_days,
+      br.date::text,
       COUNT(*)::int AS total_datapoints,
-      COUNT(DISTINCT (lb.isl, lb.osl))::int AS distinct_sequences,
-      COUNT(DISTINCT lb.conc)::int AS distinct_concurrencies,
-      MAX(lb.conc)::int AS max_concurrency,
-      (ARRAY_AGG(lb.image ORDER BY lb.date DESC) FILTER (WHERE lb.image IS NOT NULL))[1] AS image
-    FROM latest_benchmarks lb
-    JOIN configs c ON c.id = lb.config_id
-    GROUP BY c.model, c.hardware, c.framework, c.precision, c.spec_method, c.disagg, c.is_multinode, c.num_prefill_gpu, c.num_decode_gpu, c.prefill_tp, c.prefill_ep, c.decode_tp, c.decode_ep
-    ORDER BY MAX(lb.date) DESC, COUNT(*) DESC
+      COUNT(DISTINCT (br.isl, br.osl))::int AS distinct_sequences,
+      COUNT(DISTINCT br.conc)::int AS distinct_concurrencies,
+      MAX(br.conc)::int AS max_concurrency,
+      (ARRAY_AGG(br.image) FILTER (WHERE br.image IS NOT NULL))[1] AS image
+    FROM benchmark_results br
+    JOIN configs c ON c.id = br.config_id
+    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE br.error IS NULL
+    GROUP BY c.model, c.hardware, c.framework, c.precision, c.spec_method, c.disagg, c.is_multinode, c.num_prefill_gpu, c.num_decode_gpu, c.prefill_tp, c.prefill_ep, c.decode_tp, c.decode_ep, br.date
+    ORDER BY br.date DESC, COUNT(*) DESC
   `;
   return rows as unknown as SubmissionSummaryRow[];
 }
 
 /** Get daily datapoint counts by hardware for volume charts.
- *  Uses latest_benchmarks (deduplicated: newest per config+conc+isl+osl, no errors). */
+ *  Uses benchmark_results with error/workflow filters to include full history. */
 export async function getSubmissionVolume(sql: DbClient): Promise<SubmissionVolumeRow[]> {
   const rows = await sql`
     SELECT
-      lb.date::text,
+      br.date::text,
       c.hardware,
       COUNT(*)::int AS datapoints
-    FROM latest_benchmarks lb
-    JOIN configs c ON c.id = lb.config_id
-    GROUP BY lb.date, c.hardware
-    ORDER BY lb.date ASC
+    FROM benchmark_results br
+    JOIN configs c ON c.id = br.config_id
+    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE br.error IS NULL
+    GROUP BY br.date, c.hardware
+    ORDER BY br.date ASC
   `;
   return rows as unknown as SubmissionVolumeRow[];
 }

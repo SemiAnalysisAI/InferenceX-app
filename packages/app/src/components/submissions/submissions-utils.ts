@@ -93,18 +93,22 @@ export function computeCumulative(volume: SubmissionVolumeRow[]): CumulativePoin
 /** Compute total stats from summary rows. */
 export function computeTotalStats(summary: SubmissionSummaryRow[]) {
   let totalDatapoints = 0;
+  const configs = new Set<string>();
   const models = new Set<string>();
   const gpus = new Set<string>();
 
   for (const row of summary) {
     totalDatapoints += row.total_datapoints;
+    configs.add(
+      `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.num_prefill_gpu}_${row.num_decode_gpu}`,
+    );
     models.add(row.model);
     gpus.add(row.hardware);
   }
 
   return {
     totalDatapoints,
-    totalConfigs: summary.length,
+    totalConfigs: configs.size,
     uniqueModels: models.size,
     uniqueGpus: gpus.size,
   };

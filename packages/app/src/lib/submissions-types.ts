@@ -12,9 +12,7 @@ export interface SubmissionSummaryRow {
   prefill_ep: number;
   decode_tp: number;
   decode_ep: number;
-  first_date: string;
-  latest_date: string;
-  run_days: number;
+  date: string;
   total_datapoints: number;
   distinct_sequences: number;
   distinct_concurrencies: number;
