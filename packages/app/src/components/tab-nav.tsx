@@ -72,7 +72,7 @@ const TAB_LINKS = [
   { href: '/reliability', label: 'GPU Reliability', testId: 'tab-trigger-reliability' },
   { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
-  { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions' },
+  { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions', gated: true },
 ] as const;
 
 function activeTab(pathname: string): string {

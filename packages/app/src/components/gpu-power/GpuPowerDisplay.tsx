@@ -11,6 +11,8 @@ import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ShareButton } from '@/components/ui/share-button';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
   Select,
   SelectContent,
@@ -207,28 +209,37 @@ export default function GpuMetricsDisplay() {
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">PowerX</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 text-xs text-muted-foreground"
-              onClick={() => {
-                localStorage.removeItem(FEATURE_GATE_KEY);
-                window.dispatchEvent(new Event('inferencex:powerx:locked'));
-                track('powerx_relocked');
-                router.push('/inference');
-              }}
-              title="Re-lock PowerX"
-            >
-              <Lock className="h-3 w-3" />
-              Lock
-            </Button>
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">PowerX</h2>
+              <p className="text-muted-foreground text-sm">
+                Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-muted-foreground"
+                onClick={() => {
+                  localStorage.removeItem(FEATURE_GATE_KEY);
+                  window.dispatchEvent(new Event('inferencex:powerx:locked'));
+                  track('powerx_relocked');
+                  router.push('/inference');
+                }}
+                title="Re-lock PowerX"
+              >
+                <Lock className="h-3 w-3" />
+                Lock
+              </Button>
+              <ShareButton />
+              <div className="hidden sm:flex items-center gap-1.5">
+                <ShareTwitterButton />
+                <ShareLinkedInButton />
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
-          </p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 max-w-sm space-y-1">
               <Label htmlFor="gpu-metrics-run-id">Run ID</Label>

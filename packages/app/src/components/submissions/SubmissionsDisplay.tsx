@@ -1,6 +1,7 @@
 'use client';
 
-import { Download, FileSpreadsheet, Image, RotateCcw } from 'lucide-react';
+import { Download, FileSpreadsheet, Image, Lock, RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -133,7 +134,10 @@ function SubmissionsChartButtons({
   );
 }
 
+const FEATURE_GATE_KEY = 'inferencex-feature-gate';
+
 export default function SubmissionsDisplay() {
+  const router = useRouter();
   const { data, isLoading, error } = useSubmissions();
   const [chartMode, setChartMode] = useState<ChartMode>('weekly');
 
@@ -179,6 +183,21 @@ export default function SubmissionsDisplay() {
               </p>
             </div>
             <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-muted-foreground"
+                onClick={() => {
+                  localStorage.removeItem(FEATURE_GATE_KEY);
+                  window.dispatchEvent(new Event('inferencex:powerx:locked'));
+                  track('submissions_relocked');
+                  router.push('/inference');
+                }}
+                title="Re-lock Submissions"
+              >
+                <Lock className="h-3 w-3" />
+                Lock
+              </Button>
               <ShareButton />
               <div className="hidden sm:flex items-center gap-1.5">
                 <ShareTwitterButton />
