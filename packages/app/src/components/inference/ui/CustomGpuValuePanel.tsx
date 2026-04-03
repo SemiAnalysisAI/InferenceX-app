@@ -11,6 +11,7 @@ import {
   type CustomGpuPanelFilters,
 } from '@/components/inference/ui/custom-gpu-value-panel-utils';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   InputGroup,
   InputGroupAddon,
@@ -32,8 +33,6 @@ const PANEL_CONFIG: Record<
     sectionTestId: string;
     calculateTestId: string;
     inputIdPrefix: string;
-    className: string;
-    skeletonClassName: string;
     resetEvent: string;
     calculatedEvent: string;
     getDefaultValue: (specs: GpuSpec) => number;
@@ -46,8 +45,6 @@ const PANEL_CONFIG: Record<
     sectionTestId: 'custom-costs-section',
     calculateTestId: 'custom-costs-calculate',
     inputIdPrefix: 'cost-input',
-    className: 'space-y-4 p-4 lg:p-8 border rounded-md bg-muted/10',
-    skeletonClassName: 'space-y-4 p-4 lg:p-8 border rounded-md bg-muted/30',
     resetEvent: 'inference_custom_costs_reset',
     calculatedEvent: 'inference_custom_costs_calculated',
     getDefaultValue: (specs) => specs.costr,
@@ -60,8 +57,6 @@ const PANEL_CONFIG: Record<
     calculateTestId: 'custom-powers-calculate',
     // Preserve legacy input IDs so existing Cypress selectors keep passing.
     inputIdPrefix: 'cost-input',
-    className: 'space-y-4 p-4 lg:p-8 border rounded-md bg-muted/10 mb-6',
-    skeletonClassName: 'space-y-4 p-4 lg:p-8 border rounded-md bg-muted/30 mb-6',
     resetEvent: 'inference_custom_powers_reset',
     calculatedEvent: 'inference_custom_powers_calculated',
     getDefaultValue: (specs) => specs.power,
@@ -107,14 +102,14 @@ const GpuValueInputGroup = memo(
 
 GpuValueInputGroup.displayName = 'GpuValueInputGroup';
 
-function renderSkeleton(title: string, description: string, className: string) {
+function renderSkeleton(title: string, description: string) {
   return (
-    <div className={className}>
-      <div className="space-y-0">
-        <h3 className="text-lg font-medium">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="flex flex-col gap-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
         <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={`skeleton-input-${index + 1}`} className="flex flex-col gap-2">
@@ -128,8 +123,8 @@ function renderSkeleton(title: string, description: string, className: string) {
           <Skeleton className="h-9 w-20" />
           <Skeleton className="h-9 w-28" />
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -236,17 +231,17 @@ const CustomGpuValuePanel = memo(
     }, [applyValues, config, inputErrors, lastCalculatedValues, selectedYAxisMetric, stableGpus]);
 
     if (loading || stableGpus.length === 0) {
-      return renderSkeleton(config.title, config.description, config.skeletonClassName);
+      return renderSkeleton(config.title, config.description);
     }
 
     return (
-      <div data-testid={config.sectionTestId} className={config.className}>
-        <div className="space-y-0">
-          <h3 className="text-lg font-medium">{config.title}</h3>
-          <p className="text-sm text-muted-foreground">{config.description}</p>
-        </div>
+      <Card data-testid={config.sectionTestId}>
+        <CardHeader>
+          <CardTitle>{config.title}</CardTitle>
+          <CardDescription>{config.description}</CardDescription>
+        </CardHeader>
 
-        <div className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-4">
           <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
             {stableGpus.map((gpu) => (
               <GpuValueInputGroup
@@ -286,8 +281,8 @@ const CustomGpuValuePanel = memo(
               )}
             </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   },
 );
