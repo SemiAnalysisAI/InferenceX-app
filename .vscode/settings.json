@@ -83,6 +83,7 @@
     "vercel",
     "vitest",
     "vllm",
+    "worktrees",
     "yaxis",
     "zoomable"
   ]
