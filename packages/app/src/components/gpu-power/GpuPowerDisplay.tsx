@@ -228,10 +228,10 @@ export default function GpuMetricsDisplay() {
                   track('powerx_relocked');
                   router.push('/inference');
                 }}
-                title="Re-lock PowerX"
+                title="Re-lock feature gate"
               >
                 <Lock className="h-3 w-3" />
-                Lock
+                Re-lock feature gate
               </Button>
               <ShareButton />
               <div className="hidden sm:flex items-center gap-1.5">

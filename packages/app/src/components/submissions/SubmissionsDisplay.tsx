@@ -193,10 +193,10 @@ export default function SubmissionsDisplay() {
                   track('submissions_relocked');
                   router.push('/inference');
                 }}
-                title="Re-lock Submissions"
+                title="Re-lock feature gate"
               >
                 <Lock className="h-3 w-3" />
-                Lock
+                Re-lock feature gate
               </Button>
               <ShareButton />
               <div className="hidden sm:flex items-center gap-1.5">
