@@ -104,11 +104,9 @@ GpuValueInputGroup.displayName = 'GpuValueInputGroup';
 
 function renderSkeleton(title: string, description: string) {
   return (
-    <Card className="gap-6">
-      <div>
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
+    <Card>
+      <h2 className="text-lg font-semibold mb-2">{title}</h2>
+      <p className="text-muted-foreground text-sm mb-4">{description}</p>
       <div className="flex flex-col gap-4">
         <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -235,11 +233,9 @@ const CustomGpuValuePanel = memo(
     }
 
     return (
-      <Card data-testid={config.sectionTestId} className="gap-6">
-        <div>
-          <h3 className="text-lg font-semibold">{config.title}</h3>
-          <p className="text-sm text-muted-foreground">{config.description}</p>
-        </div>
+      <Card data-testid={config.sectionTestId}>
+        <h2 className="text-lg font-semibold mb-2">{config.title}</h2>
+        <p className="text-muted-foreground text-sm mb-4">{config.description}</p>
 
         <div className="flex flex-col gap-4">
           <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-4">
