@@ -5,6 +5,7 @@ import { track } from '@/lib/analytics';
 import { BarChart3, Radar, Table2 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
@@ -63,6 +64,29 @@ function VendorBadge({ vendor }: { vendor: GpuSpec['vendor'] }) {
     </span>
   );
 }
+
+type GpuSpecsViewMode = 'table' | 'chart' | 'radar';
+
+const GPU_SPECS_VIEW_MODE_OPTIONS: SegmentedToggleOption<GpuSpecsViewMode>[] = [
+  {
+    value: 'table',
+    label: 'Table',
+    icon: <Table2 className="size-3.5" />,
+    testId: 'gpu-specs-table-view-btn',
+  },
+  {
+    value: 'chart',
+    label: 'Chart',
+    icon: <BarChart3 className="size-3.5" />,
+    testId: 'gpu-specs-chart-view-btn',
+  },
+  {
+    value: 'radar',
+    label: 'Radar',
+    icon: <Radar className="size-3.5" />,
+    testId: 'gpu-specs-radar-view-btn',
+  },
+];
 
 function GpuSpecsTable({
   onTopologyClick,
@@ -263,7 +287,7 @@ function GpuSpecsTable({
 export function GpuSpecsContent() {
   const specsWithTopology = GPU_SPECS.filter((spec) => spec.scaleOutTopology !== null);
 
-  const [viewMode, setViewMode] = useState<'table' | 'chart' | 'radar'>('table');
+  const [viewMode, setViewMode] = useState<GpuSpecsViewMode>('table');
   const [selectedMetric, setSelectedMetric] = useState(GPU_CHART_METRICS[0].key);
 
   // Refs for each scale-out topology diagram, keyed by GPU name
@@ -277,6 +301,11 @@ export function GpuSpecsContent() {
 
   const handleScaleUpTopologyClick = (gpuName: string) => {
     scaleUpDiagramRefs.current[gpuName]?.openDialog();
+  };
+
+  const handleViewModeChange = (value: GpuSpecsViewMode) => {
+    setViewMode(value);
+    track('gpu_specs_view_changed', { view: value });
   };
 
   return (
@@ -305,67 +334,13 @@ export function GpuSpecsContent() {
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between pb-4">
             <div />
-            <div
-              className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5"
-              role="tablist"
-              aria-label="View mode"
-              data-testid="gpu-specs-view-toggle"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'table'}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  viewMode === 'table'
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => {
-                  setViewMode('table');
-                  track('gpu_specs_view_changed', { view: 'table' });
-                }}
-                data-testid="gpu-specs-table-view-btn"
-              >
-                <Table2 className="size-3.5" />
-                Table
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'chart'}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  viewMode === 'chart'
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => {
-                  setViewMode('chart');
-                  track('gpu_specs_view_changed', { view: 'chart' });
-                }}
-                data-testid="gpu-specs-chart-view-btn"
-              >
-                <BarChart3 className="size-3.5" />
-                Chart
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'radar'}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  viewMode === 'radar'
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => {
-                  setViewMode('radar');
-                  track('gpu_specs_view_changed', { view: 'radar' });
-                }}
-                data-testid="gpu-specs-radar-view-btn"
-              >
-                <Radar className="size-3.5" />
-                Radar
-              </button>
-            </div>
+            <SegmentedToggle
+              value={viewMode}
+              options={GPU_SPECS_VIEW_MODE_OPTIONS}
+              onValueChange={handleViewModeChange}
+              ariaLabel="View mode"
+              testId="gpu-specs-view-toggle"
+            />
           </div>
 
           {viewMode === 'table' && (
