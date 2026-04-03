@@ -104,7 +104,7 @@ GpuValueInputGroup.displayName = 'GpuValueInputGroup';
 
 function renderSkeleton(title: string, description: string) {
   return (
-    <Card>
+    <Card className="gap-6">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
