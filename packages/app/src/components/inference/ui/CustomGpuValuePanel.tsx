@@ -262,19 +262,8 @@ const CustomGpuValuePanel = memo(
             >
               Reset
             </Button>
-            <Button
-              data-testid={config.calculateTestId}
-              onClick={handleRecalculate}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                  Calculating...
-                </>
-              ) : (
-                'Calculate'
-              )}
+            <Button data-testid={config.calculateTestId} onClick={handleRecalculate}>
+              Calculate
             </Button>
           </div>
         </div>
