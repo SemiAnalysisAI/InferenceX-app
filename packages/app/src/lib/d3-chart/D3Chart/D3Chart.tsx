@@ -107,6 +107,7 @@ function D3ChartInner<T>(
       setupZoom,
       zoomTransformRef,
       isPinned,
+      pinTooltip,
       dismissTooltip,
       createRulers,
       attachHandlers,

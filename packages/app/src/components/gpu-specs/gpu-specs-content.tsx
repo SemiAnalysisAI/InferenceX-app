@@ -302,7 +302,7 @@ export function GpuSpecsContent() {
         </Card>
       </section>
       <section className="pt-8 md:pt-0">
-        <Card className="overflow-hidden px-0">
+        <Card className="overflow-hidden">
           <div className="flex items-center justify-between pb-4">
             <div />
             <div

@@ -8,6 +8,7 @@
  */
 
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
+import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
@@ -310,6 +311,20 @@ export function historicalTrendToCsv(
       ]);
     }
   }
+
+  return { headers, rows };
+}
+
+/**
+ * Generate CSV data from submission volume rows.
+ * Exports daily datapoint counts per hardware key.
+ */
+export function submissionsVolumeToCsv(volume: SubmissionVolumeRow[]): CsvData {
+  const headers = ['Date', 'Hardware', 'Datapoints'];
+
+  const rows = [...volume]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.hardware.localeCompare(b.hardware))
+    .map((r) => [r.date, r.hardware, r.datapoints]);
 
   return { headers, rows };
 }
