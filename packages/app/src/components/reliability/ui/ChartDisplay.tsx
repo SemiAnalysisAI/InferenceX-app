@@ -4,9 +4,8 @@ import { useCallback } from 'react';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import { Card } from '@/components/ui/card';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
-import { ShareButton } from '@/components/ui/share-button';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { exportToCsv } from '@/lib/csv-export';
 import { reliabilityChartToCsv } from '@/lib/csv-export-helpers';
 
@@ -35,13 +34,7 @@ export default function ReliabilityChartDisplay() {
                   reliability for inference runs over time.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <ShareButton />
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <ShareTwitterButton />
-                  <ShareLinkedInButton />
-                </div>
-              </div>
+              <ChartShareActions />
             </div>
             <ReliabilityChartControls />
           </div>
