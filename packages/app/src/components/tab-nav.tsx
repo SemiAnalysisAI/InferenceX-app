@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { Card } from '@/components/ui/card';
+import { TAB_LINKS, isTabLinkValue } from '@/components/tab-nav-links';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -64,17 +65,6 @@ function useFeatureGate(): boolean {
   return unlocked;
 }
 
-const TAB_LINKS = [
-  { href: '/inference', label: 'Inference Performance', testId: 'tab-trigger-inference' },
-  { href: '/evaluation', label: 'Accuracy Evals', testId: 'tab-trigger-evaluation' },
-  { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },
-  { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
-  { href: '/reliability', label: 'GPU Reliability', testId: 'tab-trigger-reliability' },
-  { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
-  { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
-  { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions', gated: true },
-] as const;
-
 function activeTab(pathname: string): string {
   const seg = pathname.split('/').filter(Boolean)[0] || 'inference';
   return seg;
@@ -85,6 +75,7 @@ export function TabNav() {
   const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
   const current = activeTab(pathname);
+  const selectedTab = isTabLinkValue(current) ? current : '';
 
   const handleMobileChange = (value: string) => {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
@@ -105,9 +96,9 @@ export function TabNav() {
         <Card>
           <div className="space-y-2">
             <Label htmlFor="chart-select">Select Chart</Label>
-            <Select value={current} onValueChange={handleMobileChange}>
+            <Select value={selectedTab} onValueChange={handleMobileChange}>
               <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select Chart" />
               </SelectTrigger>
               <SelectContent>
                 {TAB_LINKS.map((tab) => {

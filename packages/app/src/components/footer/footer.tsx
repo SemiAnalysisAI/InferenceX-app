@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 
+import { FooterReliabilityLink } from './footer-reliability-link';
 import { StarButton } from './footer-star-cta';
 
 export const Footer = ({ starCount }: { starCount?: number | null }) => {
@@ -71,6 +72,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
               >
                 About
               </a>
+              <FooterReliabilityLink />
             </div>
             <div data-testid="footer-links-legal" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">Legal</span>
