@@ -7,6 +7,7 @@ describe('EvalBarChartD3', () => {
   it('shows skeleton during loading with no data', () => {
     mountWithProviders(<EvalBarChartD3 />, {
       evaluation: { loading: true, chartData: [], error: null },
+      unofficial: {},
     });
     // Skeleton elements are rendered (Skeleton component uses data-slot="skeleton")
     cy.get('[data-slot="skeleton"]').should('have.length.greaterThan', 0);
@@ -15,6 +16,7 @@ describe('EvalBarChartD3', () => {
   it('shows error message when error is set', () => {
     mountWithProviders(<EvalBarChartD3 />, {
       evaluation: { error: 'Failed to fetch', chartData: [], loading: false },
+      unofficial: {},
     });
     cy.contains('Failed to load eval data.').should('be.visible');
   });
@@ -31,6 +33,7 @@ describe('EvalBarChartD3', () => {
         availableDates: ['2025-03-01'],
         modelHasEvalData: true,
       },
+      unofficial: {},
     });
     cy.contains('No evaluation data available').should('be.visible');
   });
@@ -70,6 +73,7 @@ describe('EvalBarChartD3', () => {
           loading: false,
           error: null,
         },
+        unofficial: {},
       },
     );
 
@@ -106,6 +110,7 @@ describe('EvalBarChartD3', () => {
           loading: false,
           error: null,
         },
+        unofficial: {},
       },
     );
 
@@ -126,6 +131,7 @@ describe('EvalBarChartD3', () => {
           loading: false,
           error: null,
         },
+        unofficial: {},
       },
     );
 

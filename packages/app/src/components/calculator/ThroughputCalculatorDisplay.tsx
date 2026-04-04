@@ -2,13 +2,13 @@
 
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
-import { BarChart3, Download, FileSpreadsheet, Image, RotateCcw, Table2 } from 'lucide-react';
+import { BarChart3, Table2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   ModelSelector,
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   getModelLabel,
@@ -40,8 +41,6 @@ import {
 import { getModelSortIndex, GPU_SPECS, HARDWARE_CONFIG } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useChartExport } from '@/hooks/useChartExport';
 import { getDisplayLabel } from '@/lib/utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
@@ -72,133 +71,25 @@ const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'cost', label: 'Cost' },
 ];
 
-function CalculatorChartButtons({
-  viewMode,
-  setViewMode,
-  chartId,
-  onExportCsv,
-  setIsLegendExpanded,
-  exportFileName,
-}: {
-  viewMode: 'chart' | 'table';
-  setViewMode: (v: 'chart' | 'table') => void;
-  chartId: string;
-  onExportCsv: () => void;
-  setIsLegendExpanded?: (expanded: boolean) => void;
-  exportFileName?: string;
-}) {
-  const { isExporting, exportToImage } = useChartExport({
-    chartId,
-    setIsLegendExpanded,
-    exportFileName,
-  });
-  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
+type CalculatorViewMode = 'chart' | 'table';
 
-  const handleExportPng = () => {
-    setExportPopoverOpen(false);
-    track('calculator_chart_exported');
-    exportToImage();
-  };
+const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] = [
+  {
+    value: 'chart',
+    label: 'Chart',
+    icon: <BarChart3 className="size-3.5" />,
+    testId: 'calculator-chart-view-btn',
+  },
+  {
+    value: 'table',
+    label: 'Table',
+    icon: <Table2 className="size-3.5" />,
+    testId: 'calculator-table-view-btn',
+  },
+];
 
-  const handleExportCsv = () => {
-    setExportPopoverOpen(false);
-    track('calculator_csv_exported');
-    onExportCsv();
-    window.dispatchEvent(new CustomEvent('inferencex:action'));
-  };
-
-  return (
-    <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10">
-      <div
-        className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
-        role="tablist"
-        aria-label="View mode"
-        data-testid="calculator-view-toggle"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewMode === 'chart'}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-            viewMode === 'chart'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => {
-            setViewMode('chart');
-            track('calculator_view_changed', { view: 'chart' });
-          }}
-          data-testid="calculator-chart-view-btn"
-        >
-          <BarChart3 className="size-3.5" />
-          Chart
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewMode === 'table'}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-            viewMode === 'table'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => {
-            setViewMode('table');
-            track('calculator_view_changed', { view: 'table' });
-          }}
-          data-testid="calculator-table-view-btn"
-        >
-          <Table2 className="size-3.5" />
-          Table
-        </button>
-      </div>
-      <Popover open={exportPopoverOpen} onOpenChange={setExportPopoverOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            data-testid="export-button"
-            variant="outline"
-            size={isExporting ? 'default' : 'icon'}
-            className={`h-7 shrink-0 ${isExporting ? '' : 'w-7'}`}
-            disabled={isExporting}
-          >
-            <Download className={isExporting ? 'mr-2' : ''} size={16} />
-            {isExporting && 'Exporting...'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-44 p-1">
-          <button
-            data-testid="export-png-button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-            onClick={handleExportPng}
-          >
-            <Image size={14} />
-            Download PNG
-          </button>
-          <button
-            data-testid="export-csv-button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-            onClick={handleExportCsv}
-          >
-            <FileSpreadsheet size={14} />
-            Download CSV
-          </button>
-        </PopoverContent>
-      </Popover>
-      <Button
-        data-testid="zoom-reset-button"
-        variant="outline"
-        size="icon"
-        className="h-7 w-7"
-        onClick={() => {
-          track('calculator_zoom_reset_button');
-          window.dispatchEvent(new CustomEvent(`d3chart_zoom_reset_${chartId}`));
-        }}
-      >
-        <RotateCcw size={16} />
-      </Button>
-    </div>
-  );
-}
+const CALCULATOR_MOBILE_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] =
+  CALCULATOR_VIEW_MODE_OPTIONS.map(({ testId: _testId, ...option }) => option);
 
 export default function ThroughputCalculatorDisplay() {
   const {
@@ -225,7 +116,7 @@ export default function ThroughputCalculatorDisplay() {
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
 
   const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
@@ -382,6 +273,11 @@ export default function ThroughputCalculatorDisplay() {
     });
     exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
   }, [results, targetValue, hardwareConfig]);
+
+  const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
+    setViewMode(value);
+    track('calculator_view_changed', { view: value });
+  }, []);
 
   const handleResetGpus = useCallback(() => {
     setVisibleHwKeys(new Set(availableHwKeys));
@@ -696,13 +592,23 @@ export default function ThroughputCalculatorDisplay() {
       {/* Chart / Table */}
       <section data-testid="calculator-chart-section">
         <figure data-testid="calculator-figure" className="relative rounded-lg">
-          <CalculatorChartButtons
-            viewMode={viewMode}
-            setViewMode={setViewMode}
+          <ChartButtons
             chartId="calculator-chart"
+            analyticsPrefix="calculator"
+            zoomResetEvent="d3chart_zoom_reset_calculator-chart"
             onExportCsv={handleExportCsv}
             setIsLegendExpanded={setIsLegendExpanded}
             exportFileName={`InferenceX_calculator_${selectedModel}`}
+            leadingControls={
+              <SegmentedToggle
+                value={viewMode}
+                options={CALCULATOR_VIEW_MODE_OPTIONS}
+                onValueChange={handleViewModeChange}
+                ariaLabel="View mode"
+                testId="calculator-view-toggle"
+                className="shrink-0"
+              />
+            }
           />
           <Card>
             {loading ? (
@@ -710,56 +616,19 @@ export default function ThroughputCalculatorDisplay() {
             ) : (
               <>
                 {(() => {
-                  const mobileToggle = (
-                    <div
-                      className="md:hidden inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
-                      role="tablist"
-                      aria-label="View mode"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={viewMode === 'chart'}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                          viewMode === 'chart'
-                            ? 'bg-muted text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        onClick={() => {
-                          setViewMode('chart');
-                          track('calculator_view_changed', { view: 'chart' });
-                        }}
-                      >
-                        <BarChart3 className="size-3.5" />
-                        Chart
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={viewMode === 'table'}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                          viewMode === 'table'
-                            ? 'bg-muted text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        onClick={() => {
-                          setViewMode('table');
-                          track('calculator_view_changed', { view: 'table' });
-                        }}
-                      >
-                        <Table2 className="size-3.5" />
-                        Table
-                      </button>
-                    </div>
-                  );
-
                   const captionContent = (
                     <>
                       <div className="flex items-start justify-between gap-4">
                         <h2 className="text-lg font-semibold">
                           {getChartTitle(barMetric, mode, targetValue, costType, costProvider)}
                         </h2>
-                        {mobileToggle}
+                        <SegmentedToggle
+                          value={viewMode}
+                          options={CALCULATOR_MOBILE_VIEW_MODE_OPTIONS}
+                          onValueChange={handleViewModeChange}
+                          ariaLabel="View mode"
+                          className="md:hidden shrink-0"
+                        />
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         {getModelLabel(selectedModel)} •{' '}
