@@ -74,6 +74,13 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </div>
             <div data-testid="footer-links-legal" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">Legal</span>
+              <Link
+                data-testid="footer-link-land-acknowledgement"
+                href="/land-acknowledgement"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Land Acknowledgement
+              </Link>
               <a
                 data-testid="footer-link-privacy"
                 href="https://semianalysis.com/privacy-policy/"
