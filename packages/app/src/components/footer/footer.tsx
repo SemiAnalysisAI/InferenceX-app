@@ -3,7 +3,6 @@ import Link from 'next/link';
 
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 
-import { FooterReliabilityLink } from './footer-reliability-link';
 import { StarButton } from './footer-star-cta';
 
 export const Footer = ({ starCount }: { starCount?: number | null }) => {
@@ -42,7 +41,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
 
           {/* Center — Links */}
-          <div data-testid="footer-links" className="flex justify-evenly gap-6">
+          <div data-testid="footer-links" className="grid grid-cols-3 gap-x-6 gap-y-8">
             <div data-testid="footer-links-semianalysis" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">SemiAnalysis</span>
               <a
@@ -72,7 +71,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
               >
                 About
               </a>
-              <FooterReliabilityLink />
             </div>
             <div data-testid="footer-links-legal" className="flex flex-col gap-2.5">
               <span className="text-sm font-medium text-foreground">Legal</span>
@@ -115,6 +113,16 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
               >
                 Frontend
               </a>
+            </div>
+            <div data-testid="footer-links-more" className="flex flex-col gap-2.5">
+              <span className="text-sm font-medium text-foreground">More</span>
+              <Link
+                data-testid="footer-link-reliability"
+                href="/reliability"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                GPU Reliability
+              </Link>
             </div>
           </div>
 

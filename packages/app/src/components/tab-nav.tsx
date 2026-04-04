@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { Card } from '@/components/ui/card';
-import { TAB_LINKS, isTabLinkValue } from '@/components/tab-nav-links';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -65,6 +64,18 @@ function useFeatureGate(): boolean {
   return unlocked;
 }
 
+const TAB_LINKS = [
+  { href: '/inference', label: 'Inference Performance', testId: 'tab-trigger-inference' },
+  { href: '/evaluation', label: 'Accuracy Evals', testId: 'tab-trigger-evaluation' },
+  { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },
+  { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
+  { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
+  { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
+  { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions', gated: true },
+] as const;
+
+const TAB_VALUES = new Set(TAB_LINKS.map((t) => t.href.slice(1)));
+
 function activeTab(pathname: string): string {
   const seg = pathname.split('/').filter(Boolean)[0] || 'inference';
   return seg;
@@ -75,7 +86,7 @@ export function TabNav() {
   const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
   const current = activeTab(pathname);
-  const selectedTab = isTabLinkValue(current) ? current : '';
+  const selectedTab = TAB_VALUES.has(current) ? current : '';
 
   const handleMobileChange = (value: string) => {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
