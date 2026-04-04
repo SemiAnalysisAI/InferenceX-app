@@ -5,7 +5,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
+import { mapAggEvalRow, type EvalParams } from '@semianalysisai/inferencex-db/etl/eval-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
+
+import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import {
   downloadGithubArtifact,
   extractZipEntries,
@@ -18,9 +21,12 @@ import {
 } from '@/lib/github-artifacts';
 
 /** Normalize raw artifact rows into the BenchmarkRow shape the frontend expects. */
-export function normalizeArtifactRows(rawRows: Record<string, unknown>[], date: string) {
+export function normalizeArtifactRows(
+  rawRows: Record<string, unknown>[],
+  date: string,
+): BenchmarkRow[] {
   const tracker = createSkipTracker();
-  const results = [];
+  const results: BenchmarkRow[] = [];
   for (const raw of rawRows) {
     const params = mapBenchmarkRow(raw as Record<string, any>, tracker);
     if (!params) continue;
@@ -49,8 +55,76 @@ export function normalizeArtifactRows(rawRows: Record<string, unknown>[], date: 
       image: params.image,
       metrics: params.metrics,
       date,
+      run_url: null,
     });
   }
+  return results;
+}
+
+function evalConfigKey(config: EvalParams['config']): string {
+  return [
+    config.hardware,
+    config.framework,
+    config.model,
+    config.precision,
+    config.specMethod,
+    config.disagg ? '1' : '0',
+    config.prefillTp,
+    config.prefillEp,
+    config.prefillDpAttn ? '1' : '0',
+    config.prefillNumWorkers,
+    config.decodeTp,
+    config.decodeEp,
+    config.decodeDpAttn ? '1' : '0',
+    config.decodeNumWorkers,
+    config.numPrefillGpu,
+    config.numDecodeGpu,
+  ].join('|');
+}
+
+/** Normalize aggregate eval rows into the EvalRow shape the frontend expects. */
+export function normalizeEvalArtifactRows(
+  rawRows: Record<string, unknown>[],
+  date: string,
+  timestamp: string,
+  runUrl: string,
+): EvalRow[] {
+  const tracker = createSkipTracker();
+  const configIds = new Map<string, number>();
+  let nextConfigId = 1;
+  const results: EvalRow[] = [];
+
+  for (const raw of rawRows) {
+    const params = mapAggEvalRow(raw as Record<string, any>, tracker);
+    if (!params) continue;
+
+    const key = evalConfigKey(params.config);
+    let configId = configIds.get(key);
+    if (!configId) {
+      configId = nextConfigId;
+      configIds.set(key, configId);
+      nextConfigId += 1;
+    }
+
+    results.push({
+      config_id: configId,
+      hardware: params.config.hardware,
+      framework: params.config.framework,
+      model: params.config.model,
+      precision: params.config.precision,
+      spec_method: params.config.specMethod,
+      decode_tp: params.config.decodeTp,
+      decode_ep: params.config.decodeEp,
+      decode_dp_attention: params.config.decodeDpAttn,
+      task: params.task,
+      date,
+      conc: params.conc,
+      metrics: params.metrics,
+      timestamp,
+      run_url: runUrl,
+    });
+  }
+
   return results;
 }
 
@@ -60,6 +134,22 @@ function extractJsonFromZip(buffer: Buffer): Record<string, unknown>[] {
     const data = JSON.parse(contents) as Record<string, unknown> | Record<string, unknown>[];
     return Array.isArray(data) ? data : [data];
   });
+}
+
+async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
+  const response = await downloadGithubArtifact(archiveUrl, githubToken);
+  if (!response.ok) {
+    return {
+      rows: [] as Record<string, unknown>[],
+      errorResponse: NextResponse.json(
+        { error: `Artifact download failed: ${response.statusText}` },
+        { status: response.status },
+      ),
+    };
+  }
+
+  const rows = extractJsonFromZip(Buffer.from(await response.arrayBuffer()));
+  return { rows, errorResponse: null };
 }
 
 export async function GET(request: NextRequest) {
@@ -84,29 +174,47 @@ export async function GET(request: NextRequest) {
     }
     const run = (await runResp.json()) as GithubWorkflowRun;
 
-    // Fetch artifacts, find latest results_bmk
+    // Fetch artifacts, find latest benchmark/eval aggregates
     const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
 
     const bmkArtifact = artifacts
       .filter((a) => a.name === 'results_bmk')
       .sort((a, b) => b.id - a.id)[0];
 
-    if (!bmkArtifact) {
-      return NextResponse.json({ error: 'No results_bmk artifact found' }, { status: 404 });
-    }
+    const evalArtifact = artifacts
+      .filter((a) => a.name === 'eval_results_all')
+      .sort((a, b) => b.id - a.id)[0];
 
-    // Download and extract benchmark data
-    const dlResp = await downloadGithubArtifact(bmkArtifact.archive_download_url, githubToken);
-    if (!dlResp.ok) {
+    if (!bmkArtifact && !evalArtifact) {
       return NextResponse.json(
-        { error: `Artifact download failed: ${dlResp.statusText}` },
-        { status: dlResp.status },
+        { error: 'No results_bmk or eval_results_all artifact found' },
+        { status: 404 },
       );
     }
 
-    const rawRows = extractJsonFromZip(Buffer.from(await dlResp.arrayBuffer()));
     const date = getRunDate(run);
-    const benchmarks = normalizeArtifactRows(rawRows, date);
+    const runUrl = run.html_url ?? '';
+    const timestamp = run.created_at ?? `${date}T00:00:00Z`;
+    let benchmarks: BenchmarkRow[] = [];
+    let evaluations: EvalRow[] = [];
+
+    if (bmkArtifact) {
+      const { rows, errorResponse } = await downloadArtifactRows(
+        bmkArtifact.archive_download_url,
+        githubToken,
+      );
+      if (errorResponse) return errorResponse;
+      benchmarks = normalizeArtifactRows(rows, date);
+    }
+
+    if (evalArtifact) {
+      const { rows, errorResponse } = await downloadArtifactRows(
+        evalArtifact.archive_download_url,
+        githubToken,
+      );
+      if (errorResponse) return errorResponse;
+      evaluations = normalizeEvalArtifactRows(rows, date, timestamp, runUrl);
+    }
 
     return NextResponse.json({
       runInfo: {
@@ -114,6 +222,7 @@ export async function GET(request: NextRequest) {
         isNonMainBranch: run.head_branch !== 'main',
       },
       benchmarks,
+      evaluations,
     });
   } catch (error) {
     console.error('Error processing unofficial run:', error);
