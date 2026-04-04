@@ -40,29 +40,33 @@ export default function AboutPage() {
   return (
     <main className="relative">
       <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
-      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4 pb-8">
-        <section>
-          <Card>
-            <h2 className="text-lg font-semibold mb-2">
+      <div className="container mx-auto px-4 lg:px-8 pb-8">
+        <Card className="gap-10">
+          {/* Hero */}
+          <header className="max-w-3xl">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
+              About InferenceX
+            </p>
+            <h1 className="text-4xl font-semibold tracking-[-0.04em] text-foreground md:text-5xl">
               Open Source Continuous Inference Benchmark trusted by Operators of Trillion Dollar
               GigaWatt Scale Token Factories
-            </h2>
-            <p className="text-muted-foreground mb-2">
+            </h1>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
               As the world progresses exponentially towards AGI, software development and model
               releases move at the speed of light. Existing benchmarks rapidly become obsolete due
               to their static nature, and participants often submit software images purpose-built
               for the benchmark itself which do not reflect real world performance.
             </p>
-            <p className="text-muted-foreground mb-2">
-              <strong>InferenceX&trade;</strong> (formerly InferenceMAX) is our independent, vendor
-              neutral, reproducible benchmark which addresses these issues by continuously
-              benchmarking inference software across a wide range of AI accelerators that are
-              actually available to the ML community.
+            <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
+              <strong className="text-foreground">InferenceX&trade;</strong> (formerly InferenceMAX)
+              is our independent, vendor neutral, reproducible benchmark which addresses these
+              issues by continuously benchmarking inference software across a wide range of AI
+              accelerators that are actually available to the ML community.
             </p>
-            <p className="text-muted-foreground">
-              Our open data & insights are widely adopted by the ML community, capacity planning
-              strategy teams at trillion dollar token factories & AI Labs & at multiple billion
-              dollar NeoClouds. Learn more in our articles:{' '}
+            <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
+              Our open data &amp; insights are widely adopted by the ML community, capacity planning
+              strategy teams at trillion dollar token factories &amp; AI Labs &amp; at multiple
+              billion dollar NeoClouds. Learn more in our articles:{' '}
               <Link
                 href="/blog/inferencemax-open-source-inference-benchmarking"
                 className="text-brand hover:underline font-medium"
@@ -78,48 +82,58 @@ export default function AboutPage() {
               </Link>
               .
             </p>
-          </Card>
-        </section>
+          </header>
 
-        <section>
-          <Card>
-            <h2 className="text-lg font-semibold mb-4">Frequently Asked Questions</h2>
-            <dl className="divide-y divide-border">
+          {/* FAQ */}
+          <section aria-label="Frequently asked questions">
+            <h2 className="mb-6 text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">
+              Frequently Asked Questions
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2">
               {FAQ_ITEMS.map((item) => (
-                <div key={item.question} className="py-4 first:pt-0 last:pb-0">
-                  <dt className="font-medium mb-1">{item.question}</dt>
-                  <dd className="text-muted-foreground text-sm">
-                    {item.answer && (
-                      <p>
-                        {item.answer}
-                        {item.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={item.link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-brand hover:underline font-medium"
-                            >
-                              {item.link.text}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    )}
-                    {item.list && (
-                      <ul className="mt-1.5 ml-8 list-disc space-y-0.5">
-                        {item.list.map((li) => (
-                          <li key={li}>{li}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </dd>
-                </div>
+                <article
+                  key={item.question}
+                  className="rounded-2xl border border-border/40 bg-background/20 p-5"
+                >
+                  <h3 className="text-lg font-semibold tracking-[-0.04em] text-foreground">
+                    {item.question}
+                  </h3>
+                  {item.answer && (
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                      {item.answer}
+                      {item.link && (
+                        <>
+                          {' '}
+                          <a
+                            href={item.link.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-brand hover:underline font-medium"
+                          >
+                            {item.link.text}
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {item.list && (
+                    <ul className="mt-3 space-y-1.5">
+                      {item.list.map((li) => (
+                        <li
+                          key={li}
+                          className="flex items-start gap-2 text-sm leading-6 text-muted-foreground"
+                        >
+                          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-brand" />
+                          {li}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
               ))}
-            </dl>
-          </Card>
-        </section>
+            </div>
+          </section>
+        </Card>
       </div>
     </main>
   );
