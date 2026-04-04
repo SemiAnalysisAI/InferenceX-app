@@ -1,114 +1,181 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ArrowRight, Quote } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const FAQS = [
+const HERO_STATS = [
+  { value: 'NVIDIA GB200', sub: 'B200 · H200 · H100' },
+  { value: 'AMD MI355X', sub: 'MI325X · MI300X' },
+];
+
+const GPUS = [
+  'NVIDIA GB200 NVL72',
+  'NVIDIA GB300',
+  'NVIDIA B200',
+  'NVIDIA H200',
+  'NVIDIA H100',
+  'AMD MI355X',
+  'AMD MI325X',
+  'AMD MI300X',
+];
+
+const PRESETS = [
   {
-    category: 'Data',
-    question: 'How often are benchmarks updated?',
-    answer:
-      'We run benchmarks daily on a cron schedule. New results appear on the dashboard within hours of completion. Historical data is preserved indefinitely so you can track performance changes over time.',
+    title: 'GB200 NVL72 vs B200',
+    href: '/inference?preset=gb200-vs-b200',
+    description: 'Multi vs Single Node at FP4.',
   },
   {
-    category: 'Data',
-    question: 'Can I download the raw benchmark data?',
-    answer:
-      'Yes. The API is public and returns raw database rows with no presentation logic. You can also query our open-source database schema directly for custom analysis.',
+    title: 'B200 vs H200',
+    href: '/inference?preset=b200-vs-h200',
+    description: 'Blackwell vs Hopper at FP8.',
   },
   {
-    category: 'Methodology',
-    question: 'Why do your numbers differ from vendor specs?',
-    answer:
-      'Vendor specs typically show peak single-request performance. We benchmark under realistic concurrency, sustained load, and mixed input/output lengths — conditions that reveal bottlenecks invisible in idealized tests.',
+    title: 'AMD MI300X → MI355X',
+    href: '/inference?preset=amd-generations',
+    description: 'Three AMD generations.',
   },
   {
-    category: 'Methodology',
-    question: 'What metrics do you measure?',
-    answer:
-      'Time to first token (TTFT), time per output token (TPOT), inter-token latency (ITL), end-to-end latency, and throughput — all at P50, P99, and tail percentiles under varying concurrency levels.',
+    title: 'H100 vs GB300 Disagg',
+    href: '/inference?preset=h100-vs-gb300-disagg',
+    description: 'Cross-generation disagg.',
   },
   {
-    category: 'Hardware',
-    question: 'Which GPUs do you benchmark?',
-    answer:
-      'NVIDIA GB200, H200, H100 (SXM and PCIe), A100, L40S, and AMD MI300X, MI325X, MI355X. We add new hardware within weeks of availability and retire legacy GPUs when they leave mainstream deployment.',
+    title: 'Disagg B200 vs MI355X',
+    href: '/inference?preset=disagg-b200-vs-mi355x',
+    description: 'Cross-vendor disagg.',
   },
   {
-    category: 'Hardware',
-    question: 'Can I run InferenceX on my own GPUs?',
-    answer:
-      'Absolutely. The benchmark runner is open source and designed to be self-hostable. Fork the repo, point it at your hardware, and compare your results against our published data.',
-  },
-  {
-    category: 'Platform',
-    question: 'Is InferenceX free?',
-    answer:
-      'Yes, completely. The dashboard, API, and all underlying code are open source under Apache 2.0. No registration, no API keys, no usage limits.',
-  },
-  {
-    category: 'Platform',
-    question: 'How can I contribute?',
-    answer:
-      'Open a PR on GitHub. We welcome new model configs, GPU additions, framework integrations, dashboard features, and methodology improvements. PRs are reviewed within 48 hours.',
+    title: 'MI355X Over Time',
+    href: '/inference?preset=mi355x-sglang-disagg-timeline',
+    description: 'Throughput timeline.',
   },
 ];
 
-const CATEGORIES = [...new Set(FAQS.map((f) => f.category))];
-
-export const metadata: Metadata = {
-  title: 'FAQ',
-  description:
-    'Frequently asked questions about InferenceX — benchmark methodology, data access, supported hardware, and how to contribute.',
-  alternates: { canonical: `${SITE_URL}/landing/faq` },
-  openGraph: {
-    title: 'FAQ | InferenceX',
-    description: 'Common questions about InferenceX benchmarks, data, and methodology.',
-    url: `${SITE_URL}/landing/faq`,
-  },
+const QUOTE = {
+  text: 'Inference demand is growing exponentially, driven by long-context reasoning. NVIDIA Grace Blackwell NVL72 was invented for this new era of thinking AI. By benchmarking frequently, InferenceMAX gives the industry a transparent view of LLM inference performance on real-world workloads.',
+  name: 'Jensen Huang',
+  title: 'Founder & CEO, NVIDIA',
 };
 
-export default function FAQPage() {
+export const metadata: Metadata = {
+  title: 'Landing Variant J — GPU Focus + Dense Layout',
+  description:
+    'InferenceX landing page variant with GPU-centric layout, dense presets, and hardware chips.',
+  alternates: { canonical: `${SITE_URL}/landing/faq` },
+};
+
+export default function VariantJ() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 pb-8">
         <Card className="gap-10">
-          <header className="max-w-3xl">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">FAQ</p>
-            <h1 className="text-4xl font-semibold tracking-[-0.04em] text-foreground md:text-5xl">
-              Questions we hear a lot.
-            </h1>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
-              Everything you need to know about InferenceX — from how we measure performance to how
-              you can contribute. Can&apos;t find your answer? Open an issue on GitHub.
+          <header>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
+              InferenceX
             </p>
+            <h1 className="text-4xl font-semibold tracking-[-0.04em] text-foreground md:text-5xl max-w-4xl">
+              Real-world GPU inference benchmarks. Updated daily.
+            </h1>
+            <div className="mt-6 grid gap-4 md:grid-cols-2 max-w-lg">
+              {HERO_STATS.map((s) => (
+                <div key={s.value} className="rounded-2xl border border-brand/20 bg-brand/5 p-4">
+                  <p className="text-lg font-semibold text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.sub}</p>
+                </div>
+              ))}
+            </div>
           </header>
 
-          {CATEGORIES.map((category) => (
-            <section key={category} aria-label={`${category} questions`}>
-              <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
-                {category}
-              </h2>
-              <div className="space-y-4">
-                {FAQS.filter((f) => f.category === category).map((faq) => (
-                  <article
-                    key={faq.question}
-                    className="rounded-2xl border border-border/40 bg-background/20 p-5"
-                  >
-                    <h3 className="text-lg font-semibold tracking-[-0.04em] text-foreground">
-                      {faq.question}
-                    </h3>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">{faq.answer}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ))}
+          {/* GPU chips */}
+          <section aria-label="Supported GPUs">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">
+              Hardware We Benchmark
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {GPUS.map((g) => (
+                <span
+                  key={g}
+                  className="rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm font-medium text-foreground"
+                >
+                  {g}
+                </span>
+              ))}
+            </div>
+          </section>
 
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Still have questions? The fastest way to get answers is to open a GitHub issue. Our team
-            monitors issues daily and most questions are answered within 24 hours.
-          </p>
+          {/* Dense presets grid */}
+          <section className="grid gap-3 grid-cols-2 lg:grid-cols-3" aria-label="Quick comparisons">
+            {PRESETS.map((p) => (
+              <Link
+                key={p.href}
+                href={p.href}
+                className="group rounded-2xl border border-border/40 bg-background/20 p-4 transition-all hover:border-brand/50"
+              >
+                <div className="flex items-start justify-between gap-1">
+                  <h3 className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors leading-tight">
+                    {p.title}
+                  </h3>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-brand transition-all group-hover:translate-x-0.5" />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
+              </Link>
+            ))}
+          </section>
+
+          {/* Quote */}
+          <div className="rounded-2xl border border-brand/20 bg-brand/5 p-5">
+            <Quote className="h-4 w-4 text-brand mb-2" />
+            <p className="text-sm leading-6 text-foreground italic max-w-3xl">
+              &ldquo;{QUOTE.text}&rdquo;
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              — {QUOTE.name}, {QUOTE.title}
+            </p>
+          </div>
+
+          {/* Bottom nav */}
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              href="/inference"
+              className="inline-flex items-center gap-2 rounded-md bg-brand px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-brand/90 transition-colors"
+            >
+              Full Dashboard
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/quotes"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Supporters →
+            </Link>
+            <Link
+              href="/blog"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Articles →
+            </Link>
+            <Link
+              href="/reliability"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Reliability →
+            </Link>
+            <Link
+              href="https://github.com/SemiAnalysisAI/InferenceX"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              GitHub →
+            </Link>
+            <Link
+              href="https://newsletter.semianalysis.com"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Newsletter →
+            </Link>
+          </div>
         </Card>
       </div>
     </main>

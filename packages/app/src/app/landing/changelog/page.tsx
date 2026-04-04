@@ -1,126 +1,125 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const RELEASES = [
+const HERO_QUOTE = {
+  text: "InferenceMAX's nightly results highlight the rapid pace of progress in the AMD software stack. It's exciting to witness the birth of an open project that provides a tied feedback loop between what the software team works on and how it affects specific ML use cases.",
+  name: 'Quentin Colombet',
+  title: 'Senior Director, AMD',
+};
+
+const FEATURES = [
   {
-    version: 'v2.4.0',
-    date: 'April 2026',
-    title: 'Disaggregated Serving Metrics',
-    changes: [
-      'Added per-prefill and per-decode GPU throughput metrics',
-      'New disagg caveat banners on affected charts',
-      'TCO calculator now supports disaggregated configs',
-    ],
+    label: 'Full Dashboard',
+    title: 'Every Model, GPU & Metric',
+    description:
+      'Fully configurable inference benchmark charts with date ranges, concurrency sweeps, and raw data export. Compare NVIDIA B200, H200, H100, AMD MI355X, MI325X, MI300X and more.',
+    href: '/inference',
   },
   {
-    version: 'v2.3.0',
-    date: 'March 2026',
-    title: 'Historical Trends Overhaul',
-    changes: [
-      'Spline-interpolated trend lines for smoother GPU timeseries',
-      'Comparison date picker for side-by-side performance deltas',
-      'Interactive zooming with persistent zoom state across tab switches',
-    ],
+    label: 'Quick Comparisons',
+    title: 'Curated GPU Benchmarks',
+    description:
+      'Jump straight into the most popular GPU inference benchmark comparisons — GB200 vs B200, AMD generations, disaggregated serving, and more.',
+    href: '/inference?preset=gb200-vs-b200',
   },
   {
-    version: 'v2.2.0',
-    date: 'February 2026',
-    title: 'Evaluation Tab Launch',
-    changes: [
-      'New evaluation benchmarks tab with accuracy vs speed tradeoffs',
-      'MMLU, HumanEval, and GSM8K integration',
-      'Sidebar legend with model-level filtering',
-    ],
+    label: 'Supporters',
+    title: '36+ Industry Quotes',
+    description:
+      'Endorsed by executives from OpenAI, NVIDIA, AMD, Microsoft, Meta, Hugging Face, and 30 more organizations building AI infrastructure.',
+    href: '/quotes',
   },
   {
-    version: 'v2.1.0',
-    date: 'January 2026',
-    title: 'AMD MI355X Support',
-    changes: [
-      'Full benchmark coverage for AMD Instinct MI355X',
-      'ROCm framework compatibility validated',
-      'Added to GPU specs comparison table',
-    ],
-  },
-  {
-    version: 'v2.0.0',
-    date: 'December 2025',
-    title: 'Platform Rewrite',
-    changes: [
-      'Migrated from Create React App to Next.js 16 App Router',
-      'D3.js chart library rewritten with 4-effect architecture',
-      'React Query data layer with automatic cache invalidation',
-      'New dark-glass design system with circuit background',
-    ],
+    label: 'Articles',
+    title: 'Deep-Dive Analysis',
+    description:
+      'In-depth write-ups on GPU performance, benchmark methodology, and inference optimization from the SemiAnalysis research team.',
+    href: '/blog',
   },
 ];
 
+const BOTTOM_LINKS = [
+  { label: 'GitHub — Benchmarks', href: 'https://github.com/SemiAnalysisAI/InferenceX' },
+  { label: 'GitHub — Frontend', href: 'https://github.com/SemiAnalysisAI/InferenceX-app' },
+  { label: 'Newsletter', href: 'https://newsletter.semianalysis.com' },
+  { label: 'GPU Reliability', href: '/reliability' },
+  { label: 'SemiAnalysis', href: 'https://semianalysis.com' },
+];
+
 export const metadata: Metadata = {
-  title: 'Changelog',
-  description:
-    'InferenceX changelog — new features, GPU additions, framework updates, and platform improvements.',
+  title: 'Landing Variant G — Feature Cards + Quote Banner',
+  description: 'InferenceX landing page variant with feature cards and quote banner.',
   alternates: { canonical: `${SITE_URL}/landing/changelog` },
-  openGraph: {
-    title: 'Changelog | InferenceX',
-    description: 'Track every InferenceX platform update, new GPU, and feature release.',
-    url: `${SITE_URL}/landing/changelog`,
-  },
 };
 
-export default function ChangelogPage() {
+export default function VariantG() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 pb-8">
         <Card className="gap-10">
           <header className="max-w-3xl">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
-              Changelog
+              Open Source Benchmark
             </p>
             <h1 className="text-4xl font-semibold tracking-[-0.04em] text-foreground md:text-5xl">
-              What&apos;s new in InferenceX.
+              AI Inference Benchmark by SemiAnalysis
             </h1>
             <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
-              A chronological record of features, improvements, and new hardware support. We ship
-              updates daily — this page captures the highlights.
+              InferenceX is the open-source AI inference benchmark that matches the rapid pace of
+              modern AI development. Powered by one of the largest open-source GPU CI/CD fleets with
+              NVIDIA GB200, AMD MI355X &amp; many more.
             </p>
           </header>
 
-          <section className="space-y-4" aria-label="Release history">
-            {RELEASES.map((release) => (
-              <article
-                key={release.version}
-                className="rounded-2xl border border-border/40 bg-background/20 p-5"
+          {/* Quote banner */}
+          <div className="rounded-2xl border border-brand/20 bg-brand/5 p-5">
+            <p className="text-sm leading-6 text-foreground italic">
+              &ldquo;{HERO_QUOTE.text}&rdquo;
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              — {HERO_QUOTE.name}, {HERO_QUOTE.title}
+            </p>
+          </div>
+
+          {/* Feature cards */}
+          <section className="grid gap-4 md:grid-cols-2" aria-label="Features">
+            {FEATURES.map((f) => (
+              <Link
+                key={f.label}
+                href={f.href}
+                className="group rounded-2xl border border-border/40 bg-background/20 p-5 transition-all hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5"
               >
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand">
-                    {release.version}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{release.date}</span>
-                </div>
-                <h2 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-foreground">
-                  {release.title}
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-brand">
+                  {f.label}
+                </p>
+                <h2 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-foreground group-hover:text-brand transition-colors">
+                  {f.title}
                 </h2>
-                <ul className="mt-4 space-y-1.5">
-                  {release.changes.map((change) => (
-                    <li
-                      key={change}
-                      className="flex items-start gap-2 text-sm leading-6 text-muted-foreground"
-                    >
-                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-brand" />
-                      {change}
-                    </li>
-                  ))}
-                </ul>
-              </article>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{f.description}</p>
+                <div className="mt-4 flex items-center gap-1 text-sm text-brand">
+                  Explore
+                  <ArrowRight className="h-4 w-4 transition-all group-hover:translate-x-0.5" />
+                </div>
+              </Link>
             ))}
           </section>
 
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            For the full commit history, visit our open-source repository on GitHub. Automated
-            release notes are generated for every deployment.
-          </p>
+          {/* Bottom links */}
+          <div className="flex flex-wrap gap-2">
+            {BOTTOM_LINKS.map((l) => (
+              <Link
+                key={l.label}
+                href={l.href}
+                className="rounded-full border border-border/40 bg-background/20 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-brand/50 transition-all"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
         </Card>
       </div>
     </main>
