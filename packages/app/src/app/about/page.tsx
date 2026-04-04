@@ -43,7 +43,7 @@ export default function AboutPage() {
       <div className="container mx-auto px-4 lg:px-8 pb-8">
         <Card className="gap-10">
           {/* Hero */}
-          <header className="max-w-3xl">
+          <header>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
               About InferenceX
             </p>
