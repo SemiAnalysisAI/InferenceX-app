@@ -1,6 +1,10 @@
 describe('Land acknowledgement', () => {
   it('navigates from the footer to the land acknowledgement page', () => {
-    cy.visit('/');
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
 
     cy.get('[data-testid="footer-link-land-acknowledgement"]').scrollIntoView().click();
 
