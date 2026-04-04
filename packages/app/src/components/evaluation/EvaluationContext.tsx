@@ -15,6 +15,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   useChartUIState,
   useChartToggleSet,
@@ -24,11 +25,14 @@ import {
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
 import { Model } from '@/lib/data-mappings';
-import { getFrameworkLabel } from '@/lib/utils';
 import type { EvalRow } from '@/lib/api';
 
+import {
+  aggregateEvaluationChartRows,
+  buildEvalChangelogEntries,
+  buildEvaluationChartRows,
+} from './chart-data';
 import { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
 
 /** @internal Exported for test provider wrapping only. */
@@ -49,9 +53,11 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   } = useGlobalFilters();
   const { getUrlParam } = useUrlState();
   const { data: rawRows, isLoading: loading, error: queryError } = useEvaluations();
+  const { unofficialEvalRows, localOfficialOverride } = useUnofficialRun();
 
   const error = queryError ? queryError.message : null;
   const rawData: EvalRow[] = rawRows ?? [];
+  const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
 
   const [selectedRunDate, setSelectedRunDate] = useState<string>(
     () => getUrlParam('e_rundate') || globalRunDate || '',
@@ -86,9 +92,12 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   } = useChartToggleSet();
 
   const availableBenchmarks = useMemo(() => {
-    const tasks = new Set(rawData.map((item) => item.task));
+    const tasks = new Set([
+      ...rawData.map((item) => item.task),
+      ...unofficialRawData.map((item) => item.task),
+    ]);
     return Array.from(tasks).sort();
-  }, [rawData]);
+  }, [rawData, unofficialRawData]);
 
   const availableDates = useMemo(() => {
     const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
@@ -162,167 +171,58 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 
   useAutoInitializeToggleSet(availableHardware, enabledHardware, setEnabledHardware);
 
-  /** Build a display label for a config row. */
-  function buildConfigLabel(
-    hwLabel: string,
-    framework: string,
-    specMethod: string,
-    precision: string,
-    conc: number | null,
-    tp?: number,
-  ): string {
-    const headerSuffixes: string[] = [];
-    if (framework && framework !== '1k8k') headerSuffixes.push(getFrameworkLabel(framework));
-    if (specMethod && specMethod !== 'none') headerSuffixes.push(getFrameworkLabel(specMethod));
-
-    const detailSuffixes: string[] = [];
-    if (precision && effectivePrecisions.length > 1) detailSuffixes.push(precision.toUpperCase());
-    if (conc) detailSuffixes.push(`C${conc}`);
-    if (tp !== undefined) detailSuffixes.push(`TP${tp}`);
-
-    const line1 = headerSuffixes.length > 0 ? `${hwLabel} (${headerSuffixes.join(', ')})` : hwLabel;
-    return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(', ')}` : line1;
-  }
-
   const availablePrecisions = useMemo(() => {
     const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
     if (!dbModelKey) return globalAvailablePrecisions;
     const precs = [
-      ...new Set(rawData.filter((r) => r.model === dbModelKey).map((r) => r.precision)),
+      ...new Set(
+        [...rawData, ...unofficialRawData]
+          .filter((r) => r.model === dbModelKey)
+          .map((r) => r.precision),
+      ),
     ].sort();
     return precs.length > 0 ? precs : globalAvailablePrecisions;
-  }, [rawData, selectedModel, globalAvailablePrecisions]);
+  }, [rawData, unofficialRawData, selectedModel, globalAvailablePrecisions]);
 
-  const unfilteredChartData: EvaluationChartData[] = useMemo(() => {
-    if (!selectedBenchmark || !selectedModel || !selectedRunDate) return [];
+  const unfilteredChartData: EvaluationChartData[] = useMemo(
+    () =>
+      buildEvaluationChartRows(
+        rawData,
+        selectedBenchmark,
+        selectedModel,
+        effectivePrecisions,
+        selectedRunDate,
+      ),
+    [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions],
+  );
 
-    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-    if (!dbModelKey) return [];
+  const unfilteredUnofficialChartData: EvaluationChartData[] = useMemo(
+    () =>
+      buildEvaluationChartRows(
+        unofficialRawData,
+        selectedBenchmark,
+        selectedModel,
+        effectivePrecisions,
+      ),
+    [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions],
+  );
 
-    // Map all rows up to selected date
-    const allData = rawData
-      .filter((item) => {
-        return (
-          item.task === selectedBenchmark &&
-          item.model === dbModelKey &&
-          item.date <= selectedRunDate &&
-          effectivePrecisions.includes(item.precision)
-        );
-      })
-      .map((item): EvaluationChartData | null => {
-        const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
-        if (score === 0) return null;
+  const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
 
-        const hwKey = normalizeEvalHardwareKey(
-          item.hardware,
-          item.framework,
-          item.spec_method,
-        ) as keyof typeof HARDWARE_CONFIG;
-        if (hwKey === 'unknown') return null;
+  const chartData = useMemo(
+    () => aggregateEvaluationChartRows(unfilteredChartData, effectiveEnabledHardware),
+    [unfilteredChartData, effectiveEnabledHardware],
+  );
 
-        return {
-          configId: item.config_id,
-          hwKey,
-          configLabel: '',
-          score,
-          scoreError: item.metrics.em_strict_se ?? item.metrics.score_se ?? 0,
-          model: item.model,
-          benchmark: item.task,
-          specDecode: item.spec_method,
-          date: item.date,
-          datetime: item.timestamp ?? '',
-          precision: item.precision,
-          framework: item.framework,
-          tp: item.decode_tp,
-          ep: item.decode_ep,
-          dp_attention: item.decode_dp_attention,
-          conc: item.conc ?? 0,
-          runUrl: item.run_url ?? undefined,
-        };
-      })
-      .filter((item): item is EvaluationChartData => item !== null);
+  const unofficialHardwareWithData = useMemo(
+    () => new Set(unfilteredUnofficialChartData.map((data) => String(data.hwKey))),
+    [unfilteredUnofficialChartData],
+  );
 
-    // Group by hw-framework-specmethod-precision. Find the latest date for each
-    // group (up to selectedRunDate), then keep ALL rows from that date for the
-    // group. This means if parallelism (conc/tp/ep) changes between runs, we
-    // only show the latest run's parallelism — old combos don't leak in.
-    const groupKeyFn = (item: EvaluationChartData) =>
-      `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
-
-    const latestDateForGroup = new Map<string, string>();
-    for (const item of allData) {
-      const key = groupKeyFn(item);
-      const existing = latestDateForGroup.get(key);
-      if (!existing || item.date > existing) latestDateForGroup.set(key, item.date);
-    }
-
-    const result: EvaluationChartData[] = [];
-    for (const item of allData) {
-      const key = groupKeyFn(item);
-      if (item.date !== latestDateForGroup.get(key)) continue;
-      const hwConfig = HARDWARE_CONFIG[item.hwKey];
-      const hwLabel = String(hwConfig?.label || item.hwKey);
-      result.push({
-        ...item,
-        configLabel: buildConfigLabel(
-          hwLabel,
-          item.framework,
-          item.specDecode,
-          item.precision,
-          item.conc,
-          item.tp,
-        ),
-      });
-    }
-
-    return result.sort((a, b) => a.configLabel.localeCompare(b.configLabel));
-  }, [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions]);
-
-  const chartData = useMemo(() => {
-    const filtered = unfilteredChartData.filter((data) => {
-      return enabledHardware.has(String(data.hwKey));
-    });
-
-    const grouped = new Map<string, EvaluationChartData[]>();
-    filtered.forEach((data) => {
-      if (!grouped.has(data.configLabel)) grouped.set(data.configLabel, []);
-      grouped.get(data.configLabel)!.push(data);
-    });
-
-    return Array.from(grouped.entries())
-      .map(([_, dataPoints]) => {
-        let sum = 0,
-          rawMin = Infinity,
-          rawMax = -Infinity,
-          errMin = Infinity,
-          errMax = -Infinity;
-        for (const d of dataPoints) {
-          sum += d.score;
-          if (d.score < rawMin) rawMin = d.score;
-          if (d.score > rawMax) rawMax = d.score;
-          const lo = Math.max(0, d.score - (d.scoreError || 0));
-          const hi = Math.min(1, d.score + (d.scoreError || 0));
-          if (lo < errMin) errMin = lo;
-          if (hi > errMax) errMax = hi;
-        }
-        const meanScore = sum / dataPoints.length;
-
-        return {
-          ...dataPoints[0],
-          score: meanScore,
-          scoreError: (errMax - errMin) / 2,
-          minScore: rawMin,
-          maxScore: rawMax,
-          errorMin: errMin,
-          errorMax: errMax,
-        };
-      })
-      .sort(
-        (a, b) =>
-          getModelSortIndex(String(a.hwKey)) - getModelSortIndex(String(b.hwKey)) ||
-          String(a.hwKey).localeCompare(String(b.hwKey)),
-      );
-  }, [unfilteredChartData, enabledHardware]);
+  const unofficialChartData = useMemo(
+    () => aggregateEvaluationChartRows(unfilteredUnofficialChartData, unofficialHardwareWithData),
+    [unfilteredUnofficialChartData, unofficialHardwareWithData],
+  );
 
   const highlightedConfigs = useMemo(() => {
     const highlighted = new Set<string>();
@@ -333,44 +233,14 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [unfilteredChartData, selectedRunDate]);
 
   const changelogEntries: EvalChangelogEntry[] = useMemo(() => {
-    if (!selectedRunDate || !selectedModel) return [];
-
-    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-    if (!dbModelKey) return [];
-
-    const entriesOnDate = rawData.filter((item) => {
-      const itemDate = item.date;
-      const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
-      return itemDate === selectedRunDate && item.model === dbModelKey && score !== 0;
-    });
-
-    const byBenchmark = new Map<string, Set<string>>();
-    entriesOnDate.forEach((item) => {
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      const hwConfig = HARDWARE_CONFIG[hwKey as keyof typeof HARDWARE_CONFIG];
-      const hwLabel = String(hwConfig?.label || hwKey);
-      const configLabel = buildConfigLabel(
-        hwLabel,
-        item.framework,
-        item.spec_method,
-        item.precision,
-        item.conc,
-      );
-
-      if (!byBenchmark.has(item.task)) byBenchmark.set(item.task, new Set());
-      byBenchmark.get(item.task)!.add(configLabel);
-    });
-
-    return Array.from(byBenchmark.entries())
-      .map(([benchmark, configs]) => ({ benchmark, configs: Array.from(configs).sort() }))
-      .sort((a, b) => a.benchmark.localeCompare(b.benchmark));
-  }, [rawData, selectedRunDate, selectedModel]);
+    return buildEvalChangelogEntries(rawData, selectedRunDate, selectedModel, effectivePrecisions);
+  }, [rawData, selectedRunDate, selectedModel, effectivePrecisions]);
 
   const modelHasEvalData = useMemo(() => {
     if (!selectedModel) return false;
     const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-    return rawData.some((item) => item.model === dbModelKey);
-  }, [rawData, selectedModel]);
+    return [...rawData, ...unofficialRawData].some((item) => item.model === dbModelKey);
+  }, [rawData, unofficialRawData, selectedModel]);
 
   const hwTypesWithData = useMemo(
     () => new Set(unfilteredChartData.map((data) => String(data.hwKey))),
@@ -444,6 +314,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       availableModels,
       availableDates,
       chartData,
+      unofficialChartData,
       unfilteredChartData,
       enabledHardware,
       toggleHardware,
@@ -475,6 +346,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       availableModels,
       availableDates,
       chartData,
+      unofficialChartData,
       unfilteredChartData,
       enabledHardware,
       toggleHardware,

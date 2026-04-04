@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-import { normalizeArtifactRows } from './route';
+import { normalizeArtifactRows, normalizeEvalArtifactRows } from './route';
 
 // ── Mock AdmZip ──────────────────────────────────────────────────────
 const mockGetEntries = vi.fn();
@@ -63,6 +63,30 @@ function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown
     std_itl: 0.001,
     output_tput_per_gpu: 80,
     input_tput_per_gpu: 120,
+    ...overrides,
+  };
+}
+
+function rawEvalRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    hw: 'gb300-nv',
+    model: 'deepseek-ai/DeepSeek-R1-0528',
+    model_prefix: 'dsr1',
+    framework: 'dynamo-sglang',
+    precision: 'fp8',
+    task: 'gsm8k',
+    tp: 8,
+    ep: 1,
+    dp_attention: false,
+    disagg: true,
+    spec_decoding: 'none',
+    source:
+      'eval_dsr1_8k1k_dsr1_8k1k_fp8_dynamo-sglang_prefill-tp8-ep1-dpfalse-nw1_decode-tp8-ep1-dpfalse-nw1_disagg-true_spec-none_conc16_gb300-nv_0/results_0.json',
+    conc: 16,
+    em_strict: 0.91,
+    em_strict_se: 0.02,
+    score: 0.91,
+    score_se: 0.02,
     ...overrides,
   };
 }
@@ -186,6 +210,49 @@ describe('normalizeArtifactRows', () => {
   });
 });
 
+describe('normalizeEvalArtifactRows', () => {
+  it('converts aggregate eval rows to EvalRow shape with synthetic config ids', () => {
+    const rows = normalizeEvalArtifactRows(
+      [rawEvalRow({ task: 'gsm8k', conc: 16 }), rawEvalRow({ task: 'mmlu', conc: 32 })],
+      '2026-03-01',
+      '2026-03-01T12:34:56Z',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      config_id: 1,
+      hardware: 'gb300',
+      framework: 'dynamo-sglang',
+      model: 'dsr1',
+      precision: 'fp8',
+      spec_method: 'none',
+      task: 'gsm8k',
+      date: '2026-03-01',
+      conc: 16,
+      timestamp: '2026-03-01T12:34:56Z',
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    });
+    expect(rows[1].config_id).toBe(1);
+    expect(rows[1].metrics.em_strict).toBe(0.91);
+  });
+
+  it('skips eval rows with unmapped hardware/model/task', () => {
+    const rows = normalizeEvalArtifactRows(
+      [
+        rawEvalRow({ hw: 'unknown-gpu' }),
+        rawEvalRow({ model_prefix: 'unknown', model: 'unknown/model' }),
+        rawEvalRow({ task: '' }),
+      ],
+      '2026-03-01',
+      '2026-03-01T00:00:00Z',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    );
+
+    expect(rows).toEqual([]);
+  });
+});
+
 // ── GET handler tests ────────────────────────────────────────────────
 
 describe('GET /api/unofficial-run', () => {
@@ -234,7 +301,7 @@ describe('GET /api/unofficial-run', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 404 when no results_bmk artifact exists', async () => {
+  it('returns 404 when neither benchmark nor eval artifact exists', async () => {
     // Run metadata fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -249,6 +316,7 @@ describe('GET /api/unofficial-run', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toContain('results_bmk');
+    expect(body.error).toContain('eval_results_all');
   });
 
   it('returns error when artifact download fails', async () => {
@@ -313,6 +381,52 @@ describe('GET /api/unofficial-run', () => {
     expect(body.runInfo.isNonMainBranch).toBe(false);
     expect(body.benchmarks).toHaveLength(1);
     expect(body.benchmarks[0].hardware).toBe('h200');
+    expect(body.evaluations).toEqual([]);
+  });
+
+  it('returns evaluations for eval-only runs', async () => {
+    const evalData = [rawEvalRow()];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 321,
+        name: 'eval-only',
+        head_branch: 'feature/evals',
+        head_sha: 'abc123',
+        created_at: '2026-03-01T12:34:56Z',
+        html_url: 'http://github.com/run/321',
+        conclusion: 'success',
+        status: 'completed',
+      }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
+      }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(8),
+    });
+
+    mockGetEntries.mockReturnValue([{ entryName: 'agg_eval_all.json' }]);
+    mockReadAsText.mockReturnValue(JSON.stringify(evalData));
+
+    const res = await GET(makeRequest('runId=321'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.benchmarks).toEqual([]);
+    expect(body.evaluations).toHaveLength(1);
+    expect(body.evaluations[0]).toMatchObject({
+      hardware: 'gb300',
+      framework: 'dynamo-sglang',
+      model: 'dsr1',
+      precision: 'fp8',
+      task: 'gsm8k',
+    });
+    expect(body.evaluations[0].run_url).toBe('http://github.com/run/321');
   });
 
   it('returns 500 on unexpected error', async () => {

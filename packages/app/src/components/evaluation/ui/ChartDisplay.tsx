@@ -6,6 +6,7 @@ import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { getPrecisionLabel, isModelExperimental, Model, Precision } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
@@ -23,6 +24,7 @@ export default function EvaluationChartDisplay() {
     chartData,
     selectedPrecisions,
   } = useEvaluation();
+  const { isUnofficialRun } = useUnofficialRun();
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = evaluationChartToCsv(chartData);
@@ -63,7 +65,8 @@ export default function EvaluationChartDisplay() {
               <p className="text-sm text-muted-foreground mb-2">
                 {selectedModel} •{' '}
                 {selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')} •{' '}
-                {selectedBenchmark} • Source: SemiAnalysis InferenceX™
+                {selectedBenchmark} •{' '}
+                {isUnofficialRun ? 'Source: UNOFFICIAL' : 'Source: SemiAnalysis InferenceX™'}
                 {selectedRunDate && (
                   <>
                     {' '}
