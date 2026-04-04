@@ -16,14 +16,19 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-calculator"]').click();
     cy.url().should('include', '/calculator');
 
-    cy.get('[data-testid="tab-trigger-reliability"]').click();
-    cy.url().should('include', '/reliability');
-
     cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
     cy.url().should('include', '/gpu-specs');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.url().should('include', '/inference');
+  });
+
+  it('opens GPU Reliability from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-reliability"]').scrollIntoView().click();
+    cy.url().should('include', '/reliability');
+    cy.get('[data-testid="reliability-chart-display"]').should('exist');
   });
 
   it('shows mobile chart select dropdown on small viewport', () => {
