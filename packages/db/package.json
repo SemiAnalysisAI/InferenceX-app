@@ -27,12 +27,12 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@semianalysisai/inferencex-constants": "workspace:*",
-    "adm-zip": "^0.5.16",
-    "postgres": "^3.4.8"
+    "adm-zip": "^0.5.17",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.5.2",
     "@vitest/coverage-v8": "^4.1.2",
     "dotenv-cli": "^11.0.0",
     "tsx": "^4.21.0",
