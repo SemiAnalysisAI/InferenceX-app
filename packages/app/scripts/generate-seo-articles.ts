@@ -1,5 +1,3 @@
-
-
 /**
  * Fetch and aggregate benchmark data for SEO article generation.
  * Outputs a JSON file that Claude uses to write natural-language articles.
