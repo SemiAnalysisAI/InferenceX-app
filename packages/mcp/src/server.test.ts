@@ -26,8 +26,13 @@ const { mockState, mockDb } = vi.hoisted(() => {
   return { mockState, mockDb };
 });
 
-vi.mock('@semianalysisai/inferencex-db/etl/db-utils', () => ({
-  createAdminSql: () => mockDb,
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  JSON_MODE: false,
+  postgresOptionsForUrl: () => ({ max: 5, ssl: false }),
+}));
+
+vi.mock('postgres', () => ({
+  default: () => mockDb,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────

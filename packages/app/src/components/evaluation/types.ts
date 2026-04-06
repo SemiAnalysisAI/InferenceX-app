@@ -54,6 +54,7 @@ export interface EvaluationChartContextType {
   availableModels: Model[];
   availableDates: string[];
   chartData: EvaluationChartData[];
+  unofficialChartData: EvaluationChartData[];
   unfilteredChartData: EvaluationChartData[];
   enabledHardware: Set<string>;
   toggleHardware: (hwKey: string) => void;

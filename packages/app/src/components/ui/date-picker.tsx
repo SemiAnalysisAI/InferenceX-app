@@ -1,11 +1,22 @@
 'use client';
 
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
 import { Button } from '@/components/ui/button';
+import {
+  CalendarMonthPanel,
+  formatCalendarDate,
+  formatDisplayDate,
+  getCalendarMonthNavState,
+  getLatestSelectableDate,
+  isCalendarDateOutOfRange,
+  parseCalendarDate,
+  resolveCalendarDateBounds,
+  useCalendarMonth,
+} from '@/components/ui/calendar-picker-utils';
 import {
   Dialog,
   DialogClose,
@@ -15,7 +26,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 
 export interface DatePickerProps {
   date?: string;
@@ -24,7 +34,7 @@ export interface DatePickerProps {
   maxDate?: string;
   className?: string;
   placeholder?: string;
-  availableDates?: string[]; // Add this
+  availableDates?: string[];
   isCheckingAvailableDates?: boolean;
 }
 
@@ -37,88 +47,26 @@ export function DatePicker({
   minDate,
   maxDate,
   placeholder = 'Select date',
-  availableDates, // Add this
+  availableDates,
   isCheckingAvailableDates,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
-  // Convert date prop to internal format for calendar (MM/DD/YYYY, HH:mm:ss)
-  const convertToInternalFormat = (dateStr: string | undefined): string | undefined => {
-    if (!dateStr) {
-      return undefined;
-    }
-    if (dateStr.includes('-') && !dateStr.includes(',')) {
-      const [year, month, day] = dateStr.split('-');
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      return `${month}/${day}/${year}, ${hours}:${minutes}:${seconds}`;
-    }
-    return dateStr;
-  };
-  const [tempDate, setTempDate] = useState<string | undefined>(() => convertToInternalFormat(date));
+  const [tempDate, setTempDate] = useState<string | undefined>(date);
   const [isApplying, _setIsApplying] = useState(false);
   const [error, setError] = useState('');
-
-  // Helper to convert string (MM/dd/yyyy, HH:mm:ss) to Date
-  const parseDate = (dateStr: string): Date => {
-    // Parse "12/01/2025, 24:22:39" format
-    const [datePart] = dateStr.split(', ');
-    const [month, day, year] = datePart.split('/');
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  };
-
-  // Helper to convert Date to string (MM/dd/yyyy, HH:mm:ss)
-  const dateToString = (dateObj: Date): string => {
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-    const seconds = String(dateObj.getSeconds()).padStart(2, '0');
-    return `${month}/${day}/${year}, ${hours}:${minutes}:${seconds}`;
-  };
-
-  // Helper to convert Date to internal string (YYYY-MM-DD) for comparison
-  const dateToInternalString = (dateObj: Date): string => {
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Format date for display (handles both YYYY-MM-DD and MM/DD/YYYY, HH:mm:ss formats)
-  const formatDate = (dateStr: string) => {
-    let dateObj: Date;
-    if (dateStr.includes('-') && !dateStr.includes(',')) {
-      // YYYY-MM-DD format
-      const [year, month, day] = dateStr.split('-');
-      dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    } else {
-      // MM/DD/YYYY, HH:mm:ss format
-      dateObj = parseDate(dateStr);
-    }
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(dateObj);
-  };
 
   // Get display text for the input
   const getDisplayText = () => {
     if (!date) {
       return placeholder;
     }
-    return formatDate(date);
+    return formatDisplayDate(date);
   };
 
   // Handle date selection in calendar
   const handleDateClick = (dateObj: Date) => {
-    const now = new Date();
-    dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-    const dateStr = dateToString(dateObj);
-    const isSelected = tempDate && parseDate(tempDate).toDateString() === dateObj.toDateString();
+    const dateStr = formatCalendarDate(dateObj);
+    const isSelected = tempDate === dateStr;
 
     if (isSelected) {
       setTempDate(undefined);
@@ -126,7 +74,7 @@ export function DatePicker({
       setTempDate(dateStr);
     }
     track('date_picker_date_clicked', {
-      date: dateToInternalString(dateObj),
+      date: dateStr,
       selected: !isSelected,
     });
   };
@@ -138,17 +86,13 @@ export function DatePicker({
       return;
     }
 
-    // Convert to YYYY-MM-DD format for existence check
-    const dateObj = parseDate(tempDate);
-    const internalDateStr = dateToInternalString(dateObj);
-
-    if (availableDates && !availableDates.includes(internalDateStr)) {
-      setError(`This date does not exist: ${formatDate(tempDate)}`);
+    if (availableDates && !availableDates.includes(tempDate)) {
+      setError(`This date does not exist: ${formatDisplayDate(tempDate)}`);
       return;
     }
 
-    track('date_picker_applied', { date: internalDateStr });
-    onChange(internalDateStr);
+    track('date_picker_applied', { date: tempDate });
+    onChange(tempDate);
     setOpen(false);
   };
 
@@ -158,15 +102,7 @@ export function DatePicker({
     setOpen(false);
   };
 
-  // Get the latest date from availableDates or maxDate
-  const getLatestDate = () => {
-    if (availableDates && availableDates.length > 0) {
-      // availableDates is already sorted, so take the last one
-      return availableDates[availableDates.length - 1];
-    }
-    // Fallback to maxDate if provided, otherwise use current date
-    return maxDate || dateToInternalString(new Date());
-  };
+  const getLatestDate = () => getLatestSelectableDate(availableDates, maxDate);
 
   // Check if the selected date is already the latest
   const isLatestDateSelected = () => {
@@ -174,10 +110,7 @@ export function DatePicker({
       return false;
     }
 
-    const latestDate = getLatestDate();
-    const selectedDateObj = parseDate(tempDate);
-    const selectedInternalDate = dateToInternalString(selectedDateObj);
-    return selectedInternalDate === latestDate;
+    return tempDate === getLatestDate();
   };
 
   // Check if the current date prop is already the latest (for external button)
@@ -192,16 +125,7 @@ export function DatePicker({
 
   // Go to latest date (for calendar dialog)
   const handleGoToLatest = () => {
-    const latestDate = getLatestDate();
-
-    // Parse the latest date (YYYY-MM-DD format) and convert to display format
-    const [year, month, day] = latestDate.split('-');
-    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    const now = new Date();
-    dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-    const dateStr = dateToString(dateObj);
-
-    setTempDate(dateStr);
+    setTempDate(getLatestDate());
   };
 
   // Go to latest date directly (for external button)
@@ -253,7 +177,7 @@ export function DatePicker({
   const handleOpenChange = (isOpen: boolean) => {
     track(isOpen ? 'date_picker_opened' : 'date_picker_closed');
     if (isOpen) {
-      setTempDate(convertToInternalFormat(date));
+      setTempDate(date);
     }
     setOpen(isOpen);
   };
@@ -310,7 +234,7 @@ export function DatePicker({
                 onDateClick={handleDateClick}
                 minDate={minDate}
                 maxDate={maxDate}
-                availableDates={availableDates} // Add this
+                availableDates={availableDates}
                 isCheckingAvailableDates={isCheckingAvailableDates}
               />
               {isCheckingAvailableDates && (
@@ -363,7 +287,7 @@ interface CalendarGridProps {
   onDateClick: (date: Date) => void;
   minDate?: string;
   maxDate?: string;
-  availableDates?: string[]; // Add this
+  availableDates?: string[];
   isCheckingAvailableDates?: boolean;
 }
 
@@ -375,144 +299,46 @@ function CalendarGrid({
   availableDates,
   isCheckingAvailableDates,
 }: CalendarGridProps) {
-  // Helper to parse date string (MM/dd/yyyy, HH:mm:ss) to Date
-  const parseDateStr = (dateStr: string): Date => {
-    const [datePart] = dateStr.split(', ');
-    const [month, day, year] = datePart.split('/');
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  };
-
-  // Helper to convert Date to string (YYYY-MM-DD) for comparison with availableDates
-  const dateToInternalString = (dateObj: Date): string => {
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Parse minDate and maxDate props (YYYY-MM-DD format), with defaults
-  const minAllowedDate = minDate
-    ? new Date(minDate + ' 12:00:00')
-    : new Date('2025-10-05 12:00:00');
-
-  const maxAllowedDate = maxDate ? new Date(maxDate + ' 12:00:00') : new Date();
-
-  maxAllowedDate.setHours(23, 59, 59, 999); // End of day
-
-  // Determine initial month to display
-  const getInitialMonth = () => {
-    // If there is a selected date, show the month of the selected date
-    if (selectedDate) {
-      return parseDateStr(selectedDate);
-    }
-
-    // Default to the latest month with available data
-    if (availableDates && availableDates.length > 0) {
-      return parseDateStr(availableDates[availableDates.length - 1]);
-    }
-    const today = new Date();
-    if (maxAllowedDate >= today) {
-      return today;
-    }
-    return maxAllowedDate;
-  };
-
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth());
-
-  // Reset to initial month when selectedDate changes (dialog reopens)
-  React.useEffect(() => {
-    setCurrentMonth(getInitialMonth());
-  }, [selectedDate]);
+  const { minAllowedDate, maxAllowedDate, earliestMonth, latestMonth } = resolveCalendarDateBounds(
+    minDate,
+    maxDate,
+    availableDates,
+    '2025-10-05',
+  );
+  const [currentMonth, setCurrentMonth] = useCalendarMonth(
+    selectedDate,
+    availableDates,
+    maxAllowedDate,
+    [selectedDate],
+  );
 
   const isDateSelected = (date: Date) => {
     if (!selectedDate) {
       return false;
     }
-    const selectedDateObj = parseDateStr(selectedDate);
+    const selectedDateObj = parseCalendarDate(selectedDate);
     return selectedDateObj.toDateString() === date.toDateString();
   };
 
-  const isDateOutOfRange = (date: Date) => {
-    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const minDateOnly = new Date(
-      minAllowedDate.getFullYear(),
-      minAllowedDate.getMonth(),
-      minAllowedDate.getDate(),
-    );
-    const maxDateOnly = new Date(
-      maxAllowedDate.getFullYear(),
-      maxAllowedDate.getMonth(),
-      maxAllowedDate.getDate(),
-    );
-    return dateOnly < minDateOnly || dateOnly > maxDateOnly;
+  const getDayState = (date: Date) => {
+    const outOfRange = isCalendarDateOutOfRange(date, minAllowedDate, maxAllowedDate);
+    const dateStr = formatCalendarDate(date);
+
+    return {
+      selected: isDateSelected(date),
+      disabled: outOfRange || (availableDates !== undefined && !availableDates.includes(dateStr)),
+      outOfRange,
+    };
   };
 
-  const isDateDisabled = (date: Date) => {
-    if (isDateOutOfRange(date)) {
-      return true;
-    }
-    if (availableDates) {
-      const dateStr = dateToInternalString(date);
-      if (!availableDates.includes(dateStr)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  // Generate calendar days - always returns 42 cells (6 rows) for consistent height
-  const getDaysInMonth = () => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-
-    const days: (Date | null)[] = [];
-
-    // Add empty cells for days before month starts
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(new Date(year, month, day));
-    }
-
-    // Pad to 42 cells (6 rows × 7 days) for consistent height
-    while (days.length < 42) {
-      days.push(null);
-    }
-
-    return days;
-  };
-
-  const days = getDaysInMonth();
-  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  // Clamp navigation to months that contain available data
-  const earliestMonth =
-    availableDates && availableDates.length > 0
-      ? new Date(availableDates[0] + 'T12:00:00')
-      : minAllowedDate;
-  const latestMonth =
-    availableDates && availableDates.length > 0
-      ? new Date(availableDates[availableDates.length - 1] + 'T12:00:00')
-      : maxAllowedDate;
-
-  const canGoPrev =
-    currentMonth.getFullYear() > earliestMonth.getFullYear() ||
-    (currentMonth.getFullYear() === earliestMonth.getFullYear() &&
-      currentMonth.getMonth() > earliestMonth.getMonth());
-  const canGoNext =
-    currentMonth.getFullYear() < latestMonth.getFullYear() ||
-    (currentMonth.getFullYear() === latestMonth.getFullYear() &&
-      currentMonth.getMonth() < latestMonth.getMonth());
+  const { canGoPrevious, canGoNext } = getCalendarMonthNavState(
+    currentMonth,
+    earliestMonth,
+    latestMonth,
+  );
 
   const goToPreviousMonth = () => {
-    if (canGoPrev) {
+    if (canGoPrevious) {
       const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
       track('date_picker_month_navigated', {
         direction: 'previous',
@@ -534,67 +360,15 @@ function CalendarGrid({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={goToPreviousMonth}
-          disabled={isCheckingAvailableDates || !canGoPrev}
-          className={cn(!canGoPrev && 'opacity-30')}
-        >
-          ‹
-        </Button>
-        <h3 className="font-semibold">{monthName}</h3>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={goToNextMonth}
-          disabled={isCheckingAvailableDates || !canGoNext}
-          className={cn(!canGoNext && 'opacity-30')}
-        >
-          ›
-        </Button>
-      </div>
-      <div className="grid grid-cols-7 gap-2">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-          <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-            {day}
-          </div>
-        ))}
-        {days.map((day, index) => {
-          if (!day) {
-            return <div key={`empty-${index}`} className="h-9" />;
-          }
-
-          const selected = isDateSelected(day);
-          const disabled = isDateDisabled(day);
-          const isToday = day.toDateString() === new Date().toDateString();
-          const outOfRange = isDateOutOfRange(day);
-
-          return (
-            <button
-              key={index}
-              onClick={() => !disabled && !isCheckingAvailableDates && onDateClick(day)}
-              disabled={disabled || isCheckingAvailableDates}
-              className={cn(
-                'h-9 w-full rounded-md text-sm transition-colors',
-                'hover:bg-accent hover:text-accent-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                selected && 'bg-primary text-primary-foreground hover:bg-primary/90',
-                (disabled || isCheckingAvailableDates) &&
-                  !selected &&
-                  'opacity-30 cursor-not-allowed hover:bg-transparent hover:text-current line-through',
-                isToday && !selected && 'border-2 border-primary',
-                !selected && !disabled && !isCheckingAvailableDates && 'bg-background',
-                outOfRange && !selected && 'text-muted-foreground',
-              )}
-            >
-              {day.getDate()}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <CalendarMonthPanel
+      month={currentMonth}
+      onPreviousMonth={goToPreviousMonth}
+      onNextMonth={goToNextMonth}
+      canGoPrevious={canGoPrevious}
+      canGoNext={canGoNext}
+      isDisabled={isCheckingAvailableDates}
+      getDayState={getDayState}
+      onDateClick={onDateClick}
+    />
   );
 }

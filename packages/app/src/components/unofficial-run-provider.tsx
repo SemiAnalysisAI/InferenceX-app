@@ -14,12 +14,13 @@ import { HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { computeToggle } from '@/hooks/useTogglableSet';
+import type { BenchmarkRow, EvalRow } from '@/lib/api';
+import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition } from '@/components/inference/types';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Model, Sequence } from '@/lib/data-mappings';
-import type { BenchmarkRow } from '@/lib/api';
 
 interface UnofficialRunInfo {
   id: number;
@@ -40,6 +41,8 @@ interface UnofficialChartData {
   };
 }
 
+const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
+
 interface AvailableModelSequence {
   model: Model;
   sequence: Sequence;
@@ -49,6 +52,7 @@ export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
   unofficialRunInfo: UnofficialRunInfo | null;
   unofficialChartData: UnofficialChartData | null;
+  unofficialEvalRows: EvalRow[] | null;
   loading: boolean;
   error: string | null;
   clearUnofficialRun: () => void;
@@ -140,6 +144,7 @@ export function parseAvailableModelsAndSequences(
 export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const [unofficialRunInfo, setUnofficialRunInfo] = useState<UnofficialRunInfo | null>(null);
   const [unofficialChartData, setUnofficialChartData] = useState<UnofficialChartData | null>(null);
+  const [unofficialEvalRows, setUnofficialEvalRows] = useState<EvalRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableModelsAndSequences, setAvailableModelsAndSequences] = useState<
@@ -152,17 +157,24 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
 
   // Derive all overlay hw types from chart data
   const allOverlayHwTypes = useMemo(() => {
-    if (!unofficialChartData) return new Set<string>();
     const hwTypes = new Set<string>();
-    for (const group of Object.values(unofficialChartData)) {
-      for (const chartType of [group.e2e, group.interactivity]) {
-        chartType.data.forEach((p) => {
-          if (p.hwKey) hwTypes.add(p.hwKey as string);
-        });
+    if (unofficialChartData) {
+      for (const group of Object.values(unofficialChartData)) {
+        for (const chartType of [group.e2e, group.interactivity]) {
+          chartType.data.forEach((p) => {
+            if (p.hwKey) hwTypes.add(p.hwKey as string);
+          });
+        }
       }
     }
+    if (unofficialEvalRows) {
+      unofficialEvalRows.forEach((row) => {
+        const hwKey = normalizeEvalHardwareKey(row.hardware, row.framework, row.spec_method);
+        if (hwKey !== 'unknown') hwTypes.add(hwKey);
+      });
+    }
     return hwTypes;
-  }, [unofficialChartData]);
+  }, [unofficialChartData, unofficialEvalRows]);
 
   // Reset overlay state when chart data changes
   useEffect(() => {
@@ -194,10 +206,13 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const clearUnofficialRun = useCallback(() => {
     setUnofficialRunInfo(null);
     setUnofficialChartData(null);
+    setUnofficialEvalRows(null);
     setError(null);
     setAvailableModelsAndSequences([]);
     const url = new URL(window.location.href);
-    url.searchParams.delete('unofficialRun');
+    for (const key of url.searchParams.keys()) {
+      if (UNOFFICIAL_RUN_PARAM_RE.test(key)) url.searchParams.delete(key);
+    }
     window.history.pushState({}, '', url);
   }, []);
 
@@ -215,10 +230,18 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const load = () => {
-      const unofficialRunId = new URLSearchParams(window.location.search).get('unofficialRun');
+      const params = new URLSearchParams(window.location.search);
+      let unofficialRunId: string | undefined;
+      for (const [key, value] of params) {
+        if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
+          unofficialRunId = value;
+          break;
+        }
+      }
       if (!unofficialRunId) {
         setUnofficialRunInfo(null);
         setUnofficialChartData(null);
+        setUnofficialEvalRows(null);
         setError(null);
         setAvailableModelsAndSequences([]);
         return;
@@ -235,12 +258,14 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
           setUnofficialRunInfo(data.runInfo);
           const chartData = buildChartData(data.benchmarks ?? []);
           setUnofficialChartData(chartData);
+          setUnofficialEvalRows(data.evaluations ?? []);
           setAvailableModelsAndSequences(parseAvailableModelsAndSequences(chartData));
         })
         .catch((e) => {
           setError(e instanceof Error ? e.message : 'Unknown error');
           setUnofficialRunInfo(null);
           setUnofficialChartData(null);
+          setUnofficialEvalRows(null);
           setAvailableModelsAndSequences([]);
         })
         .finally(() => setLoading(false));
@@ -257,6 +282,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         isUnofficialRun: !!unofficialRunInfo,
         unofficialRunInfo,
         unofficialChartData,
+        unofficialEvalRows,
         loading,
         error,
         clearUnofficialRun,

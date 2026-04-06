@@ -395,7 +395,8 @@ export default function ChartLegend({
             <div
               key={i}
               className={cn(
-                'p-1 rounded-sm mt-2 shrink-0',
+                'p-1 rounded-sm shrink-0',
+                i > 0 && 'mt-2',
                 allHidden && 'h-0 m-0! p-0! overflow-hidden',
               )}
             >

@@ -107,6 +107,7 @@ export function QuoteCarousel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hovering = useRef(false);
 
   // Build shuffled org order on mount (client only)
@@ -116,10 +117,12 @@ export function QuoteCarousel({
 
   const advance = useCallback(() => {
     if (hovering.current) return;
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
     setFading(true);
-    setTimeout(() => {
+    fadeTimeoutRef.current = setTimeout(() => {
       setActiveIndex((prev) => (prev + 1) % (entries.length || 1));
       setFading(false);
+      fadeTimeoutRef.current = null;
     }, 300);
   }, [entries.length]);
 
@@ -129,16 +132,19 @@ export function QuoteCarousel({
     timerRef.current = setInterval(advance, intervalMs);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
     };
   }, [advance, entries.length, intervalMs]);
 
   const goTo = useCallback(
     (index: number) => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
       setFading(true);
-      setTimeout(() => {
+      fadeTimeoutRef.current = setTimeout(() => {
         setActiveIndex(index);
         setFading(false);
+        fadeTimeoutRef.current = null;
       }, 300);
       timerRef.current = setInterval(advance, intervalMs);
       track('quote_carousel_navigated', {
@@ -146,7 +152,7 @@ export function QuoteCarousel({
         fromOrg: entries[activeIndex]?.org,
       });
     },
-    [advance, intervalMs],
+    [advance, intervalMs, entries, activeIndex],
   );
 
   if (entries.length === 0) return null;
@@ -179,17 +185,22 @@ export function QuoteCarousel({
 
       {/* All quotes stacked in same grid cell — tallest sets height */}
       <div className="grid items-center">
-        {entries.map((e, i) => (
-          <div
-            key={e.org}
-            className={`col-start-1 row-start-1 transition-opacity duration-300 ease-in-out ${
-              i === activeIndex && !fading ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-            aria-hidden={i !== activeIndex}
-          >
-            <QuoteBlock quote={e.quote} />
-          </div>
-        ))}
+        {entries.map((e, i) => {
+          const isActive = i === activeIndex;
+          return (
+            <div
+              key={e.org}
+              className={`col-start-1 row-start-1 ${
+                isActive
+                  ? `transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`
+                  : 'opacity-0 invisible pointer-events-none'
+              }`}
+              aria-hidden={!isActive}
+            >
+              <QuoteBlock quote={e.quote} />
+            </div>
+          );
+        })}
       </div>
 
       {moreHref && (

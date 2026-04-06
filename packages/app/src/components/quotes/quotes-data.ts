@@ -347,4 +347,5 @@ export const CAROUSEL_ORGS = [
 export const CAROUSEL_LABELS: Record<string, string> = {
   'Together AI': 'Tri Dao',
   'PyTorch Foundation': 'PyTorch',
+  'Meta Superintelligence Labs': 'Meta',
 };

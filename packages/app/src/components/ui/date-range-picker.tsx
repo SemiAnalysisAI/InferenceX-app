@@ -1,11 +1,20 @@
 'use client';
 
 import { Calendar, Loader2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
 import { Button } from '@/components/ui/button';
+import {
+  CalendarMonthPanel,
+  formatCalendarDate,
+  formatDisplayDate,
+  getCalendarMonthNavState,
+  isCalendarDateOutOfRange,
+  resolveCalendarDateBounds,
+  useCalendarMonth,
+} from '@/components/ui/calendar-picker-utils';
 import {
   Dialog,
   DialogClose,
@@ -30,7 +39,7 @@ export interface DateRangePickerProps {
   placeholder?: string;
   minDate?: string;
   maxDate?: string;
-  availableDates?: string[]; // Add this
+  availableDates?: string[];
   isCheckingAvailableDates?: boolean;
 }
 
@@ -45,7 +54,7 @@ export function DateRangePicker({
   placeholder = 'Select date range',
   minDate,
   maxDate,
-  availableDates, // Add this
+  availableDates,
   isCheckingAvailableDates,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
@@ -54,28 +63,6 @@ export function DateRangePicker({
   const [error, setError] = useState('');
   const [isApplying, _setIsApplying] = useState(false);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  // Helper to convert string to Date
-  const parseDate = (dateStr: string): Date => {
-    return new Date(dateStr + 'T12:00:00');
-  };
-
-  // Helper to convert Date to string (YYYY-MM-DD)
-  const dateToString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Format date for display
-  const formatDate = (dateStr: string) => {
-    const date = parseDate(dateStr);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(date);
-  };
 
   // Get display text for the input
   const getDisplayText = () => {
@@ -83,17 +70,17 @@ export function DateRangePicker({
       return placeholder;
     }
     if (dateRange.startDate && dateRange.endDate) {
-      return `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`;
+      return `${formatDisplayDate(dateRange.startDate)} - ${formatDisplayDate(dateRange.endDate)}`;
     }
     if (dateRange.startDate) {
-      return `${formatDate(dateRange.startDate)} - ...`;
+      return `${formatDisplayDate(dateRange.startDate)} - ...`;
     }
     return placeholder;
   };
 
   // Handle date selection in calendar
   const handleDateClick = (date: Date) => {
-    const dateStr = dateToString(date);
+    const dateStr = formatCalendarDate(date);
     track('date_range_picker_date_clicked', { date: dateStr });
 
     if (tempRange.startDate && tempRange.endDate) {
@@ -173,14 +160,15 @@ export function DateRangePicker({
                 <span>
                   Selected:{' '}
                   <span className="font-semibold text-foreground">
-                    {formatDate(tempRange.startDate)} - {formatDate(tempRange.endDate)}
+                    {formatDisplayDate(tempRange.startDate)} -{' '}
+                    {formatDisplayDate(tempRange.endDate)}
                   </span>
                 </span>
               ) : tempRange.startDate ? (
                 <span>
                   Start date:{' '}
                   <span className="font-semibold text-foreground">
-                    {formatDate(tempRange.startDate)}
+                    {formatDisplayDate(tempRange.startDate)}
                   </span>{' '}
                   - Choose an end date
                 </span>
@@ -198,7 +186,7 @@ export function DateRangePicker({
               maxDate={maxDate}
               hoveredDate={hoveredDate}
               onDateHover={setHoveredDate}
-              availableDates={availableDates} // Add this
+              availableDates={availableDates}
               isCheckingAvailableDates={isCheckingAvailableDates}
             />
             {isCheckingAvailableDates && (
@@ -322,7 +310,7 @@ interface CalendarGridProps {
   maxDate?: string;
   hoveredDate: string | null;
   onDateHover: (date: string | null) => void;
-  availableDates?: string[]; // Add this
+  availableDates?: string[];
   isCheckingAvailableDates?: boolean;
 }
 
@@ -334,48 +322,21 @@ function CalendarGrid({
   maxDate,
   hoveredDate,
   onDateHover,
-  availableDates, // Add this
+  availableDates,
   isCheckingAvailableDates,
 }: CalendarGridProps) {
-  // Parse minDate and maxDate props, with defaults
-  const minAllowedDate = minDate
-    ? new Date(minDate + ' 12:00:00')
-    : new Date('2025-10-05 12:00:00');
-
-  const maxAllowedDate = maxDate ? new Date(maxDate + ' 12:00:00') : new Date();
-
-  maxAllowedDate.setHours(23, 59, 59, 999); // End of day
-
-  // Determine initial month to display
-  const getInitialMonth = () => {
-    if (dateRange.startDate) {
-      return new Date(dateRange.startDate + ' 12:00:00');
-    }
-    // Default to the latest month with available data
-    if (availableDates && availableDates.length > 0) {
-      return new Date(availableDates[availableDates.length - 1] + 'T12:00:00');
-    }
-    const today = new Date();
-    if (maxAllowedDate >= today) {
-      return today;
-    }
-    return maxAllowedDate;
-  };
-
-  const [currentMonth, setCurrentMonth] = useState(getInitialMonth());
-
-  // Reset to initial month when dateRange changes (dialog reopens)
-  useEffect(() => {
-    setCurrentMonth(getInitialMonth());
-  }, [dateRange.startDate, dateRange.endDate]);
-
-  // Helper to convert Date to string (YYYY-MM-DD)
-  const dateToString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  const { minAllowedDate, maxAllowedDate, earliestMonth, latestMonth } = resolveCalendarDateBounds(
+    minDate,
+    maxDate,
+    availableDates,
+    '2025-10-05',
+  );
+  const [currentMonth, setCurrentMonth] = useCalendarMonth(
+    dateRange.startDate,
+    availableDates,
+    maxAllowedDate,
+    [dateRange.startDate, dateRange.endDate],
+  );
 
   // Get the effective range for highlighting (includes hover)
   const getEffectiveRange = () => {
@@ -403,7 +364,7 @@ function CalendarGrid({
     if (!effectiveRange.start) {
       return false;
     }
-    const dateStr = dateToString(date);
+    const dateStr = formatCalendarDate(date);
 
     // Don't highlight if it's the start or end date
     if (dateStr === effectiveRange.start || dateStr === effectiveRange.end) {
@@ -416,111 +377,30 @@ function CalendarGrid({
     return false;
   };
 
-  const isDateSelected = (date: Date) => {
-    const dateStr = dateToString(date);
-    return dateStr === dateRange.startDate || dateStr === dateRange.endDate;
-  };
+  const getDayState = (date: Date) => {
+    const dateStr = formatCalendarDate(date);
+    const outOfRange = isCalendarDateOutOfRange(date, minAllowedDate, maxAllowedDate);
 
-  const isDateHovered = (date: Date) => {
-    if (!hoveredDate) {
-      return false;
-    }
-    const dateStr = dateToString(date);
-    return dateStr === hoveredDate;
-  };
-
-  const isDateOutOfRange = (date: Date) => {
-    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const minDateOnly = new Date(
-      minAllowedDate.getFullYear(),
-      minAllowedDate.getMonth(),
-      minAllowedDate.getDate(),
-    );
-    const maxDateOnly = new Date(
-      maxAllowedDate.getFullYear(),
-      maxAllowedDate.getMonth(),
-      maxAllowedDate.getDate(),
-    );
-    return dateOnly < minDateOnly || dateOnly > maxDateOnly;
-  };
-
-  const isDateDisabled = (date: Date) => {
-    if (isDateOutOfRange(date)) {
-      return true;
-    }
-    if (availableDates) {
-      const dateStr = dateToString(date);
-      if (!availableDates.includes(dateStr)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  // Generate calendar days for a given month - always returns 42 cells (6 rows) for consistent height
-  const getDaysInMonth = (month: Date) => {
-    const year = month.getFullYear();
-    const monthIndex = month.getMonth();
-    const firstDay = new Date(year, monthIndex, 1);
-    const lastDay = new Date(year, monthIndex + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-
-    const days: (Date | null)[] = [];
-
-    // Add empty cells for days before month starts
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(new Date(year, monthIndex, day));
-    }
-
-    // Pad to 42 cells (6 rows × 7 days) for consistent height
-    while (days.length < 42) {
-      days.push(null);
-    }
-
-    return days;
+    return {
+      selected: dateStr === dateRange.startDate || dateStr === dateRange.endDate,
+      disabled: outOfRange || (availableDates !== undefined && !availableDates.includes(dateStr)),
+      hovered: dateStr === hoveredDate,
+      inRange: isDateInRange(date),
+      outOfRange,
+    };
   };
 
   // Get second month (next month)
   const secondMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
-
-  const firstMonthDays = getDaysInMonth(currentMonth);
-  const secondMonthDays = getDaysInMonth(secondMonth);
-  const firstMonthName = currentMonth.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-  const secondMonthName = secondMonth.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-
-  // Clamp navigation to months that contain available data
-  const earliestMonth =
-    availableDates && availableDates.length > 0
-      ? new Date(availableDates[0] + 'T12:00:00')
-      : minAllowedDate;
-  const latestMonth =
-    availableDates && availableDates.length > 0
-      ? new Date(availableDates[availableDates.length - 1] + 'T12:00:00')
-      : maxAllowedDate;
-
-  const canGoPrev =
-    currentMonth.getFullYear() > earliestMonth.getFullYear() ||
-    (currentMonth.getFullYear() === earliestMonth.getFullYear() &&
-      currentMonth.getMonth() > earliestMonth.getMonth());
-  const canGoNext =
-    secondMonth.getFullYear() < latestMonth.getFullYear() ||
-    (secondMonth.getFullYear() === latestMonth.getFullYear() &&
-      secondMonth.getMonth() < latestMonth.getMonth());
+  const { canGoPrevious, canGoNext } = getCalendarMonthNavState(
+    currentMonth,
+    earliestMonth,
+    latestMonth,
+    secondMonth,
+  );
 
   const goToPreviousMonth = () => {
-    if (canGoPrev) {
+    if (canGoPrevious) {
       const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1);
       track('date_range_picker_month_navigated', {
         direction: 'previous',
@@ -549,105 +429,33 @@ function CalendarGrid({
 
     // Only show hover effect when start date is selected and we're selecting end date
     if (!selectingStart && dateRange.startDate) {
-      onDateHover(dateToString(date));
+      onDateHover(formatCalendarDate(date));
     } else {
       onDateHover(null);
     }
   };
 
-  const renderCalendarMonth = (
-    days: (Date | null)[],
-    monthName: string,
-    showPrevButton: boolean,
-    showNextButton: boolean,
-  ) => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        {showPrevButton ? (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToPreviousMonth}
-            disabled={isCheckingAvailableDates || !canGoPrev}
-            className={cn(!canGoPrev && 'opacity-30')}
-          >
-            ‹
-          </Button>
-        ) : (
-          <div className="w-10" />
-        )}
-        <h3 className="font-semibold">{monthName}</h3>
-        {showNextButton ? (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToNextMonth}
-            disabled={isCheckingAvailableDates || !canGoNext}
-            className={cn(!canGoNext && 'opacity-30')}
-          >
-            ›
-          </Button>
-        ) : (
-          <div className="w-10" />
-        )}
-      </div>
-      <div className="grid grid-cols-7 gap-2">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-          <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-            {day}
-          </div>
-        ))}
-        {days.map((day, index) => {
-          if (!day) {
-            return <div key={`empty-${index}`} className="h-9" />;
-          }
-
-          const selected = isDateSelected(day);
-          const inRange = isDateInRange(day);
-          const hovered = isDateHovered(day);
-          const disabled = isDateDisabled(day);
-          const isToday = day.toDateString() === new Date().toDateString();
-          const outOfRange = isDateOutOfRange(day);
-
-          return (
-            <button
-              key={index}
-              onClick={() => !disabled && !isCheckingAvailableDates && onDateClick(day)}
-              onMouseEnter={() => !isCheckingAvailableDates && handleDateHover(day)}
-              onMouseLeave={() => !isCheckingAvailableDates && handleDateHover(null)}
-              disabled={disabled || isCheckingAvailableDates}
-              className={cn(
-                'h-9 w-full rounded-md text-sm transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                selected && 'bg-primary text-primary-foreground hover:bg-primary/90',
-                hovered && !selected && 'bg-primary text-primary-foreground',
-                inRange && !selected && !hovered && 'bg-primary/20',
-                disabled &&
-                  !selected &&
-                  'opacity-30 cursor-not-allowed hover:bg-transparent hover:text-current line-through',
-                !disabled &&
-                  !selected &&
-                  !hovered &&
-                  !inRange &&
-                  'hover:bg-accent hover:text-accent-foreground',
-                isToday && !selected && 'border-2 border-primary',
-                !selected && !disabled && !inRange && !hovered && 'bg-background',
-                outOfRange && !selected && 'text-muted-foreground',
-              )}
-            >
-              {day.getDate()}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-4" onMouseLeave={() => !isCheckingAvailableDates && onDateHover(null)}>
       <div className="grid grid-cols-2 gap-6">
-        {renderCalendarMonth(firstMonthDays, firstMonthName, true, false)}
-        {renderCalendarMonth(secondMonthDays, secondMonthName, false, true)}
+        <CalendarMonthPanel
+          month={currentMonth}
+          onPreviousMonth={goToPreviousMonth}
+          canGoPrevious={canGoPrevious}
+          isDisabled={isCheckingAvailableDates}
+          getDayState={getDayState}
+          onDateClick={onDateClick}
+          onDateHover={handleDateHover}
+        />
+        <CalendarMonthPanel
+          month={secondMonth}
+          onNextMonth={goToNextMonth}
+          canGoNext={canGoNext}
+          isDisabled={isCheckingAvailableDates}
+          getDayState={getDayState}
+          onDateClick={onDateClick}
+          onDateHover={handleDateHover}
+        />
       </div>
     </div>
   );

@@ -143,9 +143,9 @@ describe('purgeAll', () => {
 });
 
 describe('cachedJson', () => {
-  it('sets Cache-Control with max-age=0 and 1 year s-maxage', () => {
+  it('sets Cache-Control with max-age=0 and 1 day s-maxage', () => {
     const res = cachedJson({ ok: true });
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=31536000');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=86400');
   });
 
   it('sets Vercel-Cache-Tag to db', () => {

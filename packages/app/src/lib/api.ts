@@ -137,3 +137,7 @@ export function fetchReliability() {
 export function fetchEvaluations() {
   return fetchJson<EvalRow[]>('/api/v1/evaluations');
 }
+
+export function fetchSubmissions() {
+  return fetchJson<import('./submissions-types').SubmissionsResponse>('/api/v1/submissions');
+}
