@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import * as d3 from 'd3';
-import type { HorizontalBarLayerConfig, CustomLayerConfig } from '@/lib/d3-chart/D3Chart/types';
+import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { contrastColors } from '@/lib/d3-chart/contrast-colors';
+import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 
 interface BenchmarkEntry {
   gpu: string;
@@ -12,9 +14,8 @@ interface BenchmarkEntry {
 }
 
 interface BenchmarkChartProps {
-  /** JSON-encoded array of { gpu, value, vendor } entries. */
+  children?: ReactNode;
   data: string;
-  /** X-axis label */
   metric?: string;
 }
 
@@ -24,21 +25,40 @@ const VENDOR_COLORS: Record<string, string> = {
   other: 'oklch(0.7 0.1 260)',
 };
 
+const CHART_MARGIN = { top: 24, right: 24, bottom: 48, left: 100 };
+
 function formatNumber(n: number): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
 
-/**
- * Interactive horizontal bar chart for SEO blog articles.
- *
- * Usage in MDX:
- * ```mdx
- * <BenchmarkChart
- *   metric="Throughput/GPU (tok/s)"
- *   data='[{"gpu":"NVIDIA B200","value":18131.6,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":4222.8,"vendor":"amd"}]'
- * />
- * ```
- */
+function getBarColor(d: BenchmarkEntry): string {
+  return VENDOR_COLORS[d.vendor] ?? VENDOR_COLORS.other;
+}
+
+const generateTooltipContent = (data: BenchmarkEntry, isPinned: boolean): string => `
+  <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+    <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${data.gpu}</div>
+    <div style="color: var(--muted-foreground); font-size: 11px;"><strong>Throughput/GPU:</strong> ${formatNumber(data.value)} tok/s</div>
+  </div>
+`;
+
+/** Position value labels, flipping inside/outside bar based on space. */
+function positionValueLabels(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  xScale: d3.ScaleLinear<number, number>,
+) {
+  group.selectAll<SVGTextElement, BenchmarkEntry>('.value-label').each(function (d) {
+    const barEnd = xScale(d.value);
+    const textWidth = this.getComputedTextLength();
+    const fitsInside = barEnd > textWidth + 24;
+    d3.select(this)
+      .attr('x', fitsInside ? barEnd - 10 : barEnd + 6)
+      .attr('text-anchor', fitsInside ? 'end' : 'start')
+      .style('fill', fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)');
+  });
+}
+
 export function BenchmarkChart({
   data: dataJson,
   metric = 'Throughput/GPU (tok/s)',
@@ -53,23 +73,20 @@ export function BenchmarkChart({
   }, [dataJson]);
 
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
   if (data.length === 0) return null;
 
-  const dynamicHeight = Math.max(200, data.length * 44 + 64);
+  const dynamicHeight = Math.max(250, data.length * 45 + 80);
 
   if (!mounted) {
     return <div className="my-6 not-prose" style={{ height: dynamicHeight }} />;
   }
 
-  return <BenchmarkChartClient data={data} metric={metric} height={dynamicHeight} />;
+  return <BenchmarkChartInner data={data} metric={metric} height={dynamicHeight} />;
 }
 
-function BenchmarkChartClient({
+function BenchmarkChartInner({
   data,
   metric,
   height,
@@ -78,64 +95,63 @@ function BenchmarkChartClient({
   metric: string;
   height: number;
 }) {
-  const [D3ChartMod, setD3ChartMod] = useState<{
-    D3Chart: typeof import('@/lib/d3-chart/D3Chart').D3Chart;
-  } | null>(null);
-
-  useEffect(() => {
-    import('@/lib/d3-chart/D3Chart').then((mod) => {
-      setD3ChartMod({ D3Chart: mod.D3Chart });
-    });
-  }, []);
+  const hoveredBarXRef = useRef(0);
 
   const maxValue = useMemo(() => Math.max(...data.map((d) => d.value)), [data]);
-  const yDomain = useMemo(() => data.map((d) => d.gpu), [data]);
+  const yDomain = useMemo(() => [...data].toReversed().map((d) => d.gpu), [data]);
 
-  const barLayer: HorizontalBarLayerConfig<BenchmarkEntry> = useMemo(
-    () => ({
-      type: 'horizontalBar',
-      data,
-      config: {
-        getY: (d) => d.gpu,
-        getX: (d) => d.value,
-        getColor: (d) => VENDOR_COLORS[d.vendor] ?? VENDOR_COLORS.other,
-        rx: 3,
-        opacity: 0.9,
-        keyFn: (d) => d.gpu,
+  const layers = useMemo(
+    (): LayerConfig<BenchmarkEntry>[] => [
+      {
+        type: 'horizontalBar',
+        data,
+        config: {
+          getY: (d) => d.gpu,
+          getX: (d) => d.value,
+          getColor: getBarColor,
+          rx: 2,
+          opacity: 1,
+          keyFn: (d) => d.gpu,
+        },
       },
-    }),
+      {
+        type: 'custom',
+        key: 'bar-labels',
+        render: (group, ctx) => {
+          const yScale = ctx.yScale as d3.ScaleBand<string>;
+
+          group
+            .selectAll<SVGTextElement, BenchmarkEntry>('.value-label')
+            .data(data, (d) => d.gpu)
+            .join('text')
+            .attr('class', 'value-label')
+            .attr('y', (d) => (yScale(d.gpu) ?? 0) + yScale.bandwidth() / 2)
+            .attr('dy', '0.35em')
+            .attr('font-size', '12px')
+            .attr('font-weight', '600')
+            .style('pointer-events', 'none')
+            .text((d) => `${formatNumber(d.value)} tok/s`);
+
+          positionValueLabels(group, ctx.xScale as d3.ScaleLinear<number, number>);
+        },
+        onZoom: (group, ctx) => {
+          positionValueLabels(group, ctx.newXScale as d3.ScaleLinear<number, number>);
+        },
+      },
+    ],
     [data],
   );
 
-  const labelLayer: CustomLayerConfig = useMemo(
+  const xAxisConfig = useMemo(
     () => ({
-      type: 'custom',
-      key: 'bar-value-labels',
-      render: (group, ctx) => {
-        const yScale = ctx.yScale as d3.ScaleBand<string>;
-        const xScale = ctx.xScale as ContinuousScale;
-
-        group
-          .selectAll<SVGTextElement, BenchmarkEntry>('.bar-value')
-          .data(data, (d: BenchmarkEntry) => d.gpu)
-          .join('text')
-          .attr('class', 'bar-value')
-          .attr('x', (d) => xScale(d.value) + 6)
-          .attr('y', (d) => (yScale(d.gpu) ?? 0) + yScale.bandwidth() / 2)
-          .attr('dy', '0.35em')
-          .attr('font-size', '12px')
-          .attr('fill', 'var(--foreground)')
-          .text((d) => formatNumber(d.value));
-      },
+      label: metric,
+      tickFormat: (d: d3.AxisDomain) => formatNumber(d as number),
+      tickCount: 5,
     }),
-    [data],
+    [metric],
   );
 
-  if (!D3ChartMod) {
-    return <div className="my-6 not-prose" style={{ height }} />;
-  }
-
-  const { D3Chart } = D3ChartMod;
+  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels(5) }), []);
 
   return (
     <div className="my-6 not-prose">
@@ -143,50 +159,41 @@ function BenchmarkChartClient({
         chartId="benchmark-bar"
         data={data}
         height={height}
-        margin={{ top: 8, right: 90, bottom: 48, left: 100 }}
+        margin={CHART_MARGIN}
         watermark="logo"
+        grabCursor
         clipContent={false}
         instructions=""
-        xScale={{ type: 'linear', domain: [0, maxValue * 1.15], nice: true }}
-        yScale={{ type: 'band', domain: yDomain, padding: 0.2 }}
-        xAxis={{
-          label: metric,
-          tickFormat: (d: d3.AxisDomain) => formatNumber(d as number),
-          tickCount: 5,
+        xScale={{ type: 'linear', domain: [0, maxValue * 1.1], nice: true }}
+        yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
+        xAxis={xAxisConfig}
+        yAxis={yAxisConfig}
+        layers={layers}
+        zoom={{
+          enabled: true,
+          axes: 'x',
+          scaleExtent: [0.1, 1],
+          rescaleX: (xScale, transform) =>
+            xScale.copy().domain([0, (maxValue * 1.1) / transform.k]) as ContinuousScale,
+          customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
         }}
-        yAxis={{
-          customize: (axisGroup) => {
-            axisGroup.selectAll('.tick text').each(function () {
-              const el = d3.select(this as SVGTextElement);
-              const fullLabel = el.text();
-              const lastSpace = fullLabel.lastIndexOf(' ');
-              el.text(null);
-              el.attr('transform', 'translate(0, 5)');
-              if (lastSpace > 0) {
-                el.append('tspan')
-                  .text(fullLabel.slice(0, lastSpace))
-                  .attr('x', -8)
-                  .attr('dy', '-0.4em')
-                  .attr('font-size', '12px')
-                  .attr('font-weight', '600');
-                el.append('tspan')
-                  .text(fullLabel.slice(lastSpace + 1))
-                  .attr('x', -8)
-                  .attr('dy', '1.2em')
-                  .attr('font-size', '10px')
-                  .style('fill', 'var(--muted-foreground)');
-              } else {
-                el.append('tspan')
-                  .text(fullLabel)
-                  .attr('x', -8)
-                  .attr('font-size', '12px')
-                  .attr('font-weight', '600');
-              }
-              el.attr('text-anchor', 'end');
-            });
+        tooltip={{
+          rulerType: 'vertical',
+          content: generateTooltipContent,
+          getRulerX: () => hoveredBarXRef.current,
+          getRulerY: (d, ys) => {
+            const bandScale = ys as unknown as d3.ScaleBand<string>;
+            return (bandScale(d.gpu) ?? 0) + bandScale.bandwidth() / 2;
           },
+          onHoverStart: (sel) => {
+            hoveredBarXRef.current = Number.parseFloat(sel.attr('width') || '0');
+            sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+          },
+          onHoverEnd: (sel) => {
+            sel.attr('stroke', 'none');
+          },
+          attachToLayer: 0,
         }}
-        layers={[barLayer, labelLayer]}
       />
     </div>
   );
