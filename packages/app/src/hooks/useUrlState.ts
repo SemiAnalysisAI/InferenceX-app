@@ -2,8 +2,12 @@
 
 import { useCallback, useRef } from 'react';
 
-import type { UrlStateKey, UrlStateParams } from '@/lib/url-state';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
+import {
+  type UrlStateKey,
+  type UrlStateParams,
+  readUrlParams,
+  writeUrlParams,
+} from '@/lib/url-state';
 
 /**
  * React hook for URL state synchronization.

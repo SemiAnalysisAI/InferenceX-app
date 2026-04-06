@@ -63,6 +63,28 @@ const getXPath = (size: number) => {
   return `M ${-s} ${-s} L ${s} ${s} M ${s} ${-s} L ${-s} ${s}`;
 };
 
+const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
+  if (typeof desc === 'string') {
+    return (
+      <div className="font-normal">
+        {desc
+          .split('- ')
+          .filter((item) => item.trim() !== '')
+          .map((item, index) => (
+            <div key={index}>{item}</div>
+          ))}
+      </div>
+    );
+  }
+  return (
+    <div className="font-normal">
+      {desc.map((item, index) => (
+        <div key={index}>{item}</div>
+      ))}
+    </div>
+  );
+};
+
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
 // Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth
@@ -189,27 +211,6 @@ const ScatterGraph = React.memo(
 
     // --- Changelog ---
     const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
-    const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
-      if (typeof desc === 'string') {
-        return (
-          <div className="font-normal">
-            {desc
-              .split('- ')
-              .filter((item) => item.trim() !== '')
-              .map((item, index) => (
-                <div key={index}>{item}</div>
-              ))}
-          </div>
-        );
-      }
-      return (
-        <div className="font-normal">
-          {desc.map((item, index) => (
-            <div key={index}>{item}</div>
-          ))}
-        </div>
-      );
-    };
     const highlightConfigSuffixes = useMemo(() => {
       if (availableRuns) {
         const cl = availableRuns[selectedRunId]?.changelog;
@@ -249,7 +250,7 @@ const ScatterGraph = React.memo(
         | 'lower_left'
         | 'lower_right'
         | undefined;
-      for (const hw in groupedData) {
+      for (const hw of Object.keys(groupedData)) {
         const front =
           dir === 'upper_right'
             ? paretoFrontUpperRight(groupedData[hw])
@@ -340,7 +341,7 @@ const ScatterGraph = React.memo(
         | 'lower_left'
         | 'lower_right'
         | undefined;
-      for (const hw in grouped) {
+      for (const hw of Object.keys(grouped)) {
         const front =
           dir === 'upper_right'
             ? paretoFrontUpperRight(grouped[hw])
@@ -491,7 +492,7 @@ const ScatterGraph = React.memo(
       (el: SVGPathElement) => {
         const hw = el.dataset.hwKey;
         const prec = el.dataset.precision;
-        if (hw == null || prec == null) return false;
+        if (hw === null || hw === undefined || prec === null || prec === undefined) return false;
         return effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(prec);
       },
       [effectiveActiveHwTypes, selectedPrecisions],
@@ -686,7 +687,7 @@ const ScatterGraph = React.memo(
             const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             node.setAttribute('class', 'rooflines-layer');
             const parent = zoomGroup.node()!;
-            if (firstDotGroup) parent.insertBefore(node, firstDotGroup);
+            if (firstDotGroup) firstDotGroup.before(node);
             else parent.append(node);
             rooflinesLayer = d3.select<SVGGElement, unknown>(node);
           }
@@ -1583,13 +1584,11 @@ const ScatterGraph = React.memo(
       const isOverlay = chartRef.current?.getPinnedPointIsOverlay();
       if (isOverlay) {
         if (!activeOverlayHwTypes.has(pp.hwKey as string)) chartRef.current?.dismissTooltip();
-      } else {
-        if (
-          !effectiveActiveHwTypes.has(pp.hwKey as string) ||
-          !selectedPrecisions.includes(pp.precision)
-        ) {
-          chartRef.current?.dismissTooltip();
-        }
+      } else if (
+        !effectiveActiveHwTypes.has(pp.hwKey as string) ||
+        !selectedPrecisions.includes(pp.precision)
+      ) {
+        chartRef.current?.dismissTooltip();
       }
     }, [effectiveActiveHwTypes, selectedPrecisions, activeOverlayHwTypes]);
 

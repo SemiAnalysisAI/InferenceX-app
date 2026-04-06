@@ -9,21 +9,21 @@ import { createServer } from './server.js';
 // callable that captures the query and returns canned rows.
 
 const { mockState, mockDb } = vi.hoisted(() => {
-  const mockState = {
+  const state = {
     dbRows: [] as Record<string, unknown>[],
     queryError: null as Error | null,
   };
-  const mockDb = Object.assign(
+  const db = Object.assign(
     // Tagged template call: db`SELECT ...`
-    async () => mockState.dbRows,
+    () => Promise.resolve(state.dbRows),
     {
-      unsafe: async () => {
-        if (mockState.queryError) throw mockState.queryError;
-        return mockState.dbRows;
+      unsafe: () => {
+        if (state.queryError) return Promise.reject(state.queryError);
+        return Promise.resolve(state.dbRows);
       },
     },
   );
-  return { mockState, mockDb };
+  return { mockState: state, mockDb: db };
 });
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({

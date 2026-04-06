@@ -89,7 +89,7 @@ export function extractHeadings(rawMdx: string): TocHeading[] {
     let id = base;
     if (seen.has(id)) {
       // prefix with nearest parent heading
-      const parent = parents.slice(1, level).findLast((p) => p);
+      const parent = parents.slice(1, level).findLast(Boolean);
       id = parent ? `${parent}-${base}` : `${base}-${level}`;
     }
     seen.add(id);

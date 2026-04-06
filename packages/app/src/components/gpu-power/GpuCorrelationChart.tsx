@@ -4,8 +4,7 @@ import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { GpuMetricKey, GpuMetricRow } from './types';
-import { ALL_METRIC_OPTIONS } from './types';
+import { type GpuMetricKey, type GpuMetricRow, ALL_METRIC_OPTIONS } from './types';
 
 interface CorrelationPoint {
   x: number;

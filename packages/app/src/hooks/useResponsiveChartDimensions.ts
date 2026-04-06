@@ -46,14 +46,14 @@ export function useResponsiveChartDimensions(
 
       if (element) {
         // set initial dimensions
-        const width = element.getBoundingClientRect().width;
-        setDimensions({ width, height });
+        const initialWidth = element.getBoundingClientRect().width;
+        setDimensions({ width: initialWidth, height });
 
         // set up ResizeObserver
         resizeObserverRef.current = new ResizeObserver((entries) => {
           if (entries[0]) {
-            const { width } = entries[0].contentRect;
-            setDimensions({ width, height });
+            const { width: observedWidth } = entries[0].contentRect;
+            setDimensions({ width: observedWidth, height });
           }
         });
 

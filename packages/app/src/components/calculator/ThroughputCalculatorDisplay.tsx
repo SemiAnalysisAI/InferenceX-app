@@ -30,8 +30,14 @@ import {
 } from '@/components/ui/select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Model, Precision, Sequence } from '@/lib/data-mappings';
-import { getModelLabel, getPrecisionLabel, getSequenceLabel } from '@/lib/data-mappings';
+import {
+  type Model,
+  type Precision,
+  type Sequence,
+  getModelLabel,
+  getPrecisionLabel,
+  getSequenceLabel,
+} from '@/lib/data-mappings';
 import { getModelSortIndex, GPU_SPECS, HARDWARE_CONFIG } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
@@ -64,6 +70,12 @@ const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'power', label: 'tok/s/MW' },
   { value: 'cost', label: 'Cost' },
 ];
+
+const getBarMetricLabel = (metric: BarMetric) => {
+  if (metric === 'throughput') return 'Throughput';
+  if (metric === 'cost') return 'Cost';
+  return 'tok/s/MW';
+};
 
 type CalculatorViewMode = 'chart' | 'table';
 
@@ -239,8 +251,7 @@ export default function ThroughputCalculatorDisplay() {
           return next;
         }
         // Add it
-        const next = new Set(prev);
-        next.add(hwKey);
+        const next = new Set([...prev, hwKey]);
         return next;
       });
       track('calculator_gpu_toggled', { gpu: hwKey });
@@ -378,12 +389,6 @@ export default function ThroughputCalculatorDisplay() {
         onClick: () => toggleGpuVisibility(key),
       }));
   }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
-
-  const getBarMetricLabel = (metric: BarMetric) => {
-    if (metric === 'throughput') return 'Throughput';
-    if (metric === 'cost') return 'Cost';
-    return 'tok/s/MW';
-  };
 
   if (!loading && error) {
     console.error(error);

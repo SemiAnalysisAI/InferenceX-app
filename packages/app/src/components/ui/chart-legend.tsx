@@ -15,8 +15,7 @@ import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from '
 import { filterAndSortLegendItems } from '@/lib/legend-utils';
 import { cn } from '@/lib/utils';
 
-import type { CommonLegendItemProps } from './chart-legend-item';
-import ChartLegendItem from './chart-legend-item';
+import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
 import { Label } from './label';
 import { Switch } from './switch';
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';

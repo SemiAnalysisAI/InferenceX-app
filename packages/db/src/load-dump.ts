@@ -48,9 +48,7 @@ async function* streamJsonArray(filePath: string): AsyncGenerator<Record<string,
   let objectStart = -1;
 
   for await (const chunk of stream) {
-    for (let i = 0; i < chunk.length; i++) {
-      const ch = chunk[i];
-
+    for (const ch of chunk) {
       if (escape) {
         escape = false;
         buffer += ch;
@@ -138,9 +136,9 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
     const colsSql = columns.join(', ');
     const rows = values
       .map(
-        (_, i) =>
+        (_row, i) =>
           `(${columns!
-            .map((_, j) => {
+            .map((_col, j) => {
               const p = `$${i * columns!.length + j + 1}`;
               return jsonbCols.has(j) ? `${p}::jsonb` : p;
             })

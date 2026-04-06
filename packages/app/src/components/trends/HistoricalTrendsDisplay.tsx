@@ -19,8 +19,10 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getModelSortIndex } from '@/lib/constants';
-import type { Model, Precision, Sequence } from '@/lib/data-mappings';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
@@ -71,7 +73,7 @@ export default function HistoricalTrendsDisplay() {
 
   // Interactivity range from current chart data
   const interactivityRange = useMemo(() => {
-    const g = graphs.find((g) => g.chartDefinition.chartType === 'interactivity');
+    const g = graphs.find((graph) => graph.chartDefinition.chartType === 'interactivity');
     if (!g || g.data.length === 0) return { min: 0, max: 200 };
     const xs = g.data.map((d) => d.x);
     return { min: Math.ceil(Math.min(...xs)), max: Math.floor(Math.max(...xs)) };

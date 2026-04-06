@@ -25,8 +25,7 @@ export function computeToggle(prev: Set<string>, item: string, allItems: Set<str
     return next;
   }
   // Add the clicked item
-  const next = new Set(prev);
-  next.add(item);
+  const next = new Set([...prev, item]);
   return next;
 }
 

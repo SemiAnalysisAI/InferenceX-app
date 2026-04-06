@@ -15,8 +15,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
-import type { Model, Precision, Sequence } from '@/lib/data-mappings';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelCategory,
   getModelLabel,
   getPrecisionLabel,

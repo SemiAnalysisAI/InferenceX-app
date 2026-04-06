@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import {
   formatNumber,
@@ -15,7 +16,7 @@ import {
 } from '@/lib/utils';
 
 vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/constants')>();
+  const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
@@ -351,26 +352,26 @@ describe('computeInputCostFields', () => {
 // ---------------------------------------------------------------------------
 // filterRunsByModel
 // ---------------------------------------------------------------------------
-describe('filterRunsByModel', () => {
-  function makeRun(configKeys: string[][], overrides: Record<string, any> = {}) {
-    return {
-      runId: '123',
-      runDate: '2025-12-15',
-      runUrl: 'https://github.com/example',
-      conclusion: 'success' as string | null,
-      changelog: {
-        base_ref: 'abc',
-        head_ref: 'def',
-        entries: configKeys.map((keys) => ({
-          config_keys: keys,
-          description: 'test entry',
-          pr_link: null,
-        })),
-      },
-      ...overrides,
-    };
-  }
+function makeRun(configKeys: string[][], overrides: Record<string, any> = {}) {
+  return {
+    runId: '123',
+    runDate: '2025-12-15',
+    runUrl: 'https://github.com/example',
+    conclusion: 'success' as string | null,
+    changelog: {
+      base_ref: 'abc',
+      head_ref: 'def',
+      entries: configKeys.map((keys) => ({
+        config_keys: keys,
+        description: 'test entry',
+        pr_link: null,
+      })),
+    },
+    ...overrides,
+  };
+}
 
+describe('filterRunsByModel', () => {
   it('returns null when availableRuns is null', () => {
     expect(filterRunsByModel(null, ['gptoss'])).toBeNull();
   });

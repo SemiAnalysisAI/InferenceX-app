@@ -25,13 +25,14 @@ import {
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
-import type {
-  GpuMetricKey,
-  GpuMetricsArtifact,
-  GpuPowerApiResponse,
-  GpuPowerRunInfo,
+import {
+  type GpuMetricKey,
+  type GpuMetricsArtifact,
+  type GpuPowerApiResponse,
+  type GpuPowerRunInfo,
+  ALL_METRIC_OPTIONS,
+  getAvailableMetrics,
 } from './types';
-import { ALL_METRIC_OPTIONS, getAvailableMetrics } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
 const FEATURE_GATE_KEY = 'inferencex-feature-gate';
@@ -106,8 +107,8 @@ export default function GpuMetricsDisplay() {
         const targetData = apiResult.artifacts.find((a) => a.name === targetArtifact)?.data ?? [];
         const gpuIndices = new Set(targetData.map((d) => d.index));
         setVisibleGpus(gpuIndices);
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Unknown error');
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
         setArtifacts([]);
         setRunInfo(null);
         setSelectedArtifact('');
@@ -203,7 +204,7 @@ export default function GpuMetricsDisplay() {
       document.body.append(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      textArea.remove();
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import { createChartDataPoint } from '@/lib/chart-utils';
 import { computeEnergyFields } from '@/lib/utils';
 
 vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/constants')>();
+  const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
     HARDWARE_CONFIG: {

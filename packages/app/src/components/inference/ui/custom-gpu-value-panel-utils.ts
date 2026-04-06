@@ -66,7 +66,7 @@ export function buildAppliedCustomGpuValues(
       return;
     }
 
-    if (currentValue == null) return;
+    if (currentValue === null || currentValue === undefined) return;
     currentValues[gpu.base] = currentValue;
   });
 

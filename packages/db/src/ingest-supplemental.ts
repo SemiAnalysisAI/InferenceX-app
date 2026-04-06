@@ -125,7 +125,7 @@ async function ingestSupplementalEvals(
 
       const outcome = await ingestEvalRow(
         sql,
-        async () => configId,
+        () => Promise.resolve(configId),
         {
           config: {} as any,
           task: entry.task,

@@ -303,12 +303,12 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
+      json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
     });
     // Artifacts fetch (no results_bmk)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ artifacts: [{ name: 'other_artifact', id: 1 }] }),
+      json: () => Promise.resolve({ artifacts: [{ name: 'other_artifact', id: 1 }] }),
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(404);
@@ -321,14 +321,15 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
+      json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
     });
     // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+        }),
     });
     // Download fails
     mockFetch.mockResolvedValueOnce({ ok: false, status: 410, statusText: 'Gone' });
@@ -342,29 +343,31 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        id: 123,
-        name: 'test-run',
-        head_branch: 'main',
-        head_sha: 'abc123',
-        created_at: '2026-01-01T00:00:00Z',
-        html_url: 'http://github.com/run/123',
-        conclusion: 'success',
-        status: 'completed',
-      }),
+      json: () =>
+        Promise.resolve({
+          id: 123,
+          name: 'test-run',
+          head_branch: 'main',
+          head_sha: 'abc123',
+          created_at: '2026-01-01T00:00:00Z',
+          html_url: 'http://github.com/run/123',
+          conclusion: 'success',
+          status: 'completed',
+        }),
     });
     // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+        }),
     });
     // Download — return a buffer-like object
     const fakeBuffer = new ArrayBuffer(8);
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => fakeBuffer,
+      arrayBuffer: () => Promise.resolve(fakeBuffer),
     });
 
     // Mock zip extraction — the AdmZip constructor receives the buffer,
@@ -387,26 +390,28 @@ describe('GET /api/unofficial-run', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        id: 321,
-        name: 'eval-only',
-        head_branch: 'feature/evals',
-        head_sha: 'abc123',
-        created_at: '2026-03-01T12:34:56Z',
-        html_url: 'http://github.com/run/321',
-        conclusion: 'success',
-        status: 'completed',
-      }),
+      json: () =>
+        Promise.resolve({
+          id: 321,
+          name: 'eval-only',
+          head_branch: 'feature/evals',
+          head_sha: 'abc123',
+          created_at: '2026-03-01T12:34:56Z',
+          html_url: 'http://github.com/run/321',
+          conclusion: 'success',
+          status: 'completed',
+        }),
     });
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
+        }),
     });
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => new ArrayBuffer(8),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
     });
 
     mockGetEntries.mockReturnValue([{ entryName: 'agg_eval_all.json' }]);
@@ -439,20 +444,21 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata without created_at
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 456, head_branch: 'feature' }),
+      json: () => Promise.resolve({ id: 456, head_branch: 'feature' }),
     });
     // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl' }],
+        }),
     });
     // Download
     const fakeBuffer = new ArrayBuffer(8);
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => fakeBuffer,
+      arrayBuffer: () => Promise.resolve(fakeBuffer),
     });
 
     // No JSON entries in zip

@@ -45,11 +45,8 @@ async function migrate(): Promise<void> {
     )
   `;
 
-  const applied = new Set(
-    (await sql<{ filename: string }[]>`select filename from schema_migrations`).map(
-      (r) => r.filename,
-    ),
-  );
+  const migrations = await sql<{ filename: string }[]>`select filename from schema_migrations`;
+  const applied = new Set(migrations.map((r) => r.filename));
 
   const files = fs
     .readdirSync(MIGRATIONS_DIR)

@@ -9,52 +9,52 @@ import {
 } from './csv-export-helpers';
 import type { InferenceData } from '@/components/inference/types';
 
-describe('inferenceChartToCsv', () => {
-  const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
-    x: 100,
-    y: 50,
-    hwKey: 'h100-sxm-sglang',
-    hw: 'H100 SXM (SGLang)',
-    framework: 'sglang',
-    precision: 'fp8',
-    tp: 4,
-    conc: 8,
-    date: '2025-01-15',
-    disagg: false,
-    tput_per_gpu: 4800,
-    output_tput_per_gpu: 3200,
-    input_tput_per_gpu: 1600,
-    mean_ttft: 120,
-    median_ttft: 110,
-    p99_ttft: 250,
-    std_ttft: 30,
-    mean_tpot: 15,
-    median_tpot: 14,
-    p99_tpot: 28,
-    std_tpot: 4,
-    mean_intvty: 66,
-    median_intvty: 71,
-    p99_intvty: 35,
-    std_intvty: 12,
-    mean_itl: 16,
-    median_itl: 15,
-    p99_itl: 30,
-    std_itl: 5,
-    mean_e2el: 5000,
-    median_e2el: 4800,
-    p99_e2el: 8000,
-    std_e2el: 1200,
-    tpPerGpu: { y: 1200, roof: false },
-    tpPerMw: { y: 694, roof: false },
-    costh: { y: 0.5, roof: false },
-    costn: { y: 0.4, roof: false },
-    costr: { y: 0.3, roof: false },
-    costhi: { y: 0.6, roof: false },
-    costni: { y: 0.5, roof: false },
-    costri: { y: 0.4, roof: false },
-    ...overrides,
-  });
+const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
+  x: 100,
+  y: 50,
+  hwKey: 'h100-sxm-sglang',
+  hw: 'H100 SXM (SGLang)',
+  framework: 'sglang',
+  precision: 'fp8',
+  tp: 4,
+  conc: 8,
+  date: '2025-01-15',
+  disagg: false,
+  tput_per_gpu: 4800,
+  output_tput_per_gpu: 3200,
+  input_tput_per_gpu: 1600,
+  mean_ttft: 120,
+  median_ttft: 110,
+  p99_ttft: 250,
+  std_ttft: 30,
+  mean_tpot: 15,
+  median_tpot: 14,
+  p99_tpot: 28,
+  std_tpot: 4,
+  mean_intvty: 66,
+  median_intvty: 71,
+  p99_intvty: 35,
+  std_intvty: 12,
+  mean_itl: 16,
+  median_itl: 15,
+  p99_itl: 30,
+  std_itl: 5,
+  mean_e2el: 5000,
+  median_e2el: 4800,
+  p99_e2el: 8000,
+  std_e2el: 1200,
+  tpPerGpu: { y: 1200, roof: false },
+  tpPerMw: { y: 694, roof: false },
+  costh: { y: 0.5, roof: false },
+  costn: { y: 0.4, roof: false },
+  costr: { y: 0.3, roof: false },
+  costhi: { y: 0.6, roof: false },
+  costni: { y: 0.5, roof: false },
+  costri: { y: 0.4, roof: false },
+  ...overrides,
+});
 
+describe('inferenceChartToCsv', () => {
   it('exports all raw benchmark fields', () => {
     const data = [makePoint()];
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
@@ -247,43 +247,43 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
   });
 });
 
-describe('evaluationChartToCsv (mirrors EvaluationChartDisplay export)', () => {
-  const makeEvalPoint = (
-    overrides: Partial<{
-      configLabel: string;
-      hwKey: string;
-      score: number;
-      scoreError: number;
-      minScore: number;
-      maxScore: number;
-      model: string;
-      benchmark: string;
-      specDecode: string;
-      precision: string;
-      framework: string;
-      tp: number;
-      ep: number;
-      dp_attention: boolean;
-      conc: number;
-      date: string;
-    }> = {},
-  ) => ({
-    configLabel: 'H100 SXM\n(vLLM, FP8, TP4)',
-    hwKey: 'h100-sxm-vllm',
-    score: 0.9234,
-    model: 'llama-3.1-8b',
-    benchmark: 'mmlu',
-    specDecode: 'none',
-    precision: 'fp8',
-    framework: 'vllm',
-    tp: 4,
-    ep: 1,
-    dp_attention: false,
-    conc: 1,
-    date: '2025-01-15',
-    ...overrides,
-  });
+const makeEvalPoint = (
+  overrides: Partial<{
+    configLabel: string;
+    hwKey: string;
+    score: number;
+    scoreError: number;
+    minScore: number;
+    maxScore: number;
+    model: string;
+    benchmark: string;
+    specDecode: string;
+    precision: string;
+    framework: string;
+    tp: number;
+    ep: number;
+    dp_attention: boolean;
+    conc: number;
+    date: string;
+  }> = {},
+) => ({
+  configLabel: 'H100 SXM\n(vLLM, FP8, TP4)',
+  hwKey: 'h100-sxm-vllm',
+  score: 0.9234,
+  model: 'llama-3.1-8b',
+  benchmark: 'mmlu',
+  specDecode: 'none',
+  precision: 'fp8',
+  framework: 'vllm',
+  tp: 4,
+  ep: 1,
+  dp_attention: false,
+  conc: 1,
+  date: '2025-01-15',
+  ...overrides,
+});
 
+describe('evaluationChartToCsv (mirrors EvaluationChartDisplay export)', () => {
   it('exports all evaluation fields', () => {
     const data = [makeEvalPoint({ scoreError: 0.01, minScore: 0.91, maxScore: 0.935 })];
     const { headers, rows } = evaluationChartToCsv(data);

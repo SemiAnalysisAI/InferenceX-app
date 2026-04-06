@@ -15,6 +15,8 @@ import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
+const wrapMetric = (n: number): { y: number } => ({ y: n });
+
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
  * Skips the expensive transformBenchmarkRows pipeline (rooflines, cost derivations)
@@ -36,8 +38,6 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const outTokPerHr = (outputTput * 3600) / 1_000_000;
   const inTokPerHr = (inputTput * 3600) / 1_000_000;
 
-  const v = (n: number): { y: number } => ({ y: n });
-
   // Build metric objects matching InferenceData shape
   return {
     x: m.median_intvty ?? 0,
@@ -47,24 +47,24 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     tp: row.decode_tp,
     conc: row.conc,
     date: row.date,
-    tpPerGpu: v(tput),
-    outputTputPerGpu: v(outputTput),
-    inputTputPerGpu: v(inputTput),
-    tpPerMw: v(power > 0 ? (tput * 1000) / power : 0),
+    tpPerGpu: wrapMetric(tput),
+    outputTputPerGpu: wrapMetric(outputTput),
+    inputTputPerGpu: wrapMetric(inputTput),
+    tpPerMw: wrapMetric(power > 0 ? (tput * 1000) / power : 0),
     // Cost per million tokens (total / output / input)
-    costh: v(tokPerHr ? specs.costh / tokPerHr : 0),
-    costn: v(tokPerHr ? specs.costn / tokPerHr : 0),
-    costr: v(tokPerHr ? specs.costr / tokPerHr : 0),
-    costhOutput: v(outTokPerHr ? specs.costh / outTokPerHr : 0),
-    costnOutput: v(outTokPerHr ? specs.costn / outTokPerHr : 0),
-    costrOutput: v(outTokPerHr ? specs.costr / outTokPerHr : 0),
-    costhi: v(inTokPerHr ? specs.costh / inTokPerHr : 0),
-    costni: v(inTokPerHr ? specs.costn / inTokPerHr : 0),
-    costri: v(inTokPerHr ? specs.costr / inTokPerHr : 0),
+    costh: wrapMetric(tokPerHr ? specs.costh / tokPerHr : 0),
+    costn: wrapMetric(tokPerHr ? specs.costn / tokPerHr : 0),
+    costr: wrapMetric(tokPerHr ? specs.costr / tokPerHr : 0),
+    costhOutput: wrapMetric(outTokPerHr ? specs.costh / outTokPerHr : 0),
+    costnOutput: wrapMetric(outTokPerHr ? specs.costn / outTokPerHr : 0),
+    costrOutput: wrapMetric(outTokPerHr ? specs.costr / outTokPerHr : 0),
+    costhi: wrapMetric(inTokPerHr ? specs.costh / inTokPerHr : 0),
+    costni: wrapMetric(inTokPerHr ? specs.costn / inTokPerHr : 0),
+    costri: wrapMetric(inTokPerHr ? specs.costr / inTokPerHr : 0),
     // Energy: J/token = W / tok/s
-    jTotal: v(power > 0 && tput ? (power * 1000) / tput : 0),
-    ...(outputTput ? { jOutput: v(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
-    ...(inputTput ? { jInput: v(power > 0 ? (power * 1000) / inputTput : 0) } : {}),
+    jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
+    ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
+    ...(inputTput ? { jInput: wrapMetric(power > 0 ? (power * 1000) / inputTput : 0) } : {}),
   } as unknown as InferenceData;
 }
 
@@ -222,8 +222,8 @@ export function useInterpolatedTrendData({
 
     // Build sorted trend lines, extending each to today with last known value
     const today = new Date().toISOString().split('T')[0];
-    const trendLines = new Map<string, TrendDataPoint[]>();
-    const hwKeysWithData: string[] = [];
+    const lines = new Map<string, TrendDataPoint[]>();
+    const keysWithData: string[] = [];
 
     for (const [groupKey, dateMap] of resultMap) {
       const points = [...dateMap.values()].toSorted(
@@ -235,16 +235,16 @@ export function useInterpolatedTrendData({
         if (last.date < today) {
           points.push({ date: today, value: last.value, x: last.x, synthetic: true });
         }
-        trendLines.set(groupKey, points);
+        lines.set(groupKey, points);
         // Return base hwKey for legend filtering
         const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
-        if (!hwKeysWithData.includes(baseHwKey)) {
-          hwKeysWithData.push(baseHwKey);
+        if (!keysWithData.includes(baseHwKey)) {
+          keysWithData.push(baseHwKey);
         }
       }
     }
 
-    return { trendLines, hwKeysWithData };
+    return { trendLines: lines, hwKeysWithData: keysWithData };
   }, [dateGroupedData, targetInteractivity, selectedYAxisMetric]);
 
   // Artificial progress that ramps up while the API call is in flight

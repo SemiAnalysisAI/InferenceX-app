@@ -103,11 +103,8 @@ export function findConfigChangeDates(
   const result: string[] = [];
   for (const date of dates) {
     const configs = byDate.get(date)!;
-    if (
-      prevConfigs === null ||
-      configs.size !== prevConfigs.size ||
-      [...configs].some((k) => !prevConfigs!.has(k))
-    ) {
+    const prev = prevConfigs;
+    if (prev === null || configs.size !== prev.size || [...configs].some((k) => !prev.has(k))) {
       result.push(date);
     }
     prevConfigs = configs;

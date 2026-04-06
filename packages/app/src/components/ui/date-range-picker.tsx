@@ -99,7 +99,7 @@ export function DateRangePicker({
   };
 
   // Apply selection
-  const handleApply = async () => {
+  const handleApply = () => {
     if (tempRange.startDate && tempRange.endDate) {
       if (availableDates) {
         const dates = [tempRange.startDate, tempRange.endDate];

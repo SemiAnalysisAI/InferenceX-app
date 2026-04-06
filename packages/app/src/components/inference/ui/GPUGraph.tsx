@@ -13,8 +13,12 @@ import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { D3ChartHandle, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
-import { applyHoverState, applyNormalState } from '@/lib/chart-rendering';
-import { formatLargeNumber, logTickFormat } from '@/lib/chart-rendering';
+import {
+  applyHoverState,
+  applyNormalState,
+  formatLargeNumber,
+  logTickFormat,
+} from '@/lib/chart-rendering';
 import {
   paretoFrontLowerLeft,
   paretoFrontLowerRight,
@@ -152,7 +156,7 @@ const GPUGraph = React.memo(
         | 'lower_left'
         | 'lower_right'
         | undefined;
-      for (const key in groupedData) {
+      for (const key of Object.keys(groupedData)) {
         result[key] =
           dir === 'upper_right'
             ? paretoFrontUpperRight(groupedData[key])

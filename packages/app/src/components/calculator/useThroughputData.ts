@@ -13,6 +13,10 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 
 import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
+/** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
+const computeGpuCost = (costPerHour: number, tps: number) =>
+  costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
+
 // ---------------------------------------------------------------------------
 // Pareto front — matches the main inference chart's roofline algorithm
 // ---------------------------------------------------------------------------
@@ -378,10 +382,6 @@ export function useThroughputData(
       const specs = getGpuSpecs(hwKey);
       const power = specs.power;
 
-      // Cost calculations: costPerHour / (tokPerSec * 3600 / 1_000_000)
-      const computeCost = (costPerHour: number, tps: number) =>
-        costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
-
       const groupKey = multiPrecision ? `${hwKey}__${row.precision}` : hwKey;
       if (!grouped[groupKey]) grouped[groupKey] = [];
 
@@ -397,15 +397,15 @@ export function useThroughputData(
         ep: row.decode_ep,
         dp_attention: row.decode_dp_attention,
         disagg: row.disagg,
-        costh: computeCost(specs.costh, tput),
-        costn: computeCost(specs.costn, tput),
-        costr: computeCost(specs.costr, tput),
-        costhi: computeCost(specs.costh, inputTput),
-        costni: computeCost(specs.costn, inputTput),
-        costri: computeCost(specs.costr, inputTput),
-        costhOutput: computeCost(specs.costh, outputTput),
-        costnOutput: computeCost(specs.costn, outputTput),
-        costrOutput: computeCost(specs.costr, outputTput),
+        costh: computeGpuCost(specs.costh, tput),
+        costn: computeGpuCost(specs.costn, tput),
+        costr: computeGpuCost(specs.costr, tput),
+        costhi: computeGpuCost(specs.costh, inputTput),
+        costni: computeGpuCost(specs.costn, inputTput),
+        costri: computeGpuCost(specs.costr, inputTput),
+        costhOutput: computeGpuCost(specs.costh, outputTput),
+        costnOutput: computeGpuCost(specs.costn, outputTput),
+        costrOutput: computeGpuCost(specs.costr, outputTput),
         tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
         inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
         outputTpPerMw: power && power > 0 ? (outputTput * 1000) / power : 0,

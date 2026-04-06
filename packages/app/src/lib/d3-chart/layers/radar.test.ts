@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { asMock, createMockGroup } from './test-helpers';
-import { renderRadar } from './radar';
-import type { RadarConfig } from './radar';
+import { renderRadar, type RadarConfig } from './radar';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 

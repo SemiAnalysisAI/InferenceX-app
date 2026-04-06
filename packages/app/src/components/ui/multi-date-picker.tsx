@@ -77,10 +77,8 @@ export function MultiDatePicker({
 
     if (isSelected) {
       setTempDates(tempDates.filter((d) => d !== dateStr));
-    } else {
-      if (tempDates.length < maxDates) {
-        setTempDates([...tempDates, dateStr].toSorted());
-      }
+    } else if (tempDates.length < maxDates) {
+      setTempDates([...tempDates, dateStr].toSorted());
     }
     track('multi_date_picker_date_clicked', { date: dateStr, selected: !isSelected });
   };

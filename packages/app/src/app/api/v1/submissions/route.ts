@@ -10,13 +10,13 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedSummary = cachedQuery(async () => {
-  if (JSON_MODE) return [];
+const getCachedSummary = cachedQuery(() => {
+  if (JSON_MODE) return Promise.resolve([]);
   return getSubmissionSummary(getDb());
 }, 'submissions-summary');
 
-const getCachedVolume = cachedQuery(async () => {
-  if (JSON_MODE) return [];
+const getCachedVolume = cachedQuery(() => {
+  if (JSON_MODE) return Promise.resolve([]);
   return getSubmissionVolume(getDb());
 }, 'submissions-volume');
 

@@ -240,9 +240,9 @@ export function generateTooltipHTML(
   const disagg = nearest?.disagg;
 
   let parallelismHtml = '';
-  if (ep != null && ep > 1 && tp === ep) {
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Parallelism:</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
-  } else if (ep != null && ep > 1) {
+  } else if (ep !== null && ep !== undefined && ep > 1) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}, <strong>EP:</strong> ${ep}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
   } else {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;

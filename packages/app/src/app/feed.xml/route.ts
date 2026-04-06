@@ -10,6 +10,7 @@ function escapeXml(s: string): string {
     .replaceAll("'", '&apos;');
 }
 
+// eslint-disable-next-line require-await
 export async function GET() {
   const posts = getAllPosts();
   const now = new Date().toUTCString();
@@ -22,7 +23,7 @@ export async function GET() {
       <guid isPermaLink="false">${SITE_URL}/blog/${post.slug}</guid>
       <description>${escapeXml(post.subtitle)}</description>
       <dc:creator>${escapeXml(AUTHOR_NAME)}</dc:creator>
-      <pubDate>${new Date(post.date + 'T00:00:00Z').toUTCString()}</pubDate>${
+      <pubDate>${new Date(`${post.date}T00:00:00Z`).toUTCString()}</pubDate>${
         post.tags
           ? post.tags.map((tag) => `\n      <category>${escapeXml(tag)}</category>`).join('')
           : ''

@@ -35,7 +35,13 @@ async function streamTable(table: string, outPath: string): Promise<number> {
   }
 
   out.write('\n]\n');
-  await new Promise<void>((res, rej) => out.end(() => res()).on('error', rej));
+  await new Promise<void>((res, rej) => {
+    out
+      .end(() => {
+        res();
+      })
+      .on('error', rej);
+  });
   return count;
 }
 

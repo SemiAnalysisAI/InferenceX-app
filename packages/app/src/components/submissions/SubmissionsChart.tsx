@@ -5,8 +5,12 @@ import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import ChartLegend from '@/components/ui/chart-legend';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart';
+import {
+  D3Chart,
+  type LayerConfig,
+  type RenderContext,
+  type ZoomContext,
+} from '@/lib/d3-chart/D3Chart';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { computeCumulative, groupVolumeByWeek } from './submissions-utils';

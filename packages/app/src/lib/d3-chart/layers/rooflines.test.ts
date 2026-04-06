@@ -1,8 +1,7 @@
 import * as d3 from 'd3';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createMockGroup, mockD3Select } from './test-helpers';
-import type { MockElement } from './test-helpers';
+import { createMockGroup, mockD3Select, type MockElement } from './test-helpers';
 
 // Partially mock d3 so that `d3.select(this)` inside .each() works with MockElements.
 // We keep all real d3 exports and only replace `select`.
@@ -20,8 +19,7 @@ vi.mock('d3', async () => {
   };
 });
 
-import { renderRooflines, updateRooflinesOnZoom } from './rooflines';
-import type { RooflineConfig } from './rooflines';
+import { renderRooflines, updateRooflinesOnZoom, type RooflineConfig } from './rooflines';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 

@@ -4,14 +4,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InferenceContext } from '@/components/inference/InferenceContext';
 import { EvaluationContext } from '@/components/evaluation/EvaluationContext';
 import { ReliabilityContext } from '@/components/reliability/ReliabilityContext';
-import { GlobalFilterContext } from '@/components/GlobalFilterContext';
-import { UnofficialRunContext } from '@/components/unofficial-run-provider';
+import {
+  GlobalFilterContext,
+  type GlobalFilterContextType,
+} from '@/components/GlobalFilterContext';
+import {
+  UnofficialRunContext,
+  type UnofficialRunContextType,
+} from '@/components/unofficial-run-provider';
 
 import type { InferenceChartContextType } from '@/components/inference/types';
 import type { EvaluationChartContextType } from '@/components/evaluation/types';
 import type { ReliabilityChartContextType } from '@/components/reliability/types';
-import type { GlobalFilterContextType } from '@/components/GlobalFilterContext';
-import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
 
 import {
   createMockInferenceContext,

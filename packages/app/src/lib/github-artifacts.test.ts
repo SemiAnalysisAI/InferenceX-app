@@ -85,7 +85,7 @@ describe('fetchGithubRunArtifacts', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ artifacts: page1Artifacts }),
+        json: () => Promise.resolve({ artifacts: page1Artifacts }),
       })
       .mockResolvedValueOnce({
         ok: false,

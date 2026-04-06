@@ -1,9 +1,16 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -11,7 +18,6 @@ import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import type { ChartDefinition } from '@/components/inference/types';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Model, Sequence } from '@/lib/data-mappings';
 
@@ -123,8 +129,8 @@ export function parseAvailableModelsAndSequences(
   for (const key of Object.keys(chartData)) {
     const lastUnderscoreIndex = key.lastIndexOf('_');
     if (lastUnderscoreIndex === -1) continue;
-    const modelPart = key.substring(0, lastUnderscoreIndex);
-    const sequencePart = key.substring(lastUnderscoreIndex + 1);
+    const modelPart = key.slice(0, lastUnderscoreIndex);
+    const sequencePart = key.slice(lastUnderscoreIndex + 1);
     const model = allModels.find((m) => m === modelPart);
     const sequence = allSequences.find((s) => s === sequencePart);
     if (model && sequence && !result.some((r) => r.model === model && r.sequence === sequence)) {
@@ -255,8 +261,8 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
           setUnofficialEvalRows(data.evaluations ?? []);
           setAvailableModelsAndSequences(parseAvailableModelsAndSequences(chartData));
         })
-        .catch((error) => {
-          setError(error instanceof Error ? error.message : 'Unknown error');
+        .catch((caughtError) => {
+          setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
           setUnofficialRunInfo(null);
           setUnofficialChartData(null);
           setUnofficialEvalRows(null);

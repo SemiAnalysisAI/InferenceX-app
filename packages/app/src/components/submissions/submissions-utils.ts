@@ -21,7 +21,7 @@ export interface WeeklyVolume {
 
 /** Get the Monday of the ISO week for a given date string. */
 function getIsoWeekStart(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
+  const d = new Date(`${dateStr}T00:00:00Z`);
   const day = d.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day; // Monday = 1
   d.setUTCDate(d.getUTCDate() + diff);

@@ -63,7 +63,7 @@ describe('blobGet', () => {
     mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/mykey.json' } as any);
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: async () => data,
+      json: () => Promise.resolve(data),
     } as Response);
 
     const result = await blobGet('mykey');
@@ -102,9 +102,7 @@ describe('blobGet', () => {
     mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/corrupt.json' } as any);
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: async () => {
-        throw new SyntaxError('Unexpected token');
-      },
+      json: () => Promise.reject(new SyntaxError('Unexpected token')),
     } as unknown as Response);
 
     const result = await blobGet('corrupt');

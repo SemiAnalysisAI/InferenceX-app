@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import {
   buildAvailabilityHwKey,
@@ -20,7 +21,7 @@ import {
 // mock constants so createChartDataPoint (also in this module) doesn't call
 // the real HARDWARE_CONFIG during module initialisation.
 vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/constants')>();
+  const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
@@ -268,35 +269,36 @@ describe('buildAvailabilityHwKey', () => {
 // ===========================================================================
 // generateHighContrastColors
 // ===========================================================================
+
+/** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
+function parseRgb(color: string): [number, number, number] {
+  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
+  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  throw new Error(`Cannot parse color: ${color}`);
+}
+
+/** Euclidean distance in RGB — rough proxy (palette is perceptually uniform by construction). */
+function rgbDist(a: [number, number, number], b: [number, number, number]): number {
+  return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+}
+
+/** Not red/pink — green, teal, yellow-green, cyan all count. */
+function isNotReddish(rgb: [number, number, number]): boolean {
+  const [r, g, b] = rgb;
+  // Reject if red-dominant with low green (the "looks red/pink" zone)
+  return !(r > g * 1.2 && r > b);
+}
+
+/** Not green — red, magenta, orange, pink all count. */
+function isNotGreenish(rgb: [number, number, number]): boolean {
+  const [r, g, b] = rgb;
+  // Reject if green-dominant with low red and blue
+  return !(g > r * 1.2 && g > b * 1.2);
+}
+
 describe('generateHighContrastColors', () => {
-  /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
-  function parseRgb(color: string): [number, number, number] {
-    const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
-    const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-    if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
-    throw new Error(`Cannot parse color: ${color}`);
-  }
-
-  /** Euclidean distance in RGB — rough proxy (palette is perceptually uniform by construction). */
-  function rgbDist(a: [number, number, number], b: [number, number, number]): number {
-    return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
-  }
-
-  /** Not red/pink — green, teal, yellow-green, cyan all count. */
-  function isNotReddish(rgb: [number, number, number]): boolean {
-    const [r, g, b] = rgb;
-    // Reject if red-dominant with low green (the "looks red/pink" zone)
-    return !(r > g * 1.2 && r > b);
-  }
-
-  /** Not green — red, magenta, orange, pink all count. */
-  function isNotGreenish(rgb: [number, number, number]): boolean {
-    const [r, g, b] = rgb;
-    // Reject if green-dominant with low red and blue
-    return !(g > r * 1.2 && g > b * 1.2);
-  }
-
   /** Assert every pair has at least `min` RGB distance. */
   function assertMinDist(colors: Record<string, string>, min: number) {
     const rgbs = Object.values(colors).map(parseRgb);

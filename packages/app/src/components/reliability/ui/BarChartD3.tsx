@@ -6,8 +6,7 @@ import * as d3 from 'd3';
 
 import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { LayerConfig } from '@/lib/d3-chart/D3Chart';
+import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';

@@ -192,7 +192,8 @@ function getStore(): Store {
   for (const br of rawBenchmarks) {
     br.id = Number(br.id);
     br.workflow_run_id = Number(br.workflow_run_id);
-    if (br.server_log_id != null) br.server_log_id = Number(br.server_log_id);
+    if (br.server_log_id !== null && br.server_log_id !== undefined)
+      br.server_log_id = Number(br.server_log_id);
   }
   for (const rs of rawRunStats) {
     rs.id = Number(rs.id);
@@ -227,7 +228,7 @@ function getStore(): Store {
   // Build benchmark → server_log_id map
   const benchmarkServerLogMap = new Map<number, number>();
   for (const br of rawBenchmarks) {
-    if (br.server_log_id != null) {
+    if (br.server_log_id !== null && br.server_log_id !== undefined) {
       benchmarkServerLogMap.set(br.id, br.server_log_id);
     }
   }
@@ -327,7 +328,7 @@ export function getLatestBenchmarks(
 
   // Filter to successful benchmarks for this model with a valid latest workflow run
   const candidates = s.benchmarks.filter((br) => {
-    if (br.error != null) return false;
+    if (br.error !== null && br.error !== undefined) return false;
     const c = s.configs.get(br.config_id);
     if (!c || c.model !== modelKey) return false;
     if (!s.latestRunsById.has(br.workflow_run_id)) return false;
@@ -363,7 +364,7 @@ export function getAllBenchmarksForHistory(
 
   const results: BenchmarkRow[] = [];
   for (const br of s.benchmarks) {
-    if (br.error != null) continue;
+    if (br.error !== null && br.error !== undefined) continue;
     if (br.isl !== isl || br.osl !== osl) continue;
     const c = s.configs.get(br.config_id);
     if (!c || c.model !== modelKey) continue;
@@ -394,9 +395,9 @@ export function getAvailabilityData(): AvailabilityRow[] {
   // Build a fast lookup set for valid (model, hardware, framework, precision, isl, osl, date) combos
   const validKeys = new Set<string>();
   for (const br of s.benchmarks) {
-    if (br.error != null) continue;
+    if (br.error !== null && br.error !== undefined) continue;
     const wr = s.latestRunsById.get(br.workflow_run_id);
-    if (!wr || wr.conclusion == null) continue;
+    if (!wr || wr.conclusion === null || wr.conclusion === undefined) continue;
     const c = s.configs.get(br.config_id);
     if (!c) continue;
     validKeys.add(
@@ -479,7 +480,7 @@ export function getWorkflowRunsByDate(date: string): WorkflowRunRow[] {
   const rows: WorkflowRunRow[] = [];
   for (const wr of s.latestRunsById.values()) {
     if (toDateString(wr.date) !== dateStr) continue;
-    if (wr.conclusion == null) continue;
+    if (wr.conclusion === null || wr.conclusion === undefined) continue;
 
     rows.push({
       github_run_id: wr.github_run_id,
@@ -529,7 +530,7 @@ export function getDateConfigs(date: string): DateConfigRow[] {
   const rows: DateConfigRow[] = [];
 
   for (const br of s.benchmarks) {
-    if (br.error != null) continue;
+    if (br.error !== null && br.error !== undefined) continue;
     if (toDateString(br.date) !== dateStr) continue;
     const wr = s.latestRunsById.get(br.workflow_run_id);
     if (!wr) continue;
@@ -558,7 +559,7 @@ export function getDateConfigs(date: string): DateConfigRow[] {
 export function getServerLog(benchmarkResultId: number): string | null {
   const s = getStore();
   const logId = s.benchmarkServerLogMap.get(benchmarkResultId);
-  if (logId == null) return null;
+  if (logId === null || logId === undefined) return null;
 
   // Lazy-load server_logs.json on first access (can be multiple GB)
   if (!s.serverLogs) {

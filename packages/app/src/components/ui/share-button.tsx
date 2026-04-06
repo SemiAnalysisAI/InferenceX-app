@@ -26,7 +26,7 @@ export function ShareButton() {
       document.body.append(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      textArea.remove();
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

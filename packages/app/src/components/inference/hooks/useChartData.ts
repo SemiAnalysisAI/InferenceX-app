@@ -77,7 +77,7 @@ export function useChartData(
   userCosts: Record<string, number | undefined> | null,
   userPowers: Record<string, number | undefined> | null,
   selectedRunDate?: string,
-  enabled: boolean = true,
+  enabled = true,
   latestAvailableDate?: string,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match

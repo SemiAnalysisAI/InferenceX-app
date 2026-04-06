@@ -60,8 +60,7 @@ function resolveCssVarsForExport(root: HTMLElement) {
 
     // Resolve inline style properties that use var()
     const style = el.style;
-    for (let i = 0; i < style.length; i++) {
-      const prop = style[i]!;
+    for (const prop of style) {
       const val = style.getPropertyValue(prop);
       if (val && CSS_VAR_RE.test(val)) {
         style.setProperty(prop, resolve(val));
@@ -99,9 +98,9 @@ function resolveCssVarsForExport(root: HTMLElement) {
 /** Collect @font-face rules from all accessible stylesheets */
 function getFontEmbedCSS(): string {
   const fontFaces: string[] = [];
-  for (const sheet of [...document.styleSheets]) {
+  for (const sheet of document.styleSheets) {
     try {
-      for (const rule of [...(sheet.cssRules || [])]) {
+      for (const rule of sheet.cssRules || []) {
         if (rule instanceof CSSFontFaceRule) fontFaces.push(rule.cssText);
       }
     } catch {
@@ -113,16 +112,20 @@ function getFontEmbedCSS(): string {
 
 /** Wait for a React re-render to flush */
 function waitForRender(): Promise<void> {
-  return new Promise((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
+  return new Promise((resolve) => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        resolve();
+      }),
+    );
+  });
 }
 
 /** Add a subtle watermark bar at the bottom of the exported image */
-async function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
+function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => {
+    img.addEventListener('load', () => {
       const WATERMARK_HEIGHT = 48;
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -154,8 +157,8 @@ async function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
       );
 
       resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror = () => resolve(dataUrl);
+    });
+    img.addEventListener('error', () => resolve(dataUrl));
     img.src = dataUrl;
   });
 }
@@ -198,7 +201,7 @@ export function useChartExport({
       clone.removeAttribute('id');
       // Remove duplicate export container from the clone to avoid DOM id conflicts
       const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
-      if (nestedExport) nestedExport.parentElement!.removeChild(nestedExport);
+      if (nestedExport) nestedExport.remove();
 
       // Bake computed text colors on the figcaption — html-to-image can't resolve
       // CSS custom properties (e.g. text-muted-foreground → var(--muted-foreground)).
@@ -210,8 +213,8 @@ export function useChartExport({
 
         const origCaption = element.querySelector('figcaption');
         if (origCaption) {
-          const origEls = [origCaption, ...[...origCaption.querySelectorAll('*')]] as HTMLElement[];
-          const cloneEls = [figcaption, ...[...figcaption.querySelectorAll('*')]] as HTMLElement[];
+          const origEls = [origCaption, ...origCaption.querySelectorAll('*')] as HTMLElement[];
+          const cloneEls = [figcaption, ...figcaption.querySelectorAll('*')] as HTMLElement[];
           for (let i = 0; i < origEls.length; i++) {
             if (!cloneEls[i]) continue;
             (cloneEls[i] as HTMLElement).style.color = getComputedStyle(origEls[i]!).color;
@@ -295,16 +298,16 @@ export function useChartExport({
       }
 
       // Hide no-export elements, nested export containers
-      for (const el of [...clone.querySelectorAll('.no-export')]) {
+      for (const el of clone.querySelectorAll('.no-export')) {
         (el as HTMLElement).style.display = 'none';
       }
-      for (const el of [...clone.querySelectorAll('[id$="-export"]')]) {
+      for (const el of clone.querySelectorAll('[id$="-export"]')) {
         (el as HTMLElement).parentElement!.style.display = 'none';
       }
 
       // Strip red changelog highlighting from legend items in the export clone
       if (legendContainer) {
-        for (const el of [...legendContainer.querySelectorAll('.text-red-900')]) {
+        for (const el of legendContainer.querySelectorAll('.text-red-900')) {
           (el as HTMLElement).style.color = 'inherit';
           (el as HTMLElement).style.fontWeight = 'normal';
         }
@@ -345,13 +348,13 @@ export function useChartExport({
       resolveCssVarsForExport(exportElement);
 
       // Normalize font sizes and SVG widths
-      for (const label of [...clone.querySelectorAll('label')]) {
+      for (const label of clone.querySelectorAll('label')) {
         label.style.fontSize = '12px';
       }
-      for (const span of [...clone.querySelectorAll('span')]) {
+      for (const span of clone.querySelectorAll('span')) {
         span.style.fontSize = '14px';
       }
-      for (const svg of [...clone.querySelectorAll('svg')]) {
+      for (const svg of clone.querySelectorAll('svg')) {
         svg.style.width = '100%';
       }
 
@@ -359,7 +362,9 @@ export function useChartExport({
       try {
         await document.fonts.ready;
       } catch {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 300);
+        });
       }
 
       // Capture chart image

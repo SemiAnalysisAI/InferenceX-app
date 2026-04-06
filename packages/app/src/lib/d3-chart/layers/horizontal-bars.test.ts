@@ -2,8 +2,11 @@ import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
 import { asMock, createMockGroup } from './test-helpers';
-import { renderHorizontalBars, updateHorizontalBarsOnZoom } from './horizontal-bars';
-import type { HorizontalBarConfig } from './horizontal-bars';
+import {
+  renderHorizontalBars,
+  updateHorizontalBarsOnZoom,
+  type HorizontalBarConfig,
+} from './horizontal-bars';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 

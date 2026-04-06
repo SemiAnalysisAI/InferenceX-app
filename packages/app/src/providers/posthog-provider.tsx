@@ -41,7 +41,7 @@ function PageViewTracker() {
   useEffect(() => {
     if (pathname && ph) {
       let url = window.origin + pathname;
-      if (searchParams.toString()) url += '?' + searchParams.toString();
+      if (searchParams.toString()) url += `?${searchParams.toString()}`;
       ph.capture('$pageview', { $current_url: url });
     }
   }, [pathname, searchParams, ph]);

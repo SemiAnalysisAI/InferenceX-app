@@ -4,8 +4,12 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useMemo } from 'react';
 
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { RenderContext, ZoomContext, ScaleConfig } from '@/lib/d3-chart/D3Chart';
+import {
+  D3Chart,
+  type RenderContext,
+  type ZoomContext,
+  type ScaleConfig,
+} from '@/lib/d3-chart/D3Chart';
 import {
   applyHoverState,
   applyNormalState,
@@ -99,7 +103,8 @@ const TrendChart = React.memo(
           .toSorted((a, b) => a.ts - b.ts);
         record[safeId] = prepared.map((p) => ({ x: p.ts, y: p.value }));
         for (const p of prepared) {
-          if (p.value != null && !isNaN(p.value) && !p.raw.synthetic) flat.push(p);
+          if (p.value !== null && p.value !== undefined && !isNaN(p.value) && !p.raw.synthetic)
+            flat.push(p);
         }
       }
       return { lineDataRecord: record, flatPointData: flat };
@@ -195,7 +200,7 @@ const TrendChart = React.memo(
             strokeWidth: 2,
             curve: d3.curveMonotoneX,
             isDefined: (d: { x: number; y: number }) =>
-              d.y != null && !isNaN(d.y) && (logScale ? d.y > 0 : true),
+              d.y !== null && d.y !== undefined && !isNaN(d.y) && (logScale ? d.y > 0 : true),
           },
         },
         {

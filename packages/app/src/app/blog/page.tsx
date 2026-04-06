@@ -78,7 +78,7 @@ export default async function BlogPage({
                       <article className="min-w-0">
                         <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
                           <time dateTime={post.date}>
-                            {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+                            {new Date(`${post.date}T00:00:00Z`).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',

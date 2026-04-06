@@ -1,7 +1,6 @@
 import { resolveFrameworkAliasesInString } from '@semianalysisai/inferencex-constants';
 
-import type { Precision } from '@/lib/data-mappings';
-import { MODEL_PREFIX_MAPPING, getPrecisionLabel } from '@/lib/data-mappings';
+import { type Precision, MODEL_PREFIX_MAPPING, getPrecisionLabel } from '@/lib/data-mappings';
 import { getFrameworkLabel } from '@/lib/utils';
 
 export function formatChangelogDescription(desc: string | string[]) {

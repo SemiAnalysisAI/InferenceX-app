@@ -6,6 +6,9 @@ import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
 import { getFrameworkLabel } from '@/lib/utils';
 
+const evalGroupKeyFn = (item: EvaluationChartData) =>
+  `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
+
 function buildConfigLabel(
   hwLabel: string,
   framework: string,
@@ -99,18 +102,15 @@ export function buildEvaluationChartRows(
     })
     .filter((item): item is EvaluationChartData => item !== null);
 
-  const groupKeyFn = (item: EvaluationChartData) =>
-    `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
-
   const latestDateForGroup = new Map<string, string>();
   for (const item of allData) {
-    const key = groupKeyFn(item);
+    const key = evalGroupKeyFn(item);
     const existing = latestDateForGroup.get(key);
     if (!existing || item.date > existing) latestDateForGroup.set(key, item.date);
   }
 
   return allData
-    .filter((item) => item.date === latestDateForGroup.get(groupKeyFn(item)))
+    .filter((item) => item.date === latestDateForGroup.get(evalGroupKeyFn(item)))
     .toSorted((a, b) => a.configLabel.localeCompare(b.configLabel));
 }
 

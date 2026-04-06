@@ -167,10 +167,8 @@ export const getHardwareKey = (entry: AggDataEntry): string => {
   }
   if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
     normalizedHwName = `${normalizedHwName}_mtp`;
-  } else {
-    if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
-      normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
-    }
+  } else if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
+    normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
   }
   return normalizedHwName;
 };
@@ -280,18 +278,21 @@ export function createChartDataPoint(
 
     // Narrow boolean | string fields to boolean
     dp_attention:
-      entry.dp_attention != null
+      entry.dp_attention !== null && entry.dp_attention !== undefined
         ? entry.dp_attention === true || entry.dp_attention === 'true'
         : undefined,
     prefill_dp_attention:
-      entry.prefill_dp_attention != null
+      entry.prefill_dp_attention !== null && entry.prefill_dp_attention !== undefined
         ? entry.prefill_dp_attention === true || entry.prefill_dp_attention === 'true'
         : undefined,
     decode_dp_attention:
-      entry.decode_dp_attention != null
+      entry.decode_dp_attention !== null && entry.decode_dp_attention !== undefined
         ? entry.decode_dp_attention === true || entry.decode_dp_attention === 'true'
         : undefined,
-    is_multinode: entry.is_multinode != null ? Boolean(entry.is_multinode) : undefined,
+    is_multinode:
+      entry.is_multinode !== null && entry.is_multinode !== undefined
+        ? Boolean(entry.is_multinode)
+        : undefined,
 
     // Disagg fields: only set when active
     disagg: entry.disagg || undefined,
@@ -580,7 +581,7 @@ export function computeAllRooflines(
 ): Record<string, Record<YAxisMetric, InferenceData[]>> {
   const computedRooflines: Record<string, Record<YAxisMetric, InferenceData[]>> = {};
 
-  for (const hw in groupedData) {
+  for (const hw of Object.keys(groupedData)) {
     computedRooflines[hw] = {} as Record<YAxisMetric, InferenceData[]>;
     for (const chartDefYKey of Y_AXIS_METRICS) {
       const actualDataYKey = chartDef[chartDefYKey as keyof ChartDefinition];
@@ -633,7 +634,7 @@ export function markRooflinePoints(
 ): InferenceData[] {
   const finalProcessedData: InferenceData[] = [];
 
-  for (const hwKey in groupedData) {
+  for (const hwKey of Object.keys(groupedData)) {
     for (const point of groupedData[hwKey]) {
       const newPoint = { ...point };
       newPoint.tpPerGpu.roof = false;
@@ -711,12 +712,12 @@ export function markRooflinePoints(
           newPoint.costni.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costri') {
           newPoint.costri.roof = onCurrentRoofline;
-        } else if (chartDefYKey === 'y_jTotal') {
-          if (newPoint.jTotal) newPoint.jTotal.roof = onCurrentRoofline;
-        } else if (chartDefYKey === 'y_jOutput') {
-          if (newPoint.jOutput) newPoint.jOutput.roof = onCurrentRoofline;
-        } else if (chartDefYKey === 'y_jInput') {
-          if (newPoint.jInput) newPoint.jInput.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_jTotal' && newPoint.jTotal) {
+          newPoint.jTotal.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_jOutput' && newPoint.jOutput) {
+          newPoint.jOutput.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_jInput' && newPoint.jInput) {
+          newPoint.jInput.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);

@@ -153,11 +153,9 @@ export const computeGradientStops = (
         stops.push({ offset: toOffset(rightPx - blendSize), color: curr.color });
         // Blend zone
         stops.push({ offset: toOffset(rightPx + blendSize), color: next.color });
-      } else {
+      } else if (i === 0) {
         // Same label, just add the territory start
-        if (i === 0) {
-          stops.push({ offset: toOffset(leftPx), color: curr.color });
-        }
+        stops.push({ offset: toOffset(leftPx), color: curr.color });
       }
     } else {
       // Last point — add final stop

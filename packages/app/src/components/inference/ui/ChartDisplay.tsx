@@ -22,8 +22,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import type { Model, Precision, Sequence } from '@/lib/data-mappings';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
@@ -232,7 +234,7 @@ export default function ChartDisplay() {
   const isFirstLoad = loading && graphs.length === 0;
 
   const displayGraphs = isFirstLoad
-    ? [...Array(2)].map((_, index) => (
+    ? Array.from({ length: 2 }).map((_, index) => (
         <Card key={`skeleton-${index}`}>
           <Skeleton className="h-7 w-2/4 mb-1" />
           <Skeleton className="h-5 w-3/4 mb-2" />
@@ -362,7 +364,7 @@ export default function ChartDisplay() {
                           <>
                             {' '}
                             • Updated:{' '}
-                            {new Date(selectedRunDate + 'T00:00:00Z').toLocaleDateString('en-US', {
+                            {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: '2-digit',
                               day: '2-digit',

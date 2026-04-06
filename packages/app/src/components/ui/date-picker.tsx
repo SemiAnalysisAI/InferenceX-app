@@ -80,7 +80,7 @@ export function DatePicker({
   };
 
   // Apply selection
-  const handleApply = async () => {
+  const handleApply = () => {
     if (!tempDate) {
       setError('Please select a date');
       return;
