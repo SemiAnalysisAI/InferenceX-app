@@ -56,11 +56,11 @@ jobs:
             ## Critical Rules
             - ALL numbers MUST come from the data file. Never invent or estimate numbers.
             - TTFT/TPOT/E2EL values in the data are in SECONDS — multiply by 1000 for display in ms.
-            - Use gpuDisplayName from the data (e.g. "NVIDIA B200", "AMD MI 355X").
+            - Use gpuDisplayName from the data for all GPU references (e.g. "NVIDIA B200", "AMD MI355X").
             - Preserve the `date` frontmatter from existing files (check if file exists first).
             - The runner-up in Key Findings must be a DIFFERENT GPU than the winner.
             - Skip the 1k/8k sequence entirely — it is deprecated.
-            - Format large numbers with commas (e.g. 18,131.6).
+            - Format large numbers with commas (e.g. xx,xxx.x).
           allowed_tools: 'Read,Write,Edit,Glob,Grep,Bash'
           claude_args: '--model claude-sonnet-4-5-20250929'
 

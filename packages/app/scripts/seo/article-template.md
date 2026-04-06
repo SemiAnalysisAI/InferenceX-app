@@ -29,105 +29,185 @@ tags:
 
 **Subtitle examples (good):**
 
-- "GB300 takes the crown, but AMD's MI 355X closes the gap on this 671B MoE beast"
-- "A dense 70B model where framework choice matters as much as GPU generation"
-- "Limited data, clear winner — B200 dominates with only 3 GPUs tested so far"
+- "yyy takes the crown, but yyy closes the gap on this xxxB MoE beast"
+- "A dense xxxB model where framework choice matters as much as GPU generation"
+- "Limited data, clear winner. yyy dominates with only x GPUs tested so far"
 
 **Subtitle examples (bad — too formulaic):**
 
 - "We benchmarked X across Y GPUs, Z precisions, and N frameworks"
 - "Comprehensive benchmarks across N GPUs with real throughput data"
 
-## Section 1: Intro (1 paragraph)
+## Section 1: Intro (1 paragraph, 2-3 sentences)
 
-2-3 sentences. Describe the model (size, architecture if known). Explain what makes
-GPU selection interesting _for this specific model_ — don't just repeat generic "GPU choice matters."
-Link to the dashboard: `[InferenceX](https://inferencex.semianalysis.com)`
+Describe the model, then say what makes GPU selection interesting for _this_ model.
+Link to the dashboard. Cross-link 1-2 related models if they exist.
 
-**Cross-link:** If there are related models (same vendor, similar size, or interesting to compare),
-mention 1-2 with links: `[see our DeepSeek-R1 benchmarks](/blog/best-gpu-for-dsr1-inference)`
+**Target length: ~40-60 words.**
 
-## Section 2: Key Findings (h2)
+> **EXAMPLE** (do not copy, match the length and tone):
+>
+> yyy is a xxxB mixture-of-experts reasoning model. Its sheer size means most
+> GPUs can't even load it without quantization, which makes the precision and framework
+> choice unusually important. We benchmarked it across x GPUs on
+> [InferenceX](https://inferencex.semianalysis.com); for a smaller dense model comparison,
+> see our [yyy benchmarks](/blog/best-gpu-for-yyy-inference).
 
-3-5 bullet points. Rules:
+## Section 2: Key Findings (h2, 3-5 bullets)
+
+Rules:
 
 - First bullet: the overall winner GPU, with bold throughput number
-- Second bullet: runner-up — MUST be a different GPU than the winner
-- Remaining bullets: highlight what's INTERESTING about this model's data specifically.
-  Don't just list numbers — surface insights (e.g. "AMD closes the gap to within 10%",
-  "FP4 provides a 2x uplift", "disagg actually hurts on this model", "the H100 holds up
-  surprisingly well", "only 1 framework was tested so results may improve")
-- Every bullet must contain a concrete number from the data
+- Second bullet: runner-up (MUST be a different GPU than the winner)
+- Remaining bullets: surface what's interesting about this model's data.
+  Don't just list numbers; state an insight. Every bullet needs a concrete number.
+
+**Target length: 3-5 bullets, each 15-25 words.**
+
+> **EXAMPLE:**
+>
+> ## Key Findings
+>
+> - yyy on FP4 hits **xx,xxx tok/s/GPU**, the fastest config we've tested for this model.
+> - yyy on FP8 comes in at xx,xxx tok/s/GPU. That's xx% of the yyy, closer than on most models.
+> - FP4 nearly xxx throughput vs FP8 on the yyy (xx,xxx vs x,xxx tok/s/GPU). Worth the accuracy tradeoff on this model.
+> - The yyy still manages x,xxx tok/s/GPU on FP8. Not bad for last-gen hardware at half the price.
 
 ## Section 3: GPU Comparison Table (h2)
 
 Title: `## GPU Comparison — <DisplayName> at 8k/1k`
 
-Markdown table with ONE row per GPU (best config for that GPU), sorted by throughput descending.
+One row per GPU (best config for that GPU), sorted by throughput descending.
 
 | GPU | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date |
 | --- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---- |
 
-- Use gpuDisplayName (e.g. "NVIDIA B200", "AMD MI 355X")
+- Use gpuDisplayName from the data (e.g. "Vendor Model")
 - Precision in UPPERCASE (FP4, FP8, BF16, INT4)
 - TTFT and TPOT: convert from seconds to milliseconds (multiply by 1000)
-- Format large numbers with commas (e.g. 18,131.6)
+- Format large numbers with commas (e.g. xx,xxx.x)
 
 Footer: `*One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks.*`
 
 ## Section 4: FAQ Sections (h2 each)
 
-Each FAQ is an h2 heading with 1 paragraph answer. Cover these topics IN ORDER,
-skipping any that don't apply to this model's data:
+Each FAQ is an h2 heading with a 2-4 sentence answer. Cover these topics IN ORDER,
+skipping any that don't apply to this model's data.
+
+**Target length per FAQ: 40-80 words. Don't pad thin answers.**
+
+**IMPORTANT:** Write each answer differently. Vary sentence length, structure, and opening.
+Don't start every answer with "The [GPU name]..." Lead with context, tradeoffs,
+or the surprising finding first.
 
 ### 4a: Best GPU (always include)
 
-Write a natural heading — doesn't have to be "What is the best GPU for X?"
-Could be "Which GPU should you pick for X?" or "The fastest GPU for X" etc.
-Mention the winner, a practical alternative, and AMD option if available.
+Write a natural heading. Mention the winner, a practical alternative, and alternate vendor option if available.
+
+> **EXAMPLE:**
+>
+> ## Which GPU should you pick for yyy?
+>
+> yyy on FP4, if you can get the cards. It's xx% faster than anything else we tested,
+> and the latency numbers are good too (xxxms TTFT, x.xms TPOT). If you're on a different
+> vendor, the yyy on FP8 gets you xx% of that throughput. The yyy still works but you're
+> leaving a lot on the table.
 
 ### 4b: Best Precision (include if >1 precision in data)
 
-Heading should name the specific precisions being compared (e.g. "FP4 vs FP8", "FP8 vs BF16").
-Compare throughput at same GPU where possible. State the winner clearly.
+Heading should name the specific precisions (e.g. "FP4 vs FP8"). Compare throughput
+at the same GPU where possible.
+
+> **EXAMPLE:**
+>
+> ## FP4 vs FP8 on yyy
+>
+> On the yyy, FP4 nearly doubles throughput: xx,xxx vs x,xxx tok/s/GPU. TTFT drops from
+> xxxms to xxxms too. We haven't measured accuracy loss from FP4 quantization on this model,
+> so check your eval suite before committing. On other hardware, only FP8 is available right now.
 
 ### 4c: Best Framework (include if >1 framework in data)
 
 Compare frameworks, noting which GPU each excels on.
 
+> **EXAMPLE:**
+>
+> ## yyy vs yyy
+>
+> Split decision. yyy wins on yyy hardware by xx-xx% on throughput, but yyy
+> is the only option on yyy. If you're running yyy, yyy gets you xx,xxx tok/s/GPU,
+> which beats the yyy on yyy (xx,xxx tok/s/GPU). Framework matters almost as much as
+> the GPU on this model.
+
 ### 4d: Disaggregated Prefill (include if both disagg=true and disagg=false exist)
 
 Compare best disagg vs best non-disagg result with percentage difference.
 
+> **EXAMPLE:**
+>
+> ## Does disaggregated prefill help?
+>
+> Yes, but only on the yyy. Disagg pushes throughput from xx,xxx to xx,xxx tok/s/GPU
+> (an x% gain) while cutting TTFT from xxxms to xxxms. On the yyy, disagg actually
+> hurt throughput by x%. Don't assume it helps everywhere.
+
 ### 4e: GPU Head-to-Head (always include)
 
-Top 2 GPUs by throughput. Compare throughput, TTFT, TPOT. Note tradeoffs.
-Phrase the heading naturally for the specific matchup.
+Compare the top 2 GPUs on throughput, TTFT, and TPOT. Note tradeoffs.
+
+> **EXAMPLE:**
+>
+> ## yyy vs yyy on yyy
+>
+> The yyy wins on throughput (xx,xxx vs xx,xxx tok/s/GPU) but the yyy actually has
+> lower TTFT: xxxms vs xxxms. If your workload is latency-sensitive with short outputs,
+> the yyy is competitive. For batch throughput, yyy is still the clear pick.
 
 ### 4f: Lowest TTFT (always include)
 
 Find the config with the ACTUAL lowest medianTtft across ALL configs at 8k/1k
 (not just best-per-GPU rows). Note the throughput tradeoff.
 
-**IMPORTANT:** Write each answer differently. Vary sentence length, structure, and opening.
-Don't start every answer with "The NVIDIA B200..." — mix it up with context, tradeoffs,
-or the surprising finding first.
+> **EXAMPLE:**
+>
+> ## Fastest time to first token
+>
+> yyy on FP8 with yyy at concurrency xx: xxxms TTFT. That's xx% faster than
+> the yyy's best TTFT (xxxms), though throughput drops to xx,xxx tok/s/GPU at that
+> concurrency. If TTFT matters more than throughput (interactive chat, for example),
+> this is the config to run.
 
 ## Section 5: Additional Sequence Table (h2)
 
 `## Additional Results — 1k/1k Sequence Length`
 
 Same table format as Section 3, one row per GPU, sorted by throughput descending.
-Skip this section if no 1k/1k data exists.
+Skip this section entirely if no 1k/1k data exists.
 NEVER include 1k/8k data.
 
-## Section 6: Cross-Links (h2)
+> **EXAMPLE:**
+>
+> ## Additional Results — 1k/1k Sequence Length
+>
+> | GPU | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+> | --- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+> | yyy | FP4       | yyy       |               xx,xxx.x |             xx.x |              x.x |         xxx | YYYY-MM-DD |
+> | yyy | FP8       | yyy       |               xx,xxx.x |             xx.x |              x.x |         xxx | YYYY-MM-DD |
+>
+> _One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Section 6: Cross-Links (h2, 1-2 sentences)
 
 `## Related Benchmarks`
 
-Link to 2-3 other model articles that readers might find useful.
-Group by relevance: similar model size, same vendor, or commonly compared.
-Example: "If you're evaluating MoE models, see our [DeepSeek-R1 benchmarks](/blog/best-gpu-for-dsr1-inference) and [Qwen-3.5 results](/blog/best-gpu-for-qwen3.5-inference)."
+Link to 2-3 other model articles. One or two sentences, no more.
+
+> **EXAMPLE:**
+>
+> ## Related Benchmarks
+>
+> If you're comparing MoE models, see our [yyy benchmarks](/blog/best-gpu-for-yyy-inference).
+> For a dense model at similar scale, check the [yyy results](/blog/best-gpu-for-yyy-inference).
 
 Use these slugs for cross-links:
 
@@ -139,20 +219,27 @@ Use these slugs for cross-links:
 - `/blog/best-gpu-for-minimaxm2.5-inference` (MiniMax-M2.5)
 - `/blog/best-gpu-for-glm5-inference` (GLM-5)
 
-## Section 7: ClusterMax CTA (h2)
+## Section 7: ClusterMax CTA (h2, exactly 1 line)
 
-`## Where to Run <DisplayName> Inference`
+> **EXAMPLE:**
+>
+> ## Where to Run yyy Inference
+>
+> Looking for yyy API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
 
-One line: `Looking for <DisplayName> API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).`
+## Section 8: Methodology (h2, 2-3 sentences)
 
-## Section 8: Methodology (h2)
+Link to dashboard. End with the date line. Don't say "automatically generated."
 
-`## Methodology`
-
-2-3 sentences about automated nightly benchmarking. Link to dashboard.
-End with: `*Last updated: <YYYY-MM-DD>.*`
-
-Do NOT say "automatically generated" — just give the date.
+> **EXAMPLE:**
+>
+> ## Methodology
+>
+> All benchmarks run nightly on dedicated hardware with standardized prompts and concurrency
+> sweeps. Results are collected and published on [InferenceX](https://inferencex.semianalysis.com).
+> Configs that fail health checks are excluded.
+>
+> _Last updated: YYYY-MM-DD._
 
 ## Section 9: JsonLd (no heading)
 
@@ -161,6 +248,115 @@ Do NOT say "automatically generated" — just give the date.
 ```
 
 The JSON-LD must include every FAQ from Section 4 as a Question/Answer pair.
+
+> **EXAMPLE:**
+>
+> ```mdx
+> <JsonLd>{`{
+>   "@context": "https://schema.org",
+>   "@type": "FAQPage",
+>   "mainEntity": [
+>     {
+>       "@type": "Question",
+>       "name": "Which GPU should you pick for yyy?",
+>       "acceptedAnswer": {
+>         "@type": "Answer",
+>         "text": "yyy on FP4. It's xx% faster than anything else we tested..."
+>       }
+>     }
+>   ]
+> }`}</JsonLd>
+> ```
+
+---
+
+## Target Article Length
+
+A complete per-model article should be roughly **150-250 lines of MDX** (including
+frontmatter, tables, and JSON-LD). That works out to about 800-1,400 words of prose.
+
+Scale with the data:
+
+- **3 GPUs, 1 framework, 1 precision:** ~150 lines. Skip sections 4b, 4c, 4d. Keep answers short.
+- **5-6 GPUs, 2 frameworks, 2 precisions:** ~200 lines. Include most FAQ sections.
+- **7+ GPUs, 3+ frameworks, disagg data:** ~250 lines. Full article with all sections.
+
+---
+
+## Writing Style — Avoiding AI Tells
+
+### Banned Words and Phrases
+
+Never use these. They are the strongest signals of AI-generated text.
+
+**Verbs:** delve, leverage, utilize, harness, unlock, unleash, streamline, foster,
+facilitate, showcase, underscore, spearhead, revolutionize, navigate, orchestrate,
+empower, elevate, transcend, unveil, bolster, garner, illuminate
+
+**Adjectives:** comprehensive, robust, seamless, pivotal, crucial, paramount,
+transformative, groundbreaking, cutting-edge, innovative, holistic, nuanced,
+multifaceted, meticulous, intricate, profound, game-changing, revolutionary
+
+**Adverbs:** significantly, notably, seamlessly, profoundly, ultimately, arguably,
+essentially, fundamentally
+
+**Nouns:** landscape, journey, tapestry, realm, odyssey, paradigm, nexus, synergy,
+ecosystem, interplay, testament
+
+**Phrases — never use these or anything like them:**
+
+- "It's worth noting that..." / "It should be noted that..."
+- "It's important to understand that..."
+- "In today's fast-paced..." / "In the ever-evolving..."
+- "When it comes to..."
+- "Not only X, but also Y"
+- "As we move forward..."
+- "The future looks promising/bright..."
+- "Stands as a testament to..."
+- "Plays a vital/crucial/pivotal role..."
+- "Underscores/highlights the importance..."
+- "In conclusion..." / "In summary..." / "To summarize..."
+- "Furthermore..." / "Moreover..." / "Additionally..."
+- "That being said..." / "With that in mind..."
+
+**Use instead:** "also", "and", "but", "still", "though", "here", simple connectors.
+Plain English. Write like you talk to a coworker.
+
+### Punctuation Rules
+
+- **Em dashes (—):** Use at most ONE per article. Prefer commas, periods, or parentheses.
+  Humans use em dashes rarely; AI uses them every other sentence.
+- **Use contractions:** "it's", "don't", "won't", "doesn't", "isn't". Uncontracted
+  forms ("it is", "do not") sound robotic.
+- **Don't bold key terms** mechanically throughout the article. Bold only in Key Findings
+  bullets where the template explicitly calls for it.
+
+### Sentence and Paragraph Structure
+
+- **Vary sentence length aggressively.** Mix 5-word sentences with 25-word ones.
+  Three medium sentences in a row is a tell.
+- **Vary paragraph length.** One-sentence paragraphs are fine. Five-sentence ones are fine.
+  Don't make them all the same.
+- **Don't start consecutive sentences the same way.** Especially not with "The [GPU name]..."
+- **No rule-of-three lists in prose.** "Fast, efficient, and reliable" is a dead giveaway.
+  Use two items or four. Never exactly three adjectives/adverbs in sequence.
+- **No synonym cycling.** If you called it "the yyy", keep calling it "the yyy". Don't
+  rotate through "the accelerator", "the chip", "the hardware", "the solution".
+
+### Tone
+
+- **Be direct.** State findings plainly. "The yyy is xx% faster" not "The yyy
+  demonstrates a remarkable xx% improvement in throughput performance."
+- **Be specific.** Every claim needs a number. No vague "significant improvement" or
+  "notable performance gains."
+- **Be honest about limitations.** If there's little data, say so. Don't pad thin
+  results with filler.
+- **Skip significance inflation.** A xx% throughput gain is a xx% throughput gain. It's
+  not "transformative" or "groundbreaking."
+- **No unearned profundity.** These are benchmark results, not philosophical revelations.
+- **No filler padding.** "To" not "in order to". "Because" not "due to the fact that".
+  Cut any sentence that conveys zero information.
+- **Write like an analyst** Terse, opinionated, data-heavy.
 
 ---
 
