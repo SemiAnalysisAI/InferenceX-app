@@ -1,0 +1,124 @@
+---
+title: 'Best GPU for gpt-oss-120b Inference — Benchmarks & Comparison (April 2026)'
+subtitle: 'B200 on TRT tops 61k tok/s/GPU, and the gap between NVIDIA and AMD is narrower than you think'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - gpt-oss-120b
+---
+
+gpt-oss-120b is a dense 120B parameter model where single-GPU configs still work at FP4. That makes it one of the easier large models to deploy, and the throughput numbers reflect it. We benchmarked it across 7 GPUs on [InferenceX](https://inferencex.semianalysis.com); for a much larger MoE model, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference).
+
+## Key Findings
+
+- NVIDIA B200 on FP4 with TRT hits **61,612.7 tok/s/GPU**, the fastest config for this model by a wide margin.
+- NVIDIA GB200 on FP4 with dynamo-trt reaches 53,952.5 tok/s/GPU, 12% behind despite the rack-scale setup.
+- AMD MI355X on FP4 with atom gets 44,999.3 tok/s/GPU. That's 73% of the B200, closer than on most models.
+- Even the H100 on FP4 with vllm manages 10,393.9 tok/s/GPU on this model, making last-gen hardware viable for smaller deployments.
+
+## GPU Comparison — gpt-oss-120b at 8k/1k
+
+| GPU          | Precision | Framework  | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ------------ | --------- | ---------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA B200  | FP4       | trt        |               61,612.7 |            244.5 |             36.7 |         256 | 2026-02-05 |
+| NVIDIA GB200 | FP4       | dynamo-trt |               53,952.5 |          5,027.7 |             14.7 |         512 | 2026-01-07 |
+| NVIDIA B200  | FP4       | vllm       |               51,523.0 |            172.6 |             21.9 |         128 | 2026-02-25 |
+| AMD MI355X   | FP4       | atom       |               44,999.3 |            175.4 |             25.1 |         128 | 2026-01-14 |
+| AMD MI355X   | FP4       | vllm       |               38,532.2 |            268.7 |             28.5 |         128 | 2026-03-09 |
+| NVIDIA H200  | FP4       | trt        |               15,202.1 |          4,286.9 |             31.3 |          64 | 2025-12-15 |
+| NVIDIA H200  | FP4       | vllm       |               13,105.6 |            442.0 |             43.0 |          64 | 2026-03-27 |
+| AMD MI325X   | FP4       | vllm       |               13,010.9 |            335.7 |             43.5 |          64 | 2026-03-09 |
+| AMD MI300X   | FP4       | vllm       |               11,511.9 |            443.0 |             49.0 |          64 | 2026-03-09 |
+| NVIDIA H100  | FP4       | vllm       |               10,393.9 |            338.4 |             27.0 |          64 | 2026-03-27 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Which GPU should you pick for gpt-oss-120b?
+
+B200 on FP4 with TRT is the throughput king at 61,612.7 tok/s/GPU, and it doesn't even need disagg or multi-node. TTFT is low at 244.5ms, TPOT at 36.7ms. If you need an AMD option, MI355X on FP4 with atom delivers 44,999.3 tok/s/GPU, which is still faster than what most models achieve on any GPU. The H200 is a reasonable budget pick at 15,202.1 tok/s/GPU.
+
+## TRT vs vllm vs atom vs dynamo-trt
+
+On B200, TRT (61,612.7 tok/s/GPU) beats vllm (51,523.0 tok/s/GPU) by 20%. On MI355X, atom (44,999.3 tok/s/GPU) outperforms vllm (38,532.2 tok/s/GPU) by 17%. dynamo-trt on GB200 is competitive at 53,952.5 tok/s/GPU but needs disaggregated serving to get there. The pattern is consistent: TensorRT-based frameworks lead on NVIDIA, atom leads on AMD.
+
+## NVIDIA B200 vs AMD MI355X on gpt-oss-120b
+
+B200 wins at 61,612.7 vs 44,999.3 tok/s/GPU, a 37% gap. TTFT tells a different story: MI355X's best is 175.4ms vs B200's 244.5ms on their respective top configs. TPOT is close (25.1ms on MI355X vs 36.7ms on B200). For pure throughput, B200 is the pick. For latency-sensitive workloads, MI355X is surprisingly competitive.
+
+## Fastest time to first token
+
+NVIDIA B200 on FP4 with vllm at concurrency 128: 172.6ms TTFT. AMD MI355X on FP4 with atom is close at 175.4ms. Both are well under 200ms, which is excellent for interactive use. The throughput difference at these configs is the deciding factor: 51,523.0 vs 44,999.3 tok/s/GPU.
+
+## Additional Results — 1k/1k Sequence Length
+
+| GPU          | Precision | Framework  | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ------------ | --------- | ---------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA GB200 | FP4       | dynamo-trt |               52,495.8 |            215.6 |             24.6 |       2,048 | 2026-01-07 |
+| NVIDIA B200  | FP4       | trt        |               28,012.9 |             72.9 |             17.9 |         256 | 2026-02-05 |
+| NVIDIA B200  | FP4       | vllm       |               18,327.9 |             83.4 |             13.6 |         128 | 2026-02-25 |
+| AMD MI355X   | FP4       | atom       |               17,577.2 |             50.5 |             14.2 |         128 | 2026-01-14 |
+| AMD MI355X   | FP4       | vllm       |               13,186.3 |            128.6 |             18.2 |         128 | 2026-03-09 |
+| NVIDIA H200  | FP4       | trt        |                6,063.8 |             96.1 |             20.6 |          64 | 2025-12-15 |
+| NVIDIA H200  | FP4       | vllm       |                5,018.8 |            121.4 |             25.1 |          64 | 2025-11-02 |
+| AMD MI325X   | FP4       | vllm       |                4,521.2 |             62.5 |             13.8 |          64 | 2026-03-09 |
+| NVIDIA H100  | FP4       | vllm       |                4,170.9 |             70.8 |             15.0 |          64 | 2026-03-27 |
+| AMD MI300X   | FP4       | vllm       |                3,887.2 |            143.6 |             32.2 |          64 | 2026-03-09 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Related Benchmarks
+
+For a large MoE model comparison, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). If you're interested in another dense model, check the [Llama-3.3-70B results](/blog/best-gpu-for-llama70b-inference).
+
+## Where to Run gpt-oss-120b Inference
+
+Looking for gpt-oss-120b API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which GPU should you pick for gpt-oss-120b?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NVIDIA B200 on FP4 with TRT at 61,612.7 tok/s/GPU. It doesn't need disagg or multi-node. AMD MI355X on FP4 with atom is a solid alternative at 44,999.3 tok/s/GPU."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "TRT vs vllm vs atom vs dynamo-trt for gpt-oss-120b?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On B200, TRT (61,612.7 tok/s/GPU) beats vllm (51,523.0) by 20%. On MI355X, atom (44,999.3) outperforms vllm (38,532.2) by 17%. TensorRT-based frameworks lead on NVIDIA, atom leads on AMD."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "NVIDIA B200 vs AMD MI355X on gpt-oss-120b?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B200 wins at 61,612.7 vs 44,999.3 tok/s/GPU, a 37% gap. MI355X has slightly better TTFT (175.4ms vs 244.5ms) and competitive TPOT."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Fastest time to first token for gpt-oss-120b?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NVIDIA B200 on FP4 with vllm: 172.6ms TTFT. AMD MI355X on FP4 with atom is close at 175.4ms. Both are under 200ms."
+      }
+    }
+  ]
+}`}</JsonLd>

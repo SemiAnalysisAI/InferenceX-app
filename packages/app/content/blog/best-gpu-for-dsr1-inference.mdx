@@ -1,0 +1,147 @@
+---
+title: 'Best GPU for DeepSeek-R1-0528 Inference — Benchmarks & Comparison (April 2026)'
+subtitle: 'GB300 takes the crown on FP4, but B300 closes the gap on this 671B MoE reasoning model'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - deepseek-r1-0528
+---
+
+DeepSeek-R1-0528 is a 671B mixture-of-experts reasoning model. Its size means most GPUs need multi-node setups with wide expert parallelism, and the choice of precision, framework, and disaggregated serving matters more than usual. We benchmarked it across 9 GPUs on [InferenceX](https://inferencex.semianalysis.com); for a smaller dense model comparison, see our [Llama-3.3-70B benchmarks](/blog/best-gpu-for-llama70b-inference).
+
+## Key Findings
+
+- NVIDIA GB300 on FP4 with dynamo-trt hits **18,131.6 tok/s/GPU**, the fastest config we tested for this model.
+- NVIDIA B300 on FP4 comes in at 15,868.1 tok/s/GPU, only 12% behind the GB300 and ahead of the GB200.
+- Disaggregated prefill with dynamo-trt dominates the top of the leaderboard. Every config above 8,000 tok/s/GPU uses disagg.
+- AMD MI355X on FP4 with mori-sglang reaches 4,222.8 tok/s/GPU. That's 23% of the GB300, but it's the best AMD result by a wide margin.
+- NVIDIA H100 still works at 850.1 tok/s/GPU on FP8, though you're leaving 95% of the GB300's throughput on the table.
+
+## GPU Comparison — DeepSeek-R1-0528 at 8k/1k
+
+| GPU          | Precision | Framework   | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ------------ | --------- | ----------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA GB300 | FP4       | dynamo-trt  |               18,131.6 |          3,358.3 |             33.6 |       2,253 | 2026-02-03 |
+| NVIDIA B300  | FP4       | dynamo-trt  |               15,868.1 |          2,773.4 |             38.5 |       2,198 | 2026-01-28 |
+| NVIDIA GB200 | FP4       | dynamo-trt  |               14,952.0 |          2,298.3 |             36.9 |       4,301 | 2026-03-23 |
+| NVIDIA B200  | FP4       | dynamo-trt  |               13,429.7 |          4,144.9 |             33.5 |       1,691 | 2026-01-29 |
+| AMD MI355X   | FP4       | mori-sglang |                4,222.8 |         71,288.6 |            108.1 |       2,048 | 2026-03-13 |
+| NVIDIA H200  | FP8       | dynamo-trt  |                2,325.9 |         17,608.3 |             40.0 |         512 | 2026-03-23 |
+| NVIDIA H100  | FP8       | dynamo-trt  |                  850.1 |          8,036.0 |             25.1 |         154 | 2026-02-08 |
+| AMD MI325X   | FP8       | sglang      |                  907.6 |            489.8 |             74.8 |          64 | 2026-02-27 |
+| AMD MI300X   | FP8       | sglang      |                  790.8 |            661.5 |             85.3 |          64 | 2026-02-27 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Which GPU should you pick for DeepSeek-R1-0528?
+
+NVIDIA GB300 on FP4 with dynamo-trt, if you can get the hardware. It's 14% faster than B300 and nearly 4.3x faster than the best AMD option. For NVIDIA Blackwell without the NVL72 rack, B200 on FP4 still delivers 13,429.7 tok/s/GPU. If you're on AMD, MI355X on FP4 with mori-sglang is the only config that breaks 4,000 tok/s/GPU, though TTFT is high at 71,288.6ms due to the large concurrency and expert parallelism overhead.
+
+## FP4 vs FP8 on DeepSeek-R1-0528
+
+FP4 is the clear winner on every NVIDIA GPU where both are available. On GB300, FP4 hits 18,131.6 tok/s/GPU vs 8,980.3 for FP8, a 2x throughput gain. On B200, the gap is similar: 13,429.7 vs 5,856.9 tok/s/GPU. TPOT stays comparable between precisions (33.6ms vs 52.9ms on GB300). We haven't measured accuracy loss from FP4 quantization on this model, so check your eval suite before committing.
+
+## dynamo-trt vs dynamo-sglang vs sglang
+
+dynamo-trt wins on NVIDIA hardware across the board. On GB300, dynamo-trt at FP4 hits 18,131.6 tok/s/GPU while dynamo-sglang manages 7,120.5 tok/s/GPU at the same precision. On AMD, mori-sglang is the only disagg-capable framework and gets 4,222.8 tok/s/GPU on MI355X. Plain sglang without disagg tops out at 1,952.2 tok/s/GPU on MI355X. Framework choice on NVIDIA hardware is a 2.5x throughput swing.
+
+## Does disaggregated prefill help?
+
+Yes, on NVIDIA hardware it's dramatic. On GB200 with FP4, disagg pushes throughput from 11,585.2 to 14,952.0 tok/s/GPU (a 29% gain). On B200 with FP8, disagg gives 5,856.9 vs 3,467.2 tok/s/GPU without it (69% gain). TTFT does increase with disagg at high concurrency, but throughput scales much better. On AMD MI355X, disagg with mori-sglang (4,222.8 tok/s/GPU) beats non-disagg atom (3,652.0 tok/s/GPU) by 16%.
+
+## NVIDIA GB300 vs NVIDIA B300 on DeepSeek-R1-0528
+
+GB300 leads on throughput: 18,131.6 vs 15,868.1 tok/s/GPU, a 14% gap. TTFT is similar (3,358.3ms vs 2,773.4ms). B300 actually has a slightly lower TPOT of 38.5ms vs 33.6ms, but the difference is small. Both use FP4 with dynamo-trt and disagg. If you're choosing between these two for a DeepSeek-R1 deployment, GB300 is the better pick, but B300 gets you 88% of the throughput.
+
+## Fastest time to first token
+
+AMD MI325X on FP8 with sglang at concurrency 64: 489.8ms TTFT. That's far lower than anything on the NVIDIA disagg configs (the GB300's best TTFT is 2,639.5ms on FP8). Throughput drops to 907.6 tok/s/GPU at that concurrency, so this is only worth it if you're optimizing for interactive latency at low batch sizes. AMD MI300X is similar at 661.5ms TTFT.
+
+## Additional Results — 1k/1k Sequence Length
+
+| GPU          | Precision | Framework   | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ------------ | --------- | ----------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA GB300 | FP4       | dynamo-trt  |               18,321.0 |          3,011.7 |             66.9 |       8,192 | 2026-02-03 |
+| NVIDIA GB200 | FP4       | dynamo-trt  |               15,003.0 |          7,628.3 |             55.3 |       6,144 | 2026-03-23 |
+| NVIDIA B300  | FP4       | dynamo-trt  |               14,773.4 |            649.0 |             73.9 |       8,192 | 2026-01-28 |
+| NVIDIA B200  | FP4       | dynamo-trt  |               13,067.3 |          1,986.1 |             46.3 |       4,096 | 2026-01-29 |
+| AMD MI355X   | FP4       | mori-sglang |                3,024.4 |         45,187.2 |             63.3 |       2,048 | 2026-03-13 |
+| NVIDIA H200  | FP8       | dynamo-trt  |                2,315.7 |          1,831.9 |             31.9 |       1,024 | 2026-03-23 |
+| NVIDIA H100  | FP8       | dynamo-trt  |                1,375.9 |         20,175.8 |            119.5 |       4,916 | 2026-02-08 |
+| AMD MI325X   | FP8       | sglang      |                  342.8 |            147.6 |             44.7 |          64 | 2026-02-27 |
+| AMD MI300X   | FP8       | sglang      |                  298.7 |            199.0 |             51.3 |          64 | 2026-02-27 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Related Benchmarks
+
+If you're comparing large MoE models, see our [Qwen-3.5-397B benchmarks](/blog/best-gpu-for-qwen3.5-inference). For a dense model at a different scale, check the [gpt-oss-120b results](/blog/best-gpu-for-gptoss120b-inference).
+
+## Where to Run DeepSeek-R1-0528 Inference
+
+Looking for DeepSeek-R1-0528 API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which GPU should you pick for DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NVIDIA GB300 on FP4 with dynamo-trt. It hits 18,131.6 tok/s/GPU, 14% faster than B300 and 4.3x faster than the best AMD option. B200 on FP4 is a good alternative at 13,429.7 tok/s/GPU."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "FP4 vs FP8 on DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "FP4 is the clear winner. On GB300, FP4 hits 18,131.6 tok/s/GPU vs 8,980.3 for FP8, a 2x throughput gain. Similar gaps on B200: 13,429.7 vs 5,856.9 tok/s/GPU."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "dynamo-trt vs dynamo-sglang vs sglang for DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "dynamo-trt wins on NVIDIA hardware. On GB300 FP4, dynamo-trt hits 18,131.6 tok/s/GPU while dynamo-sglang manages 7,120.5. On AMD, mori-sglang is the top option at 4,222.8 tok/s/GPU on MI355X."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does disaggregated prefill help for DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, on NVIDIA hardware. On GB200 FP4, disagg pushes throughput from 11,585.2 to 14,952.0 tok/s/GPU (29% gain). On B200 FP8, disagg gives 5,856.9 vs 3,467.2 tok/s/GPU (69% gain)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "NVIDIA GB300 vs NVIDIA B300 on DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GB300 leads at 18,131.6 vs 15,868.1 tok/s/GPU, a 14% gap. TTFT is similar. B300 gets you 88% of the throughput."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Fastest time to first token for DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AMD MI325X on FP8 with sglang at concurrency 64: 489.8ms TTFT. Throughput drops to 907.6 tok/s/GPU at that concurrency."
+      }
+    }
+  ]
+}`}</JsonLd>

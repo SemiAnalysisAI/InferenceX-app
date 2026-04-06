@@ -1,0 +1,118 @@
+---
+title: 'Best GPU for MiniMax-M2.5 Inference — Benchmarks & Comparison (April 2026)'
+subtitle: 'AMD MI355X edges past B200 on this MoE model, a rare win for non-NVIDIA hardware'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - minimax-m2-5
+---
+
+MiniMax-M2.5 is a MoE model where AMD MI355X pulls ahead of NVIDIA B200 on throughput, one of the few models in our suite where that happens. Six GPUs are tested, all on FP8, with vllm and atom as the available frameworks. We benchmarked it on [InferenceX](https://inferencex.semianalysis.com); for a model where NVIDIA dominates instead, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). Note: InferenceX support for this model is still early; expect more GPUs and frameworks in future updates.
+
+## Key Findings
+
+- AMD MI355X on FP8 with vllm hits **10,391.0 tok/s/GPU**, the fastest config for MiniMax-M2.5.
+- NVIDIA B200 on FP8 with vllm comes in at 9,652.0 tok/s/GPU, just 7% behind MI355X.
+- MI355X on atom also performs well at 8,395.9 tok/s/GPU, giving AMD two of the top three configs.
+- H100 on FP8 with vllm still delivers 2,136.9 tok/s/GPU, though that's 79% slower than MI355X.
+
+## GPU Comparison — MiniMax-M2.5 at 8k/1k
+
+| GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| AMD MI355X  | FP8       | vllm      |               10,391.0 |            747.7 |            108.3 |         256 | 2026-04-05 |
+| NVIDIA B200 | FP8       | vllm      |                9,652.0 |            436.4 |             58.4 |         256 | 2026-04-03 |
+| AMD MI355X  | FP8       | atom      |                8,395.9 |            512.2 |             67.4 |         128 | 2026-04-01 |
+| AMD MI325X  | FP8       | vllm      |                3,950.0 |            587.1 |             71.4 |          64 | 2026-03-29 |
+| AMD MI300X  | FP8       | vllm      |                3,503.7 |            671.3 |             80.5 |          64 | 2026-03-28 |
+| NVIDIA H200 | FP8       | vllm      |                3,370.8 |            340.4 |             41.7 |         128 | 2026-03-28 |
+| NVIDIA H100 | FP8       | vllm      |                2,136.9 |         31,646.2 |             29.7 |          64 | 2026-03-28 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Which GPU should you pick for MiniMax-M2.5?
+
+MI355X on FP8 with vllm at 10,391.0 tok/s/GPU. This is one of the few models where AMD leads NVIDIA on throughput. B200 on FP8 is close at 9,652.0 tok/s/GPU with better TPOT (58.4ms vs 108.3ms), so if per-token latency matters more than aggregate throughput, B200 is the pick. On older AMD hardware, MI325X on FP8 still gets 3,950.0 tok/s/GPU.
+
+## vllm vs atom on AMD MI355X
+
+vllm (10,391.0 tok/s/GPU) beats atom (8,395.9 tok/s/GPU) by 24% on throughput. TPOT is worse on vllm though: 108.3ms vs 67.4ms. TTFT is similar (747.7ms vs 512.2ms). vllm runs at concurrency 256, atom at 128. If you're optimizing for throughput at scale, vllm is the framework to run. For lower-latency serving, atom's TPOT is 38% better.
+
+## AMD MI355X vs NVIDIA B200 on MiniMax-M2.5
+
+MI355X leads on throughput: 10,391.0 vs 9,652.0 tok/s/GPU. B200 has the better latency profile, with TTFT at 436.4ms (vs 747.7ms) and TPOT at 58.4ms (vs 108.3ms). If your workload is batch inference or high-concurrency API serving, MI355X wins. For interactive chat with strict latency SLAs, B200 is the safer choice despite lower throughput.
+
+## Fastest time to first token
+
+NVIDIA H200 on FP8 with vllm at concurrency 128: 340.4ms TTFT with 3,370.8 tok/s/GPU. B200 is close at 436.4ms. H100 has 31,646.2ms TTFT at its top-throughput config, so avoid that one for latency-sensitive use. At concurrency 64, MI325X gives 587.1ms TTFT with 3,950.0 tok/s/GPU.
+
+## Additional Results — 1k/1k Sequence Length
+
+| GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA B200 | FP8       | vllm      |                8,833.9 |            275.0 |             55.8 |         512 | 2026-04-03 |
+| AMD MI355X  | FP8       | vllm      |                8,080.0 |            289.5 |             61.7 |         512 | 2026-04-05 |
+| AMD MI355X  | FP8       | atom      |                3,797.8 |            118.6 |             33.1 |         128 | 2026-04-01 |
+| AMD MI325X  | FP8       | vllm      |                3,061.1 |            195.7 |             41.1 |         512 | 2026-03-29 |
+| AMD MI300X  | FP8       | vllm      |                1,596.0 |            165.2 |             39.0 |          64 | 2026-03-28 |
+| NVIDIA H200 | FP8       | vllm      |                1,303.9 |            133.6 |             24.3 |         128 | 2026-03-28 |
+| NVIDIA H100 | FP8       | vllm      |                1,206.4 |             99.6 |             25.9 |          64 | 2026-03-28 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Related Benchmarks
+
+For a model where NVIDIA dominates, see our [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). For another experimental MoE, check the [Kimi-K2.5 results](/blog/best-gpu-for-kimik2.5-inference).
+
+## Where to Run MiniMax-M2.5 Inference
+
+Looking for MiniMax-M2.5 API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which GPU should you pick for MiniMax-M2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AMD MI355X on FP8 with vllm at 10,391.0 tok/s/GPU. This is one of the few models where AMD leads NVIDIA. B200 on FP8 is close at 9,652.0 tok/s/GPU with better per-token latency."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "vllm vs atom on AMD MI355X for MiniMax-M2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "vllm (10,391.0 tok/s/GPU) beats atom (8,395.9) by 24% on throughput. atom has better TPOT at 67.4ms vs 108.3ms. For throughput, vllm wins; for latency, atom is better."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "AMD MI355X vs NVIDIA B200 on MiniMax-M2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MI355X leads on throughput: 10,391.0 vs 9,652.0 tok/s/GPU. B200 has better latency: 436.4ms TTFT vs 747.7ms, 58.4ms TPOT vs 108.3ms."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Fastest time to first token for MiniMax-M2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NVIDIA H200 on FP8 with vllm at concurrency 128: 340.4ms TTFT with 3,370.8 tok/s/GPU throughput."
+      }
+    }
+  ]
+}`}</JsonLd>

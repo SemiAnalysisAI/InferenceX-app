@@ -1,0 +1,132 @@
+---
+title: 'Best GPU for Kimi-K2.5 Inference — Benchmarks & Comparison (April 2026)'
+subtitle: 'AMD MI355X takes the lead with atom, and the INT4 results show how much precision still matters'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - kimi-k2-5
+---
+
+Kimi-K2.5 is a large MoE model where AMD hardware shows up strong. The availability of FP4, INT4, and multiple frameworks makes GPU selection trickier than on most models. We benchmarked it across 5 GPUs on [InferenceX](https://inferencex.semianalysis.com); for another experimental MoE, see our [Qwen-3.5-397B benchmarks](/blog/best-gpu-for-qwen3.5-inference). Note: InferenceX support for this model is still early; expect more GPUs and frameworks in future updates.
+
+## Key Findings
+
+- NVIDIA B200 on FP4 with vllm hits **4,020.9 tok/s/GPU**, the top NVIDIA config for Kimi-K2.5.
+- AMD MI355X on FP4 with atom reaches 3,510.4 tok/s/GPU, only 13% behind the B200.
+- INT4 configs lag badly: B200 on INT4 gets just 1,419.3 tok/s/GPU, 65% slower than FP4 on the same GPU.
+- MI300X and MI325X on INT4 collapse to under 300 tok/s/GPU, making older AMD hardware impractical for this model.
+
+## GPU Comparison — Kimi-K2.5 at 8k/1k
+
+| GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA B200 | FP4       | vllm      |                4,020.9 |            645.9 |             34.1 |          64 | 2026-03-27 |
+| AMD MI355X  | FP4       | atom      |                3,510.4 |            649.6 |             80.4 |         128 | 2026-04-01 |
+| AMD MI355X  | FP4       | vllm      |                2,697.4 |            485.8 |             52.3 |          64 | 2026-03-27 |
+| NVIDIA B200 | INT4      | vllm      |                1,419.3 |            457.5 |             49.4 |          64 | 2026-03-24 |
+| AMD MI355X  | INT4      | vllm      |                1,223.0 |            481.1 |             56.8 |          64 | 2026-03-27 |
+| NVIDIA H200 | INT4      | vllm      |                1,149.3 |            520.7 |             61.3 |          64 | 2026-03-27 |
+| AMD MI325X  | INT4      | vllm      |                  298.4 |          1,649.2 |            233.8 |          64 | 2026-03-27 |
+| AMD MI300X  | INT4      | vllm      |                  287.0 |          1,739.9 |            243.4 |          64 | 2026-03-30 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Which GPU should you pick for Kimi-K2.5?
+
+B200 on FP4 with vllm leads at 4,020.9 tok/s/GPU with 645.9ms TTFT. AMD MI355X on FP4 with atom is a close second at 3,510.4 tok/s/GPU, with nearly identical TTFT (649.6ms). If you're on AMD, MI355X with atom is the pick. Avoid INT4 on any GPU if you can, as the throughput penalty is steep. H200 on INT4 is viable at 1,149.3 tok/s/GPU but you're getting less than a third of what B200 does on FP4.
+
+## FP4 vs INT4 on Kimi-K2.5
+
+On B200, FP4 (4,020.9 tok/s/GPU) beats INT4 (1,419.3 tok/s/GPU) by 2.8x. On MI355X, FP4 with atom (3,510.4 tok/s/GPU) beats INT4 with vllm (1,223.0 tok/s/GPU) by 2.9x. TPOT is better on FP4 too: 34.1ms vs 49.4ms on B200. INT4 quantization for this model clearly isn't where it needs to be yet.
+
+## atom vs vllm on AMD MI355X
+
+On MI355X, atom at FP4 (3,510.4 tok/s/GPU) beats vllm at FP4 (2,697.4 tok/s/GPU) by 30%. The tradeoff: atom has higher TPOT (80.4ms vs 52.3ms) and runs at higher concurrency (128 vs 64). TTFT is nearly identical at 649.6ms vs 485.8ms. For throughput, atom wins. For per-request latency, vllm is tighter.
+
+## NVIDIA B200 vs AMD MI355X on Kimi-K2.5
+
+Comparing both on FP4 with vllm: B200 hits 4,020.9 vs MI355X at 2,697.4 tok/s/GPU, a 49% gap. TTFT favors MI355X (485.8ms vs 645.9ms), though B200 has better TPOT (34.1ms vs 52.3ms). With atom, MI355X closes the throughput gap to 13% (3,510.4 vs 4,020.9 tok/s/GPU). Framework availability matters a lot on this model.
+
+## Fastest time to first token
+
+NVIDIA B200 on INT4 with vllm at concurrency 64: 457.5ms TTFT. AMD MI355X on FP4 with vllm is close at 485.8ms. Both are under 500ms. If you want the fastest TTFT with decent throughput, MI355X on FP4 with vllm gives 2,697.4 tok/s/GPU at 485.8ms TTFT, a good balance for interactive workloads.
+
+## Additional Results — 1k/1k Sequence Length
+
+| GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
+| AMD MI355X  | FP4       | atom      |                1,648.4 |            222.5 |             38.0 |         128 | 2026-04-01 |
+| NVIDIA B200 | FP4       | vllm      |                1,112.5 |            189.1 |             28.7 |          64 | 2026-03-27 |
+| AMD MI355X  | FP4       | vllm      |                  967.9 |            139.4 |             32.2 |          64 | 2026-03-27 |
+| NVIDIA B200 | INT4      | vllm      |                  541.8 |            155.2 |             29.0 |          64 | 2026-03-24 |
+| NVIDIA H200 | INT4      | vllm      |                  498.1 |            160.0 |             31.7 |          64 | 2026-03-27 |
+| AMD MI355X  | INT4      | vllm      |                  396.4 |            167.8 |             39.3 |          64 | 2026-03-27 |
+| AMD MI325X  | INT4      | vllm      |                   79.1 |            764.1 |            197.6 |          64 | 2026-03-27 |
+| AMD MI300X  | INT4      | vllm      |                   78.5 |            780.8 |            198.9 |          64 | 2026-03-30 |
+
+_One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+
+## Related Benchmarks
+
+For another experimental model, see our [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference). For the largest MoE model in our suite, check the [DeepSeek-R1-0528 results](/blog/best-gpu-for-dsr1-inference).
+
+## Where to Run Kimi-K2.5 Inference
+
+Looking for Kimi-K2.5 API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which GPU should you pick for Kimi-K2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B200 on FP4 with vllm at 4,020.9 tok/s/GPU. AMD MI355X on FP4 with atom is close at 3,510.4 tok/s/GPU. Avoid INT4 on any GPU as throughput drops 2.8-2.9x."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "FP4 vs INT4 on Kimi-K2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "FP4 wins by 2.8-2.9x on every GPU. On B200, FP4 gets 4,020.9 tok/s/GPU vs INT4 at 1,419.3. INT4 quantization for this model isn't optimized yet."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "atom vs vllm on AMD MI355X for Kimi-K2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "atom at FP4 (3,510.4 tok/s/GPU) beats vllm at FP4 (2,697.4) by 30%. atom has higher TPOT (80.4ms vs 52.3ms). For throughput, atom wins; for per-request latency, vllm is tighter."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "NVIDIA B200 vs AMD MI355X on Kimi-K2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On FP4 with vllm, B200 leads by 49%. But MI355X with atom closes the gap to 13% (3,510.4 vs 4,020.9 tok/s/GPU). Framework choice matters on AMD."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Fastest time to first token for Kimi-K2.5?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NVIDIA B200 on INT4 with vllm: 457.5ms TTFT. AMD MI355X on FP4 with vllm is close at 485.8ms with better throughput (2,697.4 tok/s/GPU)."
+      }
+    }
+  ]
+}`}</JsonLd>

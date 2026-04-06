@@ -73,7 +73,6 @@ appending a superscript marker (e.g. "GLM-5 <sup>1</sup>") with a footnote below
 Describe the model, then say what makes GPU selection interesting for _this_ model.
 Link to the dashboard. Cross-link 1-2 related models if they exist.
 If the model's category is `experimental` or `deprecated`, include the disclaimer (see above).
-If the model's category is `experimental` or `deprecated`, include the disclaimer (see above).
 
 **Target length: ~40-60 words.**
 
