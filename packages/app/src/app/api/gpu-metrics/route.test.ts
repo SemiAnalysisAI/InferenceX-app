@@ -29,12 +29,16 @@ vi.mock('@/components/gpu-power/types', () => ({
 }));
 
 vi.mock('adm-zip', () => {
+  const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
     getEntries() {
-      return [{ entryName: 'gpu_metrics_0.csv', isDirectory: false }];
-    }
-    readAsText() {
-      return 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
+      return [
+        {
+          entryName: 'gpu_metrics_0.csv',
+          isDirectory: false,
+          getData: () => Buffer.from(csvContent),
+        },
+      ];
     }
   }
   return { default: MockAdmZip };

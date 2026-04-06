@@ -5,14 +5,10 @@ import { normalizeArtifactRows, normalizeEvalArtifactRows } from './route';
 
 // ── Mock AdmZip ──────────────────────────────────────────────────────
 const mockGetEntries = vi.fn();
-const mockReadAsText = vi.fn();
 vi.mock('adm-zip', () => ({
   default: class MockAdmZip {
     getEntries() {
       return mockGetEntries();
-    }
-    readAsText(entry: unknown) {
-      return mockReadAsText(entry);
     }
   },
 }));
@@ -261,7 +257,6 @@ describe('GET /api/unofficial-run', () => {
     vi.resetModules();
     mockFetch.mockReset();
     mockGetEntries.mockReset();
-    mockReadAsText.mockReset();
     process.env.GITHUB_TOKEN = 'test-token';
     const mod = await import('./route');
     GET = mod.GET as any;
@@ -372,8 +367,10 @@ describe('GET /api/unofficial-run', () => {
 
     // Mock zip extraction — the AdmZip constructor receives the buffer,
     // and our mock returns these entries
-    mockGetEntries.mockReturnValue([{ entryName: 'results.json' }]);
-    mockReadAsText.mockReturnValue(JSON.stringify(bmkData));
+    const bmkJson = JSON.stringify(bmkData);
+    mockGetEntries.mockReturnValue([
+      { entryName: 'results.json', getData: () => Buffer.from(bmkJson) },
+    ]);
 
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(200);
@@ -414,8 +411,10 @@ describe('GET /api/unofficial-run', () => {
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
     });
 
-    mockGetEntries.mockReturnValue([{ entryName: 'agg_eval_all.json' }]);
-    mockReadAsText.mockReturnValue(JSON.stringify(evalData));
+    const evalJson = JSON.stringify(evalData);
+    mockGetEntries.mockReturnValue([
+      { entryName: 'agg_eval_all.json', getData: () => Buffer.from(evalJson) },
+    ]);
 
     const res = await GET(makeRequest('runId=321'));
     expect(res.status).toBe(200);
