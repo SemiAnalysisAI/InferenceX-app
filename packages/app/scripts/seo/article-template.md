@@ -324,8 +324,13 @@ Plain English. Write like you talk to a coworker.
 
 ### Punctuation Rules
 
-- **Em dashes (—):** Use at most ONE per article. Prefer commas, periods, or parentheses.
-  Humans use em dashes rarely; AI uses them every other sentence.
+- **Em dashes (—):** ZERO em dashes in article prose. The only em dashes allowed are in
+  the prescribed headings ("GPU Comparison — ...", "Additional Results — ...") and the
+  title frontmatter. Everywhere else, rewrite:
+  - "B200 hits 18k tok/s — 40% faster" → "B200 hits 18k tok/s, 40% faster"
+  - "only on AMD — at a steep cost" → "only on AMD (at a steep cost)"
+  - "FP4 is the winner — if accuracy allows" → "FP4 is the winner, if accuracy allows."
+    Em dashes are the single strongest AI tell in technical writing. Don't use them.
 - **Use contractions:** "it's", "don't", "won't", "doesn't", "isn't". Uncontracted
   forms ("it is", "do not") sound robotic.
 - **Don't bold key terms** mechanically throughout the article. Bold only in Key Findings
@@ -357,6 +362,21 @@ Plain English. Write like you talk to a coworker.
 - **No filler padding.** "To" not "in order to". "Because" not "due to the fact that".
   Cut any sentence that conveys zero information.
 - **Write like an analyst** Terse, opinionated, data-heavy.
+
+### Mandatory Editing Pass
+
+After writing each article, you MUST re-read it and fix these issues before moving
+to the next article. This is not optional.
+
+1. **Em dash sweep:** Search the file for "—". Delete every em dash that isn't in a
+   prescribed heading ("GPU Comparison — ...", "Additional Results — ...") or the title
+   frontmatter. Replace with a comma, period, semicolon, or parentheses. No exceptions.
+2. **Banned word sweep:** Search for any word from the banned lists above. Replace with
+   plain English.
+3. **Sentence start check:** Read the first word of every sentence in each FAQ answer.
+   If two consecutive sentences start the same way, rewrite one.
+4. **Filler check:** Cut any sentence that restates the previous sentence or conveys
+   zero new information.
 
 ---
 

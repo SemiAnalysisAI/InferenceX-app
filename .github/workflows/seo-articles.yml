@@ -61,6 +61,15 @@ jobs:
             - The runner-up in Key Findings must be a DIFFERENT GPU than the winner.
             - Skip the 1k/8k sequence entirely — it is deprecated.
             - Format large numbers with commas (e.g. xx,xxx.x).
+            - ZERO em dashes in prose. Only allowed in prescribed headings and title frontmatter.
+
+            ## Mandatory Editing Pass
+            After writing EACH article, re-read it and run these fixes before moving on:
+            1. Search the file for "—". Remove every em dash not in a heading or title.
+               Replace with comma, period, semicolon, or parentheses (see template).
+            2. Search for banned words (see template). Replace with plain English.
+            3. Check consecutive sentence starts aren't identical.
+            4. Cut filler sentences that restate the previous one.
           allowed_tools: 'Read,Write,Edit,Glob,Grep,Bash'
           claude_args: '--model claude-sonnet-4-5-20250929'
 

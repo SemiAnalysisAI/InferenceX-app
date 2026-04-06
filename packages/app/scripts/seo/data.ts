@@ -6,7 +6,7 @@ import type { BestConfig, ModelData } from './types';
 /** Human-readable GPU name (e.g. "NVIDIA B200"). */
 export function gpuDisplayName(hw: string): string {
   const vendor = GPU_VENDORS[hw];
-  const upper = hw.toUpperCase().replace('MI', 'MI ');
+  const upper = hw.toUpperCase();
   return vendor ? `${vendor} ${upper}` : upper;
 }
 
