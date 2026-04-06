@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import type * as d3 from 'd3';
+import * as d3 from 'd3';
 import type { HorizontalBarLayerConfig, CustomLayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 
@@ -143,15 +143,48 @@ function BenchmarkChartClient({
         chartId="benchmark-bar"
         data={data}
         height={height}
-        margin={{ top: 8, right: 90, bottom: 36, left: 130 }}
+        margin={{ top: 8, right: 90, bottom: 48, left: 100 }}
         watermark="logo"
         clipContent={false}
+        instructions=""
         xScale={{ type: 'linear', domain: [0, maxValue * 1.15], nice: true }}
         yScale={{ type: 'band', domain: yDomain, padding: 0.2 }}
         xAxis={{
           label: metric,
           tickFormat: (d: d3.AxisDomain) => formatNumber(d as number),
           tickCount: 5,
+        }}
+        yAxis={{
+          customize: (axisGroup) => {
+            axisGroup.selectAll('.tick text').each(function () {
+              const el = d3.select(this as SVGTextElement);
+              const fullLabel = el.text();
+              const lastSpace = fullLabel.lastIndexOf(' ');
+              el.text(null);
+              el.attr('transform', 'translate(0, 5)');
+              if (lastSpace > 0) {
+                el.append('tspan')
+                  .text(fullLabel.slice(0, lastSpace))
+                  .attr('x', -8)
+                  .attr('dy', '-0.4em')
+                  .attr('font-size', '12px')
+                  .attr('font-weight', '600');
+                el.append('tspan')
+                  .text(fullLabel.slice(lastSpace + 1))
+                  .attr('x', -8)
+                  .attr('dy', '1.2em')
+                  .attr('font-size', '10px')
+                  .style('fill', 'var(--muted-foreground)');
+              } else {
+                el.append('tspan')
+                  .text(fullLabel)
+                  .attr('x', -8)
+                  .attr('font-size', '12px')
+                  .attr('font-weight', '600');
+              }
+              el.attr('text-anchor', 'end');
+            });
+          },
         }}
         layers={[barLayer, labelLayer]}
       />
