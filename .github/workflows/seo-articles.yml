@@ -40,32 +40,59 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.PAT }}
           direct_prompt: |
-            You are generating SEO blog articles for InferenceX from benchmark data.
+            You are updating SEO blog articles for InferenceX with fresh benchmark data.
 
             ## Instructions
             1. Read the article template at `packages/app/scripts/seo/article-template.md`
             2. Read the benchmark data at `packages/app/tmp/seo-data.json`
-            3. For each model in the data, create or update an MDX file at
-               `packages/app/content/blog/best-gpu-for-<modelKey>-inference.mdx`
-            4. Create/update the rollup article at
-               `packages/app/content/blog/inference-benchmark-roundup.mdx`
+            3. For each model in the data:
+               a. Check if `packages/app/content/blog/best-gpu-for-<modelKey>-inference.mdx` exists.
+               b. If it EXISTS: read it, then edit in place (see Update Rules below).
+               c. If it does NOT exist: create it from scratch following the template.
+            4. Same for the rollup at `packages/app/content/blog/inference-benchmark-roundup.mdx`.
                The rollup MUST include GPU head-to-head comparison sections (see template).
 
-            Follow the template structure EXACTLY — same sections, same order, same table format.
-            Write natural, varied prose for each model (not copy-paste between articles).
+            ## Update Rules (edit-in-place for existing articles)
+
+            The goal is MINIMAL diffs. Only change what the new data requires.
+
+            **Always update:**
+            - `modifiedDate` and `publishDate` in frontmatter → today's date
+            - `*Last updated: YYYY-MM-DD.*` → today's date
+            - All markdown tables → regenerate from new data (sort by throughput descending)
+            - Key Findings bullets → update numbers and GPU names if rankings changed
+            - JSON-LD answers → update to match any changed FAQ prose
+
+            **Update only if the data changed the conclusion:**
+            - FAQ prose (e.g. if the winner GPU changed, or a new GPU appeared, rewrite that FAQ)
+            - Subtitle (if the winner or key insight changed)
+            - Intro (if GPU count or framework count changed meaningfully)
+
+            **Never touch unless factually wrong:**
+            - Prose phrasing that is still accurate (don't reword for variety)
+            - Cross-links section (unless new model articles were added)
+            - ClusterMax CTA
+            - Methodology section (unless the template changed)
+            - `date` in frontmatter (preserve the original)
+
+            **For new sections** (e.g. a new FAQ that applies because new data appeared):
+            - Add it in the correct position per the template ordering.
+            - Follow the template's writing style guidelines.
+
+            **For removed sections** (e.g. a FAQ that no longer applies):
+            - Remove it and update the JSON-LD to match.
 
             ## Critical Rules
             - ALL numbers MUST come from the data file. Never invent or estimate numbers.
             - TTFT/TPOT/E2EL values in the data are in SECONDS — multiply by 1000 for display in ms.
-            - Use gpuDisplayName from the data for all GPU references (e.g. "NVIDIA B200", "AMD MI355X").
-            - Preserve the `date` frontmatter from existing files (check if file exists first).
+            - Use gpuDisplayName from the data for all GPU references.
             - The runner-up in Key Findings must be a DIFFERENT GPU than the winner.
             - Skip the 1k/8k sequence entirely — it is deprecated.
             - Format large numbers with commas (e.g. xx,xxx.x).
             - ZERO em dashes in prose. Only allowed in prescribed headings and title frontmatter.
 
             ## Mandatory Editing Pass
-            After writing EACH article, re-read it and run these fixes before moving on:
+            After updating EACH article, re-read it and run these fixes before moving on:
             1. Search the file for "—". Remove every em dash not in a heading or title.
                Replace with comma, period, semicolon, or parentheses (see template).
             2. Search for banned words (see template). Replace with plain English.

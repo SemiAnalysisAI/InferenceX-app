@@ -8,6 +8,20 @@ and write natural prose that reads like a SemiAnalysis engineer wrote it — not
 and disaggregated data should produce a rich, detailed article. A model with 3 GPUs and
 1 framework should be shorter and honest about limited coverage.
 
+## Update Mode (existing articles)
+
+When an article already exists, **edit in place with minimal diffs.** Don't rewrite
+prose that's still accurate. Only change what the new data requires.
+
+**Always update:** tables, Key Findings numbers, dates (`modifiedDate`, `publishDate`,
+`*Last updated*`), JSON-LD answers.
+
+**Update only if the conclusion changed:** FAQ prose (e.g. new winner), subtitle, intro
+(e.g. GPU count changed).
+
+**Never touch unless wrong:** prose phrasing that's still accurate, cross-links,
+ClusterMax CTA, methodology, `date` frontmatter.
+
 ---
 
 ## Frontmatter
@@ -51,13 +65,14 @@ Each model in the data has a `category` field:
   continue to benchmark it for reference."
 
 Also mark experimental/deprecated models in the rollup "Best GPU Per Model" table by
-appending a footnote marker (e.g. "GLM-5 †") with a footnote below the table:
-`† Experimental support — limited GPU/framework coverage.`
+appending a superscript marker (e.g. "GLM-5 <sup>1</sup>") with a footnote below the table:
+`<sup>1</sup> Experimental support — limited GPU/framework coverage.`
 
 ## Section 1: Intro (1 paragraph, 2-3 sentences)
 
 Describe the model, then say what makes GPU selection interesting for _this_ model.
 Link to the dashboard. Cross-link 1-2 related models if they exist.
+If the model's category is `experimental` or `deprecated`, include the disclaimer (see above).
 If the model's category is `experimental` or `deprecated`, include the disclaimer (see above).
 
 **Target length: ~40-60 words.**
@@ -252,10 +267,13 @@ Link to dashboard. End with the date line. Don't say "automatically generated."
 >
 > ## Methodology
 >
-> All benchmarks run nightly on dedicated hardware with standardized prompts and concurrency
-> sweeps. Results are collected and published on [InferenceX](https://inferencex.semianalysis.com).
-> Configs that fail health checks are excluded.
->
+> Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.)
+> ship updates or when we change benchmark configs, on dedicated hardware with standardized
+> prompts and concurrency sweeps. Results are published on
+> [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+**NEVER say benchmarks run "nightly", "daily", or on any fixed schedule. The cadence is tied to serving software updates and config changes.**
+
 > _Last updated: YYYY-MM-DD._
 
 ## Section 9: JsonLd (no heading)
