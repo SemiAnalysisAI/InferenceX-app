@@ -49,6 +49,7 @@ jobs:
                `packages/app/content/blog/best-gpu-for-<modelKey>-inference.mdx`
             4. Create/update the rollup article at
                `packages/app/content/blog/inference-benchmark-roundup.mdx`
+               The rollup MUST include GPU head-to-head comparison sections (see template).
 
             Follow the template structure EXACTLY — same sections, same order, same table format.
             Write natural, varied prose for each model (not copy-paste between articles).

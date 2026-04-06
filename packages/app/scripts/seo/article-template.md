@@ -400,6 +400,43 @@ tags: [benchmark, inference, gpu, roundup]
 1. **Overview** (h2) — 1 paragraph explaining this is a cross-model summary, link to dashboard
 2. **Best GPU Per Model** (h2) — markdown table: Model (linked to article), Best GPU, Precision, Throughput/GPU
 3. **Per-Model Details** (h2) — one h3 per model with best result, interesting insight, and link to full article
-4. **ClusterMax CTA** (h2)
-5. **Methodology** (h2) — end with `*Last updated: <YYYY-MM-DD>.*`
-6. **JsonLd** — Article schema (not FAQPage)
+4. **GPU Head-to-Head Comparisons** (h2) — see below
+5. **ClusterMax CTA** (h2)
+6. **Methodology** (h2) — end with `*Last updated: <YYYY-MM-DD>.*`
+7. **JsonLd** — FAQPage schema (include every h3 matchup from section 4 as a Question/Answer)
+
+### Section 4: GPU Head-to-Head Comparisons
+
+This section targets search queries like "B200 vs MI355X inference" or "H100 vs H200 performance".
+
+Generate one h3 subsection for every GPU pair where **both GPUs appear in at least 2 models'
+data**. Skip pairs that only overlap on 1 model (not enough data to generalize).
+
+Sort pairs by how interesting the matchup is (close races first, blowouts last).
+
+Each h3 subsection:
+
+**Heading:** `### <GPU A> vs <GPU B>` (use gpuDisplayName, alphabetical by vendor then model)
+
+**Body (3-5 sentences):**
+
+- Which GPU wins on throughput across more models, and by how much on average
+- Any models where the loser wins instead (call these out, they're the interesting part)
+- One sentence on latency tradeoffs if they diverge from the throughput story
+- Link to the specific model article for the most interesting matchup
+
+> **EXAMPLE:**
+>
+> ### NVIDIA B200 vs AMD MI355X
+>
+> B200 wins on throughput in x out of x models tested, by xx% on average. The exception is
+> yyy, where MI355X edges ahead at xx,xxx vs xx,xxx tok/s/GPU. On latency, B200 consistently
+> has lower TPOT (xxms vs xxms typical). MI355X tends to have better TTFT at lower
+> concurrencies. For the full yyy matchup, see our [yyy benchmarks](/blog/best-gpu-for-yyy-inference).
+>
+> ### NVIDIA B200 vs NVIDIA H200
+>
+> Generational gap. B200 is x.xx faster on average across all x shared models. H200 still has
+> competitive TTFT at low concurrency on some models (see [yyy results](/blog/best-gpu-for-yyy-inference)),
+> but throughput isn't close. If you're choosing between the two, B200 is worth the upgrade
+> unless you're TTFT-bound at low batch sizes.
