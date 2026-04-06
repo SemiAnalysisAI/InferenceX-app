@@ -120,6 +120,29 @@ One row per GPU (best config for that GPU), sorted by throughput descending.
 
 Footer: `*One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks.*`
 
+## Section 3b: Interactive Throughput Chart
+
+Immediately after the table footer, add a `<BenchmarkChart>` component. This renders an
+interactive horizontal bar chart from the same data as the table.
+
+The component takes a `data` prop (single-quoted JSON string) and an optional `metric` prop.
+
+> **EXAMPLE:**
+>
+> ```mdx
+> <BenchmarkChart metric="Throughput/GPU (tok/s)" data='[{"gpu":"yyy","value":0,"vendor":"nvidia"},{"gpu":"yyy","value":0,"vendor":"amd"}]' />
+> ```
+
+Rules:
+
+- Include one entry per GPU (same rows as the table, best config per GPU)
+- `data` is a **single-quoted** JSON string prop (NOT children, NOT backtick template)
+- `value` is throughput per GPU (raw number, no commas)
+- `vendor` must be lowercase: `"nvidia"`, `"amd"`, or `"other"`
+- Self-closing tag (`/>`) with no children
+- Keep the JSON compact (one line) to avoid MDX parsing issues
+- Sort doesn't matter (the component sorts by value descending)
+
 ## Section 4: FAQ Sections (h2 each)
 
 Each FAQ is an h2 heading with a 2-4 sentence answer. Cover these topics IN ORDER,

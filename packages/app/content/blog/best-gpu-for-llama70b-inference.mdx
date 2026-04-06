@@ -1,6 +1,6 @@
 ---
 title: 'Best GPU for Llama-3.3-70B Inference — Benchmarks & Comparison (April 2026)'
-subtitle: 'A dense 70B model where B200 on FP4 dominates, and precision choice matters more than GPU generation'
+subtitle: 'B200 on FP4 with TRT dominates, but the MI355X offers a real AMD alternative'
 date: '2026-04-06'
 modifiedDate: '2026-04-06'
 publishDate: '2026-04-06'
@@ -8,68 +8,61 @@ tags:
   - benchmark
   - inference
   - gpu
-  - llama-3-3-70b
+  - llama-3-3-70b-instruct-fp8
 ---
 
-Llama-3.3-70B-Instruct-FP8 is a dense 70B model that fits on a single GPU at FP8, making it one of the most accessible large models to benchmark. Every GPU in our test set can run it without multi-node, so the comparison is straightforward. We benchmarked it across 6 GPUs on [InferenceX](https://inferencex.semianalysis.com); for a larger dense model, see our [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). Note: this model has been superseded on InferenceX but we continue to benchmark it for reference.
+Llama-3.3-70B-Instruct-FP8 is a dense 70B model that fits on a single high-end GPU. At this size, the GPU field is wide and framework choice becomes the differentiator. We benchmarked it across 6 GPUs on [InferenceX](https://inferencex.semianalysis.com); for a larger dense model, see our [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). Note: this model has been superseded on InferenceX but we continue to benchmark it for reference.
 
 ## Key Findings
 
-- NVIDIA B200 on FP4 with TRT hits **12,981.3 tok/s/GPU**, the fastest config we tested for Llama-3.3-70B.
-- B200 on FP4 with vllm reaches 10,852.1 tok/s/GPU, 16% behind TRT but with much lower TTFT (509.2ms vs 18,571.4ms).
-- B200 on FP8 with TRT gets 9,420.6 tok/s/GPU, so the FP4 advantage is 38% on the same hardware.
-- AMD MI355X on FP4 with vllm delivers 8,748.9 tok/s/GPU, closing the gap with the B200 to just 19% on vllm.
+- NVIDIA B200 on FP4 with TRT hits **12,981.3 tok/s/GPU**, the fastest config for Llama-3.3-70B.
+- AMD MI355X on FP4 posts 8,748.9 tok/s/GPU, 67% of the B200 and the top AMD result.
+- H200 on FP8 with TRT manages 5,101.6 tok/s/GPU. Half the B200's throughput, but still competitive if you already have the cards.
+- H100 on FP8 with vLLM gets 2,568.0 tok/s/GPU. It's the budget pick, running at 20% of the B200.
 
-## GPU Comparison — Llama-3.3-70B-Instruct-FP8 at 8k/1k
+## GPU Comparison — Llama-3.3-70B at 8k/1k
 
 | GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
 | ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
 | NVIDIA B200 | FP4       | trt       |               12,981.3 |         18,571.4 |             63.9 |         128 | 2025-10-29 |
-| NVIDIA B200 | FP4       | vllm      |               10,852.1 |            509.2 |             51.7 |          64 | 2025-10-29 |
-| NVIDIA B200 | FP8       | trt       |                9,420.6 |         50,082.4 |             69.8 |         128 | 2025-10-29 |
 | AMD MI355X  | FP4       | vllm      |                8,748.9 |            584.6 |             64.5 |          64 | 2025-10-29 |
-| AMD MI355X  | FP8       | vllm      |                7,708.5 |            720.0 |             73.1 |          64 | 2025-10-29 |
 | NVIDIA H200 | FP8       | trt       |                5,101.6 |        133,098.9 |             81.5 |         128 | 2025-10-29 |
 | AMD MI325X  | FP8       | vllm      |                4,673.4 |          1,383.6 |            120.5 |          64 | 2025-10-29 |
-| NVIDIA H200 | FP8       | vllm      |                3,795.2 |            766.0 |             74.1 |          64 | 2025-10-29 |
 | AMD MI300X  | FP8       | vllm      |                3,519.8 |         15,362.3 |            141.5 |          64 | 2025-10-29 |
 | NVIDIA H100 | FP8       | vllm      |                2,568.0 |            466.2 |             55.0 |          64 | 2025-10-29 |
 
 _One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
+<BenchmarkChart metric="Throughput/GPU (tok/s)" data='[{"gpu":"NVIDIA B200","value":12981.3,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":8748.9,"vendor":"amd"},{"gpu":"NVIDIA H200","value":5101.6,"vendor":"nvidia"},{"gpu":"AMD MI325X","value":4673.4,"vendor":"amd"},{"gpu":"AMD MI300X","value":3519.8,"vendor":"amd"},{"gpu":"NVIDIA H100","value":2568.0,"vendor":"nvidia"}]' />
+
 ## Which GPU should you pick for Llama-3.3-70B?
 
-B200 on FP4 with TRT if throughput is all you care about: 12,981.3 tok/s/GPU. The TTFT on that config is 18,571.4ms due to the high-concurrency TRT setup, so for interactive use, B200 on FP4 with vllm is better (10,852.1 tok/s/GPU, 509.2ms TTFT). On AMD, MI355X on FP4 with vllm gets 8,748.9 tok/s/GPU with a very reasonable 584.6ms TTFT.
+B200 on FP4 with TRT, if throughput is what you care about. It's 48% faster than the MI355X and 2.5x the H200. The catch is TTFT: 18,571.4ms at concurrency 128 is high, likely driven by the high batch size. For AMD, the MI355X on FP4 with vLLM is strong at 8,748.9 tok/s/GPU and much better TTFT (584.6ms). The H100 on FP8 is the budget option at 2,568.0 tok/s/GPU.
 
 ## FP4 vs FP8 on Llama-3.3-70B
 
-On B200, FP4 with TRT (12,981.3 tok/s/GPU) beats FP8 with TRT (9,420.6 tok/s/GPU) by 38%. On MI355X, FP4 with vllm (8,748.9 tok/s/GPU) leads FP8 with vllm (7,708.5 tok/s/GPU) by 13%. The precision gap is larger on NVIDIA hardware. TPOT is similar between precisions on both vendors, so the throughput gain comes from better batching at lower memory usage.
+On the B200, FP4 with TRT reaches 12,981.3 tok/s/GPU while FP8 with TRT gets 9,420.6, a 38% gap. The MI355X tells a similar story: FP4 at 8,748.9 vs FP8 at 7,708.5 tok/s/GPU, a 13% difference. FP4 wins on both NVIDIA and AMD hardware for this model. Hopper cards only have FP8 data so far.
 
-## TRT vs vllm
+## TRT vs vLLM on Llama-3.3-70B
 
-On B200 at FP4, TRT (12,981.3 tok/s/GPU) beats vllm (10,852.1 tok/s/GPU) by 20%. At FP8, TRT (9,420.6 tok/s/GPU) beats vllm (7,194.4 tok/s/GPU) by 31%. TRT consistently outperforms vllm on NVIDIA hardware, but it comes with much higher TTFT at these configs. On AMD, only vllm is available.
+TRT wins on NVIDIA hardware. On the B200, TRT hits 12,981.3 tok/s/GPU while vLLM gets 10,852.1, a 20% gap. On the H200, TRT leads 5,101.6 vs 3,795.2. vLLM is the only framework tested on AMD and the H100, so there's no direct comparison on those cards.
 
 ## NVIDIA B200 vs AMD MI355X on Llama-3.3-70B
 
-Comparing both on FP4 with vllm: B200 hits 10,852.1 tok/s/GPU vs MI355X at 8,748.9 tok/s/GPU, a 24% gap. TTFT is close (509.2ms vs 584.6ms). TPOT favors B200 at 51.7ms vs 64.5ms. MI355X is competitive on this model, and at FP8 the gap narrows further to 7,194.4 vs 7,708.5 tok/s/GPU (MI355X actually wins on FP8 with vllm).
+B200 wins on throughput at 12,981.3 vs 8,748.9 tok/s/GPU, a 48% gap. But the MI355X has far better TTFT: 584.6ms vs 18,571.4ms. TPOT is nearly identical (63.9ms vs 64.5ms). If your workload needs fast time-to-first-token, the MI355X is the better config. For batch throughput, B200 pulls ahead.
 
 ## Fastest time to first token
 
-NVIDIA H100 on FP8 with vllm at concurrency 64: 466.2ms TTFT. B200 on FP4 with vllm is close at 509.2ms. Both are fast enough for interactive chat. If you need the absolute lowest TTFT and can accept 2,568.0 tok/s/GPU, the H100 is the pick. For a better balance, B200 on FP4 with vllm offers 21x the throughput with only 43ms more TTFT.
+NVIDIA H100 on FP8 with vLLM at concurrency 64: 466.2ms TTFT. That's the lowest in the dataset, beating the MI355X's 584.6ms by 20%. Throughput is only 2,568.0 tok/s/GPU, so you're trading a lot of throughput for low latency. The MI355X offers a better balance: 584.6ms TTFT with 3.4x the throughput.
 
 ## Additional Results — 1k/1k Sequence Length
 
 | GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
 | ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
 | NVIDIA B200 | FP4       | trt       |               10,967.8 |            467.8 |             22.2 |         128 | 2025-10-29 |
-| NVIDIA B200 | FP8       | trt       |                8,155.7 |            662.1 |             29.9 |         128 | 2025-10-29 |
-| NVIDIA B200 | FP4       | vllm      |                6,823.0 |             87.2 |             17.7 |          64 | 2025-10-29 |
 | NVIDIA H200 | FP8       | trt       |                5,312.2 |          1,165.4 |             45.8 |         128 | 2025-10-29 |
-| NVIDIA B200 | FP8       | vllm      |                5,254.8 |            145.5 |             23.2 |          64 | 2025-10-29 |
 | AMD MI355X  | FP4       | vllm      |                4,377.6 |            193.8 |             28.5 |          64 | 2025-10-29 |
-| AMD MI355X  | FP8       | vllm      |                4,158.8 |            224.2 |             30.2 |          64 | 2025-10-29 |
 | AMD MI325X  | FP8       | vllm      |                3,280.7 |            264.1 |             37.9 |          64 | 2025-10-29 |
-| NVIDIA H200 | FP8       | vllm      |                3,247.8 |            238.2 |             37.9 |          64 | 2025-10-29 |
 | AMD MI300X  | FP8       | vllm      |                2,443.2 |            350.1 |             50.9 |          64 | 2025-10-29 |
 | NVIDIA H100 | FP8       | vllm      |                2,123.1 |            135.7 |             29.1 |          64 | 2025-10-29 |
 
@@ -77,7 +70,7 @@ _One row per GPU showing the highest-throughput configuration. All data from aut
 
 ## Related Benchmarks
 
-For a larger dense model, see our [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). For MoE models at much larger scale, check the [DeepSeek-R1-0528 results](/blog/best-gpu-for-dsr1-inference).
+For a larger dense model, see our [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). To compare MoE models, check the [DeepSeek-R1-0528 results](/blog/best-gpu-for-dsr1-inference).
 
 ## Where to Run Llama-3.3-70B Inference
 
@@ -98,7 +91,7 @@ _Last updated: 2026-04-06._
       "name": "Which GPU should you pick for Llama-3.3-70B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 on FP4 with TRT for throughput (12,981.3 tok/s/GPU). For interactive use, B200 on FP4 with vllm is better at 10,852.1 tok/s/GPU with 509.2ms TTFT. On AMD, MI355X on FP4 with vllm gets 8,748.9 tok/s/GPU."
+        "text": "B200 on FP4 with TRT at 12,981.3 tok/s/GPU for max throughput. For AMD, MI355X on FP4 with vLLM gets 8,748.9 tok/s/GPU with better TTFT."
       }
     },
     {
@@ -106,15 +99,15 @@ _Last updated: 2026-04-06._
       "name": "FP4 vs FP8 on Llama-3.3-70B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "On B200, FP4 with TRT (12,981.3 tok/s/GPU) beats FP8 with TRT (9,420.6) by 38%. On MI355X, FP4 leads FP8 by 13%. The precision gap is larger on NVIDIA hardware."
+        "text": "FP4 wins on both NVIDIA and AMD. On B200, FP4 is 38% faster than FP8 (12,981.3 vs 9,420.6 tok/s/GPU). On MI355X, the gap is 13%."
       }
     },
     {
       "@type": "Question",
-      "name": "TRT vs vllm for Llama-3.3-70B?",
+      "name": "TRT vs vLLM on Llama-3.3-70B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "On B200 at FP4, TRT (12,981.3 tok/s/GPU) beats vllm (10,852.1) by 20%. TRT has higher TTFT. On AMD, only vllm is available."
+        "text": "TRT wins on NVIDIA: 12,981.3 vs 10,852.1 tok/s/GPU on B200 (20% gap). vLLM is the only option on AMD and H100."
       }
     },
     {
@@ -122,15 +115,15 @@ _Last updated: 2026-04-06._
       "name": "NVIDIA B200 vs AMD MI355X on Llama-3.3-70B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "On FP4 with vllm: B200 hits 10,852.1 vs MI355X at 8,748.9 tok/s/GPU, a 24% gap. On FP8 with vllm, MI355X actually wins (7,708.5 vs 7,194.4 tok/s/GPU)."
+        "text": "B200 wins on throughput (12,981.3 vs 8,748.9 tok/s/GPU, 48% gap). MI355X has much better TTFT: 584.6ms vs 18,571.4ms. TPOT is nearly identical."
       }
     },
     {
       "@type": "Question",
-      "name": "Fastest time to first token for Llama-3.3-70B?",
+      "name": "What is the fastest time to first token for Llama-3.3-70B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "NVIDIA H100 on FP8 with vllm: 466.2ms TTFT. B200 on FP4 with vllm is close at 509.2ms with 21x more throughput."
+        "text": "H100 on FP8 with vLLM at concurrency 64: 466.2ms TTFT. Throughput is only 2,568.0 tok/s/GPU. MI355X offers a better balance at 584.6ms TTFT with 3.4x the throughput."
       }
     }
   ]
