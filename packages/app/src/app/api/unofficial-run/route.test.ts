@@ -6,18 +6,16 @@ import { normalizeArtifactRows, normalizeEvalArtifactRows } from './route';
 // ── Mock AdmZip ──────────────────────────────────────────────────────
 const mockGetEntries = vi.fn();
 const mockReadAsText = vi.fn();
-vi.mock('adm-zip', () => {
-  return {
-    default: class MockAdmZip {
-      getEntries() {
-        return mockGetEntries();
-      }
-      readAsText(entry: unknown) {
-        return mockReadAsText(entry);
-      }
-    },
-  };
-});
+vi.mock('adm-zip', () => ({
+  default: class MockAdmZip {
+    getEntries() {
+      return mockGetEntries();
+    }
+    readAsText(entry: unknown) {
+      return mockReadAsText(entry);
+    }
+  },
+}));
 
 // ── Mock fetch ───────────────────────────────────────────────────────
 const mockFetch = vi.fn();
@@ -51,7 +49,7 @@ function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown
     std_tpot: 0.003,
     mean_e2el: 1.5,
     median_e2el: 1.4,
-    p99_e2el: 2.0,
+    p99_e2el: 2,
     std_e2el: 0.2,
     mean_intvty: 50,
     median_intvty: 48,

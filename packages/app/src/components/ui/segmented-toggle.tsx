@@ -4,13 +4,13 @@ import { type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-type SegmentedToggleOptionBase<TValue extends string> = {
+interface SegmentedToggleOptionBase<TValue extends string> {
   value: TValue;
   icon?: ReactNode;
   title?: string;
   testId?: string;
   className?: string;
-};
+}
 
 type SegmentedToggleOptionContent =
   | {

@@ -12,7 +12,8 @@ import type {
   InferenceData,
 } from '@/components/inference/types';
 import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
-import { HARDWARE_CONFIG, getHardwareConfig } from '@/lib/constants';
+import type { HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 import type { BenchmarkRow } from '@/lib/api';
 
 /** Convert a DB benchmark row to an AggDataEntry. */

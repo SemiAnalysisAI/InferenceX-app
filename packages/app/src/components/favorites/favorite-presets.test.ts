@@ -312,7 +312,7 @@ describe('findConfigChangeDates', () => {
 describe('findClosestDate + subtractMonths integration', () => {
   it('finds a reasonable start date for a 2-month range', () => {
     const dates = ['2025-01-05', '2025-01-20', '2025-02-10', '2025-03-01', '2025-03-15'];
-    const latest = dates[dates.length - 1];
+    const latest = dates.at(-1)!;
     const target = subtractMonths(latest, 2);
     const start = findClosestDate(dates, target);
     expect(dates).toContain(start);

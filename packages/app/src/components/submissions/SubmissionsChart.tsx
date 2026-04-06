@@ -26,7 +26,12 @@ const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
 const CHART_ID = 'submissions-chart';
 const NIGHTLY_END_DATE = new Date('2025-12-16').getTime();
 
-type ChartPoint = { date: number; nvidia: number; amd: number; total: number };
+interface ChartPoint {
+  date: number;
+  nvidia: number;
+  amd: number;
+  total: number;
+}
 
 function lineColor(key: string): string {
   if (key === 'nvidia') return NVIDIA_COLOR;

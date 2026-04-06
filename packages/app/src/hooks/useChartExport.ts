@@ -49,7 +49,7 @@ function resolveCssVarsForExport(root: HTMLElement) {
     'lighting-color',
   ];
 
-  for (const el of Array.from(root.querySelectorAll('svg, svg *')) as SVGElement[]) {
+  for (const el of [...root.querySelectorAll('svg, svg *')] as SVGElement[]) {
     // Resolve presentation attributes (e.g. fill="var(--foreground)")
     for (const attr of PRESENTATION_ATTRS) {
       const val = el.getAttribute(attr);
@@ -83,7 +83,7 @@ function resolveCssVarsForExport(root: HTMLElement) {
   ];
 
   for (const { selector, attrs } of COMPUTED_STYLE_SELECTORS) {
-    for (const el of Array.from(root.querySelectorAll(selector)) as SVGElement[]) {
+    for (const el of [...root.querySelectorAll(selector)] as SVGElement[]) {
       // Only set if the attribute isn't already resolved (from the loop above)
       for (const [svgAttr, cssProp] of Object.entries(attrs)) {
         const current = el.getAttribute(svgAttr);
@@ -99,9 +99,9 @@ function resolveCssVarsForExport(root: HTMLElement) {
 /** Collect @font-face rules from all accessible stylesheets */
 function getFontEmbedCSS(): string {
   const fontFaces: string[] = [];
-  for (const sheet of Array.from(document.styleSheets)) {
+  for (const sheet of [...document.styleSheets]) {
     try {
-      for (const rule of Array.from(sheet.cssRules || [])) {
+      for (const rule of [...(sheet.cssRules || [])]) {
         if (rule instanceof CSSFontFaceRule) fontFaces.push(rule.cssText);
       }
     } catch {
@@ -176,9 +176,9 @@ export function useChartExport({
     // Temporarily expand the legend so the clone captures expanded state
     let wasCollapsed = false;
     if (setIsLegendExpanded) {
-      const el = document.getElementById(chartId);
+      const el = document.querySelector(`#${chartId}`);
       const legend = el?.getElementsByClassName('legend-container')[0];
-      wasCollapsed = !!legend && !legend.classList.contains('bg-accent');
+      wasCollapsed = Boolean(legend) && !legend!.classList.contains('bg-accent');
       if (wasCollapsed) {
         setIsLegendExpanded(true);
         await waitForRender();
@@ -188,10 +188,10 @@ export function useChartExport({
     try {
       const htmlToImagePromise = import('@jpinsonneau/html-to-image');
 
-      const element = document.getElementById(chartId);
+      const element = document.querySelector(`#${chartId}`);
       if (!element) throw new Error('Chart element not found');
 
-      const exportElement = document.getElementById(`${chartId}-export`);
+      const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
       if (!exportElement) throw new Error('Export container not found');
 
       const clone = element.cloneNode(true) as HTMLElement;
@@ -210,14 +210,8 @@ export function useChartExport({
 
         const origCaption = element.querySelector('figcaption');
         if (origCaption) {
-          const origEls = [
-            origCaption,
-            ...Array.from(origCaption.querySelectorAll('*')),
-          ] as HTMLElement[];
-          const cloneEls = [
-            figcaption,
-            ...Array.from(figcaption.querySelectorAll('*')),
-          ] as HTMLElement[];
+          const origEls = [origCaption, ...[...origCaption.querySelectorAll('*')]] as HTMLElement[];
+          const cloneEls = [figcaption, ...[...figcaption.querySelectorAll('*')]] as HTMLElement[];
           for (let i = 0; i < origEls.length; i++) {
             if (!cloneEls[i]) continue;
             (cloneEls[i] as HTMLElement).style.color = getComputedStyle(origEls[i]!).color;
@@ -225,7 +219,7 @@ export function useChartExport({
         }
       }
 
-      exportElement.appendChild(clone);
+      exportElement.append(clone);
 
       // Restore collapsed state immediately after cloning
       if (wasCollapsed && setIsLegendExpanded) {
@@ -235,7 +229,7 @@ export function useChartExport({
       const bgColor = getComputedStyle(document.documentElement)
         .getPropertyValue('--background')
         .trim();
-      const legendContainer = clone.getElementsByClassName('legend-container')[0] as
+      const legendContainer = clone.querySelectorAll('.legend-container')[0] as
         | HTMLElement
         | undefined;
 
@@ -255,7 +249,7 @@ export function useChartExport({
       if (svgWrapper) {
         const originalWidth =
           (element.querySelector('.relative > .relative') as HTMLElement)?.offsetWidth ||
-          element.offsetWidth;
+          (element as HTMLElement).offsetWidth;
         applyStyles(svgWrapper, { width: `${originalWidth}px`, flexShrink: '0' });
         // Also lock the flex-1 parent so min-w-0 doesn't collapse it
         const svgParent = svgWrapper.parentElement as HTMLElement | null;
@@ -301,16 +295,16 @@ export function useChartExport({
       }
 
       // Hide no-export elements, nested export containers
-      for (const el of Array.from(clone.getElementsByClassName('no-export'))) {
+      for (const el of [...clone.querySelectorAll('.no-export')]) {
         (el as HTMLElement).style.display = 'none';
       }
-      for (const el of Array.from(clone.querySelectorAll('[id$="-export"]'))) {
+      for (const el of [...clone.querySelectorAll('[id$="-export"]')]) {
         (el as HTMLElement).parentElement!.style.display = 'none';
       }
 
       // Strip red changelog highlighting from legend items in the export clone
       if (legendContainer) {
-        for (const el of Array.from(legendContainer.querySelectorAll('.text-red-900'))) {
+        for (const el of [...legendContainer.querySelectorAll('.text-red-900')]) {
           (el as HTMLElement).style.color = 'inherit';
           (el as HTMLElement).style.fontWeight = 'normal';
         }
@@ -326,9 +320,7 @@ export function useChartExport({
           const hasVisibleControls =
             sibling &&
             sibling.style.display !== 'none' &&
-            Array.from(sibling.children).some(
-              (child) => (child as HTMLElement).style.display !== 'none',
-            );
+            [...sibling.children].some((child) => (child as HTMLElement).style.display !== 'none');
           if (!hasVisibleControls) {
             scrollContainer.style.borderBottom = 'none';
             scrollContainer.style.paddingBottom = '0';
@@ -340,7 +332,7 @@ export function useChartExport({
       if (legendContainer) {
         const legendList = legendContainer.querySelector('ul');
         if (legendList) {
-          const firstVisible = Array.from(legendList.children).find(
+          const firstVisible = [...legendList.children].find(
             (child) => (child as HTMLElement).style.display !== 'none',
           ) as HTMLElement | undefined;
           if (firstVisible && firstVisible !== legendList.firstElementChild) {
@@ -353,13 +345,13 @@ export function useChartExport({
       resolveCssVarsForExport(exportElement);
 
       // Normalize font sizes and SVG widths
-      for (const label of Array.from(clone.getElementsByTagName('label'))) {
+      for (const label of [...clone.querySelectorAll('label')]) {
         label.style.fontSize = '12px';
       }
-      for (const span of Array.from(clone.getElementsByTagName('span'))) {
+      for (const span of [...clone.querySelectorAll('span')]) {
         span.style.fontSize = '14px';
       }
-      for (const svg of Array.from(clone.getElementsByTagName('svg'))) {
+      for (const svg of [...clone.querySelectorAll('svg')]) {
         svg.style.width = '100%';
       }
 
@@ -373,7 +365,7 @@ export function useChartExport({
       // Capture chart image
       const { toPng } = await htmlToImagePromise;
       const chartDataUrl = await toPng(exportElement, {
-        quality: 1.0,
+        quality: 1,
         pixelRatio: 2,
         backgroundColor: bgColor,
         cacheBust: true,
@@ -404,7 +396,7 @@ export function useChartExport({
       if (wasCollapsed && setIsLegendExpanded) setIsLegendExpanded(false);
     } finally {
       setIsExporting(false);
-      const exportElement = document.getElementById(`${chartId}-export`);
+      const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
       if (exportElement) exportElement.innerHTML = '';
     }
   }, [chartId, setIsLegendExpanded]);

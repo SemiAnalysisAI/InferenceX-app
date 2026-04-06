@@ -79,7 +79,7 @@ export function BlogToc({ headings }: BlogTocProps) {
     function onScrollEnd() {
       const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
       if (atBottom && headings.length > 0) {
-        setActiveId(headings[headings.length - 1].id);
+        setActiveId(headings.at(-1)!.id);
       }
     }
 

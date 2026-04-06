@@ -23,8 +23,8 @@ export function slugify(raw: string): string {
   return (
     raw
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'post'
+      .replaceAll(/[^a-z0-9]+/g, '-')
+      .replaceAll(/^-+|-+$/g, '') || 'post'
   );
 }
 
@@ -40,7 +40,7 @@ export function getAllPosts(): BlogPostMeta[] {
 
   const posts = files.map((filename) => {
     const slug = slugify(filename.replace(/\.mdx$/, ''));
-    const raw = fs.readFileSync(path.join(CONTENT_DIR, filename), 'utf-8');
+    const raw = fs.readFileSync(path.join(CONTENT_DIR, filename), 'utf8');
     const { data, content } = matter(raw);
 
     return {
@@ -50,7 +50,7 @@ export function getAllPosts(): BlogPostMeta[] {
     };
   });
 
-  return posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return posts.toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export interface AdjacentPosts {
@@ -103,7 +103,7 @@ export function getPostBySlug(slug: string): { meta: BlogPostMeta; raw: string }
   const filePath = path.join(CONTENT_DIR, `${safe}.mdx`);
   if (!fs.existsSync(filePath)) return null;
 
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  const fileContent = fs.readFileSync(filePath, 'utf8');
   const { data, content } = matter(fileContent);
 
   return {

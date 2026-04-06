@@ -13,7 +13,7 @@ import {
   logTickFormat,
 } from '@/lib/chart-rendering';
 
-import { TrendDataPoint, TrendLineConfig } from '../types';
+import type { TrendDataPoint, TrendLineConfig } from '../types';
 
 interface TrendChartProps {
   trendLines: Map<string, TrendDataPoint[]>;
@@ -79,7 +79,7 @@ const TrendChart = React.memo(
       for (const config of lineConfigs) {
         const data = trendLines.get(config.id);
         if (!data || data.length === 0) continue;
-        const safeId = config.id.replace(/[|]/g, '_');
+        const safeId = config.id.replaceAll(/[|]/g, '_');
         const precision = config.precision ?? 'fp4';
         const prepared = data
           .map((d) => {
@@ -96,7 +96,7 @@ const TrendChart = React.memo(
               y: d.value,
             } as PreparedPoint;
           })
-          .sort((a, b) => a.ts - b.ts);
+          .toSorted((a, b) => a.ts - b.ts);
         record[safeId] = prepared.map((p) => ({ x: p.ts, y: p.value }));
         for (const p of prepared) {
           if (p.value != null && !isNaN(p.value) && !p.raw.synthetic) flat.push(p);
@@ -108,7 +108,7 @@ const TrendChart = React.memo(
     // Reverse lookup: safeId -> config
     const safeIdToConfig = useMemo(() => {
       const map = new Map<string, TrendLineConfig>();
-      for (const c of lineConfigs) map.set(c.id.replace(/[|]/g, '_'), c);
+      for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/g, '_'), c);
       return map;
     }, [lineConfigs]);
 
@@ -145,7 +145,7 @@ const TrendChart = React.memo(
         if (dataMin <= 0) {
           yMin = 0.1;
         } else if (dataMin < 1) {
-          yMin = Math.pow(10, Math.floor(Math.log10(dataMin)));
+          yMin = 10 ** Math.floor(Math.log10(dataMin));
         } else {
           yMin = dataMin * 0.95;
         }

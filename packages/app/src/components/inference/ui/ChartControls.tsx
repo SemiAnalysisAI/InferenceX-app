@@ -23,7 +23,7 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition } from '@/components/inference/types';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/data-mappings';
 
 // Build Y-axis metric options from static chart config JSON — available immediately, no API wait
 const METRIC_GROUPS = [

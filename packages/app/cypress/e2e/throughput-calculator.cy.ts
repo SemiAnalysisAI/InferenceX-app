@@ -304,7 +304,7 @@ describe('TCO Calculator', () => {
     // Clear stale Radix scroll lock before each test to prevent pointer-events: none
     beforeEach(() => {
       cy.document().then((doc) => {
-        doc.body.removeAttribute('data-scroll-locked');
+        delete doc.body.dataset.scrollLocked;
         doc.body.style.removeProperty('pointer-events');
       });
     });

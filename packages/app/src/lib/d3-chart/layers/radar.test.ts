@@ -370,8 +370,8 @@ describe('renderRadar', () => {
     const gridCircles = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-grid');
 
     // The outermost grid circle (level 5) should have stroke-dasharray = 'none'
-    const outerCircle = gridCircles[gridCircles.length - 1];
-    expect(outerCircle.attrs['stroke-dasharray']).toBe('none');
+    const outerCircle = gridCircles.at(-1);
+    expect(outerCircle!.attrs['stroke-dasharray']).toBe('none');
   });
 
   it('inner grid circles have dashed stroke', () => {
@@ -407,7 +407,7 @@ describe('renderRadar', () => {
 
   it('all values at 1.0 produce dots at maximum radius', () => {
     const group = createMockGroup();
-    const maxData: TestGpu[] = [{ name: 'GPU-MAX', color: '#f00', values: [1.0, 1.0, 1.0, 1.0] }];
+    const maxData: TestGpu[] = [{ name: 'GPU-MAX', color: '#f00', values: [1, 1, 1, 1] }];
     renderRadar(group as any, maxData, 400, 400, makeConfig({ labelMargin: 30 }));
 
     const root = group.elements[0];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { InterpolatedResult } from './types';
+import type { InterpolatedResult } from './types';
 import {
   getCostForType,
   getCostProviderLabel,
@@ -408,8 +408,8 @@ describe('getSortedResults', () => {
       tpPerMw: 800,
       inputTpPerMw: 200,
       outputTpPerMw: 700,
-      cost: 2.0,
-      costInput: 1.0,
+      cost: 2,
+      costInput: 1,
     }),
     makeResult({
       hwKey: 'b',
@@ -419,7 +419,7 @@ describe('getSortedResults', () => {
       tpPerMw: 1200,
       inputTpPerMw: 100,
       outputTpPerMw: 1100,
-      cost: 1.0,
+      cost: 1,
       costInput: 0.5,
     }),
     makeResult({
@@ -430,7 +430,7 @@ describe('getSortedResults', () => {
       tpPerMw: 2000,
       inputTpPerMw: 500,
       outputTpPerMw: 1500,
-      cost: 3.0,
+      cost: 3,
       costInput: 1.5,
     }),
   ];

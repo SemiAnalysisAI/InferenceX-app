@@ -52,7 +52,7 @@ export function buildDefaultCustomGpuValues<TSpecs>(
 }
 
 export function buildAppliedCustomGpuValues(
-  stableGpus: Array<{ base: string }>,
+  stableGpus: { base: string }[],
   lastCalculatedValues: Record<string, string | number>,
 ): Record<string, number> {
   const currentValues: Record<string, number> = {};

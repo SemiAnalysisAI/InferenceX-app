@@ -123,7 +123,7 @@ export function detectTdpFromArtifactName(
 ): { sku: string; tdp: number } | null {
   const lower = artifactName.toLowerCase();
   // Check longer names first to avoid partial matches (e.g., gb200 before b200)
-  const orderedSkus = Object.keys(GPU_TDP_MAP).sort((a, b) => b.length - a.length);
+  const orderedSkus = Object.keys(GPU_TDP_MAP).toSorted((a, b) => b.length - a.length);
   for (const sku of orderedSkus) {
     if (lower.includes(sku)) {
       return { sku: sku.toUpperCase(), tdp: GPU_TDP_MAP[sku] };
@@ -142,7 +142,7 @@ export interface Anomaly {
 }
 
 function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
@@ -282,7 +282,7 @@ export function detectAnomalies(
     return true;
   });
 
-  return deduped.sort((a, b) => a.seconds - b.seconds);
+  return deduped.toSorted((a, b) => a.seconds - b.seconds);
 }
 
 /**
@@ -501,16 +501,16 @@ export function computeGpuStats(data: GpuMetricRow[], metricKey: GpuMetricKey): 
   }
 
   const result: GpuStats[] = [];
-  for (const [gpuIndex, values] of Array.from(groups.entries()).sort((a, b) => a[0] - b[0])) {
+  for (const [gpuIndex, values] of [...groups.entries()].toSorted((a, b) => a[0] - b[0])) {
     if (values.length === 0) continue;
-    const sorted = [...values].sort((a, b) => a - b);
+    const sorted = [...values].toSorted((a, b) => a - b);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     const variance = values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / values.length;
     result.push({
       gpuIndex,
       count: values.length,
       min: sorted[0],
-      max: sorted[sorted.length - 1],
+      max: sorted.at(-1)!,
       mean,
       median: percentile(sorted, 50),
       p95: percentile(sorted, 95),

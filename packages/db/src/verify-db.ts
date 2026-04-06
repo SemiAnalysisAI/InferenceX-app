@@ -345,8 +345,8 @@ async function verify(): Promise<void> {
 }
 
 verify()
-  .catch((err) => {
-    console.error('db:verify failed:', err);
+  .catch((error) => {
+    console.error('db:verify failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

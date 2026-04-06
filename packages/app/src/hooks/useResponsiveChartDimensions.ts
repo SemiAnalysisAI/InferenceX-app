@@ -64,13 +64,14 @@ export function useResponsiveChartDimensions(
   );
 
   // clean up on unmount or height change
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
       }
-    };
-  }, []);
+    },
+    [],
+  );
 
   // update dimensions when height changes
   useEffect(() => {

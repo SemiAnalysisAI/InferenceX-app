@@ -23,25 +23,26 @@ describe('Performance', () => {
 
     // Measure CLS using PerformanceObserver
     cy.window()
-      .then((win) => {
-        return new Cypress.Promise((resolve) => {
-          let clsScore = 0;
-          const observer = new win.PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-              if (!(entry as unknown as { hadRecentInput: boolean }).hadRecentInput) {
-                clsScore += (entry as unknown as { value: number }).value;
+      .then(
+        (win) =>
+          new Cypress.Promise((resolve) => {
+            let clsScore = 0;
+            const observer = new win.PerformanceObserver((list) => {
+              for (const entry of list.getEntries()) {
+                if (!(entry as unknown as { hadRecentInput: boolean }).hadRecentInput) {
+                  clsScore += (entry as unknown as { value: number }).value;
+                }
               }
-            }
-          });
-          observer.observe({ type: 'layout-shift', buffered: true });
+            });
+            observer.observe({ type: 'layout-shift', buffered: true });
 
-          // Give a short window for any remaining shifts after load
-          setTimeout(() => {
-            observer.disconnect();
-            resolve(clsScore);
-          }, 1000);
-        });
-      })
+            // Give a short window for any remaining shifts after load
+            setTimeout(() => {
+              observer.disconnect();
+              resolve(clsScore);
+            }, 1000);
+          }),
+      )
       .then((clsScore) => {
         // CLS threshold relaxed for data-driven dashboard (charts cause shifts as data loads)
         expect(clsScore).to.be.lessThan(0.5);

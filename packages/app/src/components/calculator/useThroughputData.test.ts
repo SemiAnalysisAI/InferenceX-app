@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { GPUDataPoint } from './types';
+import type { GPUDataPoint } from './types';
 import {
   getCostField,
   hermiteInterpolate,
@@ -25,7 +25,7 @@ function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
     tp: 8,
     precision: 'fp8',
     costh: 1.5,
-    costn: 2.0,
+    costn: 2,
     costr: 1.2,
     costhi: 0.8,
     costni: 1.1,
@@ -64,7 +64,7 @@ describe('sign', () => {
 describe('getCostField', () => {
   const p = makePoint({
     costh: 1.5,
-    costn: 2.0,
+    costn: 2,
     costr: 1.2,
     costhi: 0.8,
     costni: 1.1,
@@ -76,7 +76,7 @@ describe('getCostField', () => {
 
   it('returns total cost for each provider', () => {
     expect(getCostField(p, 'costh', 'total')).toBe(1.5);
-    expect(getCostField(p, 'costn', 'total')).toBe(2.0);
+    expect(getCostField(p, 'costn', 'total')).toBe(2);
     expect(getCostField(p, 'costr', 'total')).toBe(1.2);
   });
 
@@ -391,7 +391,7 @@ describe('interpolateForGPU', () => {
 
   it('uses the specified cost provider', () => {
     const points = [
-      makePoint({ interactivity: 10, throughput: 800, costh: 1.0, costn: 2.0, costr: 3.0 }),
+      makePoint({ interactivity: 10, throughput: 800, costh: 1, costn: 2, costr: 3 }),
       makePoint({ interactivity: 30, throughput: 400, costh: 1.5, costn: 2.5, costr: 3.5 }),
     ];
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh');
@@ -730,7 +730,7 @@ describe('interpolateForGPU — cost provider consistency', () => {
         interactivity: 10,
         throughput: 800,
         costh: 0.5,
-        costn: 1.0,
+        costn: 1,
         costr: 0.3,
         costhi: 0.25,
         costni: 0.5,

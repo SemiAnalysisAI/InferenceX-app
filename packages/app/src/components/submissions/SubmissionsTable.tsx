@@ -90,7 +90,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   const sorted = useMemo(() => {
     const mult = sortDir === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
+    return [...filtered].toSorted((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mult;

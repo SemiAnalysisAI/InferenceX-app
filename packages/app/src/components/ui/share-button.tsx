@@ -23,7 +23,7 @@ export function ShareButton() {
       // fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = url;
-      document.body.appendChild(textArea);
+      document.body.append(textArea);
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);

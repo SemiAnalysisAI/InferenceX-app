@@ -264,8 +264,8 @@ async function main(): Promise<void> {
 }
 
 main()
-  .catch((err) => {
-    console.error('apply-overrides failed:', err);
+  .catch((error) => {
+    console.error('apply-overrides failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

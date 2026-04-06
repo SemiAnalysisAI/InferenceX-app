@@ -95,7 +95,7 @@ export function findConfigChangeDates(
     set.add(key);
   }
 
-  const dates = [...byDate.keys()].sort();
+  const dates = [...byDate.keys()].toSorted();
   if (dates.length === 0) return [];
 
   // Flag dates where the config set differs from the previous date

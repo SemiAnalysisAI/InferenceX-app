@@ -7,10 +7,7 @@ import type { PointConfig } from './points';
 
 // Mock the downsample module so we can control when LTTB triggers
 vi.mock('../downsample', () => ({
-  lttbDownsample: vi.fn((data: any[], target: number) => {
-    // Simple mock: just return first `target` items
-    return data.slice(0, target);
-  }),
+  lttbDownsample: vi.fn((data: any[], target: number) => data.slice(0, target)),
 }));
 
 import { lttbDownsample } from '../downsample';

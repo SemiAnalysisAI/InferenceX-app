@@ -1,5 +1,3 @@
-export {};
-
 /**
  * Invalidate the Next.js data cache by hitting the /api/v1/invalidate endpoint.
  *
@@ -38,7 +36,7 @@ async function invalidateCache() {
   console.log('Success:', JSON.stringify(data));
 }
 
-invalidateCache().catch((err) => {
-  console.error('invalidate-cache failed:', err);
+invalidateCache().catch((error) => {
+  console.error('invalidate-cache failed:', error);
   process.exitCode = 1;
 });

@@ -39,7 +39,7 @@ describe('normalizeGpuData', () => {
     for (let i = 0; i < RADAR_METRICS.length; i++) {
       const nonNullValues = result.map((r) => r.values[i]).filter((v): v is number => v !== null);
       if (nonNullValues.length > 0) {
-        expect(Math.max(...nonNullValues)).toBeCloseTo(1.0, 5);
+        expect(Math.max(...nonNullValues)).toBeCloseTo(1, 5);
       }
     }
   });
@@ -63,7 +63,7 @@ describe('normalizeGpuData', () => {
     const result = normalizeGpuData(GPU_SPECS, RADAR_METRICS);
     const gb300 = result.find((r) => r.gpu.name === 'GB300 NVL72');
     expect(gb300).toBeDefined();
-    expect(gb300!.values[fp4Idx]).toBeCloseTo(1.0, 5);
+    expect(gb300!.values[fp4Idx]).toBeCloseTo(1, 5);
   });
 
   it('preserves correct GPU references', () => {
@@ -88,7 +88,7 @@ describe('normalizeGpuData', () => {
     }
     // FP8 for H100 is 1979, which is >> 1, so should normalize to 1.0
     const fp8Idx = RADAR_METRICS.findIndex((m) => m.key === 'fp8');
-    expect(result[0].values[fp8Idx]).toBeCloseTo(1.0, 5);
+    expect(result[0].values[fp8Idx]).toBeCloseTo(1, 5);
   });
 
   it('handles empty GPU array', () => {
@@ -112,7 +112,7 @@ describe('normalizeGpuData', () => {
     const gb300 = result.find((r) => r.gpu.name === 'GB300 NVL72');
     expect(gb300).toBeDefined();
     // MI355X also has 288 GB, so both should be 1.0
-    expect(gb300!.values[memIdx]).toBeCloseTo(1.0, 5);
+    expect(gb300!.values[memIdx]).toBeCloseTo(1, 5);
   });
 
   it('computes correct relative values for FP8', () => {
@@ -128,7 +128,7 @@ describe('normalizeGpuData', () => {
     expect(h100).toBeDefined();
 
     // MI355X should be at 1.0 (the max)
-    expect(mi355x!.values[fp8Idx]).toBeCloseTo(1.0, 5);
+    expect(mi355x!.values[fp8Idx]).toBeCloseTo(1, 5);
     // H100 should be proportionally lower: 1979/5033 ≈ 0.393
     expect(h100!.values[fp8Idx]!).toBeLessThan(0.5);
     expect(h100!.values[fp8Idx]!).toBeGreaterThan(0.3);

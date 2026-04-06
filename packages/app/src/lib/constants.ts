@@ -1,4 +1,4 @@
-import { HardwareConfig } from '@/components/inference/types';
+import type { HardwareConfig } from '@/components/inference/types';
 
 /** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
 export const TABLEAU_10 = [

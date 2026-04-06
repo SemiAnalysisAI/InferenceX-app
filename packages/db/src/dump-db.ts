@@ -40,7 +40,7 @@ async function streamTable(table: string, outPath: string): Promise<number> {
 }
 
 async function dump(): Promise<void> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-').slice(0, 19);
   const outDir = resolve(process.argv[2] ?? `inferencex-dump-${timestamp}`);
   mkdirSync(outDir, { recursive: true });
 
@@ -58,8 +58,8 @@ async function dump(): Promise<void> {
 }
 
 dump()
-  .catch((err) => {
-    console.error('db:dump failed:', err);
+  .catch((error) => {
+    console.error('db:dump failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

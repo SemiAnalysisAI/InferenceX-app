@@ -1,16 +1,9 @@
 'use client';
 
-import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import type { ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -34,12 +27,13 @@ interface UnofficialRunInfo {
   isNonMainBranch: boolean;
 }
 
-interface UnofficialChartData {
-  [key: string]: {
+type UnofficialChartData = Record<
+  string,
+  {
     e2e: { data: InferenceData[]; gpus: HardwareConfig };
     interactivity: { data: InferenceData[]; gpus: HardwareConfig };
-  };
-}
+  }
+>;
 
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
 
@@ -261,8 +255,8 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
           setUnofficialEvalRows(data.evaluations ?? []);
           setAvailableModelsAndSequences(parseAvailableModelsAndSequences(chartData));
         })
-        .catch((e) => {
-          setError(e instanceof Error ? e.message : 'Unknown error');
+        .catch((error) => {
+          setError(error instanceof Error ? error.message : 'Unknown error');
           setUnofficialRunInfo(null);
           setUnofficialChartData(null);
           setUnofficialEvalRows(null);
@@ -279,7 +273,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   return (
     <UnofficialRunContext.Provider
       value={{
-        isUnofficialRun: !!unofficialRunInfo,
+        isUnofficialRun: Boolean(unofficialRunInfo),
         unofficialRunInfo,
         unofficialChartData,
         unofficialEvalRows,

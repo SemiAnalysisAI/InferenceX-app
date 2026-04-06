@@ -65,7 +65,7 @@ export function formatDisplayDate(dateStr: string): string {
 export function getLatestSelectableDate(availableDates?: string[], maxDate?: string): string {
   if (availableDates && availableDates.length > 0) {
     // Callers provide ascending dates; first/last are the min/max selectable entries.
-    return availableDates[availableDates.length - 1];
+    return availableDates.at(-1)!;
   }
 
   return maxDate || formatCalendarDate(new Date());
@@ -88,7 +88,7 @@ export function resolveCalendarDateBounds(
       : minAllowedDate;
   const latestMonth =
     availableDates && availableDates.length > 0
-      ? parseCalendarDate(availableDates[availableDates.length - 1])
+      ? parseCalendarDate(availableDates.at(-1)!)
       : maxAllowedDate;
 
   return {
@@ -142,7 +142,7 @@ export function getInitialCalendarMonth(
   }
 
   if (availableDates && availableDates.length > 0) {
-    return parseCalendarDate(availableDates[availableDates.length - 1]);
+    return parseCalendarDate(availableDates.at(-1)!);
   }
 
   const today = new Date();
@@ -156,14 +156,14 @@ export function useCalendarMonth(
   selectedDate: string | undefined,
   availableDates: string[] | undefined,
   maxAllowedDate: Date,
-  deps: ReadonlyArray<CalendarMonthResetDep>,
+  deps: readonly CalendarMonthResetDep[],
 ) {
   const resetMonthKey = formatCalendarDate(
     getInitialCalendarMonth(selectedDate, availableDates, maxAllowedDate),
   );
   const availableDatesKey = availableDates?.join(',') ?? '';
   const maxAllowedDateKey = formatCalendarDate(maxAllowedDate);
-  const selectionResetKey = deps.map((dep) => String(dep ?? '')).join('\u001f');
+  const selectionResetKey = deps.map((dep) => String(dep ?? '')).join('\u001F');
   const [currentMonth, setCurrentMonth] = useState(() => parseCalendarDate(resetMonthKey));
 
   useEffect(() => {
@@ -192,7 +192,7 @@ export function getCalendarMonthNavState(
   return { canGoPrevious, canGoNext };
 }
 
-function getCalendarMonthDays(month: Date): Array<Date | null> {
+function getCalendarMonthDays(month: Date): (Date | null)[] {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const firstDay = new Date(year, monthIndex, 1);
@@ -200,7 +200,7 @@ function getCalendarMonthDays(month: Date): Array<Date | null> {
   const daysInMonth = lastDay.getDate();
   const startingDayOfWeek = firstDay.getDay();
 
-  const days: Array<Date | null> = [];
+  const days: (Date | null)[] = [];
 
   for (let i = 0; i < startingDayOfWeek; i++) {
     days.push(null);

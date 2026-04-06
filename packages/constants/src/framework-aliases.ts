@@ -31,7 +31,9 @@ export function resolveFrameworkAlias(fw: string): string {
 }
 
 // Sorted longest-first to avoid substring conflicts (e.g. `dynamo-trtllm` before `trtllm`).
-const SORTED_ALIASES = Object.entries(FRAMEWORK_ALIASES).sort(([a], [b]) => b.length - a.length);
+const SORTED_ALIASES = Object.entries(FRAMEWORK_ALIASES).toSorted(
+  ([a], [b]) => b.length - a.length,
+);
 
 /**
  * Replace all legacy framework substrings in a string with their canonical form.

@@ -60,7 +60,7 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
 
 export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
   .filter((m) => MODEL_CONFIG[m].category !== 'hidden')
-  .sort((a, b) => a.localeCompare(b));
+  .toSorted((a, b) => a.localeCompare(b));
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
 export const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');

@@ -21,7 +21,7 @@ export function reconcileActiveSet<T>(
 
   if (removedCount === 0) return prev;
 
-  const filtered = new Set(Array.from(prev).filter((item: T) => itemsWithData.has(item)));
+  const filtered = new Set([...prev].filter((item: T) => itemsWithData.has(item)));
 
   if (filtered.size === 0 && resetOnChange) return itemsWithData;
 
@@ -168,9 +168,7 @@ export function useChartDataFilter<TData, TKey extends string>(
   }, [data, extractKey]);
 
   // create stable string representation for comparison
-  const itemsWithDataKey = useMemo(() => {
-    return Array.from(itemsWithData).sort().join(',');
-  }, [itemsWithData]);
+  const itemsWithDataKey = useMemo(() => [...itemsWithData].toSorted().join(','), [itemsWithData]);
 
   // track previous key to detect actual changes
   const prevItemsKeyRef = useRef<string>('');
@@ -203,7 +201,8 @@ export function useFilteredData<TData, TKey extends string>(
   activeSet: Set<TKey>,
   extractKey: (item: TData) => TKey,
 ) {
-  return useMemo(() => {
-    return data.filter((item) => activeSet.has(extractKey(item)));
-  }, [data, activeSet, extractKey]);
+  return useMemo(
+    () => data.filter((item) => activeSet.has(extractKey(item))),
+    [data, activeSet, extractKey],
+  );
 }

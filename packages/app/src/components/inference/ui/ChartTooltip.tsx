@@ -4,7 +4,7 @@ import { useInference } from '@/components/inference/InferenceContext';
 
 interface TooltipContentProps<TValue, _TName> {
   active?: boolean;
-  payload?: Array<{
+  payload?: {
     payload?: {
       hwKey?: string | number;
       tp?: number;
@@ -14,13 +14,13 @@ interface TooltipContentProps<TValue, _TName> {
       [key: string]: unknown;
     };
     [key: string]: unknown;
-  }>;
+  }[];
   [key: string]: unknown;
 }
 
 export default function ChartTooltip({ active, payload }: TooltipContentProps<number, string>) {
   const { hardwareConfig } = useInference();
-  const pointPayload = payload?.[payload.length - 1]?.payload;
+  const pointPayload = payload?.at(-1)?.payload;
   if (active && pointPayload) {
     return (
       <div className="bg-accent p-2 border rounded-sm">

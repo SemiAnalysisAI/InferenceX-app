@@ -44,7 +44,7 @@ export function groupVolumeByWeek(volume: SubmissionVolumeRow[]): WeeklyVolume[]
   }
 
   return [...weekMap.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([week, counts]) => ({
       week,
       nvidia: counts.nvidia,
@@ -74,7 +74,7 @@ export function computeCumulative(volume: SubmissionVolumeRow[]): CumulativePoin
     dateMap.set(row.date, entry);
   }
 
-  const sorted = [...dateMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const sorted = [...dateMap.entries()].toSorted(([a], [b]) => a.localeCompare(b));
 
   let cumNvidia = 0;
   let cumNonNvidia = 0;

@@ -298,15 +298,17 @@ const ScatterGraph = React.memo(
     }, []);
 
     // filteredData: visible points only (for scale domain calculation)
-    const filteredData = useMemo(() => {
-      return Object.values(groupedData)
-        .flat()
-        .filter(
-          (p) =>
-            selectedPrecisions.includes(p.precision) &&
-            effectiveActiveHwTypes.has(p.hwKey as string),
-        );
-    }, [groupedData, selectedPrecisions, effectiveActiveHwTypes]);
+    const filteredData = useMemo(
+      () =>
+        Object.values(groupedData)
+          .flat()
+          .filter(
+            (p) =>
+              selectedPrecisions.includes(p.precision) &&
+              effectiveActiveHwTypes.has(p.hwKey as string),
+          ),
+      [groupedData, selectedPrecisions, effectiveActiveHwTypes],
+    );
 
     const processedOverlayData = useMemo(() => {
       if (!overlayData?.data) return [];
@@ -320,7 +322,7 @@ const ScatterGraph = React.memo(
     }, [filteredData, processedOverlayData]);
 
     const overlayRooflines = useMemo(() => {
-      if (!processedOverlayData.length) return {};
+      if (processedOverlayData.length === 0) return {};
       const grouped = processedOverlayData.reduce(
         (acc, p) => {
           const key = `${p.hwKey}_${p.precision}`;
@@ -439,11 +441,7 @@ const ScatterGraph = React.memo(
       if (useLog) {
         const dataMin = ext[0];
         yMin =
-          dataMin <= 0
-            ? 0.1
-            : dataMin < 1
-              ? Math.pow(10, Math.floor(Math.log10(dataMin)))
-              : dataMin * 0.95;
+          dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
       } else {
         yMin = Math.max(0, ext[0] - range * 0.05);
       }
@@ -491,11 +489,10 @@ const ScatterGraph = React.memo(
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
       (el: SVGPathElement) => {
-        const hw = el.getAttribute('data-hw-key');
-        const prec = el.getAttribute('data-precision');
-        return (
-          !!hw && effectiveActiveHwTypes.has(hw) && !!prec && selectedPrecisions.includes(prec)
-        );
+        const hw = el.dataset.hwKey;
+        const prec = el.dataset.precision;
+        if (hw == null || prec == null) return false;
+        return effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(prec);
       },
       [effectiveActiveHwTypes, selectedPrecisions],
     );
@@ -516,14 +513,14 @@ const ScatterGraph = React.memo(
           .duration(150)
           .style('opacity', function () {
             if (!isRooflineVisible(this)) return 0;
-            return this.getAttribute('data-hw-key') === hwKey ? null : '0.15';
+            return this.dataset.hwKey === hwKey ? null : '0.15';
           });
         root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
           .transition('legend-hover')
           .duration(150)
           .style('opacity', function () {
-            const hw = (this as SVGGElement).getAttribute('data-hw-key');
+            const hw = (this as SVGGElement).dataset.hwKey;
             if (!hw) return 0;
             return hw === hwKey ? 1 : 0;
           });
@@ -552,8 +549,8 @@ const ScatterGraph = React.memo(
         .transition('legend-hover')
         .duration(150)
         .style('opacity', function () {
-          const hw = (this as SVGGElement).getAttribute('data-hw-key');
-          const prec = (this as SVGGElement).getAttribute('data-precision');
+          const hw = (this as SVGGElement).dataset.hwKey;
+          const prec = (this as SVGGElement).dataset.precision;
           if (!hw) return 0;
           // Line labels have no precision attr — always visible if hw is active
           if (!prec) return effectiveActiveHwTypes.has(hw) ? 1 : 0;
@@ -690,19 +687,19 @@ const ScatterGraph = React.memo(
             node.setAttribute('class', 'rooflines-layer');
             const parent = zoomGroup.node()!;
             if (firstDotGroup) parent.insertBefore(node, firstDotGroup);
-            else parent.appendChild(node);
+            else parent.append(node);
             rooflinesLayer = d3.select<SVGGElement, unknown>(node);
           }
 
           // Build roofline entries with gradient or solid stroke
-          type Entry = {
+          interface Entry {
             key: string;
             hw: string;
             precision: string;
             points: InferenceData[];
             stroke: string;
             visible: boolean;
-          };
+          }
           const entries: Entry[] = [];
           const activeGradientIds = new Set<string>();
 
@@ -727,7 +724,7 @@ const ScatterGraph = React.memo(
                     .attr('gradientUnits', 'userSpaceOnUse')
                     .attr('x1', xScale(pts[0].x))
                     .attr('y1', 0)
-                    .attr('x2', xScale(pts[pts.length - 1].x))
+                    .attr('x2', xScale(pts.at(-1)!.x))
                     .attr('y2', 0);
                   gradient
                     .selectAll('stop')
@@ -767,7 +764,7 @@ const ScatterGraph = React.memo(
             .style('opacity', (d) => (d.visible ? 1 : 0));
 
           // Parallelism labels
-          type LabelSeg = {
+          interface LabelSeg {
             segKey: string;
             hw: string;
             precision: string;
@@ -776,7 +773,7 @@ const ScatterGraph = React.memo(
             x: number;
             y: number;
             visible: boolean;
-          };
+          }
           const labelSegments: LabelSeg[] = [];
 
           if (showGradientLabels) {
@@ -870,7 +867,7 @@ const ScatterGraph = React.memo(
             });
 
           // ── Line labels (run name along each roofline) ──
-          type LineLabel = {
+          interface LineLabel {
             key: string;
             hw: string;
             label: string;
@@ -878,7 +875,7 @@ const ScatterGraph = React.memo(
             x: number;
             y: number;
             visible: boolean;
-          };
+          }
           const lineLabels: LineLabel[] = [];
 
           if (showLineLabels) {
@@ -902,7 +899,7 @@ const ScatterGraph = React.memo(
               }
 
               // Sort entries by highest y-value first (top of chart) for priority
-              const sorted = [...bestByHw.values()].sort((a, b) => {
+              const sorted = [...bestByHw.values()].toSorted((a, b) => {
                 const ay = yScale(a.points[0].y);
                 const by = yScale(b.points[0].y);
                 return ay - by; // smaller pixel y = higher on chart
@@ -914,7 +911,7 @@ const ScatterGraph = React.memo(
                   pts[Math.min(1, pts.length - 1)], // top-left (near start)
                   pts[Math.floor(pts.length / 2)], // midpoint
                   pts[Math.max(0, Math.floor((pts.length * 2) / 3))], // right-third
-                  pts[pts.length - 1], // endpoint
+                  pts.at(-1)!, // endpoint
                 ];
 
                 const { label } = parseHwKeyToLabel(entry.hw);
@@ -975,7 +972,7 @@ const ScatterGraph = React.memo(
               for (const entry of entries) {
                 if (entry.points.length < 2 || seenHw.has(entry.hw)) continue;
                 seenHw.add(entry.hw);
-                const pt = entry.points[entry.points.length - 1];
+                const pt = entry.points.at(-1)!;
                 const { label } = parseHwKeyToLabel(entry.hw);
                 lineLabels.push({
                   key: entry.key,
@@ -1084,7 +1081,7 @@ const ScatterGraph = React.memo(
                 if (newStops) {
                   gradientEl
                     .attr('x1', newXScale(pointLabels[0].point.x))
-                    .attr('x2', newXScale(pointLabels[pointLabels.length - 1].point.x));
+                    .attr('x2', newXScale(pointLabels.at(-1)!.point.x));
                   gradientEl
                     .selectAll('stop')
                     .data(newStops)
@@ -1145,7 +1142,7 @@ const ScatterGraph = React.memo(
                 const prev = bestByHw.get(hw);
                 if (!prev || pts.length > prev[1].length) bestByHw.set(hw, [key, pts]);
               }
-              const visibleEntries = [...bestByHw.values()].sort(
+              const visibleEntries = [...bestByHw.values()].toSorted(
                 ([, a], [, b]) => newYScale(a[0].y) - newYScale(b[0].y),
               );
 
@@ -1155,7 +1152,7 @@ const ScatterGraph = React.memo(
                   pts[Math.min(1, pts.length - 1)],
                   pts[Math.floor(pts.length / 2)],
                   pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
-                  pts[pts.length - 1],
+                  pts.at(-1)!,
                 ];
                 let found = false;
                 for (const pt of candidates) {
@@ -1190,7 +1187,11 @@ const ScatterGraph = React.memo(
               });
             } else {
               // TTFT / E2EL: endpoint with bidirectional nudge, one per hw
-              type ZoomLabel = { key: string; x: number; y: number };
+              interface ZoomLabel {
+                key: string;
+                x: number;
+                y: number;
+              }
               const zoomLabels: ZoomLabel[] = [];
               const seenHw = new Set<string>();
               Object.entries(rooflines).forEach(([key, pts]) => {
@@ -1198,7 +1199,7 @@ const ScatterGraph = React.memo(
                 const hw = key.split('_').slice(0, -1).join('_');
                 if (seenHw.has(hw)) return;
                 seenHw.add(hw);
-                const pt = pts[pts.length - 1];
+                const pt = pts.at(-1)!;
                 zoomLabels.push({ key, x: newXScale(pt.x), y: newYScale(pt.y) });
               });
               if (zoomLabels.length > 1) {
@@ -1271,11 +1272,11 @@ const ScatterGraph = React.memo(
                 .y((d) => yScale(d.y))
                 .curve(d3.curveMonotoneX);
 
-              type OvEntry = {
+              interface OvEntry {
                 key: string;
                 points: InferenceData[];
                 stroke: string;
-              };
+              }
               const ovEntries: OvEntry[] = [];
               Object.entries(overlayRooflines).forEach(([key, pts]) => {
                 const hw = key.split('_').slice(0, -1).join('_');
@@ -1705,7 +1706,7 @@ const ScatterGraph = React.memo(
                 .filter(([key]) =>
                   showAllHardwareTypes ? effectiveActiveHwTypes.has(key) : hwTypesWithData.has(key),
                 )
-                .sort(
+                .toSorted(
                   ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                 )
                 .map(([key, hwConfig]: [string, any]) => ({
@@ -1713,7 +1714,7 @@ const ScatterGraph = React.memo(
                   label: getDisplayLabel(hwConfig),
                   color: resolveColor(key),
                   title: hwConfig.gpu,
-                  isHighlighted: highlightConfigSuffixes.has(key.replace(/_/g, '-')),
+                  isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
                   hw: key,
                   isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
                   onClick: showAllHardwareTypes

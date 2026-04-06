@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';

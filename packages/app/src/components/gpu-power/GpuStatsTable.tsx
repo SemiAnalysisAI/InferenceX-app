@@ -21,13 +21,15 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   const stats = useMemo(() => computeGpuStats(data, metricKey), [data, metricKey]);
   const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
 
-  const sorted = useMemo(() => {
-    return [...stats].sort((a, b) => {
-      const av = a[sortCol];
-      const bv = b[sortCol];
-      return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
-    });
-  }, [stats, sortCol, sortAsc]);
+  const sorted = useMemo(
+    () =>
+      [...stats].toSorted((a, b) => {
+        const av = a[sortCol];
+        const bv = b[sortCol];
+        return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
+      }),
+    [stats, sortCol, sortAsc],
+  );
 
   const handleSort = (col: SortCol) => {
     const newAsc = sortCol === col ? !sortAsc : true;

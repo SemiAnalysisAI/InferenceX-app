@@ -178,7 +178,7 @@ export function mapBenchmarkRow(
   }
 
   // Artifact names encode '/' as '#' to avoid path separators; restore the URI.
-  const image = row.image ? String(row.image).replace(/#/g, '/') : null;
+  const image = row.image ? String(row.image).replaceAll('#', '/') : null;
 
   return {
     config: {

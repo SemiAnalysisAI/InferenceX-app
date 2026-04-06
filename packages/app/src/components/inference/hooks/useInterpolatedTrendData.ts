@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
+import type { InferenceData, TrendDataPoint, YAxisMetricKey } from '@/components/inference/types';
 import {
   hermiteInterpolate,
   monotoneSlopes,
@@ -13,7 +13,7 @@ import { getHardwareKey } from '@/lib/chart-utils';
 import { HARDWARE_CONFIG, getGpuSpecs } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/data-mappings';
 
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
@@ -90,10 +90,10 @@ export function interpolateMetricAtInteractivity(
   if (frontier.length === 0) return null;
 
   // Sort frontier by interactivity ascending
-  const sorted = [...frontier].sort((a, b) => a.x - b.x);
+  const sorted = [...frontier].toSorted((a, b) => a.x - b.x);
 
   // No extrapolation — target must be within frontier range
-  if (targetInteractivity < sorted[0].x || targetInteractivity > sorted[sorted.length - 1].x) {
+  if (targetInteractivity < sorted[0].x || targetInteractivity > sorted.at(-1)!.x) {
     return null;
   }
 
@@ -226,12 +226,12 @@ export function useInterpolatedTrendData({
     const hwKeysWithData: string[] = [];
 
     for (const [groupKey, dateMap] of resultMap) {
-      const points = Array.from(dateMap.values()).sort(
+      const points = [...dateMap.values()].toSorted(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       );
       if (points.length > 0) {
         // Extend line to today if the last point is before today
-        const last = points[points.length - 1];
+        const last = points.at(-1)!;
         if (last.date < today) {
           points.push({ date: today, value: last.value, x: last.x, synthetic: true });
         }

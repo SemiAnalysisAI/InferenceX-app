@@ -189,7 +189,7 @@ export function evaluationChartToCsv(
   ];
 
   const rows = data.map((d) => [
-    d.configLabel.replace(/\n/g, ' '),
+    d.configLabel.replaceAll('\n', ' '),
     d.hwKey,
     d.model,
     d.benchmark,
@@ -323,7 +323,7 @@ export function submissionsVolumeToCsv(volume: SubmissionVolumeRow[]): CsvData {
   const headers = ['Date', 'Hardware', 'Datapoints'];
 
   const rows = [...volume]
-    .sort((a, b) => a.date.localeCompare(b.date) || a.hardware.localeCompare(b.hardware))
+    .toSorted((a, b) => a.date.localeCompare(b.date) || a.hardware.localeCompare(b.hardware))
     .map((r) => [r.date, r.hardware, r.datapoints]);
 
   return { headers, rows };

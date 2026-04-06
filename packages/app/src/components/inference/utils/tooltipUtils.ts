@@ -1,6 +1,6 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 
-import { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 
 export interface TooltipConfig {
   /** The data point to display */

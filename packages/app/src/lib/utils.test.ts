@@ -193,8 +193,8 @@ describe('calculatePowerForGpus', () => {
     // (50 / 700) * 700 = 50.0
     const data = [pt({ hwKey: 'h100' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 700 });
-    expect(result[0].powerUser?.y).toBe(50.0);
-    expect(result[0].y).toBe(50.0);
+    expect(result[0].powerUser?.y).toBe(50);
+    expect(result[0].y).toBe(50);
     expect(result[0].powerUser?.roof).toBe(false);
   });
 
@@ -202,8 +202,8 @@ describe('calculatePowerForGpus', () => {
     // (50 / 700) * 350 = 25.0
     const data = [pt({ hwKey: 'h100' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 350 });
-    expect(result[0].powerUser?.y).toBe(25.0);
-    expect(result[0].y).toBe(25.0);
+    expect(result[0].powerUser?.y).toBe(25);
+    expect(result[0].y).toBe(25);
   });
 
   it('returns item unchanged when no user power is provided for that GPU', () => {
@@ -216,7 +216,7 @@ describe('calculatePowerForGpus', () => {
   it('inherits power from base GPU key for prefixed hardware (e.g. h100_mtp → h100)', () => {
     const data = [pt({ hwKey: 'h100_mtp' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 700 });
-    expect(result[0].powerUser?.y).toBe(50.0);
+    expect(result[0].powerUser?.y).toBe(50);
   });
 });
 

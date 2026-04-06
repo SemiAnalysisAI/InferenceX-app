@@ -70,7 +70,7 @@ const GPUGraph = React.memo(
       }
       dates.push(...selectedDates);
       dates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-      const sortedGPUs = [...selectedGPUs].sort(
+      const sortedGPUs = [...selectedGPUs].toSorted(
         (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
       );
       return { dates, sortedGPUs };
@@ -199,11 +199,7 @@ const GPUGraph = React.memo(
       if (logScale) {
         const dataMin = yExtent[0];
         yMin =
-          dataMin <= 0
-            ? 0.1
-            : dataMin < 1
-              ? Math.pow(10, Math.floor(Math.log10(dataMin)))
-              : dataMin * 0.95;
+          dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
       } else {
         yMin = Math.max(0, yExtent[0] - yRange * 0.05);
       }
@@ -211,29 +207,32 @@ const GPUGraph = React.memo(
     }, [filteredData, logScale]);
 
     // Color resolver for points/rooflines
-    const getColor = useMemo(() => {
-      return (d: InferenceData) => {
+    const getColor = useMemo(
+      () => (d: InferenceData) => {
         const graphIndex = allGraphs.findIndex(
           ({ date, hwKey }) => d.date === date && d.hwKey === hwKey,
         );
-        return graphIndex >= 0 ? allGraphs[graphIndex].color : '#6b7280';
-      };
-    }, [allGraphs]);
+        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+      },
+      [allGraphs],
+    );
 
-    const getRooflineColor = useMemo(() => {
-      return (key: string) => {
+    const getRooflineColor = useMemo(
+      () => (key: string) => {
         const graphId = key.split('_').slice(0, -1).join('_');
         const graphIndex = allGraphs.findIndex((d) => d.id === graphId);
-        return graphIndex >= 0 ? allGraphs[graphIndex].color : '#6b7280';
-      };
-    }, [allGraphs]);
+        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+      },
+      [allGraphs],
+    );
 
-    const isRooflineVisible = useMemo(() => {
-      return (key: string) => {
+    const isRooflineVisible = useMemo(
+      () => (key: string) => {
         const graphId = key.split('_').slice(0, -1).join('_');
         return activeDates.has(graphId);
-      };
-    }, [activeDates]);
+      },
+      [activeDates],
+    );
 
     // Dismiss tooltip when pinned point's combo is hidden
     useEffect(() => {

@@ -12,12 +12,13 @@ export type BuiltScale =
 /** Build a D3 scale from a declarative config. Pure function, no side effects. */
 export function buildScale(config: ScaleConfig, range: [number, number]): BuiltScale {
   switch (config.type) {
-    case 'band':
+    case 'band': {
       return d3
         .scaleBand<string>()
         .domain(config.domain)
         .range(range)
         .padding(config.padding ?? 0.1);
+    }
 
     case 'linear': {
       const s = d3.scaleLinear().domain(config.domain).range(range);

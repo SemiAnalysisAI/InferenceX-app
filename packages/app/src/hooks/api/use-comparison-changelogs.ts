@@ -20,7 +20,7 @@ export function useComparisonChangelogs(
   availableDates: string[],
 ) {
   const hasGPUs = selectedGPUs.length > 0;
-  const hasDateRange = !!selectedDateRange.startDate && !!selectedDateRange.endDate;
+  const hasDateRange = Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate);
 
   // When GPUs selected: fetch all available dates. When date range also set: limit to range.
   const datesToQuery = useMemo(() => {
@@ -59,8 +59,8 @@ export function useComparisonChangelogs(
 
       results.push({
         date: datesToQuery[i],
-        headRef: data.changelogs[data.changelogs.length - 1]?.head_ref,
-        runUrl: data.runs[data.runs.length - 1]?.html_url ?? undefined,
+        headRef: data.changelogs.at(-1)?.head_ref,
+        runUrl: data.runs.at(-1)?.html_url ?? undefined,
         entries: data.changelogs.map((c: ChangelogRow) => ({
           config_keys: c.config_keys,
           description: c.description,

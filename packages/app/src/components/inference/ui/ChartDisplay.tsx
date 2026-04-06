@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 import { useInference } from '@/components/inference/InferenceContext';
-import { InferenceData, OverlayData, TrendDataPoint } from '@/components/inference/types';
+import type { InferenceData, OverlayData, TrendDataPoint } from '@/components/inference/types';
 import { processOverlayChartData } from '@/components/inference/utils';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
@@ -22,14 +22,12 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import type { Model, Precision, Sequence } from '@/lib/data-mappings';
 import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
   isModelExperimental,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
@@ -141,7 +139,7 @@ export default function ChartDisplay() {
       rawData: { data: InferenceData[]; hardwareConfig: any } | null,
       chartType: 'e2e' | 'interactivity',
     ): OverlayData | null => {
-      if (!rawData || !rawData.data.length) return null;
+      if (!rawData || rawData.data.length === 0) return null;
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const processed = processOverlayChartData(

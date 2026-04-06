@@ -94,15 +94,17 @@ export function GpuSpecsBarChart({
     [selectedMetric],
   );
 
-  const chartData = useMemo(() => {
-    return GPU_SPECS.map((spec) => ({
-      name: spec.name,
-      vendor: spec.vendor,
-      value: metric.getValue(spec),
-    }))
-      .filter((d): d is ChartDatum => d.value !== null)
-      .sort((a, b) => b.value - a.value);
-  }, [metric]);
+  const chartData = useMemo(
+    () =>
+      GPU_SPECS.map((spec) => ({
+        name: spec.name,
+        vendor: spec.vendor,
+        value: metric.getValue(spec),
+      }))
+        .filter((d): d is ChartDatum => d.value !== null)
+        .sort((a, b) => b.value - a.value),
+    [metric],
+  );
 
   const maxValue = useMemo(() => Math.max(...chartData.map((d) => d.value), 0) * 1.1, [chartData]);
 
@@ -191,9 +193,7 @@ export function GpuSpecsBarChart({
             </div>
           </div>`;
       },
-      getRulerX: (d: ChartDatum, xs: any) => {
-        return (xs as ScaleLinear<number, number>)(d.value);
-      },
+      getRulerX: (d: ChartDatum, xs: any) => (xs as ScaleLinear<number, number>)(d.value),
       getRulerY: (d: ChartDatum, ys: any) => {
         const bandScale = ys as ScaleBand<string>;
         return (bandScale(d.name) ?? 0) + bandScale.bandwidth() / 2;

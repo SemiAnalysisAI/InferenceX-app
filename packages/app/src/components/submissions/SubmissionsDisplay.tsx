@@ -110,7 +110,7 @@ export default function SubmissionsDisplay() {
               { label: 'Unique Models', value: stats.uniqueModels, subtitle: 'LLMs' },
               { label: 'Unique Hardware', value: stats.uniqueGpus, subtitle: 'SKUs' },
             ]
-              .sort((a, b) => b.value - a.value)
+              .toSorted((a, b) => b.value - a.value)
               .map((s) => (
                 <StatCard
                   key={s.label}

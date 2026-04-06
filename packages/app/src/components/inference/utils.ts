@@ -6,7 +6,7 @@
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 
-import { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
+import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
 /**
  * Filters data points based on cost limits defined in the chart definition.

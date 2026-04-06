@@ -207,7 +207,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
           const containerEl = svgRef.current!.parentElement as HTMLDivElement;
           const getDataX = tooltipConfig.getDataX;
-          const sortedData = [...data].sort((a, b) => getDataX(a) - getDataX(b));
+          const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
 
           // Remove any previous overlay to avoid duplicates

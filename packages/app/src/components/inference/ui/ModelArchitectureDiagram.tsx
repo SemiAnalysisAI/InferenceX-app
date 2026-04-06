@@ -8,17 +8,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 import { Badge } from '@/components/ui/badge';
-import { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/data-mappings';
+import type { ArchSubBlock, SubBlockFlow, ModelArchitecture } from '@/lib/model-architectures';
 import {
-  ArchSubBlock,
-  SubBlockFlow,
   formatContextWindow,
   formatParamCount,
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
   getModelArchitecture,
-  ModelArchitecture,
 } from '@/lib/model-architectures';
 
 interface ModelArchitectureDiagramProps {
@@ -118,7 +116,7 @@ function renderDiagram(
     arch.attentionExpandable !== false &&
     arch.attentionType !== 'MLA' &&
     arch.attentionType !== 'AlternatingSinkGQA';
-  const hasAlternatingLayers = !!(arch.alternatingLayers && arch.alternatingLayers.length > 0);
+  const hasAlternatingLayers = Boolean(arch.alternatingLayers && arch.alternatingLayers.length > 0);
   const alternatingSpecs = arch.alternatingLayers ?? [];
 
   // Get sub-blocks data (only used for expandable attention types)
@@ -685,7 +683,7 @@ function renderDiagram(
     label?: string,
   ) {
     let sy = startY;
-    const totalH = getFlowHeight(flow, !!label);
+    const totalH = getFlowHeight(flow, Boolean(label));
 
     g.append('rect')
       .attr('x', x + 4)

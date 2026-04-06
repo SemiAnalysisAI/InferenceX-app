@@ -12,13 +12,9 @@ import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
-import { EvaluationChartData } from '@/components/evaluation/types';
-import {
-  EvalBenchmark,
-  getEvalBenchmarkLabel,
-  getPrecisionLabel,
-  Precision,
-} from '@/lib/data-mappings';
+import type { EvaluationChartData } from '@/components/evaluation/types';
+import type { EvalBenchmark, Precision } from '@/lib/data-mappings';
+import { getEvalBenchmarkLabel, getPrecisionLabel } from '@/lib/data-mappings';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
@@ -181,7 +177,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         });
       }
     });
-    return Array.from(configMap.values()).sort(
+    return [...configMap.values()].toSorted(
       (a, b) =>
         getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) || a.hwKey.localeCompare(b.hwKey),
     );
@@ -197,7 +193,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         });
       }
     });
-    return Array.from(configMap.values()).sort(
+    return [...configMap.values()].toSorted(
       (a, b) =>
         getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) ||
         a.hwKey.localeCompare(b.hwKey) ||
@@ -208,7 +204,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const yLabels = useMemo(() => {
     const labels = new Set<string>();
     [...chartData, ...unofficialChartData].forEach((item) => labels.add(item.configLabel));
-    return Array.from(labels);
+    return [...labels];
   }, [chartData, unofficialChartData]);
 
   const sortedConfigLabels = useMemo(

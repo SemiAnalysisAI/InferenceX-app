@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
+import type { Model, Precision, Sequence } from '@/lib/data-mappings';
 import {
   getModelCategory,
   getModelLabel,
@@ -22,9 +23,6 @@ import {
   getSequenceCategory,
   getSequenceLabel,
   groupByCategory,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 
 function DeprecatedLabel({ reason }: { reason: string }) {

@@ -210,7 +210,7 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
   it('exports reliability data with correct headers and values', () => {
     const data = [
       { model: 'h100-sxm', modelLabel: 'H100 SXM', successRate: 99.5, n_success: 199, total: 200 },
-      { model: 'b200-sxm', modelLabel: 'B200 SXM', successRate: 98.0, n_success: 98, total: 100 },
+      { model: 'b200-sxm', modelLabel: 'B200 SXM', successRate: 98, n_success: 98, total: 100 },
     ];
 
     const { headers, rows } = reliabilityChartToCsv(data);
@@ -224,7 +224,7 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
     ]);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toEqual(['H100 SXM', 'h100-sxm', 99.5, 199, 200]);
-    expect(rows[1]).toEqual(['B200 SXM', 'b200-sxm', 98.0, 98, 100]);
+    expect(rows[1]).toEqual(['B200 SXM', 'b200-sxm', 98, 98, 100]);
   });
 
   it('handles empty data', () => {
@@ -237,7 +237,7 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
     // ReliabilityChartDisplay passes chartData directly — no precision/GPU filter
     const chartData = [
       { model: 'h100-sxm', modelLabel: 'H100 SXM', successRate: 99.5, n_success: 199, total: 200 },
-      { model: 'a100-sxm', modelLabel: 'A100 SXM', successRate: 95.0, n_success: 95, total: 100 },
+      { model: 'a100-sxm', modelLabel: 'A100 SXM', successRate: 95, n_success: 95, total: 100 },
     ];
 
     const { rows } = reliabilityChartToCsv(chartData);

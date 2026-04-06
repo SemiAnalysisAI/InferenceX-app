@@ -20,7 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: BASE_URL,
       lastModified: now,
       changeFrequency: 'daily',
-      priority: 1.0,
+      priority: 1,
     },
     ...TABS.map((tab) => ({
       url: `${BASE_URL}/${tab}`,

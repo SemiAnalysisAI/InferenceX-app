@@ -25,14 +25,14 @@ const BLOCKED_PATTERN =
 const QUERY_TIMEOUT_MS = 5_000;
 
 // ── Enum arrays for JSON Schema constraints ──────────────────────────────
-const HW_ENUM = [...GPU_KEYS].sort() as [string, ...string[]];
-const MODEL_ENUM = Object.keys(DB_MODEL_TO_DISPLAY).sort() as [string, ...string[]];
-const FW_ENUM = [...FRAMEWORK_KEYS].sort() as [string, ...string[]];
-const PREC_ENUM = [...PRECISION_KEYS].sort() as [string, ...string[]];
-const SPEC_ENUM = [...SPEC_METHOD_KEYS].sort() as [string, ...string[]];
+const HW_ENUM = [...GPU_KEYS].toSorted() as [string, ...string[]];
+const MODEL_ENUM = Object.keys(DB_MODEL_TO_DISPLAY).toSorted() as [string, ...string[]];
+const FW_ENUM = [...FRAMEWORK_KEYS].toSorted() as [string, ...string[]];
+const PREC_ENUM = [...PRECISION_KEYS].toSorted() as [string, ...string[]];
+const SPEC_ENUM = [...SPEC_METHOD_KEYS].toSorted() as [string, ...string[]];
 
 const modelMapping = Object.entries(DB_MODEL_TO_DISPLAY)
-  .sort(([a], [b]) => a.localeCompare(b))
+  .toSorted(([a], [b]) => a.localeCompare(b))
   .map(([k, v]) => `${k}=${v}`)
   .join(', ');
 
@@ -351,7 +351,7 @@ export function createServer(): McpServer {
           {
             type: 'text' as const,
             text: JSON.stringify({
-              ...(Object.keys(appliedFilters).length ? { filters: appliedFilters } : {}),
+              ...(Object.keys(appliedFilters).length > 0 ? { filters: appliedFilters } : {}),
               rows: processedRows,
               count: processedRows.length,
               truncated,
@@ -405,12 +405,12 @@ export function createServer(): McpServer {
             },
           ],
         };
-      } catch (err) {
+      } catch (error) {
         return {
           content: [
             {
               type: 'text' as const,
-              text: `SQL error: ${err instanceof Error ? err.message : String(err)}`,
+              text: `SQL error: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

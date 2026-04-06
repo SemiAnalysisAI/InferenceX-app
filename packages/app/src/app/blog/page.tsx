@@ -36,7 +36,7 @@ export default async function BlogPage({
 }) {
   const { tag: activeTag } = await searchParams;
   const posts = getAllPosts();
-  const allTags = [...new Set(posts.flatMap((p) => p.tags ?? []))].sort();
+  const allTags = [...new Set(posts.flatMap((p) => p.tags ?? []))].toSorted();
   const filtered = activeTag ? posts.filter((p) => p.tags?.includes(activeTag)) : posts;
 
   return (

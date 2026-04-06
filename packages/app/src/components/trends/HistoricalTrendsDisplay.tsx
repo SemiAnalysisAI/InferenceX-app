@@ -5,7 +5,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
-import { TrendLineConfig } from '@/components/inference/types';
+import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
@@ -19,14 +19,12 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getModelSortIndex } from '@/lib/constants';
+import type { Model, Precision, Sequence } from '@/lib/data-mappings';
 import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
   isModelExperimental,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -132,7 +130,7 @@ export default function HistoricalTrendsDisplay() {
   // Line configs for TrendChart — one per visible GPU+precision combo
   const lineConfigs = useMemo(
     (): TrendLineConfig[] =>
-      Array.from(trendLines.keys())
+      [...trendLines.keys()]
         .filter((groupKey) => {
           const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
           return activeHwTypes.has(baseHwKey);
@@ -338,7 +336,7 @@ export default function HistoricalTrendsDisplay() {
                     onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)
                       .filter(([key]) => hwTypesWithData.has(key))
-                      .sort(
+                      .toSorted(
                         ([a], [b]) =>
                           getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                       )

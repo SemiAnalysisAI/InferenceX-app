@@ -2,7 +2,8 @@
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
  * It fetches live GitHub Actions artifacts which change while a run is in progress.
  */
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 import { parseCsvData } from '@/components/gpu-power/types';
 import {

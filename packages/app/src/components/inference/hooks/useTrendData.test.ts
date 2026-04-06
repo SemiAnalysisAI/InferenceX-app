@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { InferenceData, TrackedConfig, TrendDataPoint } from '@/components/inference/types';
+import type { InferenceData, TrackedConfig, TrendDataPoint } from '@/components/inference/types';
 
 // ─── Re-implement the pure functions from useTrendData.ts for testing ───
 // These are module-private in the hook, so we replicate them here to verify behavior.
@@ -26,7 +26,7 @@ function buildTrendLines(
 ): Map<string, TrendDataPoint[]> {
   const result = new Map<string, TrendDataPoint[]>();
   for (const [configId, dateMap] of accumulator) {
-    const points = Array.from(dateMap.values()).sort(
+    const points = [...dateMap.values()].toSorted(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
     result.set(configId, points);
@@ -208,7 +208,7 @@ describe('buildTrendLines', () => {
     const dateMap = new Map<string, TrendDataPoint>([
       ['2025-06-15', { date: '2025-06-15', value: 1500, x: 42.5 }],
       ['2025-06-16', { date: '2025-06-16', value: 1600, x: 38.2 }],
-      ['2025-06-17', { date: '2025-06-17', value: 1700, x: 35.0 }],
+      ['2025-06-17', { date: '2025-06-17', value: 1700, x: 35 }],
     ]);
     const accumulator = new Map([['config-1', dateMap]]);
 
@@ -220,14 +220,14 @@ describe('buildTrendLines', () => {
     expect(points[0].value).toBe(1500);
     expect(points[1].x).toBe(38.2);
     expect(points[1].value).toBe(1600);
-    expect(points[2].x).toBe(35.0);
+    expect(points[2].x).toBe(35);
     expect(points[2].value).toBe(1700);
 
     // Verify x-axis trend derivation: mapping x → value produces correct trend data
     const xTrendPoints = points.map((p) => ({ ...p, value: p.x }));
     expect(xTrendPoints[0].value).toBe(42.5);
     expect(xTrendPoints[1].value).toBe(38.2);
-    expect(xTrendPoints[2].value).toBe(35.0);
+    expect(xTrendPoints[2].value).toBe(35);
   });
 });
 

@@ -1,5 +1,5 @@
-import { Model } from '@/lib/data-mappings';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import type { Model } from '@/lib/data-mappings';
+import type { HARDWARE_CONFIG } from '@/lib/constants';
 
 /**
  * Represents a single eval data point for the chart

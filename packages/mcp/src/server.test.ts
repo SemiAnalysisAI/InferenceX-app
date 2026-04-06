@@ -76,7 +76,7 @@ afterEach(async () => {
 describe('tool listing', () => {
   it('registers all expected tools', async () => {
     const { tools } = await client.listTools();
-    const names = tools.map((t) => t.name).sort();
+    const names = tools.map((t) => t.name).toSorted();
     expect(names).toEqual([
       'get_latest_benchmarks',
       'get_overview',

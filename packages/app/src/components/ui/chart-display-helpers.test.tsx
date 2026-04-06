@@ -18,14 +18,14 @@ function getVisibleText() {
 }
 
 function getVisibleCaveatText() {
-  return Array.from(container.querySelectorAll('div.max-h-20 p'))
+  return [...container.querySelectorAll('div.max-h-20 p')]
     .map((element) => element.textContent ?? '')
     .join(' ');
 }
 
 beforeEach(() => {
   container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   root = createRoot(container);
 });
 
