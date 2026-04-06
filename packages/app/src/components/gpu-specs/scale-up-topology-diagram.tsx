@@ -70,7 +70,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
   useImperativeHandle(ref, () => ({
     openDialog: () => {
       const idx = allSpecs.findIndex((s) => s.name === spec.name);
-      setDisplayedIndex(idx >= 0 ? idx : 0);
+      setDisplayedIndex(Math.max(idx, 0));
       setOpen(true);
       track('gpu_specs_scaleup_topology_expanded', { gpu: spec.name });
     },
@@ -105,7 +105,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
         className="cursor-pointer rounded-md hover:bg-muted/50 transition-colors p-1 -m-1"
         onClick={() => {
           const idx = allSpecs.findIndex((s) => s.name === spec.name);
-          setDisplayedIndex(idx >= 0 ? idx : 0);
+          setDisplayedIndex(Math.max(idx, 0));
           setOpen(true);
           track('gpu_specs_scaleup_topology_expanded', { gpu: spec.name });
         }}
@@ -265,7 +265,7 @@ function renderSwitchedTopology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-sw-${spec.name.replace(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')
@@ -418,7 +418,7 @@ function renderMeshTopology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-mesh-${spec.name.replace(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')
@@ -586,7 +586,7 @@ function renderSwitchedNvl72Topology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-nvl72-${spec.name.replace(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')

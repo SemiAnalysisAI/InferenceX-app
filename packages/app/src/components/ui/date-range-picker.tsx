@@ -93,13 +93,13 @@ export function DateRangePicker({
       setTempRange({ startDate: dateStr, endDate: '' });
       setSelectingStart(false);
     } else {
-      const [start, end] = [tempRange.startDate, dateStr].sort();
+      const [start, end] = [tempRange.startDate, dateStr].toSorted();
       setTempRange({ startDate: start, endDate: end });
     }
   };
 
   // Apply selection
-  const handleApply = async () => {
+  const handleApply = () => {
     if (tempRange.startDate && tempRange.endDate) {
       if (availableDates) {
         const dates = [tempRange.startDate, tempRange.endDate];
@@ -127,7 +127,7 @@ export function DateRangePicker({
     track(isOpen ? 'date_range_picker_opened' : 'date_range_picker_closed');
     if (isOpen) {
       setTempRange(dateRange);
-      setSelectingStart(!dateRange.startDate || !!dateRange.endDate);
+      setSelectingStart(!dateRange.startDate || Boolean(dateRange.endDate));
     }
     setOpen(isOpen);
   };
@@ -232,7 +232,7 @@ export function DateRangePicker({
                     label: 'Max Range',
                     getRange: () => ({
                       startDate: availableDates[0],
-                      endDate: availableDates[availableDates.length - 1],
+                      endDate: availableDates.at(-1)!,
                     }),
                   },
                   {
@@ -243,7 +243,7 @@ export function DateRangePicker({
                       const cutoffStr = cutoff.toISOString().slice(0, 10);
                       const filtered = availableDates.filter((d) => d >= cutoffStr);
                       if (filtered.length < 2) return null;
-                      return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
+                      return { startDate: filtered[0], endDate: filtered.at(-1)! };
                     },
                   },
                   {
@@ -254,7 +254,7 @@ export function DateRangePicker({
                       const cutoffStr = cutoff.toISOString().slice(0, 10);
                       const filtered = availableDates.filter((d) => d >= cutoffStr);
                       if (filtered.length < 2) return null;
-                      return { startDate: filtered[0], endDate: filtered[filtered.length - 1] };
+                      return { startDate: filtered[0], endDate: filtered.at(-1)! };
                     },
                   },
                 ].map(({ label, getRange }) => {
@@ -346,7 +346,7 @@ function CalendarGrid({
 
     // If hovering and first date is selected, show preview range in either direction
     if (hoveredDate && !dateRange.endDate && !selectingStart) {
-      const [start, end] = [dateRange.startDate, hoveredDate].sort();
+      const [start, end] = [dateRange.startDate, hoveredDate].toSorted();
       return { start, end };
     }
 

@@ -3,8 +3,7 @@ import * as d3 from 'd3';
 
 import { computeTooltipPosition } from '../layers/scatter-points';
 import { setupChartStructure } from '../chart-setup';
-import { renderAxes, renderGrid } from '../chart-update';
-import type { AnyScale } from '../chart-update';
+import { renderAxes, renderGrid, type AnyScale } from '../chart-update';
 import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
@@ -125,7 +124,11 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       }
 
       // ── Structure setup ──
-      const hasScales = xScaleConfig != null && yScaleConfig != null;
+      const hasScales =
+        xScaleConfig !== null &&
+        xScaleConfig !== undefined &&
+        yScaleConfig !== null &&
+        yScaleConfig !== undefined;
       const layout = setupChartStructure(svgRef.current, {
         chartId,
         containerWidth: dimensions.width,
@@ -207,7 +210,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
           const containerEl = svgRef.current!.parentElement as HTMLDivElement;
           const getDataX = tooltipConfig.getDataX;
-          const sortedData = [...data].sort((a, b) => getDataX(a) - getDataX(b));
+          const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
 
           // Remove any previous overlay to avoid duplicates
@@ -305,7 +308,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             });
         } else {
           const attachIdx =
-            tooltipConfig.attachToLayer ?? layerSelections.findIndex((s) => s != null);
+            tooltipConfig.attachToLayer ??
+            layerSelections.findIndex((s) => s !== null && s !== undefined);
           const targetSelection = attachIdx >= 0 ? layerSelections[attachIdx] : null;
 
           if (targetSelection) {

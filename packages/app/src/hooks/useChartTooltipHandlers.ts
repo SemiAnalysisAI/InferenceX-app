@@ -214,10 +214,10 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         | d3.ScaleLinear<number, number, never>
         | d3.ScaleLogarithmic<number, number, never>,
       svgRef?: React.RefObject<SVGSVGElement | null>,
-      zoomAxes?: 'x' | 'y' | 'both',
+      zoomAxes: 'x' | 'y' | 'both' = 'both',
     ) => {
       const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
-      const effectiveZoomAxes = zoomAxes ?? 'both';
+      const effectiveZoomAxes = zoomAxes;
 
       /** Apply zoom transform to scales, respecting which axes are zoomed. */
       const getZoomedScales = () => {

@@ -4,7 +4,7 @@ import { useQueries } from '@tanstack/react-query';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import {
+import type {
   AggDataEntry,
   ChartDefinition,
   HardwareConfig,
@@ -16,7 +16,7 @@ import { filterDataByCostLimit } from '@/components/inference/utils';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import { GPU_ALIAS_TO_CANONICAL, getModelSortIndex } from '@/lib/constants';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 
 /** Build deduplicated comparison dates, excluding the main run date. */
@@ -74,10 +74,10 @@ export function useChartData(
   selectedGPUs: string[],
   selectedDates: string[],
   selectedDateRange: { startDate: string; endDate: string },
-  userCosts: { [gpuKey: string]: number | undefined } | null,
-  userPowers: { [gpuKey: string]: number | undefined } | null,
+  userCosts: Record<string, number | undefined> | null,
+  userPowers: Record<string, number | undefined> | null,
   selectedRunDate?: string,
-  enabled: boolean = true,
+  enabled = true,
   latestAvailableDate?: string,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
@@ -95,9 +95,10 @@ export function useChartData(
   } = useBenchmarks(selectedModel, queryDate, enabled);
 
   // GPU comparison: fetch data for each additional comparison date
-  const comparisonDates = useMemo(() => {
-    return buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate);
-  }, [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate]);
+  const comparisonDates = useMemo(
+    () => buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate),
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
+  );
 
   const comparisonQueries = useQueries({
     queries: comparisonDates.map((date) =>
@@ -169,7 +170,7 @@ export function useChartData(
   const hardwareConfig = useMemo(() => {
     const hwKeys = Object.keys(rawHardwareConfig);
     if (hwKeys.length === 0) return rawHardwareConfig;
-    const sortedKeys = hwKeys.sort(
+    const sortedKeys = hwKeys.toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
     );
     const newKey = sortedKeys.join(',');
@@ -187,79 +188,82 @@ export function useChartData(
   // Stable chart definitions — only depends on metric/axis selections, not data.
   // Separated so that sequence/data changes don't create new chartDefinition refs,
   // which would cause Effect 3 (metric reposition) to fire redundantly after Effect 2.
-  const stableChartDefinitions = useMemo(() => {
-    return (chartDefinitions as ChartDefinition[]).map((chartDef) => {
-      const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
+  const stableChartDefinitions = useMemo(
+    () =>
+      (chartDefinitions as ChartDefinition[]).map((chartDef) => {
+        const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
-      // Determine dynamic x-axis
-      let xAxisField: keyof AggDataEntry = chartDef.x;
-      let xAxisLabel = chartDef.x_label;
+        // Determine dynamic x-axis
+        let xAxisField: keyof AggDataEntry = chartDef.x;
+        let xAxisLabel = chartDef.x_label;
 
-      const metricTitle =
-        (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-      const isInputMetric = metricTitle.toLowerCase().includes('input');
+        const metricTitle =
+          (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
+        const isInputMetric = metricTitle.toLowerCase().includes('input');
 
-      // Resolve the effective x-axis override per chart type
-      const effectiveXMetric =
-        chartDef.chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
-      const isTtftOverride = effectiveXMetric === 'p99_ttft' || effectiveXMetric === 'median_ttft';
-      const ttftLabel =
-        effectiveXMetric === 'p99_ttft'
-          ? 'P99 Time To First Token (s)'
-          : 'Median Time To First Token (s)';
+        // Resolve the effective x-axis override per chart type
+        const effectiveXMetric =
+          chartDef.chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
+        const isTtftOverride =
+          effectiveXMetric === 'p99_ttft' || effectiveXMetric === 'median_ttft';
+        const ttftLabel =
+          effectiveXMetric === 'p99_ttft'
+            ? 'P99 Time To First Token (s)'
+            : 'Median Time To First Token (s)';
 
-      if (effectiveXMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
-        xAxisField = effectiveXMetric as keyof AggDataEntry;
-        const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
-        if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
-          xAxisLabel = (chartDef[labelKey] as string) || chartDef.x_label;
-        } else {
-          xAxisLabel = isTtftOverride ? ttftLabel : chartDef.x_label;
+        if (effectiveXMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
+          xAxisField = effectiveXMetric as keyof AggDataEntry;
+          const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
+            xAxisLabel = (chartDef[labelKey] as string) || chartDef.x_label;
+          } else {
+            xAxisLabel = isTtftOverride ? ttftLabel : chartDef.x_label;
+          }
+        } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
+          const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
+          const xLabelOverrideKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
+          xAxisField = (chartDef[xOverrideKey] as keyof AggDataEntry) || chartDef.x;
+          xAxisLabel = (chartDef[xLabelOverrideKey] as string) || chartDef.x_label;
+        } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
+          xAxisField = effectiveXMetric as keyof AggDataEntry;
+          xAxisLabel = ttftLabel;
         }
-      } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
-        const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
-        const xLabelOverrideKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
-        xAxisField = (chartDef[xOverrideKey] as keyof AggDataEntry) || chartDef.x;
-        xAxisLabel = (chartDef[xLabelOverrideKey] as string) || chartDef.x_label;
-      } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
-        xAxisField = effectiveXMetric as keyof AggDataEntry;
-        xAxisLabel = ttftLabel;
-      }
 
-      // The x-axis is "flipped" only when the good-direction reverses
-      // (e.g. interactivity → TTFT: "higher is better" → "lower is better").
-      // E2EL → TTFT keeps the same direction ("lower is better" for both),
-      // so no roofline flip is needed for the e2e chart.
-      const xAxisFlipped =
-        xAxisField !== chartDef.x && !(chartDef.chartType === 'e2e' && isTtftOverride);
+        // The x-axis is "flipped" only when the good-direction reverses
+        // (e.g. interactivity → TTFT: "higher is better" → "lower is better").
+        // E2EL → TTFT keeps the same direction ("lower is better" for both),
+        // so no roofline flip is needed for the e2e chart.
+        const xAxisFlipped =
+          xAxisField !== chartDef.x && !(chartDef.chartType === 'e2e' && isTtftOverride);
 
-      const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-      const dynamicYLabel = chartDef[yLabelKey];
+        const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
+        const dynamicYLabel = chartDef[yLabelKey];
 
-      const rooflineOverrides: Partial<ChartDefinition> = {};
-      if (xAxisFlipped) {
-        for (const key of Object.keys(chartDef) as (keyof ChartDefinition)[]) {
-          if (typeof key === 'string' && key.endsWith('_roofline')) {
-            const dir = chartDef[key] as string | undefined;
-            if (dir && dir in FLIP_MAP) {
-              (rooflineOverrides as any)[key] = flipRooflineDirection(dir as RooflineDirection);
+        const rooflineOverrides: Partial<ChartDefinition> = {};
+        if (xAxisFlipped) {
+          for (const key of Object.keys(chartDef) as (keyof ChartDefinition)[]) {
+            if (typeof key === 'string' && key.endsWith('_roofline')) {
+              const dir = chartDef[key] as string | undefined;
+              if (dir && dir in FLIP_MAP) {
+                (rooflineOverrides as any)[key] = flipRooflineDirection(dir as RooflineDirection);
+              }
             }
           }
         }
-      }
 
-      return {
-        chartDefinition: {
-          ...chartDef,
-          ...rooflineOverrides,
-          x_label: xAxisLabel,
-          y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),
-        },
-        metricKey,
-        xAxisField,
-      };
-    });
-  }, [selectedYAxisMetric, selectedXAxisMetric, selectedE2eXAxisMetric]);
+        return {
+          chartDefinition: {
+            ...chartDef,
+            ...rooflineOverrides,
+            x_label: xAxisLabel,
+            y_label: dynamicYLabel === null ? undefined : String(dynamicYLabel),
+          },
+          metricKey,
+          xAxisField,
+        };
+      }),
+    [selectedYAxisMetric, selectedXAxisMetric, selectedE2eXAxisMetric],
+  );
 
   // Build renderable graphs (data processing + stable chart definitions)
   const graphs: RenderableGraph[] = useMemo(() => {

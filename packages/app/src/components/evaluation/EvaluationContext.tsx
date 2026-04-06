@@ -1,8 +1,8 @@
 'use client';
 
 import {
+  type ReactNode,
   createContext,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -25,7 +25,7 @@ import {
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/data-mappings';
 import type { EvalRow } from '@/lib/api';
 
 import {
@@ -33,7 +33,7 @@ import {
   buildEvalChangelogEntries,
   buildEvaluationChartRows,
 } from './chart-data';
-import { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
+import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
 
 /** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
@@ -96,7 +96,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       ...rawData.map((item) => item.task),
       ...unofficialRawData.map((item) => item.task),
     ]);
-    return Array.from(tasks).sort();
+    return [...tasks].toSorted();
   }, [rawData, unofficialRawData]);
 
   const availableDates = useMemo(() => {
@@ -107,7 +107,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         .map((item) => item.date)
         .filter(Boolean),
     );
-    return Array.from(dates).sort();
+    return [...dates].toSorted();
   }, [rawData, selectedModel]);
 
   const prevAvailableDatesRef = useRef<string[]>([]);
@@ -123,15 +123,14 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (availableDates.length === 0) return;
-    const latestDate = availableDates[availableDates.length - 1];
+    const latestDate = availableDates.at(-1);
     const prevAvailableDates = prevAvailableDatesRef.current;
     const wasOnLatest =
-      prevAvailableDates.length > 0 &&
-      selectedRunDate === prevAvailableDates[prevAvailableDates.length - 1];
+      prevAvailableDates.length > 0 && selectedRunDate === prevAvailableDates.at(-1);
     if (!selectedRunDate || wasOnLatest || !availableDates.includes(selectedRunDate)) {
-      setSelectedRunDate(latestDate);
+      setSelectedRunDate(latestDate!);
       // If no global date yet (evals loaded first), set it so inference syncs to us.
-      if (!globalRunDate) setGlobalRunDate(latestDate);
+      if (!globalRunDate) setGlobalRunDate(latestDate!);
     }
     prevAvailableDatesRef.current = availableDates;
   }, [availableDates, selectedRunDate, setSelectedRunDate, globalRunDate, setGlobalRunDate]);
@@ -166,7 +165,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
       if (hwKey !== 'unknown') hwSet.add(hwKey);
     });
-    return Array.from(hwSet).sort();
+    return [...hwSet].toSorted();
   }, [rawData]);
 
   useAutoInitializeToggleSet(availableHardware, enabledHardware, setEnabledHardware);
@@ -180,7 +179,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
           .filter((r) => r.model === dbModelKey)
           .map((r) => r.precision),
       ),
-    ].sort();
+    ].toSorted();
     return precs.length > 0 ? precs : globalAvailablePrecisions;
   }, [rawData, unofficialRawData, selectedModel, globalAvailablePrecisions]);
 
@@ -232,9 +231,10 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return highlighted;
   }, [unfilteredChartData, selectedRunDate]);
 
-  const changelogEntries: EvalChangelogEntry[] = useMemo(() => {
-    return buildEvalChangelogEntries(rawData, selectedRunDate, selectedModel, effectivePrecisions);
-  }, [rawData, selectedRunDate, selectedModel, effectivePrecisions]);
+  const changelogEntries: EvalChangelogEntry[] = useMemo(
+    () => buildEvalChangelogEntries(rawData, selectedRunDate, selectedModel, effectivePrecisions),
+    [rawData, selectedRunDate, selectedModel, effectivePrecisions],
+  );
 
   const modelHasEvalData = useMemo(() => {
     if (!selectedModel) return false;
@@ -278,7 +278,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     }
     if (enabledHardware.size === 0) return;
     const timer = setTimeout(() => {
-      const gpus = [...enabledHardware].sort();
+      const gpus = [...enabledHardware].toSorted();
       track('evaluation_hw_selection_settled', {
         gpus,
         gpu_count: gpus.length,

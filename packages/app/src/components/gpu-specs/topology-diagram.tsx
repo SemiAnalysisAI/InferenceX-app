@@ -66,7 +66,7 @@ export const TopologyDiagram = forwardRef<
   useImperativeHandle(ref, () => ({
     openDialog: () => {
       const idx = allSpecs.findIndex((s) => s.name === spec.name);
-      setDisplayedIndex(idx >= 0 ? idx : 0);
+      setDisplayedIndex(Math.max(idx, 0));
       setOpen(true);
       track('gpu_specs_topology_expanded', { gpu: spec.name });
     },
@@ -103,7 +103,7 @@ export const TopologyDiagram = forwardRef<
         className="cursor-pointer rounded-md hover:bg-muted/50 transition-colors p-1 -m-1"
         onClick={() => {
           const idx = allSpecs.findIndex((s) => s.name === spec.name);
-          setDisplayedIndex(idx >= 0 ? idx : 0);
+          setDisplayedIndex(Math.max(idx, 0));
           setOpen(true);
           track('gpu_specs_topology_expanded', { gpu: spec.name });
         }}
@@ -408,7 +408,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
       .attr('aria-label', `${spec.name} ${spec.scaleOutTopology} scale-out topology diagram`);
 
     // Add background logo watermark
-    const patternId = `logo-scaleout-${spec.name.replace(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+    const patternId = `logo-scaleout-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
     svg
       .append('defs')
       .append('pattern')

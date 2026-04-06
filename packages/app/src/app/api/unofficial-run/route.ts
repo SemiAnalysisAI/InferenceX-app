@@ -2,7 +2,7 @@
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
  * It fetches live GitHub Actions artifacts which change while a run is in progress.
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { mapAggEvalRow, type EvalParams } from '@semianalysisai/inferencex-db/etl/eval-mapper';
@@ -179,11 +179,11 @@ export async function GET(request: NextRequest) {
 
     const bmkArtifact = artifacts
       .filter((a) => a.name === 'results_bmk')
-      .sort((a, b) => b.id - a.id)[0];
+      .toSorted((a, b) => b.id - a.id)[0];
 
     const evalArtifact = artifacts
       .filter((a) => a.name === 'eval_results_all')
-      .sort((a, b) => b.id - a.id)[0];
+      .toSorted((a, b) => b.id - a.id)[0];
 
     if (!bmkArtifact && !evalArtifact) {
       return NextResponse.json(

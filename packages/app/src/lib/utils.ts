@@ -28,7 +28,7 @@ export function cn(...inputs: ClassValue[]) {
  * @returns The updated URL
  */
 export function updateRepoUrl(url: string): string {
-  return url.replace(
+  return url.replaceAll(
     /https?:\/\/github\.com\/InferenceMAX\/InferenceMAX\//g,
     'https://github.com/SemiAnalysisAI/InferenceX/',
   );
@@ -54,7 +54,7 @@ export function formatNumber(tickItem: number) {
  */
 export function calculateCostsForGpus(
   data: InferenceData[],
-  userCosts: { [gpuKey: string]: number | undefined },
+  userCosts: Record<string, number | undefined>,
 ): InferenceData[] {
   const result = data.map((item) => {
     const baseGpuKey = item.hwKey.toString().split('_')[0];
@@ -92,7 +92,7 @@ export function calculateCostsForGpus(
  */
 export function calculatePowerForGpus(
   data: InferenceData[],
-  userPowers: { [gpuKey: string]: number | undefined },
+  userPowers: Record<string, number | undefined>,
 ): InferenceData[] {
   const result = data.map((item) => {
     const baseGpuKey = item.hwKey.toString().split('_')[0];
@@ -235,11 +235,11 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
  * @returns Filtered runs with relevant changelog entries, or null if none match
  */
 export function filterRunsByModel(
-  availableRuns: { [runId: string]: RunInfo } | null,
+  availableRuns: Record<string, RunInfo> | null,
   modelPrefixes: string[],
   selectedPrecisions?: string[],
   selectedGPUs?: string[],
-): { [runId: string]: RunInfo } | null {
+): Record<string, RunInfo> | null {
   if (!availableRuns || modelPrefixes.length === 0) return availableRuns;
 
   const filterByPrecision = selectedPrecisions && selectedPrecisions.length > 0;
@@ -247,10 +247,10 @@ export function filterRunsByModel(
   // Convert hwKey format (underscores as separators) to config-key format (all dashes)
   // e.g. 'mi355x_mori-sglang_mtp' → 'mi355x-mori-sglang-mtp'
   const gpuConfigSuffixes = filterByGpu
-    ? new Set(selectedGPUs!.map((gpu) => gpu.replace(/_/g, '-')))
+    ? new Set(selectedGPUs!.map((gpu) => gpu.replaceAll('_', '-')))
     : null;
 
-  const filtered: { [runId: string]: RunInfo } = {};
+  const filtered: Record<string, RunInfo> = {};
   for (const [runId, runInfo] of Object.entries(availableRuns)) {
     if (!runInfo.changelog) continue;
 
@@ -281,7 +281,7 @@ export function filterRunsByModel(
 
   // No changelog matches — return all runs without changelogs so the run
   // selector still renders (e.g. Llama has runs but no changelog entries).
-  const fallback: { [runId: string]: RunInfo } = {};
+  const fallback: Record<string, RunInfo> = {};
   for (const [runId, runInfo] of Object.entries(availableRuns)) {
     fallback[runId] = { ...runInfo, changelog: undefined };
   }

@@ -12,7 +12,7 @@ import type {
   InferenceData,
 } from '@/components/inference/types';
 import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
-import { HARDWARE_CONFIG, getHardwareConfig } from '@/lib/constants';
+import { type HARDWARE_CONFIG, getHardwareConfig } from '@/lib/constants';
 import type { BenchmarkRow } from '@/lib/api';
 
 /** Convert a DB benchmark row to an AggDataEntry. */
@@ -111,9 +111,7 @@ export function transformBenchmarkRows(rows: BenchmarkRow[]): {
   const chartData = (chartDefinitions as ChartDefinition[]).map((chartDef) => {
     const groupedByHw: Record<string, InferenceData[]> = {};
 
-    for (let i = 0; i < prepared.length; i++) {
-      const { entry, hwKey, date } = prepared[i];
-
+    for (const { entry, hwKey, date } of prepared) {
       const dataPoint = createChartDataPoint(
         date,
         entry,

@@ -66,7 +66,7 @@ async function ingestSupplementalEvals(
     return;
   }
 
-  const data: SupplementalEval[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const data: SupplementalEval[] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   console.log(`  Loaded ${data.length} supplemental eval entries`);
 
   const { getOrCreateConfig } = configCache;
@@ -125,7 +125,7 @@ async function ingestSupplementalEvals(
 
       const outcome = await ingestEvalRow(
         sql,
-        async () => configId,
+        () => Promise.resolve(configId),
         {
           config: {} as any,
           task: entry.task,
@@ -148,8 +148,8 @@ async function ingestSupplementalEvals(
       );
       if (outcome === 'new') ingested++;
       else skipped++;
-    } catch (err: any) {
-      console.warn(`  Error ingesting ${entry.hw} ${entry.framework}: ${err.message}`);
+    } catch (error: any) {
+      console.warn(`  Error ingesting ${entry.hw} ${entry.framework}: ${error.message}`);
       skipped++;
     }
   }
@@ -188,7 +188,7 @@ async function ingestSupplementalBmk(
     return;
   }
 
-  const data: SupplementalBmk[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const data: SupplementalBmk[] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   if (data.length === 0) {
     console.log('  supplemental-bmk.json is empty, skipping.');
     return;
@@ -217,14 +217,14 @@ async function ingestSupplementalBmk(
       conclusion: 'success',
     }))!;
 
-    const rows: Array<{
+    const rows: {
       configId: number;
       isl: number;
       osl: number;
       conc: number;
       image: string | null;
       metrics: Record<string, number>;
-    }> = [];
+    }[] = [];
 
     for (const entry of entries) {
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
@@ -292,7 +292,7 @@ async function ingestSupplementalBmk(
     // Entries that failed model/hw resolution were skipped via `continue` in the loop,
     // and getOrCreateConfig failures propagate (no try/catch), so `entries` that made it
     // to `rows` are exactly the valid ones.
-    const availRows: Array<{
+    const availRows: {
       model: string;
       isl: number;
       osl: number;
@@ -301,7 +301,7 @@ async function ingestSupplementalBmk(
       framework: string;
       specMethod: string;
       disagg: boolean;
-    }> = [];
+    }[] = [];
     for (const entry of entries) {
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
       const hw = hwToGpuKey(entry.hw);
@@ -354,8 +354,8 @@ async function main(): Promise<void> {
 }
 
 main()
-  .catch((err) => {
-    console.error('ingest-supplemental failed:', err);
+  .catch((error) => {
+    console.error('ingest-supplemental failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

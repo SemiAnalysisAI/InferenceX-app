@@ -1,6 +1,6 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 
-import { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 
 export interface TooltipConfig {
   /** The data point to display */
@@ -38,11 +38,11 @@ const configSegmentLabel = (
   ep: number | undefined,
   dpAttention: boolean | undefined,
 ): string => {
-  if (ep != null && ep > 1 && tp === ep) {
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     return dpAttention ? `DEP${tp}` : `TEP${tp}`;
   }
   const dpaPrefix = dpAttention ? 'DPA' : '';
-  if (ep == null || ep <= 1) return `${dpaPrefix}TP${tp}`;
+  if (ep === null || ep === undefined || ep <= 1) return `${dpaPrefix}TP${tp}`;
   return `${dpaPrefix}EP${ep}`;
 };
 
@@ -53,7 +53,11 @@ const configSegmentLabel = (
  * - Old data (no ep field): falls back to tp value
  */
 export const getPointLabel = (d: InferenceData): string => {
-  if (d.ep == null && d.prefill_ep == null) return String(d.tp);
+  if (
+    (d.ep === null || d.ep === undefined) &&
+    (d.prefill_ep === null || d.prefill_ep === undefined)
+  )
+    return String(d.tp);
 
   if (d.is_multinode && d.disagg) {
     const prefillLabel = configSegmentLabel(
@@ -89,7 +93,10 @@ const tooltipLine = (label: string, value: string | number) =>
  * Falls back to GPU count for old data without parallelism fields.
  */
 const generateParallelismHTML = (d: InferenceData): string => {
-  if (d.ep == null && d.prefill_ep == null) {
+  if (
+    (d.ep === null || d.ep === undefined) &&
+    (d.prefill_ep === null || d.prefill_ep === undefined)
+  ) {
     return tooltipLine('Parallelism Strategy', `${d.tp} GPU${d.tp > 1 ? 's' : ''}`);
   }
 
@@ -113,7 +120,7 @@ const generateParallelismHTML = (d: InferenceData): string => {
 
   return `
     ${tooltipLine('Tensor Parallelism', d.tp)}
-    ${d.ep != null ? tooltipLine('Expert Parallelism', d.ep) : ''}
+    ${d.ep !== null && d.ep !== undefined ? tooltipLine('Expert Parallelism', d.ep) : ''}
     ${tooltipLine('DP Attention', d.dp_attention ? 'True' : 'False')}`;
 };
 

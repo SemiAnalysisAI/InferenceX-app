@@ -2,8 +2,7 @@ import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
 import { createMockGroup } from './test-helpers';
-import { renderLines, updateLinesOnZoom } from './lines';
-import type { LineConfig } from './lines';
+import { renderLines, updateLinesOnZoom, type LineConfig } from './lines';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 

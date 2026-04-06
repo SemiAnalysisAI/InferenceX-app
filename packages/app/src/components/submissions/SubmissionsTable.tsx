@@ -55,6 +55,9 @@ function getModelDisplayName(dbModel: string): string {
   return dbModel;
 }
 
+const submissionRowKey = (row: SubmissionSummaryRow) =>
+  `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}_${row.date}`;
+
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -90,7 +93,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   const sorted = useMemo(() => {
     const mult = sortDir === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
+    return [...filtered].toSorted((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mult;
@@ -111,9 +114,6 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
       return next;
     });
   }, []);
-
-  const rowKey = (row: SubmissionSummaryRow) =>
-    `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}_${row.date}`;
 
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
     <th
@@ -156,7 +156,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           </thead>
           <tbody className="divide-y divide-border">
             {sorted.map((row) => {
-              const key = rowKey(row);
+              const key = submissionRowKey(row);
               const isExpanded = expandedRows.has(key);
               return (
                 <SubmissionRow

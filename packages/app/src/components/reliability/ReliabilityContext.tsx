@@ -1,8 +1,8 @@
 'use client';
 
 import {
+  type ReactNode,
   createContext,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -21,7 +21,7 @@ import { useUrlState } from '@/hooks/useUrlState';
 import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
 import type { ReliabilityRow } from '@/lib/api';
 
-import {
+import type {
   DateRangeSuccessRateData,
   ModelSuccessRateData,
   ReliabilityChartContextType,
@@ -120,7 +120,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     () =>
       [...filteredReliabilityData]
         .filter((item) => enabledModels.has(item.model))
-        .sort(
+        .toSorted(
           (a, b) =>
             getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
             a.model.localeCompare(b.model),

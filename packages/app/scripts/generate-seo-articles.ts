@@ -1,4 +1,4 @@
-export {};
+
 
 /**
  * Fetch and aggregate benchmark data for SEO article generation.
@@ -180,7 +180,7 @@ async function main() {
 
   // Write output
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  fs.writeFileSync(output, JSON.stringify(result, null, 2), 'utf-8');
+  fs.writeFileSync(output, JSON.stringify(result, null, 2), 'utf8');
 
   // Print summary
   const included = fetchResults.filter((r) => r.status === 'included');
@@ -212,7 +212,7 @@ async function main() {
   console.log(`\nWrote ${result.models.length} models to: ${output}`);
 }
 
-main().catch((err) => {
-  console.error('generate-seo-data failed:', err);
+main().catch((error) => {
+  console.error('generate-seo-data failed:', error);
   process.exitCode = 1;
 });

@@ -4,8 +4,13 @@ import React, { useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
-import type { GpuMetricKey, GpuMetricRow, GpuStats } from './types';
-import { computeGpuStats, ALL_METRIC_OPTIONS } from './types';
+import {
+  type GpuMetricKey,
+  type GpuMetricRow,
+  type GpuStats,
+  computeGpuStats,
+  ALL_METRIC_OPTIONS,
+} from './types';
 
 interface GpuStatsTableProps {
   data: GpuMetricRow[];
@@ -14,6 +19,8 @@ interface GpuStatsTableProps {
 
 type SortCol = keyof GpuStats;
 
+const fmtStat = (v: number) => (v >= 1000 ? v.toFixed(0) : v.toFixed(1));
+
 const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   const [sortCol, setSortCol] = useState<SortCol>('gpuIndex');
   const [sortAsc, setSortAsc] = useState(true);
@@ -21,13 +28,15 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   const stats = useMemo(() => computeGpuStats(data, metricKey), [data, metricKey]);
   const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
 
-  const sorted = useMemo(() => {
-    return [...stats].sort((a, b) => {
-      const av = a[sortCol];
-      const bv = b[sortCol];
-      return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
-    });
-  }, [stats, sortCol, sortAsc]);
+  const sorted = useMemo(
+    () =>
+      [...stats].toSorted((a, b) => {
+        const av = a[sortCol];
+        const bv = b[sortCol];
+        return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
+      }),
+    [stats, sortCol, sortAsc],
+  );
 
   const handleSort = (col: SortCol) => {
     const newAsc = sortCol === col ? !sortAsc : true;
@@ -41,8 +50,6 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   };
 
   if (stats.length === 0) return null;
-
-  const fmt = (v: number) => (v >= 1000 ? v.toFixed(0) : v.toFixed(1));
 
   const cols: { key: SortCol; label: string }[] = [
     { key: 'gpuIndex', label: 'GPU' },
@@ -79,13 +86,13 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
             <tr key={s.gpuIndex} className="border-b border-border/50 hover:bg-muted/50">
               <td className="px-2 py-1 font-medium">{s.gpuIndex}</td>
               <td className="px-2 py-1">{s.count.toLocaleString()}</td>
-              <td className="px-2 py-1">{fmt(s.min)}</td>
-              <td className="px-2 py-1">{fmt(s.max)}</td>
-              <td className="px-2 py-1">{fmt(s.mean)}</td>
-              <td className="px-2 py-1">{fmt(s.median)}</td>
-              <td className="px-2 py-1">{fmt(s.p95)}</td>
-              <td className="px-2 py-1">{fmt(s.p99)}</td>
-              <td className="px-2 py-1">{fmt(s.stddev)}</td>
+              <td className="px-2 py-1">{fmtStat(s.min)}</td>
+              <td className="px-2 py-1">{fmtStat(s.max)}</td>
+              <td className="px-2 py-1">{fmtStat(s.mean)}</td>
+              <td className="px-2 py-1">{fmtStat(s.median)}</td>
+              <td className="px-2 py-1">{fmtStat(s.p95)}</td>
+              <td className="px-2 py-1">{fmtStat(s.p99)}</td>
+              <td className="px-2 py-1">{fmtStat(s.stddev)}</td>
             </tr>
           ))}
         </tbody>

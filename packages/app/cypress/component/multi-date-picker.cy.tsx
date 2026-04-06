@@ -29,7 +29,7 @@ function MultiDatePickerWrapper({
       maxDates={maxDates}
       availableDates={AVAILABLE_DATES}
       minDate={AVAILABLE_DATES[0]}
-      maxDate={AVAILABLE_DATES[AVAILABLE_DATES.length - 1]}
+      maxDate={AVAILABLE_DATES.at(-1)}
       placeholder="Select dates"
     />
   );

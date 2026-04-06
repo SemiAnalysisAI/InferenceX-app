@@ -6,7 +6,7 @@ import { fetchBenchmarks } from '@/lib/api';
 export function benchmarkQueryOptions(
   model: string,
   date: string,
-  enabled: boolean = true,
+  enabled = true,
   exact?: boolean,
 ) {
   return {
@@ -16,6 +16,6 @@ export function benchmarkQueryOptions(
   };
 }
 
-export function useBenchmarks(model: string, date?: string, enabled: boolean = true) {
+export function useBenchmarks(model: string, date?: string, enabled = true) {
   return useQuery(benchmarkQueryOptions(model, date ?? 'latest', enabled));
 }

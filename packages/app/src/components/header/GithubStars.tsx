@@ -18,7 +18,7 @@ export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
 
   useEffect(() => {
     try {
-      setHasStarred(!!localStorage.getItem(STARRED_KEY));
+      setHasStarred(Boolean(localStorage.getItem(STARRED_KEY)));
     } catch {}
 
     const handleStarred = () => setHasStarred(true);

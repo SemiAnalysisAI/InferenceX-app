@@ -5,19 +5,13 @@ import { normalizeArtifactRows, normalizeEvalArtifactRows } from './route';
 
 // ── Mock AdmZip ──────────────────────────────────────────────────────
 const mockGetEntries = vi.fn();
-const mockReadAsText = vi.fn();
-vi.mock('adm-zip', () => {
-  return {
-    default: class MockAdmZip {
-      getEntries() {
-        return mockGetEntries();
-      }
-      readAsText(entry: unknown) {
-        return mockReadAsText(entry);
-      }
-    },
-  };
-});
+vi.mock('adm-zip', () => ({
+  default: class MockAdmZip {
+    getEntries() {
+      return mockGetEntries();
+    }
+  },
+}));
 
 // ── Mock fetch ───────────────────────────────────────────────────────
 const mockFetch = vi.fn();
@@ -51,7 +45,7 @@ function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown
     std_tpot: 0.003,
     mean_e2el: 1.5,
     median_e2el: 1.4,
-    p99_e2el: 2.0,
+    p99_e2el: 2,
     std_e2el: 0.2,
     mean_intvty: 50,
     median_intvty: 48,
@@ -263,7 +257,6 @@ describe('GET /api/unofficial-run', () => {
     vi.resetModules();
     mockFetch.mockReset();
     mockGetEntries.mockReset();
-    mockReadAsText.mockReset();
     process.env.GITHUB_TOKEN = 'test-token';
     const mod = await import('./route');
     GET = mod.GET as any;
@@ -305,12 +298,12 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
+      json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
     });
     // Artifacts fetch (no results_bmk)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ artifacts: [{ name: 'other_artifact', id: 1 }] }),
+      json: () => Promise.resolve({ artifacts: [{ name: 'other_artifact', id: 1 }] }),
     });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(404);
@@ -323,14 +316,15 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
+      json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
     });
     // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+        }),
     });
     // Download fails
     mockFetch.mockResolvedValueOnce({ ok: false, status: 410, statusText: 'Gone' });
@@ -344,35 +338,39 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        id: 123,
-        name: 'test-run',
-        head_branch: 'main',
-        head_sha: 'abc123',
-        created_at: '2026-01-01T00:00:00Z',
-        html_url: 'http://github.com/run/123',
-        conclusion: 'success',
-        status: 'completed',
-      }),
+      json: () =>
+        Promise.resolve({
+          id: 123,
+          name: 'test-run',
+          head_branch: 'main',
+          head_sha: 'abc123',
+          created_at: '2026-01-01T00:00:00Z',
+          html_url: 'http://github.com/run/123',
+          conclusion: 'success',
+          status: 'completed',
+        }),
     });
     // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+        }),
     });
     // Download — return a buffer-like object
     const fakeBuffer = new ArrayBuffer(8);
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => fakeBuffer,
+      arrayBuffer: () => Promise.resolve(fakeBuffer),
     });
 
     // Mock zip extraction — the AdmZip constructor receives the buffer,
     // and our mock returns these entries
-    mockGetEntries.mockReturnValue([{ entryName: 'results.json' }]);
-    mockReadAsText.mockReturnValue(JSON.stringify(bmkData));
+    const bmkJson = JSON.stringify(bmkData);
+    mockGetEntries.mockReturnValue([
+      { entryName: 'results.json', getData: () => Buffer.from(bmkJson) },
+    ]);
 
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(200);
@@ -389,30 +387,34 @@ describe('GET /api/unofficial-run', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        id: 321,
-        name: 'eval-only',
-        head_branch: 'feature/evals',
-        head_sha: 'abc123',
-        created_at: '2026-03-01T12:34:56Z',
-        html_url: 'http://github.com/run/321',
-        conclusion: 'success',
-        status: 'completed',
-      }),
+      json: () =>
+        Promise.resolve({
+          id: 321,
+          name: 'eval-only',
+          head_branch: 'feature/evals',
+          head_sha: 'abc123',
+          created_at: '2026-03-01T12:34:56Z',
+          html_url: 'http://github.com/run/321',
+          conclusion: 'success',
+          status: 'completed',
+        }),
     });
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
+        }),
     });
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => new ArrayBuffer(8),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
     });
 
-    mockGetEntries.mockReturnValue([{ entryName: 'agg_eval_all.json' }]);
-    mockReadAsText.mockReturnValue(JSON.stringify(evalData));
+    const evalJson = JSON.stringify(evalData);
+    mockGetEntries.mockReturnValue([
+      { entryName: 'agg_eval_all.json', getData: () => Buffer.from(evalJson) },
+    ]);
 
     const res = await GET(makeRequest('runId=321'));
     expect(res.status).toBe(200);
@@ -441,20 +443,21 @@ describe('GET /api/unofficial-run', () => {
     // Run metadata without created_at
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 456, head_branch: 'feature' }),
+      json: () => Promise.resolve({ id: 456, head_branch: 'feature' }),
     });
     // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl' }],
-      }),
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl' }],
+        }),
     });
     // Download
     const fakeBuffer = new ArrayBuffer(8);
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => fakeBuffer,
+      arrayBuffer: () => Promise.resolve(fakeBuffer),
     });
 
     // No JSON entries in zip

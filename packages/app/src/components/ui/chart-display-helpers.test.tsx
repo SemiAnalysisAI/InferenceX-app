@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { act } from 'react';
+import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -18,14 +17,14 @@ function getVisibleText() {
 }
 
 function getVisibleCaveatText() {
-  return Array.from(container.querySelectorAll('div.max-h-20 p'))
+  return [...container.querySelectorAll('div.max-h-20 p')]
     .map((element) => element.textContent ?? '')
     .join(' ');
 }
 
 beforeEach(() => {
   container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   root = createRoot(container);
 });
 

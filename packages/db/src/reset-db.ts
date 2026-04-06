@@ -55,8 +55,8 @@ async function reset(): Promise<void> {
 }
 
 reset()
-  .catch((err) => {
-    console.error('db:reset failed:', err);
+  .catch((error) => {
+    console.error('db:reset failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

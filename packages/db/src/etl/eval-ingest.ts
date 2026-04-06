@@ -2,7 +2,7 @@
  * Single-row eval result insert.
  */
 
-import postgres from 'postgres';
+import type postgres from 'postgres';
 import type { ConfigParams } from './config-cache';
 import type { EvalParams } from './eval-mapper';
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import {
+import type {
   InferenceData,
   TrackedConfig,
   TrendDataPoint,
@@ -10,7 +10,7 @@ import {
 } from '@/components/inference/types';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/data-mappings';
 import { computeInputCostFields, computeOutputCostFields } from '@/lib/utils';
 
 function computeAllCostFields(data: InferenceData[]): InferenceData[] {
@@ -127,7 +127,7 @@ export function useTrendData(
     // Build sorted trend lines
     const result = new Map<string, TrendDataPoint[]>();
     for (const [configId, dateMap] of accumulator) {
-      const points = Array.from(dateMap.values()).sort(
+      const points = [...dateMap.values()].toSorted(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       );
       result.set(configId, points);

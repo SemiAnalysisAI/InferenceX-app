@@ -80,7 +80,7 @@ export function DatePicker({
   };
 
   // Apply selection
-  const handleApply = async () => {
+  const handleApply = () => {
     if (!tempDate) {
       setError('Please select a date');
       return;
@@ -193,7 +193,7 @@ export function DatePicker({
           variant="ghost"
           size="sm"
           onClick={handleGoToLatestExternal}
-          disabled={isCurrentDateLatest() || !!isCheckingAvailableDates}
+          disabled={isCurrentDateLatest() || Boolean(isCheckingAvailableDates)}
           className="text-xs px-2"
         >
           Latest
@@ -202,7 +202,7 @@ export function DatePicker({
           variant="ghost"
           size="icon"
           onClick={handleGoPrevious}
-          disabled={!canGoPrevious() || !!isCheckingAvailableDates}
+          disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
           className="h-8 w-8"
           suppressHydrationWarning
         >
@@ -251,7 +251,7 @@ export function DatePicker({
               <Button
                 variant="outline"
                 onClick={handleGoToLatest}
-                disabled={isLatestDateSelected() || !!isCheckingAvailableDates}
+                disabled={isLatestDateSelected() || Boolean(isCheckingAvailableDates)}
               >
                 Go to Latest
               </Button>
@@ -272,7 +272,7 @@ export function DatePicker({
           variant="ghost"
           size="icon"
           onClick={handleGoNext}
-          disabled={!canGoNext() || !!isCheckingAvailableDates}
+          disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
           className="h-8 w-8"
         >
           <ChevronRight className="h-4 w-4" />

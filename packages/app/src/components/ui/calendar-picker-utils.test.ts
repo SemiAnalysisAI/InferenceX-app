@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import React, { type Dispatch, type SetStateAction } from 'react';
-import { act } from 'react';
+import React, { type Dispatch, type SetStateAction, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -118,7 +117,7 @@ describe('useCalendarMonth', () => {
     selectedDate?: string;
     availableDates?: string[];
     maxAllowedDate: Date;
-    deps: ReadonlyArray<string>;
+    deps: readonly string[];
   }
 
   function TestComponent({
@@ -138,7 +137,7 @@ describe('useCalendarMonth', () => {
 
   beforeEach(() => {
     container = document.createElement('div');
-    document.body.appendChild(container);
+    document.body.append(container);
     root = createRoot(container);
   });
 
@@ -195,7 +194,7 @@ describe('CalendarMonthPanel', () => {
 
   beforeEach(() => {
     container = document.createElement('div');
-    document.body.appendChild(container);
+    document.body.append(container);
     root = createRoot(container);
   });
 
@@ -228,7 +227,7 @@ describe('CalendarMonthPanel', () => {
 
     expect(container.textContent).toContain('April 2026');
 
-    const buttons = Array.from(container.querySelectorAll('button'));
+    const buttons = [...container.querySelectorAll('button')];
     act(() => buttons[0].click());
     act(() => buttons[1].click());
     act(() => buttons.find((button) => button.textContent === '2')?.click());

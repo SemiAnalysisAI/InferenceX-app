@@ -11,14 +11,14 @@ export type DbClient = (
 ) => Promise<Record<string, unknown>[]>;
 
 /** True when running off a JSON dump directory instead of a live database (local dev only). */
-export const JSON_MODE = !process.env.DATABASE_READONLY_URL && !!process.env.DUMP_DIR;
+export const JSON_MODE = !process.env.DATABASE_READONLY_URL && Boolean(process.env.DUMP_DIR);
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
-type PostgresConnectionOptions = {
+interface PostgresConnectionOptions {
   max: number;
   ssl: false | 'require';
-};
+}
 
 function getDbHostname(url: string): string | null {
   try {

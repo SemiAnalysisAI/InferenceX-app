@@ -15,7 +15,7 @@ import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from '
 import { filterAndSortLegendItems } from '@/lib/legend-utils';
 import { cn } from '@/lib/utils';
 
-import ChartLegendItem, { CommonLegendItemProps } from './chart-legend-item';
+import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
 import { Label } from './label';
 import { Switch } from './switch';
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';
@@ -125,9 +125,9 @@ export default function ChartLegend({
     const items = isSidebar ? sortedItems : legendItems;
     const hwKeys = items.map((item) => item.name.split(' ')[0]);
     const uniqueNames = [...new Set(hwKeys)];
-    const result = uniqueNames.map((name) => {
-      return items.filter((item) => item.name.split(' ')[0] === name);
-    });
+    const result = uniqueNames.map((name) =>
+      items.filter((item) => item.name.split(' ')[0] === name),
+    );
     // In sidebar mode, sort groups so those with active items come first
     if (isSidebar && !disableActiveSort) {
       result.sort((a, b) => {

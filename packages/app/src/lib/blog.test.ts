@@ -81,7 +81,7 @@ This post has no publishDate field at all.
 `;
 
 vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
+  const actual = await importOriginal<typeof fs>();
   return { ...actual, default: { ...actual } };
 });
 
@@ -120,7 +120,7 @@ describe('getReadingTime', () => {
   });
 
   it('calculates reading time for longer content', () => {
-    const words = Array(500).fill('word').join(' ');
+    const words = Array.from({ length: 500 }, () => 'word').join(' ');
     // 500 words / 265 wpm = 1.89 → ceil = 2
     expect(getReadingTime(words)).toBe(2);
   });

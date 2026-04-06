@@ -2,8 +2,7 @@ import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
 import { asMock, createMockGroup } from './test-helpers';
-import { renderBars, updateBarsOnZoom } from './bars';
-import type { BarConfig } from './bars';
+import { renderBars, updateBarsOnZoom, type BarConfig } from './bars';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 

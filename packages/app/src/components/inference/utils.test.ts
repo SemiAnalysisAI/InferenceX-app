@@ -17,11 +17,11 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
     precision: 'fp16',
     tpPerGpu: { y: 1000, roof: false },
     tpPerMw: { y: 50, roof: false },
-    costh: { y: 2.0, roof: false },
+    costh: { y: 2, roof: false },
     costn: { y: 1.5, roof: false },
-    costr: { y: 1.0, roof: false },
-    costhi: { y: 5.0, roof: false },
-    costni: { y: 3.0, roof: false },
+    costr: { y: 1, roof: false },
+    costhi: { y: 5, roof: false },
+    costni: { y: 3, roof: false },
     costri: { y: 1.5, roof: false },
     ...overrides,
   };
@@ -44,7 +44,7 @@ function chartDef(overrides: Partial<ChartDefinition> = {}): ChartDefinition {
 describe('filterDataByCostLimit', () => {
   it('returns data unchanged when selectedYAxisMetric does not include "cost"', () => {
     const data = [pt(), pt({ x: 2 })];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.0 }), 'y_tpPerGpu');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_tpPerGpu');
     expect(result).toHaveLength(2);
   });
 
@@ -56,53 +56,50 @@ describe('filterDataByCostLimit', () => {
 
   it('filters by costh.y <= y_cost_limit', () => {
     const data = [
-      pt({ costh: { y: 1.0, roof: false } }), // keep
+      pt({ costh: { y: 1, roof: false } }), // keep
       pt({ costh: { y: 2.5, roof: false } }), // remove
-      pt({ costh: { y: 2.0, roof: false } }), // keep (equal to limit)
+      pt({ costh: { y: 2, roof: false } }), // keep (equal to limit)
     ];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2.0 }), 'y_costh');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2 }), 'y_costh');
     expect(result).toHaveLength(2);
-    expect(result.every((p) => p.costh.y <= 2.0)).toBe(true);
+    expect(result.every((p) => p.costh.y <= 2)).toBe(true);
   });
 
   it('filters by costn.y <= y_cost_limit', () => {
-    const data = [pt({ costn: { y: 1.0, roof: false } }), pt({ costn: { y: 3.0, roof: false } })];
+    const data = [pt({ costn: { y: 1, roof: false } }), pt({ costn: { y: 3, roof: false } })];
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.5 }), 'y_costn');
     expect(result).toHaveLength(1);
-    expect(result[0].costn.y).toBe(1.0);
+    expect(result[0].costn.y).toBe(1);
   });
 
   it('filters by costr.y <= y_cost_limit', () => {
     const data = [pt({ costr: { y: 0.5, roof: false } }), pt({ costr: { y: 1.5, roof: false } })];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.0 }), 'y_costr');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_costr');
     expect(result).toHaveLength(1);
   });
 
   it('filters by costhOutput.y when metric is y_costhOutput', () => {
     const data = [
-      pt({ costhOutput: { y: 1.0, roof: false } }),
-      pt({ costhOutput: { y: 5.0, roof: false } }),
+      pt({ costhOutput: { y: 1, roof: false } }),
+      pt({ costhOutput: { y: 5, roof: false } }),
     ];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2.0 }), 'y_costhOutput');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2 }), 'y_costhOutput');
     expect(result).toHaveLength(1);
   });
 
   it('filters by costhi.y when metric is y_costhi', () => {
-    const data = [
-      pt({ costhi: { y: 2.0, roof: false } }),
-      pt({ costhi: { y: 10.0, roof: false } }),
-    ];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 3.0 }), 'y_costhi');
+    const data = [pt({ costhi: { y: 2, roof: false } }), pt({ costhi: { y: 10, roof: false } })];
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 3 }), 'y_costhi');
     expect(result).toHaveLength(1);
   });
 
   it('does NOT filter y_costUser by cost limit (custom user metric bypasses the limit)', () => {
     // y_costUser allows users to enter arbitrary costs; the hard-coded limit must not apply
     const data = [
-      pt({ costUser: { y: 1.0, roof: false } }),
-      pt({ costUser: { y: 999.0, roof: false } }),
+      pt({ costUser: { y: 1, roof: false } }),
+      pt({ costUser: { y: 999, roof: false } }),
     ];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2.0 }), 'y_costUser');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2 }), 'y_costUser');
     expect(result).toHaveLength(2);
   });
 
@@ -116,19 +113,19 @@ describe('filterDataByCostLimit', () => {
   it('returns data unchanged for an unknown metric key even if it includes "cost"', () => {
     // 'y_unknownCost' maps to metricKey 'unknownCost', not in costFieldMap
     const data = [pt(), pt()];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.0 }), 'y_unknownCost');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_unknownCost');
     expect(result).toHaveLength(2);
   });
 
   it('returns empty array when all points exceed the limit', () => {
-    const data = [pt({ costh: { y: 5.0, roof: false } }), pt({ costh: { y: 10.0, roof: false } })];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.0 }), 'y_costh');
+    const data = [pt({ costh: { y: 5, roof: false } }), pt({ costh: { y: 10, roof: false } })];
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_costh');
     expect(result).toHaveLength(0);
   });
 
   it('returns all points when all are within the limit', () => {
     const data = [pt({ costh: { y: 0.5, roof: false } }), pt({ costh: { y: 0.9, roof: false } })];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.0 }), 'y_costh');
+    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_costh');
     expect(result).toHaveLength(2);
   });
 });

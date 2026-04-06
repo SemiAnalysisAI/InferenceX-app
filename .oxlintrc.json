@@ -1,9 +1,45 @@
 {
-  "rules": {
+  "categories": {
     "correctness": "warn",
     "suspicious": "warn",
-    "pedantic": "off",
+    "pedantic": "warn",
     "style": "warn",
-    "nursery": "off"
+    "nursery": "warn"
+  },
+  "rules": {
+    "capitalized-comments": "off",
+    "curly": "off",
+    "func-names": "off",
+    "func-style": "off",
+    "id-length": "off",
+    "init-declarations": "off",
+    "max-depth": "off",
+    "max-lines": "off",
+    "max-lines-per-function": "off",
+    "max-params": "off",
+    "max-statements": "off",
+    "new-cap": "off",
+    "no-continue": "off",
+    "no-inline-comments": "off",
+    "no-magic-numbers": "off",
+    "no-negated-condition": "off",
+    "no-nested-ternary": "off",
+    "no-ternary": "off",
+    "no-undef": "off",
+    "no-useless-undefined": "off",
+    "no-warning-comments": "off",
+    "prefer-destructuring": "off",
+    "sort-imports": "off",
+    "sort-keys": "off",
+    "sort-vars": "off",
+    "oxc/approx-constant": "off",
+    "unicorn/filename-case": "off",
+    "unicorn/no-array-callback-reference": "off",
+    "unicorn/no-nested-ternary": "off",
+    "unicorn/no-null": "off",
+    "unicorn/no-useless-undefined": "off",
+    "unicorn/numeric-separators-style": "off",
+    "unicorn/prefer-global-this": "off",
+    "unicorn/prefer-top-level-await": "off"
   }
 }

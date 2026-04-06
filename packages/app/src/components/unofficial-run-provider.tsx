@@ -1,8 +1,8 @@
 'use client';
 
 import {
+  type ReactNode,
   createContext,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 
-import { HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -18,7 +18,6 @@ import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import type { ChartDefinition } from '@/components/inference/types';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Model, Sequence } from '@/lib/data-mappings';
 
@@ -34,12 +33,13 @@ interface UnofficialRunInfo {
   isNonMainBranch: boolean;
 }
 
-interface UnofficialChartData {
-  [key: string]: {
+type UnofficialChartData = Record<
+  string,
+  {
     e2e: { data: InferenceData[]; gpus: HardwareConfig };
     interactivity: { data: InferenceData[]; gpus: HardwareConfig };
-  };
-}
+  }
+>;
 
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
 
@@ -129,8 +129,8 @@ export function parseAvailableModelsAndSequences(
   for (const key of Object.keys(chartData)) {
     const lastUnderscoreIndex = key.lastIndexOf('_');
     if (lastUnderscoreIndex === -1) continue;
-    const modelPart = key.substring(0, lastUnderscoreIndex);
-    const sequencePart = key.substring(lastUnderscoreIndex + 1);
+    const modelPart = key.slice(0, lastUnderscoreIndex);
+    const sequencePart = key.slice(lastUnderscoreIndex + 1);
     const model = allModels.find((m) => m === modelPart);
     const sequence = allSequences.find((s) => s === sequencePart);
     if (model && sequence && !result.some((r) => r.model === model && r.sequence === sequence)) {
@@ -261,8 +261,8 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
           setUnofficialEvalRows(data.evaluations ?? []);
           setAvailableModelsAndSequences(parseAvailableModelsAndSequences(chartData));
         })
-        .catch((e) => {
-          setError(e instanceof Error ? e.message : 'Unknown error');
+        .catch((caughtError) => {
+          setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
           setUnofficialRunInfo(null);
           setUnofficialChartData(null);
           setUnofficialEvalRows(null);
@@ -279,7 +279,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   return (
     <UnofficialRunContext.Provider
       value={{
-        isUnofficialRun: !!unofficialRunInfo,
+        isUnofficialRun: Boolean(unofficialRunInfo),
         unofficialRunInfo,
         unofficialChartData,
         unofficialEvalRows,

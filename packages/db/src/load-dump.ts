@@ -23,7 +23,7 @@ import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1 });
 
 // Tables with serial/bigserial PKs that need sequence resets
-const SEQUENCES: Array<{ seq: string; table: string; col: string }> = [
+const SEQUENCES: { seq: string; table: string; col: string }[] = [
   { seq: 'configs_id_seq', table: TABLE_NAMES.configs, col: 'id' },
   { seq: 'server_logs_id_seq', table: TABLE_NAMES.serverLogs, col: 'id' },
   { seq: 'workflow_runs_id_seq', table: TABLE_NAMES.workflowRuns, col: 'id' },
@@ -40,7 +40,7 @@ const BATCH_SIZE = 500;
  * Avoids loading the entire file into memory.
  */
 async function* streamJsonArray(filePath: string): AsyncGenerator<Record<string, unknown>> {
-  const stream = createReadStream(filePath, { encoding: 'utf-8' });
+  const stream = createReadStream(filePath, { encoding: 'utf8' });
   let buffer = '';
   let depth = 0;
   let inString = false;
@@ -48,9 +48,7 @@ async function* streamJsonArray(filePath: string): AsyncGenerator<Record<string,
   let objectStart = -1;
 
   for await (const chunk of stream) {
-    for (let i = 0; i < chunk.length; i++) {
-      const ch = chunk[i];
-
+    for (const ch of chunk) {
       if (escape) {
         escape = false;
         buffer += ch;
@@ -125,7 +123,7 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
         if (val === null || val === undefined) return null;
         // Postgres text[] arrays: convert JSON ["a","b"] → Postgres {a,b} literal
         if (Array.isArray(val) && val.every((v) => typeof v === 'string'))
-          return `{${(val as string[]).map((v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')}}`;
+          return `{${(val as string[]).map((v) => `"${v.replaceAll('\\', String.raw`\\`).replaceAll('"', String.raw`\"`)}"`).join(',')}}`;
         // JSONB columns: pass objects as-is (sql.unsafe serializes them correctly with ::jsonb cast)
         if (typeof val === 'object') {
           jsonbCols.add(colIdx);
@@ -138,9 +136,9 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
     const colsSql = columns.join(', ');
     const rows = values
       .map(
-        (_, i) =>
+        (_row, i) =>
           `(${columns!
-            .map((_, j) => {
+            .map((_col, j) => {
               const p = `$${i * columns!.length + j + 1}`;
               return jsonbCols.has(j) ? `${p}::jsonb` : p;
             })
@@ -222,8 +220,8 @@ async function load(): Promise<void> {
 }
 
 load()
-  .catch((err) => {
-    console.error('db:load-dump failed:', err);
+  .catch((error) => {
+    console.error('db:load-dump failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

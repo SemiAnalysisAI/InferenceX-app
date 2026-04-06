@@ -3,7 +3,7 @@
  */
 
 import { resolveFrameworkAliasesInString } from '@semianalysisai/inferencex-constants';
-import postgres from 'postgres';
+import type postgres from 'postgres';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -48,7 +48,7 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
  * Returns true if any changelog entry in the given arrays is marked `evals-only: true`.
  * When a run is evals-only, its benchmark/perf data should be skipped during ingest.
  */
-export function hasEvalsOnlyFlag(changelogs: Array<{ entries: ChangelogEntry[] }>): boolean {
+export function hasEvalsOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): boolean {
   return changelogs.some((c) => c.entries.some((e) => e.evalsOnly));
 }
 

@@ -103,7 +103,7 @@ describe('Model Architecture Diagram', () => {
       // Switch model and open architecture
       // Clear any stale Radix scroll lock from prior Select interactions
       cy.document().then((doc) => {
-        doc.body.removeAttribute('data-scroll-locked');
+        delete doc.body.dataset.scrollLocked;
         doc.body.style.removeProperty('pointer-events');
       });
       cy.get('[role="combobox"]').filter(':visible').first().click();
@@ -146,7 +146,7 @@ describe('Model Architecture Diagram', () => {
     before(() => {
       // Clear any stale Radix scroll lock from prior Select interactions
       cy.document().then((doc) => {
-        doc.body.removeAttribute('data-scroll-locked');
+        delete doc.body.dataset.scrollLocked;
         doc.body.style.removeProperty('pointer-events');
       });
       cy.get('[role="combobox"]').filter(':visible').first().click();
@@ -194,7 +194,7 @@ describe('Model Architecture Diagram', () => {
     before(() => {
       // Clear any stale Radix scroll lock from prior Select interactions
       cy.document().then((doc) => {
-        doc.body.removeAttribute('data-scroll-locked');
+        delete doc.body.dataset.scrollLocked;
         doc.body.style.removeProperty('pointer-events');
       });
       cy.get('[role="combobox"]').filter(':visible').first().click();
@@ -242,7 +242,7 @@ describe('Model Architecture Diagram', () => {
     before(() => {
       // Clear any stale Radix scroll lock from prior Select interactions
       cy.document().then((doc) => {
-        doc.body.removeAttribute('data-scroll-locked');
+        delete doc.body.dataset.scrollLocked;
         doc.body.style.removeProperty('pointer-events');
       });
       cy.get('[role="combobox"]').filter(':visible').first().click();

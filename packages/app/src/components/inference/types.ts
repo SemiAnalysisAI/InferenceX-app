@@ -1,7 +1,7 @@
 import type React from 'react';
 
-import { HARDWARE_CONFIG } from '@/lib/constants';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { HARDWARE_CONFIG } from '@/lib/constants';
+import type { Model, Sequence } from '@/lib/data-mappings';
 
 /**
  * Represents an aggregated data entry, typically from a raw data source.
@@ -388,11 +388,7 @@ export interface WorkflowInfoDisplayProps {
  * @property {object} [modelName: string].[sequence: string] - An object where keys are sequence names.
  * @property {string[]} [modelName: string].[sequence: string] - An array of available precisions for the given model and sequence.
  */
-export interface ModelConfig {
-  [modelName: string]: {
-    [sequence: string]: string[]; // Array of precisions
-  };
-}
+export type ModelConfig = Record<string, Record<string, string[]>>;
 
 /**
  * Represents information about a workflow run.
@@ -402,14 +398,15 @@ export interface ModelConfig {
  * @property {ModelConfig} modelConfig - Configuration details for models, sequences, and precisions.
  */
 export interface WorkflowInfo {
-  runInfoBySequence: {
-    [sequence: string]: {
+  runInfoBySequence: Record<
+    string,
+    {
       runId: string;
       runDate: string;
       runUrl: string;
       changelog?: ChangelogMetadata;
-    };
-  };
+    }
+  >;
   run_date: string;
   modelConfig: ModelConfig;
   gpus: HardwareConfig;
@@ -500,21 +497,21 @@ export interface InferenceChartContextType {
   setSelectedDates: (dates: string[]) => void;
   selectedDateRange: { startDate: string; endDate: string };
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
-  userCosts: { [gpuKey: string]: number | undefined } | null;
-  setUserCosts: (userCosts: { [gpuKey: string]: number | undefined } | null) => void;
+  userCosts: Record<string, number | undefined> | null;
+  setUserCosts: (userCosts: Record<string, number | undefined> | null) => void;
   selectedRunDate: string;
   setSelectedRunDate: (date: string) => void;
   availableDates: string[];
   dateRangeAvailableDates: string[];
   isCheckingAvailableDates: boolean;
-  availableRuns: { [runId: string]: RunInfo } | null;
+  availableRuns: Record<string, RunInfo> | null;
   selectedRunId: string;
   setSelectedRunId: (runId: string) => void;
   availablePrecisions: string[];
   availableSequences: Sequence[];
   availableModels: string[];
-  userPowers: { [gpuKey: string]: number | undefined } | null;
-  setUserPowers: (userPowers: { [gpuKey: string]: number | undefined } | null) => void;
+  userPowers: Record<string, number | undefined> | null;
+  setUserPowers: (userPowers: Record<string, number | undefined> | null) => void;
   trackedConfigs: TrackedConfig[];
   addTrackedConfig: (point: InferenceData, chartType: string) => void;
   removeTrackedConfig: (id: string) => void;
@@ -528,9 +525,7 @@ export interface CalculateUserCostsRequest {
   model: string;
   sequence: string;
   precision: string;
-  userCosts: {
-    [gpuKey: string]: number | undefined;
-  };
+  userCosts: Record<string, number | undefined>;
 }
 
 export interface CalculateUserCostsResponse {
@@ -538,19 +533,18 @@ export interface CalculateUserCostsResponse {
   data?: InferenceData[][];
   error?: string;
 }
-export interface UserCostInputs {
-  [gpuKey: string]: string | undefined;
-}
+export type UserCostInputs = Record<string, string | undefined>;
 
-export interface HardwareConfig {
-  [key: string]: {
+export type HardwareConfig = Record<
+  string,
+  {
     name: string;
     label: string;
     suffix: string;
     gpu: string;
     framework?: string;
-  };
-}
+  }
+>;
 
 /**
  * Represents a tracked configuration for the "Performance Over Time" drill-down feature.

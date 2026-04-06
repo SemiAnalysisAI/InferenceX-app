@@ -8,8 +8,8 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedEvaluations = cachedQuery(async () => {
-  if (JSON_MODE) return jsonProvider.getAllEvalResults();
+const getCachedEvaluations = cachedQuery(() => {
+  if (JSON_MODE) return Promise.resolve(jsonProvider.getAllEvalResults());
   return getAllEvalResults(getDb());
 }, 'evaluations');
 

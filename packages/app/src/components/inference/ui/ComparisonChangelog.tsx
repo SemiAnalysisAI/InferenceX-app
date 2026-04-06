@@ -78,7 +78,7 @@ export default function ComparisonChangelog({
 
     return mapped
       .filter((item) => item.entries.length > 0 || pinnedDates.has(item.date))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .toSorted((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [changelogs, selectedGPUs, selectedPrecisions, pinnedDates]);
 
   const datesOnChart = useMemo(() => {

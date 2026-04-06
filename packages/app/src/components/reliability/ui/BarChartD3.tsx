@@ -6,12 +6,11 @@ import * as d3 from 'd3';
 
 import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { LayerConfig } from '@/lib/d3-chart/D3Chart';
+import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
-import { ModelSuccessRateData } from '@/components/reliability/types';
+import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import ChartLegend from '@/components/ui/chart-legend';
 
@@ -89,7 +88,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const sortedModels = useMemo(
     () =>
       [...filteredReliabilityData]
-        .sort(
+        .toSorted(
           (a, b) =>
             getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
             a.model.localeCompare(b.model),
@@ -111,7 +110,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const legendItems = useMemo(
     () =>
       [...filteredReliabilityData]
-        .sort(
+        .toSorted(
           (a, b) =>
             getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
             a.model.localeCompare(b.model),
@@ -132,7 +131,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   // Sort chart data by model sort index (same as legend)
   const sortedChartData = useMemo(
     () =>
-      [...chartData].sort(
+      [...chartData].toSorted(
         (a, b) =>
           getModelSortIndex(a.model) - getModelSortIndex(b.model) || a.model.localeCompare(b.model),
       ),
@@ -205,7 +204,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
 
   // Reverse so first in sort order appears at top (band scale range is [height, 0])
   const yDomain = useMemo(
-    () => [...sortedChartData].reverse().map((d) => d.modelLabel),
+    () => [...sortedChartData].toReversed().map((d) => d.modelLabel),
     [sortedChartData],
   );
 

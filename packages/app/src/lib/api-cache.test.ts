@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock next/cache before importing the module under test
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
-  unstable_cache: vi.fn((fn: Function, _keys: string[], _opts: unknown) => fn),
+  unstable_cache: vi.fn((fn: (...args: any[]) => any, _keys: string[], _opts: unknown) => fn),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
@@ -29,20 +29,20 @@ const mockBlobPurge = vi.mocked(blobPurge);
 beforeEach(() => {
   vi.clearAllMocks();
   // Default: unstable_cache returns the original function as-is
-  mockUnstableCache.mockImplementation((fn: Function) => fn as any);
+  mockUnstableCache.mockImplementation((fn: (...args: any[]) => any) => fn as any);
 });
 
 describe('cachedQuery', () => {
   describe('default mode (unstable_cache)', () => {
     it('wraps the function with unstable_cache', () => {
-      const fn = vi.fn(async (x: number) => x * 2);
+      const fn = vi.fn((x: number) => Promise.resolve(x * 2));
       cachedQuery(fn, 'test-key');
 
       expect(mockUnstableCache).toHaveBeenCalledWith(fn, ['test-key'], { tags: ['db'] });
     });
 
     it('calls through to the original function and returns its result', async () => {
-      const fn = vi.fn(async (x: number) => x * 2);
+      const fn = vi.fn((x: number) => Promise.resolve(x * 2));
       const wrapped = cachedQuery(fn, 'multiply');
 
       const result = await wrapped(5);
@@ -51,7 +51,7 @@ describe('cachedQuery', () => {
     });
 
     it('passes arguments through to the cached function', async () => {
-      const fn = vi.fn(async (a: string, b: string) => `${a}-${b}`);
+      const fn = vi.fn((a: string, b: string) => Promise.resolve(`${a}-${b}`));
       const wrapped = cachedQuery(fn, 'concat');
 
       const result = await wrapped('hello', 'world');
@@ -60,7 +60,7 @@ describe('cachedQuery', () => {
     });
 
     it('does not call blob functions in default mode', async () => {
-      const fn = vi.fn(async () => 'data');
+      const fn = vi.fn(() => Promise.resolve('data'));
       const wrapped = cachedQuery(fn, 'no-blob');
 
       await wrapped();
@@ -72,7 +72,7 @@ describe('cachedQuery', () => {
   describe('blobOnly mode', () => {
     it('returns cached value from blob on hit', async () => {
       mockBlobGet.mockResolvedValue({ answer: 42 });
-      const fn = vi.fn(async () => ({ answer: 99 }));
+      const fn = vi.fn(() => Promise.resolve({ answer: 99 }));
       const wrapped = cachedQuery(fn, 'blob-key', { blobOnly: true });
 
       const result = await wrapped();
@@ -85,7 +85,7 @@ describe('cachedQuery', () => {
     it('calls fn and stores result on blob miss', async () => {
       mockBlobGet.mockResolvedValue(null);
       mockBlobSet.mockResolvedValue(undefined);
-      const fn = vi.fn(async () => ({ big: 'payload' }));
+      const fn = vi.fn(() => Promise.resolve({ big: 'payload' }));
       const wrapped = cachedQuery(fn, 'miss-key', { blobOnly: true });
 
       const result = await wrapped();
@@ -97,7 +97,7 @@ describe('cachedQuery', () => {
     it('builds blob key from prefix and args', async () => {
       mockBlobGet.mockResolvedValue(null);
       mockBlobSet.mockResolvedValue(undefined);
-      const fn = vi.fn(async (model: string, date: string) => [model, date]);
+      const fn = vi.fn((model: string, date: string) => Promise.resolve([model, date]));
       const wrapped = cachedQuery(fn, 'bench', { blobOnly: true });
 
       await wrapped('llama', '2025-01-01');
@@ -107,7 +107,7 @@ describe('cachedQuery', () => {
 
     it('uses bare prefix when no args are passed', async () => {
       mockBlobGet.mockResolvedValue('cached');
-      const fn = vi.fn(async () => 'fresh');
+      const fn = vi.fn(() => Promise.resolve('fresh'));
       const wrapped = cachedQuery(fn, 'no-args', { blobOnly: true });
 
       await wrapped();
@@ -115,7 +115,7 @@ describe('cachedQuery', () => {
     });
 
     it('does not use unstable_cache in blobOnly mode', () => {
-      const fn = vi.fn(async () => null);
+      const fn = vi.fn(() => Promise.resolve(null));
       cachedQuery(fn, 'skip-uc', { blobOnly: true });
 
       expect(mockUnstableCache).not.toHaveBeenCalled();
@@ -171,7 +171,11 @@ describe('cachedJson', () => {
     const res = cachedJson(data);
     const reader = res.body!.getReader();
     let chunks = 0;
-    while (!(await reader.read()).done) chunks++;
+    let readResult = await reader.read();
+    while (!readResult.done) {
+      chunks++;
+      readResult = await reader.read();
+    }
     expect(chunks).toBeGreaterThan(1);
   });
 

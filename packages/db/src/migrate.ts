@@ -45,16 +45,13 @@ async function migrate(): Promise<void> {
     )
   `;
 
-  const applied = new Set(
-    (await sql<{ filename: string }[]>`select filename from schema_migrations`).map(
-      (r) => r.filename,
-    ),
-  );
+  const migrations = await sql<{ filename: string }[]>`select filename from schema_migrations`;
+  const applied = new Set(migrations.map((r) => r.filename));
 
   const files = fs
     .readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith('.sql'))
-    .sort();
+    .toSorted();
 
   let ran = 0;
   for (const file of files) {
@@ -64,7 +61,7 @@ async function migrate(): Promise<void> {
     }
 
     console.log(`  apply ${file} ...`);
-    const sql_text = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8');
+    const sql_text = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
 
     await sql.begin(async (tx) => {
       await tx.unsafe(sql_text);
@@ -85,8 +82,8 @@ async function migrate(): Promise<void> {
 }
 
 migrate()
-  .catch((err) => {
-    console.error('db:migrate failed:', err);
+  .catch((error) => {
+    console.error('db:migrate failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

@@ -71,7 +71,7 @@ describe('Historical Trends — Content & Interactions', () => {
   it('model selector is present and has selectable options', () => {
     // Clear any stale Radix scroll lock from prior Select interactions
     cy.document().then((doc) => {
-      doc.body.removeAttribute('data-scroll-locked');
+      delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="model-selector"]').should('be.visible');
@@ -84,7 +84,7 @@ describe('Historical Trends — Content & Interactions', () => {
 
   it('sequence selector is present and has selectable options', () => {
     cy.document().then((doc) => {
-      doc.body.removeAttribute('data-scroll-locked');
+      delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="sequence-selector"]').should('be.visible');
@@ -107,7 +107,7 @@ describe('Historical Trends — Content & Interactions', () => {
 
   it('Log Scale switch exists in the legend and can be toggled', () => {
     cy.document().then((doc) => {
-      doc.body.removeAttribute('data-scroll-locked');
+      delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="historical-trend-figure"]')
@@ -128,7 +128,7 @@ describe('Historical Trends — Content & Interactions', () => {
 
   it('Y-axis metric selector is present and can be changed', () => {
     cy.document().then((doc) => {
-      doc.body.removeAttribute('data-scroll-locked');
+      delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
@@ -147,7 +147,7 @@ describe('Historical Trends — Content & Interactions', () => {
 
   it('changing model updates the chart title to reflect the new model', () => {
     cy.document().then((doc) => {
-      doc.body.removeAttribute('data-scroll-locked');
+      delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="historical-trend-figure"]').should('exist');

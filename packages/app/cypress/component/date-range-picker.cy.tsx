@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
+import { type DateRange, DateRangePicker } from '@/components/ui/date-range-picker';
 
 function DateRangePickerHarness({
   initialRange = { startDate: '', endDate: '' },

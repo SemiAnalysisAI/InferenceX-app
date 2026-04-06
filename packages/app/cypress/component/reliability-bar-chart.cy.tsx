@@ -30,7 +30,7 @@ describe('ReliabilityBarChartD3', () => {
       createMockReliabilityData({
         model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct' as Model,
         modelLabel: 'Llama 4 Maverick',
-        successRate: 88.0,
+        successRate: 88,
         total: 100,
         n_success: 88,
       }),

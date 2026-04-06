@@ -25,13 +25,14 @@ import {
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
-import type {
-  GpuMetricKey,
-  GpuMetricsArtifact,
-  GpuPowerApiResponse,
-  GpuPowerRunInfo,
+import {
+  type GpuMetricKey,
+  type GpuMetricsArtifact,
+  type GpuPowerApiResponse,
+  type GpuPowerRunInfo,
+  ALL_METRIC_OPTIONS,
+  getAvailableMetrics,
 } from './types';
-import { ALL_METRIC_OPTIONS, getAvailableMetrics } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
 const FEATURE_GATE_KEY = 'inferencex-feature-gate';
@@ -93,7 +94,7 @@ export default function GpuMetricsDisplay() {
 
         const pending = pendingUrlState.current;
         const targetArtifact =
-          pending?.artifact && apiResult.artifacts.find((a) => a.name === pending.artifact)
+          pending?.artifact && apiResult.artifacts.some((a) => a.name === pending.artifact)
             ? pending.artifact
             : (apiResult.artifacts[0]?.name ?? '');
         setSelectedArtifact(targetArtifact);
@@ -106,8 +107,8 @@ export default function GpuMetricsDisplay() {
         const targetData = apiResult.artifacts.find((a) => a.name === targetArtifact)?.data ?? [];
         const gpuIndices = new Set(targetData.map((d) => d.index));
         setVisibleGpus(gpuIndices);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
         setArtifacts([]);
         setRunInfo(null);
         setSelectedArtifact('');
@@ -156,9 +157,10 @@ export default function GpuMetricsDisplay() {
     setSelectedMetric(value as GpuMetricKey);
   }, []);
 
-  const currentData = useMemo(() => {
-    return artifacts.find((a) => a.name === selectedArtifact)?.data ?? [];
-  }, [artifacts, selectedArtifact]);
+  const currentData = useMemo(
+    () => artifacts.find((a) => a.name === selectedArtifact)?.data ?? [],
+    [artifacts, selectedArtifact],
+  );
 
   const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
 
@@ -199,10 +201,10 @@ export default function GpuMetricsDisplay() {
     } catch {
       const textArea = document.createElement('textarea');
       textArea.value = url;
-      document.body.appendChild(textArea);
+      document.body.append(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      textArea.remove();
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -212,7 +214,7 @@ export default function GpuMetricsDisplay() {
   const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === selectedMetric)!;
 
   const allGpuIndices = useMemo(
-    () => Array.from(new Set(currentData.map((d) => d.index))).sort((a, b) => a - b),
+    () => [...new Set(currentData.map((d) => d.index))].toSorted((a, b) => a - b),
     [currentData],
   );
 

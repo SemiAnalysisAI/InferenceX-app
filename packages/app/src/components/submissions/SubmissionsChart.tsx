@@ -5,8 +5,12 @@ import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import ChartLegend from '@/components/ui/chart-legend';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart';
+import {
+  D3Chart,
+  type LayerConfig,
+  type RenderContext,
+  type ZoomContext,
+} from '@/lib/d3-chart/D3Chart';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { computeCumulative, groupVolumeByWeek } from './submissions-utils';
@@ -26,7 +30,12 @@ const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
 const CHART_ID = 'submissions-chart';
 const NIGHTLY_END_DATE = new Date('2025-12-16').getTime();
 
-type ChartPoint = { date: number; nvidia: number; amd: number; total: number };
+interface ChartPoint {
+  date: number;
+  nvidia: number;
+  amd: number;
+  total: number;
+}
 
 function lineColor(key: string): string {
   if (key === 'nvidia') return NVIDIA_COLOR;

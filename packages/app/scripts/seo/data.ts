@@ -14,8 +14,8 @@ export function gpuDisplayName(hw: string): string {
 export function modelSlug(displayName: string): string {
   return displayName
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '');
 }
 
 /** Sequence key from ISL/OSL. */
@@ -139,7 +139,7 @@ export function aggregateModelData(
       }
     }
 
-    const configs = [...configMap.values()].sort((a, b) => b.tputPerGpu - a.tputPerGpu);
+    const configs = [...configMap.values()].toSorted((a, b) => b.tputPerGpu - a.tputPerGpu);
     bestBySequence.set(seq, configs);
   }
 

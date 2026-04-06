@@ -24,8 +24,8 @@ export function slugify(raw: string): string {
   return (
     raw
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'post'
+      .replaceAll(/[^a-z0-9]+/g, '-')
+      .replaceAll(/^-+|-+$/g, '') || 'post'
   );
 }
 
@@ -41,7 +41,7 @@ export function getAllPosts(): BlogPostMeta[] {
 
   const posts = files.map((filename) => {
     const slug = slugify(filename.replace(/\.mdx$/, ''));
-    const raw = fs.readFileSync(path.join(CONTENT_DIR, filename), 'utf-8');
+    const raw = fs.readFileSync(path.join(CONTENT_DIR, filename), 'utf8');
     const { data, content } = matter(raw);
 
     return {
@@ -54,10 +54,10 @@ export function getAllPosts(): BlogPostMeta[] {
   const now = new Date();
   const visible =
     process.env.NODE_ENV === 'production'
-      ? posts.filter((p) => !!p.publishDate && new Date(p.publishDate + 'T00:00:00Z') <= now)
+      ? posts.filter((p) => Boolean(p.publishDate) && new Date(p.publishDate + 'T00:00:00Z') <= now)
       : posts;
 
-  return visible.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return visible.toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export interface AdjacentPosts {
@@ -96,7 +96,7 @@ export function extractHeadings(rawMdx: string): TocHeading[] {
     let id = base;
     if (seen.has(id)) {
       // prefix with nearest parent heading
-      const parent = parents.slice(1, level).findLast((p) => p);
+      const parent = parents.slice(1, level).findLast(Boolean);
       id = parent ? `${parent}-${base}` : `${base}-${level}`;
     }
     seen.add(id);
@@ -110,7 +110,7 @@ export function getPostBySlug(slug: string): { meta: BlogPostMeta; raw: string }
   const filePath = path.join(CONTENT_DIR, `${safe}.mdx`);
   if (!fs.existsSync(filePath)) return null;
 
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  const fileContent = fs.readFileSync(filePath, 'utf8');
   const { data, content } = matter(fileContent);
 
   return {

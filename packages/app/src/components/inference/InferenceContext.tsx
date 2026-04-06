@@ -1,8 +1,8 @@
 'use client';
 
 import {
+  type ReactNode,
   createContext,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -16,7 +16,7 @@ import { track } from '@/lib/analytics';
 import { FAVORITE_PRESETS, type FavoritePreset } from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import {
+import type {
   HardwareConfig,
   InferenceChartContextType,
   InferenceData,
@@ -128,10 +128,8 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
-  const [userCosts, setUserCosts] = useState<{ [gpuKey: string]: number | undefined } | null>(null);
-  const [userPowers, setUserPowers] = useState<{ [gpuKey: string]: number | undefined } | null>(
-    null,
-  );
+  const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
+  const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
   // --- Tracked configs state ---
   const [trackedConfigs, setTrackedConfigs] = useState<TrackedConfig[]>([]);
@@ -144,8 +142,7 @@ export function InferenceProvider({
   const presetHwFilterRef = useRef<string[] | null>(null);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
-  const latestDate =
-    availableDates.length > 0 ? availableDates[availableDates.length - 1] : undefined;
+  const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
   const {
     graphs,
@@ -186,7 +183,7 @@ export function InferenceProvider({
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
       return selectedGPUs.includes(hwKey);
     });
-    const dates = [...new Set(rows.map((r) => r.date))].sort();
+    const dates = [...new Set(rows.map((r) => r.date))].toSorted();
     return dates.length > 0 ? dates : availableDates;
   }, [
     availabilityRows,
@@ -212,7 +209,7 @@ export function InferenceProvider({
       if (HARDWARE_CONFIG[hwKey]) hwKeys.add(hwKey);
     }
     return [...hwKeys]
-      .sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+      .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map((hw) => ({
         value: hw,
         label: getDisplayLabel(HARDWARE_CONFIG[hw as keyof HardwareConfig]),
@@ -387,7 +384,7 @@ export function InferenceProvider({
       // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
       const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
       const filterSet = new Set(filter);
-      const filtered = new Set(Array.from(base).filter((hwKey: string) => filterSet.has(hwKey)));
+      const filtered = new Set([...base].filter((hwKey: string) => filterSet.has(hwKey)));
       if (filtered.size > 0) {
         setActiveHwTypes(filtered);
         setPendingHwFilter(null);
@@ -409,7 +406,7 @@ export function InferenceProvider({
   useEffect(() => {
     if (!pendingHwFilter || hwTypesWithData.size === 0) return;
     const filterSet = new Set(pendingHwFilter);
-    const filtered = new Set(Array.from(hwTypesWithData).filter((hwKey) => filterSet.has(hwKey)));
+    const filtered = new Set([...hwTypesWithData].filter((hwKey) => filterSet.has(hwKey)));
     if (filtered.size > 0) {
       setActiveHwTypes(filtered);
       setPendingHwFilter(null);
@@ -475,7 +472,7 @@ export function InferenceProvider({
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
       const filterSet = new Set(presetFilter);
-      const filtered = new Set(Array.from(hwTypesWithData).filter((k) => filterSet.has(k)));
+      const filtered = new Set([...hwTypesWithData].filter((k) => filterSet.has(k)));
       if (filtered.size > 0) {
         setActiveHwTypes(filtered);
         return;
@@ -542,7 +539,7 @@ export function InferenceProvider({
     }
     if (activeHwTypes.size === 0) return;
     const timer = setTimeout(() => {
-      const gpus = [...activeHwTypes].sort();
+      const gpus = [...activeHwTypes].toSorted();
       track('inference_gpu_selection_settled', {
         gpus,
         gpu_count: gpus.length,
@@ -564,11 +561,11 @@ export function InferenceProvider({
     }
     if (activeDates.size === 0) return;
     const timer = setTimeout(() => {
-      const pairs = [...activeDates].sort();
+      const pairs = [...activeDates].toSorted();
       track('interactivity_selection_settled', {
         date_gpu_pairs: pairs,
         pair_count: pairs.length,
-        gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].sort(),
+        gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].toSorted(),
         model: selectedModel,
         sequence: effectiveSequence,
         yAxisMetric: selectedYAxisMetric,
@@ -644,7 +641,7 @@ export function InferenceProvider({
       return;
     }
     const first = dateRangeAvailableDates[0];
-    const last = dateRangeAvailableDates[dateRangeAvailableDates.length - 1];
+    const last = dateRangeAvailableDates.at(-1)!;
     presetGuardRef.current = true;
     setSelectedDateRange({ startDate: first, endDate: last });
     setSelectedDates([]);

@@ -1,7 +1,7 @@
 import { del, head, list, put } from '@vercel/blob';
 
 function blobEnabled(): boolean {
-  return !!process.env.BLOB_READ_WRITE_TOKEN && !!process.env.BLOB_CACHE_PREFIX;
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN) && Boolean(process.env.BLOB_CACHE_PREFIX);
 }
 
 function getPrefix(): string {
@@ -32,9 +32,9 @@ export async function blobSet(key: string, data: unknown): Promise<void> {
       addRandomSuffix: false,
       contentType: 'application/json',
     });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes('already exists')) return;
-    throw err;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) return;
+    throw error;
   }
 }
 

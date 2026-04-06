@@ -73,31 +73,29 @@ interface GpuValueInputGroupProps {
 }
 
 const GpuValueInputGroup = memo(
-  ({ gpuKey, gpuLabel, inputIdPrefix, inputValue, error, onChange }: GpuValueInputGroupProps) => {
-    return (
-      <div className="flex flex-col gap-2">
-        <InputGroup>
-          <InputGroupAddon align="inline-start">
-            <InputGroupText>{gpuLabel}:</InputGroupText>
-          </InputGroupAddon>
-          <InputGroupInput
-            id={`${inputIdPrefix}-${gpuKey}`}
-            type="number"
-            step="0.01"
-            min="0"
-            value={inputValue}
-            placeholder=""
-            onChange={(e) => {
-              onChange(e.target.value);
-            }}
-            className={error ? 'text-destructive' : ''}
-            aria-invalid={!!error}
-          />
-        </InputGroup>
-        {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-      </div>
-    );
-  },
+  ({ gpuKey, gpuLabel, inputIdPrefix, inputValue, error, onChange }: GpuValueInputGroupProps) => (
+    <div className="flex flex-col gap-2">
+      <InputGroup>
+        <InputGroupAddon align="inline-start">
+          <InputGroupText>{gpuLabel}:</InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
+          id={`${inputIdPrefix}-${gpuKey}`}
+          type="number"
+          step="0.01"
+          min="0"
+          value={inputValue}
+          placeholder=""
+          onChange={(e) => {
+            onChange(e.target.value);
+          }}
+          className={error ? 'text-destructive' : ''}
+          aria-invalid={Boolean(error)}
+        />
+      </InputGroup>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
+  ),
 );
 
 GpuValueInputGroup.displayName = 'GpuValueInputGroup';
@@ -153,12 +151,13 @@ const CustomGpuValuePanel = memo(
       yAxisMetric: selectedYAxisMetric,
     });
 
-    const stableGpus = React.useMemo(() => {
-      // One input per physical GPU, and GPUs with a zero default for this metric are omitted.
-      return Object.entries(GPU_SPECS)
-        .filter(([, specs]) => config.getDefaultValue(specs) > 0)
-        .map(([base, specs]) => ({ base, label: base.toUpperCase(), specs }));
-    }, [config]);
+    const stableGpus = React.useMemo(
+      () =>
+        Object.entries(GPU_SPECS)
+          .filter(([, specs]) => config.getDefaultValue(specs) > 0)
+          .map(([base, specs]) => ({ base, label: base.toUpperCase(), specs })),
+      [config],
+    );
 
     useEffect(() => {
       const { defaultValues: defaults, numericDefaults } = buildDefaultCustomGpuValues(

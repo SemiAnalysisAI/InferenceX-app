@@ -59,7 +59,7 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
     parents[level] = base;
     let id = base;
     if (seen.has(id)) {
-      const parent = parents.slice(1, level).findLast((p) => p);
+      const parent = parents.slice(1, level).findLast(Boolean);
       id = parent ? `${parent}-${base}` : `${base}-${level}`;
     }
     seen.add(id);

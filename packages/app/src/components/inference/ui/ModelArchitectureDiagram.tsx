@@ -8,17 +8,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 import { Badge } from '@/components/ui/badge';
-import { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/data-mappings';
 import {
-  ArchSubBlock,
-  SubBlockFlow,
+  type ArchSubBlock,
+  type SubBlockFlow,
+  type ModelArchitecture,
   formatContextWindow,
   formatParamCount,
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
   getModelArchitecture,
-  ModelArchitecture,
 } from '@/lib/model-architectures';
 
 interface ModelArchitectureDiagramProps {
@@ -118,7 +118,7 @@ function renderDiagram(
     arch.attentionExpandable !== false &&
     arch.attentionType !== 'MLA' &&
     arch.attentionType !== 'AlternatingSinkGQA';
-  const hasAlternatingLayers = !!(arch.alternatingLayers && arch.alternatingLayers.length > 0);
+  const hasAlternatingLayers = Boolean(arch.alternatingLayers && arch.alternatingLayers.length > 0);
   const alternatingSpecs = arch.alternatingLayers ?? [];
 
   // Get sub-blocks data (only used for expandable attention types)
@@ -349,7 +349,6 @@ function renderDiagram(
         y += 24;
       }
     }
-    y += arrowH;
   } else if (txExpanded) {
     y += 14;
 
@@ -384,35 +383,27 @@ function renderDiagram(
       // Expert grid
       expertY = y;
       y += expertGridH;
-
-      // Expanded expert FFN sub-blocks
-      ffnExpandedStartY = y;
-      if (ffnExpanded) {
-        y += ffnExpandedH;
-      }
     } else {
       // Dense FFN
       ffnY = y;
       y += blockH;
+    }
 
-      // Expanded FFN sub-blocks
-      ffnExpandedStartY = y;
-      if (ffnExpanded) {
-        y += ffnExpandedH;
-      }
+    // Expanded FFN sub-blocks (shared by MoE and dense paths)
+    ffnExpandedStartY = y;
+    if (ffnExpanded) {
+      y += ffnExpandedH;
     }
 
     merge2Y = y + mergeGap / 2;
     y += mergeGap;
 
     y += 14;
-    txEnd = y;
-    y += arrowH;
   } else {
     y += collapsedTxH;
-    txEnd = y;
-    y += arrowH;
   }
+  txEnd = y;
+  y += arrowH;
 
   // Final RMSNorm
   const finalNormY = y;
@@ -633,19 +624,21 @@ function renderDiagram(
       });
   }
 
+  const DEFAULT_SUB_BLOCK_FONT_SIZE = { name: '11px', detail: '9px' };
+
   /** Draw a single sub-block at the given position */
   function drawSingleSubBlock(
     block: ArchSubBlock,
     bx: number,
     by: number,
-    bw: number,
-    fontSize: { name: string; detail: string } = { name: '11px', detail: '9px' },
+    subBw: number,
+    fontSize: { name: string; detail: string } = DEFAULT_SUB_BLOCK_FONT_SIZE,
   ) {
     const color = getSubBlockColor(block.type, isDark);
     g.append('rect')
       .attr('x', bx)
       .attr('y', by)
-      .attr('width', bw)
+      .attr('width', subBw)
       .attr('height', subBlockH)
       .attr('rx', 6)
       .attr('fill', color.fill)
@@ -653,7 +646,7 @@ function renderDiagram(
       .attr('stroke-width', 1);
 
     g.append('text')
-      .attr('x', bx + bw / 2)
+      .attr('x', bx + subBw / 2)
       .attr('y', by + subBlockH / 2 - (block.detail ? 5 : 0))
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
@@ -665,7 +658,7 @@ function renderDiagram(
 
     if (block.detail) {
       g.append('text')
-        .attr('x', bx + bw / 2)
+        .attr('x', bx + subBw / 2)
         .attr('y', by + subBlockH / 2 + 8)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
@@ -685,13 +678,13 @@ function renderDiagram(
     label?: string,
   ) {
     let sy = startY;
-    const totalH = getFlowHeight(flow, !!label);
+    const flowH = getFlowHeight(flow, Boolean(label));
 
     g.append('rect')
       .attr('x', x + 4)
       .attr('y', sy)
       .attr('width', w - 8)
-      .attr('height', totalH)
+      .attr('height', flowH)
       .attr('rx', 8)
       .attr('fill', expandedBg)
       .attr('stroke', borderColor)
@@ -931,13 +924,13 @@ function renderDiagram(
     _label?: string,
   ) {
     let sy = startY;
-    const totalH = getFlowHeight(flow, false);
+    const flowH = getFlowHeight(flow, false);
 
     g.append('rect')
       .attr('x', x + 4)
       .attr('y', sy)
       .attr('width', w - 8)
-      .attr('height', totalH)
+      .attr('height', flowH)
       .attr('rx', 8)
       .attr('fill', expandedBg)
       .attr('stroke', borderColor)
@@ -1034,6 +1027,7 @@ function renderDiagram(
 
     const maxRows = Math.max(flow.leftPath.length, flow.middlePath.length, flow.rightPath.length);
     const hasIntermediate = flow.intermediateMergeBlocks.length > 0;
+    let finalMergeStartY: number;
 
     if (hasIntermediate) {
       const intermediateStartY =
@@ -1092,7 +1086,7 @@ function renderDiagram(
         }
       }
 
-      const finalStartY =
+      finalMergeStartY =
         intermediateStartY +
         flow.intermediateMergeBlocks.length * subBlockH +
         Math.max(0, flow.intermediateMergeBlocks.length - 1) * subArrowH +
@@ -1123,31 +1117,12 @@ function renderDiagram(
         .attr('x1', mergeCxLocal)
         .attr('y1', finalConvergeY)
         .attr('x2', mergeCxLocal)
-        .attr('y2', finalStartY - 2)
+        .attr('y2', finalMergeStartY - 2)
         .attr('stroke', mutedFg)
         .attr('stroke-width', 1)
         .attr('marker-end', 'url(#arch-arrow-sub)');
-
-      const subInnerXLocal = x + 16;
-      const subInnerWLocal = w - 40;
-      let fmsy = finalStartY;
-      for (let i = 0; i < flow.finalMergeBlocks.length; i++) {
-        drawSingleSubBlock(flow.finalMergeBlocks[i], subInnerXLocal, fmsy, subInnerWLocal);
-        fmsy += subBlockH;
-        if (i < flow.finalMergeBlocks.length - 1) {
-          g.append('line')
-            .attr('x1', mergeCxLocal)
-            .attr('y1', fmsy + 1)
-            .attr('x2', mergeCxLocal)
-            .attr('y2', fmsy + subArrowH - 2)
-            .attr('stroke', mutedFg)
-            .attr('stroke-width', 1)
-            .attr('marker-end', 'url(#arch-arrow-sub)');
-          fmsy += subArrowH;
-        }
-      }
     } else {
-      const finalStartY =
+      finalMergeStartY =
         parallelStartY + maxRows * subBlockH + Math.max(0, maxRows - 1) * subArrowH + subArrowH + 4;
 
       const allEndY = Math.max(leftEndY, middleEndY, rightEndY);
@@ -1192,28 +1167,28 @@ function renderDiagram(
         .attr('x1', mergeCxLocal)
         .attr('y1', convergeY)
         .attr('x2', mergeCxLocal)
-        .attr('y2', finalStartY - 2)
+        .attr('y2', finalMergeStartY - 2)
         .attr('stroke', mutedFg)
         .attr('stroke-width', 1)
         .attr('marker-end', 'url(#arch-arrow-sub)');
+    }
 
-      const subInnerXLocal = x + 16;
-      const subInnerWLocal = w - 40;
-      let fmsy = finalStartY;
-      for (let i = 0; i < flow.finalMergeBlocks.length; i++) {
-        drawSingleSubBlock(flow.finalMergeBlocks[i], subInnerXLocal, fmsy, subInnerWLocal);
-        fmsy += subBlockH;
-        if (i < flow.finalMergeBlocks.length - 1) {
-          g.append('line')
-            .attr('x1', mergeCxLocal)
-            .attr('y1', fmsy + 1)
-            .attr('x2', mergeCxLocal)
-            .attr('y2', fmsy + subArrowH - 2)
-            .attr('stroke', mutedFg)
-            .attr('stroke-width', 1)
-            .attr('marker-end', 'url(#arch-arrow-sub)');
-          fmsy += subArrowH;
-        }
+    const subInnerXLocal = x + 16;
+    const subInnerWLocal = w - 40;
+    let fmsy = finalMergeStartY;
+    for (let i = 0; i < flow.finalMergeBlocks.length; i++) {
+      drawSingleSubBlock(flow.finalMergeBlocks[i], subInnerXLocal, fmsy, subInnerWLocal);
+      fmsy += subBlockH;
+      if (i < flow.finalMergeBlocks.length - 1) {
+        g.append('line')
+          .attr('x1', mergeCxLocal)
+          .attr('y1', fmsy + 1)
+          .attr('x2', mergeCxLocal)
+          .attr('y2', fmsy + subArrowH - 2)
+          .attr('stroke', mutedFg)
+          .attr('stroke-width', 1)
+          .attr('marker-end', 'url(#arch-arrow-sub)');
+        fmsy += subArrowH;
       }
     }
   }
@@ -1891,9 +1866,6 @@ function renderDiagram(
       drawArrow(ffnBottom, merge2Y - circleR);
       drawResidualBypass(norm2Y, merge2Y);
     }
-
-    // Arrow from transformer container to final norm
-    drawArrow(txEnd, finalNormY);
   } else {
     // === MAIN TRANSFORMER (collapsed) ===
     const collapsedLabel = isMoE ? 'MoE Transformer Block' : 'Dense Transformer Block';
@@ -1909,7 +1881,9 @@ function renderDiagram(
       collapsedSub,
       'transformer',
     );
+  }
 
+  if (!hasAlternatingLayers) {
     // Arrow from transformer container to final norm
     drawArrow(txEnd, finalNormY);
   }

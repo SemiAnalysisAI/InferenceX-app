@@ -7,7 +7,7 @@
 import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
-import { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
+import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { getGpuSpecs, HARDWARE_CONFIG } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 
@@ -57,10 +57,10 @@ const BAN_MAX = 10;
 export const generateHighContrastColors = (
   keys: string[],
   theme: string,
-): { [key: string]: string } => {
+): Record<string, string> => {
   if (keys.length === 0) return {};
 
-  const colors: { [key: string]: string } = {};
+  const colors: Record<string, string> = {};
   const [lmin, lmax] = theme === 'dark' ? [50, 100] : [30, 65];
 
   // Group keys by vendor
@@ -167,10 +167,8 @@ export const getHardwareKey = (entry: AggDataEntry): string => {
   }
   if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
     normalizedHwName = `${normalizedHwName}_mtp`;
-  } else {
-    if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
-      normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
-    }
+  } else if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
+    normalizedHwName = `${normalizedHwName}_${entry['spec_decoding']}`;
   }
   return normalizedHwName;
 };
@@ -185,7 +183,7 @@ export function normalizeEvalHardwareKey(
   framework?: string,
   specDecoding?: string,
 ): string {
-  let hwName = hw.toLowerCase().replace(/-/g, '_');
+  let hwName = hw.toLowerCase().replaceAll('-', '_');
 
   // Strip additional qualifiers that aren't in HARDWARE_CONFIG
   // e.g., "b200 nb" -> "b200", "h200 cw" -> "h200"
@@ -193,7 +191,7 @@ export function normalizeEvalHardwareKey(
 
   // Try to find a more specific hardware config that includes framework
   if (framework) {
-    const frameworkKey = resolveFrameworkAlias(framework).replace(/-/g, '_');
+    const frameworkKey = resolveFrameworkAlias(framework).replaceAll('-', '_');
     const specificHwName = `${hwName}_${frameworkKey}`;
 
     if (specificHwName in HARDWARE_CONFIG) {
@@ -202,7 +200,7 @@ export function normalizeEvalHardwareKey(
 
     // Also check for configs with spec_decoding in the key
     if (specDecoding && specDecoding !== 'none') {
-      const specKey = specDecoding.toLowerCase().replace(/-/g, '_');
+      const specKey = specDecoding.toLowerCase().replaceAll('-', '_');
       const withSpecHwName = `${hwName}_${specKey}`;
       if (withSpecHwName in HARDWARE_CONFIG) {
         hwName = withSpecHwName;
@@ -280,18 +278,21 @@ export function createChartDataPoint(
 
     // Narrow boolean | string fields to boolean
     dp_attention:
-      entry.dp_attention != null
+      entry.dp_attention !== null && entry.dp_attention !== undefined
         ? entry.dp_attention === true || entry.dp_attention === 'true'
         : undefined,
     prefill_dp_attention:
-      entry.prefill_dp_attention != null
+      entry.prefill_dp_attention !== null && entry.prefill_dp_attention !== undefined
         ? entry.prefill_dp_attention === true || entry.prefill_dp_attention === 'true'
         : undefined,
     decode_dp_attention:
-      entry.decode_dp_attention != null
+      entry.decode_dp_attention !== null && entry.decode_dp_attention !== undefined
         ? entry.decode_dp_attention === true || entry.decode_dp_attention === 'true'
         : undefined,
-    is_multinode: entry.is_multinode != null ? !!entry.is_multinode : undefined,
+    is_multinode:
+      entry.is_multinode !== null && entry.is_multinode !== undefined
+        ? Boolean(entry.is_multinode)
+        : undefined,
 
     // Disagg fields: only set when active
     disagg: entry.disagg || undefined,
@@ -421,11 +422,8 @@ export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] 
   let maxY = -Infinity;
 
   for (const point of points) {
-    if (
-      point.y > maxY ||
-      (front.length > 0 && point.y === maxY && point.x > front[front.length - 1].x)
-    ) {
-      if (front.length > 0 && point.x === front[front.length - 1].x) {
+    if (point.y > maxY || (front.length > 0 && point.y === maxY && point.x > front.at(-1)!.x)) {
+      if (front.length > 0 && point.x === front.at(-1)!.x) {
         front[front.length - 1] = point;
       } else {
         front.push(point);
@@ -454,14 +452,14 @@ export const paretoFrontUpperLeft = (points: InferenceData[]): InferenceData[] =
   const front: InferenceData[] = [];
 
   for (const point of points) {
-    if (front.length > 0 && point.x === front[front.length - 1].x) {
-      if (point.y > front[front.length - 1].y) {
+    if (front.length > 0 && point.x === front.at(-1)!.x) {
+      if (point.y > front.at(-1)!.y) {
         front[front.length - 1] = point;
       }
       continue;
     }
 
-    while (front.length >= 1 && point.y >= front[front.length - 1].y) {
+    while (front.length > 0 && point.y >= front.at(-1)!.y) {
       front.pop();
     }
     front.push(point);
@@ -556,16 +554,21 @@ export const calculateRoofline = (
   });
 
   switch (rooflineDirection) {
-    case 'upper_right':
+    case 'upper_right': {
       return paretoFrontUpperRight(pointsForRoofline);
-    case 'upper_left':
+    }
+    case 'upper_left': {
       return paretoFrontUpperLeft(pointsForRoofline);
-    case 'lower_left':
+    }
+    case 'lower_left': {
       return paretoFrontLowerLeft(pointsForRoofline);
-    case 'lower_right':
+    }
+    case 'lower_right': {
       return paretoFrontLowerRight(pointsForRoofline);
-    default:
+    }
+    default: {
       return [];
+    }
   }
 };
 
@@ -578,7 +581,7 @@ export function computeAllRooflines(
 ): Record<string, Record<YAxisMetric, InferenceData[]>> {
   const computedRooflines: Record<string, Record<YAxisMetric, InferenceData[]>> = {};
 
-  for (const hw in groupedData) {
+  for (const hw of Object.keys(groupedData)) {
     computedRooflines[hw] = {} as Record<YAxisMetric, InferenceData[]>;
     for (const chartDefYKey of Y_AXIS_METRICS) {
       const actualDataYKey = chartDef[chartDefYKey as keyof ChartDefinition];
@@ -631,7 +634,7 @@ export function markRooflinePoints(
 ): InferenceData[] {
   const finalProcessedData: InferenceData[] = [];
 
-  for (const hwKey in groupedData) {
+  for (const hwKey of Object.keys(groupedData)) {
     for (const point of groupedData[hwKey]) {
       const newPoint = { ...point };
       newPoint.tpPerGpu.roof = false;
@@ -709,12 +712,12 @@ export function markRooflinePoints(
           newPoint.costni.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_costri') {
           newPoint.costri.roof = onCurrentRoofline;
-        } else if (chartDefYKey === 'y_jTotal') {
-          if (newPoint.jTotal) newPoint.jTotal.roof = onCurrentRoofline;
-        } else if (chartDefYKey === 'y_jOutput') {
-          if (newPoint.jOutput) newPoint.jOutput.roof = onCurrentRoofline;
-        } else if (chartDefYKey === 'y_jInput') {
-          if (newPoint.jInput) newPoint.jInput.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_jTotal' && newPoint.jTotal) {
+          newPoint.jTotal.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_jOutput' && newPoint.jOutput) {
+          newPoint.jOutput.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_jInput' && newPoint.jInput) {
+          newPoint.jInput.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);

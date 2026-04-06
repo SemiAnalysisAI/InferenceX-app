@@ -16,15 +16,15 @@ import {
 } from '@/components/ui/select';
 import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelCategory,
   getModelLabel,
   getPrecisionLabel,
   getSequenceCategory,
   getSequenceLabel,
   groupByCategory,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 
 function DeprecatedLabel({ reason }: { reason: string }) {

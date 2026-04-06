@@ -66,7 +66,7 @@ function appendPaginationParams(url: string, page: number): string {
   return `${url}${separator}per_page=100&page=${page}`;
 }
 
-export async function fetchGithubWorkflowRun(runId: string, token: string): Promise<Response> {
+export function fetchGithubWorkflowRun(runId: string, token: string): Promise<Response> {
   return fetch(`${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}`, {
     headers: {
       ...GITHUB_HEADERS,
@@ -111,7 +111,7 @@ export async function fetchGithubRunArtifacts(
   return artifacts;
 }
 
-export async function downloadGithubArtifact(url: string, token: string): Promise<Response> {
+export function downloadGithubArtifact(url: string, token: string): Promise<Response> {
   return fetch(url, {
     headers: {
       ...GITHUB_HEADERS,
@@ -136,7 +136,7 @@ export function extractZipEntries<T>(
     }
 
     try {
-      rows.push(...parseEntry(entry.entryName, zip.readAsText(entry)));
+      rows.push(...parseEntry(entry.entryName, entry.getData().toString('utf8')));
     } catch (error) {
       onParseError?.(entry.entryName, error);
     }

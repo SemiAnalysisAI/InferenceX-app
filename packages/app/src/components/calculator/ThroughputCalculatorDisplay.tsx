@@ -31,12 +31,12 @@ import {
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 import { getModelSortIndex, GPU_SPECS, HARDWARE_CONFIG } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -50,7 +50,7 @@ import ThroughputBarChart, {
   getThroughputForType,
   getTpPerMwForType,
 } from './ThroughputBarChart';
-import { BarMetric, CostProvider, CostType, InterpolatedResult } from './types';
+import type { BarMetric, CostProvider, CostType, InterpolatedResult } from './types';
 import { useThroughputData } from './useThroughputData';
 
 const COST_PROVIDER_OPTIONS: { value: CostProvider; label: string }[] = [
@@ -70,6 +70,12 @@ const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'power', label: 'tok/s/MW' },
   { value: 'cost', label: 'Cost' },
 ];
+
+const getBarMetricLabel = (metric: BarMetric) => {
+  if (metric === 'throughput') return 'Throughput';
+  if (metric === 'cost') return 'Cost';
+  return 'tok/s/MW';
+};
 
 type CalculatorViewMode = 'chart' | 'table';
 
@@ -134,7 +140,7 @@ export default function ThroughputCalculatorDisplay() {
   // Reset visible GPUs when the available set changes (model/sequence/precision change or customer filter toggle)
   useEffect(() => {
     if (availableHwKeys.length === 0) return;
-    const key = [...availableHwKeys].sort().join(',');
+    const key = [...availableHwKeys].toSorted().join(',');
     if (key !== prevAvailableKeyRef.current) {
       prevAvailableKeyRef.current = key;
       setVisibleHwKeys(new Set(availableHwKeys));
@@ -157,9 +163,7 @@ export default function ThroughputCalculatorDisplay() {
     return getResults(targetValue, mode, costProvider, visibleHwKeys);
   }, [hasData, targetValue, mode, costProvider, getResults, visibleHwKeys]);
 
-  const currentRange = useMemo(() => {
-    return ranges.interactivity;
-  }, [ranges]);
+  const currentRange = useMemo(() => ranges.interactivity, [ranges]);
 
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
@@ -240,18 +244,15 @@ export default function ThroughputCalculatorDisplay() {
           } else if (prev.size === 1) {
             // If only one visible and clicking it, show all
             return new Set(availableHwKeys);
-          } else {
-            // Remove it
-            const next = new Set(prev);
-            next.delete(hwKey);
-            return next;
           }
-        } else {
-          // Add it
+          // Remove it
           const next = new Set(prev);
-          next.add(hwKey);
+          next.delete(hwKey);
           return next;
         }
+        // Add it
+        const next = new Set([...prev, hwKey]);
+        return next;
       });
       track('calculator_gpu_toggled', { gpu: hwKey });
     },
@@ -377,7 +378,7 @@ export default function ThroughputCalculatorDisplay() {
     const availableSet = new Set(availableHwKeys);
     return Object.entries(hardwareConfig)
       .filter(([key]) => availableSet.has(key))
-      .sort(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+      .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map(([key, config]) => ({
         name: config.name,
         label: getDisplayLabel(config),
@@ -388,12 +389,6 @@ export default function ThroughputCalculatorDisplay() {
         onClick: () => toggleGpuVisibility(key),
       }));
   }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
-
-  const getBarMetricLabel = (metric: BarMetric) => {
-    if (metric === 'throughput') return 'Throughput';
-    if (metric === 'cost') return 'Cost';
-    return 'tok/s/MW';
-  };
 
   if (!loading && error) {
     console.error(error);

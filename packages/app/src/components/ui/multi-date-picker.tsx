@@ -77,10 +77,8 @@ export function MultiDatePicker({
 
     if (isSelected) {
       setTempDates(tempDates.filter((d) => d !== dateStr));
-    } else {
-      if (tempDates.length < maxDates) {
-        setTempDates([...tempDates, dateStr].sort());
-      }
+    } else if (tempDates.length < maxDates) {
+      setTempDates([...tempDates, dateStr].toSorted());
     }
     track('multi_date_picker_date_clicked', { date: dateStr, selected: !isSelected });
   };
@@ -133,7 +131,7 @@ export function MultiDatePicker({
             variant="outline"
             className={cn(
               'w-full justify-start text-left font-normal',
-              !dates.length && 'text-muted-foreground',
+              dates.length === 0 && 'text-muted-foreground',
               className,
             )}
           >
@@ -243,9 +241,7 @@ function CalendarGrid({
     [selectedDates.join(',')],
   );
 
-  const isDateSelected = (date: Date) => {
-    return selectedDates.includes(formatCalendarDate(date));
-  };
+  const isDateSelected = (date: Date) => selectedDates.includes(formatCalendarDate(date));
 
   const getDayState = (date: Date) => {
     const outOfRange = isCalendarDateOutOfRange(date, minAllowedDate, maxAllowedDate, true);

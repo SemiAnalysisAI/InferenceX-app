@@ -3,6 +3,8 @@
  * Each function is a thin fetch wrapper returning typed data.
  */
 
+import type { SubmissionsResponse } from './submissions-types';
+
 export interface BenchmarkRow {
   hardware: string;
   framework: string;
@@ -139,5 +141,5 @@ export function fetchEvaluations() {
 }
 
 export function fetchSubmissions() {
-  return fetchJson<import('./submissions-types').SubmissionsResponse>('/api/v1/submissions');
+  return fetchJson<SubmissionsResponse>('/api/v1/submissions');
 }

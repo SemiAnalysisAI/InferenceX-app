@@ -5,7 +5,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
-import { TrendLineConfig } from '@/components/inference/types';
+import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
@@ -20,13 +20,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getModelSortIndex } from '@/lib/constants';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
   isModelExperimental,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -73,7 +73,7 @@ export default function HistoricalTrendsDisplay() {
 
   // Interactivity range from current chart data
   const interactivityRange = useMemo(() => {
-    const g = graphs.find((g) => g.chartDefinition.chartType === 'interactivity');
+    const g = graphs.find((graph) => graph.chartDefinition.chartType === 'interactivity');
     if (!g || g.data.length === 0) return { min: 0, max: 200 };
     const xs = g.data.map((d) => d.x);
     return { min: Math.ceil(Math.min(...xs)), max: Math.floor(Math.max(...xs)) };
@@ -132,7 +132,7 @@ export default function HistoricalTrendsDisplay() {
   // Line configs for TrendChart — one per visible GPU+precision combo
   const lineConfigs = useMemo(
     (): TrendLineConfig[] =>
-      Array.from(trendLines.keys())
+      [...trendLines.keys()]
         .filter((groupKey) => {
           const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
           return activeHwTypes.has(baseHwKey);
@@ -338,7 +338,7 @@ export default function HistoricalTrendsDisplay() {
                     onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)
                       .filter(([key]) => hwTypesWithData.has(key))
-                      .sort(
+                      .toSorted(
                         ([a], [b]) =>
                           getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                       )

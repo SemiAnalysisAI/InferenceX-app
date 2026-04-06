@@ -4,7 +4,7 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import { useEffect, useMemo, useRef } from 'react';
 
-import { HardwareConfig } from '@/components/inference/types';
+import type { HardwareConfig } from '@/components/inference/types';
 import { HARDWARE_CONFIG } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -17,7 +17,13 @@ import type {
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { getDisplayLabel } from '@/lib/utils';
 
-import { BarMetric, CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
+import type {
+  BarMetric,
+  CalculatorMode,
+  CostProvider,
+  CostType,
+  InterpolatedResult,
+} from './types';
 
 interface ThroughputBarChartProps {
   results: InterpolatedResult[];
@@ -55,12 +61,15 @@ export function getMetricValue(
   costType: CostType,
 ): number {
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return getTpPerMwForType(d, costType);
-    case 'cost':
+    }
+    case 'cost': {
       return getCostForType(d, costType);
-    default:
+    }
+    default: {
       return getThroughputForType(d, costType);
+    }
   }
 }
 
@@ -71,14 +80,17 @@ export function getMetricLabel(
 ): string {
   const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return `${tokenTypePrefix}Tokens per Provisioned All-in Megawatt (tok/s/MW)`;
-    case 'cost':
+    }
+    case 'cost': {
       return `Cost ($${getCostTypeLabel(costType)})`;
-    default:
+    }
+    default: {
       return mode === 'interactivity_to_throughput'
         ? `${tokenTypePrefix}Throughput per GPU (tok/s/gpu)`
         : 'Interactivity (tok/s/user)';
+    }
   }
 }
 
@@ -89,25 +101,31 @@ export function getValueLabel(
   costType: CostType,
 ): string {
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return `${getTpPerMwForType(d, costType).toFixed(0)} tok/s/MW`;
-    case 'cost':
+    }
+    case 'cost': {
       return `$${getCostForType(d, costType).toFixed(3)}${getCostTypeLabel(costType)}`;
-    default:
+    }
+    default: {
       return mode === 'interactivity_to_throughput'
         ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/gpu`
         : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+    }
   }
 }
 
 export function getCostProviderLabel(provider: CostProvider): string {
   switch (provider) {
-    case 'costh':
+    case 'costh': {
       return 'Owning - Hyperscaler';
-    case 'costn':
+    }
+    case 'costn': {
       return 'Owning - Neocloud';
-    case 'costr':
+    }
+    case 'costr': {
       return 'Renting - 3yr Rental';
+    }
   }
 }
 
@@ -127,16 +145,18 @@ export function getChartTitle(
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt at ${targetLabel}`;
+    }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
       return `Cost per Million ${tokenTypeLabel} Tokens (${providerLabel}) at ${targetLabel}`;
     }
-    default:
+    default: {
       return mode === 'interactivity_to_throughput'
         ? `${tokenTypeLabel} Token Throughput per GPU at ${targetLabel}`
         : `Interactivity at ${targetLabel}`;
+    }
   }
 }
 
@@ -147,18 +167,21 @@ export function getSortedResults(
 ): InterpolatedResult[] {
   const sorted = [...results];
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       // Most efficient first (descending)
       sorted.sort((a, b) => getTpPerMwForType(b, costType) - getTpPerMwForType(a, costType));
       return sorted;
-    case 'cost':
+    }
+    case 'cost': {
       // Cheapest first (ascending cost)
       sorted.sort((a, b) => getCostForType(a, costType) - getCostForType(b, costType));
       return sorted;
-    default:
+    }
+    default: {
       // Highest throughput first (descending, using token-type-appropriate value)
       sorted.sort((a, b) => getThroughputForType(b, costType) - getThroughputForType(a, costType));
       return sorted;
+    }
   }
 }
 
@@ -217,9 +240,9 @@ export function generateTooltipHTML(
   const disagg = nearest?.disagg;
 
   let parallelismHtml = '';
-  if (ep != null && ep > 1 && tp === ep) {
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Parallelism:</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
-  } else if (ep != null && ep > 1) {
+  } else if (ep !== null && ep !== undefined && ep > 1) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}, <strong>EP:</strong> ${ep}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
   } else {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
@@ -374,7 +397,7 @@ export default function ThroughputBarChart({
 
   // Y domain — reversed because useD3ChartRenderer builds band scale with range [height, 0]
   const yDomain = useMemo(
-    () => [...sortedResults].reverse().map((r) => r.resultKey),
+    () => [...sortedResults].toReversed().map((r) => r.resultKey),
     [sortedResults],
   );
 

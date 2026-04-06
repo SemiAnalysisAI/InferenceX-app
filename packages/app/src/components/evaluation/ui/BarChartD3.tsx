@@ -5,19 +5,18 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
 import { getModelSortIndex } from '@/lib/constants';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { D3ChartHandle, LayerConfig } from '@/lib/d3-chart/D3Chart';
+import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
-import { EvaluationChartData } from '@/components/evaluation/types';
+import type { EvaluationChartData } from '@/components/evaluation/types';
 import {
-  EvalBenchmark,
+  type EvalBenchmark,
+  type Precision,
   getEvalBenchmarkLabel,
   getPrecisionLabel,
-  Precision,
 } from '@/lib/data-mappings';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +32,15 @@ const OVERLAY_ERROR_STROKE_WIDTH = 1.5;
 
 const getOverlayXPath = (size: number) =>
   `M ${-size},${-size} L ${size},${size} M ${-size},${size} L ${size},${-size}`;
+
+const formatDateStr = (dateStr: string) => {
+  const [year, month, day] = dateStr.split('-');
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10)));
+};
 
 const runLinkHTML = (runUrl?: string) =>
   runUrl
@@ -181,7 +189,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         });
       }
     });
-    return Array.from(configMap.values()).sort(
+    return [...configMap.values()].toSorted(
       (a, b) =>
         getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) || a.hwKey.localeCompare(b.hwKey),
     );
@@ -197,7 +205,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         });
       }
     });
-    return Array.from(configMap.values()).sort(
+    return [...configMap.values()].toSorted(
       (a, b) =>
         getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) ||
         a.hwKey.localeCompare(b.hwKey) ||
@@ -208,7 +216,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const yLabels = useMemo(() => {
     const labels = new Set<string>();
     [...chartData, ...unofficialChartData].forEach((item) => labels.add(item.configLabel));
-    return Array.from(labels);
+    return [...labels];
   }, [chartData, unofficialChartData]);
 
   const sortedConfigLabels = useMemo(
@@ -701,14 +709,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     const hasSelections = selectedBenchmark && selectedModel && selectedRunDate;
     const hasNoEvalDataForDate =
       hasSelections && availableDates.length > 0 && !availableDates.includes(selectedRunDate);
-    const formatDate = (dateStr: string) => {
-      const [year, month, day] = dateStr.split('-');
-      return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }).format(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
-    };
     return (
       <div className="flex items-center justify-center h-100 text-muted-foreground">
         <div className="text-center">
@@ -718,7 +718,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             'No evaluation data is available for this model.'
           ) : hasNoEvalDataForDate ? (
             <>
-              <div>No evaluation data available for {formatDate(selectedRunDate)}.</div>
+              <div>No evaluation data available for {formatDateStr(selectedRunDate)}.</div>
               <div>Try selecting a different date.</div>
             </>
           ) : (

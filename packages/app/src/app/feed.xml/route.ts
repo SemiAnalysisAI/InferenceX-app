@@ -3,13 +3,14 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 function escapeXml(s: string): string {
   return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
 
+// eslint-disable-next-line require-await
 export async function GET() {
   const posts = getAllPosts();
   const now = new Date().toUTCString();
@@ -22,7 +23,7 @@ export async function GET() {
       <guid isPermaLink="false">${SITE_URL}/blog/${post.slug}</guid>
       <description>${escapeXml(post.subtitle)}</description>
       <dc:creator>${escapeXml(AUTHOR_NAME)}</dc:creator>
-      <pubDate>${new Date(post.date + 'T00:00:00Z').toUTCString()}</pubDate>${
+      <pubDate>${new Date(`${post.date}T00:00:00Z`).toUTCString()}</pubDate>${
         post.tags
           ? post.tags.map((tag) => `\n      <category>${escapeXml(tag)}</category>`).join('')
           : ''

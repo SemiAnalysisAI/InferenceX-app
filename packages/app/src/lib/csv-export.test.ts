@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { buildCsv, csvLicensePreamble, downloadCsv, exportToCsv } from './csv-export';
 
-describe('buildCsv', () => {
-  /** Strip the license preamble to isolate data assertions */
-  function dataLines(csv: string): string {
-    return csv
-      .split('\n')
-      .filter((l) => !l.startsWith('#'))
-      .join('\n');
-  }
+/** Strip the license preamble to isolate data assertions */
+function dataLines(csv: string): string {
+  return csv
+    .split('\n')
+    .filter((l) => !l.startsWith('#'))
+    .join('\n');
+}
 
+describe('buildCsv', () => {
   it('prepends the license preamble', () => {
     const result = buildCsv(['A'], [['1']]);
     expect(result.startsWith(csvLicensePreamble())).toBe(true);

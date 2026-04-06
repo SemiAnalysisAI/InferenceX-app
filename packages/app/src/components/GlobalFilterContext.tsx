@@ -1,8 +1,8 @@
 'use client';
 
 import {
+  type ReactNode,
   createContext,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -191,7 +191,7 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   const availablePrecisions = useMemo(() => {
     if (!availabilityRows) return ['fp4'];
     const rows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
-    const precs = [...new Set(rows.map((r) => r.precision))].sort();
+    const precs = [...new Set(rows.map((r) => r.precision))].toSorted();
     return precs.length > 0 ? precs : ['fp4'];
   }, [availabilityRows, modelRows, effectiveSequence]);
 
@@ -208,13 +208,13 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     const seqRows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
     const rows = seqRows.filter((r) => effectivePrecisions.includes(r.precision));
     if (rows.length === 0) {
-      return [...new Set(seqRows.map((r) => r.date))].sort();
+      return [...new Set(seqRows.map((r) => r.date))].toSorted();
     }
-    return [...new Set(rows.map((r) => r.date))].sort();
+    return [...new Set(rows.map((r) => r.date))].toSorted();
   }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
 
   // When true, keep the user's date if available; otherwise always use latest
-  const userPickedDateRef = useRef(!!getUrlParam('g_rundate'));
+  const userPickedDateRef = useRef(Boolean(getUrlParam('g_rundate')));
 
   const setSelectedRunDateManual = useCallback((date: string) => {
     userPickedDateRef.current = true;
@@ -224,7 +224,7 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
 
   const effectiveRunDate = useMemo(() => {
     if (availableDates.length === 0) return selectedRunDate;
-    const latest = availableDates[availableDates.length - 1];
+    const latest = availableDates.at(-1)!;
     if (userPickedDateRef.current && selectedRunDate && availableDates.includes(selectedRunDate)) {
       return selectedRunDate;
     }

@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { useInference } from '@/components/inference/InferenceContext';
-import {
+import type {
   ChartDefinition,
   HardwareConfig,
   InferenceData,
@@ -56,10 +56,10 @@ export function UnofficialChartDisplay() {
   ]);
 
   // Generate the key to look up unofficial data
-  const dataKey = useMemo(() => {
-    // Model and Sequence enum values are the strings used as API response keys directly
-    return `${selectedModel}_${selectedSequence}`;
-  }, [selectedModel, selectedSequence]);
+  const dataKey = useMemo(
+    () => `${selectedModel}_${selectedSequence}`,
+    [selectedModel, selectedSequence],
+  );
 
   // Create graphs with hardware config for unofficial data
   interface UnofficialGraph extends RenderableGraph {

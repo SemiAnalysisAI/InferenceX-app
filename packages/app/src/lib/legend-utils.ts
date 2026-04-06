@@ -30,7 +30,7 @@ export function filterAndSortLegendItems<T extends LegendItem>(
   }
 
   if (sortActiveFirst) {
-    result = [...result].sort((a, b) => {
+    result = [...result].toSorted((a, b) => {
       if (a.isActive && !b.isActive) return -1;
       if (!a.isActive && b.isActive) return 1;
       return 0;

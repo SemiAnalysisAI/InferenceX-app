@@ -7,7 +7,12 @@ import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { getPrecisionLabel, isModelExperimental, Model, Precision } from '@/lib/data-mappings';
+import {
+  type Model,
+  type Precision,
+  getPrecisionLabel,
+  isModelExperimental,
+} from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
 
@@ -71,7 +76,7 @@ export default function EvaluationChartDisplay() {
                   <>
                     {' '}
                     • Updated:{' '}
-                    {new Date(selectedRunDate + 'T00:00:00Z').toLocaleDateString('en-US', {
+                    {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: '2-digit',
                       day: '2-digit',

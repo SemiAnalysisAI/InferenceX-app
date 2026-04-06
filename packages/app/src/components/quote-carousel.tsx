@@ -58,7 +58,7 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
     const orderSet = new Set(order);
     const pinned = order
       .map((c) => entries.find((e) => e.org === c))
-      .filter((e): e is CompanyEntry => !!e);
+      .filter(Boolean) as CompanyEntry[];
     const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.org)));
     return [...pinned, ...rest];
   }

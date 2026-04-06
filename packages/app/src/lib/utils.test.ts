@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import {
   formatNumber,
@@ -15,7 +16,7 @@ import {
 } from '@/lib/utils';
 
 vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/constants')>();
+  const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
@@ -193,8 +194,8 @@ describe('calculatePowerForGpus', () => {
     // (50 / 700) * 700 = 50.0
     const data = [pt({ hwKey: 'h100' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 700 });
-    expect(result[0].powerUser?.y).toBe(50.0);
-    expect(result[0].y).toBe(50.0);
+    expect(result[0].powerUser?.y).toBe(50);
+    expect(result[0].y).toBe(50);
     expect(result[0].powerUser?.roof).toBe(false);
   });
 
@@ -202,8 +203,8 @@ describe('calculatePowerForGpus', () => {
     // (50 / 700) * 350 = 25.0
     const data = [pt({ hwKey: 'h100' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 350 });
-    expect(result[0].powerUser?.y).toBe(25.0);
-    expect(result[0].y).toBe(25.0);
+    expect(result[0].powerUser?.y).toBe(25);
+    expect(result[0].y).toBe(25);
   });
 
   it('returns item unchanged when no user power is provided for that GPU', () => {
@@ -216,7 +217,7 @@ describe('calculatePowerForGpus', () => {
   it('inherits power from base GPU key for prefixed hardware (e.g. h100_mtp → h100)', () => {
     const data = [pt({ hwKey: 'h100_mtp' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 700 });
-    expect(result[0].powerUser?.y).toBe(50.0);
+    expect(result[0].powerUser?.y).toBe(50);
   });
 });
 
@@ -351,26 +352,26 @@ describe('computeInputCostFields', () => {
 // ---------------------------------------------------------------------------
 // filterRunsByModel
 // ---------------------------------------------------------------------------
-describe('filterRunsByModel', () => {
-  function makeRun(configKeys: string[][], overrides: Record<string, any> = {}) {
-    return {
-      runId: '123',
-      runDate: '2025-12-15',
-      runUrl: 'https://github.com/example',
-      conclusion: 'success' as string | null,
-      changelog: {
-        base_ref: 'abc',
-        head_ref: 'def',
-        entries: configKeys.map((keys) => ({
-          config_keys: keys,
-          description: 'test entry',
-          pr_link: null,
-        })),
-      },
-      ...overrides,
-    };
-  }
+function makeRun(configKeys: string[][], overrides: Record<string, any> = {}) {
+  return {
+    runId: '123',
+    runDate: '2025-12-15',
+    runUrl: 'https://github.com/example',
+    conclusion: 'success' as string | null,
+    changelog: {
+      base_ref: 'abc',
+      head_ref: 'def',
+      entries: configKeys.map((keys) => ({
+        config_keys: keys,
+        description: 'test entry',
+        pr_link: null,
+      })),
+    },
+    ...overrides,
+  };
+}
 
+describe('filterRunsByModel', () => {
   it('returns null when availableRuns is null', () => {
     expect(filterRunsByModel(null, ['gptoss'])).toBeNull();
   });

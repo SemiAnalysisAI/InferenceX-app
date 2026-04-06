@@ -9,7 +9,7 @@ export function HashScroll() {
     if (!hash) return;
     // Small delay to let the page finish rendering
     const timer = setTimeout(() => {
-      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+      document.querySelector(`#${CSS.escape(hash)}`)?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
     return () => clearTimeout(timer);
   }, []);

@@ -6,6 +6,9 @@ import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
 import { getFrameworkLabel } from '@/lib/utils';
 
+const evalGroupKeyFn = (item: EvaluationChartData) =>
+  `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
+
 function buildConfigLabel(
   hwLabel: string,
   framework: string,
@@ -48,14 +51,13 @@ export function buildEvaluationChartRows(
 
   const showPrecision = selectedPrecisions.length > 1;
   const allData = rawData
-    .filter((item) => {
-      return (
+    .filter(
+      (item) =>
         item.task === selectedBenchmark &&
         item.model === dbModelKey &&
         (!selectedRunDate || item.date <= selectedRunDate) &&
-        selectedPrecisions.includes(item.precision)
-      );
-    })
+        selectedPrecisions.includes(item.precision),
+    )
     .map((item): EvaluationChartData | null => {
       const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
       if (score === 0) return null;
@@ -100,19 +102,16 @@ export function buildEvaluationChartRows(
     })
     .filter((item): item is EvaluationChartData => item !== null);
 
-  const groupKeyFn = (item: EvaluationChartData) =>
-    `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
-
   const latestDateForGroup = new Map<string, string>();
   for (const item of allData) {
-    const key = groupKeyFn(item);
+    const key = evalGroupKeyFn(item);
     const existing = latestDateForGroup.get(key);
     if (!existing || item.date > existing) latestDateForGroup.set(key, item.date);
   }
 
   return allData
-    .filter((item) => item.date === latestDateForGroup.get(groupKeyFn(item)))
-    .sort((a, b) => a.configLabel.localeCompare(b.configLabel));
+    .filter((item) => item.date === latestDateForGroup.get(evalGroupKeyFn(item)))
+    .toSorted((a, b) => a.configLabel.localeCompare(b.configLabel));
 }
 
 /** Aggregate repeated eval rows by config label and keep min/max/error range metadata. */
@@ -127,7 +126,7 @@ export function aggregateEvaluationChartRows(
     grouped.get(data.configLabel)!.push(data);
   }
 
-  return Array.from(grouped.values())
+  return [...grouped.values()]
     .map((dataPoints) => {
       let sum = 0;
       let rawMin = Infinity;
@@ -156,7 +155,7 @@ export function aggregateEvaluationChartRows(
         errorMax: errMax,
       };
     })
-    .sort(
+    .toSorted(
       (a, b) =>
         getModelSortIndex(String(a.hwKey)) - getModelSortIndex(String(b.hwKey)) ||
         String(a.hwKey).localeCompare(String(b.hwKey)) ||
@@ -210,7 +209,7 @@ export function buildEvalChangelogEntries(
     byBenchmark.get(item.benchmark)!.add(item.configLabel);
   }
 
-  return Array.from(byBenchmark.entries())
-    .map(([benchmark, configs]) => ({ benchmark, configs: Array.from(configs).sort() }))
-    .sort((a, b) => a.benchmark.localeCompare(b.benchmark));
+  return [...byBenchmark.entries()]
+    .map(([benchmark, configs]) => ({ benchmark, configs: [...configs].toSorted() }))
+    .toSorted((a, b) => a.benchmark.localeCompare(b.benchmark));
 }
