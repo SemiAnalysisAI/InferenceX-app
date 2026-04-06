@@ -17,7 +17,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
-          token: ${{ secrets.PAT }}
 
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
@@ -38,7 +37,7 @@ jobs:
         uses: anthropics/claude-code-action@88c168b39e7e64da0286d812b6e9fbebb6708185 # v1.0.82
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.PAT }}
+          github_token: ${{ github.token }}
           direct_prompt: |
             You are updating SEO blog articles for InferenceX with fresh benchmark data.
 
@@ -113,7 +112,7 @@ jobs:
       - name: Create PR
         if: steps.changes.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           DATE=$(date +%Y-%m-%d)
           BRANCH="seo/update-articles-${DATE}"
