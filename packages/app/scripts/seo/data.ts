@@ -18,10 +18,11 @@ export function modelSlug(displayName: string): string {
     .replaceAll(/^-+|-+$/g, '');
 }
 
+const fmtSeqPart = (n: number) => (n >= 1024 ? `${Math.round(n / 1024)}k` : String(n));
+
 /** Sequence key from ISL/OSL. */
 function seqKey(isl: number, osl: number): string {
-  const fmt = (n: number) => (n >= 1024 ? `${Math.round(n / 1024)}k` : String(n));
-  return `${fmt(isl)}/${fmt(osl)}`;
+  return `${fmtSeqPart(isl)}/${fmtSeqPart(osl)}`;
 }
 
 const MAX_RETRIES = 3;
@@ -34,7 +35,9 @@ function isRetryable(error: unknown): boolean {
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 /** Fetch benchmark data for a model from the API (retries on network errors / 5xx). */

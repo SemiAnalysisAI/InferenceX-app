@@ -57,11 +57,11 @@ describe('gpuDisplayName', () => {
   });
 
   it('prepends AMD vendor for mi300x', () => {
-    expect(gpuDisplayName('mi300x')).toBe('AMD MI 300X');
+    expect(gpuDisplayName('mi300x')).toBe('AMD MI300X');
   });
 
-  it('inserts space after MI for AMD keys', () => {
-    expect(gpuDisplayName('mi325x')).toBe('AMD MI 325X');
+  it('uppercases MI keys without inserting space', () => {
+    expect(gpuDisplayName('mi325x')).toBe('AMD MI325X');
   });
 
   it('uppercases unknown key with no vendor prefix', () => {
@@ -72,8 +72,8 @@ describe('gpuDisplayName', () => {
     expect(gpuDisplayName('gb200')).toBe('NVIDIA GB200');
   });
 
-  it('handles mi355x with space insertion', () => {
-    expect(gpuDisplayName('mi355x')).toBe('AMD MI 355X');
+  it('handles mi355x without space insertion', () => {
+    expect(gpuDisplayName('mi355x')).toBe('AMD MI355X');
   });
 });
 
