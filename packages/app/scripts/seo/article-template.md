@@ -38,10 +38,27 @@ tags:
 - "We benchmarked X across Y GPUs, Z precisions, and N frameworks"
 - "Comprehensive benchmarks across N GPUs with real throughput data"
 
+## Model Categories
+
+Each model in the data has a `category` field:
+
+- **`default`** — stable, well-tested models. No special disclaimer needed.
+- **`experimental`** — early support, limited GPU/framework coverage. Add a one-line
+  disclaimer at the end of the intro: "Note: InferenceX support for this model is still
+  early; expect more GPUs and frameworks in future updates."
+- **`deprecated`** — still benchmarked but no longer featured in the main dashboard.
+  Add to the intro: "Note: this model has been superseded on InferenceX but we
+  continue to benchmark it for reference."
+
+Also mark experimental/deprecated models in the rollup "Best GPU Per Model" table by
+appending a footnote marker (e.g. "GLM-5 †") with a footnote below the table:
+`† Experimental support — limited GPU/framework coverage.`
+
 ## Section 1: Intro (1 paragraph, 2-3 sentences)
 
 Describe the model, then say what makes GPU selection interesting for _this_ model.
 Link to the dashboard. Cross-link 1-2 related models if they exist.
+If the model's category is `experimental` or `deprecated`, include the disclaimer (see above).
 
 **Target length: ~40-60 words.**
 

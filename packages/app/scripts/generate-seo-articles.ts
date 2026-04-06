@@ -19,6 +19,17 @@ import type { BestConfig } from './seo/types';
 const PRIMARY_SEQ = '8k/1k';
 const MIN_GPUS = 2;
 
+/** Model category — mirrors MODEL_CONFIG in src/lib/data-mappings.ts */
+const MODEL_CATEGORY: Record<string, 'default' | 'experimental' | 'deprecated'> = {
+  dsr1: 'default',
+  gptoss120b: 'default',
+  llama70b: 'deprecated',
+  'qwen3.5': 'experimental',
+  'kimik2.5': 'experimental',
+  'minimaxm2.5': 'experimental',
+  glm5: 'experimental',
+};
+
 // ---------------------------------------------------------------------------
 // CLI arg parsing
 // ---------------------------------------------------------------------------
@@ -52,6 +63,7 @@ interface SerializableModelData {
   modelKey: string;
   displayName: string;
   slug: string;
+  category: 'default' | 'experimental' | 'deprecated';
   totalRows: number;
   sequences: Record<string, SerializableBestConfig[]>;
   primarySequence: string;
@@ -73,7 +85,7 @@ interface SeoDataOutput {
 
 function gpuDisplay(hw: string): string {
   const vendor = GPU_VENDORS[hw];
-  const upper = hw.toUpperCase().replace('MI', 'MI ');
+  const upper = hw.toUpperCase();
   return vendor ? `${vendor} ${upper}` : upper;
 }
 
@@ -130,6 +142,7 @@ async function processModel(
     modelKey,
     displayName,
     slug: `best-gpu-for-${modelKey}-inference`,
+    category: MODEL_CATEGORY[modelKey] ?? 'default',
     totalRows: rows.length,
     sequences,
     primarySequence: PRIMARY_SEQ,
