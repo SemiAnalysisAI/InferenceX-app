@@ -37,6 +37,7 @@ MI355X's composability problem shows here. Its FP4 disagg results (MoRI SGLang) 
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="DeepSeek-R1-0528 Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"B200 Dynamo TRT FP4","value":13429.7,"vendor":"nvidia"},{"gpu":"MI355X MoRI SGLang FP4","value":4222.8,"vendor":"amd"},{"gpu":"MI355X MoRI SGLang FP8","value":3815.3,"vendor":"amd"},{"gpu":"MI355X Atom FP4","value":3652.0,"vendor":"amd"}]'
 />
@@ -44,6 +45,7 @@ _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inf
 TTFT tells a different story. MI355X (Atom) FP4 at concurrency 256 posts 1,021ms TTFT, while B200 (Dynamo TRT) FP4 at concurrency 1,691 sits at 4,145ms. If you're latency-sensitive and running low concurrency, Atom on MI355X is worth looking at. But at scale, the throughput gap is too large to ignore.
 
 <BenchmarkChart
+  title="DeepSeek-R1-0528 — Performance Over Time"
   variant="line"
   metric="Throughput/GPU (tok/s), DeepSeek-R1"
   data='{"series":{"B200 TRT FP4":[{"date":"2025-09-30","value":4010.8},{"date":"2025-10-22","value":8381.8},{"date":"2025-11-13","value":8366.9},{"date":"2025-12-05","value":8359.8},{"date":"2026-01-14","value":9554.2},{"date":"2026-02-06","value":10505.4}],"MI355X SGLang FP4":[{"date":"2025-09-30","value":1349.6},{"date":"2025-10-22","value":1473.6},{"date":"2025-11-13","value":1340.7},{"date":"2025-12-05","value":1851.8},{"date":"2025-12-30","value":2140.1},{"date":"2026-01-29","value":2004.6},{"date":"2026-02-27","value":1952.2}]}}'
@@ -67,11 +69,13 @@ Cost tells a closer story: B200 at $0.01/Mtok, MI355X at $0.01/Mtok. The differe
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="gpt-oss-120b Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"B200 TRT FP4","value":61612.7,"vendor":"nvidia"},{"gpu":"B200 vLLM FP4","value":51523.0,"vendor":"nvidia"},{"gpu":"MI355X Atom FP4","value":44999.3,"vendor":"amd"},{"gpu":"MI355X vLLM FP4","value":38532.2,"vendor":"amd"}]'
 />
 
 <BenchmarkChart
+  title="gpt-oss-120b — Performance Over Time"
   variant="line"
   metric="Throughput/GPU (tok/s), gpt-oss-120b"
   data='{"series":{"B200 TRT FP4":[{"date":"2025-09-30","value":10913.7},{"date":"2025-10-22","value":37172.6},{"date":"2025-11-13","value":37030.0},{"date":"2025-12-05","value":50638.3},{"date":"2026-01-07","value":50910.3},{"date":"2026-02-05","value":61612.7}],"MI355X vLLM FP4":[{"date":"2025-09-30","value":21243.6},{"date":"2025-10-22","value":27971.2},{"date":"2025-11-13","value":33380.0},{"date":"2025-12-05","value":33451.3},{"date":"2026-02-26","value":34121.0},{"date":"2026-03-09","value":38532.2}]}}'
@@ -94,6 +98,7 @@ On cost, B200 is at $0.04/Mtok and MI355X at $0.05/Mtok. B200 wins on both throu
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="Llama-3.3-70B Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"B200 TRT FP4","value":12981.3,"vendor":"nvidia"},{"gpu":"MI355X vLLM FP4","value":8748.9,"vendor":"amd"},{"gpu":"MI355X vLLM FP8","value":7708.5,"vendor":"amd"}]'
 />
@@ -115,6 +120,7 @@ Only SGLang has been tested on both GPUs so far. B200 runs FP8, MI355X runs BF16
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="Qwen-3.5-397B-A17B Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"B200 SGLang FP8","value":5709.7,"vendor":"nvidia"},{"gpu":"MI355X SGLang BF16","value":1671.5,"vendor":"amd"},{"gpu":"MI355X SGLang FP8","value":1288.0,"vendor":"amd"}]'
 />
@@ -134,6 +140,7 @@ MI355X takes the cost win here. MI355X (Atom) FP4 at 3,510.4 tok/s/GPU costs $0.
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="Kimi-K2.5 Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"B200 vLLM FP4","value":4020.9,"vendor":"nvidia"},{"gpu":"MI355X Atom FP4","value":3510.4,"vendor":"amd"},{"gpu":"MI355X vLLM FP4","value":2697.4,"vendor":"amd"}]'
 />
@@ -155,6 +162,7 @@ Note: InferenceX support for this model is still early, with only FP8 vLLM teste
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="MiniMax-M2.5 Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"MI355X vLLM FP8","value":10391.0,"vendor":"amd"},{"gpu":"B200 vLLM FP8","value":9652.0,"vendor":"nvidia"},{"gpu":"MI355X Atom FP8","value":8395.9,"vendor":"amd"}]'
 />
@@ -175,6 +183,7 @@ Cost follows: $0.32/Mtok (B200) vs $0.98/Mtok (MI355X). Note: InferenceX support
 _Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
+  title="GLM-5 Throughput"
   metric="Throughput/GPU (tok/s)"
   data='[{"gpu":"B200 SGLang FP8","value":1673.6,"vendor":"nvidia"},{"gpu":"MI355X SGLang FP8","value":420.5,"vendor":"amd"}]'
 />
