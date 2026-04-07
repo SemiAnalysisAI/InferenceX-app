@@ -183,15 +183,15 @@ GLM-5 has only one framework per GPU so far. Early data, but B200 dominates on e
 
 ## Cost Comparison — All Models at 8k/1k
 
-| Model              | B200 $/Mtok | MI355X $/Mtok | Cheaper             |
-| ------------------ | ----------: | ------------: | ------------------- |
-| DeepSeek-R1-0528   |       $0.04 |         $0.10 | B200                |
-| gpt-oss-120b       |       $0.01 |         $0.01 | MI355X (by $0.0003) |
-| Llama-3.3-70B      |       $0.04 |         $0.05 | B200                |
-| Qwen-3.5-397B-A17B |       $0.09 |         $0.25 | B200                |
-| Kimi-K2.5          |       $0.13 |         $0.12 | MI355X              |
-| MiniMax-M2.5       |       $0.06 |         $0.04 | MI355X              |
-| GLM-5              |       $0.32 |         $0.98 | B200                |
+| Model              | B200 $/Mtok | MI355X $/Mtok |
+| ------------------ | ----------: | ------------: |
+| DeepSeek-R1-0528   |       $0.04 |         $0.10 |
+| gpt-oss-120b       |       $0.01 |         $0.01 |
+| Llama-3.3-70B      |       $0.04 |         $0.05 |
+| Qwen-3.5-397B-A17B |       $0.09 |         $0.25 |
+| Kimi-K2.5          |       $0.13 |         $0.12 |
+| MiniMax-M2.5       |       $0.06 |         $0.04 |
+| GLM-5              |       $0.32 |         $0.98 |
 
 B200 wins on cost in 4 of 7 models. MI355X wins in 3 (gpt-oss-120b by a razor-thin margin, Kimi-K2.5, and MiniMax-M2.5). The MI355X cost wins happen on models where the throughput gap is small or where MI355X's lower $/hr compensates.
 
