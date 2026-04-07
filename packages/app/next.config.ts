@@ -14,12 +14,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPostHogConfig(nextConfig, {
-  personalApiKey: process.env.POSTHOG_PERSONAL_API_KEY ?? '',
-  projectId: process.env.POSTHOG_PROJECT_ID ?? '',
-  host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-  sourcemaps: {
-    enabled: true,
-    deleteAfterUpload: true,
-  },
-});
+const hasPostHogKeys = Boolean(
+  process.env.POSTHOG_PERSONAL_API_KEY && process.env.POSTHOG_PROJECT_ID,
+);
+
+export default hasPostHogKeys
+  ? withPostHogConfig(nextConfig, {
+      personalApiKey: process.env.POSTHOG_PERSONAL_API_KEY!,
+      projectId: process.env.POSTHOG_PROJECT_ID!,
+      host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+      sourcemaps: {
+        enabled: true,
+        deleteAfterUpload: true,
+      },
+    })
+  : nextConfig;
