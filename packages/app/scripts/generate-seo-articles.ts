@@ -177,12 +177,11 @@ async function processModel(
     sequences[seq] = configs.map(enrichConfig);
   }
 
-  // Fetch historical data for default models (8k/1k only to limit API calls)
+  // Fetch historical data for all models (8k/1k)
   const category = MODEL_CATEGORY[modelKey] ?? 'default';
-  let history: Record<string, HistoryPoint[]> = {};
-  if (category === 'default') {
-    const historyRows = await fetchHistory(baseUrl, displayName, 8192, 1024);
-    history = aggregateHistory(historyRows);
+  const historyRows = await fetchHistory(baseUrl, displayName, 8192, 1024);
+  const history = aggregateHistory(historyRows);
+  if (historyRows.length > 0) {
     console.log(
       `  ${displayName}: ${historyRows.length} history rows → ${Object.keys(history).length} configs`,
     );
