@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 
 import {
@@ -43,6 +43,41 @@ date: '2026-01-01'
 # Middle
 
 Some middle content.
+`;
+
+const FAKE_MDX_FUTURE = `---
+title: 'Future Post'
+subtitle: 'A future subtitle'
+date: '2099-06-01'
+publishDate: '2099-06-01'
+---
+
+# Future
+
+This post is scheduled for the far future.
+`;
+
+const FAKE_MDX_PAST_PUBLISH = `---
+title: 'Past Publish Post'
+subtitle: 'Already published'
+date: '2025-06-01'
+publishDate: '2025-01-01'
+---
+
+# Past Publish
+
+This post has a publishDate in the past.
+`;
+
+const FAKE_MDX_NO_PUBLISH = `---
+title: 'No Publish Date Post'
+subtitle: 'No publishDate set'
+date: '2025-08-01'
+---
+
+# No Publish
+
+This post has no publishDate field at all.
 `;
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -136,6 +171,117 @@ describe('getAllPosts', () => {
   });
 });
 
+describe('getAllPosts — publishDate filtering', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function mockPostFiles(files: Record<string, string>) {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readdirSync').mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Object.keys(files).map((name) => name) as any,
+    );
+    vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+      const p = String(filePath);
+      for (const [name, content] of Object.entries(files)) {
+        if (p.includes(name.replace('.mdx', ''))) return content;
+      }
+      return '';
+    });
+  }
+
+  it('filters out future-publishDate and missing-publishDate posts in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockPostFiles({
+      'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
+      'future-post.mdx': FAKE_MDX_FUTURE,
+      'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
+    });
+
+    const posts = getAllPosts();
+    const slugs = posts.map((p) => p.slug);
+    expect(slugs).toContain('past-publish');
+    expect(slugs).not.toContain('no-publish');
+    expect(slugs).not.toContain('future-post');
+  });
+
+  it('filters out posts without publishDate in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockPostFiles({
+      'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
+    });
+
+    const posts = getAllPosts();
+    expect(posts).toHaveLength(0);
+  });
+
+  it('keeps posts with past publishDate in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockPostFiles({
+      'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
+    });
+
+    const posts = getAllPosts();
+    expect(posts).toHaveLength(1);
+    expect(posts[0].slug).toBe('past-publish');
+  });
+
+  it('shows all posts including future-dated in development', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    mockPostFiles({
+      'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
+      'future-post.mdx': FAKE_MDX_FUTURE,
+      'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
+    });
+
+    const posts = getAllPosts();
+    const slugs = posts.map((p) => p.slug);
+    expect(slugs).toContain('past-publish');
+    expect(slugs).toContain('future-post');
+    expect(slugs).toContain('no-publish');
+    expect(posts).toHaveLength(3);
+  });
+
+  it('shows all posts including future-dated in test env', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    mockPostFiles({
+      'future-post.mdx': FAKE_MDX_FUTURE,
+      'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
+    });
+
+    const posts = getAllPosts();
+    expect(posts).toHaveLength(2);
+    const slugs = posts.map((p) => p.slug);
+    expect(slugs).toContain('future-post');
+    expect(slugs).toContain('no-publish');
+  });
+
+  it('returns empty array when all posts are future-dated in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockPostFiles({
+      'future-post.mdx': FAKE_MDX_FUTURE,
+    });
+
+    const posts = getAllPosts();
+    expect(posts).toHaveLength(0);
+  });
+
+  it('still sorts filtered results by date descending in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockPostFiles({
+      'past-publish.mdx': FAKE_MDX_PAST_PUBLISH,
+      'no-publish.mdx': FAKE_MDX_NO_PUBLISH,
+      'future-post.mdx': FAKE_MDX_FUTURE,
+    });
+
+    const posts = getAllPosts();
+    // only past-publish has a valid publishDate <= now
+    expect(posts).toHaveLength(1);
+    expect(posts[0].slug).toBe('past-publish');
+  });
+});
+
 describe('getPostBySlug', () => {
   it('returns null for non-existent slug', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
@@ -152,6 +298,20 @@ describe('getPostBySlug', () => {
     expect(result!.meta.title).toBe('Test Post');
     expect(result!.meta.slug).toBe('test-post');
     expect(result!.raw).toContain('# Test Heading');
+  });
+
+  it('returns a post with future publishDate regardless of NODE_ENV', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(FAKE_MDX_FUTURE);
+
+    const result = getPostBySlug('future-post');
+    expect(result).not.toBeNull();
+    expect(result!.meta.title).toBe('Future Post');
+    expect(result!.meta.publishDate).toBe('2099-06-01');
+
+    vi.unstubAllEnvs();
   });
 });
 
