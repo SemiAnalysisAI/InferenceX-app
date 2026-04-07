@@ -442,7 +442,11 @@ Plain English. Write like you talk to a coworker.
 - **No unearned profundity.** These are benchmark results, not philosophical revelations.
 - **No filler padding.** "To" not "in order to". "Because" not "due to the fact that".
   Cut any sentence that conveys zero information.
-- **Write like an analyst** Terse, opinionated, data-heavy.
+- **Write like an analyst.** Terse, opinionated, data-heavy.
+- **No narration or setup.** Never write "this comparison matters", "everyone is
+  watching", "both GPUs have production deployments", "the gap isn't as simple as",
+  or any sentence that could be deleted without losing information. If a sentence
+  doesn't contain a number or a concrete claim, cut it.
 
 ### Mandatory Editing Pass
 

@@ -33,15 +33,18 @@ tags:
 
 ## Section 1: Intro (2-3 sentences)
 
-What GPUs are being compared, on what model, and why this matchup matters.
+State the GPUs, how many models they share, and the top-line result. No narration,
+no "this matchup matters", no "everyone asks about". Just data.
 Link to [InferenceX](https://inferencex.semianalysis.com).
 
 > **EXAMPLE:**
 >
-> This is the matchup everyone asks about: yyy vs yyy on yyy inference. Both
-> GPUs have production deployments, and the gap between them isn't as simple as
-> "one is faster." We ran both across the full pareto frontier on
-> [InferenceX](https://inferencex.semianalysis.com).
+> yyy vs yyy across x shared models on [InferenceX](https://inferencex.semianalysis.com).
+> yyy wins on throughput in x of x, yyy wins on cost/Mtok in x of x.
+
+**NEVER write narration like "this is the matchup everyone is watching" or "both GPUs
+have production deployments" or "this comparison matters for anyone picking hardware."
+State the result. Skip the setup.**
 
 ## Section 2: Key Numbers (3-4 bullets)
 
