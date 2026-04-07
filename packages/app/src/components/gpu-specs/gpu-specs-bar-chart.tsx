@@ -6,6 +6,7 @@ import { track } from '@/lib/analytics';
 import { select, type Selection, type ScaleLinear, type ScaleBand } from 'd3';
 
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
+import { measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -39,14 +40,16 @@ function positionLabelPairs(
   const valueLabels = group.selectAll<SVGTextElement, ChartDatum>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, ChartDatum>('.overlay-label');
 
-  // Build a map of max text width per name
+  // Build a map of max text width per name (pretext, no reflow)
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
-    maxWidths.set(d.name, this.getComputedTextLength());
+    const text = select(this).text();
+    maxWidths.set(d.name, measureTextWidth(text, '600 12px sans-serif'));
   });
   overlayLabels.each(function (d) {
+    const text = select(this).text();
     const prev = maxWidths.get(d.name) ?? 0;
-    maxWidths.set(d.name, Math.max(prev, this.getComputedTextLength()));
+    maxWidths.set(d.name, Math.max(prev, measureTextWidth(text, '500 10px sans-serif')));
   });
 
   const applyOutlined = (sel: Selection<SVGTextElement, ChartDatum, SVGGElement, unknown>) => {
