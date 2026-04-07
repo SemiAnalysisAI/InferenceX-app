@@ -1,6 +1,6 @@
 ---
-title: 'NVIDIA B200 vs AMD MI355X — Inference Benchmark'
-subtitle: 'B200 wins 6 of 7 models on throughput, but MI355X takes MiniMax-M2.5 and matches on cost for gpt-oss-120b'
+title: 'B200 vs MI355X — Inference Benchmark Comparison (April 2026)'
+subtitle: 'B200 wins 6 of 7 models on throughput, but MI355X takes MiniMax-M2.5 and undercuts on cost where it counts'
 date: '2026-04-06'
 modifiedDate: '2026-04-06'
 publishDate: '2026-04-06'
@@ -12,180 +12,214 @@ tags:
   - mi355x
 ---
 
-## Introduction
-
-NVIDIA B200 vs AMD MI355X across 7 shared models on [InferenceX](https://inferencex.semianalysis.com). B200 wins on peak throughput in 6 of 7 models. MI355X wins on cost/Mtok in 3 of 7 (gpt-oss-120b, MiniMax-M2.5, and Kimi-K2.5), and it actually beats the B200 on raw throughput for MiniMax-M2.5. The average throughput gap across all models is 124%, but that number is skewed by DeepSeek R1 and Qwen 3.5 where B200's disagg and FP4 advantages are massive.
-
-The picture changes when you account for pricing. MI355X's lower hyperscaler $/hr rate means it can compete on $/Mtok even when throughput is 25-30% behind. On dense models (gpt-oss-120b, Llama 70B), MI355X is surprisingly close on both throughput and cost. On large MoE models (DeepSeek R1, Qwen 3.5, GLM-5), the gap blows open because AMD's FP4 disagg+wideEP composability is still immature.
+B200 vs MI355X across 7 shared models on [InferenceX](https://inferencex.semianalysis.com). B200 wins on throughput in 6 of 7. MI355X wins on cost/Mtok in 3 of 7, and takes the throughput crown on MiniMax-M2.5.
 
 ## Key Numbers
 
-- B200 leads on peak throughput: **61,612.7 tok/s/GPU** on gpt-oss-120b FP4 TRT vs MI355X's 44,999.3 on Atom.
-- MI355X is cheaper on MiniMax-M2.5: $0.04/Mtok vs $0.06/Mtok, while also delivering 8% more throughput.
-- On DeepSeek R1, B200 with Dynamo TRT disagg hits 13,429.7 tok/s/GPU. MI355X's best (MoRI SGLang disagg) manages 4,222.8, a 3.2x gap.
-- Llama 70B is the closest race: B200 at 12,981.3 tok/s/GPU vs MI355X at 8,748.9, only 48% apart, and MI355X wins on TTFT (584ms vs 18,571ms).
+- B200 (TRT) FP4 leads peak throughput on gpt-oss-120b: **61,612.7 tok/s/GPU** vs 44,999.3 on MI355X (Atom) FP4.
+- MI355X (vLLM) FP8 beats B200 on MiniMax-M2.5 at 8k/1k: 10,391.0 vs 9,652.0 tok/s/GPU, and it's 29% cheaper per Mtok ($0.04 vs $0.06).
+- B200 (Dynamo TRT) FP4 hits 13,429.7 tok/s/GPU on DeepSeek-R1, 3.2x what MI355X (MoRI SGLang) FP4 manages (4,222.8).
+- MI355X wins on cost/Mtok for Kimi-K2.5 ($0.12 vs $0.13) and gpt-oss-120b ($0.01 vs $0.01, marginal), even losing on raw throughput.
 
 ## DeepSeek-R1-0528
 
-| GPU         | Precision | Framework            | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | -------------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP4       | dynamo-trt (disagg)  |               13,429.7 |  $0.04 |          4,144.9 |             33.5 |       1,691 | 2026-01-29 |
-| AMD MI355X  | FP4       | mori-sglang (disagg) |                4,222.8 |  $0.10 |         71,288.6 |            108.1 |       2,048 | 2026-03-13 |
+The largest gap in the dataset. B200 (Dynamo TRT) FP4 with disaggregated prefill pulls 13,429.7 tok/s/GPU. MI355X's best config, MoRI SGLang FP4 with disagg, reaches 4,222.8. That's a 3.2x throughput gap, which maps to a 2.4x cost gap ($0.04 vs $0.10/Mtok).
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+MI355X's composability problem shows here. Its FP4 disagg results (MoRI SGLang) nearly doubled since February 2026, jumping from 1,733.5 to 4,222.8 tok/s/GPU. But B200 started from a higher baseline and the gap remains wide.
+
+| GPU                      | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ------------------------ | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| B200 (Dynamo TRT) FP4    |               13,429.7 |  $0.04 |          4,144.9 |             33.5 |       1,691 | 2026-01-29 |
+| MI355X (MoRI SGLang) FP4 |                4,222.8 |  $0.10 |         71,288.6 |            108.1 |       2,048 | 2026-03-13 |
+| MI355X (Atom) FP4        |                3,652.0 |  $0.11 |          1,021.0 |            155.4 |         256 | 2026-02-25 |
+| MI355X (MoRI SGLang) FP8 |                3,815.3 |  $0.11 |        126,290.2 |             57.6 |       2,048 | 2026-02-23 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200","value":13429.7,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":4222.8,"vendor":"amd"}]'
+  data='[{"gpu":"B200 Dynamo TRT FP4","value":13429.7,"vendor":"nvidia"},{"gpu":"MI355X MoRI SGLang FP4","value":4222.8,"vendor":"amd"},{"gpu":"MI355X MoRI SGLang FP8","value":3815.3,"vendor":"amd"},{"gpu":"MI355X Atom FP4","value":3652.0,"vendor":"amd"}]'
 />
 
-B200 is 3.2x faster on DeepSeek R1. The story here is entirely about disaggregated serving maturity. B200 runs Dynamo TRT-LLM with FP4 disagg, a battle-tested stack that NVIDIA has been optimizing for months. MI355X runs MoRI SGLang disagg, which has improved rapidly (throughput went from 1,734 to 4,223 tok/s/GPU between February and March 2026) but still has composability issues with FP4+wideEP.
-
-The TTFT gap is brutal: 4.1 seconds for B200 vs 71.3 seconds for MI355X. At $0.04/Mtok vs $0.10/Mtok, B200 is 2.4x cheaper per token too. If you're serving DeepSeek R1 and can get B200s, there's no reason to pick MI355X today.
-
-MI355X does have an interesting non-disagg option: Atom at 3,652.0 tok/s/GPU with a 1,021ms TTFT. That's a 70x improvement in TTFT over disagg, though throughput drops 14%. Atom is worth watching as AMD's alternative to disagg on models where their distributed stack isn't yet competitive.
+TTFT tells a different story. MI355X (Atom) FP4 at concurrency 256 posts 1,021ms TTFT, while B200 (Dynamo TRT) FP4 at concurrency 1,691 sits at 4,145ms. If you're latency-sensitive and running low concurrency, Atom on MI355X is worth looking at. But at scale, the throughput gap is too large to ignore.
 
 <BenchmarkChart
   variant="line"
-  data='{"series":{"B200 trt FP4":[{"date":"2025-09-30","value":4011},{"date":"2025-10-10","value":8398},{"date":"2025-10-22","value":8382},{"date":"2025-11-15","value":8366},{"date":"2025-12-05","value":8360},{"date":"2026-02-03","value":9235},{"date":"2026-02-06","value":10505}],"MI355X mori-sglang FP4 disagg":[{"date":"2026-02-04","value":1734},{"date":"2026-02-11","value":1746},{"date":"2026-02-13","value":1787},{"date":"2026-03-03","value":1893},{"date":"2026-03-13","value":4223}]}}'
+  metric="Throughput/GPU (tok/s), DeepSeek-R1"
+  data='{"series":{"B200 TRT FP4":[{"date":"2025-09-30","value":4010.8},{"date":"2025-10-22","value":8381.8},{"date":"2025-11-13","value":8366.9},{"date":"2025-12-05","value":8359.8},{"date":"2026-01-14","value":9554.2},{"date":"2026-02-06","value":10505.4}],"MI355X SGLang FP4":[{"date":"2025-09-30","value":1349.6},{"date":"2025-10-22","value":1473.6},{"date":"2025-11-13","value":1340.7},{"date":"2025-12-05","value":1851.8},{"date":"2025-12-30","value":2140.1},{"date":"2026-01-29","value":2004.6},{"date":"2026-02-27","value":1952.2}]}}'
 />
 
-B200 TRT performance on DeepSeek R1 has been steady, climbing from ~4,000 tok/s/GPU in late September 2025 to 10,505 by February 2026. MI355X MoRI disagg started at 1,734 in February 2026 and jumped to 4,223 by mid-March, a 2.4x improvement in 5 weeks. AMD's software team is moving fast here, but the starting point was very low.
+B200's TRT FP4 throughput climbed from ~4,000 in September 2025 to 10,505 by February 2026 (aggregated, non-disagg). MI355X SGLang FP4 went from 1,350 to about 1,950 in the same period, with a brief spike to 2,155 in late December. B200 improved 2.6x, MI355X improved 1.4x.
 
 ## gpt-oss-120b
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP4       | TRT       |               61,612.7 |  $0.01 |            244.5 |             36.7 |         256 | 2026-02-05 |
-| AMD MI355X  | FP4       | Atom      |               44,999.3 |  $0.01 |            175.4 |             25.1 |         128 | 2026-01-14 |
+B200 (TRT) FP4 hits 61,612.7 tok/s/GPU. MI355X (Atom) FP4 reaches 44,999.3. That's a 37% gap, which is the smallest throughput margin in this dataset by percentage after MiniMax-M2.5.
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+Cost tells a closer story: B200 at $0.01/Mtok, MI355X at $0.01/Mtok. The difference is fractions of a penny ($0.0088 vs $0.0091). If you're running gpt-oss-120b and MI355X cards are easier to get, the cost math works.
+
+| GPU               | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| B200 (TRT) FP4    |               61,612.7 |  $0.01 |            244.5 |             36.7 |         256 | 2026-02-05 |
+| B200 (vLLM) FP4   |               51,523.0 |  $0.01 |            172.6 |             21.9 |         128 | 2026-02-25 |
+| MI355X (Atom) FP4 |               44,999.3 |  $0.01 |            175.4 |             25.1 |         128 | 2026-01-14 |
+| MI355X (vLLM) FP4 |               38,532.2 |  $0.01 |            268.7 |             28.5 |         128 | 2026-03-09 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200","value":61612.7,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":44999.3,"vendor":"amd"}]'
+  data='[{"gpu":"B200 TRT FP4","value":61612.7,"vendor":"nvidia"},{"gpu":"B200 vLLM FP4","value":51523.0,"vendor":"nvidia"},{"gpu":"MI355X Atom FP4","value":44999.3,"vendor":"amd"},{"gpu":"MI355X vLLM FP4","value":38532.2,"vendor":"amd"}]'
 />
-
-This is the closest race in throughput terms and MI355X actually wins on cost. B200 is 37% faster (61,613 vs 44,999 tok/s/GPU), but MI355X matches at $0.01/Mtok because its $/hr is lower. MI355X also has better latency here: 175ms TTFT vs 245ms, and 25.1ms TPOT vs 36.7ms.
-
-gpt-oss-120b is a dense 120B model, so the FP4 composability issues that plague MI355X on MoE workloads don't apply. AMD's Atom framework delivers strong numbers. If you're running gpt-oss-120b and optimizing for cost per token, MI355X on Atom is the better pick.
 
 <BenchmarkChart
   variant="line"
-  data='{"series":{"B200 trt FP4":[{"date":"2025-09-30","value":10914},{"date":"2025-10-10","value":31022},{"date":"2025-10-21","value":36927},{"date":"2025-11-14","value":37181},{"date":"2025-11-24","value":47269},{"date":"2025-12-04","value":50892},{"date":"2026-02-05","value":61613}],"MI355X vllm FP4":[{"date":"2025-09-30","value":21244},{"date":"2025-10-09","value":27911},{"date":"2025-10-21","value":28069},{"date":"2025-11-12","value":33329},{"date":"2025-11-24","value":33359},{"date":"2025-12-03","value":33613},{"date":"2026-03-09","value":38532}]}}'
+  metric="Throughput/GPU (tok/s), gpt-oss-120b"
+  data='{"series":{"B200 TRT FP4":[{"date":"2025-09-30","value":10913.7},{"date":"2025-10-22","value":37172.6},{"date":"2025-11-13","value":37030.0},{"date":"2025-12-05","value":50638.3},{"date":"2026-01-07","value":50910.3},{"date":"2026-02-05","value":61612.7}],"MI355X vLLM FP4":[{"date":"2025-09-30","value":21243.6},{"date":"2025-10-22","value":27971.2},{"date":"2025-11-13","value":33380.0},{"date":"2025-12-05","value":33451.3},{"date":"2026-02-26","value":34121.0},{"date":"2026-03-09","value":38532.2}]}}'
 />
 
-Both GPUs have improved steadily on gpt-oss-120b. B200 TRT went from 10,914 to 61,613 tok/s/GPU (5.6x) between September 2025 and February 2026. MI355X vLLM went from 21,244 to 38,532 (1.8x) in roughly the same period. B200's gains came largely from TRT-LLM optimization. MI355X's Atom result (44,999) is from January 2026 and represents a step up from the vLLM baseline.
+Both GPUs have improved steadily on gpt-oss-120b. B200 TRT FP4 went from 10,914 to 61,613 tok/s/GPU (5.6x) between September 2025 and February 2026. MI355X vLLM FP4 went from 21,244 to 38,532 (1.8x). B200 benefited disproportionately from TRT optimizations on this dense 120B model.
 
 ## Llama-3.3-70B
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP4       | TRT       |               12,981.3 |  $0.04 |         18,571.4 |             63.9 |         128 | 2025-10-29 |
-| AMD MI355X  | FP4       | vLLM      |                8,748.9 |  $0.05 |            584.6 |             64.5 |          64 | 2025-10-29 |
+B200 (TRT) FP4 posts 12,981.3 tok/s/GPU at 8k/1k. MI355X (vLLM) FP4 hits 8,748.9. A 48% gap. This model is deprecated on InferenceX but still benchmarked for reference.
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+On cost, B200 is at $0.04/Mtok and MI355X at $0.05/Mtok. B200 wins on both throughput and cost here.
+
+| GPU               | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| B200 (TRT) FP4    |               12,981.3 |  $0.04 |         18,571.4 |             63.9 |         128 | 2025-10-29 |
+| MI355X (vLLM) FP4 |                8,748.9 |  $0.05 |            584.6 |             64.5 |          64 | 2025-10-29 |
+| MI355X (vLLM) FP8 |                7,708.5 |  $0.05 |            720.0 |             73.1 |          64 | 2025-10-29 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200","value":12981.3,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":8748.9,"vendor":"amd"}]'
+  data='[{"gpu":"B200 TRT FP4","value":12981.3,"vendor":"nvidia"},{"gpu":"MI355X vLLM FP4","value":8748.9,"vendor":"amd"},{"gpu":"MI355X vLLM FP8","value":7708.5,"vendor":"amd"}]'
 />
 
-B200 is 48% faster, but there's a catch. B200's best throughput config has an 18.6-second TTFT, which makes it unusable for interactive workloads. MI355X on FP4 vLLM has a 585ms TTFT. The TPOT numbers are nearly identical: 63.9ms for B200 vs 64.5ms for MI355X.
-
-If you pick B200's second-best config (FP4 vLLM, 10,852.1 tok/s/GPU), TTFT drops to 509ms and it's still 24% faster than MI355X. On cost, B200 is at $0.04/Mtok vs MI355X at $0.05/Mtok, so B200 wins on both throughput and cost at this sequence length.
-
-These benchmarks are from October 2025. Both GPUs likely have newer framework versions available that we haven't tested yet on Llama 70B.
+TTFT is worth flagging: B200 (TRT) FP4 posts 18,571ms at concurrency 128, while MI355X (vLLM) FP4 posts 585ms at concurrency 64. B200's TRT engine trades prefill latency for decode throughput at higher concurrency. For latency-sensitive workloads at low batch, MI355X looks better on TTFT.
 
 ## Qwen-3.5-397B-A17B
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP8       | SGLang    |                5,709.7 |  $0.09 |          5,131.8 |             94.2 |         256 | 2026-03-20 |
-| AMD MI355X  | BF16      | SGLang    |                1,671.5 |  $0.25 |            300.0 |             42.2 |          64 | 2026-02-17 |
+B200 (SGLang) FP8 at 5,709.7 tok/s/GPU vs MI355X (SGLang) BF16 at 1,671.5. A 3.4x gap. Note: InferenceX support for this model is still early; expect more GPUs and frameworks in future updates.
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+Only SGLang has been tested on both GPUs so far. B200 runs FP8, MI355X runs BF16 (FP8 is available but slower at 1,288.0 tok/s/GPU). The precision difference makes this an uneven comparison, but it reflects what's actually deployable today.
+
+| GPU                  | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| -------------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| B200 (SGLang) FP8    |                5,709.7 |  $0.09 |          5,131.8 |             94.2 |         256 | 2026-03-20 |
+| MI355X (SGLang) BF16 |                1,671.5 |  $0.25 |            299.9 |             42.2 |          64 | 2026-02-17 |
+| MI355X (SGLang) FP8  |                1,288.0 |  $0.32 |            331.3 |             52.0 |          64 | 2026-02-20 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200","value":5709.7,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":1671.5,"vendor":"amd"}]'
+  data='[{"gpu":"B200 SGLang FP8","value":5709.7,"vendor":"nvidia"},{"gpu":"MI355X SGLang BF16","value":1671.5,"vendor":"amd"},{"gpu":"MI355X SGLang FP8","value":1288.0,"vendor":"amd"}]'
 />
 
-B200 is 3.4x faster on Qwen 3.5. This is another large MoE model (397B total, 17B active), and the same pattern from DeepSeek R1 shows up: B200 benefits from FP8 quantization at high concurrency (256 vs 64), while MI355X runs BF16 because FP8 SGLang on MI355X only gets 1,288 tok/s/GPU here.
-
-MI355X does have a much better TTFT (300ms vs 5,132ms) and lower TPOT (42.2ms vs 94.2ms), which reflects its lower concurrency. At concurrency 64, MI355X delivers 23.7 tok/s/user interactivity vs B200's 10.6 at concurrency 256. If you need high interactivity on Qwen 3.5, MI355X at BF16 is actually the smoother experience per user, but you pay 2.6x more per million tokens.
+MI355X (SGLang) BF16 has 42.2ms TPOT vs B200's 94.2ms. Lower TPOT at low concurrency (64 vs 256) is expected, but for interactive use cases that need fast token generation and can tolerate lower throughput, the MI355X numbers aren't bad.
 
 ## Kimi-K2.5
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP4       | vLLM      |                4,020.9 |  $0.13 |            645.9 |             34.1 |          64 | 2026-03-27 |
-| AMD MI355X  | FP4       | Atom      |                3,510.4 |  $0.12 |            649.6 |             80.4 |         128 | 2026-04-01 |
+MI355X takes the cost win here. MI355X (Atom) FP4 at 3,510.4 tok/s/GPU costs $0.12/Mtok. B200 (vLLM) FP4 at 4,020.9 tok/s/GPU costs $0.13/Mtok. B200 is 15% faster but 15% more expensive per token. Note: InferenceX support for this model is still early.
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+| GPU               | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| B200 (vLLM) FP4   |                4,020.9 |  $0.13 |            645.9 |             34.1 |          64 | 2026-03-27 |
+| MI355X (Atom) FP4 |                3,510.4 |  $0.12 |            649.6 |             80.4 |         128 | 2026-04-01 |
+| MI355X (vLLM) FP4 |                2,697.4 |  $0.15 |            485.8 |             52.3 |          64 | 2026-03-27 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200","value":4020.9,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":3510.4,"vendor":"amd"}]'
+  data='[{"gpu":"B200 vLLM FP4","value":4020.9,"vendor":"nvidia"},{"gpu":"MI355X Atom FP4","value":3510.4,"vendor":"amd"},{"gpu":"MI355X vLLM FP4","value":2697.4,"vendor":"amd"}]'
 />
 
-Only 15% throughput gap here, and MI355X is actually cheaper at $0.12/Mtok vs $0.13/Mtok. TTFT is nearly identical (646ms vs 650ms). The big difference is TPOT: 34.1ms for B200 vs 80.4ms for MI355X, which means B200 delivers 29.3 tok/s/user vs MI355X's 12.4.
-
-Kimi-K2.5 is where MI355X Atom shines. If your workload is batch-heavy and you're optimizing for cost, MI355X wins. If your users care about per-request speed, B200's 2.4x better interactivity makes it the pick.
+TTFT is nearly identical: 646ms (B200) vs 650ms (MI355X Atom). TPOT diverges: 34.1ms on B200 vs 80.4ms on MI355X. If your application is TPOT-sensitive (streaming chat), B200 is the pick. If you're optimizing $/Mtok, MI355X wins by a hair.
 
 ## MiniMax-M2.5
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| AMD MI355X  | FP8       | vLLM      |               10,391.0 |  $0.04 |            747.7 |            108.3 |         256 | 2026-04-05 |
-| NVIDIA B200 | FP8       | vLLM      |                9,652.0 |  $0.06 |            436.4 |             58.4 |         256 | 2026-04-03 |
+The one model where MI355X beats B200 on throughput. MI355X (vLLM) FP8 posts 10,391.0 tok/s/GPU at 8k/1k, topping B200 (vLLM) FP8 at 9,652.0 (a 7.7% lead). MI355X also wins on cost: $0.04/Mtok vs $0.06/Mtok.
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+Note: InferenceX support for this model is still early, with only FP8 vLLM tested on B200 and two configs on MI355X.
+
+| GPU               | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| MI355X (vLLM) FP8 |               10,391.0 |  $0.04 |            747.7 |            108.3 |         256 | 2026-04-05 |
+| B200 (vLLM) FP8   |                9,652.0 |  $0.06 |            436.4 |             58.4 |         256 | 2026-04-03 |
+| MI355X (Atom) FP8 |                8,395.9 |  $0.05 |            512.2 |             67.4 |         128 | 2026-04-01 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"AMD MI355X","value":10391.0,"vendor":"amd"},{"gpu":"NVIDIA B200","value":9652.0,"vendor":"nvidia"}]'
+  data='[{"gpu":"MI355X vLLM FP8","value":10391.0,"vendor":"amd"},{"gpu":"B200 vLLM FP8","value":9652.0,"vendor":"nvidia"},{"gpu":"MI355X Atom FP8","value":8395.9,"vendor":"amd"}]'
 />
 
-MI355X's only throughput win. It's 8% faster (10,391 vs 9,652 tok/s/GPU) and 29% cheaper ($0.04 vs $0.06/Mtok). Both are running FP8 vLLM at concurrency 256.
-
-B200 has better latency: 436ms TTFT vs 748ms, and 58.4ms TPOT vs 108.3ms. Per-user interactivity is 17.1 tok/s/user for B200 vs 9.2 for MI355X. So the same split as Kimi-K2.5: MI355X wins on throughput and cost, B200 wins on per-user experience.
-
-MiniMax-M2.5 is a relatively new model on InferenceX. Both GPUs only have FP8 results so far. FP4 support could change the picture if B200's FP4 advantage shows up here.
+B200 still has better TPOT (58.4ms vs 108.3ms) and TTFT (436ms vs 748ms). MI355X's throughput lead comes from pushing more tokens at the cost of per-token latency. For batch-heavy workloads where latency doesn't matter, MI355X is the better deal on this model.
 
 ## GLM-5
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP8       | SGLang    |                1,673.6 |  $0.32 |            526.6 |             83.7 |         128 | 2026-03-20 |
-| AMD MI355X  | FP8       | SGLang    |                  420.5 |  $0.98 |          1,368.1 |            162.5 |          64 | 2026-03-07 |
+B200 (SGLang) FP8 at 1,673.6 tok/s/GPU. MI355X (SGLang) FP8 at 420.5. A 4x gap. Both are running SGLang FP8, so this is a clean hardware comparison.
 
-_Best config per GPU on 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+Cost follows: $0.32/Mtok (B200) vs $0.98/Mtok (MI355X). Note: InferenceX support for this model is still early.
+
+| GPU                 | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ------------------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| B200 (SGLang) FP8   |                1,673.6 |  $0.32 |            526.6 |             83.7 |         128 | 2026-03-20 |
+| MI355X (SGLang) FP8 |                  420.5 |  $0.98 |          1,368.1 |            162.5 |          64 | 2026-03-07 |
+
+_Best configs per GPU at 8k/1k. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200","value":1673.6,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":420.5,"vendor":"amd"}]'
+  data='[{"gpu":"B200 SGLang FP8","value":1673.6,"vendor":"nvidia"},{"gpu":"MI355X SGLang FP8","value":420.5,"vendor":"amd"}]'
 />
 
-4x gap. GLM-5 is a huge model and neither GPU produces great absolute numbers here. B200 at 1,674 tok/s/GPU is already low; MI355X at 421 tok/s/GPU is painfully slow. Cost reflects this: $0.32/Mtok for B200 vs $0.98/Mtok for MI355X. Both on FP8 SGLang, same framework, so the difference is entirely hardware and low-level kernel maturity.
+GLM-5 has only one framework per GPU so far. Early data, but B200 dominates on every metric.
 
-GLM-5 is in early InferenceX support. More framework optimization and FP4 quantization could narrow this gap, but right now B200 is the only viable option.
+## Cost Comparison — All Models at 8k/1k
 
-## Cost Analysis — $/Mtok Across All Models
+| Model              | B200 $/Mtok | MI355X $/Mtok | Cheaper             |
+| ------------------ | ----------: | ------------: | ------------------- |
+| DeepSeek-R1-0528   |       $0.04 |         $0.10 | B200                |
+| gpt-oss-120b       |       $0.01 |         $0.01 | MI355X (by $0.0003) |
+| Llama-3.3-70B      |       $0.04 |         $0.05 | B200                |
+| Qwen-3.5-397B-A17B |       $0.09 |         $0.25 | B200                |
+| Kimi-K2.5          |       $0.13 |         $0.12 | MI355X              |
+| MiniMax-M2.5       |       $0.06 |         $0.04 | MI355X              |
+| GLM-5              |       $0.32 |         $0.98 | B200                |
 
-| Model            | B200 $/Mtok | MI355X $/Mtok | Cheaper | Diff |
-| ---------------- | ----------: | ------------: | ------- | ---: |
-| gpt-oss-120b     |       $0.01 |         $0.01 | MI355X  |   4% |
-| DeepSeek-R1-0528 |       $0.04 |         $0.10 | B200    |  59% |
-| Llama-3.3-70B    |       $0.04 |         $0.05 | B200    |  13% |
-| MiniMax-M2.5     |       $0.06 |         $0.04 | MI355X  |  30% |
-| Qwen-3.5-397B    |       $0.09 |         $0.25 | B200    |  61% |
-| Kimi-K2.5        |       $0.13 |         $0.12 | MI355X  |  13% |
-| GLM-5            |       $0.32 |         $0.98 | B200    |  67% |
+B200 wins on cost in 4 of 7 models. MI355X wins in 3 (gpt-oss-120b by a razor-thin margin, Kimi-K2.5, and MiniMax-M2.5). The MI355X cost wins happen on models where the throughput gap is small or where MI355X's lower $/hr compensates.
 
-MI355X wins on cost for 3 of 7 models (gpt-oss-120b, MiniMax-M2.5, Kimi-K2.5). The pattern is clear: on dense models and MoE models where both GPUs run the same precision, MI355X's lower $/hr compensates for its throughput deficit. On models where B200 can run FP4 disagg and MI355X can't match it, B200 wins on cost too because throughput scales faster than the price difference.
+## Which GPU should you pick?
 
-For batch inference on gpt-oss-120b or MiniMax-M2.5, MI355X is the better economics. For anything MoE at scale (DeepSeek R1, Qwen 3.5), B200's software stack advantage translates directly into lower cost per token.
+B200 if you need throughput. It wins 6 of 7 models, and the gaps are large on MoE models like DeepSeek-R1 (3.2x) and GLM-5 (4x). TRT and Dynamo TRT are the best frameworks on B200 for most models.
+
+MI355X if you're cost-sensitive on specific models. It's cheaper per Mtok on MiniMax-M2.5, Kimi-K2.5, and gpt-oss-120b (barely). The Atom framework has been a big addition for MI355X, pushing it closer to B200 on several models. If your workload is MiniMax-M2.5, MI355X is the pick.
+
+## FP4 vs FP8
+
+On B200, FP4 consistently beats FP8 by large margins. DeepSeek-R1: 13,429.7 vs 5,856.9 tok/s/GPU (2.3x). gpt-oss-120b: 61,612.7 vs not available at 8k/1k (only FP4 tested). Llama-3.3-70B: 12,981.3 vs 9,420.6 (1.4x).
+
+On MI355X, FP4 also leads but the gap is smaller. DeepSeek-R1: 4,222.8 vs 3,815.3 (1.1x). Kimi-K2.5: 3,510.4 vs not tested. The composability issue on MI355X means FP4 gains aren't as large with disagg enabled.
+
+## Frameworks: TRT vs SGLang vs vLLM vs Atom
+
+B200's best results come from TRT (gpt-oss-120b, Llama-3.3-70B) or Dynamo TRT (DeepSeek-R1). SGLang is competitive on B200 for Qwen-3.5 and GLM-5 where TRT configs aren't tested yet.
+
+MI355X's best results come from Atom (gpt-oss-120b, Kimi-K2.5, DeepSeek-R1 non-disagg) and MoRI SGLang (DeepSeek-R1 disagg). vLLM wins on MiniMax-M2.5 and Llama-3.3-70B. Framework diversity on MI355X is improving.
+
+## Related Benchmarks
+
+For per-model deep dives, see our [DeepSeek-R1 benchmarks](/blog/best-gpu-for-dsr1-inference) and [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). For a different MoE comparison, check the [Kimi-K2.5 results](/blog/best-gpu-for-kimik25-inference).
+
+## Where to Run Inference
+
+Looking for B200 or MI355X API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
 
 ## Methodology
 
@@ -199,34 +233,34 @@ _Last updated: 2026-04-06._
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "Is the NVIDIA B200 faster than the AMD MI355X for inference?",
+      "name": "Which GPU should you pick, B200 or MI355X?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 wins on throughput in 6 of 7 shared models. The gap ranges from 15% on Kimi-K2.5 to 4x on GLM-5. MI355X beats B200 on MiniMax-M2.5 by 8%. The largest gaps are on MoE models where B200 benefits from FP4 disaggregated serving with TRT-LLM."
+        "text": "B200 if you need throughput. It wins 6 of 7 models, with gaps of 3.2x on DeepSeek-R1 and 4x on GLM-5. MI355X if you're cost-sensitive on MiniMax-M2.5, Kimi-K2.5, or gpt-oss-120b, where it's cheaper per million tokens."
       }
     },
     {
       "@type": "Question",
-      "name": "Which GPU is cheaper per million tokens, B200 or MI355X?",
+      "name": "Is FP4 better than FP8 for B200 and MI355X inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "MI355X is cheaper on 3 of 7 models: gpt-oss-120b ($0.01 vs $0.01, 4% cheaper), MiniMax-M2.5 ($0.04 vs $0.06), and Kimi-K2.5 ($0.12 vs $0.13). B200 is cheaper on the other 4, with the largest cost advantage on GLM-5 (67% cheaper) and Qwen-3.5 (61% cheaper)."
+        "text": "On B200, FP4 consistently beats FP8 by 1.4x to 2.3x on throughput. On MI355X, FP4 also leads but by smaller margins (1.1x on DeepSeek-R1). Check your eval suite before committing to FP4 quantization."
       }
     },
     {
       "@type": "Question",
-      "name": "How does B200 compare to MI355X on DeepSeek R1?",
+      "name": "Which frameworks work best on B200 vs MI355X?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 is 3.2x faster at 13,430 tok/s/GPU vs 4,223 tok/s/GPU and 2.4x cheaper at $0.04/Mtok vs $0.10/Mtok. The gap is driven by B200 running Dynamo TRT-LLM FP4 disagg vs MI355X on MoRI SGLang FP4 disagg, where AMD's distributed inference stack is less mature."
+        "text": "B200 gets its best results from TRT and Dynamo TRT. MI355X performs best with Atom (for non-disagg workloads) and MoRI SGLang (for disaggregated prefill). vLLM wins on MI355X for MiniMax-M2.5 and Llama-3.3-70B."
       }
     },
     {
       "@type": "Question",
-      "name": "Which GPU should I pick for gpt-oss-120b inference?",
+      "name": "Does MI355X beat B200 on any model?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 is 37% faster (61,613 vs 44,999 tok/s/GPU) but MI355X matches on cost at $0.01/Mtok and has better latency (175ms TTFT vs 245ms). For cost-optimized batch workloads, MI355X on Atom is the better pick. For maximum throughput, B200 on TRT wins."
+        "text": "Yes. MI355X (vLLM) FP8 beats B200 (vLLM) FP8 on MiniMax-M2.5 at 8k/1k: 10,391 vs 9,652 tok/s/GPU, a 7.7% lead. MI355X is also 29% cheaper per million tokens on that model ($0.04 vs $0.06)."
       }
     }
   ]
