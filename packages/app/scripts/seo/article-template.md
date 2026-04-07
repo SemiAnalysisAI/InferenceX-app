@@ -130,7 +130,10 @@ The component takes a `data` prop (single-quoted JSON string) and an optional `m
 > **EXAMPLE:**
 >
 > ```mdx
-> <BenchmarkChart metric="Throughput/GPU (tok/s)" data='[{"gpu":"yyy","value":0,"vendor":"nvidia"},{"gpu":"yyy","value":0,"vendor":"amd"}]' />
+> <BenchmarkChart
+>   metric="Throughput/GPU (tok/s)"
+>   data='[{"gpu":"yyy","value":0,"vendor":"nvidia"},{"gpu":"yyy","value":0,"vendor":"amd"}]'
+> />
 > ```
 
 Rules:
