@@ -1,3 +1,4 @@
+import '@/lib/polyfills';
 import './globals.css';
 
 import { Analytics } from '@vercel/analytics/next';
