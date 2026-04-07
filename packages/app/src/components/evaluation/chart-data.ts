@@ -3,7 +3,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import type { EvalChangelogEntry, EvaluationChartData } from '@/components/evaluation/types';
 import type { EvalRow } from '@/lib/api';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getFrameworkLabel } from '@/lib/utils';
 
 const evalGroupKeyFn = (item: EvaluationChartData) =>
@@ -62,15 +62,11 @@ export function buildEvaluationChartRows(
       const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
       if (score === 0) return null;
 
-      const hwKey = normalizeEvalHardwareKey(
-        item.hardware,
-        item.framework,
-        item.spec_method,
-      ) as keyof typeof HARDWARE_CONFIG;
+      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
       if (hwKey === 'unknown') return null;
 
-      const hwConfig = HARDWARE_CONFIG[hwKey];
-      const hwLabel = String(hwConfig?.label || hwKey);
+      const hwConfig = getHardwareConfig(hwKey);
+      const hwLabel = hwConfig.label;
 
       return {
         configId: item.config_id,
@@ -187,8 +183,8 @@ export function buildEvalChangelogEntries(
     })
     .map((item) => {
       const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      const hwConfig = HARDWARE_CONFIG[hwKey as keyof typeof HARDWARE_CONFIG];
-      const hwLabel = String(hwConfig?.label || hwKey);
+      const hwConfig = getHardwareConfig(hwKey);
+      const hwLabel = hwConfig.label;
       return {
         benchmark: item.task,
         configLabel: buildConfigLabel(

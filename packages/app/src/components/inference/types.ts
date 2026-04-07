@@ -1,6 +1,6 @@
 import type React from 'react';
 
-import type { HARDWARE_CONFIG } from '@/lib/constants';
+import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
 /**
@@ -9,7 +9,7 @@ import type { Model, Sequence } from '@/lib/data-mappings';
  * @interface AggDataEntry
  * @property {string} hw - Hardware name.
  * @property {string} [mtp] - Multi-tenancy parameter, if applicable.
- * @property {keyof typeof HARDWARE_CONFIG} hwKey - Hardware key.
+ * @property {string} hwKey - Hardware key.
  * @property {number} tp - Throughput.
  * @property {number} conc - Concurrency.
  * @property {string} model - Model name.
@@ -38,7 +38,7 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 export interface AggDataEntry {
   hw: string;
   mtp?: string;
-  hwKey: keyof typeof HARDWARE_CONFIG;
+  hwKey: string;
   tp: number;
   conc: number;
   model: string;
@@ -433,7 +433,7 @@ export interface RunInfo {
  * @property {Set<string>} activeHwTypes - A set of currently active hardware types for filtering.
  * @property {Set<string>} hwTypesWithData - A set of all hardware types present in the current dataset.
  * @property {(hw: string) => void} toggleHwType - Function to toggle the active state of a hardware type.
- * @property {typeof HARDWARE_CONFIG} hardwareConfig - The global hardware configuration object.
+ * @property {HardwareConfig} hardwareConfig - The hardware configuration map.
  * @property {RenderableGraph[]} graphs - An array of graphs ready for rendering.
  * @property {string} selectedModel - The currently selected model.
  * @property {(model: string) => void} setSelectedModel - Function to set the selected model.
@@ -535,16 +535,7 @@ export interface CalculateUserCostsResponse {
 }
 export type UserCostInputs = Record<string, string | undefined>;
 
-export type HardwareConfig = Record<
-  string,
-  {
-    name: string;
-    label: string;
-    suffix: string;
-    gpu: string;
-    framework?: string;
-  }
->;
+export type HardwareConfig = Record<string, HardwareEntry>;
 
 /**
  * Represents a tracked configuration for the "Performance Over Time" drill-down feature.

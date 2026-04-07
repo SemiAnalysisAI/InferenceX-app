@@ -10,7 +10,7 @@ import {
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { getHardwareKey } from '@/lib/chart-utils';
-import { HARDWARE_CONFIG, getGpuSpecs } from '@/lib/constants';
+import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import type { Model, Sequence } from '@/lib/data-mappings';
@@ -25,7 +25,7 @@ const wrapMetric = (n: number): { y: number } => ({ y: n });
 function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
-  if (!HARDWARE_CONFIG[hwKey]) return null;
+  if (!isKnownGpu(hwKey)) return null;
 
   const m = row.metrics;
   const tput = m.tput_per_gpu ?? 0;

@@ -8,7 +8,7 @@ import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
-import { getGpuSpecs, HARDWARE_CONFIG } from '@/lib/constants';
+import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 
 // ---------------------------------------------------------------------------
@@ -154,13 +154,13 @@ export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
   if (entry.framework) {
-    // Try framework as-is first, then disagg variant if it exists in HARDWARE_CONFIG
+    // Try framework as-is first, then disagg variant if it exists
     const candidateDirect = `${normalizedHwName}_${entry.framework}`;
-    if (candidateDirect in HARDWARE_CONFIG) {
+    if (isKnownGpu(candidateDirect)) {
       normalizedHwName = candidateDirect;
     } else if (entry.disagg) {
       const candidateDisagg = `${normalizedHwName}_${entry.framework}-disagg`;
-      normalizedHwName = candidateDisagg in HARDWARE_CONFIG ? candidateDisagg : candidateDirect;
+      normalizedHwName = isKnownGpu(candidateDisagg) ? candidateDisagg : candidateDirect;
     } else {
       normalizedHwName = candidateDirect;
     }
@@ -176,7 +176,7 @@ export const getHardwareKey = (entry: AggDataEntry): string => {
 /**
  * Normalizes a hardware key from evaluation/reliability data entries.
  * Handles the looser naming conventions in eval data (e.g. "B200 NB", "H200 CW")
- * by stripping qualifiers and building a HARDWARE_CONFIG-compatible key.
+ * by stripping qualifiers and building a normalized hardware key.
  */
 export function normalizeEvalHardwareKey(
   hw: string,
@@ -185,7 +185,7 @@ export function normalizeEvalHardwareKey(
 ): string {
   let hwName = hw.toLowerCase().replaceAll('-', '_');
 
-  // Strip additional qualifiers that aren't in HARDWARE_CONFIG
+  // Strip additional qualifiers not relevant to GPU identification
   // e.g., "b200 nb" -> "b200", "h200 cw" -> "h200"
   hwName = hwName.replace(/\s+(nb|cw|nv|dgxc|amds|cr|amd)$/i, '');
 
@@ -194,7 +194,7 @@ export function normalizeEvalHardwareKey(
     const frameworkKey = resolveFrameworkAlias(framework).replaceAll('-', '_');
     const specificHwName = `${hwName}_${frameworkKey}`;
 
-    if (specificHwName in HARDWARE_CONFIG) {
+    if (isKnownGpu(specificHwName)) {
       hwName = specificHwName;
     }
 
@@ -202,13 +202,13 @@ export function normalizeEvalHardwareKey(
     if (specDecoding && specDecoding !== 'none') {
       const specKey = specDecoding.toLowerCase().replaceAll('-', '_');
       const withSpecHwName = `${hwName}_${specKey}`;
-      if (withSpecHwName in HARDWARE_CONFIG) {
+      if (isKnownGpu(withSpecHwName)) {
         hwName = withSpecHwName;
       }
     }
   }
 
-  return hwName in HARDWARE_CONFIG ? hwName : 'unknown';
+  return isKnownGpu(hwName) ? hwName : 'unknown';
 }
 
 /**
@@ -226,11 +226,11 @@ export function buildAvailabilityHwKey(
   if (fw) {
     // Try framework as-is first, then disagg variant if it exists
     const candidateDirect = `${hwKey}_${fw}`;
-    if (candidateDirect in HARDWARE_CONFIG) {
+    if (isKnownGpu(candidateDirect)) {
       hwKey = candidateDirect;
     } else if (disagg) {
       const candidateDisagg = `${hwKey}_${fw}-disagg`;
-      hwKey = candidateDisagg in HARDWARE_CONFIG ? candidateDisagg : candidateDirect;
+      hwKey = isKnownGpu(candidateDisagg) ? candidateDisagg : candidateDirect;
     } else {
       hwKey = candidateDirect;
     }

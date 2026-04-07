@@ -12,7 +12,7 @@ import type {
   InferenceData,
 } from '@/components/inference/types';
 import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
-import { type HARDWARE_CONFIG, getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 import type { BenchmarkRow } from '@/lib/api';
 
 /** Convert a DB benchmark row to an AggDataEntry. */
@@ -23,7 +23,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
     precision: row.precision,
-    hwKey: '' as keyof typeof HARDWARE_CONFIG,
+    hwKey: '',
     tp: row.decode_tp,
     conc: row.conc,
     tput_per_gpu: m.tput_per_gpu ?? 0,
@@ -96,7 +96,7 @@ export function transformBenchmarkRows(rows: BenchmarkRow[]): {
     const row = rows[i];
     const entry = rowToAggDataEntry(row);
     const hwKey = getHardwareKey(entry);
-    entry.hwKey = hwKey as keyof typeof HARDWARE_CONFIG;
+    entry.hwKey = hwKey;
 
     if (!hwConfigCache.has(hwKey)) {
       const hwConfig = getHardwareConfig(hwKey);

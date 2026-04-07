@@ -17,7 +17,6 @@ import { FAVORITE_PRESETS, type FavoritePreset } from '@/components/favorites/fa
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import type {
-  HardwareConfig,
   InferenceChartContextType,
   InferenceData,
   TrackedConfig,
@@ -39,7 +38,7 @@ import {
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getModelSortIndex, HARDWARE_CONFIG, TABLEAU_10 } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
 import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
@@ -206,13 +205,13 @@ export function InferenceProvider({
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
-      if (HARDWARE_CONFIG[hwKey]) hwKeys.add(hwKey);
+      if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
     }
     return [...hwKeys]
       .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map((hw) => ({
         value: hw,
-        label: getDisplayLabel(HARDWARE_CONFIG[hw as keyof HardwareConfig]),
+        label: getDisplayLabel(getHardwareConfig(hw)),
       }));
   }, [availabilityRows, dbModelKey, effectiveSequence, effectivePrecisions]);
 

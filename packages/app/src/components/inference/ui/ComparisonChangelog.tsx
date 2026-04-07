@@ -11,7 +11,7 @@ import {
   configKeyMatchesHwKey,
   formatChangelogDescription,
 } from '@/components/inference/utils/changelogFormatters';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 import { getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 
 interface ComparisonChangelogProps {
@@ -223,7 +223,7 @@ export default function ComparisonChangelog({
                             entry.config_keys.some((key) => configKeyMatchesHwKey(key, gpu)),
                           );
                           const labels = matchingGpus.map((gpu) =>
-                            HARDWARE_CONFIG[gpu] ? getDisplayLabel(HARDWARE_CONFIG[gpu]) : gpu,
+                            getDisplayLabel(getHardwareConfig(gpu)),
                           );
                           return labels.length > 0 ? (
                             <span className="text-xs font-medium text-foreground/70">

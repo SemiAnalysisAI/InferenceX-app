@@ -9,23 +9,6 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
-    HARDWARE_CONFIG: {
-      ...actual.HARDWARE_CONFIG,
-      h100: {
-        name: 'H100',
-        label: 'H100',
-        suffix: '',
-        gpu: 'H100',
-        color: '#00ff00',
-      },
-      b200: {
-        name: 'B200',
-        label: 'B200',
-        suffix: '',
-        gpu: 'B200',
-        color: '#0000ff',
-      },
-    },
     getHardwareConfig: vi.fn((key: string) => {
       const configs: Record<
         string,

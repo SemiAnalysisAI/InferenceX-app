@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 
 import ScatterGraph from './ScatterGraph';
 
@@ -106,7 +106,7 @@ export function UnofficialChartDisplay() {
         hardwareConfig: Object.fromEntries(
           Object.entries(dataForChart.gpus || {}).map(([k, v]) => [
             k,
-            { ...v, ...HARDWARE_CONFIG[k] },
+            { ...getHardwareConfig(k), ...v },
           ]),
         ),
       };

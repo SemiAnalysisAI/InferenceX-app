@@ -18,7 +18,7 @@ import {
 } from '@/hooks/useChartContext';
 import { useReliability } from '@/hooks/api/use-reliability';
 import { useUrlState } from '@/hooks/useUrlState';
-import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import type { ReliabilityRow } from '@/lib/api';
 
 import type {
@@ -127,8 +127,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
         )
         .map((item) => ({
           ...item,
-          modelLabel:
-            HARDWARE_CONFIG[item.model as keyof typeof HARDWARE_CONFIG]?.label || item.model,
+          modelLabel: getHardwareConfig(item.model).label,
         })),
     [filteredReliabilityData, enabledModels],
   );

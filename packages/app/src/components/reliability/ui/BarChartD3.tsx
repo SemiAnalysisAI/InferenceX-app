@@ -4,7 +4,7 @@ import { track } from '@/lib/analytics';
 import { type ReactNode, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
@@ -21,8 +21,7 @@ type ChartItem = ModelSuccessRateData & { modelLabel: string };
 const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
 const generateReliabilityTooltipContent = (data: ChartItem, isPinned: boolean): string => {
-  const modelLabel =
-    HARDWARE_CONFIG[data.model as keyof typeof HARDWARE_CONFIG]?.label || data.model;
+  const modelLabel = getHardwareConfig(data.model).label;
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
@@ -123,7 +122,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         )
         .map((data) => ({
           name: data.model,
-          label: HARDWARE_CONFIG[data.model as keyof typeof HARDWARE_CONFIG]?.label || data.model,
+          label: getHardwareConfig(data.model).label,
           color: resolveColor(data.model),
           isActive: enabledModels.has(data.model),
           onClick: () => {

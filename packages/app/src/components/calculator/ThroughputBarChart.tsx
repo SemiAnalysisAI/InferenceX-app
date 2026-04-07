@@ -5,7 +5,7 @@ import * as d3 from 'd3';
 import { useEffect, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
@@ -39,7 +39,7 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Optional color resolver — when provided, overrides static HARDWARE_CONFIG colors. */
+  /** Optional color resolver — when provided, overrides static hardware config colors. */
   colorResolver?: (hwKey: string) => string;
 }
 
@@ -208,7 +208,7 @@ export function generateTooltipHTML(
   runUrl?: string,
   isPinned?: boolean,
 ): string {
-  const config = hardwareConfig[d.hwKey] || HARDWARE_CONFIG[d.hwKey];
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
   const label = d.precision ? `${baseName} (${d.precision.toUpperCase()})` : baseName;
   const costLabel = getCostTypeLabel(costType);
@@ -288,7 +288,7 @@ export function generateTooltipHTML(
 // ── Helpers at module scope for use in memos and layers ──
 
 function getLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
-  const config = hardwareConfig[d.hwKey] || HARDWARE_CONFIG[d.hwKey];
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
   if (d.precision) return `${baseName} (${d.precision.toUpperCase()})`;
   return baseName;

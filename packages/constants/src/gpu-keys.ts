@@ -1,33 +1,28 @@
+/** Single source of truth for GPU metadata. Add new GPUs here. */
+export const HW_REGISTRY = {
+  h100: { vendor: 'NVIDIA', arch: 'Hopper', label: 'H100' },
+  h200: { vendor: 'NVIDIA', arch: 'Hopper', label: 'H200' },
+  b200: { vendor: 'NVIDIA', arch: 'Blackwell', label: 'B200' },
+  b300: { vendor: 'NVIDIA', arch: 'Blackwell', label: 'B300' },
+  gb200: { vendor: 'NVIDIA', arch: 'Blackwell', label: 'GB200 NVL72' },
+  gb300: { vendor: 'NVIDIA', arch: 'Blackwell', label: 'GB300 NVL72' },
+  mi300x: { vendor: 'AMD', arch: 'CDNA 3', label: 'MI300X' },
+  mi325x: { vendor: 'AMD', arch: 'CDNA 3', label: 'MI325X' },
+  mi355x: { vendor: 'AMD', arch: 'CDNA 4', label: 'MI355X' },
+} as const;
+
 /** Canonical set of GPU key strings used across all packages. */
-export const GPU_KEYS = new Set([
-  'h100',
-  'h200',
-  'b200',
-  'b300',
-  'gb200',
-  'gb300',
-  'mi300x',
-  'mi325x',
-  'mi355x',
-]);
+export const GPU_KEYS = new Set(Object.keys(HW_REGISTRY));
 
 /** Maps each GPU key to its vendor for display grouping. */
-export const GPU_VENDORS: Record<string, string> = {
-  h100: 'NVIDIA',
-  h200: 'NVIDIA',
-  b200: 'NVIDIA',
-  b300: 'NVIDIA',
-  gb200: 'NVIDIA',
-  gb300: 'NVIDIA',
-  mi300x: 'AMD',
-  mi325x: 'AMD',
-  mi355x: 'AMD',
-};
+export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
+  Object.entries(HW_REGISTRY).map(([k, v]) => [k, v.vendor]),
+);
 
 // ---------------------------------------------------------------------------
 // Vendor color zones
 //
-// To add a new vendor: add entries to GPU_VENDORS above, then add color
+// To add a new vendor: add an entry to HW_REGISTRY above, then add color
 // zones to both maps below (OKLch for normal mode, HSL for high-contrast).
 // ---------------------------------------------------------------------------
 

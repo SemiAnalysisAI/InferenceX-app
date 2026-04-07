@@ -4,11 +4,11 @@ import {
   GPU_ALIAS_TO_CANONICAL,
   GPU_KEY_ALIASES,
   GPU_SPECS,
-  HARDWARE_CONFIG,
   MODEL_ORDER,
   getGpuSpecs,
   getHardwareConfig,
   getModelSortIndex,
+  isKnownGpu,
 } from '@/lib/constants';
 
 // ===========================================================================
@@ -23,10 +23,10 @@ describe('GPU_KEY_ALIASES', () => {
     expect(GPU_KEY_ALIASES['gb200_dynamo-trt_mtp']).toContain('gb200_dynamo-trtllm_mtp');
   });
 
-  it('alias keys all exist in HARDWARE_CONFIG', () => {
+  it('alias keys resolve to known GPUs', () => {
     for (const aliases of Object.values(GPU_KEY_ALIASES)) {
       for (const alias of aliases) {
-        expect(HARDWARE_CONFIG).toHaveProperty(alias);
+        expect(isKnownGpu(alias)).toBe(true);
       }
     }
   });
@@ -69,37 +69,46 @@ describe('getHardwareConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns the config for an exact key match', () => {
+  it('returns the config for a base key', () => {
     const config = getHardwareConfig('h100');
-    expect(config).toBe(HARDWARE_CONFIG.h100);
+    expect(config).toEqual({
+      name: 'h100',
+      label: 'H100',
+      suffix: '',
+      gpu: "NVIDIA 'Hopper' H100",
+    });
   });
 
-  it('returns the config for a compound exact key match (e.g. h100_vllm)', () => {
+  it('returns the config for a compound key (e.g. h100_vllm)', () => {
     const config = getHardwareConfig('h100_vllm');
-    expect(config).toBe(HARDWARE_CONFIG.h100_vllm);
+    expect(config).toEqual({
+      name: 'h100-vllm',
+      label: 'H100',
+      suffix: '(vLLM)',
+      gpu: "NVIDIA 'Hopper' H100 vLLM",
+    });
   });
 
-  it('falls back to base key when the full key is not in HARDWARE_CONFIG', () => {
-    // 'h100_nonexistent' is not in config; base key split on [-_] → 'h100'
+  it('derives config for any key with a known base GPU', () => {
     const config = getHardwareConfig('h100_nonexistent');
-    expect(config).toBe(HARDWARE_CONFIG.h100);
+    expect(config.label).toBe('H100');
+    expect(config.suffix).toBe('(NONEXISTENT)');
   });
 
-  it('falls back to base key for dash-separated unknown suffix', () => {
-    // 'h200-customsuffix' → base 'h200' which IS in config
-    const config = getHardwareConfig('h200-customsuffix');
-    expect(config).toBe(HARDWARE_CONFIG.h200);
+  it('handles GB200 NVL72 label vs gpu name divergence', () => {
+    const config = getHardwareConfig('gb200_dynamo-trt');
+    expect(config.label).toBe('GB200 NVL72');
+    expect(config.gpu).toBe("NVIDIA 'Blackwell' GB200 Dynamo TRT");
   });
 
-  it('returns the unknown config when key is completely unrecognized (no base match)', () => {
+  it('returns unknown config when base GPU is not recognised', () => {
     const config = getHardwareConfig('completelynew');
-    expect(config).toBe(HARDWARE_CONFIG.unknown);
+    expect(config.label).toBe('Unknown');
   });
 
-  it('returns the unknown config when neither key nor base is in config', () => {
-    // 'completelynew_variant' → base 'completelynew' → also not in config → unknown
+  it('returns unknown config when neither key nor base is recognised', () => {
     const config = getHardwareConfig('completelynew_variant');
-    expect(config).toBe(HARDWARE_CONFIG.unknown);
+    expect(config.label).toBe('Unknown');
   });
 
   it('always returns an object with required fields (name, label)', () => {

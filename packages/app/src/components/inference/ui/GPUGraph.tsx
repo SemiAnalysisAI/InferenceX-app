@@ -7,7 +7,7 @@ import { useTheme } from 'next-themes';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
-import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -420,7 +420,7 @@ const GPUGraph = React.memo(
                 hw: id,
                 label: date,
                 color,
-                title: HARDWARE_CONFIG[hwKey] ? getDisplayLabel(HARDWARE_CONFIG[hwKey]) : hwKey,
+                title: getDisplayLabel(getHardwareConfig(hwKey)),
                 isActive: activeDates.has(id),
                 onClick: () => {
                   toggleActiveDate(id);
