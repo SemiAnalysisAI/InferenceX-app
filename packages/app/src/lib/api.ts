@@ -94,26 +94,39 @@ export interface EvalRow {
   run_url: string | null;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
   return res.json();
 }
 
-export function fetchBenchmarks(model: string, date?: string, exact?: boolean) {
+export function fetchBenchmarks(
+  model: string,
+  date?: string,
+  exact?: boolean,
+  signal?: AbortSignal,
+) {
   const params = new URLSearchParams({ model });
   if (date) params.set('date', date);
   if (exact) params.set('exact', 'true');
-  return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`);
+  return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`, signal);
 }
 
-export function fetchBenchmarkHistory(model: string, isl: number, osl: number) {
+export function fetchBenchmarkHistory(
+  model: string,
+  isl: number,
+  osl: number,
+  signal?: AbortSignal,
+) {
   const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
-  return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`);
+  return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
-export function fetchWorkflowInfo(date: string) {
-  return fetchJson<WorkflowInfoResponse>(`/api/v1/workflow-info?date=${encodeURIComponent(date)}`);
+export function fetchWorkflowInfo(date: string, signal?: AbortSignal) {
+  return fetchJson<WorkflowInfoResponse>(
+    `/api/v1/workflow-info?date=${encodeURIComponent(date)}`,
+    signal,
+  );
 }
 
 export interface AvailabilityRow {
@@ -128,18 +141,18 @@ export interface AvailabilityRow {
   date: string;
 }
 
-export function fetchAvailability() {
-  return fetchJson<AvailabilityRow[]>('/api/v1/availability');
+export function fetchAvailability(signal?: AbortSignal) {
+  return fetchJson<AvailabilityRow[]>('/api/v1/availability', signal);
 }
 
-export function fetchReliability() {
-  return fetchJson<ReliabilityRow[]>('/api/v1/reliability');
+export function fetchReliability(signal?: AbortSignal) {
+  return fetchJson<ReliabilityRow[]>('/api/v1/reliability', signal);
 }
 
-export function fetchEvaluations() {
-  return fetchJson<EvalRow[]>('/api/v1/evaluations');
+export function fetchEvaluations(signal?: AbortSignal) {
+  return fetchJson<EvalRow[]>('/api/v1/evaluations', signal);
 }
 
-export function fetchSubmissions() {
-  return fetchJson<SubmissionsResponse>('/api/v1/submissions');
+export function fetchSubmissions(signal?: AbortSignal) {
+  return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
