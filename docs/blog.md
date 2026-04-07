@@ -124,11 +124,20 @@ All blog analytics use the `blog_` prefix per the `[section]_[action]` conventio
 
 ## Auto-Generated SEO Articles
 
-A weekly GitHub Action (`.github/workflows/seo-articles.yml`) generates per-model benchmark articles from InferenceX data:
+A weekly GitHub Action (`.github/workflows/seo-articles.yml`) generates three types of benchmark articles from InferenceX data:
 
-1. **Data script** (`packages/app/scripts/generate-seo-articles.ts`) fetches benchmark data from the production API and writes a JSON summary to `packages/app/tmp/seo-data.json`
-2. **Claude Code Action** reads the data + article template (`packages/app/scripts/seo/article-template.md`) and writes MDX files to `content/blog/`
+1. **Data script** (`packages/app/scripts/generate-seo-articles.ts`) fetches benchmark data + history from the production API and writes enriched JSON to `packages/app/tmp/seo-data.json` (includes cost, interactivity, history, GPU matchups, and improvement detection)
+2. **Claude Code Action** reads the data + templates and writes MDX files to `content/blog/`
 3. A PR is created for human review before merge
+
+### Article types
+
+| Type               | Template              | Slug pattern                              | Count              |
+| ------------------ | --------------------- | ----------------------------------------- | ------------------ |
+| Per-model roundup  | `article-template.md` | `best-gpu-for-<modelKey>-inference`       | 1 per model        |
+| GPU matchup        | `matchup-template.md` | `<gpuA>-vs-<gpuB>-inference`              | Top 3 pairs        |
+| Performance update | `update-template.md`  | `<gpu>-<framework>-<model>-update-<date>` | Top 3 improvements |
+| Cross-model rollup | `article-template.md` | `inference-benchmark-roundup`             | 1                  |
 
 ### Running locally
 
@@ -137,10 +146,33 @@ pnpm admin:seo:data                                    # fetch data from product
 pnpm admin:seo:data --base-url http://localhost:3000    # fetch from local dev
 ```
 
-### Article template
+### Templates
 
-The template at `packages/app/scripts/seo/article-template.md` defines the section order and formatting rules. Claude adapts depth and tone to each model's data richness — sparse-data models get shorter, honest articles; data-rich models get detailed analysis with framework and disagg comparisons.
+Templates live in `packages/app/scripts/seo/`:
+
+- `article-template.md` — per-model roundup + rollup (includes writing style rules, banned words, editing pass)
+- `matchup-template.md` — GPU head-to-head comparisons with interactivity curves and cost analysis
+- `update-template.md` — performance improvement news articles
+
+### Interactive chart components
+
+Three MDX components for embedding charts in articles:
+
+- `<BenchmarkChart>` — horizontal bar chart (default) or scatter plot (`variant="scatter"`)
+- `<TrendChart>` — time-series line chart for performance history
+- `<InteractivityChart>` — throughput vs interactivity (tok/s/user) pareto curves
+
+All accept a `data` prop (single-quoted JSON string) and render client-side with D3.
+
+### Data pipeline
+
+The data script (`generate-seo-articles.ts`) produces `seo-data.json` with:
+
+- Per-model configs with throughput, latency, interactivity, and cost ($/Mtok at 3 pricing tiers)
+- Historical benchmark data per config (for trend charts)
+- GPU matchup pairs (shared models, win/loss, avg % diff)
+- Detected improvements (>20% throughput gain between runs)
 
 ### Slugs
 
-Per-model articles use `best-gpu-for-<modelKey>-inference` slugs (e.g., `best-gpu-for-dsr1-inference`). The rollup uses `inference-benchmark-roundup`. Slugs are stable across updates to preserve SEO authority.
+Per-model articles use `best-gpu-for-<modelKey>-inference` slugs. Matchup articles use `<gpuA>-vs-<gpuB>-inference`. Update articles use `<gpu>-<framework>-<model>-update-<date>`. Slugs are stable across updates to preserve SEO authority.
