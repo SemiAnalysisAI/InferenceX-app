@@ -13,8 +13,18 @@ import path from 'node:path';
 
 import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
-import { aggregateModelData, allModels, distinctGpus, fetchBenchmarks } from './seo/data';
-import type { BestConfig } from './seo/types';
+import {
+  aggregateHistory,
+  aggregateModelData,
+  allModels,
+  costPerMtok,
+  detectImprovements,
+  distinctGpus,
+  fetchBenchmarks,
+  fetchHistory,
+} from './seo/data';
+import type { BestConfig, HistoryPoint, Improvement, MatchupData } from './seo/types';
+import { getGpuSpecs } from '../src/lib/constants';
 
 const PRIMARY_SEQ = '8k/1k';
 const MIN_GPUS = 2;
@@ -57,6 +67,9 @@ function parseArgs(): { baseUrl: string; output: string } {
 interface SerializableBestConfig extends BestConfig {
   gpuDisplayName: string;
   vendor: string;
+  costMtokHyperscaler: number;
+  costMtokNeocloud: number;
+  costMtokRental: number;
 }
 
 interface SerializableModelData {
@@ -70,6 +83,7 @@ interface SerializableModelData {
   gpuCount: number;
   precisionCount: number;
   frameworkCount: number;
+  history: Record<string, HistoryPoint[]>;
 }
 
 interface SeoDataOutput {
@@ -77,6 +91,8 @@ interface SeoDataOutput {
   baseUrl: string;
   primarySequence: string;
   models: SerializableModelData[];
+  matchups: MatchupData[];
+  improvements: Improvement[];
 }
 
 // ---------------------------------------------------------------------------
@@ -90,10 +106,14 @@ function gpuDisplay(hw: string): string {
 }
 
 function enrichConfig(c: BestConfig): SerializableBestConfig {
+  const specs = getGpuSpecs(c.hardware);
   return {
     ...c,
     gpuDisplayName: gpuDisplay(c.hardware),
     vendor: GPU_VENDORS[c.hardware] ?? 'Unknown',
+    costMtokHyperscaler: costPerMtok(specs.costh, c.tputPerGpu),
+    costMtokNeocloud: costPerMtok(specs.costn, c.tputPerGpu),
+    costMtokRental: costPerMtok(specs.costr, c.tputPerGpu),
   };
 }
 
@@ -138,20 +158,112 @@ async function processModel(
     sequences[seq] = configs.map(enrichConfig);
   }
 
+  // Fetch historical data for default models (8k/1k only to limit API calls)
+  const category = MODEL_CATEGORY[modelKey] ?? 'default';
+  let history: Record<string, HistoryPoint[]> = {};
+  if (category === 'default') {
+    const historyRows = await fetchHistory(baseUrl, displayName, 8192, 1024);
+    history = aggregateHistory(historyRows);
+    console.log(
+      `  ${displayName}: ${historyRows.length} history rows → ${Object.keys(history).length} configs`,
+    );
+  }
+
   const entry: SerializableModelData = {
     modelKey,
     displayName,
     slug: `best-gpu-for-${modelKey}-inference`,
-    category: MODEL_CATEGORY[modelKey] ?? 'default',
+    category,
     totalRows: rows.length,
     sequences,
     primarySequence: PRIMARY_SEQ,
     gpuCount: new Set(primaryConfigs.map((c) => c.hardware)).size,
     precisionCount: new Set(primaryConfigs.map((c) => c.precision)).size,
     frameworkCount: new Set(primaryConfigs.map((c) => c.framework)).size,
+    history,
   };
 
   return { result: { modelKey, displayName, status: 'included' }, entry };
+}
+
+/** Build GPU-pair matchup data for head-to-head articles. */
+function computeMatchups(models: SerializableModelData[]): MatchupData[] {
+  // For each model, find the best config per GPU at the primary sequence
+  const gpuBestByModel = new Map<string, Map<string, SerializableBestConfig>>();
+
+  for (const model of models) {
+    const configs = model.sequences[model.primarySequence] ?? [];
+    const bestPerGpu = new Map<string, SerializableBestConfig>();
+    for (const c of configs) {
+      const existing = bestPerGpu.get(c.hardware);
+      if (!existing || c.tputPerGpu > existing.tputPerGpu) {
+        bestPerGpu.set(c.hardware, c);
+      }
+    }
+    gpuBestByModel.set(model.modelKey, bestPerGpu);
+  }
+
+  // Find all GPU pairs that share 2+ models
+  const allGpus = new Set<string>();
+  for (const bestPerGpu of gpuBestByModel.values()) {
+    for (const hw of bestPerGpu.keys()) allGpus.add(hw);
+  }
+  const gpuList = [...allGpus].toSorted();
+
+  const matchups: MatchupData[] = [];
+
+  for (let i = 0; i < gpuList.length; i++) {
+    for (let j = i + 1; j < gpuList.length; j++) {
+      const gpuA = gpuList[i];
+      const gpuB = gpuList[j];
+      const sharedModels: MatchupData['sharedModels'] = [];
+
+      for (const model of models) {
+        const bestPerGpu = gpuBestByModel.get(model.modelKey)!;
+        const configA = bestPerGpu.get(gpuA);
+        const configB = bestPerGpu.get(gpuB);
+        if (configA && configB) {
+          sharedModels.push({
+            model: model.displayName,
+            modelKey: model.modelKey,
+            tputA: configA.tputPerGpu,
+            tputB: configB.tputPerGpu,
+            costMtokA: configA.costMtokHyperscaler,
+            costMtokB: configB.costMtokHyperscaler,
+            intvtyA: configA.medianIntvty,
+            intvtyB: configB.medianIntvty,
+          });
+        }
+      }
+
+      if (sharedModels.length < 2) continue;
+
+      let winsA = 0;
+      let winsB = 0;
+      let totalPctDiff = 0;
+      for (const m of sharedModels) {
+        if (m.tputA > m.tputB) winsA++;
+        else winsB++;
+        const max = Math.max(m.tputA, m.tputB);
+        const min = Math.min(m.tputA, m.tputB);
+        totalPctDiff += min > 0 ? (max - min) / min : 0;
+      }
+
+      matchups.push({
+        gpuA: gpuDisplay(gpuA),
+        gpuB: gpuDisplay(gpuB),
+        sharedModels,
+        winsA,
+        winsB,
+        avgPctDiff: totalPctDiff / sharedModels.length,
+      });
+    }
+  }
+
+  // Sort by most shared models first, then closest races
+  return matchups.toSorted(
+    (a, b) => b.sharedModels.length - a.sharedModels.length || a.avgPctDiff - b.avgPctDiff,
+  );
 }
 
 async function main() {
@@ -168,6 +280,8 @@ async function main() {
     baseUrl,
     primarySequence: PRIMARY_SEQ,
     models: [],
+    matchups: [],
+    improvements: [],
   };
 
   const fetchResults: FetchResult[] = [];
@@ -188,6 +302,18 @@ async function main() {
       result.models.push(outcome.value.entry);
     }
   }
+
+  // Detect improvements from history data
+  for (const model of result.models) {
+    if (Object.keys(model.history).length > 0) {
+      const modelImprovements = detectImprovements(model.history, model.displayName);
+      result.improvements.push(...modelImprovements);
+    }
+  }
+  result.improvements.sort((a, b) => b.pctGain - a.pctGain);
+
+  // Generate GPU matchups (pairs that share 2+ models)
+  result.matchups = computeMatchups(result.models);
 
   // Write output
   fs.mkdirSync(path.dirname(output), { recursive: true });

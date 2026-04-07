@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
 
 import type { BenchmarkRow } from '../../src/lib/api';
-import type { BestConfig } from './types';
-import { gpuDisplayName, modelSlug, aggregateModelData, distinctGpus, allModels } from './data';
+import type { BestConfig, HistoryPoint } from './types';
+import {
+  gpuDisplayName,
+  modelSlug,
+  aggregateModelData,
+  distinctGpus,
+  allModels,
+  costPerMtok,
+  aggregateHistory,
+  detectImprovements,
+} from './data';
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -353,5 +362,227 @@ describe('allModels', () => {
     const llama = models.find(([k]) => k === 'llama70b');
     expect(llama).toBeDefined();
     expect(llama![1]).toContain('70B');
+  });
+});
+
+// ===========================================================================
+// costPerMtok
+// ===========================================================================
+describe('costPerMtok', () => {
+  it('computes cost per million tokens correctly', () => {
+    // $1.30/hr GPU, 1000 tok/s = $1.30 / (1000 * 3600 / 1_000_000) = $1.30 / 3.6 ≈ $0.361
+    const cost = costPerMtok(1.3, 1000);
+    expect(cost).toBeCloseTo(0.3611, 3);
+  });
+
+  it('returns 0 for zero throughput', () => {
+    expect(costPerMtok(1.3, 0)).toBe(0);
+  });
+
+  it('returns 0 for zero cost', () => {
+    expect(costPerMtok(0, 1000)).toBe(0);
+  });
+
+  it('higher throughput means lower cost per Mtok', () => {
+    const costLow = costPerMtok(1.3, 500);
+    const costHigh = costPerMtok(1.3, 2000);
+    expect(costHigh).toBeLessThan(costLow);
+  });
+});
+
+// ===========================================================================
+// aggregateHistory
+// ===========================================================================
+describe('aggregateHistory', () => {
+  it('groups rows by config key and picks best per date', () => {
+    const rows = [
+      makeRow({
+        hardware: 'b200',
+        framework: 'vllm',
+        precision: 'fp8',
+        disagg: false,
+        date: '2026-01-01',
+        metrics: { tput_per_gpu: 500, median_ttft: 100, median_tpot: 10, median_e2el: 2000 },
+      }),
+      makeRow({
+        hardware: 'b200',
+        framework: 'vllm',
+        precision: 'fp8',
+        disagg: false,
+        date: '2026-01-01',
+        metrics: { tput_per_gpu: 700, median_ttft: 80, median_tpot: 8, median_e2el: 1800 },
+      }),
+      makeRow({
+        hardware: 'b200',
+        framework: 'vllm',
+        precision: 'fp8',
+        disagg: false,
+        date: '2026-02-01',
+        metrics: { tput_per_gpu: 900, median_ttft: 60, median_tpot: 6, median_e2el: 1500 },
+      }),
+    ];
+    const history = aggregateHistory(rows);
+    const key = 'b200|vllm|fp8|false';
+    expect(history[key]).toHaveLength(2);
+    expect(history[key][0].tputPerGpu).toBe(700); // best of Jan 1
+    expect(history[key][1].tputPerGpu).toBe(900); // Feb 1
+  });
+
+  it('separates different configs', () => {
+    const rows = [
+      makeRow({ hardware: 'b200', framework: 'vllm', date: '2026-01-01' }),
+      makeRow({ hardware: 'h100', framework: 'trt', date: '2026-01-01' }),
+    ];
+    const history = aggregateHistory(rows);
+    expect(Object.keys(history)).toHaveLength(2);
+  });
+
+  it('sorts points chronologically', () => {
+    const rows = [
+      makeRow({ date: '2026-03-01', metrics: { tput_per_gpu: 100 } }),
+      makeRow({ date: '2026-01-01', metrics: { tput_per_gpu: 200 } }),
+      makeRow({ date: '2026-02-01', metrics: { tput_per_gpu: 300 } }),
+    ];
+    const history = aggregateHistory(rows);
+    const points = Object.values(history)[0];
+    expect(points.map((p) => p.date)).toEqual(['2026-01-01', '2026-02-01', '2026-03-01']);
+  });
+});
+
+// ===========================================================================
+// detectImprovements
+// ===========================================================================
+describe('detectImprovements', () => {
+  function makeHistory(tputs: number[], dates?: string[]): Record<string, HistoryPoint[]> {
+    const points: HistoryPoint[] = tputs.map((tput, i) => ({
+      date: dates?.[i] ?? `2026-0${i + 1}-01`,
+      hardware: 'b200',
+      framework: 'vllm',
+      precision: 'fp8',
+      disagg: false,
+      tputPerGpu: tput,
+      medianTtft: 100,
+      medianTpot: 10,
+      medianIntvty: 50,
+      conc: 64,
+    }));
+    return { 'b200|vllm|fp8|false': points };
+  }
+
+  it('flags >20% improvement', () => {
+    const history = makeHistory([1000, 1300]); // 30% gain
+    const improvements = detectImprovements(history, 'TestModel');
+    expect(improvements).toHaveLength(1);
+    expect(improvements[0].pctGain).toBeCloseTo(0.3);
+    expect(improvements[0].oldTput).toBe(1000);
+    expect(improvements[0].newTput).toBe(1300);
+  });
+
+  it('ignores <20% improvement', () => {
+    const history = makeHistory([1000, 1100]); // 10% gain
+    const improvements = detectImprovements(history, 'TestModel');
+    expect(improvements).toHaveLength(0);
+  });
+
+  it('ignores regressions', () => {
+    const history = makeHistory([1000, 800]); // -20%
+    const improvements = detectImprovements(history, 'TestModel');
+    expect(improvements).toHaveLength(0);
+  });
+
+  it('needs at least 2 data points', () => {
+    const history = makeHistory([1000]);
+    const improvements = detectImprovements(history, 'TestModel');
+    expect(improvements).toHaveLength(0);
+  });
+
+  it('sorts by pctGain descending', () => {
+    const history = {
+      'b200|vllm|fp8|false': [
+        {
+          date: '2026-01-01',
+          hardware: 'b200',
+          framework: 'vllm',
+          precision: 'fp8',
+          disagg: false,
+          tputPerGpu: 1000,
+          medianTtft: 0,
+          medianTpot: 0,
+          medianIntvty: 0,
+          conc: 64,
+        },
+        {
+          date: '2026-02-01',
+          hardware: 'b200',
+          framework: 'vllm',
+          precision: 'fp8',
+          disagg: false,
+          tputPerGpu: 1500,
+          medianTtft: 0,
+          medianTpot: 0,
+          medianIntvty: 0,
+          conc: 64,
+        },
+      ] satisfies HistoryPoint[],
+      'h100|trt|fp8|false': [
+        {
+          date: '2026-01-01',
+          hardware: 'h100',
+          framework: 'trt',
+          precision: 'fp8',
+          disagg: false,
+          tputPerGpu: 500,
+          medianTtft: 0,
+          medianTpot: 0,
+          medianIntvty: 0,
+          conc: 64,
+        },
+        {
+          date: '2026-02-01',
+          hardware: 'h100',
+          framework: 'trt',
+          precision: 'fp8',
+          disagg: false,
+          tputPerGpu: 1000,
+          medianTtft: 0,
+          medianTpot: 0,
+          medianIntvty: 0,
+          conc: 64,
+        },
+      ] satisfies HistoryPoint[],
+    };
+    const improvements = detectImprovements(history, 'TestModel');
+    expect(improvements).toHaveLength(2);
+    expect(improvements[0].pctGain).toBeCloseTo(1); // h100: 100% gain
+    expect(improvements[1].pctGain).toBeCloseTo(0.5); // b200: 50% gain
+  });
+});
+
+// ===========================================================================
+// aggregateModelData — medianIntvty
+// ===========================================================================
+describe('aggregateModelData medianIntvty', () => {
+  it('extracts median_intvty from metrics', () => {
+    const rows = [
+      makeRow({
+        metrics: {
+          tput_per_gpu: 500,
+          median_ttft: 100,
+          median_tpot: 10,
+          median_e2el: 2000,
+          median_intvty: 42.5,
+        },
+      }),
+    ];
+    const result = aggregateModelData('m', 'M', rows);
+    const config = result.bestBySequence.get('1k/1k')![0];
+    expect(config.medianIntvty).toBe(42.5);
+  });
+
+  it('defaults medianIntvty to 0 when missing', () => {
+    const rows = [makeRow({ metrics: { tput_per_gpu: 500 } })];
+    const result = aggregateModelData('m', 'M', rows);
+    const config = result.bestBySequence.get('1k/1k')![0];
+    expect(config.medianIntvty).toBe(0);
   });
 });

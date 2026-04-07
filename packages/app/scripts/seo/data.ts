@@ -1,7 +1,7 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkRow } from '../../src/lib/api';
-import type { BestConfig, ModelData } from './types';
+import type { BestConfig, HistoryPoint, Improvement, ModelData } from './types';
 
 /** Human-readable GPU name (e.g. "NVIDIA B200"). */
 export function gpuDisplayName(hw: string): string {
@@ -135,6 +135,7 @@ export function aggregateModelData(
           medianTtft: row.metrics.median_ttft ?? 0,
           medianTpot: row.metrics.median_tpot ?? 0,
           medianE2el: row.metrics.median_e2el ?? 0,
+          medianIntvty: row.metrics.median_intvty ?? 0,
           conc: row.conc,
           tp: row.disagg ? row.num_prefill_gpu + row.num_decode_gpu : row.decode_tp,
           date: row.date,
@@ -158,4 +159,136 @@ export function distinctGpus(data: ModelData, primarySeq: string): Set<string> {
 /** All available model entries as [dbKey, displayName] pairs. */
 export function allModels(): [string, string][] {
   return Object.entries(DB_MODEL_TO_DISPLAY);
+}
+
+/**
+ * Cost per million tokens: costPerHour / (tps * 3600 / 1_000_000).
+ * Same formula as useThroughputData.ts:16-18.
+ */
+export function costPerMtok(costPerHour: number, tputPerGpu: number): number {
+  if (costPerHour <= 0 || tputPerGpu <= 0) return 0;
+  return costPerHour / ((tputPerGpu * 3600) / 1_000_000);
+}
+
+/** Fetch historical benchmark data for a model+sequence from the API. */
+export async function fetchHistory(
+  baseUrl: string,
+  displayName: string,
+  isl: number,
+  osl: number,
+): Promise<BenchmarkRow[]> {
+  const params = new URLSearchParams({
+    model: displayName,
+    isl: String(isl),
+    osl: String(osl),
+  });
+  const url = `${baseUrl}/api/v1/benchmarks/history?${params}`;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.status >= 400 && res.status < 500) {
+        console.warn(`  History fetch ${displayName} ${isl}/${osl}: ${res.status}`);
+        return [];
+      }
+      if (!res.ok) {
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        return [];
+      }
+      return (await res.json()) as BenchmarkRow[];
+    } catch (error: unknown) {
+      if (isRetryable(error) && attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Group history rows by GPU config, pick best throughput per date per config.
+ * Returns a map keyed by "hardware|framework|precision|disagg" with sorted history points.
+ */
+export function aggregateHistory(rows: BenchmarkRow[]): Record<string, HistoryPoint[]> {
+  const byConfig = new Map<string, Map<string, HistoryPoint>>();
+
+  for (const row of rows) {
+    const tput = row.metrics.tput_per_gpu ?? 0;
+    if (tput <= 0) continue;
+
+    const configKey = `${row.hardware}|${row.framework}|${row.precision}|${row.disagg}`;
+    let dateMap = byConfig.get(configKey);
+    if (!dateMap) {
+      dateMap = new Map();
+      byConfig.set(configKey, dateMap);
+    }
+
+    const existing = dateMap.get(row.date);
+    if (!existing || tput > existing.tputPerGpu) {
+      dateMap.set(row.date, {
+        date: row.date,
+        hardware: row.hardware,
+        framework: row.framework,
+        precision: row.precision,
+        disagg: row.disagg,
+        tputPerGpu: tput,
+        medianTtft: row.metrics.median_ttft ?? 0,
+        medianTpot: row.metrics.median_tpot ?? 0,
+        medianIntvty: row.metrics.median_intvty ?? 0,
+        conc: row.conc,
+      });
+    }
+  }
+
+  const result: Record<string, HistoryPoint[]> = {};
+  for (const [key, dateMap] of byConfig) {
+    result[key] = [...dateMap.values()].toSorted(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+  }
+  return result;
+}
+
+/** Minimum throughput gain (as fraction) to flag as a notable improvement. */
+const IMPROVEMENT_THRESHOLD = 0.2;
+
+/**
+ * Detect significant improvements: compare the latest two data points per config.
+ * Flags any config where throughput increased by >20%.
+ */
+export function detectImprovements(
+  history: Record<string, HistoryPoint[]>,
+  model: string,
+): Improvement[] {
+  const improvements: Improvement[] = [];
+
+  for (const points of Object.values(history)) {
+    if (points.length < 2) continue;
+    const prev = points.at(-2)!;
+    const latest = points.at(-1)!;
+    if (prev.tputPerGpu <= 0) continue;
+
+    const pctGain = (latest.tputPerGpu - prev.tputPerGpu) / prev.tputPerGpu;
+    if (pctGain >= IMPROVEMENT_THRESHOLD) {
+      improvements.push({
+        model,
+        hardware: latest.hardware,
+        framework: latest.framework,
+        precision: latest.precision,
+        disagg: latest.disagg,
+        oldTput: prev.tputPerGpu,
+        newTput: latest.tputPerGpu,
+        pctGain,
+        oldDate: prev.date,
+        newDate: latest.date,
+      });
+    }
+  }
+
+  return improvements.toSorted((a, b) => b.pctGain - a.pctGain);
 }
