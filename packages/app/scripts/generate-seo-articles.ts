@@ -172,7 +172,7 @@ async function processModel(
   const entry: SerializableModelData = {
     modelKey,
     displayName,
-    slug: `best-gpu-for-${modelKey}-inference`,
+    slug: `best-gpu-for-${modelKey.replaceAll('.', '')}-inference`,
     category,
     totalRows: rows.length,
     sequences,

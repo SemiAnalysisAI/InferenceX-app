@@ -22,9 +22,9 @@ This is a cross-model summary of GPU inference performance from [InferenceX](htt
 | [DeepSeek-R1-0528](/blog/best-gpu-for-dsr1-inference)                 | NVIDIA GB300 | FP4       |               18,131.6 |
 | [gpt-oss-120b](/blog/best-gpu-for-gptoss120b-inference)               | NVIDIA B200  | FP4       |               61,612.7 |
 | [Llama-3.3-70B](/blog/best-gpu-for-llama70b-inference) <sup>2</sup>   | NVIDIA B200  | FP4       |               12,981.3 |
-| [Qwen-3.5-397B](/blog/best-gpu-for-qwen3.5-inference) <sup>1</sup>    | NVIDIA B200  | FP8       |                5,709.7 |
-| [Kimi-K2.5](/blog/best-gpu-for-kimik2.5-inference) <sup>1</sup>       | NVIDIA B200  | FP4       |                4,020.9 |
-| [MiniMax-M2.5](/blog/best-gpu-for-minimaxm2.5-inference) <sup>1</sup> | AMD MI355X   | FP8       |               10,391.0 |
+| [Qwen-3.5-397B](/blog/best-gpu-for-qwen35-inference) <sup>1</sup>    | NVIDIA B200  | FP8       |                5,709.7 |
+| [Kimi-K2.5](/blog/best-gpu-for-kimik25-inference) <sup>1</sup>       | NVIDIA B200  | FP4       |                4,020.9 |
+| [MiniMax-M2.5](/blog/best-gpu-for-minimaxm25-inference) <sup>1</sup> | AMD MI355X   | FP8       |               10,391.0 |
 | [GLM-5](/blog/best-gpu-for-glm5-inference) <sup>1</sup>               | NVIDIA B200  | FP8       |                1,673.6 |
 
 <sup>1</sup> Experimental support, limited GPU/framework coverage.
@@ -46,15 +46,15 @@ A dense 70B model where B200 on FP4 gets 12,981.3 tok/s/GPU. MI355X on FP4 reach
 
 ### Qwen-3.5-397B
 
-B200 on FP8 dominates at 5,709.7 tok/s/GPU, 3.2x faster than the runner-up. Unusual finding: BF16 beats FP8 on all AMD cards, suggesting immature FP8 support for this model. [Full benchmarks](/blog/best-gpu-for-qwen3.5-inference).
+B200 on FP8 dominates at 5,709.7 tok/s/GPU, 3.2x faster than the runner-up. Unusual finding: BF16 beats FP8 on all AMD cards, suggesting immature FP8 support for this model. [Full benchmarks](/blog/best-gpu-for-qwen35-inference).
 
 ### Kimi-K2.5
 
-B200 on FP4 gets 4,020.9 tok/s/GPU, but MI355X with atom is close at 3,510.4 (87%) and cheaper per token. FP4 is 2.8x faster than INT4 on both vendors. [Full benchmarks](/blog/best-gpu-for-kimik2.5-inference).
+B200 on FP4 gets 4,020.9 tok/s/GPU, but MI355X with atom is close at 3,510.4 (87%) and cheaper per token. FP4 is 2.8x faster than INT4 on both vendors. [Full benchmarks](/blog/best-gpu-for-kimik25-inference).
 
 ### MiniMax-M2.5
 
-The one model where AMD wins. MI355X on FP8 with vllm hits 10,391.0 tok/s/GPU, 8% faster than B200 (9,652.0) and 33% cheaper per token. [Full benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
+The one model where AMD wins. MI355X on FP8 with vllm hits 10,391.0 tok/s/GPU, 8% faster than B200 (9,652.0) and 33% cheaper per token. [Full benchmarks](/blog/best-gpu-for-minimaxm25-inference).
 
 ### GLM-5
 
@@ -64,11 +64,11 @@ Limited data: only 3 GPUs tested. B200 on FP8 gets 1,673.6 tok/s/GPU. FP8 is fas
 
 ### NVIDIA H200 vs AMD MI355X
 
-MI355X wins on throughput in 5 out of 7 shared models, by 116% on average. The exceptions are Qwen-3.5-397B (H200 leads 1,796.7 vs 1,671.5 tok/s/GPU) and GLM-5 (H200 leads 639.5 vs 420.5 tok/s/GPU). On cost, MI355X is cheaper per Mtok in 5 of 7 models. H200 tends to have better TTFT at low concurrencies. For the full MiniMax-M2.5 matchup (MI355X's strongest win), see our [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
+MI355X wins on throughput in 5 out of 7 shared models, by 116% on average. The exceptions are Qwen-3.5-397B (H200 leads 1,796.7 vs 1,671.5 tok/s/GPU) and GLM-5 (H200 leads 639.5 vs 420.5 tok/s/GPU). On cost, MI355X is cheaper per Mtok in 5 of 7 models. H200 tends to have better TTFT at low concurrencies. For the full MiniMax-M2.5 matchup (MI355X's strongest win), see our [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm25-inference).
 
 ### NVIDIA B200 vs AMD MI355X
 
-B200 wins on throughput in 6 out of 7 models, by 124% on average. MiniMax-M2.5 is the exception, where MI355X edges ahead (10,391.0 vs 9,652.0 tok/s/GPU). B200 consistently has lower TPOT. MI355X wins on cost in 2 models (MiniMax-M2.5, Kimi-K2.5). For the closest matchup, see our [Kimi-K2.5 benchmarks](/blog/best-gpu-for-kimik2.5-inference).
+B200 wins on throughput in 6 out of 7 models, by 124% on average. MiniMax-M2.5 is the exception, where MI355X edges ahead (10,391.0 vs 9,652.0 tok/s/GPU). B200 consistently has lower TPOT. MI355X wins on cost in 2 models (MiniMax-M2.5, Kimi-K2.5). For the closest matchup, see our [Kimi-K2.5 benchmarks](/blog/best-gpu-for-kimik25-inference).
 
 ### NVIDIA B200 vs NVIDIA H200
 
@@ -84,7 +84,7 @@ H200 wins 5 of 6 models by 88% on average throughput. MI325X's only win is on Mi
 
 ### NVIDIA H200 vs AMD MI300X
 
-H200 wins 5 of 6 models. MI300X's only win is on MiniMax-M2.5 (3,503.7 vs 3,370.8 tok/s/GPU, a tiny margin). H200 averages 105% more throughput across shared models. MI300X tends to be slightly cheaper per token on the models it competes on. See the [MiniMax-M2.5 results](/blog/best-gpu-for-minimaxm2.5-inference).
+H200 wins 5 of 6 models. MI300X's only win is on MiniMax-M2.5 (3,503.7 vs 3,370.8 tok/s/GPU, a tiny margin). H200 averages 105% more throughput across shared models. MI300X tends to be slightly cheaper per token on the models it competes on. See the [MiniMax-M2.5 results](/blog/best-gpu-for-minimaxm25-inference).
 
 ### NVIDIA H100 vs AMD MI300X
 
