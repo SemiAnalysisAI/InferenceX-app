@@ -110,12 +110,13 @@ Title: `## GPU Comparison — <DisplayName> at 8k/1k`
 
 One row per GPU (best config for that GPU), sorted by throughput descending.
 
-| GPU | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date |
-| --- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---- |
+| GPU | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date |
+| --- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---- |
 
 - Use gpuDisplayName from the data (e.g. "Vendor Model")
 - Precision in UPPERCASE (FP4, FP8, BF16, INT4)
 - TTFT and TPOT: convert from seconds to milliseconds (multiply by 1000)
+- $/Mtok: use `costMtokHyperscaler` from the data, format to 2 decimal places (e.g. $0.04)
 - Format large numbers with commas (e.g. xx,xxx.x)
 
 Footer: `*One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks.*`
@@ -235,6 +236,20 @@ Find the config with the ACTUAL lowest medianTtft across ALL configs at 8k/1k
 > the yyy's best TTFT (xxxms), though throughput drops to xx,xxx tok/s/GPU at that
 > concurrency. If TTFT matters more than throughput (interactive chat, for example),
 > this is the config to run.
+
+### 4g: Cheapest Per Million Tokens (include if cost data exists)
+
+Which GPU has the lowest $/Mtok? Note this often differs from the throughput winner
+because cheaper GPUs (lower $/hr) can win on cost even with lower throughput.
+
+> **EXAMPLE:**
+>
+> ## Cheapest inference per million tokens
+>
+> yyy on FP8 at $x.xx/Mtok (hyperscaler pricing). That's xx% cheaper than yyy
+> ($x.xx/Mtok) despite xx% lower throughput, because its $/hr is much lower.
+> If you're optimizing for cost and can tolerate the throughput gap, yyy is the
+> better deal.
 
 ## Section 5: Additional Sequence Table (h2)
 

@@ -17,6 +17,8 @@ interface BenchmarkChartProps {
   children?: ReactNode;
   data: string;
   metric?: string;
+  /** "bar" (default) = horizontal bar chart, "scatter" = scatter plot */
+  variant?: 'bar' | 'scatter';
 }
 
 const VENDOR_COLORS: Record<string, string> = {
@@ -25,13 +27,11 @@ const VENDOR_COLORS: Record<string, string> = {
   other: 'oklch(0.7 0.1 260)',
 };
 
-const CHART_MARGIN = { top: 24, right: 24, bottom: 48, left: 100 };
-
 function formatNumber(n: number): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
 
-function getBarColor(d: BenchmarkEntry): string {
+function getColor(d: BenchmarkEntry): string {
   return VENDOR_COLORS[d.vendor] ?? VENDOR_COLORS.other;
 }
 
@@ -55,13 +55,14 @@ function positionValueLabels(
     d3.select(this)
       .attr('x', fitsInside ? barEnd - 10 : barEnd + 6)
       .attr('text-anchor', fitsInside ? 'end' : 'start')
-      .style('fill', fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)');
+      .style('fill', fitsInside ? contrastColors(getColor(d)) : 'var(--foreground)');
   });
 }
 
 export function BenchmarkChart({
   data: dataJson,
   metric = 'Throughput/GPU (tok/s)',
+  variant = 'bar',
 }: BenchmarkChartProps) {
   const data = useMemo<BenchmarkEntry[]>(() => {
     try {
@@ -77,16 +78,23 @@ export function BenchmarkChart({
 
   if (data.length === 0) return null;
 
-  const dynamicHeight = Math.max(250, data.length * 45 + 80);
+  const barHeight = Math.max(250, data.length * 45 + 80);
+  const scatterHeight = 350;
+  const height = variant === 'scatter' ? scatterHeight : barHeight;
 
-  if (!mounted) {
-    return <div className="my-6 not-prose" style={{ height: dynamicHeight }} />;
+  if (!mounted) return <div className="my-6 not-prose" style={{ height }} />;
+
+  if (variant === 'scatter') {
+    return <ScatterVariant data={data} metric={metric} height={scatterHeight} />;
   }
-
-  return <BenchmarkChartInner data={data} metric={metric} height={dynamicHeight} />;
+  return <BarVariant data={data} metric={metric} height={barHeight} />;
 }
 
-function BenchmarkChartInner({
+// ---------------------------------------------------------------------------
+// Bar variant (horizontal bars, same as before)
+// ---------------------------------------------------------------------------
+
+function BarVariant({
   data,
   metric,
   height,
@@ -96,7 +104,6 @@ function BenchmarkChartInner({
   height: number;
 }) {
   const hoveredBarXRef = useRef(0);
-
   const maxValue = useMemo(() => Math.max(...data.map((d) => d.value)), [data]);
   const yDomain = useMemo(() => [...data].toReversed().map((d) => d.gpu), [data]);
 
@@ -108,7 +115,7 @@ function BenchmarkChartInner({
         config: {
           getY: (d) => d.gpu,
           getX: (d) => d.value,
-          getColor: getBarColor,
+          getColor,
           rx: 2,
           opacity: 1,
           keyFn: (d) => d.gpu,
@@ -119,7 +126,6 @@ function BenchmarkChartInner({
         key: 'bar-labels',
         render: (group, ctx) => {
           const yScale = ctx.yScale as d3.ScaleBand<string>;
-
           group
             .selectAll<SVGTextElement, BenchmarkEntry>('.value-label')
             .data(data, (d) => d.gpu)
@@ -131,7 +137,6 @@ function BenchmarkChartInner({
             .attr('font-weight', '600')
             .style('pointer-events', 'none')
             .text((d) => `${formatNumber(d.value)} tok/s`);
-
           positionValueLabels(group, ctx.xScale as d3.ScaleLinear<number, number>);
         },
         onZoom: (group, ctx) => {
@@ -142,32 +147,25 @@ function BenchmarkChartInner({
     [data],
   );
 
-  const xAxisConfig = useMemo(
-    () => ({
-      label: metric,
-      tickFormat: (d: d3.AxisDomain) => formatNumber(d as number),
-      tickCount: 5,
-    }),
-    [metric],
-  );
-
-  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels(5) }), []);
-
   return (
     <div className="my-6 not-prose">
       <D3Chart<BenchmarkEntry>
         chartId="benchmark-bar"
         data={data}
         height={height}
-        margin={CHART_MARGIN}
+        margin={{ top: 24, right: 24, bottom: 48, left: 100 }}
         watermark="logo"
         grabCursor
         clipContent={false}
         instructions=""
         xScale={{ type: 'linear', domain: [0, maxValue * 1.1], nice: true }}
         yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
-        xAxis={xAxisConfig}
-        yAxis={yAxisConfig}
+        xAxis={{
+          label: metric,
+          tickFormat: (d: d3.AxisDomain) => formatNumber(d as number),
+          tickCount: 5,
+        }}
+        yAxis={{ customize: twoRowYAxisLabels(5) }}
         layers={layers}
         zoom={{
           enabled: true,
@@ -195,6 +193,93 @@ function BenchmarkChartInner({
           attachToLayer: 0,
         }}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scatter variant (points on a linear scale)
+// ---------------------------------------------------------------------------
+
+interface IndexedBenchmarkEntry extends BenchmarkEntry {
+  idx: number;
+}
+
+function ScatterVariant({
+  data,
+  metric,
+  height,
+}: {
+  data: BenchmarkEntry[];
+  metric: string;
+  height: number;
+}) {
+  const indexed = useMemo<IndexedBenchmarkEntry[]>(
+    () => data.map((d, i) => ({ ...d, idx: i })),
+    [data],
+  );
+  const maxValue = useMemo(() => Math.max(...data.map((d) => d.value)), [data]);
+
+  const layers = useMemo(
+    (): LayerConfig<IndexedBenchmarkEntry>[] => [
+      {
+        type: 'point',
+        data: indexed,
+        config: {
+          getCx: (d) => d.idx,
+          getCy: (d) => d.value,
+          getX: (d) => d.idx,
+          getY: (d) => d.value,
+          getColor: (d) => getColor(d),
+          getRadius: () => 7,
+          keyFn: (d) => d.gpu,
+        },
+      },
+    ],
+    [indexed],
+  );
+
+  const legend = (
+    <div className="flex flex-wrap gap-4 mt-2 ml-16">
+      {data.map((d) => (
+        <div key={d.gpu} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="w-3 h-3 rounded-full" style={{ background: getColor(d) }} />
+          {d.gpu}: {formatNumber(d.value)} tok/s
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="my-6 not-prose">
+      <D3Chart<IndexedBenchmarkEntry>
+        chartId="benchmark-scatter"
+        data={indexed}
+        height={height}
+        margin={{ top: 16, right: 24, bottom: 48, left: 70 }}
+        watermark="logo"
+        grabCursor
+        instructions=""
+        xScale={{ type: 'linear', domain: [-0.5, data.length - 0.5] }}
+        yScale={{ type: 'linear', domain: [0, maxValue * 1.15], nice: true }}
+        xAxis={{
+          tickFormat: (d: d3.AxisDomain) => data[d as number]?.gpu ?? '',
+          tickCount: data.length,
+        }}
+        yAxis={{
+          label: metric,
+          tickFormat: (d: d3.AxisDomain) => formatNumber(d as number),
+        }}
+        layers={layers}
+        tooltip={{
+          rulerType: 'crosshair',
+          content: generateTooltipContent,
+          attachToLayer: 0,
+          proximityHover: true,
+          getDataX: (d) => d.idx,
+        }}
+      />
+      {legend}
     </div>
   );
 }
