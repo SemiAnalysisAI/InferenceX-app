@@ -120,10 +120,10 @@ One row per GPU (best config for that GPU), sorted by throughput descending.
 
 Footer: `*One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks.*`
 
-## Section 3b: Interactive Throughput Chart
+## MANDATORY: BenchmarkChart after EVERY table
 
-Immediately after the table footer, add a `<BenchmarkChart>` component. This renders an
-interactive horizontal bar chart from the same data as the table.
+**Every GPU comparison table in the article MUST be followed by a `<BenchmarkChart>`.**
+This applies to Section 3 (8k/1k) AND Section 5 (1k/1k). No exceptions.
 
 The component takes a `data` prop (single-quoted JSON string) and an optional `metric` prop.
 
@@ -138,13 +138,15 @@ The component takes a `data` prop (single-quoted JSON string) and an optional `m
 
 Rules:
 
-- Include one entry per GPU (same rows as the table, best config per GPU)
+- One `<BenchmarkChart>` immediately after each table footer (after the italic footnote)
+- Include one entry per GPU (same rows as the table above it)
 - `data` is a **single-quoted** JSON string prop (NOT children, NOT backtick template)
 - `value` is throughput per GPU (raw number, no commas)
 - `vendor` must be lowercase: `"nvidia"`, `"amd"`, or `"other"`
 - Self-closing tag (`/>`) with no children
 - Keep the JSON compact (one line) to avoid MDX parsing issues
 - Sort doesn't matter (the component sorts by value descending)
+- If the article has 2 tables, it MUST have 2 charts
 
 ## Section 4: FAQ Sections (h2 each)
 
@@ -252,6 +254,10 @@ NEVER include 1k/8k data.
 > | yyy | FP8       | yyy       |               xx,xxx.x |             xx.x |              x.x |         xxx | YYYY-MM-DD |
 >
 > _One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
+>
+> `<BenchmarkChart metric="Throughput/GPU (tok/s)" data='[...]' />`
+
+**A `<BenchmarkChart>` MUST follow this table too (see chart rules above).**
 
 ## Section 6: Cross-Links (h2, 1-2 sentences)
 
@@ -437,6 +443,8 @@ to the next article. This is not optional.
    If two consecutive sentences start the same way, rewrite one.
 4. **Filler check:** Cut any sentence that restates the previous sentence or conveys
    zero new information.
+5. **Chart check:** Count the tables and `<BenchmarkChart>` tags. They must match.
+   Every table MUST have a chart immediately after it.
 
 ---
 
