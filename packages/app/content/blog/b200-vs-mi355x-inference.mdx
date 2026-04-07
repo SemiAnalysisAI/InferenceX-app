@@ -1,0 +1,102 @@
+---
+title: 'NVIDIA B200 vs AMD MI355X — Inference Benchmark (April 2026)'
+subtitle: 'B200 wins 6 of 7 models, but MI355X steals MiniMax-M2.5 and competes on cost for Kimi-K2.5'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - b200
+  - mi355x
+---
+
+## Intro
+
+NVIDIA B200 vs AMD MI355X is the matchup everyone is watching. B200 is NVIDIA's current-gen Blackwell card; MI355X is AMD's answer. Both are the top picks from their respective vendors. We ran them head-to-head across 7 models on [InferenceX](https://inferencex.semianalysis.com).
+
+## Key Numbers
+
+- B200 wins on throughput in 6 of 7 shared models, by 124% on average.
+- On DeepSeek-R1-0528, B200 is 3.2x faster: **13,429.7 vs 4,222.8 tok/s/GPU**.
+- MI355X wins MiniMax-M2.5 (10,391.0 vs 9,652.0 tok/s/GPU), an 8% edge.
+- On Kimi-K2.5, the gap is just 15% and MI355X is cheaper per token ($0.12 vs $0.13/Mtok).
+
+## Throughput Comparison
+
+| Model            | B200 Throughput | MI355X Throughput | Winner |  Diff |
+| ---------------- | --------------: | ----------------: | ------ | ----: |
+| DeepSeek-R1-0528 |        13,429.7 |           4,222.8 | B200   | +218% |
+| gpt-oss-120b     |        61,612.7 |          44,999.3 | B200   |  +37% |
+| Llama-3.3-70B    |        12,981.3 |           8,748.9 | B200   |  +48% |
+| Qwen-3.5-397B    |         5,709.7 |           1,671.5 | B200   | +242% |
+| Kimi-K2.5        |         4,020.9 |           3,510.4 | B200   |  +15% |
+| MiniMax-M2.5     |         9,652.0 |          10,391.0 | MI355X |   +8% |
+| GLM-5            |         1,673.6 |             420.5 | B200   | +298% |
+
+_All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks at 8k/1k sequence length._
+
+<BenchmarkChart
+  metric="Throughput/GPU (tok/s)"
+  data='[{"gpu":"B200 - DSR1","value":13429.7,"vendor":"nvidia"},{"gpu":"MI355X - DSR1","value":4222.8,"vendor":"amd"},{"gpu":"B200 - gptoss","value":61612.7,"vendor":"nvidia"},{"gpu":"MI355X - gptoss","value":44999.3,"vendor":"amd"},{"gpu":"B200 - Llama70B","value":12981.3,"vendor":"nvidia"},{"gpu":"MI355X - Llama70B","value":8748.9,"vendor":"amd"},{"gpu":"B200 - MiniMax","value":9652.0,"vendor":"nvidia"},{"gpu":"MI355X - MiniMax","value":10391.0,"vendor":"amd"}]'
+/>
+
+## Cost Comparison
+
+| Model            | B200 $/Mtok | MI355X $/Mtok | Cheaper |
+| ---------------- | ----------: | ------------: | ------- |
+| DeepSeek-R1-0528 |       $0.04 |         $0.10 | B200    |
+| gpt-oss-120b     |       $0.01 |         $0.01 | Tie     |
+| Llama-3.3-70B    |       $0.04 |         $0.05 | B200    |
+| Qwen-3.5-397B    |       $0.09 |         $0.25 | B200    |
+| Kimi-K2.5        |       $0.13 |         $0.12 | MI355X  |
+| MiniMax-M2.5     |       $0.06 |         $0.04 | MI355X  |
+| GLM-5            |       $0.32 |         $0.98 | B200    |
+
+B200 wins on cost in 4 models, MI355X in 2, and they tie on gpt-oss-120b. The models where MI355X wins on cost (Kimi-K2.5, MiniMax-M2.5) are also the ones where the throughput gap is smallest. On models where B200 has a large throughput lead, it also wins on cost because the higher throughput more than offsets its higher $/hr.
+
+## Where MI355X Competes
+
+MiniMax-M2.5 is MI355X's strongest showing: 8% faster than B200 and 33% cheaper per token. Kimi-K2.5 is competitive too, with just a 15% throughput gap and lower cost. Both models use atom or vllm on MI355X, frameworks that seem well-optimized for AMD hardware. On models requiring dynamo-trt or TensorRT-LLM (NVIDIA-only frameworks), MI355X can't compete.
+
+## The DeepSeek-R1 Gap
+
+B200's biggest win is on DeepSeek-R1-0528: 218% faster than MI355X. This is mostly a framework story. B200 runs dynamo-trt with disaggregated prefill; MI355X uses mori-sglang. On this model, disagg prefill is worth 57% throughput on NVIDIA hardware, and MI355X's best framework (mori-sglang) is still maturing. As AMD's serving stack improves, this gap should narrow.
+
+## Cross-Links and Further Reading
+
+For the closest matchup, see our [Kimi-K2.5 benchmarks](/blog/best-gpu-for-kimik2.5-inference). For MI355X's win, see [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference). For the largest gap, see [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference).
+
+## Where to Run Inference
+
+Looking for GPU providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "NVIDIA B200 vs AMD MI355X inference performance?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B200 wins on throughput in 6 of 7 models by 124% on average. MI355X wins on MiniMax-M2.5 by 8%. Gap is closest on Kimi-K2.5 (15%)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is NVIDIA B200 or AMD MI355X cheaper for inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B200 is cheaper in 4 of 7 models, MI355X in 2, tied on 1. MI355X wins on cost for Kimi-K2.5 and MiniMax-M2.5."
+      }
+    }
+  ]
+}`}</JsonLd>

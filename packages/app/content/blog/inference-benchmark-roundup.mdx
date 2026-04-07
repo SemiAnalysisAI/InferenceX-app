@@ -1,15 +1,19 @@
 ---
 title: 'ML Inference Benchmark Roundup — GPU Comparison (April 2026)'
-subtitle: 'B200 wins most models, but AMD MI355X takes MiniMax-M2.5 and is closing the gap'
+subtitle: 'NVIDIA B200 wins on most models, but AMD MI355X takes MiniMax-M2.5 and closes the gap on Kimi-K2.5'
 date: '2026-04-06'
 modifiedDate: '2026-04-06'
 publishDate: '2026-04-06'
-tags: [benchmark, inference, gpu, roundup]
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - roundup
 ---
 
 ## Overview
 
-This is a cross-model summary of the latest [InferenceX](https://inferencex.semianalysis.com) benchmark data. We test ML inference across 9 GPUs, multiple frameworks, and various precisions. Below you'll find the best GPU for each model, per-model highlights, and GPU head-to-head comparisons drawn from all 7 models in the dataset.
+This is a cross-model summary of GPU inference performance from [InferenceX](https://inferencex.semianalysis.com). We benchmark 7 models across up to 9 GPUs, testing multiple frameworks, precisions, and concurrency levels. NVIDIA Blackwell GPUs dominate most models, but AMD MI355X has bright spots. Each model link below goes to a dedicated article with full tables and analysis.
 
 ## Best GPU Per Model
 
@@ -17,75 +21,80 @@ This is a cross-model summary of the latest [InferenceX](https://inferencex.semi
 | --------------------------------------------------------------------- | ------------ | --------- | ---------------------: |
 | [DeepSeek-R1-0528](/blog/best-gpu-for-dsr1-inference)                 | NVIDIA GB300 | FP4       |               18,131.6 |
 | [gpt-oss-120b](/blog/best-gpu-for-gptoss120b-inference)               | NVIDIA B200  | FP4       |               61,612.7 |
-| [Llama-3.3-70B](/blog/best-gpu-for-llama70b-inference)                | NVIDIA B200  | FP4       |               12,981.3 |
+| [Llama-3.3-70B](/blog/best-gpu-for-llama70b-inference) <sup>2</sup>   | NVIDIA B200  | FP4       |               12,981.3 |
 | [Qwen-3.5-397B](/blog/best-gpu-for-qwen3.5-inference) <sup>1</sup>    | NVIDIA B200  | FP8       |                5,709.7 |
 | [Kimi-K2.5](/blog/best-gpu-for-kimik2.5-inference) <sup>1</sup>       | NVIDIA B200  | FP4       |                4,020.9 |
 | [MiniMax-M2.5](/blog/best-gpu-for-minimaxm2.5-inference) <sup>1</sup> | AMD MI355X   | FP8       |               10,391.0 |
 | [GLM-5](/blog/best-gpu-for-glm5-inference) <sup>1</sup>               | NVIDIA B200  | FP8       |                1,673.6 |
 
 <sup>1</sup> Experimental support, limited GPU/framework coverage.
+<sup>2</sup> Deprecated, benchmarked for reference only.
 
 ## Per-Model Details
 
 ### DeepSeek-R1-0528
 
-NVIDIA GB300 on FP4 with dynamo-trt leads at 18,131.6 tok/s/GPU. The top four GPUs are all NVIDIA Blackwell variants, and they all use FP4 with dynamo-trt. AMD MI355X is the best non-NVIDIA option at 4,222.8 tok/s/GPU, a 4.3x gap. See the [full DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference).
+NVIDIA GB300 on FP4 with dynamo-trt leads at 18,131.6 tok/s/GPU. Disaggregated prefill is critical on this model, adding 57% throughput on GB300. The NVIDIA-AMD gap is large: best AMD result (MI355X, 4,222.8 tok/s/GPU) is 77% behind. [Full benchmarks](/blog/best-gpu-for-dsr1-inference).
 
 ### gpt-oss-120b
 
-B200 on FP4 with TRT hits 61,612.7 tok/s/GPU, the highest throughput of any model in this roundup. MI355X is competitive at 44,999.3 tok/s/GPU with lower TTFT (175.4ms vs 244.5ms). All GPUs run FP4 on this model. See the [full gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference).
+NVIDIA B200 on FP4 with TensorRT-LLM hits 61,612.7 tok/s/GPU, the highest throughput of any model we test. AMD MI355X with atom gets 44,999.3 tok/s/GPU (73% of B200) at the same $0.01/Mtok cost. This model runs entirely on FP4. [Full benchmarks](/blog/best-gpu-for-gptoss120b-inference).
 
-### Llama-3.3-70B (deprecated)
+### Llama-3.3-70B
 
-B200 on FP4 with TRT hits 12,981.3 tok/s/GPU. This model has been superseded on the main dashboard, but the data is still useful for hardware comparison. MI355X at 8,748.9 tok/s/GPU has much better TTFT than the B200. See the [full Llama-3.3-70B benchmarks](/blog/best-gpu-for-llama70b-inference).
+A dense 70B model where B200 on FP4 gets 12,981.3 tok/s/GPU. MI355X on FP4 reaches 8,748.9 tok/s/GPU. Simple model, clear NVIDIA lead. [Full benchmarks](/blog/best-gpu-for-llama70b-inference).
 
-### Qwen-3.5-397B (experimental)
+### Qwen-3.5-397B
 
-B200 on FP8 dominates at 5,709.7 tok/s/GPU, 3.2x the next GPU. Only sglang is tested. AMD cards run BF16 and outperform their FP8 configs, which is unusual. See the [full Qwen-3.5-397B benchmarks](/blog/best-gpu-for-qwen3.5-inference).
+B200 on FP8 dominates at 5,709.7 tok/s/GPU, 3.2x faster than the runner-up. Unusual finding: BF16 beats FP8 on all AMD cards, suggesting immature FP8 support for this model. [Full benchmarks](/blog/best-gpu-for-qwen3.5-inference).
 
-### Kimi-K2.5 (experimental)
+### Kimi-K2.5
 
-B200 on FP4 with vLLM leads at 4,020.9 tok/s/GPU, but MI355X on FP4 with atom is only 15% behind at 3,510.4. Older AMD cards (MI325X, MI300X) struggle below 300 tok/s/GPU on INT4. See the [full Kimi-K2.5 benchmarks](/blog/best-gpu-for-kimik2.5-inference).
+B200 on FP4 gets 4,020.9 tok/s/GPU, but MI355X with atom is close at 3,510.4 (87%) and cheaper per token. FP4 is 2.8x faster than INT4 on both vendors. [Full benchmarks](/blog/best-gpu-for-kimik2.5-inference).
 
-### MiniMax-M2.5 (experimental)
+### MiniMax-M2.5
 
-The one model where AMD wins. MI355X on FP8 with vLLM hits 10,391.0 tok/s/GPU, edging out the B200 at 9,652.0 tok/s/GPU. B200 has better latency (58.4ms vs 108.3ms TPOT). See the [full MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
+The one model where AMD wins. MI355X on FP8 with vllm hits 10,391.0 tok/s/GPU, 8% faster than B200 (9,652.0) and 33% cheaper per token. [Full benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
 
-### GLM-5 (experimental)
+### GLM-5
 
-Very limited data: 3 GPUs, 1 framework. B200 on FP8 leads at 1,673.6 tok/s/GPU. H200 has unusable TTFT (46,130.9ms) at its best throughput config. See the [full GLM-5 benchmarks](/blog/best-gpu-for-glm5-inference).
+Limited data: only 3 GPUs tested. B200 on FP8 gets 1,673.6 tok/s/GPU. FP8 is faster than FP4 here (immature kernel support). Expensive to serve at $0.32+/Mtok. [Full benchmarks](/blog/best-gpu-for-glm5-inference).
 
 ## GPU Head-to-Head Comparisons
 
-### AMD MI355X vs NVIDIA B200
+### NVIDIA H200 vs AMD MI355X
 
-B200 wins on throughput in 6 out of 7 shared models. The exception is MiniMax-M2.5, where MI355X edges ahead at 10,391.0 vs 9,652.0 tok/s/GPU. The gap varies widely: from 15% on Kimi-K2.5 to 3.2x on DeepSeek-R1-0528. MI355X tends to have lower TTFT at low concurrency. For the closest matchup, see our [Kimi-K2.5 benchmarks](/blog/best-gpu-for-kimik2.5-inference).
+MI355X wins on throughput in 5 out of 7 shared models, by 116% on average. The exceptions are Qwen-3.5-397B (H200 leads 1,796.7 vs 1,671.5 tok/s/GPU) and GLM-5 (H200 leads 639.5 vs 420.5 tok/s/GPU). On cost, MI355X is cheaper per Mtok in 5 of 7 models. H200 tends to have better TTFT at low concurrencies. For the full MiniMax-M2.5 matchup (MI355X's strongest win), see our [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
 
-### AMD MI355X vs NVIDIA H200
+### NVIDIA B200 vs AMD MI355X
 
-MI355X wins throughput in 5 out of 7 shared models, by 1.7x to 3.1x. H200 takes Qwen-3.5-397B (1,796.7 vs 1,671.5 tok/s/GPU, just 7% ahead) and GLM-5 (639.5 vs 420.5 tok/s/GPU). H200 generally has lower TPOT. MI355X is the better throughput play unless you're on one of those two models. For the closest race, see our [Qwen-3.5-397B benchmarks](/blog/best-gpu-for-qwen3.5-inference).
+B200 wins on throughput in 6 out of 7 models, by 124% on average. MiniMax-M2.5 is the exception, where MI355X edges ahead (10,391.0 vs 9,652.0 tok/s/GPU). B200 consistently has lower TPOT. MI355X wins on cost in 2 models (MiniMax-M2.5, Kimi-K2.5). For the closest matchup, see our [Kimi-K2.5 benchmarks](/blog/best-gpu-for-kimik2.5-inference).
 
 ### NVIDIA B200 vs NVIDIA H200
 
-Generational gap. B200 wins all 7 shared models, by 2.5x to 5.5x on throughput. H200 occasionally has competitive TTFT at low concurrency (see [Kimi-K2.5 results](/blog/best-gpu-for-kimik2.5-inference)), but throughput isn't close. If you're choosing between the two, B200 is worth the upgrade unless you're strictly TTFT-bound at low batch sizes.
+Generational gap. B200 is 2.5x faster on average across all 7 shared models. H200 doesn't win on any model. H200 still has competitive TTFT at low concurrency on some models (see [Llama-3.3-70B results](/blog/best-gpu-for-llama70b-inference)), but throughput isn't close. B200 also wins on cost/Mtok in every model.
 
 ### AMD MI300X vs AMD MI325X
 
-MI325X wins all 6 shared models, but the margins are small: 4% to 33%. The biggest gap is on Llama-3.3-70B (4,673.4 vs 3,519.8 tok/s/GPU). TPOT tracks similarly across both. MI325X is the better card, but MI300X is close enough that you wouldn't rush to replace it. For the full comparison, see our [Llama-3.3-70B benchmarks](/blog/best-gpu-for-llama70b-inference).
+MI325X wins all 6 shared models, but only by 14% on average. Close race: MI325X gets 1,406.7 vs MI300X's 1,314.7 on Qwen-3.5-397B, and 4,673.4 vs 3,519.8 on Llama-3.3-70B. Cost per token is similar. If you have MI300X hardware, upgrading to MI325X gives a modest bump.
 
-### AMD MI325X vs AMD MI355X
+### NVIDIA H200 vs AMD MI325X
 
-MI355X wins all 6 shared models. Margins range from 19% on Qwen-3.5-397B to 11.8x on Kimi-K2.5. The Kimi-K2.5 gap is extreme because MI355X runs FP4 while MI325X is stuck on INT4. On models with the same precision (MiniMax-M2.5: FP8 on both), the gap is 2.6x. Generational upgrade. See the [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
+H200 wins 5 of 6 models by 88% on average throughput. MI325X's only win is on MiniMax-M2.5 (3,950.0 vs 3,370.8 tok/s/GPU). H200 generally has better TTFT at matched concurrency levels. Cost is close on most models.
 
-### AMD MI300X vs NVIDIA H100
+### NVIDIA H200 vs AMD MI300X
 
-Close matchup. MI300X wins 3 out of 4 shared models. On gpt-oss-120b, MI300X leads 11,511.9 vs 10,394.0 tok/s/GPU. H100 wins on DeepSeek-R1-0528 (850.1 vs 790.8 tok/s/GPU), barely. H100 has lower TPOT on most configs. See the [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference) for the full picture.
+H200 wins 5 of 6 models. MI300X's only win is on MiniMax-M2.5 (3,503.7 vs 3,370.8 tok/s/GPU, a tiny margin). H200 averages 105% more throughput across shared models. MI300X tends to be slightly cheaper per token on the models it competes on. See the [MiniMax-M2.5 results](/blog/best-gpu-for-minimaxm2.5-inference).
 
-### NVIDIA B200 vs NVIDIA H100
+### NVIDIA H100 vs AMD MI300X
 
-B200 wins all 4 shared models by 4.5x to 15.8x. On DeepSeek-R1-0528, the gap is 15.8x (13,429.7 vs 850.1 tok/s/GPU). On gpt-oss-120b, it's 5.9x. This is two generations of improvement. See the [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference).
+Surprisingly close. MI300X wins 3 of 4 shared models. On MiniMax-M2.5, MI300X gets 3,503.7 vs H100's 2,136.9 tok/s/GPU. H100 wins on gpt-oss-120b (10,394.0 vs 11,511.9 tok/s/GPU for MI300X, actually MI300X wins there too). On Llama-3.3-70B, MI300X gets 3,519.8 vs H100's 2,568.0. AMD's older card beats NVIDIA's older card on most models.
 
-## Where to Run Inference
+### NVIDIA H100 vs NVIDIA H200
+
+H200 wins all 4 shared models by 98% on average. On gpt-oss-120b, H200 gets 15,202.1 vs H100's 10,394.0 tok/s/GPU. The gap is largest on DeepSeek-R1-0528: 2,453.9 vs 850.1 tok/s/GPU. H200 is the clear upgrade path. See the [DeepSeek-R1-0528 results](/blog/best-gpu-for-dsr1-inference).
+
+## Where to Find GPU Providers
 
 Looking for inference API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
 
@@ -101,18 +110,18 @@ _Last updated: 2026-04-06._
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "AMD MI355X vs NVIDIA B200 for inference?",
+      "name": "NVIDIA H200 vs AMD MI355X for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 wins throughput on 6 of 7 models tested. MI355X wins on MiniMax-M2.5 (10,391 vs 9,652 tok/s/GPU). MI355X tends to have lower TTFT at low concurrency."
+        "text": "MI355X wins on throughput in 5 of 7 models by 116% on average. H200 wins on Qwen-3.5-397B and GLM-5. MI355X is cheaper per Mtok in most models."
       }
     },
     {
       "@type": "Question",
-      "name": "AMD MI355X vs NVIDIA H200 for inference?",
+      "name": "NVIDIA B200 vs AMD MI355X for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "MI355X wins throughput on 5 of 7 models, by 1.7x to 3.1x. H200 wins on Qwen-3.5-397B and GLM-5, both by small margins."
+        "text": "B200 wins on throughput in 6 of 7 models by 124% on average. MI355X wins on MiniMax-M2.5. B200 has consistently lower TPOT."
       }
     },
     {
@@ -120,7 +129,7 @@ _Last updated: 2026-04-06._
       "name": "NVIDIA B200 vs NVIDIA H200 for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 wins all 7 shared models by 2.5x to 5.5x. H200 has competitive TTFT at low concurrency on some models but throughput isn't close."
+        "text": "B200 is 2.5x faster on average across all 7 shared models. H200 doesn't win on any model. B200 also wins on cost per Mtok everywhere."
       }
     },
     {
@@ -128,31 +137,39 @@ _Last updated: 2026-04-06._
       "name": "AMD MI300X vs AMD MI325X for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "MI325X wins all 6 shared models by 4-33%. The biggest gap is on Llama-3.3-70B. Close enough that MI300X isn't obsolete."
+        "text": "MI325X wins all 6 shared models but only by 14% on average. Close race, similar cost per token."
       }
     },
     {
       "@type": "Question",
-      "name": "AMD MI325X vs AMD MI355X for inference?",
+      "name": "NVIDIA H200 vs AMD MI325X for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "MI355X wins all 6 shared models. Margins range from 19% to 11.8x depending on precision availability. A generational upgrade."
+        "text": "H200 wins 5 of 6 models by 88% on average. MI325X only wins on MiniMax-M2.5."
       }
     },
     {
       "@type": "Question",
-      "name": "AMD MI300X vs NVIDIA H100 for inference?",
+      "name": "NVIDIA H200 vs AMD MI300X for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "MI300X wins 3 of 4 shared models. H100 wins on DeepSeek-R1-0528 by 7%. H100 has lower TPOT on most configs."
+        "text": "H200 wins 5 of 6 models, averaging 105% more throughput. MI300X only wins on MiniMax-M2.5 by a tiny margin."
       }
     },
     {
       "@type": "Question",
-      "name": "NVIDIA B200 vs NVIDIA H100 for inference?",
+      "name": "NVIDIA H100 vs AMD MI300X for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 wins all 4 shared models by 4.5x to 15.8x. Two generations of improvement, biggest gap on DeepSeek-R1-0528."
+        "text": "MI300X wins 3 of 4 shared models. AMD's older card beats NVIDIA's older card on most models."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "NVIDIA H100 vs NVIDIA H200 for inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "H200 wins all 4 shared models by 98% on average. H200 is the clear upgrade path from H100."
       }
     }
   ]

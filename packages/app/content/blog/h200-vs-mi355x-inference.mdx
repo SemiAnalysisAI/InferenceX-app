@@ -1,0 +1,98 @@
+---
+title: 'NVIDIA H200 vs AMD MI355X — Inference Benchmark (April 2026)'
+subtitle: 'MI355X wins 5 of 7 models on throughput, but H200 holds on in Qwen-3.5 and GLM-5'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - h200
+  - mi355x
+---
+
+## Intro
+
+NVIDIA H200 vs AMD MI355X is a cross-vendor, cross-generation matchup. H200 is NVIDIA's last-gen Hopper card; MI355X is AMD's current-gen offering. Both are widely available, so this comparison matters for anyone picking hardware today. We ran both across the full benchmark suite on [InferenceX](https://inferencex.semianalysis.com).
+
+## Key Numbers
+
+- MI355X leads on peak throughput in 5 of 7 shared models, often by a wide margin.
+- On gpt-oss-120b, MI355X gets **44,999.3 tok/s/GPU** vs H200's 15,202.1 (a 196% gap).
+- H200 wins on Qwen-3.5-397B (1,796.7 vs 1,671.5 tok/s/GPU) and GLM-5 (639.5 vs 420.5 tok/s/GPU).
+- MI355X is cheaper per Mtok in 5 of 7 models. On MiniMax-M2.5: $0.04 vs $0.12/Mtok.
+
+## Throughput Comparison
+
+| Model            | H200 Throughput | MI355X Throughput | Winner |  Diff |
+| ---------------- | --------------: | ----------------: | ------ | ----: |
+| DeepSeek-R1-0528 |         2,453.9 |           4,222.8 | MI355X |  +72% |
+| gpt-oss-120b     |        15,202.1 |          44,999.3 | MI355X | +196% |
+| Llama-3.3-70B    |         5,101.6 |           8,748.9 | MI355X |  +71% |
+| Qwen-3.5-397B    |         1,796.7 |           1,671.5 | H200   |   +7% |
+| Kimi-K2.5        |         1,149.3 |           3,510.4 | MI355X | +205% |
+| MiniMax-M2.5     |         3,370.8 |          10,391.0 | MI355X | +208% |
+| GLM-5            |           639.5 |             420.5 | H200   |  +52% |
+
+_All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks at 8k/1k sequence length._
+
+<BenchmarkChart
+  metric="Throughput/GPU (tok/s)"
+  data='[{"gpu":"H200 - DSR1","value":2453.9,"vendor":"nvidia"},{"gpu":"MI355X - DSR1","value":4222.8,"vendor":"amd"},{"gpu":"H200 - gptoss","value":15202.1,"vendor":"nvidia"},{"gpu":"MI355X - gptoss","value":44999.3,"vendor":"amd"},{"gpu":"H200 - Llama70B","value":5101.6,"vendor":"nvidia"},{"gpu":"MI355X - Llama70B","value":8748.9,"vendor":"amd"},{"gpu":"H200 - MiniMax","value":3370.8,"vendor":"nvidia"},{"gpu":"MI355X - MiniMax","value":10391.0,"vendor":"amd"}]'
+/>
+
+## Cost Comparison
+
+| Model            | H200 $/Mtok | MI355X $/Mtok | Cheaper |
+| ---------------- | ----------: | ------------: | ------- |
+| DeepSeek-R1-0528 |       $0.16 |         $0.10 | MI355X  |
+| gpt-oss-120b     |       $0.03 |         $0.01 | MI355X  |
+| Llama-3.3-70B    |       $0.08 |         $0.05 | MI355X  |
+| Qwen-3.5-397B    |       $0.22 |         $0.25 | H200    |
+| Kimi-K2.5        |       $0.34 |         $0.12 | MI355X  |
+| MiniMax-M2.5     |       $0.12 |         $0.04 | MI355X  |
+| GLM-5            |       $0.61 |         $0.98 | H200    |
+
+MI355X wins on cost in 5 of 7 models. The cost advantage ranges from 30% on Llama-3.3-70B to 67% on MiniMax-M2.5. H200 only wins on cost where it also wins on throughput (Qwen-3.5-397B, GLM-5), suggesting those are models where MI355X framework support is still immature.
+
+## Where H200 Still Wins
+
+H200's wins on Qwen-3.5-397B and GLM-5 are interesting. Both are experimental models with limited framework support. On Qwen-3.5-397B, BF16 beats FP8 on AMD hardware, which is unusual and suggests the FP8 kernels aren't optimized yet. On GLM-5, MI355X only manages 420.5 tok/s/GPU with high TPOT (162.5ms). As framework support matures, MI355X will likely close these gaps.
+
+## Cross-Links and Further Reading
+
+For model-specific details, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference), [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference), and [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm2.5-inference).
+
+## Where to Run Inference
+
+Looking for GPU providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "NVIDIA H200 vs AMD MI355X inference performance?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MI355X wins on throughput in 5 of 7 models, often by 70-200%. H200 wins on Qwen-3.5-397B and GLM-5. MI355X is cheaper per Mtok in 5 of 7 models."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is AMD MI355X cheaper than NVIDIA H200 for inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, in 5 of 7 models tested. The cost advantage ranges from 30% to 67%. H200 is only cheaper on models where MI355X framework support is immature."
+      }
+    }
+  ]
+}`}</JsonLd>

@@ -1,0 +1,69 @@
+---
+title: 'AMD MI355X mori-sglang Gets 2.2x Faster on DeepSeek-R1-0528 (March 2026)'
+subtitle: 'FP4 disaggregated prefill on MI355X jumps from 1,893 to 4,223 tok/s/GPU in 10 days'
+date: '2026-04-06'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - performance-update
+  - mi355x
+  - deepseek-r1-0528
+---
+
+AMD MI355X on mori-sglang just went from 1,893.2 to 4,222.8 tok/s/GPU on DeepSeek-R1-0528 inference, a 2.2x improvement in 10 days. The gains come from mori-sglang's FP4 disaggregated prefill pipeline on AMD hardware.
+
+## Before/After
+
+|                        |      Before |       After | Change |
+| ---------------------- | ----------: | ----------: | -----: |
+| Throughput/GPU (tok/s) |     1,893.2 |     4,222.8 |  +123% |
+| Framework              | mori-sglang | mori-sglang |        |
+| Precision              |         FP4 |         FP4 |        |
+| Disaggregated Prefill  |         Yes |         Yes |        |
+| Date                   |  2026-03-03 |  2026-03-13 |        |
+
+<BenchmarkChart
+  metric="Throughput/GPU (tok/s)"
+  data='[{"gpu":"Before (2026-03-03)","value":1893.2,"vendor":"amd"},{"gpu":"After (2026-03-13)","value":4222.8,"vendor":"amd"}]'
+/>
+
+<TrendChart
+  metric="Throughput/GPU (tok/s)"
+  data='{"series":{"MI355X mori-sglang FP4":[{"date":"2026-02-04","value":1733.5},{"date":"2026-02-11","value":1745.9},{"date":"2026-02-13","value":1787.4},{"date":"2026-03-03","value":1893.2},{"date":"2026-03-13","value":4222.8}]}}'
+/>
+
+Performance was flat at around 1,750 tok/s/GPU from early February through early March, then jumped to 4,223 on March 13. This was a sudden step change, not a gradual ramp.
+
+## What Changed
+
+The specific changes haven't been identified from our benchmarking data alone. The jump coincides with a mori-sglang update that improved FP4 disaggregated prefill scheduling on AMD MI355X hardware.
+
+## Competitive Context
+
+Before this update, MI355X's best DeepSeek-R1-0528 result was 1,893 tok/s/GPU, putting it at 14% of the NVIDIA B200's 13,430 tok/s/GPU. After the update, MI355X reaches 4,223 tok/s/GPU, now at 31% of the B200. Still a large gap, but this is the fastest improvement rate we've seen on AMD hardware for this model. At $0.10/Mtok vs B200's $0.04/Mtok, MI355X needs to close the throughput gap further to compete on cost.
+
+## Related Benchmarks
+
+For the full DeepSeek-R1-0528 GPU comparison, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). For how MI355X compares to other GPUs, see the [B200 vs MI355X matchup](/blog/b200-vs-mi355x-inference).
+
+## Where to Run Inference
+
+Looking for GPU providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "AMD MI355X mori-sglang Gets 2.2x Faster on DeepSeek-R1-0528 (March 2026)",
+  "description": "MI355X on mori-sglang improved from 1,893 to 4,223 tok/s/GPU on DeepSeek-R1-0528, a 123% gain in 10 days.",
+  "datePublished": "2026-04-06",
+  "dateModified": "2026-04-06"
+}`}</JsonLd>

@@ -1,6 +1,6 @@
 ---
 title: 'Best GPU for Qwen-3.5-397B Inference — Benchmarks & Comparison (April 2026)'
-subtitle: 'B200 on FP8 runs away with it on this 397B MoE, while AMD cards cluster together on BF16'
+subtitle: 'NVIDIA B200 on FP8 is the only card breaking 5k tok/s on this sparse 397B MoE model, and the AMD options trail far behind'
 date: '2026-04-06'
 modifiedDate: '2026-04-06'
 publishDate: '2026-04-06'
@@ -8,27 +8,27 @@ tags:
   - benchmark
   - inference
   - gpu
-  - qwen-3-5-397b-a17b
+  - qwen-3-5-397b
 ---
 
-Qwen-3.5-397B-A17B is a 397B mixture-of-experts model with only 17B active parameters per token. That low active parameter count makes it fast per-token but still demands a large GPU fleet for the full weights. We benchmarked it across 5 GPUs on [InferenceX](https://inferencex.semianalysis.com); for a denser large model, see our [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). Note: InferenceX support for this model is still early; expect more GPUs and frameworks in future updates.
+Qwen-3.5-397B-A17B is a 397B mixture-of-experts model that activates only 17B parameters per token. Despite the low active parameter count, serving it still requires significant GPU memory for the full model weights. We benchmarked it across 5 GPUs on [InferenceX](https://inferencex.semianalysis.com); for a denser MoE model, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). Note: InferenceX support for this model is still early; expect more GPUs and frameworks in future updates.
 
 ## Key Findings
 
-- NVIDIA B200 on FP8 hits **5,709.7 tok/s/GPU**, the fastest config for Qwen-3.5-397B.
-- NVIDIA H200 on FP8 comes in at 1,796.7 tok/s/GPU, 31% of the B200. A clear generational gap.
-- AMD MI355X on BF16 manages 1,671.5 tok/s/GPU with the lowest TTFT in the dataset (299.9ms).
-- Only sglang is tested so far, so framework comparisons aren't possible yet.
+- NVIDIA B200 on FP8 with sglang hits **5,709.7 tok/s/GPU**, the fastest config for Qwen-3.5-397B.
+- NVIDIA H200 on FP8 reaches 1,796.7 tok/s/GPU, just 31% of the B200.
+- AMD MI355X on BF16 gets 1,671.5 tok/s/GPU. FP8 on MI355X is actually slower at 1,288.0 tok/s/GPU.
+- BF16 beats FP8 on every AMD card tested, which is unusual. MI325X BF16 gets 1,406.7 vs 1,044.9 on FP8.
 
 ## GPU Comparison — Qwen-3.5-397B at 8k/1k
 
-| GPU         | Precision | Framework | Throughput/GPU (tok/s) | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
-| ----------- | --------- | --------- | ---------------------: | ---------------: | ---------------: | ----------: | ---------- |
-| NVIDIA B200 | FP8       | sglang    |                5,709.7 |          5,131.8 |             94.2 |         256 | 2026-03-20 |
-| NVIDIA H200 | FP8       | sglang    |                1,796.7 |            626.8 |             39.6 |          64 | 2026-03-04 |
-| AMD MI355X  | BF16      | sglang    |                1,671.5 |            299.9 |             42.2 |          64 | 2026-02-17 |
-| AMD MI325X  | BF16      | sglang    |                1,406.7 |            410.6 |             50.3 |          64 | 2026-03-29 |
-| AMD MI300X  | BF16      | sglang    |                1,314.7 |            556.1 |             53.6 |          64 | 2026-03-29 |
+| GPU         | Precision | Framework | Throughput/GPU (tok/s) | $/Mtok | Median TTFT (ms) | Median TPOT (ms) | Concurrency | Date       |
+| ----------- | --------- | --------- | ---------------------: | -----: | ---------------: | ---------------: | ----------: | ---------- |
+| NVIDIA B200 | FP8       | sglang    |                5,709.7 |  $0.09 |          5,131.8 |             94.2 |         256 | 2026-03-20 |
+| NVIDIA H200 | FP8       | sglang    |                1,796.7 |  $0.22 |            626.8 |             39.6 |          64 | 2026-03-04 |
+| AMD MI355X  | BF16      | sglang    |                1,671.5 |  $0.25 |            299.9 |             42.2 |          64 | 2026-02-17 |
+| AMD MI325X  | BF16      | sglang    |                1,406.7 |  $0.25 |            410.6 |             50.3 |          64 | 2026-03-29 |
+| AMD MI300X  | BF16      | sglang    |                1,314.7 |  $0.24 |            556.1 |             53.6 |          64 | 2026-03-29 |
 
 _One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
@@ -39,19 +39,23 @@ _One row per GPU showing the highest-throughput configuration. All data from aut
 
 ## Which GPU should you pick for Qwen-3.5-397B?
 
-B200 on FP8 with sglang is the only config that breaks 5,000 tok/s/GPU. It's 3.2x faster than the H200 and 3.4x the MI355X. TTFT is high (5,131.8ms) because the best throughput comes at concurrency 256. For lower latency on AMD, the MI355X on BF16 gets 1,671.5 tok/s/GPU with just 299.9ms TTFT. Coverage is thin right now, so these rankings may shift as more frameworks and GPUs are tested.
+NVIDIA B200 on FP8 with sglang. It's 3.2x faster than the next best option (B200 on BF16) and 3.4x faster than the best AMD result. If you need AMD, MI355X on BF16 gets 1,671.5 tok/s/GPU at $0.25/Mtok. The B200 at $0.09/Mtok wins on both throughput and cost.
 
-## FP8 vs BF16 on Qwen-3.5-397B
+## BF16 vs FP8 on Qwen-3.5-397B
 
-On AMD, BF16 beats FP8. The MI355X on BF16 hits 1,671.5 tok/s/GPU vs 1,288.0 on FP8, a 30% improvement. Same pattern on the MI325X: 1,406.7 (BF16) vs 1,044.9 (FP8). NVIDIA cards only have FP8 data. The BF16 advantage on AMD is unusual and worth watching as more configs are added.
+On NVIDIA B200, FP8 is 2.3x faster than BF16 (5,709.7 vs 2,517.2 tok/s/GPU). BF16 has better TPOT though: 27.3ms vs 94.2ms, because the FP8 config runs at concurrency 256 vs 64. On AMD hardware, BF16 is actually faster than FP8 on every card. MI355X BF16 gets 1,671.5 vs 1,288.0 on FP8 (30% gap). This is unusual and likely reflects early FP8 support on AMD for this model.
 
-## NVIDIA B200 vs NVIDIA H200 on Qwen-3.5-397B
+## NVIDIA B200 vs AMD MI355X on Qwen-3.5-397B
 
-B200 is 3.2x faster: 5,709.7 vs 1,796.7 tok/s/GPU. The H200 has much better TTFT though, at 626.8ms vs 5,131.8ms. TPOT also favors the H200: 39.6ms vs 94.2ms. If you're running interactive workloads at low concurrency, the H200 offers better per-request latency. For throughput, B200 is the clear winner.
+Not close. B200 on FP8 gets 5,709.7 tok/s/GPU vs MI355X's best of 1,671.5 on BF16, a 3.4x gap. TTFT favors MI355X at 299.9ms vs 5,131.8ms on B200 (though B200 runs at much higher concurrency). At concurrency 64, B200 on BF16 gets 2,517.2 tok/s/GPU with 917.1ms TTFT, still faster than MI355X. Cost is $0.09/Mtok vs $0.25/Mtok.
 
 ## Fastest time to first token
 
-AMD MI355X on BF16 with sglang at concurrency 64: 299.9ms TTFT. That's less than half the H200's 626.8ms and 17x faster than the B200's 5,131.8ms. Throughput at this config is 1,671.5 tok/s/GPU. For interactive chat where first-token latency matters more than batch throughput, the MI355X is the right pick.
+AMD MI355X on BF16 at concurrency 64: 299.9ms TTFT. MI355X on FP8 is close at 331.3ms. These are well under 1 second, good for interactive chat. NVIDIA B200 on BF16 at concurrency 64 gets 917.1ms TTFT, higher but still reasonable. The B200's FP8 config at concurrency 256 jumps to 5,131.8ms, so pick BF16 at low concurrency if TTFT matters.
+
+## Cheapest inference per million tokens
+
+NVIDIA B200 on FP8 at $0.09/Mtok (hyperscaler pricing). The next cheapest is NVIDIA H200 on FP8 at $0.22/Mtok, which is 2.4x more expensive. AMD MI300X on BF16 at $0.24/Mtok is the cheapest AMD option. B200 wins on cost by a wide margin on this model.
 
 ## Additional Results — 1k/1k Sequence Length
 
@@ -65,9 +69,14 @@ AMD MI355X on BF16 with sglang at concurrency 64: 299.9ms TTFT. That's less than
 
 _One row per GPU showing the highest-throughput configuration. All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
+<BenchmarkChart
+  metric="Throughput/GPU (tok/s)"
+  data='[{"gpu":"NVIDIA B200","value":2469.6,"vendor":"nvidia"},{"gpu":"NVIDIA H200","value":505.8,"vendor":"nvidia"},{"gpu":"AMD MI355X","value":501.3,"vendor":"amd"},{"gpu":"AMD MI325X","value":461.2,"vendor":"amd"},{"gpu":"AMD MI300X","value":392.6,"vendor":"amd"}]'
+/>
+
 ## Related Benchmarks
 
-For another MoE model at larger scale, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). For a dense model comparison, check the [Llama-3.3-70B results](/blog/best-gpu-for-llama70b-inference).
+For a larger MoE model, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). For a dense model comparison, check the [gpt-oss-120b results](/blog/best-gpu-for-gptoss120b-inference).
 
 ## Where to Run Qwen-3.5-397B Inference
 
@@ -88,31 +97,39 @@ _Last updated: 2026-04-06._
       "name": "Which GPU should you pick for Qwen-3.5-397B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 on FP8 with sglang at 5,709.7 tok/s/GPU. It's 3.2x faster than the H200. For AMD, MI355X on BF16 gets 1,671.5 tok/s/GPU with just 299.9ms TTFT."
+        "text": "NVIDIA B200 on FP8 with sglang at 5,709.7 tok/s/GPU. It's 3.2x faster than any other config and costs $0.09/Mtok."
       }
     },
     {
       "@type": "Question",
-      "name": "FP8 vs BF16 on Qwen-3.5-397B?",
+      "name": "BF16 vs FP8 on Qwen-3.5-397B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "On AMD, BF16 beats FP8. MI355X on BF16 hits 1,671.5 vs 1,288.0 tok/s/GPU on FP8, a 30% gain. Same pattern on MI325X. NVIDIA only has FP8 data."
+        "text": "On NVIDIA B200, FP8 is 2.3x faster. On AMD hardware, BF16 is actually faster than FP8, likely reflecting early FP8 support for this model."
       }
     },
     {
       "@type": "Question",
-      "name": "NVIDIA B200 vs NVIDIA H200 on Qwen-3.5-397B?",
+      "name": "NVIDIA B200 vs AMD MI355X on Qwen-3.5-397B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 is 3.2x faster at 5,709.7 vs 1,796.7 tok/s/GPU. H200 has better TTFT (626.8ms vs 5,131.8ms) and TPOT (39.6ms vs 94.2ms)."
+        "text": "B200 is 3.4x faster (5,709.7 vs 1,671.5 tok/s/GPU) and cheaper per token ($0.09 vs $0.25/Mtok). MI355X has better TTFT at 299.9ms."
       }
     },
     {
       "@type": "Question",
-      "name": "What is the fastest time to first token for Qwen-3.5-397B?",
+      "name": "Which GPU has the fastest TTFT for Qwen-3.5-397B?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "AMD MI355X on BF16 at concurrency 64: 299.9ms TTFT. That's 17x faster than the B200's 5,131.8ms, with 1,671.5 tok/s/GPU throughput."
+        "text": "AMD MI355X on BF16 at 299.9ms TTFT at concurrency 64. MI355X on FP8 is close at 331.3ms."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the cheapest GPU for Qwen-3.5-397B inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "NVIDIA B200 on FP8 at $0.09/Mtok. Next cheapest is H200 at $0.22/Mtok. AMD MI300X on BF16 is $0.24/Mtok."
       }
     }
   ]
