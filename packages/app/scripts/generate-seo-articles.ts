@@ -27,6 +27,17 @@ import {
 } from './seo/data';
 import type { BestConfig, HistoryPoint, Improvement, MatchupData, ParetoPoint } from './seo/types';
 import { getGpuSpecs } from '../src/lib/constants';
+import gpuPairPopularity from './seo/gpu-pair-popularity.json';
+
+/** Look up user view count for a GPU pair from PostHog analytics data. */
+function getGpuPairPopularity(gpuA: string, gpuB: string): number {
+  const pairs = gpuPairPopularity.pairs as Record<string, number>;
+  // Extract base GPU from display name (e.g. "NVIDIA B200" → "b200")
+  const a = gpuA.split(' ').pop()!.toLowerCase();
+  const b = gpuB.split(' ').pop()!.toLowerCase();
+  const [first, second] = [a, b].toSorted();
+  return pairs[`${first}|${second}`] ?? 0;
+}
 
 const PRIMARY_SEQ = '8k/1k';
 const MIN_GPUS = 2;
@@ -270,10 +281,13 @@ function computeMatchups(models: SerializableModelData[]): MatchupData[] {
     }
   }
 
-  // Sort by most shared models first, then closest races
-  return matchups.toSorted(
-    (a, b) => b.sharedModels.length - a.sharedModels.length || a.avgPctDiff - b.avgPctDiff,
-  );
+  // Sort by user interest (PostHog view counts), then shared model count
+  return matchups.toSorted((a, b) => {
+    const popA = getGpuPairPopularity(a.gpuA, a.gpuB);
+    const popB = getGpuPairPopularity(b.gpuA, b.gpuB);
+    if (popA !== popB) return popB - popA;
+    return b.sharedModels.length - a.sharedModels.length || a.avgPctDiff - b.avgPctDiff;
+  });
 }
 
 async function main() {
