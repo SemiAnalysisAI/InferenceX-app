@@ -44,7 +44,10 @@ _All data from automated [InferenceX](https://inferencex.semianalysis.com) bench
 
 B200's pareto frontier on DeepSeek-R1-0528 spans a wide range: from 2,260 tok/s/GPU at 8.0 tok/s/user interactivity up to 13,430 tok/s/GPU at 29.9 tok/s/user. MI355X has only two points, hitting 3,652 tok/s/GPU at 6.4 tok/s/user and 4,223 tok/s/GPU at 9.2 tok/s/user. B200 overtakes MI355X at around 11 tok/s/user interactivity, and the gap widens from there.
 
-<InteractivityChart data='{"series":{"NVIDIA B200":[{"interactivity":8.0,"throughput":2260},{"interactivity":10.9,"throughput":2880},{"interactivity":13.1,"throughput":3467},{"interactivity":14.8,"throughput":4070},{"interactivity":14.9,"throughput":4072},{"interactivity":14.9,"throughput":4083},{"interactivity":15.3,"throughput":8382},{"interactivity":15.4,"throughput":8408},{"interactivity":15.5,"throughput":8445},{"interactivity":17.9,"throughput":9554},{"interactivity":19.5,"throughput":10505},{"interactivity":29.9,"throughput":13430}],"AMD MI355X":[{"interactivity":6.4,"throughput":3652},{"interactivity":9.2,"throughput":4223}]}}' />
+<BenchmarkChart
+  variant="scatter"
+  data='{"series":{"NVIDIA B200":[{"interactivity":8.0,"throughput":2260},{"interactivity":10.9,"throughput":2880},{"interactivity":13.1,"throughput":3467},{"interactivity":14.8,"throughput":4070},{"interactivity":14.9,"throughput":4072},{"interactivity":14.9,"throughput":4083},{"interactivity":15.3,"throughput":8382},{"interactivity":15.4,"throughput":8408},{"interactivity":15.5,"throughput":8445},{"interactivity":17.9,"throughput":9554},{"interactivity":19.5,"throughput":10505},{"interactivity":29.9,"throughput":13430}],"AMD MI355X":[{"interactivity":6.4,"throughput":3652},{"interactivity":9.2,"throughput":4223}]}}'
+/>
 
 ## Cost Comparison — $/Mtok at Hyperscaler Pricing
 

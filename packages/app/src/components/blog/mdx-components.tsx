@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { slugify } from '@/lib/blog';
 import { HeadingLink } from '@/components/blog/heading-link';
 import { BenchmarkChart } from '@/components/blog/benchmark-chart';
-import { TrendChart } from '@/components/blog/trend-chart';
-import { InteractivityChart } from '@/components/blog/interactivity-chart';
 
 function childrenToText(children: ReactNode): string {
   if (typeof children === 'string') return children;
@@ -127,8 +125,6 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
     ),
     Blur,
     BenchmarkChart,
-    TrendChart,
-    InteractivityChart,
     JsonLd: (props: { children?: ReactNode }) => {
       const raw = childrenToText(props.children).trim();
       if (!raw) return null;

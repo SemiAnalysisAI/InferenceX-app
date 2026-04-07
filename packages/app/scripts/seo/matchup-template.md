@@ -71,13 +71,16 @@ Table with BOTH GPUs' best configs side by side. One row per model where both ha
 
 Follow with a `<BenchmarkChart>` showing both GPUs' throughput.
 
-## Section 4: InteractivityChart
+## Section 4: Interactivity Chart
 
-Add an `<InteractivityChart>` showing throughput vs interactivity curves for both GPUs
+Add an `<BenchmarkChart variant="scatter">` showing throughput vs interactivity curves for both GPUs
 on the most data-rich model. This is the core visualization.
 
 ```mdx
-<InteractivityChart data='{"series":{"yyy":[{"interactivity":10,"throughput":5000},...],"yyy":[...]}}' />
+<BenchmarkChart
+  variant="scatter"
+  data='{"series":{"yyy":[{"interactivity":10,"throughput":5000},...],"yyy":[...]}}'
+/>
 ```
 
 The data comes from the history/benchmark rows at different concurrency levels for
@@ -96,11 +99,14 @@ interactivity levels?
 
 ## Section 6: Performance Over Time (if history data exists)
 
-Add a `<TrendChart>` showing how both GPUs' throughput has evolved on the most
+Add a `<BenchmarkChart variant="line">` showing how both GPUs' throughput has evolved on the most
 interesting model.
 
 ```mdx
-<TrendChart data='{"series":{"yyy":[{"date":"YYYY-MM-DD","value":xxx},...],"yyy":[...]}}' />
+<BenchmarkChart
+  variant="line"
+  data='{"series":{"yyy":[{"date":"YYYY-MM-DD","value":xxx},...],"yyy":[...]}}'
+/>
 ```
 
 Commentary: which GPU is improving faster? What framework/config changes drove gains?

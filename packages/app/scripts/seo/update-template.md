@@ -57,13 +57,14 @@ Lead with the result. No preamble.
 Follow with a `<BenchmarkChart variant="bar">` showing just the before/after throughput
 (two bars: "Before (YYYY-MM-DD)" and "After (YYYY-MM-DD)").
 
-## Section 3: TrendChart
+## Section 3: Trend Chart
 
-Show **multiple series** in the TrendChart: the improved config AND other configs on the
+Show **multiple series** in the trend chart: the improved config AND other configs on the
 same hardware for context. The `relatedHistory` field in the improvement data has this.
 
 ```mdx
-<TrendChart
+<BenchmarkChart
+  variant="line"
   metric="Throughput/GPU (tok/s)"
   data='{"series":{"yyy framework-A":[...], "yyy framework-B":[...]}}'
 />
