@@ -1,0 +1,75 @@
+---
+title: 'MI355X mori-sglang Gets 2.2x Faster on DeepSeek-R1 (March 2026)'
+subtitle: 'New FP4 disagg sweep configs more than double throughput on AMD hardware'
+date: '2026-03-13'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - performance-update
+  - mi355x
+  - deepseek-r1
+---
+
+AMD MI355X on mori-sglang FP4 with disaggregated prefill jumped from 1,893 to 4,223 tok/s/GPU on DeepSeek-R1-0528 inference, a 2.2x improvement in 10 days. The gain came from expanded concurrency sweep configs and an updated FP4 image.
+
+## Before/After
+
+|                        |      Before |       After | Change |
+| ---------------------- | ----------: | ----------: | -----: |
+| Throughput/GPU (tok/s) |       1,893 |       4,223 |  +123% |
+| Median TTFT (ms)       |      29,501 |      71,289 |      - |
+| Median TPOT (ms)       |        17.1 |       108.1 |      - |
+| Framework              | mori-sglang | mori-sglang |      - |
+| Concurrency            |         256 |       2,048 |      - |
+| Date                   |  2026-03-03 |  2026-03-13 |      - |
+
+Latency went up because the after config runs at 8x the concurrency (2,048 vs 256). At that batch size, throughput is what matters.
+
+<BenchmarkChart
+  variant="bar"
+  metric="Throughput/GPU (tok/s)"
+  data='[{"gpu":"Before (2026-03-03)","value":1893,"vendor":"amd"},{"gpu":"After (2026-03-13)","value":4223,"vendor":"amd"}]'
+/>
+
+## Throughput Trend on MI355X
+
+<TrendChart
+  metric="Throughput/GPU (tok/s)"
+  data='{"series":{"MI355X sglang FP4":[["2025-09-30",1350],["2025-10-10",1486],["2025-10-29",1460],["2025-11-10",1465],["2025-11-27",1482],["2025-12-10",912],["2026-02-27",1952]],"MI355X sglang FP8":[["2025-09-30",1309],["2025-10-10",1311],["2025-10-30",1316],["2025-11-11",1313],["2025-11-28",1319],["2025-12-11",478],["2026-01-05",1708],["2026-03-05",1857]],"MI355X mori-sglang FP8 disagg":[["2026-01-08",1895],["2026-02-14",3012],["2026-02-23",3815],["2026-03-03",3752]],"MI355X atom FP8":[["2026-01-14",2491],["2026-02-11",3165],["2026-04-01",3433]],"MI355X atom FP4":[["2026-01-14",3281],["2026-02-11",3424],["2026-02-25",3652]],"MI355X mori-sglang FP4 disagg":[["2026-02-04",1734],["2026-02-13",1787],["2026-03-03",1893],["2026-03-13",4223]]}}'
+/>
+
+The mori-sglang FP4 disagg line shows a sudden jump on March 13. Other MI355X configs stayed flat or grew gradually. The atom FP4 line (3,652 tok/s) was the previous AMD best; mori-sglang FP4 disagg now beats it by 16%.
+
+## What Changed
+
+[PR #899](https://github.com/SemiAnalysisAI/InferenceX/pull/899) added more sweep configs for MI355X FP4 disagg and bumped the FP4 image to the Feb 27 latest build. The wider concurrency sweep (up to 2,048) found a config that trades latency for throughput, and the updated image contributed its own gains.
+
+## Competitive Context
+
+Before this update, the best MI355X result on DeepSeek-R1 was 3,652 tok/s/GPU (atom FP4). Now mori-sglang FP4 disagg hits 4,223 tok/s/GPU, the top AMD config. That's still 77% behind the NVIDIA GB300 at 18,132 tok/s/GPU. At $0.10/Mtok vs the GB300's $0.04/Mtok, the MI355X costs 2.4x more per token on this model.
+
+## Related Benchmarks
+
+For the full GPU comparison on this model, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). For another large MoE model, check the [Kimi-K2.5 results](/blog/best-gpu-for-kimik25-inference).
+
+## Where to Run DeepSeek-R1 Inference
+
+Looking for DeepSeek-R1 API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "MI355X mori-sglang Gets 2.2x Faster on DeepSeek-R1 (March 2026)",
+  "datePublished": "2026-03-13",
+  "dateModified": "2026-04-06",
+  "description": "AMD MI355X mori-sglang FP4 disagg throughput on DeepSeek-R1-0528 jumped from 1,893 to 4,223 tok/s/GPU, a 123% improvement driven by new sweep configs and an updated FP4 image."
+}`}</JsonLd>

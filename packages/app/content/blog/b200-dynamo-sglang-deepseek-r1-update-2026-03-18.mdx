@@ -1,0 +1,75 @@
+---
+title: 'DeepSeek-R1 Inference on B200: 1.9x Improvement in 5 Weeks (March 2026)'
+subtitle: 'Updated dynamo-sglang FP8 disagg recipes nearly double throughput while cutting TTFT by 86%'
+date: '2026-03-18'
+modifiedDate: '2026-04-06'
+publishDate: '2026-04-06'
+tags:
+  - benchmark
+  - inference
+  - gpu
+  - performance-update
+  - b200
+  - deepseek-r1
+---
+
+NVIDIA B200 on dynamo-sglang FP8 with disaggregated prefill went from 2,237 to 4,242 tok/s/GPU on DeepSeek-R1-0528, a 1.9x gain in five weeks. TTFT dropped from 58,236ms to 8,254ms at the same time.
+
+## Before/After
+
+|                        |        Before |         After | Change |
+| ---------------------- | ------------: | ------------: | -----: |
+| Throughput/GPU (tok/s) |         2,237 |         4,242 |   +90% |
+| Median TTFT (ms)       |        58,236 |         8,254 |   -86% |
+| Median TPOT (ms)       |          19.9 |          52.4 |      - |
+| Framework              | dynamo-sglang | dynamo-sglang |      - |
+| Concurrency            |           512 |         1,024 |      - |
+| Date                   |    2026-02-13 |    2026-03-18 |      - |
+
+TPOT rose from 19.9ms to 52.4ms because the after config runs at 2x the concurrency. The TTFT improvement is the standout here: 86% lower, even at higher batch size.
+
+<BenchmarkChart
+  variant="bar"
+  metric="Throughput/GPU (tok/s)"
+  data='[{"gpu":"Before (2026-02-13)","value":2237,"vendor":"nvidia"},{"gpu":"After (2026-03-18)","value":4242,"vendor":"nvidia"}]'
+/>
+
+## Throughput Trend on B200
+
+<TrendChart
+  metric="Throughput/GPU (tok/s)"
+  data='{"series":{"B200 trt FP8":[["2025-09-30",1165],["2025-10-10",1636],["2025-10-23",1643],["2025-11-05",1637],["2025-11-16",1635],["2025-11-26",1638],["2025-12-08",1641],["2026-02-05",3467]],"B200 trt FP4":[["2025-09-30",4011],["2025-10-06",8408],["2025-10-19",5749],["2025-11-04",130],["2025-11-11",8363],["2025-11-23",8377],["2025-12-05",8360],["2026-02-06",10505]],"B200 sglang FP8":[["2025-10-01",1528],["2025-10-11",760],["2025-10-25",1478],["2025-11-07",1482],["2025-11-19",1490],["2025-12-03",1484],["2026-03-25",2265]],"B200 sglang FP4":[["2025-10-01",4569],["2025-10-11",4293],["2025-10-25",4304],["2025-11-07",3954],["2025-11-19",4409],["2025-12-02",4484],["2026-03-25",5390]],"B200 dynamo-trt FP4 disagg":[["2026-01-29",13430]],"B200 dynamo-sglang FP8 disagg":[["2026-02-07",2037],["2026-02-10",2230],["2026-02-13",2237],["2026-03-18",4242]],"B200 dynamo-trt FP8 disagg":[["2026-02-11",5858],["2026-03-23",5857]]}}'
+/>
+
+The dynamo-sglang FP8 disagg line shows steady growth from 2,037 in early February to 4,242 on March 18. Other B200 configs also improved over this period: trt FP4 jumped from ~8,400 to 10,505 tok/s/GPU, and sglang FP8 climbed from ~1,480 to 2,265. The dynamo-trt FP4 disagg config at 13,430 tok/s/GPU still leads on this GPU.
+
+## What Changed
+
+[PR #907](https://github.com/SemiAnalysisAI/InferenceX/pull/907) replaced the old per-file recipes for B200 FP8 DSR1 8k1k dynamo-sglang with resolved variants from a consolidated config. The new config has 14 variants covering STP/MTP at both low-latency and max-throughput, with updated concurrency points and scale settings.
+
+## Competitive Context
+
+This moves dynamo-sglang FP8 disagg from 7th to 6th among B200 configs on DeepSeek-R1. The B200's best config is still dynamo-trt FP4 disagg at 13,430 tok/s/GPU, so FP8 on dynamo-sglang is at 32% of peak B200 throughput. Against other GPUs at FP8, the B200 now beats the H200's best FP8 result (2,454 tok/s/GPU on trt) by 73%. At $0.13/Mtok for dynamo-sglang FP8 disagg vs the H200's $0.16/Mtok, it's cheaper per token too.
+
+## Related Benchmarks
+
+For the full GPU comparison on this model, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). For a B200-vs-H200 matchup across models, check our [B200 vs H200 comparison](/blog/b200-vs-h200-inference).
+
+## Where to Run DeepSeek-R1 Inference
+
+Looking for DeepSeek-R1 API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+
+## Methodology
+
+Benchmarks are re-run whenever serving frameworks (vLLM, SGLang, TensorRT-LLM, etc.) ship updates or when we change benchmark configs, on dedicated hardware with standardized prompts and concurrency sweeps. Results are published on [InferenceX](https://inferencex.semianalysis.com). Configs that fail health checks are excluded.
+
+_Last updated: 2026-04-06._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "DeepSeek-R1 Inference on B200: 1.9x Improvement in 5 Weeks (March 2026)",
+  "datePublished": "2026-03-18",
+  "dateModified": "2026-04-06",
+  "description": "NVIDIA B200 dynamo-sglang FP8 disagg throughput on DeepSeek-R1-0528 jumped from 2,237 to 4,242 tok/s/GPU with TTFT dropping 86%, driven by new consolidated recipe configs."
+}`}</JsonLd>
