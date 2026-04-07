@@ -371,6 +371,8 @@ function LineVariant({
               isPinned,
             );
           },
+          getRulerX: (d: LineEntry, xScale: any) => xScale(d.x),
+          getRulerY: (d: LineEntry, yScale: any) => yScale(d.y),
           attachToLayer: 1,
         }}
       />
@@ -514,6 +516,8 @@ function ScatterVariant({
              <div class="mt-1 font-medium">${metric}: ${formatLargeNumber(d.y)}</div>`,
               isPinned,
             ),
+          getRulerX: (d: LineEntry, xScale: any) => xScale(d.x),
+          getRulerY: (d: LineEntry, yScale: any) => yScale(d.y),
           attachToLayer: 1,
         }}
       />
