@@ -53,6 +53,37 @@ function getBarColor(d: BarEntry): string {
   return VENDOR_COLORS[d.vendor] ?? VENDOR_COLORS.other;
 }
 
+/**
+ * Compute dynamic left margin for bar charts based on y-axis label widths.
+ * Uses canvas measureText to approximate SVG text width, matching the
+ * approach in calculator/ThroughputBarChart.tsx.
+ *
+ * For two-row labels (split at last space), measures both rows at their
+ * respective font sizes and uses the wider one.
+ */
+function computeLeftMargin(labels: string[]): number {
+  if (typeof document === 'undefined') return 100; // SSR fallback
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 100;
+
+  let maxWidth = 0;
+  for (const label of labels) {
+    const lastSpace = label.lastIndexOf(' ');
+    // First row (or only row): 600 12px
+    ctx.font = '600 12px sans-serif';
+    const line1 = lastSpace > 0 ? label.slice(0, lastSpace) : label;
+    maxWidth = Math.max(maxWidth, ctx.measureText(line1).width);
+    // Second row if split: 10px muted
+    if (lastSpace > 0) {
+      ctx.font = '10px sans-serif';
+      maxWidth = Math.max(maxWidth, ctx.measureText(label.slice(lastSpace + 1)).width);
+    }
+  }
+  // Add padding for the tick mark + gap
+  return Math.max(60, Math.ceil(maxWidth) + 16);
+}
+
 function tooltipShell(inner: string, isPinned: boolean): string {
   return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 140px; user-select: ${isPinned ? 'text' : 'none'};">
     ${isPinned ? '<div class="text-muted-foreground text-[10px] mb-1 italic">Click elsewhere to dismiss</div>' : ''}
@@ -123,6 +154,7 @@ function BarVariant({
 
   const maxValue = Math.max(...data.map((d) => d.value));
   const yDomain = [...data].toReversed().map((d) => d.gpu);
+  const leftMargin = computeLeftMargin(data.map((d) => d.gpu));
 
   const layers: LayerConfig<BarEntry>[] = [
     {
@@ -166,7 +198,7 @@ function BarVariant({
         chartId="benchmark-bar"
         data={data}
         height={height}
-        margin={{ top: 24, right: 24, bottom: 48, left: 100 }}
+        margin={{ top: 24, right: 24, bottom: 48, left: leftMargin }}
         watermark="logo"
         grabCursor
         clipContent={false}
