@@ -73,8 +73,12 @@ Follow with a `<BenchmarkChart>` showing both GPUs' throughput.
 
 ## Section 4: Interactivity Chart
 
-Add an `<BenchmarkChart variant="scatter">` showing throughput vs interactivity curves for both GPUs
-on the most data-rich model. This is the core visualization.
+Add a `<BenchmarkChart variant="scatter">` showing throughput vs interactivity curves for both GPUs
+on the model where both GPUs have the most pareto points.
+
+**Skip this section entirely if either GPU has fewer than 3 pareto points on all shared models.**
+Two points is a straight line, not a curve. Say "Insufficient interactivity sweep data for
+a meaningful pareto comparison" and move on.
 
 ```mdx
 <BenchmarkChart

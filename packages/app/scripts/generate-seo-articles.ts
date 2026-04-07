@@ -165,17 +165,18 @@ async function processModel(
   // Fetch historical data for default models (8k/1k only to limit API calls)
   const category = MODEL_CATEGORY[modelKey] ?? 'default';
   let history: Record<string, HistoryPoint[]> = {};
-  let allRows = rows;
   if (category === 'default') {
     const historyRows = await fetchHistory(baseUrl, displayName, 8192, 1024);
     history = aggregateHistory(historyRows);
-    allRows = historyRows.length > 0 ? historyRows : rows;
     console.log(
       `  ${displayName}: ${historyRows.length} history rows → ${Object.keys(history).length} configs`,
     );
   }
 
-  const paretoFrontiers = computeParetoFrontiers(allRows, { isl: 8192, osl: 1024 });
+  // Pareto frontiers: always use latest benchmarks (rows), not history.
+  // The latest_benchmarks view has ALL concurrency levels at the most recent date,
+  // which gives the full throughput-vs-interactivity sweep needed for pareto curves.
+  const paretoFrontiers = computeParetoFrontiers(rows, { isl: 8192, osl: 1024 });
 
   const entry: SerializableModelData = {
     modelKey,
