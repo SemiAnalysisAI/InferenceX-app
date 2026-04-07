@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { HardwareConfig } from '@/components/inference/types';
 import { HARDWARE_CONFIG } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
+import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -308,14 +310,16 @@ function positionLabelPairs(
   const valueLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.overlay-label');
 
-  // Build a map of max text width per resultKey
+  // Build a map of max text width per resultKey (pretext, no reflow)
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
-    maxWidths.set(d.resultKey, this.getComputedTextLength());
+    const text = d3.select(this).text();
+    maxWidths.set(d.resultKey, measureTextWidth(text, '600 12px sans-serif'));
   });
   overlayLabels.each(function (d) {
+    const text = d3.select(this).text();
     const prev = maxWidths.get(d.resultKey) ?? 0;
-    maxWidths.set(d.resultKey, Math.max(prev, this.getComputedTextLength()));
+    maxWidths.set(d.resultKey, Math.max(prev, measureTextWidth(text, '500 10px sans-serif')));
   });
 
   const apply = (sel: d3.Selection<SVGTextElement, InterpolatedResult, SVGGElement, unknown>) => {
@@ -374,19 +378,16 @@ export default function ThroughputBarChart({
     return Math.max(600, barCount * 55 + 120);
   }, [sortedResults.length]);
 
-  // Dynamic left margin: measure longest Y-axis label via canvas
+  // Dynamic left margin: measure longest Y-axis label via pretext
   const dynamicMargin = useMemo(() => {
-    if (typeof document === 'undefined' || sortedResults.length === 0)
-      return { top: 20, right: 20, bottom: 60, left: 80 };
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    ctx.font = '12px sans-serif';
-    let maxWidth = 0;
-    for (const r of sortedResults) {
-      const w = ctx.measureText(getLabel(r, hardwareConfig)).width;
-      if (w > maxWidth) maxWidth = w;
-    }
-    return { top: 20, right: 20, bottom: 60, left: Math.max(80, Math.ceil(maxWidth * 0.6) + 12) };
+    if (sortedResults.length === 0) return { top: 20, right: 20, bottom: 60, left: 80 };
+    const labels = sortedResults.map((r) => getLabel(r, hardwareConfig));
+    return {
+      top: 20,
+      right: 20,
+      bottom: 60,
+      left: computeLeftMargin(labels, { split: 'parens', minMargin: 80, padding: 12 }),
+    };
   }, [sortedResults, hardwareConfig]);
 
   // X domain
@@ -509,37 +510,7 @@ export default function ThroughputBarChart({
 
   // ── Y axis customize: two-line GPU labels ──
 
-  const yAxisConfig = useMemo(
-    () => ({
-      customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-        axisGroup.selectAll('.tick text').each(function (d) {
-          const el = d3.select(this);
-          const r = sortedResults.find((item) => item.resultKey === (d as string));
-          const fullLabel = r ? getLabel(r, hardwareConfig) : (d as string);
-          const match = fullLabel.match(/^(.+?)(\s*\(.+\))$/);
-          el.text(null);
-          if (match) {
-            el.append('tspan')
-              .text(match[1])
-              .attr('x', -8)
-              .attr('dy', '-0.4em')
-              .attr('font-size', '12px')
-              .attr('font-weight', '600');
-            el.append('tspan')
-              .text(match[2].trim())
-              .attr('x', -8)
-              .attr('dy', '1.2em')
-              .attr('font-size', '10px')
-              .style('fill', 'var(--muted-foreground)');
-          } else {
-            el.text(fullLabel).attr('font-size', '12px');
-          }
-          el.attr('text-anchor', 'end');
-        });
-      },
-    }),
-    [sortedResults, hardwareConfig],
-  );
+  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels({ split: 'parens' }) }), []);
 
   const xAxisConfig = useMemo(() => ({ tickCount: 6 }), []);
 

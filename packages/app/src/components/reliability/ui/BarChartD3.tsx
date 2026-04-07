@@ -8,6 +8,8 @@ import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
+import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
@@ -16,7 +18,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
-const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 70 };
+const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
 const generateReliabilityTooltipContent = (data: ChartItem, isPinned: boolean): string => {
   const modelLabel =
@@ -43,11 +45,15 @@ function positionLabelPairs(
 
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
-    maxWidths.set(d.modelLabel, this.getComputedTextLength());
+    maxWidths.set(
+      d.modelLabel,
+      measureTextWidth(`${d.successRate.toFixed(1)}%`, '600 12px sans-serif'),
+    );
   });
   overlayLabels.each(function (d) {
     const prev = maxWidths.get(d.modelLabel) ?? 0;
-    maxWidths.set(d.modelLabel, Math.max(prev, this.getComputedTextLength()));
+    const w = measureTextWidth(`${d.n_success}/${d.total} runs`, '500 10px sans-serif');
+    maxWidths.set(d.modelLabel, Math.max(prev, w));
   });
 
   const apply = (sel: d3.Selection<SVGTextElement, ChartItem, SVGGElement, unknown>) => {
@@ -208,39 +214,11 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [sortedChartData],
   );
 
-  const yAxisConfig = useMemo(
-    () => ({
-      customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-        axisGroup.selectAll('.tick text').each(function () {
-          const el = d3.select(this);
-          const fullLabel = el.text();
-          const lastSpace = fullLabel.lastIndexOf(' ');
-          el.text(null);
-          if (lastSpace > 0) {
-            el.append('tspan')
-              .text(fullLabel.slice(0, lastSpace))
-              .attr('x', -8)
-              .attr('dy', '-0.4em')
-              .attr('font-size', '12px')
-              .attr('font-weight', '600');
-            el.append('tspan')
-              .text(fullLabel.slice(lastSpace + 1))
-              .attr('x', -8)
-              .attr('dy', '1.2em')
-              .attr('font-size', '10px')
-              .style('fill', 'var(--muted-foreground)');
-          } else {
-            el.append('tspan')
-              .text(fullLabel)
-              .attr('x', -8)
-              .attr('font-size', '12px')
-              .attr('font-weight', '600');
-          }
-          el.attr('text-anchor', 'end');
-        });
-      },
-    }),
-    [],
+  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels() }), []);
+
+  const chartMargin = useMemo(
+    () => ({ ...BASE_MARGIN, left: computeLeftMargin(yDomain) }),
+    [yDomain],
   );
 
   const xAxisConfig = useMemo(
@@ -270,7 +248,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         chartId="reliability-chart"
         data={sortedChartData}
         height={dynamicHeight}
-        margin={CHART_MARGIN}
+        margin={chartMargin}
         watermark="logo"
         grabCursor
         clipContent={false}

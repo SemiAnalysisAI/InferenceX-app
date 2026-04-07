@@ -2,6 +2,7 @@
 title: 'InferenceMAX: Open Source Inference Benchmarking'
 subtitle: 'NVIDIA GB200 NVL72, AMD MI355X, Throughput Token per GPU, Latency Tok/s/user, Perf per Dollar, Cost per Million Tokens, Tokens per Provisioned Megawatt, DeepSeek R1 670B, GPTOSS 120B, Llama3 70B'
 date: '2025-10-09'
+publishDate: '2025-10-09'
 tags:
   - benchmark
   - gpu
@@ -613,3 +614,58 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 ---
 
 _This article continues on our Substack. [Subscribe to SemiAnalysis](https://newsletter.semianalysis.com/subscribe) to read the complete article._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is InferenceMAX?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "InferenceMAX is an open-source automated benchmark designed to track ML inference performance in real-time. It runs a suite of benchmarks every night on hundreds of chips, continually re-benchmarking the world's most popular open-source inference frameworks and models. A live dashboard is available for free at inferencemax.ai."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What GPUs does InferenceMAX benchmark?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "InferenceMAX v1 benchmarks the NVIDIA GB200 NVL72, B200, H200, and H100, as well as the AMD MI355X, MI325X, and MI300X. The project is expanding to include Google TPU and AWS Trainium backends, making it the first truly multi-vendor open benchmark."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How often are InferenceMAX benchmarks run?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "InferenceMAX runs its full suite of benchmarks every night using GitHub Actions to orchestrate benchmark runs across GPU clusters. This nightly cadence ensures the results keep pace with the rapid speed of software improvements in inference engines like vLLM, SGLang, and TensorRT-LLM."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do AMD and NVIDIA GPUs compare in InferenceMAX benchmarks?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AMD and NVIDIA GPUs both deliver competitive performance for different workloads. For example, the MI300X shows strong performance against the H100 at low interactivity levels due to better memory bandwidth, and the MI355X can beat the B200 on TCO per million tokens for certain GPT-OSS 120B workloads. However, NVIDIA's B200 significantly outperforms the MI355X on Llama 70B FP4 across all workload types."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Who supports the InferenceMAX initiative?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "InferenceMAX is supported by major industry leaders including Lisa Su (AMD), Jensen Huang (NVIDIA), Scott Guthrie (Microsoft), and Peter Hoeschele (OpenAI Stargate). Compute resources are provided by Crusoe, CoreWeave, Nebius, TensorWave, Oracle, and Together AI. The PyTorch Foundation, vLLM, and SGLang maintainers also endorse the project."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What models does InferenceMAX benchmark?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "InferenceMAX v1 benchmarks LLaMA 3 70B to represent dense enterprise model deployments, DeepSeek V3 670B as a proxy for frontier sparse MoE model architectures like OpenAI's, and GPT-OSS 120B MoE as a smaller sparse model closest to GPT-5 mini. Benchmarks run across FP8, FP4, and MX4 precisions depending on hardware support."
+      }
+    }
+  ]
+}`}</JsonLd>

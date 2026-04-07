@@ -11,11 +11,13 @@ export function createLogoWatermark(
   innerWidth: number,
   innerHeight: number,
   margin: ChartMargin,
+  chartId: string,
 ): void {
+  const patternId = `logo-pattern-${chartId}`;
   const logoSize = Math.min(innerWidth, innerHeight) * 0.6;
   defs
     .append('pattern')
-    .attr('id', 'logo-pattern')
+    .attr('id', patternId)
     .attr('patternUnits', 'userSpaceOnUse')
     .attr('width', containerWidth)
     .attr('height', containerHeight)
@@ -32,7 +34,7 @@ export function createLogoWatermark(
     .attr('class', 'watermark-rect')
     .attr('width', containerWidth)
     .attr('height', containerHeight)
-    .attr('fill', 'url(#logo-pattern)');
+    .attr('fill', `url(#${patternId})`);
 }
 
 /** Create a diagonal repeating "UNOFFICIAL" watermark pattern. */
@@ -41,11 +43,13 @@ export function createUnofficialWatermark(
   defs: d3.Selection<SVGDefsElement, unknown, null, undefined>,
   containerWidth: number,
   containerHeight: number,
+  chartId: string,
 ): void {
+  const patternId = `unofficial-pattern-${chartId}`;
   const patternSize = 200;
   const pattern = defs
     .append('pattern')
-    .attr('id', 'unofficial-pattern')
+    .attr('id', patternId)
     .attr('patternUnits', 'userSpaceOnUse')
     .attr('width', patternSize)
     .attr('height', patternSize)
@@ -68,5 +72,5 @@ export function createUnofficialWatermark(
     .attr('class', 'watermark-rect')
     .attr('width', containerWidth)
     .attr('height', containerHeight)
-    .attr('fill', 'url(#unofficial-pattern)');
+    .attr('fill', `url(#${patternId})`);
 }

@@ -24,6 +24,7 @@
     "cache:warmup": "dotenv -e ../../.env -- tsx scripts/warmup-cache.ts"
   },
   "dependencies": {
+    "@chenglou/pretext": "^0.0.4",
     "@jpinsonneau/html-to-image": "^1.11.13",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -360,8 +360,8 @@ describe('GPU Specs Radar Chart View', () => {
     cy.get('[data-testid="gpu-specs-radar-chart"] svg')
       .first()
       .within(() => {
-        cy.get('defs pattern#logo-pattern').should('exist');
-        cy.get('defs pattern#logo-pattern image')
+        cy.get('defs pattern[id^="logo-pattern"]').should('exist');
+        cy.get('defs pattern[id^="logo-pattern"] image')
           .should('have.attr', 'href', '/brand/logo-color.webp')
           .and('have.attr', 'opacity', '0.1');
       });

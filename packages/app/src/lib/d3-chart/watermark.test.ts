@@ -37,9 +37,10 @@ describe('createLogoWatermark', () => {
       innerWidth,
       innerHeight,
       margin,
+      'test',
     );
 
-    const pattern = defs.select('#logo-pattern');
+    const pattern = defs.select('#logo-pattern-test');
     expect(pattern.empty()).toBe(false);
     expect(pattern.attr('patternUnits')).toBe('userSpaceOnUse');
     expect(pattern.attr('width')).toBe(String(containerWidth));
@@ -56,9 +57,10 @@ describe('createLogoWatermark', () => {
       innerWidth,
       innerHeight,
       margin,
+      'test',
     );
 
-    const image = defs.select('#logo-pattern image');
+    const image = defs.select('#logo-pattern-test image');
     expect(image.empty()).toBe(false);
     expect(image.attr('href')).toBe('/brand/logo-color.webp');
     expect(image.attr('opacity')).toBe('0.1');
@@ -78,9 +80,10 @@ describe('createLogoWatermark', () => {
       innerWidth,
       innerHeight,
       margin,
+      'test',
     );
 
-    const image = defs.select('#logo-pattern image');
+    const image = defs.select('#logo-pattern-test image');
     const logoSize = Math.min(innerWidth, innerHeight) * 0.6;
     const expectedX = margin.left + (innerWidth - logoSize) / 2;
     const expectedY = margin.top + (innerHeight - logoSize) / 2;
@@ -99,11 +102,12 @@ describe('createLogoWatermark', () => {
       innerWidth,
       innerHeight,
       margin,
+      'test',
     );
 
     const rect = svg.select('.watermark-rect');
     expect(rect.empty()).toBe(false);
-    expect(rect.attr('fill')).toBe('url(#logo-pattern)');
+    expect(rect.attr('fill')).toBe('url(#logo-pattern-test)');
     expect(Number(rect.attr('width'))).toBe(containerWidth);
     expect(Number(rect.attr('height'))).toBe(containerHeight);
   });
@@ -112,9 +116,9 @@ describe('createLogoWatermark', () => {
     const { svg, defs } = makeSvg();
     const tallInnerWidth = 200;
     const tallInnerHeight = 800;
-    createLogoWatermark(svg, defs, 300, 900, tallInnerWidth, tallInnerHeight, margin);
+    createLogoWatermark(svg, defs, 300, 900, tallInnerWidth, tallInnerHeight, margin, 'test');
 
-    const image = defs.select('#logo-pattern image');
+    const image = defs.select('#logo-pattern-test image');
     const logoSize = Math.min(tallInnerWidth, tallInnerHeight) * 0.6;
     expect(Number(image.attr('width'))).toBe(logoSize);
     expect(logoSize).toBe(200 * 0.6);
@@ -124,9 +128,9 @@ describe('createLogoWatermark', () => {
     const { svg, defs } = makeSvg();
     const wideInnerWidth = 800;
     const wideInnerHeight = 200;
-    createLogoWatermark(svg, defs, 900, 300, wideInnerWidth, wideInnerHeight, margin);
+    createLogoWatermark(svg, defs, 900, 300, wideInnerWidth, wideInnerHeight, margin, 'test');
 
-    const image = defs.select('#logo-pattern image');
+    const image = defs.select('#logo-pattern-test image');
     const logoSize = Math.min(wideInnerWidth, wideInnerHeight) * 0.6;
     expect(Number(image.attr('width'))).toBe(logoSize);
     expect(logoSize).toBe(200 * 0.6);
@@ -139,9 +143,9 @@ describe('createUnofficialWatermark', () => {
 
   it('creates a pattern element with id "unofficial-pattern"', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
 
-    const pattern = defs.select('#unofficial-pattern');
+    const pattern = defs.select('#unofficial-pattern-test');
     expect(pattern.empty()).toBe(false);
     expect(pattern.attr('patternUnits')).toBe('userSpaceOnUse');
     expect(pattern.attr('width')).toBe('200');
@@ -151,9 +155,9 @@ describe('createUnofficialWatermark', () => {
 
   it('creates a text element with "UNOFFICIAL" inside the pattern', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
 
-    const text = defs.select('#unofficial-pattern text');
+    const text = defs.select('#unofficial-pattern-test text');
     expect(text.empty()).toBe(false);
     expect(text.text()).toBe('UNOFFICIAL');
     expect(text.attr('fill')).toBe('#dc2626');
@@ -164,9 +168,9 @@ describe('createUnofficialWatermark', () => {
 
   it('centers the text within the 200x200 pattern tile', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
 
-    const text = defs.select('#unofficial-pattern text');
+    const text = defs.select('#unofficial-pattern-test text');
     expect(text.attr('x')).toBe('100');
     expect(text.attr('y')).toBe('100');
     expect(text.attr('text-anchor')).toBe('middle');
@@ -175,11 +179,11 @@ describe('createUnofficialWatermark', () => {
 
   it('creates a watermark rect as the first child of SVG', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
 
     const rect = svg.select('.watermark-rect');
     expect(rect.empty()).toBe(false);
-    expect(rect.attr('fill')).toBe('url(#unofficial-pattern)');
+    expect(rect.attr('fill')).toBe('url(#unofficial-pattern-test)');
     expect(Number(rect.attr('width'))).toBe(containerWidth);
     expect(Number(rect.attr('height'))).toBe(containerHeight);
   });
@@ -188,7 +192,7 @@ describe('createUnofficialWatermark', () => {
     const { svg, defs } = makeSvg();
     // Add a dummy child before calling watermark
     svg.append('g').attr('class', 'pre-existing');
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
 
     // The watermark rect should be inserted before defs (first child)
     const firstChild = svg.select(':first-child');

@@ -13,6 +13,7 @@ export function setupChartStructure(
   config: ChartSetupConfig,
 ): ChartLayout {
   const {
+    chartId,
     containerWidth,
     containerHeight,
     margin,
@@ -38,9 +39,18 @@ export function setupChartStructure(
 
     // Watermark
     if (watermark === 'logo') {
-      createLogoWatermark(svg, defs, containerWidth, containerHeight, width, height, margin);
+      createLogoWatermark(
+        svg,
+        defs,
+        containerWidth,
+        containerHeight,
+        width,
+        height,
+        margin,
+        chartId,
+      );
     } else if (watermark === 'unofficial') {
-      createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+      createUnofficialWatermark(svg, defs, containerWidth, containerHeight, chartId);
     }
 
     const g = svg
@@ -141,8 +151,10 @@ export function setupChartStructure(
   const zoomGroup = g.select<SVGGElement>('.zoom-group');
 
   // Update watermark — detect type change and recreate if needed
-  const hasLogo = !defs.select('#logo-pattern').empty();
-  const hasUnofficial = !defs.select('#unofficial-pattern').empty();
+  const logoPatternId = `logo-pattern-${chartId}`;
+  const unofficialPatternId = `unofficial-pattern-${chartId}`;
+  const hasLogo = !defs.select(`#${logoPatternId}`).empty();
+  const hasUnofficial = !defs.select(`#${unofficialPatternId}`).empty();
   const needsSwitch =
     (watermark === 'unofficial' && !hasUnofficial) ||
     (watermark === 'logo' && !hasLogo) ||
@@ -150,18 +162,27 @@ export function setupChartStructure(
 
   if (needsSwitch) {
     svg.select('.watermark-rect').remove();
-    defs.select('#logo-pattern').remove();
-    defs.select('#unofficial-pattern').remove();
+    defs.select(`#${logoPatternId}`).remove();
+    defs.select(`#${unofficialPatternId}`).remove();
     if (watermark === 'logo') {
-      createLogoWatermark(svg, defs, containerWidth, containerHeight, width, height, margin);
+      createLogoWatermark(
+        svg,
+        defs,
+        containerWidth,
+        containerHeight,
+        width,
+        height,
+        margin,
+        chartId,
+      );
     } else if (watermark === 'unofficial') {
-      createUnofficialWatermark(svg, defs, containerWidth, containerHeight);
+      createUnofficialWatermark(svg, defs, containerWidth, containerHeight, chartId);
     }
   } else {
     svg.select('.watermark-rect').attr('width', containerWidth).attr('height', containerHeight);
     if (watermark === 'logo') {
       const logoSize = Math.min(width, height) * 0.6;
-      const pattern = defs.select('#logo-pattern');
+      const pattern = defs.select(`#${logoPatternId}`);
       if (!pattern.empty()) {
         pattern.attr('width', containerWidth).attr('height', containerHeight);
         pattern

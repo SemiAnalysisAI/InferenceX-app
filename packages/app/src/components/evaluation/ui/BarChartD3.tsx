@@ -9,6 +9,7 @@ import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import type { EvaluationChartData } from '@/components/evaluation/types';
@@ -24,7 +25,7 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { computeToggle } from '@/hooks/useTogglableSet';
 
-const CHART_MARGIN = { top: 24, right: 24, bottom: 52, left: 160 };
+const BASE_MARGIN = { top: 24, right: 24, bottom: 52 };
 const OVERLAY_X_SIZE = 6;
 const OVERLAY_X_HOVER_SIZE = 8;
 const OVERLAY_HIT_RADIUS = 10;
@@ -219,6 +220,19 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     return [...labels];
   }, [chartData, unofficialChartData]);
 
+  const chartMargin = useMemo(
+    () => ({
+      ...BASE_MARGIN,
+      left: computeLeftMargin(yLabels, {
+        split: 'newline',
+        primaryFont: '600 10px sans-serif',
+        secondaryFont: '9px sans-serif',
+        minMargin: 80,
+      }),
+    }),
+    [yLabels],
+  );
+
   const sortedConfigLabels = useMemo(
     () => [...configurations, ...unofficialConfigurations].map((c) => c.configLabel),
     [configurations, unofficialConfigurations],
@@ -314,7 +328,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     return [Math.max(0, xMin - xPadding), Math.min(1, xMax + xPadding)];
   }, [chartData, unofficialChartData]);
 
-  const chartHeight = Math.max(400, yLabels.length * 40 + CHART_MARGIN.top + CHART_MARGIN.bottom);
+  const chartHeight = Math.max(400, yLabels.length * 40 + chartMargin.top + chartMargin.bottom);
 
   const errorData = useMemo(
     () => chartData.filter((d) => d.errorMin !== undefined && d.errorMax !== undefined),
@@ -738,7 +752,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       chartId="evaluation-chart"
       data={chartData}
       height={chartHeight}
-      margin={CHART_MARGIN}
+      margin={chartMargin}
       watermark={isUnofficialRun ? 'unofficial' : 'logo'}
       grabCursor={false}
       caption={caption}
@@ -760,8 +774,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           const k = transform.k;
           const innerWidth =
             (typeof window !== 'undefined' ? window.innerWidth : 800) -
-            CHART_MARGIN.left -
-            CHART_MARGIN.right;
+            chartMargin.left -
+            chartMargin.right;
           const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
           const minTx = -xScale(1) * k + innerWidth;
           const maxTx = -xScale(0) * k;
