@@ -15,7 +15,9 @@ const nextConfig: NextConfig = {
 };
 
 const hasPostHogKeys = Boolean(
-  process.env.POSTHOG_PERSONAL_API_KEY && process.env.POSTHOG_PROJECT_ID,
+  process.env.NODE_ENV === 'production' &&
+  process.env.POSTHOG_PERSONAL_API_KEY &&
+  process.env.POSTHOG_PROJECT_ID,
 );
 
 export default hasPostHogKeys
