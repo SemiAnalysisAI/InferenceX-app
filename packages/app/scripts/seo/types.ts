@@ -38,6 +38,14 @@ export interface HistoryPoint {
   conc: number;
 }
 
+/** A changelog entry associated with a benchmark date. */
+export interface ChangelogEntry {
+  date: string;
+  description: string;
+  prLink: string | null;
+  configKeys: string[];
+}
+
 /** A notable performance improvement between two runs. */
 export interface Improvement {
   model: string;
@@ -50,6 +58,10 @@ export interface Improvement {
   pctGain: number;
   oldDate: string;
   newDate: string;
+  /** Changelog entries around the improvement date. */
+  changelogs: ChangelogEntry[];
+  /** Other configs on the same model for context in trend charts. */
+  relatedHistory: Record<string, HistoryPoint[]>;
 }
 
 /** GPU-pair matchup data for head-to-head articles. */

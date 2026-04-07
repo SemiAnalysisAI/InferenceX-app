@@ -1,7 +1,7 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkRow } from '../../src/lib/api';
-import type { BestConfig, HistoryPoint, Improvement, ModelData } from './types';
+import type { BestConfig, ChangelogEntry, HistoryPoint, Improvement, ModelData } from './types';
 
 /** Human-readable GPU name (e.g. "NVIDIA B200"). */
 export function gpuDisplayName(hw: string): string {
@@ -254,6 +254,31 @@ export function aggregateHistory(rows: BenchmarkRow[]): Record<string, HistoryPo
   return result;
 }
 
+/** Fetch changelog entries for a specific date from the workflow-info API. */
+export async function fetchChangelogs(baseUrl: string, date: string): Promise<ChangelogEntry[]> {
+  const url = `${baseUrl}/api/v1/workflow-info?date=${encodeURIComponent(date)}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      changelogs: {
+        date: string;
+        description: string;
+        pr_link: string | null;
+        config_keys: string[];
+      }[];
+    };
+    return (data.changelogs ?? []).map((c) => ({
+      date: c.date,
+      description: c.description,
+      prLink: c.pr_link,
+      configKeys: c.config_keys,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Minimum throughput gain (as fraction) to flag as a notable improvement. */
 const IMPROVEMENT_THRESHOLD = 0.2;
 
@@ -286,6 +311,8 @@ export function detectImprovements(
         pctGain,
         oldDate: prev.date,
         newDate: latest.date,
+        changelogs: [], // populated later from workflow-info API
+        relatedHistory: {}, // populated later with competing configs
       });
     }
   }

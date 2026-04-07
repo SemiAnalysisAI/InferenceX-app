@@ -59,31 +59,38 @@ Follow with a `<BenchmarkChart variant="bar">` showing just the before/after thr
 
 ## Section 3: TrendChart
 
-Show the full performance history for this GPU+model config.
+Show **multiple series** in the TrendChart: the improved config AND other configs on the
+same hardware for context. The `relatedHistory` field in the improvement data has this.
 
 ```mdx
 <TrendChart
   metric="Throughput/GPU (tok/s)"
-  data='{"series":{"yyy":[{"date":"YYYY-MM-DD","value":xxx},...]}}'
+  data='{"series":{"yyy framework-A":[...], "yyy framework-B":[...]}}'
 />
 ```
 
-Commentary: was this a sudden jump or gradual improvement? Are there other configs on
-the same GPU that also improved?
+This lets readers see whether the improvement was config-specific or affected all
+frameworks on that GPU. Commentary: sudden jump or gradual? Other configs also improved?
 
 ## Section 4: What Changed (2-3 sentences)
 
-What framework version, PR, or config change drove the improvement? Reference the
-changelog data if available. If unknown, say so.
+The improvement data includes a `changelogs[]` array with descriptions and PR links.
+Use these to explain what changed. Be specific: name the PR, the framework version,
+the optimization.
 
-> **EXAMPLE:**
+> **EXAMPLE (when changelogs exist):**
 >
-> The main driver was the vLLM x.xx release, which fixed the AITER integration
-> for MLA (PR #xxxxx). This enabled proper tensor parallelism for this model's
-> architecture on AMD hardware.
+> PR #xxxxx in yyy vX.Y fixed the AITER integration for MLA on AMD hardware.
+> This unblocked proper tensor parallelism for this model's architecture,
+> accounting for most of the throughput gain.
 
-If the improvement reason isn't in the data, write: "The specific changes haven't been
-identified from our benchmarking data alone."
+> **EXAMPLE (when changelogs are empty):**
+>
+> No changelog entries matched this date in our pipeline. The jump coincides with
+> a yyy framework update, but the specific PR hasn't been identified.
+
+**NEVER write "The specific changes haven't been identified from our benchmarking
+data alone." That's filler. Either cite the changelog or say "No changelog matched."**
 
 ## Section 5: Competitive Context (2-3 sentences)
 

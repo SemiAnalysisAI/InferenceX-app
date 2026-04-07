@@ -21,6 +21,7 @@ import {
   detectImprovements,
   distinctGpus,
   fetchBenchmarks,
+  fetchChangelogs,
   fetchHistory,
 } from './seo/data';
 import type { BestConfig, HistoryPoint, Improvement, MatchupData } from './seo/types';
@@ -311,6 +312,40 @@ async function main() {
     }
   }
   result.improvements.sort((a, b) => b.pctGain - a.pctGain);
+
+  // Enrich top improvements with changelogs and related config history
+  const topImprovements = result.improvements.slice(0, 5);
+  for (const imp of topImprovements) {
+    // Fetch changelogs for the improvement date
+    const changelogs = await fetchChangelogs(baseUrl, imp.newDate);
+    // Filter to changelogs that mention this hardware or framework
+    imp.changelogs = changelogs.filter(
+      (c) =>
+        c.configKeys.some((k) => k.includes(imp.hardware) || k.includes(imp.framework)) ||
+        c.configKeys.length === 0,
+    );
+
+    // Add related history: other configs on the same hardware for the same model
+    const model = result.models.find((m) => m.displayName === imp.model);
+    if (model) {
+      const related: Record<string, HistoryPoint[]> = {};
+      for (const [key, points] of Object.entries(model.history)) {
+        const isImprovedConfig =
+          key === `${imp.hardware}|${imp.framework}|${imp.precision}|${imp.disagg}`;
+        // Include: the improved config itself + other configs on the same hardware
+        if (isImprovedConfig || key.startsWith(`${imp.hardware}|`)) {
+          related[key] = points;
+        }
+      }
+      imp.relatedHistory = related;
+    }
+
+    if (imp.changelogs.length > 0) {
+      console.log(
+        `  Improvement ${imp.hardware} ${imp.framework}: ${imp.changelogs.length} changelog(s)`,
+      );
+    }
+  }
 
   // Generate GPU matchups (pairs that share 2+ models)
   result.matchups = computeMatchups(result.models);
