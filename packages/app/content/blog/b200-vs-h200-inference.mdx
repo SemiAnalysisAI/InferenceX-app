@@ -1,6 +1,6 @@
 ---
 title: 'NVIDIA B200 vs NVIDIA H200 — Inference Benchmark (April 2026)'
-subtitle: 'Generational leap: B200 is 2.5x faster on average and cheaper per token on every model'
+subtitle: 'B200 sweeps all 7 models, but the gap varies from 2x on Kimi-K2.5 to 5.5x on DeepSeek-R1-0528'
 date: '2026-04-06'
 modifiedDate: '2026-04-06'
 publishDate: '2026-04-06'
@@ -12,65 +12,69 @@ tags:
   - h200
 ---
 
-## Intro
-
-This is the NVIDIA generational matchup: Blackwell B200 vs Hopper H200. Both are available at hyperscalers, and the question is simple: is B200 worth the premium? We tested both across 7 models on [InferenceX](https://inferencex.semianalysis.com). Short answer: yes, it is.
+NVIDIA B200 vs NVIDIA H200 across 7 shared models on [InferenceX](https://inferencex.semianalysis.com). B200 wins on throughput in all 7. It also wins on cost per Mtok in all 7. This is a generational gap, not a close race.
 
 ## Key Numbers
 
-- B200 wins on throughput in all 7 shared models. No exceptions.
-- Average throughput advantage: **246%** (2.5x faster).
-- Largest gap: DeepSeek-R1-0528, where B200 is 5.5x faster (13,429.7 vs 2,453.9 tok/s/GPU).
-- B200 is also cheaper per Mtok on all 7 models because its throughput outpaces its $/hr premium.
+- B200 leads on gpt-oss-120b: **61,612.7 tok/s/GPU** vs H200's 15,202.1, a 4.1x difference.
+- On DeepSeek-R1-0528, the gap is 5.5x: 13,429.7 vs 2,453.9 tok/s/GPU.
+- Closest model is MiniMax-M2.5: B200 at 9,652.0 vs H200 at 3,370.8 tok/s/GPU, still 2.9x.
+- B200 is cheaper per Mtok on every shared model. On DeepSeek-R1-0528, it's $0.04 vs $0.16.
 
-## Throughput Comparison
+## Throughput Comparison — B200 vs H200 at 8k/1k
 
-| Model            | B200 Throughput | H200 Throughput | B200 Advantage |
-| ---------------- | --------------: | --------------: | -------------: |
-| DeepSeek-R1-0528 |        13,429.7 |         2,453.9 |          +447% |
-| gpt-oss-120b     |        61,612.7 |        15,202.1 |          +305% |
-| Llama-3.3-70B    |        12,981.3 |         5,101.6 |          +154% |
-| Qwen-3.5-397B    |         5,709.7 |         1,796.7 |          +218% |
-| Kimi-K2.5        |         4,020.9 |         1,149.3 |          +250% |
-| MiniMax-M2.5     |         9,652.0 |         3,370.8 |          +186% |
-| GLM-5            |         1,673.6 |           639.5 |          +162% |
+| Model              | B200 Throughput (tok/s/GPU) | H200 Throughput (tok/s/GPU) | Winner |  Diff |
+| ------------------ | --------------------------: | --------------------------: | ------ | ----: |
+| gpt-oss-120b       |                    61,612.7 |                    15,202.1 | B200   | +305% |
+| DeepSeek-R1-0528   |                    13,429.7 |                     2,453.9 | B200   | +447% |
+| Llama-3.3-70B      |                    12,981.3 |                     5,101.6 | B200   | +154% |
+| MiniMax-M2.5       |                     9,652.0 |                     3,370.8 | B200   | +186% |
+| Qwen-3.5-397B-A17B |                     5,709.7 |                     1,796.7 | B200   | +218% |
+| Kimi-K2.5          |                     4,020.9 |                     1,149.3 | B200   | +250% |
+| GLM-5              |                     1,673.6 |                       639.5 | B200   | +162% |
 
-_All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks at 8k/1k sequence length._
+_All data from automated [InferenceX](https://inferencex.semianalysis.com) benchmarks._
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"B200 - DSR1","value":13429.7,"vendor":"nvidia"},{"gpu":"H200 - DSR1","value":2453.9,"vendor":"nvidia"},{"gpu":"B200 - gptoss","value":61612.7,"vendor":"nvidia"},{"gpu":"H200 - gptoss","value":15202.1,"vendor":"nvidia"},{"gpu":"B200 - Llama70B","value":12981.3,"vendor":"nvidia"},{"gpu":"H200 - Llama70B","value":5101.6,"vendor":"nvidia"},{"gpu":"B200 - MiniMax","value":9652.0,"vendor":"nvidia"},{"gpu":"H200 - MiniMax","value":3370.8,"vendor":"nvidia"}]'
+  data='[{"gpu":"NVIDIA B200 (gpt-oss-120b)","value":61612.7,"vendor":"nvidia"},{"gpu":"NVIDIA H200 (gpt-oss-120b)","value":15202.1,"vendor":"nvidia"},{"gpu":"NVIDIA B200 (DeepSeek-R1-0528)","value":13429.7,"vendor":"nvidia"},{"gpu":"NVIDIA B200 (Llama-3.3-70B)","value":12981.3,"vendor":"nvidia"},{"gpu":"NVIDIA B200 (MiniMax-M2.5)","value":9652.0,"vendor":"nvidia"},{"gpu":"NVIDIA H200 (Llama-3.3-70B)","value":5101.6,"vendor":"nvidia"},{"gpu":"NVIDIA B200 (Kimi-K2.5)","value":4020.9,"vendor":"nvidia"}]'
 />
 
-## Cost Comparison
+## Throughput vs Interactivity (DeepSeek-R1-0528)
 
-| Model            | B200 $/Mtok | H200 $/Mtok | B200 Savings |
-| ---------------- | ----------: | ----------: | -----------: |
-| DeepSeek-R1-0528 |       $0.04 |       $0.16 |  75% cheaper |
-| gpt-oss-120b     |       $0.01 |       $0.03 |  66% cheaper |
-| Llama-3.3-70B    |       $0.04 |       $0.08 |  46% cheaper |
-| Qwen-3.5-397B    |       $0.09 |       $0.22 |  56% cheaper |
-| Kimi-K2.5        |       $0.13 |       $0.34 |  60% cheaper |
-| MiniMax-M2.5     |       $0.06 |       $0.12 |  52% cheaper |
-| GLM-5            |       $0.32 |       $0.61 |  47% cheaper |
+On DeepSeek-R1-0528, B200's pareto curve starts at 2,260 tok/s/GPU (8.0 tok/s/user interactivity) and climbs to 13,430 tok/s/GPU (29.9 tok/s/user). H200 has two data points: 331 tok/s/GPU at 4.8 tok/s/user and 2,454 tok/s/GPU at 9.4 tok/s/user. Even at H200's peak interactivity level, B200 is already pushing over 8,000 tok/s/GPU at a similar interactivity.
 
-B200 is cheaper per token on every model. The savings range from 46% on Llama-3.3-70B to 75% on DeepSeek-R1-0528. This is a clean generational upgrade: more throughput, lower cost per token, and access to FP4 precision (which H200 doesn't support on most models).
+<InteractivityChart data='{"series":{"NVIDIA B200":[{"interactivity":8.0,"throughput":2260},{"interactivity":10.9,"throughput":2880},{"interactivity":13.1,"throughput":3467},{"interactivity":14.8,"throughput":4070},{"interactivity":14.9,"throughput":4072},{"interactivity":14.9,"throughput":4083},{"interactivity":15.3,"throughput":8382},{"interactivity":15.4,"throughput":8408},{"interactivity":15.5,"throughput":8445},{"interactivity":17.9,"throughput":9554},{"interactivity":19.5,"throughput":10505},{"interactivity":29.9,"throughput":13430}],"NVIDIA H200":[{"interactivity":4.8,"throughput":331},{"interactivity":9.4,"throughput":2454}]}}' />
 
-## Why the Gap Is So Large on DeepSeek-R1-0528
+## Cost Comparison — $/Mtok at Hyperscaler Pricing
 
-The 5.5x gap on DeepSeek-R1-0528 is the largest across all models. Three factors compound: (1) B200 runs FP4 while H200 is limited to FP8, (2) B200 uses dynamo-trt with disaggregated prefill while H200 uses plain trt, and (3) B200 runs at concurrency 1,691 while H200 tops out at 256. On models where both use the same framework and precision (like MiniMax-M2.5 with vllm FP8), the gap narrows to 186%.
+| Model              | B200 $/Mtok | H200 $/Mtok | Cheaper |
+| ------------------ | ----------: | ----------: | ------- |
+| gpt-oss-120b       |       $0.01 |       $0.03 | B200    |
+| DeepSeek-R1-0528   |       $0.04 |       $0.16 | B200    |
+| Llama-3.3-70B      |       $0.04 |       $0.08 | B200    |
+| MiniMax-M2.5       |       $0.06 |       $0.12 | B200    |
+| Qwen-3.5-397B-A17B |       $0.09 |       $0.22 | B200    |
+| Kimi-K2.5          |       $0.13 |       $0.34 | B200    |
+| GLM-5              |       $0.32 |       $0.61 | B200    |
 
-## When H200 Still Makes Sense
+B200 wins cost on every model. The largest cost gap is on DeepSeek-R1-0528: $0.04/Mtok vs $0.16/Mtok, 75% cheaper. On gpt-oss-120b it's $0.01 vs $0.03, 66% cheaper. The throughput advantage is so large that B200 wins on cost despite its higher hourly rate.
 
-H200 is cheaper per hour than B200, so if your workload is low-utilization (sporadic requests, not batch), the idle cost matters. H200 also has lower TTFT at low concurrency on some models, like Llama-3.3-70B (766.0ms with vllm vs B200's 509.2ms with vllm at the same concurrency). If you're running a chatbot with low QPS, H200's lower hourly rate and competitive TTFT might make it the right call.
+## B200 vs H200 on DeepSeek-R1-0528
 
-## Cross-Links and Further Reading
+B200 gets 13,429.7 tok/s/GPU, 5.5x H200's 2,453.9. This is the widest gap in the dataset. B200 runs this 671B MoE model in FP4 on TensorRT-LLM with disaggregated prefill. H200's best result is FP8 on SGLang. The combination of FP4 quantization, a newer framework, and Blackwell's memory bandwidth creates a large compounding advantage.
 
-For the largest gap, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference). For a closer matchup, see [MiniMax-M2.5 benchmarks](/blog/best-gpu-for-minimaxm25-inference). For the full roundup, see our [benchmark roundup](/blog/inference-benchmark-roundup).
+## How wide is the gap across models?
+
+It varies. gpt-oss-120b: 4.1x. Llama-3.3-70B: 2.5x. MiniMax-M2.5: 2.9x. Qwen-3.5-397B-A17B: 3.2x. The gap is smallest on dense 70B-class models and widest on large MoE architectures. If you're running any model at scale, B200 is the clear upgrade from H200.
+
+## Related Benchmarks
+
+For per-model breakdowns, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference) and [Llama-3.3-70B benchmarks](/blog/best-gpu-for-llama70b-inference). For a cross-vendor comparison, check our [B200 vs MI355X results](/blog/b200-vs-mi355x-inference).
 
 ## Where to Run Inference
 
-Looking for GPU providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
+Looking for GPU API providers? See real-time provider rankings on [ClusterMax](https://www.clustermax.ai/).
 
 ## Methodology
 
@@ -84,18 +88,34 @@ _Last updated: 2026-04-06._
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "NVIDIA B200 vs NVIDIA H200 inference performance?",
+      "name": "How much faster is NVIDIA B200 than H200 for inference?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 wins on all 7 models by 246% on average. Largest gap is on DeepSeek-R1-0528 (5.5x faster). B200 is also cheaper per Mtok on every model."
+        "text": "B200 is 2.5x to 5.5x faster than H200 depending on the model. The gap is widest on DeepSeek-R1-0528 (5.5x) and narrowest on Llama-3.3-70B (2.5x). B200 wins all 7 shared models."
       }
     },
     {
       "@type": "Question",
-      "name": "Is NVIDIA B200 worth upgrading from H200?",
+      "name": "Is NVIDIA B200 cheaper per token than H200?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. B200 is 2.5x faster on average and 46-75% cheaper per token across all models tested. The only scenario for H200 is low-utilization workloads where idle cost matters."
+        "text": "Yes, on every shared model. B200 is 75% cheaper on DeepSeek-R1-0528 ($0.04 vs $0.16/Mtok) and 66% cheaper on gpt-oss-120b ($0.01 vs $0.03/Mtok). The throughput advantage offsets B200's higher hourly rate."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "B200 vs H200 on DeepSeek-R1-0528?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B200 gets 13,430 tok/s/GPU vs H200's 2,454, a 5.5x gap. Cost is $0.04/Mtok vs $0.16. B200 runs this model in FP4 on TensorRT-LLM with disaggregated prefill, while H200's best is FP8 on SGLang."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Should I upgrade from H200 to B200?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "If you're running inference at scale, yes. B200 is faster and cheaper per token on every model we tested. The gap ranges from 2.5x to 5.5x on throughput, and B200 wins on cost/Mtok across the board."
       }
     }
   ]
