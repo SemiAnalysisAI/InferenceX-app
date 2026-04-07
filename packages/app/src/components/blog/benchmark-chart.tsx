@@ -29,6 +29,8 @@ interface BenchmarkChartProps {
   children?: ReactNode;
   data: string;
   metric?: string;
+  /** Chart title displayed above the chart (e.g. model name) */
+  title?: string;
   /** "bar" (default) = horizontal bars, "line" = time-series, "scatter" = XY scatter+lines */
   variant?: 'bar' | 'line' | 'scatter';
 }
@@ -80,7 +82,10 @@ function computeLeftMargin(labels: string[]): number {
     maxWidth = Math.max(maxWidth, measureTextWidth(line1, '600 12px sans-serif'));
     // Second row if split: 10px muted
     if (lastSpace > 0) {
-      maxWidth = Math.max(maxWidth, measureTextWidth(label.slice(lastSpace + 1), '10px sans-serif'));
+      maxWidth = Math.max(
+        maxWidth,
+        measureTextWidth(label.slice(lastSpace + 1), '10px sans-serif'),
+      );
     }
   }
   // Add padding for the tick mark + gap
@@ -101,16 +106,23 @@ function tooltipShell(inner: string, isPinned: boolean): string {
 export function BenchmarkChart({
   data: dataJson,
   metric = 'Throughput/GPU (tok/s)',
+  title,
   variant = 'bar',
 }: BenchmarkChartProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const titleEl = title ? (
+    <div className="text-sm font-medium text-foreground mb-1 ml-1">{title}</div>
+  ) : null;
+
   if (variant === 'line')
-    return <LineVariant dataJson={dataJson} metric={metric} mounted={mounted} />;
+    return <LineVariant dataJson={dataJson} metric={metric} mounted={mounted} titleEl={titleEl} />;
   if (variant === 'scatter')
-    return <ScatterVariant dataJson={dataJson} metric={metric} mounted={mounted} />;
-  return <BarVariant dataJson={dataJson} metric={metric} mounted={mounted} />;
+    return (
+      <ScatterVariant dataJson={dataJson} metric={metric} mounted={mounted} titleEl={titleEl} />
+    );
+  return <BarVariant dataJson={dataJson} metric={metric} mounted={mounted} titleEl={titleEl} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,15 +144,14 @@ function positionValueLabels(
   });
 }
 
-function BarVariant({
-  dataJson,
-  metric,
-  mounted,
-}: {
+interface VariantProps {
   dataJson: string;
   metric: string;
   mounted: boolean;
-}) {
+  titleEl: ReactNode;
+}
+
+function BarVariant({ dataJson, metric, mounted, titleEl }: VariantProps) {
   const hoveredBarXRef = useRef(0);
 
   const data = useMemo<BarEntry[]>(() => {
@@ -197,6 +208,7 @@ function BarVariant({
 
   return (
     <div className="my-6 not-prose">
+      {titleEl}
       <D3Chart<BarEntry>
         chartId="benchmark-bar"
         data={data}
@@ -317,15 +329,7 @@ function parseLine(dataJson: string): LineParsed | null {
   }
 }
 
-function LineVariant({
-  dataJson,
-  metric,
-  mounted,
-}: {
-  dataJson: string;
-  metric: string;
-  mounted: boolean;
-}) {
+function LineVariant({ dataJson, metric, mounted, titleEl }: VariantProps) {
   const parsed = useMemo(() => parseLine(dataJson), [dataJson]);
   if (!parsed) return null;
   const height = 350;
@@ -368,6 +372,7 @@ function LineVariant({
 
   return (
     <div className="my-6 not-prose">
+      {titleEl}
       <D3Chart<LineEntry>
         chartId="benchmark-line"
         data={parsed.points}
@@ -473,15 +478,7 @@ function parseScatter(dataJson: string): ScatterParsed | null {
   }
 }
 
-function ScatterVariant({
-  dataJson,
-  metric,
-  mounted,
-}: {
-  dataJson: string;
-  metric: string;
-  mounted: boolean;
-}) {
+function ScatterVariant({ dataJson, metric, mounted, titleEl }: VariantProps) {
   const parsed = useMemo(() => parseScatter(dataJson), [dataJson]);
   if (!parsed) return null;
   const height = 350;
@@ -524,6 +521,7 @@ function ScatterVariant({
 
   return (
     <div className="my-6 not-prose">
+      {titleEl}
       <D3Chart<LineEntry>
         chartId="benchmark-scatter"
         data={parsed.points}
