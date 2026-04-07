@@ -18,6 +18,7 @@ import {
   aggregateModelData,
   allModels,
   computeParetoFrontiers,
+  configDisplayName,
   costPerMtok,
   detectImprovements,
   distinctGpus,
@@ -79,6 +80,8 @@ function parseArgs(): { baseUrl: string; output: string } {
 
 interface SerializableBestConfig extends BestConfig {
   gpuDisplayName: string;
+  /** Dashboard-style label e.g. "B200 (Dynamo TRT) FP4" */
+  configLabel: string;
   vendor: string;
   costMtokHyperscaler: number;
   costMtokNeocloud: number;
@@ -125,6 +128,7 @@ function enrichConfig(c: BestConfig): SerializableBestConfig {
   return {
     ...c,
     gpuDisplayName: gpuDisplay(c.hardware),
+    configLabel: configDisplayName(c.hardware, c.framework, c.precision),
     vendor: GPU_VENDORS[c.hardware] ?? 'Unknown',
     costMtokHyperscaler: costPerMtok(specs.costh, c.tputPerGpu),
     costMtokNeocloud: costPerMtok(specs.costn, c.tputPerGpu),

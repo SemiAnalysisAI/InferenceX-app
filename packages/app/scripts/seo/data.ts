@@ -1,4 +1,5 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
+import { HARDWARE_CONFIG } from '../../src/lib/constants';
 
 import type { BenchmarkRow } from '../../src/lib/api';
 import type {
@@ -15,6 +16,19 @@ export function gpuDisplayName(hw: string): string {
   const vendor = GPU_VENDORS[hw];
   const upper = hw.toUpperCase();
   return vendor ? `${vendor} ${upper}` : upper;
+}
+
+/**
+ * Dashboard-style config display name, e.g. "B200 (Dynamo TRT) FP4".
+ * Uses HARDWARE_CONFIG label+suffix when available, falls back to "GPU framework".
+ */
+export function configDisplayName(hardware: string, framework: string, precision: string): string {
+  const hwKey = `${hardware}_${framework}`;
+  const config = HARDWARE_CONFIG[hwKey];
+  const label = config
+    ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}`
+    : gpuDisplayName(hardware);
+  return `${label} ${precision.toUpperCase()}`;
 }
 
 /** Human-friendly model slug for article filenames. */
