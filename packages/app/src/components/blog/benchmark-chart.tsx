@@ -221,6 +221,8 @@ interface LineParsed {
   points: LineEntry[];
   keys: string[];
   colorMap: Record<string, string>;
+  /** safeKey → original display name */
+  labelMap: Record<string, string>;
   minDate: Date;
   maxDate: Date;
   minValue: number;
@@ -237,7 +239,7 @@ function parseLine(dataJson: string): LineParsed | null {
     const keys: string[] = [];
 
     for (const [key, entries] of Object.entries(parsed.series)) {
-      const safeKey = key.replaceAll(/[|]/g, '_');
+      const safeKey = key.replaceAll(/[^a-zA-Z0-9-]/g, '_');
       keys.push(key);
       const mapped = entries
         .map((e) => {
@@ -257,8 +259,11 @@ function parseLine(dataJson: string): LineParsed | null {
     const yRange = Math.max(...ys) - Math.min(...ys);
 
     const colorMap: Record<string, string> = {};
+    const labelMap: Record<string, string> = {};
     for (const [i, key] of keys.entries()) {
-      colorMap[key.replaceAll(/[|]/g, '_')] = SERIES_COLORS[i % SERIES_COLORS.length];
+      const safe = key.replaceAll(/[^a-zA-Z0-9-]/g, '_');
+      colorMap[safe] = SERIES_COLORS[i % SERIES_COLORS.length];
+      labelMap[safe] = key;
     }
 
     return {
@@ -266,6 +271,7 @@ function parseLine(dataJson: string): LineParsed | null {
       points,
       keys,
       colorMap,
+      labelMap,
       minDate: new Date(Math.min(...xs) - pad),
       maxDate: new Date(Math.max(...xs) + pad),
       minValue: Math.max(0, Math.min(...ys) - yRange * 0.05),
@@ -359,7 +365,7 @@ function LineVariant({
               year: 'numeric',
             });
             return tooltipShell(
-              `<div class="font-semibold mb-1" style="color: ${parsed.colorMap[d.key] ?? '#888'}">${d.key.replaceAll('_', '|')}</div>
+              `<div class="font-semibold mb-1" style="color: ${parsed.colorMap[d.key] ?? '#888'}">${parsed.labelMap[d.key] ?? d.key}</div>
                <div class="text-muted-foreground">${date}</div>
                <div class="mt-1 font-medium">${metric}: ${formatLargeNumber(d.y)}</div>`,
               isPinned,
@@ -382,6 +388,7 @@ interface ScatterParsed {
   points: LineEntry[];
   keys: string[];
   colorMap: Record<string, string>;
+  labelMap: Record<string, string>;
   maxX: number;
   maxY: number;
 }
@@ -396,7 +403,7 @@ function parseScatter(dataJson: string): ScatterParsed | null {
     const keys: string[] = [];
 
     for (const [key, entries] of Object.entries(parsed.series)) {
-      const safeKey = key.replaceAll(/[|]/g, '_');
+      const safeKey = key.replaceAll(/[^a-zA-Z0-9-]/g, '_');
       keys.push(key);
       const mapped = entries
         .map((e) => ({ x: e.interactivity, y: e.throughput }))
@@ -408,8 +415,11 @@ function parseScatter(dataJson: string): ScatterParsed | null {
     if (keys.length === 0) return null;
 
     const colorMap: Record<string, string> = {};
+    const labelMap: Record<string, string> = {};
     for (const [i, key] of keys.entries()) {
-      colorMap[key.replaceAll(/[|]/g, '_')] = SERIES_COLORS[i % SERIES_COLORS.length];
+      const safe = key.replaceAll(/[^a-zA-Z0-9-]/g, '_');
+      colorMap[safe] = SERIES_COLORS[i % SERIES_COLORS.length];
+      labelMap[safe] = key;
     }
 
     return {
@@ -417,6 +427,7 @@ function parseScatter(dataJson: string): ScatterParsed | null {
       points,
       keys,
       colorMap,
+      labelMap,
       maxX: Math.max(...points.map((p) => p.x)),
       maxY: Math.max(...points.map((p) => p.y)),
     };
@@ -498,7 +509,7 @@ function ScatterVariant({
           rulerType: 'crosshair',
           content: (d: LineEntry, isPinned: boolean) =>
             tooltipShell(
-              `<div class="font-semibold mb-1" style="color: ${parsed.colorMap[d.key] ?? '#888'}">${d.key.replaceAll('_', '|')}</div>
+              `<div class="font-semibold mb-1" style="color: ${parsed.colorMap[d.key] ?? '#888'}">${parsed.labelMap[d.key] ?? d.key}</div>
              <div class="text-muted-foreground">Interactivity: ${formatLargeNumber(d.x)} tok/s/user</div>
              <div class="mt-1 font-medium">${metric}: ${formatLargeNumber(d.y)}</div>`,
               isPinned,
