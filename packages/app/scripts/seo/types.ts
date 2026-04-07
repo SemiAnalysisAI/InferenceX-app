@@ -86,6 +86,13 @@ export interface MatchupData {
   avgPctDiff: number;
 }
 
+/** A point on the throughput-vs-interactivity pareto frontier. */
+export interface ParetoPoint {
+  interactivity: number;
+  throughput: number;
+  conc: number;
+}
+
 /** FAQ question/answer pair for JSON-LD. */
 export interface FaqEntry {
   question: string;

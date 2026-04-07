@@ -17,6 +17,7 @@ import {
   aggregateHistory,
   aggregateModelData,
   allModels,
+  computeParetoFrontiers,
   costPerMtok,
   detectImprovements,
   distinctGpus,
@@ -24,7 +25,7 @@ import {
   fetchChangelogs,
   fetchHistory,
 } from './seo/data';
-import type { BestConfig, HistoryPoint, Improvement, MatchupData } from './seo/types';
+import type { BestConfig, HistoryPoint, Improvement, MatchupData, ParetoPoint } from './seo/types';
 import { getGpuSpecs } from '../src/lib/constants';
 
 const PRIMARY_SEQ = '8k/1k';
@@ -85,6 +86,8 @@ interface SerializableModelData {
   precisionCount: number;
   frameworkCount: number;
   history: Record<string, HistoryPoint[]>;
+  /** Throughput vs interactivity pareto curves per GPU at primary sequence. */
+  paretoFrontiers: Record<string, ParetoPoint[]>;
 }
 
 interface SeoDataOutput {
@@ -162,13 +165,17 @@ async function processModel(
   // Fetch historical data for default models (8k/1k only to limit API calls)
   const category = MODEL_CATEGORY[modelKey] ?? 'default';
   let history: Record<string, HistoryPoint[]> = {};
+  let allRows = rows;
   if (category === 'default') {
     const historyRows = await fetchHistory(baseUrl, displayName, 8192, 1024);
     history = aggregateHistory(historyRows);
+    allRows = historyRows.length > 0 ? historyRows : rows;
     console.log(
       `  ${displayName}: ${historyRows.length} history rows → ${Object.keys(history).length} configs`,
     );
   }
+
+  const paretoFrontiers = computeParetoFrontiers(allRows, { isl: 8192, osl: 1024 });
 
   const entry: SerializableModelData = {
     modelKey,
@@ -182,6 +189,7 @@ async function processModel(
     precisionCount: new Set(primaryConfigs.map((c) => c.precision)).size,
     frameworkCount: new Set(primaryConfigs.map((c) => c.framework)).size,
     history,
+    paretoFrontiers,
   };
 
   return { result: { modelKey, displayName, status: 'included' }, entry };

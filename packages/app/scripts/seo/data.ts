@@ -1,7 +1,14 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkRow } from '../../src/lib/api';
-import type { BestConfig, ChangelogEntry, HistoryPoint, Improvement, ModelData } from './types';
+import type {
+  BestConfig,
+  ChangelogEntry,
+  HistoryPoint,
+  Improvement,
+  ModelData,
+  ParetoPoint,
+} from './types';
 
 /** Human-readable GPU name (e.g. "NVIDIA B200"). */
 export function gpuDisplayName(hw: string): string {
@@ -318,4 +325,62 @@ export function detectImprovements(
   }
 
   return improvements.toSorted((a, b) => b.pctGain - a.pctGain);
+}
+
+/**
+ * Compute pareto frontiers (throughput vs interactivity) per GPU from benchmark rows.
+ * Groups all concurrency points by GPU (best framework/precision per GPU), then computes
+ * the upper-right pareto frontier (higher throughput AND higher interactivity is better).
+ *
+ * Returns a map of gpuKey → ParetoPoint[] sorted by interactivity ascending.
+ */
+export function computeParetoFrontiers(
+  rows: BenchmarkRow[],
+  sequence: { isl: number; osl: number },
+): Record<string, ParetoPoint[]> {
+  // Collect all points per GPU (across all concurrencies, frameworks, precisions)
+  const pointsByGpu = new Map<string, { x: number; y: number; conc: number }[]>();
+
+  for (const row of rows) {
+    if (row.isl !== sequence.isl || row.osl !== sequence.osl) continue;
+    const tput = row.metrics.tput_per_gpu ?? 0;
+    const intvty = row.metrics.median_intvty ?? 0;
+    if (tput <= 0 || intvty <= 0) continue;
+
+    const gpu = row.hardware;
+    let pts = pointsByGpu.get(gpu);
+    if (!pts) {
+      pts = [];
+      pointsByGpu.set(gpu, pts);
+    }
+    pts.push({ x: intvty, y: tput, conc: row.conc });
+  }
+
+  // Compute upper-right pareto frontier per GPU
+  const result: Record<string, ParetoPoint[]> = {};
+
+  for (const [gpu, points] of pointsByGpu) {
+    // Sort by interactivity (x) ascending, then throughput (y) descending
+    points.sort((a, b) => (a.x === b.x ? b.y - a.y : a.x - b.x));
+
+    const front: typeof points = [];
+    let maxY = -Infinity;
+
+    for (const pt of points) {
+      if (pt.y > maxY) {
+        front.push(pt);
+        maxY = pt.y;
+      }
+    }
+
+    if (front.length >= 2) {
+      result[gpu] = front.map((p) => ({
+        interactivity: p.x,
+        throughput: p.y,
+        conc: p.conc,
+      }));
+    }
+  }
+
+  return result;
 }
