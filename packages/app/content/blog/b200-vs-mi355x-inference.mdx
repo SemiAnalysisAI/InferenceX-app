@@ -1,6 +1,6 @@
 ---
 title: 'NVIDIA B200 vs AMD MI355X — Inference Benchmark (April 2026)'
-subtitle: 'B200 wins 6 of 7 models on throughput, but MI355X takes MiniMax-M2.5 and costs less on 3'
+subtitle: 'B200 wins throughput on 6 of 7 shared models, but MI355X takes MiniMax-M2.5 and costs less on Kimi-K2.5'
 date: '2026-04-06'
 modifiedDate: '2026-04-06'
 publishDate: '2026-04-06'
@@ -12,21 +12,21 @@ tags:
   - mi355x
 ---
 
-NVIDIA B200 vs AMD MI355X across 7 shared models on [InferenceX](https://inferencex.semianalysis.com). B200 wins on throughput in 6 of 7. MI355X takes MiniMax-M2.5 (10,391.0 vs 9,652.0 tok/s/GPU). On cost per Mtok, B200 wins 4 and MI355X wins 3.
+NVIDIA B200 vs AMD MI355X across 7 shared models on [InferenceX](https://inferencex.semianalysis.com). B200 wins on throughput in 6 of 7. MI355X takes MiniMax-M2.5 by 8%. On cost/Mtok, B200 is cheaper in 5 of 7, while MI355X undercuts on Kimi-K2.5 and MiniMax-M2.5.
 
 ## Key Numbers
 
-- B200 leads on gpt-oss-120b: **61,612.7 tok/s/GPU** vs MI355X's 44,999.3, a 37% gap.
-- MI355X beats B200 on MiniMax-M2.5: 10,391.0 vs 9,652.0 tok/s/GPU, an 8% edge.
-- On DeepSeek-R1-0528, B200 is 3.2x faster (13,429.7 vs 4,222.8 tok/s/GPU) and 59% cheaper per Mtok ($0.04 vs $0.10).
-- MI355X wins on cost for Kimi-K2.5 ($0.12 vs $0.13/Mtok), MiniMax-M2.5 ($0.04 vs $0.06), and Llama-3.3-70B ($0.05 vs $0.04).
+- B200 leads on peak throughput with gpt-oss-120b: **61,612.7 tok/s/GPU** vs 44,999.3 on MI355X, a 37% gap.
+- MI355X wins MiniMax-M2.5 at 10,391.0 vs 9,652.0 tok/s/GPU, the only model where it beats B200 on throughput.
+- At $0.12/Mtok on Kimi-K2.5, MI355X is 13% cheaper than B200's $0.13/Mtok (hyperscaler pricing).
+- On DeepSeek-R1-0528, B200 hits 14,952.0 tok/s/GPU vs MI355X's 4,222.8, a 3.5x difference.
 
 ## Throughput Comparison — B200 vs MI355X at 8k/1k
 
 | Model              | B200 Throughput (tok/s/GPU) | MI355X Throughput (tok/s/GPU) | Winner |  Diff |
 | ------------------ | --------------------------: | ----------------------------: | ------ | ----: |
 | gpt-oss-120b       |                    61,612.7 |                      44,999.3 | B200   |  +37% |
-| DeepSeek-R1-0528   |                    13,429.7 |                       4,222.8 | B200   | +218% |
+| DeepSeek-R1-0528   |                    14,952.0 |                       4,222.8 | B200   | +254% |
 | Llama-3.3-70B      |                    12,981.3 |                       8,748.9 | B200   |  +48% |
 | MiniMax-M2.5       |                     9,652.0 |                      10,391.0 | MI355X |   +8% |
 | Qwen-3.5-397B-A17B |                     5,709.7 |                       1,671.5 | B200   | +242% |
@@ -37,17 +37,12 @@ _All data from automated [InferenceX](https://inferencex.semianalysis.com) bench
 
 <BenchmarkChart
   metric="Throughput/GPU (tok/s)"
-  data='[{"gpu":"NVIDIA B200 (gpt-oss-120b)","value":61612.7,"vendor":"nvidia"},{"gpu":"AMD MI355X (gpt-oss-120b)","value":44999.3,"vendor":"amd"},{"gpu":"NVIDIA B200 (DeepSeek-R1-0528)","value":13429.7,"vendor":"nvidia"},{"gpu":"NVIDIA B200 (Llama-3.3-70B)","value":12981.3,"vendor":"nvidia"},{"gpu":"AMD MI355X (MiniMax-M2.5)","value":10391.0,"vendor":"amd"},{"gpu":"NVIDIA B200 (MiniMax-M2.5)","value":9652.0,"vendor":"nvidia"},{"gpu":"AMD MI355X (Llama-3.3-70B)","value":8748.9,"vendor":"amd"}]'
+  data='[{"gpu":"B200 (gpt-oss-120b)","value":61612.7,"vendor":"nvidia"},{"gpu":"MI355X (gpt-oss-120b)","value":44999.3,"vendor":"amd"},{"gpu":"B200 (DeepSeek-R1)","value":14952.0,"vendor":"nvidia"},{"gpu":"B200 (Llama-3.3-70B)","value":12981.3,"vendor":"nvidia"},{"gpu":"MI355X (MiniMax-M2.5)","value":10391.0,"vendor":"amd"},{"gpu":"B200 (MiniMax-M2.5)","value":9652.0,"vendor":"nvidia"},{"gpu":"MI355X (Llama-3.3-70B)","value":8748.9,"vendor":"amd"}]'
 />
 
-## Throughput vs Interactivity (DeepSeek-R1-0528)
+## Interactivity Comparison
 
-B200's pareto frontier on DeepSeek-R1-0528 spans a wide range: from 2,260 tok/s/GPU at 8.0 tok/s/user interactivity up to 13,430 tok/s/GPU at 29.9 tok/s/user. MI355X has only two points, hitting 3,652 tok/s/GPU at 6.4 tok/s/user and 4,223 tok/s/GPU at 9.2 tok/s/user. B200 overtakes MI355X at around 11 tok/s/user interactivity, and the gap widens from there.
-
-<BenchmarkChart
-  variant="scatter"
-  data='{"series":{"NVIDIA B200":[{"interactivity":8.0,"throughput":2260},{"interactivity":10.9,"throughput":2880},{"interactivity":13.1,"throughput":3467},{"interactivity":14.8,"throughput":4070},{"interactivity":14.9,"throughput":4072},{"interactivity":14.9,"throughput":4083},{"interactivity":15.3,"throughput":8382},{"interactivity":15.4,"throughput":8408},{"interactivity":15.5,"throughput":8445},{"interactivity":17.9,"throughput":9554},{"interactivity":19.5,"throughput":10505},{"interactivity":29.9,"throughput":13430}],"AMD MI355X":[{"interactivity":6.4,"throughput":3652},{"interactivity":9.2,"throughput":4223}]}}'
-/>
+Insufficient interactivity sweep data for a pareto comparison; MI355X has only been benchmarked at 2 concurrency levels on most models.
 
 ## Cost Comparison — $/Mtok at Hyperscaler Pricing
 
@@ -61,19 +56,32 @@ B200's pareto frontier on DeepSeek-R1-0528 spans a wide range: from 2,260 tok/s/
 | Kimi-K2.5          |       $0.13 |         $0.12 | MI355X  |
 | GLM-5              |       $0.32 |         $0.98 | B200    |
 
-B200 wins on cost in 4 of 7 models. MI355X is cheaper on MiniMax-M2.5 ($0.04 vs $0.06), Kimi-K2.5 ($0.12 vs $0.13), and Llama-3.3-70B ($0.05 vs $0.04). On gpt-oss-120b the cost is nearly identical: $0.009 for B200 vs $0.009 for MI355X.
+B200 wins on cost in 5 of 7 models. The two MI355X cost wins are MiniMax-M2.5 ($0.04 vs $0.06) and Kimi-K2.5 ($0.12 vs $0.13). On gpt-oss-120b, B200 is $0.009/Mtok vs MI355X's $0.009/Mtok, nearly identical at the rounding level, but B200 edges ahead by 4%.
 
-## B200 vs MI355X on DeepSeek-R1-0528
+## Performance Over Time (gpt-oss-120b)
 
-B200 hits 13,429.7 tok/s/GPU, 3.2x MI355X's 4,222.8. Cost is $0.04/Mtok vs $0.10/Mtok. This is one of the biggest gaps in the dataset. DeepSeek-R1-0528 is a 671B MoE model where B200's memory bandwidth and FP4 support with TensorRT-LLM give it a massive advantage.
+Both GPUs have improved on gpt-oss-120b since September 2025. B200 went from 10,914 tok/s/GPU to 61,613 tok/s/GPU, a 5.6x gain over five months driven by TRT upgrades and concurrency scaling. MI355X climbed from 21,244 to 38,532 tok/s/GPU on vLLM FP4. The Atom framework pushed MI355X to 44,999 in a single-date run (January 2026) but hasn't been re-benchmarked since.
+
+<BenchmarkChart
+  variant="line"
+  data='{"series":{"B200 (TRT FP4)":[{"date":"2025-09-30","value":10914},{"date":"2025-10-08","value":31235},{"date":"2025-10-16","value":31169},{"date":"2025-10-27","value":37215},{"date":"2025-11-05","value":37123},{"date":"2025-11-14","value":37181},{"date":"2025-11-22","value":47309},{"date":"2025-11-30","value":47288},{"date":"2025-12-10","value":51150},{"date":"2026-02-05","value":61613}],"MI355X (vLLM FP4)":[{"date":"2025-09-30","value":21244},{"date":"2025-10-07","value":27908},{"date":"2025-10-14","value":28007},{"date":"2025-10-27","value":27895},{"date":"2025-11-05","value":27870},{"date":"2025-11-12","value":33329},{"date":"2025-11-22","value":33561},{"date":"2025-11-30","value":34520},{"date":"2025-12-10","value":33597},{"date":"2026-03-09","value":38532}]}}'
+/>
 
 ## Where MI355X wins
 
-MiniMax-M2.5. MI355X gets 10,391.0 tok/s/GPU vs B200's 9,652.0, an 8% lead. Cost is $0.04/Mtok vs $0.06/Mtok. On Kimi-K2.5, B200 wins throughput (4,020.9 vs 3,510.4) but MI355X is slightly cheaper per Mtok ($0.12 vs $0.13). If you're running MiniMax-M2.5 at scale, MI355X is the better deal.
+MiniMax-M2.5 is the only throughput win for MI355X: 10,391.0 vs 9,652.0 tok/s/GPU, both on FP8 vLLM at concurrency 256. MI355X also has lower TPOT on gpt-oss-120b (25.1ms vs 36.7ms) and lower TTFT on Qwen-3.5 (299.9ms vs 5,131.8ms). On cost, MI355X undercuts B200 on Kimi-K2.5 ($0.12 vs $0.13/Mtok) and MiniMax-M2.5 ($0.04 vs $0.06/Mtok).
+
+## B200 vs MI355X on DeepSeek-R1-0528
+
+B200 hits 14,952.0 tok/s/GPU on dynamo-trt FP4 with disaggregated prefill at concurrency 4,301. MI355X reaches 4,222.8 tok/s/GPU on mori-sglang FP4 disagg at concurrency 2,048. That's a 3.5x gap, the largest among shared models. B200's TPOT is 36.9ms vs MI355X's 108.1ms. MI355X's TTFT is very high at 71,289ms because it's running at max concurrency; at lower concurrency (sglang FP4, conc 64), MI355X gets 656ms TTFT but only 1,952 tok/s/GPU throughput.
+
+## Fastest time to first token
+
+MI355X on Qwen-3.5-397B-A17B BF16 with SGLang at concurrency 64: 299.9ms TTFT. B200's best TTFT on the same model is 917.1ms (also BF16 SGLang, conc 64). On gpt-oss-120b the gap narrows: B200 at 172.6ms vs MI355X at 175.4ms. B200 tends to run at higher concurrency to maximize throughput, which inflates TTFT. If you need low TTFT, lower-concurrency MI355X configs are competitive on several models.
 
 ## Related Benchmarks
 
-For per-GPU breakdowns, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference) and [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). For the AMD generational comparison, check [MI355X vs MI325X results](/blog/best-gpu-for-minimaxm25-inference).
+For per-model deep dives, see our [DeepSeek-R1-0528 benchmarks](/blog/best-gpu-for-dsr1-inference) and [gpt-oss-120b benchmarks](/blog/best-gpu-for-gptoss120b-inference). For the AMD vs last-gen NVIDIA matchup, check [H200 vs MI355X](/blog/h200-vs-mi355x-inference).
 
 ## Where to Run Inference
 
@@ -94,15 +102,15 @@ _Last updated: 2026-04-06._
       "name": "Which is faster for inference, NVIDIA B200 or AMD MI355X?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "NVIDIA B200 wins on throughput in 6 of 7 shared models. The biggest gap is on DeepSeek-R1-0528, where B200 is 3.2x faster (13,430 vs 4,223 tok/s/GPU). MI355X wins only on MiniMax-M2.5 by 8%."
+        "text": "NVIDIA B200 wins on throughput in 6 of 7 shared models. On gpt-oss-120b, B200 hits 61,613 tok/s/GPU vs MI355X's 44,999. MI355X only wins on MiniMax-M2.5 (10,391 vs 9,652 tok/s/GPU)."
       }
     },
     {
       "@type": "Question",
-      "name": "Is AMD MI355X cheaper than NVIDIA B200 for inference?",
+      "name": "Which GPU is cheaper per million tokens, B200 or MI355X?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "MI355X is cheaper per Mtok on 3 of 7 models: MiniMax-M2.5 ($0.04 vs $0.06), Kimi-K2.5 ($0.12 vs $0.13), and Llama-3.3-70B ($0.05 vs $0.04). B200 is cheaper on the remaining 4."
+        "text": "B200 is cheaper per Mtok in 5 of 7 models. MI355X wins on cost only for Kimi-K2.5 ($0.12 vs $0.13/Mtok) and MiniMax-M2.5 ($0.04 vs $0.06/Mtok)."
       }
     },
     {
@@ -110,7 +118,7 @@ _Last updated: 2026-04-06._
       "name": "B200 vs MI355X on DeepSeek-R1-0528?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "B200 hits 13,430 tok/s/GPU vs MI355X's 4,223, a 3.2x gap. Cost is $0.04/Mtok vs $0.10/Mtok. B200's FP4 support with TensorRT-LLM gives it a large advantage on this 671B MoE model."
+        "text": "B200 hits 14,952 tok/s/GPU vs MI355X's 4,223, a 3.5x gap. B200 uses dynamo-trt FP4 disagg at concurrency 4,301. MI355X uses mori-sglang FP4 disagg at concurrency 2,048. B200's TPOT is 36.9ms vs 108.1ms."
       }
     },
     {
@@ -118,7 +126,15 @@ _Last updated: 2026-04-06._
       "name": "Where does AMD MI355X beat NVIDIA B200?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "On MiniMax-M2.5, MI355X gets 10,391 tok/s/GPU vs B200's 9,652, an 8% lead at $0.04/Mtok vs $0.06. MI355X is also slightly cheaper per Mtok on Kimi-K2.5."
+        "text": "MI355X wins on throughput only for MiniMax-M2.5 (10,391 vs 9,652 tok/s/GPU). It also has lower cost/Mtok on Kimi-K2.5 and MiniMax-M2.5, and better TTFT on Qwen-3.5-397B-A17B (300ms vs 917ms)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which GPU has the fastest time to first token?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MI355X on Qwen-3.5-397B-A17B BF16 SGLang at concurrency 64: 300ms TTFT. On gpt-oss-120b the gap is small: B200 at 173ms vs MI355X at 175ms. B200 runs higher concurrency by default, which inflates TTFT."
       }
     }
   ]
