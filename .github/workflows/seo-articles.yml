@@ -8,7 +8,7 @@ on:
 
 jobs:
   generate:
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,63 +40,72 @@ jobs:
           github_token: ${{ github.token }}
           direct_prompt: |
             You are updating SEO blog articles for InferenceX with fresh benchmark data.
+            There are THREE article types. Read ALL templates before starting.
+
+            ## Templates
+            - Per-model roundup: `packages/app/scripts/seo/article-template.md`
+            - GPU matchup: `packages/app/scripts/seo/matchup-template.md`
+            - Performance update: `packages/app/scripts/seo/update-template.md`
+
+            ## Data
+            Read the benchmark data at `packages/app/tmp/seo-data.json`. It contains:
+            - `models[]` — per-model benchmark data with cost fields and history
+            - `matchups[]` — GPU pair data for head-to-head articles
+            - `improvements[]` — significant performance gains for update articles
 
             ## Instructions
-            1. Read the article template at `packages/app/scripts/seo/article-template.md`
-            2. Read the benchmark data at `packages/app/tmp/seo-data.json`
-            3. For each model in the data:
-               a. Check if `packages/app/content/blog/best-gpu-for-<modelKey>-inference.mdx` exists.
-               b. If it EXISTS: read it, then edit in place (see Update Rules below).
-               c. If it does NOT exist: create it from scratch following the template.
-            4. Same for the rollup at `packages/app/content/blog/inference-benchmark-roundup.mdx`.
-               The rollup MUST include GPU head-to-head comparison sections (see template).
+
+            ### 1. Per-model roundup articles (update existing or create new)
+            For each model in `models[]`:
+            a. Check if `packages/app/content/blog/best-gpu-for-<modelKey>-inference.mdx` exists.
+            b. If it EXISTS: edit in place with minimal diffs (see Update Rules below).
+            c. If it does NOT exist: create from scratch per `article-template.md`.
+            d. Same for the rollup at `packages/app/content/blog/inference-benchmark-roundup.mdx`.
+
+            ### 2. GPU matchup articles (create top 3 most interesting)
+            From the `matchups[]` array, pick the 3 matchups with the most shared models
+            (break ties by closest `avgPctDiff`). For each:
+            a. Check if the article exists at `packages/app/content/blog/<slug>.mdx`.
+            b. If it EXISTS: edit in place. If NOT: create per `matchup-template.md`.
+            c. Slug format: `<gpuA>-vs-<gpuB>-inference` (e.g. `b200-vs-mi355x-inference`).
+
+            ### 3. Performance update articles (create for top 3 improvements)
+            From the `improvements[]` array (already sorted by pctGain descending), take the
+            top 3 improvements. For each:
+            a. Check if the article exists. If NOT: create per `update-template.md`.
+            b. If it EXISTS: edit in place (update numbers only).
+            c. Slug format: `<gpu>-<framework>-<model>-update-<date>` from the improvement data.
 
             ## Update Rules (edit-in-place for existing articles)
-
             The goal is MINIMAL diffs. Only change what the new data requires.
 
-            **Always update:**
-            - `modifiedDate` and `publishDate` in frontmatter → today's date
-            - `*Last updated: YYYY-MM-DD.*` → today's date
-            - All markdown tables → regenerate from new data (sort by throughput descending)
-            - Key Findings bullets → update numbers and GPU names if rankings changed
-            - JSON-LD answers → update to match any changed FAQ prose
+            **Always update:** dates, tables, Key Findings numbers, BenchmarkChart data,
+            TrendChart data, InteractivityChart data, JSON-LD.
 
-            **Update only if the data changed the conclusion:**
-            - FAQ prose (e.g. if the winner GPU changed, or a new GPU appeared, rewrite that FAQ)
-            - Subtitle (if the winner or key insight changed)
-            - Intro (if GPU count or framework count changed meaningfully)
+            **Update only if conclusion changed:** FAQ prose, subtitle, intro.
 
-            **Never touch unless factually wrong:**
-            - Prose phrasing that is still accurate (don't reword for variety)
-            - Cross-links section (unless new model articles were added)
-            - ClusterMax CTA
-            - Methodology section (unless the template changed)
-            - `date` in frontmatter (preserve the original)
-
-            **For new sections** (e.g. a new FAQ that applies because new data appeared):
-            - Add it in the correct position per the template ordering.
-            - Follow the template's writing style guidelines.
-
-            **For removed sections** (e.g. a FAQ that no longer applies):
-            - Remove it and update the JSON-LD to match.
+            **Never touch unless wrong:** accurate prose, cross-links, CTA, methodology,
+            original `date` frontmatter.
 
             ## Critical Rules
-            - ALL numbers MUST come from the data file. Never invent or estimate numbers.
-            - TTFT/TPOT/E2EL values in the data are in SECONDS — multiply by 1000 for display in ms.
-            - Use gpuDisplayName from the data for all GPU references.
-            - The runner-up in Key Findings must be a DIFFERENT GPU than the winner.
-            - Skip the 1k/8k sequence entirely — it is deprecated.
-            - Format large numbers with commas (e.g. xx,xxx.x).
-            - ZERO em dashes in prose. Only allowed in prescribed headings and title frontmatter.
+            - ALL numbers from data file only. Never invent numbers.
+            - TTFT/TPOT values in data are SECONDS — multiply by 1000 for ms.
+            - Use gpuDisplayName from data for all GPU references.
+            - $/Mtok: use costMtokHyperscaler, format to 2 decimal places.
+            - Runner-up must be DIFFERENT GPU than winner.
+            - Skip 1k/8k sequence entirely.
+            - Format large numbers with commas.
+            - ZERO em dashes in prose (only in prescribed headings/titles).
+            - BenchmarkChart: use data='...' prop (single-quoted JSON, self-closing tag).
+            - TrendChart/InteractivityChart: same data='...' prop pattern.
 
             ## Mandatory Editing Pass
-            After updating EACH article, re-read it and run these fixes before moving on:
-            1. Search the file for "—". Remove every em dash not in a heading or title.
-               Replace with comma, period, semicolon, or parentheses (see template).
-            2. Search for banned words (see template). Replace with plain English.
-            3. Check consecutive sentence starts aren't identical.
-            4. Cut filler sentences that restate the previous one.
+            After each article:
+            1. Em dash sweep — remove all outside headings/titles.
+            2. Banned word sweep — see article-template.md for the full list.
+            3. Chart count check — every table must have a BenchmarkChart.
+            4. Consecutive sentence start check.
+            5. Filler sentence removal.
           allowed_tools: 'Read,Write,Edit,Glob,Grep,Bash'
           claude_args: '--model claude-sonnet-4-5-20250929'
 
@@ -124,13 +133,17 @@ jobs:
             --title "update SEO benchmark articles (${DATE})" \
             --body "$(cat <<'EOF'
           ## Summary
-          - Auto-generated SEO blog articles from latest benchmark data
-          - Articles written by Claude using real data from `seo-data.json`
+          - Per-model roundup articles (updated or created)
+          - GPU matchup articles (top 3 most interesting pairs)
+          - Performance update articles (top 3 improvements >20%)
+          - All from real benchmark data in `seo-data.json`
 
           ## Review checklist
           - [ ] Spot-check numbers against live dashboard
+          - [ ] Verify charts render in dev server
           - [ ] Verify JSON-LD in page source
           - [ ] Read prose for quality and accuracy
+          - [ ] Check no AI tells (em dashes, banned words)
           EOF
           )" \
             --base master
