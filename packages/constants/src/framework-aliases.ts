@@ -3,6 +3,7 @@ export const FRAMEWORK_KEYS = new Set([
   'atom',
   'dynamo-sglang',
   'dynamo-trt',
+  'dynamo-vllm',
   'mori-sglang',
   'sglang',
   'trt',

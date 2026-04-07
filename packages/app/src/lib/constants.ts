@@ -253,6 +253,12 @@ export const HARDWARE_CONFIG: HardwareConfig = {
     suffix: '(Dynamo SGLang)',
     gpu: "NVIDIA 'Blackwell' GB200 Dynamo SGLang",
   },
+  'gb200_dynamo-vllm': {
+    name: 'gb200-dynamo-vllm',
+    label: 'GB200 NVL72',
+    suffix: '(Dynamo vLLM)',
+    gpu: "NVIDIA 'Blackwell' GB200 Dynamo vLLM",
+  },
   gb300: {
     name: 'gb300',
     label: 'GB300 NVL72',
@@ -407,6 +413,7 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
   'dynamo-sglang': 'Dynamo SGLang',
   'dynamo-trtllm': 'Dynamo TRT',
   'dynamo-trt': 'Dynamo TRT',
+  'dynamo-vllm': 'Dynamo vLLM',
   'mori-sglang': 'MoRI SGLang',
   atom: 'ATOM¹',
   mtp: 'MTP',
