@@ -7,6 +7,7 @@ import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { formatLargeNumber } from '@/lib/chart-rendering';
+import { prepareWithSegments, walkLineRanges } from '@chenglou/pretext';
 
 // ---------------------------------------------------------------------------
 // Shared types and constants
@@ -55,29 +56,31 @@ function getBarColor(d: BarEntry): string {
 
 /**
  * Compute dynamic left margin for bar charts based on y-axis label widths.
- * Uses canvas measureText to approximate SVG text width, matching the
- * approach in calculator/ThroughputBarChart.tsx.
+ * Uses @chenglou/pretext for fast, accurate text measurement without DOM reflow.
  *
  * For two-row labels (split at last space), measures both rows at their
  * respective font sizes and uses the wider one.
  */
-function computeLeftMargin(labels: string[]): number {
-  if (typeof document === 'undefined') return 100; // SSR fallback
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return 100;
+/** Measure single-line text width using pretext. */
+function measureTextWidth(text: string, font: string): number {
+  const prepared = prepareWithSegments(text, font);
+  let width = 0;
+  walkLineRanges(prepared, Infinity, (line) => {
+    width = line.width;
+  });
+  return width;
+}
 
+function computeLeftMargin(labels: string[]): number {
   let maxWidth = 0;
   for (const label of labels) {
     const lastSpace = label.lastIndexOf(' ');
     // First row (or only row): 600 12px
-    ctx.font = '600 12px sans-serif';
     const line1 = lastSpace > 0 ? label.slice(0, lastSpace) : label;
-    maxWidth = Math.max(maxWidth, ctx.measureText(line1).width);
+    maxWidth = Math.max(maxWidth, measureTextWidth(line1, '600 12px sans-serif'));
     // Second row if split: 10px muted
     if (lastSpace > 0) {
-      ctx.font = '10px sans-serif';
-      maxWidth = Math.max(maxWidth, ctx.measureText(label.slice(lastSpace + 1)).width);
+      maxWidth = Math.max(maxWidth, measureTextWidth(label.slice(lastSpace + 1), '10px sans-serif'));
     }
   }
   // Add padding for the tick mark + gap
