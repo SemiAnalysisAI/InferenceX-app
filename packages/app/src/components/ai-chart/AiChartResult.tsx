@@ -4,13 +4,13 @@ import { useMemo } from 'react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { InferenceData } from '@/components/inference/types';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type {
-  BarLayerConfig,
-  ScatterLayerConfig,
-  TooltipConfig,
-  ScaleConfig,
-  AxisConfig,
+import {
+  D3Chart,
+  type BarLayerConfig,
+  type ScatterLayerConfig,
+  type TooltipConfig,
+  type ScaleConfig,
+  type AxisConfig,
 } from '@/lib/d3-chart/D3Chart';
 
 import DOMPurify from 'dompurify';

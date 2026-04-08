@@ -136,9 +136,9 @@ export async function callLlm(
       json?.error?.message ?? json?.error?.type ?? `${provider} request failed (${res.status})`;
     // Strip anything that looks like an API key to prevent accidental leaks in UI
     const msg = String(raw)
-      .replace(/sk-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
-      .replace(/key-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
-      .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]');
+      .replaceAll(/sk-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
+      .replaceAll(/key-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
+      .replaceAll(/Bearer\s+\S+/gi, 'Bearer [REDACTED]');
     throw new Error(msg);
   }
 

@@ -1,6 +1,6 @@
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
 import { Y_AXIS_METRICS } from '@/lib/chart-utils';
-import { MODEL_ORDER } from '@/lib/constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 export type AiProvider = 'openai' | 'anthropic' | 'xai' | 'google';
 
@@ -41,7 +41,7 @@ const VALID_DATA_SOURCES = new Set<string>(['benchmarks', 'evaluations', 'reliab
 const VALID_MODELS = new Set<string>(Object.values(Model));
 const VALID_SEQUENCES = new Set<string>(Object.values(Sequence));
 const VALID_PRECISIONS = new Set<string>(Object.values(Precision));
-const VALID_GPU_BASES = new Set<string>(MODEL_ORDER);
+const VALID_GPU_BASES = new Set<string>(Object.keys(HW_REGISTRY));
 const VALID_Y_METRICS = new Set<string>([...Y_AXIS_METRICS, 'eval_score', 'reliability_rate']);
 
 /** Validate and clamp an LLM-generated spec to known values. Throws on unrecoverable input. */

@@ -2,8 +2,12 @@
 
 import { useCallback, useState } from 'react';
 
-import type { AiChartBarPoint, AiChartSpec, AiProvider } from '@/components/ai-chart/types';
-import { validateSpec } from '@/components/ai-chart/types';
+import {
+  validateSpec,
+  type AiChartBarPoint,
+  type AiChartSpec,
+  type AiProvider,
+} from '@/components/ai-chart/types';
 import { buildParsePrompt, buildSummaryPrompt } from '@/components/ai-chart/prompt-templates';
 import type { InferenceData } from '@/components/inference/types';
 import { callLlm } from '@/lib/ai-providers';
@@ -12,11 +16,15 @@ import {
   fetchBenchmarkHistory,
   fetchEvaluations,
   fetchReliability,
+  type EvalRow,
+  type ReliabilityRow,
 } from '@/lib/api';
-import type { EvalRow, ReliabilityRow } from '@/lib/api';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { getNestedYValue, normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { generateHighContrastColors } from '@/lib/chart-utils';
+import {
+  getNestedYValue,
+  normalizeEvalHardwareKey,
+  generateHighContrastColors,
+} from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
@@ -51,8 +59,8 @@ interface UseAiChartReturn {
 
 function parseSpecsFromLlm(raw: string): AiChartSpec[] {
   const cleaned = raw
-    .replace(/```json\s*/g, '')
-    .replace(/```/g, '')
+    .replaceAll(/```json\s*/g, '')
+    .replaceAll('```', '')
     .trim();
   const parsed = JSON.parse(cleaned);
   const arr = Array.isArray(parsed) ? parsed : [parsed];
@@ -98,7 +106,7 @@ function buildBenchmarkBarData(
     const config = getHardwareConfig(hwKey);
     bars.push({
       hwKey,
-      label: config ? `${config.label}${config.suffix ? ' ' + config.suffix : ''}` : hwKey,
+      label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
       value,
       color: colorMap[hwKey] ?? '#888',
     });
@@ -108,10 +116,13 @@ function buildBenchmarkBarData(
   return bars;
 }
 
+function parseSeqPart(s: string): number {
+  return s.includes('8k') ? 8192 : 1024;
+}
+
 function sequenceToIslOsl(seq: string): { isl: number; osl: number } {
   const parts = seq.split('/');
-  const parse = (s: string) => (s.includes('8k') ? 8192 : 1024);
-  return { isl: parse(parts[0] ?? '1k'), osl: parse(parts[1] ?? '1k') };
+  return { isl: parseSeqPart(parts[0] ?? '1k'), osl: parseSeqPart(parts[1] ?? '1k') };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +164,7 @@ function buildEvalBarData(
     const config = getHardwareConfig(hwKey);
     bars.push({
       hwKey,
-      label: config ? `${config.label}${config.suffix ? ' ' + config.suffix : ''}` : hwKey,
+      label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
       value: score,
       color: colorMap[hwKey] ?? '#888',
     });
@@ -197,7 +208,7 @@ function buildReliabilityBarData(
     const config = getHardwareConfig(hw);
     bars.push({
       hwKey: hw,
-      label: config ? `${config.label}${config.suffix ? ' ' + config.suffix : ''}` : hw,
+      label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hw,
       value: Math.round(rate * 100) / 100,
       color: colorMap[hw] ?? '#888',
     });
@@ -270,7 +281,7 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   if (spec.dataSource !== 'history') {
     points = points.filter((p) => {
       const entry = p as any;
-      if (entry.isl != null && entry.osl != null) {
+      if (entry.isl !== null && entry.osl !== null) {
         return entry.isl === isl && entry.osl === osl;
       }
       return true;
@@ -351,8 +362,10 @@ export function useAiChart(): UseAiChartReturn {
       }
 
       setResult({ charts, summary });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : 'An unexpected error occurred.',
+      );
     } finally {
       setIsLoading(false);
     }
