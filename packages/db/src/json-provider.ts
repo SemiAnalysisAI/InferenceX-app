@@ -9,8 +9,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 import type { BenchmarkRow } from './queries/benchmarks.js';
 import type { EvalRow } from './queries/evaluations.js';
@@ -169,7 +168,7 @@ function getStore(): Store {
 
   // Resolve relative paths from the monorepo root (packages/db/../../), not CWD,
   // since Next.js runs from packages/app/ but .env paths are repo-root-relative.
-  const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const pkgRoot = resolve(import.meta.dirname, '..');
   const monoRoot = resolve(pkgRoot, '../..');
   const resolvedDir = existsSync(resolve(dir)) ? resolve(dir) : resolve(monoRoot, dir);
 

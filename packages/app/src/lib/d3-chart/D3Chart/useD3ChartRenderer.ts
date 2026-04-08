@@ -181,7 +181,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         yScale,
         width,
         height,
-        transitionDuration: transitionDuration,
+        transitionDuration,
       };
 
       // ── Render layers ──
