@@ -22,6 +22,10 @@ interface ChartSectionProps {
   onExportCsv?: () => void;
   /** Human-readable base name for exported files. Falls back to chartId. */
   exportFileName?: string;
+  /** Optional controls rendered before export buttons (e.g., a chart/table toggle). */
+  leadingControls?: ReactNode;
+  /** Disable PNG image export (e.g., when showing a table view). */
+  hideImageExport?: boolean;
 }
 
 /**
@@ -40,6 +44,8 @@ export function ChartSection({
   setIsLegendExpanded,
   onExportCsv,
   exportFileName,
+  leadingControls,
+  hideImageExport,
 }: ChartSectionProps) {
   return (
     <section className={className}>
@@ -52,6 +58,8 @@ export function ChartSection({
           setIsLegendExpanded={setIsLegendExpanded}
           onExportCsv={onExportCsv}
           exportFileName={exportFileName}
+          leadingControls={leadingControls}
+          hideImageExport={hideImageExport}
         />
 
         <Card>{children}</Card>
