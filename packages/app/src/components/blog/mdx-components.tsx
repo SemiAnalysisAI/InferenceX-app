@@ -101,7 +101,6 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
       figureCount++;
       return (
         <figure className="my-6 flex flex-col items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={props.src}
             alt={props.alt ?? ''}

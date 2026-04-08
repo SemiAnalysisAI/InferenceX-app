@@ -478,7 +478,7 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- precisionsKey is a stable proxy for effectivePrecisions
+  }, [selectedModel, effectiveSequence, precisionsKey]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
@@ -549,7 +549,7 @@ export function InferenceProvider({
       });
     }, 3000);
     return () => clearTimeout(timer);
-  }, [activeHwTypes]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on GPU set changes
+  }, [activeHwTypes]);
 
   // Interactivity / E2E chart — tracks activeDates (date+gpu pairs)
   const e2eTrackMounted = useRef(false);
@@ -571,7 +571,7 @@ export function InferenceProvider({
       });
     }, 3000);
     return () => clearTimeout(timer);
-  }, [activeDates]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on date selection changes
+  }, [activeDates]);
 
   // Fire once on mount to capture the initial y-axis metric (default or URL-restored)
   useEffect(() => {
@@ -579,7 +579,7 @@ export function InferenceProvider({
       yAxisMetric: selectedYAxisMetric,
       source: getUrlParam('i_metric') ? 'url' : 'default',
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- fire once on mount
+  }, []);
 
   // ── URL sync ──────────────────────────────────────────────────────────────
 

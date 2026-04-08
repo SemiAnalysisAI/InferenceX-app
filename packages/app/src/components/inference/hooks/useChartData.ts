@@ -150,7 +150,6 @@ export function useChartData(
         .map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
     );
     return [...mainRows, ...extraRows];
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- comparisonDataKey is a stable proxy for comparisonQueries data
   }, [allRows, sequenceIslOsl, comparisonDates, comparisonDataKey, selectedRunDate]);
 
   // Transform filtered rows into chart data

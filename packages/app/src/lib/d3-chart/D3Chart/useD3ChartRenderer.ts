@@ -474,7 +474,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
     return () => clearTimeout(timeoutId);
     // We intentionally list specific deps rather than the entire props object.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     data,
     dimensions,

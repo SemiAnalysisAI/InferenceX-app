@@ -129,7 +129,7 @@ describe('getReadingTime', () => {
 describe('getAllPosts', () => {
   it('returns an array of posts sorted by date descending', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     vi.spyOn(fs, 'readdirSync').mockReturnValue(['test-post.mdx', 'older-post.mdx'] as any);
     vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
       if (String(filePath).includes('test-post')) return FAKE_MDX;
@@ -150,7 +150,7 @@ describe('getAllPosts', () => {
 
   it('returns posts with required frontmatter fields', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     vi.spyOn(fs, 'readdirSync').mockReturnValue(['test-post.mdx'] as any);
     vi.spyOn(fs, 'readFileSync').mockReturnValue(FAKE_MDX);
 
@@ -178,10 +178,7 @@ describe('getAllPosts — publishDate filtering', () => {
 
   function mockPostFiles(files: Record<string, string>) {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    vi.spyOn(fs, 'readdirSync').mockReturnValue(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      Object.keys(files).map((name) => name) as any,
-    );
+    vi.spyOn(fs, 'readdirSync').mockReturnValue(Object.keys(files).map((name) => name) as any);
     vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
       const p = String(filePath);
       for (const [name, content] of Object.entries(files)) {
@@ -318,7 +315,7 @@ describe('getPostBySlug', () => {
 describe('getAdjacentPosts', () => {
   function mockThreePosts() {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     vi.spyOn(fs, 'readdirSync').mockReturnValue([
       'test-post.mdx',
       'middle-post.mdx',

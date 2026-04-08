@@ -287,7 +287,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       });
     }, 3000);
     return () => clearTimeout(timer);
-  }, [enabledHardware]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only re-fire on hw set changes
+  }, [enabledHardware]);
 
   useUrlStateSync(
     {

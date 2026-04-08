@@ -148,7 +148,6 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
       )
       .join(', ');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await sql.unsafe(`INSERT INTO ${table} (${colsSql}) VALUES ${rows}`, values.flat() as any[]);
 
     total += batch.length;

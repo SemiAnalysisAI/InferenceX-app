@@ -10,7 +10,7 @@ function escapeXml(s: string): string {
     .replaceAll("'", '&apos;');
 }
 
-// eslint-disable-next-line require-await
+// oxlint-disable-next-line require-await
 export async function GET() {
   const posts = getAllPosts();
   const now = new Date().toUTCString();

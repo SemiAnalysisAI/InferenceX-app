@@ -1,7 +1,7 @@
 import { getAllPosts } from '@/lib/blog';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-// eslint-disable-next-line require-await
+// oxlint-disable-next-line require-await
 export async function GET() {
   const posts = getAllPosts();
 
