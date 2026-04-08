@@ -20,6 +20,8 @@ interface ChartButtonsProps {
   setIsLegendExpanded?: (expanded: boolean) => void;
   /** Hide the zoom reset button (e.g., for charts without zoom) */
   hideZoomReset?: boolean;
+  /** Hide the PNG image export button (e.g., for table views) */
+  hideImageExport?: boolean;
   /** Optional callback to export chart data as CSV */
   onExportCsv?: () => void;
   /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
@@ -47,6 +49,7 @@ export function ChartButtons({
   zoomResetEvent,
   setIsLegendExpanded,
   hideZoomReset,
+  hideImageExport,
   onExportCsv,
   exportFileName,
   leadingControls,
@@ -82,7 +85,17 @@ export function ChartButtons({
       )}
     >
       {leadingControls}
-      {onExportCsv ? (
+      {onExportCsv && hideImageExport ? (
+        <Button
+          data-testid="export-csv-button"
+          variant="outline"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={handleExportCsv}
+        >
+          <FileSpreadsheet size={16} />
+        </Button>
+      ) : onExportCsv ? (
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>
             <Button

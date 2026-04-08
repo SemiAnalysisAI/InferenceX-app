@@ -292,6 +292,8 @@ export default function ChartDisplay() {
                     testId={`inference-view-toggle-${graphIndex}`}
                   />
                 }
+                hideImageExport={getViewMode(graphIndex) === 'table'}
+                hideZoomReset={getViewMode(graphIndex) === 'table'}
                 setIsLegendExpanded={setIsLegendExpanded}
                 exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                 onExportCsv={() => {
