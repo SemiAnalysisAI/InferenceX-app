@@ -293,7 +293,6 @@ export default function ChartDisplay() {
                   />
                 }
                 hideImageExport={getViewMode(graphIndex) === 'table'}
-                hideZoomReset={getViewMode(graphIndex) === 'table'}
                 setIsLegendExpanded={setIsLegendExpanded}
                 exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                 onExportCsv={() => {
