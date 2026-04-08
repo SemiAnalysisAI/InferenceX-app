@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
 import {
@@ -19,8 +19,17 @@ export interface DataTableColumn<T> {
   align?: 'left' | 'right' | 'center';
   /** Extract and format the cell value from a row. */
   cell: (row: T, index: number) => React.ReactNode;
+  /** Extract a sortable value from a row. Omit to disable sorting for this column. */
+  sortValue?: (row: T) => number | string;
   /** Additional className for header and body cells. */
   className?: string;
+}
+
+type SortDir = 'asc' | 'desc' | null;
+
+interface SortState {
+  columnIndex: number;
+  dir: SortDir;
 }
 
 interface DataTableProps<T> {
@@ -44,6 +53,12 @@ const ALIGN_CLASSES = {
   center: 'text-center',
 } as const;
 
+const SORT_ICON = {
+  asc: <ArrowUp className="inline h-3 w-3" />,
+  desc: <ArrowDown className="inline h-3 w-3" />,
+  none: <ArrowUpDown className="inline h-3 w-3 opacity-30" />,
+};
+
 export function DataTable<T>({
   data,
   columns,
@@ -53,10 +68,46 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(25);
+  const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
 
-  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+  const handleSort = (colIndex: number) => {
+    const col = columns[colIndex];
+    if (!col.sortValue) return;
+    setSort((prev) => {
+      // Cycle: none → desc → asc → none
+      let nextDir: SortDir;
+      if (prev.columnIndex !== colIndex) {
+        nextDir = 'desc';
+      } else if (prev.dir === 'desc') {
+        nextDir = 'asc';
+      } else if (prev.dir === 'asc') {
+        nextDir = null;
+      } else {
+        nextDir = 'desc';
+      }
+      track(`${analyticsPrefix}_sort_changed`, { column: col.header, dir: nextDir ?? 'none' });
+      return { columnIndex: colIndex, dir: nextDir };
+    });
+    setPage(0);
+  };
+
+  const sorted = useMemo(() => {
+    if (sort.dir === null || sort.columnIndex < 0) return data;
+    const col = columns[sort.columnIndex];
+    if (!col?.sortValue) return data;
+    const extract = col.sortValue;
+    const multiplier = sort.dir === 'asc' ? 1 : -1;
+    return [...data].toSorted((a, b) => {
+      const av = extract(a);
+      const bv = extract(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * multiplier;
+      return String(av).localeCompare(String(bv)) * multiplier;
+    });
+  }, [data, sort, columns]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
-  const pageData = data.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const pageData = sorted.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   if (data.length === 0) {
     return (
@@ -80,14 +131,32 @@ export function DataTable<T>({
         <table className="w-full text-sm relative">
           <thead>
             <tr className="border-b border-border">
-              {columns.map((col, i) => (
-                <th
-                  key={i}
-                  className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''}`}
-                >
-                  {col.header}
-                </th>
-              ))}
+              {columns.map((col, i) => {
+                const sortable = Boolean(col.sortValue);
+                const sortIcon =
+                  sort.columnIndex === i && sort.dir
+                    ? SORT_ICON[sort.dir]
+                    : sortable
+                      ? SORT_ICON.none
+                      : null;
+                return (
+                  <th
+                    key={i}
+                    className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
+                    onClick={sortable ? () => handleSort(i) : undefined}
+                    aria-sort={
+                      sort.columnIndex === i && sort.dir
+                        ? sort.dir === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : undefined
+                    }
+                  >
+                    {col.header}
+                    {sortIcon && <span className="ml-1">{sortIcon}</span>}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -111,8 +180,8 @@ export function DataTable<T>({
       <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>
-            {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, data.length)} of{' '}
-            {data.length}
+            {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of{' '}
+            {sorted.length}
           </span>
           <Select
             value={String(pageSize)}
