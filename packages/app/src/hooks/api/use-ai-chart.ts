@@ -79,6 +79,12 @@ function parseSpecsFromLlm(raw: string): AiChartSpec[] {
   return arr.slice(0, 2).map((s: unknown) => validateSpec(s as Record<string, unknown>));
 }
 
+function sortBars(bars: AiChartBarPoint[], order: AiChartSpec['sortOrder']): void {
+  if (order === 'asc') bars.sort((a, b) => a.value - b.value);
+  else if (order === 'desc') bars.sort((a, b) => b.value - a.value);
+  else bars.sort((a, b) => getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey));
+}
+
 // ---------------------------------------------------------------------------
 // Benchmark helpers
 // ---------------------------------------------------------------------------
@@ -123,7 +129,7 @@ function buildBenchmarkBarData(
     });
   }
 
-  bars.sort((a, b) => getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey));
+  sortBars(bars, spec.sortOrder);
   return bars;
 }
 
@@ -181,7 +187,7 @@ function buildEvalBarData(
     });
   }
 
-  bars.sort((a, b) => getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey));
+  sortBars(bars, spec.sortOrder);
   return bars;
 }
 
@@ -225,7 +231,7 @@ function buildReliabilityBarData(
     });
   }
 
-  bars.sort((a, b) => getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey));
+  sortBars(bars, spec.sortOrder);
   return bars;
 }
 
@@ -403,6 +409,21 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
     const allowedPrec = new Set(spec.precisions.map((p) => p.toLowerCase()));
     points = points.filter((p) => p.precision && allowedPrec.has(p.precision.toLowerCase()));
   }
+  if (spec.frameworks.length > 0) {
+    const allowedFw = new Set(spec.frameworks.map((f) => f.toLowerCase()));
+    points = points.filter((p) => {
+      const hwKey = p.hwKey ?? '';
+      const parts = hwKey.split('_').slice(1);
+      return parts.some((part) => allowedFw.has(part));
+    });
+  }
+  if (spec.disagg !== null) {
+    points = points.filter((p) => {
+      const hwKey = p.hwKey ?? '';
+      const isDisagg = hwKey.includes('-disagg');
+      return spec.disagg ? isDisagg : !isDisagg;
+    });
+  }
 
   if (spec.dataSource !== 'history') {
     points = points.filter((p) => {
@@ -417,6 +438,46 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
       }
       return true;
     });
+  }
+
+  // topN: rank configs by peak metric value and keep only the best N
+  if (spec.topN) {
+    const chartDef = (chartDefinitions as any[])[0];
+    const yFieldPath: string = chartDef[spec.yAxisMetric] ?? 'tpPerGpu.y';
+    const peakByHw = new Map<string, number>();
+    for (const p of points) {
+      const hw = p.hwKey ?? '';
+      if (!hw) continue;
+      const val = getNestedYValue(p, yFieldPath);
+      peakByHw.set(hw, Math.max(peakByHw.get(hw) ?? 0, val));
+    }
+
+    let topHwKeys: Set<string>;
+    if (spec.topNDistinctGpus !== false) {
+      // Group by base GPU, pick the best config per GPU, then take top N GPUs
+      const bestPerGpu = new Map<string, { hwKey: string; peak: number }>();
+      for (const [hwKey, peak] of peakByHw) {
+        const base = hwKey.split('_')[0];
+        const existing = bestPerGpu.get(base);
+        if (!existing || peak > existing.peak) {
+          bestPerGpu.set(base, { hwKey, peak });
+        }
+      }
+      const topBases = [...bestPerGpu.entries()]
+        .toSorted(([, a], [, b]) => b.peak - a.peak)
+        .slice(0, spec.topN);
+      // Include only the single best config per winning GPU
+      topHwKeys = new Set(topBases.map(([, v]) => v.hwKey));
+    } else {
+      // Rank individual configs regardless of GPU family
+      topHwKeys = new Set(
+        [...peakByHw.entries()]
+          .toSorted(([, a], [, b]) => b - a)
+          .slice(0, spec.topN)
+          .map(([k]) => k),
+      );
+    }
+    points = points.filter((p) => topHwKeys.has(p.hwKey ?? ''));
   }
 
   const hwKeys = [...new Set(points.map((p) => p.hwKey ?? '').filter(Boolean))];

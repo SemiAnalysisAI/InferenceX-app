@@ -447,7 +447,7 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
         return (
           <figure key={i} className="relative rounded-lg">
             <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
-            <Card>
+            <Card id={`${chartId}-export`}>
               <CardHeader>
                 <CardTitle>{chart.spec.title}</CardTitle>
                 <CardDescription>{chart.spec.description}</CardDescription>
