@@ -219,6 +219,19 @@ export function DateRangePicker({
                       Historical comparison requires at least 2 dates. Please change Model, ISL/OSL,
                       or GPU selection.
                     </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1"
+                      onClick={() => {
+                        const singleDate = availableDates[0];
+                        track('date_range_picker_view_single_date', { date: singleDate });
+                        onChange({ startDate: singleDate, endDate: singleDate });
+                        setOpen(false);
+                      }}
+                    >
+                      View anyway
+                    </Button>
                   </div>
                 </div>
               )}
