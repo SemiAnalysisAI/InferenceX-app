@@ -1749,7 +1749,7 @@ const ScatterGraph = React.memo(
                 : []),
               {
                 id: 'scatter-hide-non-optimal',
-                label: 'Hide Non-Optimal',
+                label: 'Optimal Only',
                 checked: hideNonOptimal,
                 onCheckedChange: (checked: boolean) => {
                   setHideNonOptimal(checked);

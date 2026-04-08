@@ -453,7 +453,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-hide-non-optimal',
-                label: 'Hide Non-Optimal',
+                label: 'Optimal Only',
                 checked: hideNonOptimal,
                 onCheckedChange: (c) => {
                   setHideNonOptimal(c);
