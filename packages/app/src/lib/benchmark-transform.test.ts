@@ -41,7 +41,7 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
       std_tpot: 0.002,
       median_intvty: 12.5,
       p99_intvty: 18.2,
-      mean_intvty: 13.0,
+      mean_intvty: 13,
       std_intvty: 2.1,
       median_itl: 0.011,
       p99_itl: 0.016,
@@ -356,14 +356,14 @@ describe('rowToAggDataEntry — extended edge cases', () => {
     const entry = rowToAggDataEntry(
       makeRow({
         metrics: {
-          mean_intvty: 15.0,
+          mean_intvty: 15,
           median_intvty: 14.2,
           std_intvty: 2.5,
           p99_intvty: 22.1,
         },
       }),
     );
-    expect(entry.mean_intvty).toBe(15.0);
+    expect(entry.mean_intvty).toBe(15);
     expect(entry.median_intvty).toBe(14.2);
     expect(entry.std_intvty).toBe(2.5);
     expect(entry.p99_intvty).toBe(22.1);
@@ -502,7 +502,7 @@ describe('transformBenchmarkRows — data point values', () => {
     const rows = [
       makeRow({
         metrics: {
-          median_intvty: 25.0,
+          median_intvty: 25,
           median_e2el: 1.8,
           tput_per_gpu: 300,
           output_tput_per_gpu: 250,
@@ -514,7 +514,7 @@ describe('transformBenchmarkRows — data point values', () => {
     // Chart 0 is interactivity (x = median_intvty), Chart 1 is e2e (x = median_e2el)
     const interactivityPoint = chartData[0][0];
     const e2ePoint = chartData[1][0];
-    expect(interactivityPoint.x).toBe(25.0);
+    expect(interactivityPoint.x).toBe(25);
     expect(e2ePoint.x).toBe(1.8);
   });
 
@@ -526,7 +526,7 @@ describe('transformBenchmarkRows — data point values', () => {
           output_tput_per_gpu: 500,
           input_tput_per_gpu: 100,
           median_intvty: 20,
-          median_e2el: 2.0,
+          median_e2el: 2,
         },
       }),
     ];
@@ -546,7 +546,7 @@ describe('transformBenchmarkRows — data point values', () => {
           output_tput_per_gpu: 350,
           input_tput_per_gpu: 50,
           median_intvty: 15,
-          median_e2el: 2.0,
+          median_e2el: 2,
         },
       }),
     ];

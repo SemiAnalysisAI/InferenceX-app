@@ -13,7 +13,7 @@ export function lttbDownsample<T>(
   getY: (d: T) => number,
 ): T[] {
   if (data.length <= target) return data;
-  if (target < 3) return [data[0], data[data.length - 1]];
+  if (target < 3) return [data[0], data.at(-1)!];
 
   const result: T[] = [data[0]]; // Always include first point
   const bucketSize = (data.length - 2) / (target - 2);
@@ -57,6 +57,6 @@ export function lttbDownsample<T>(
     prevIndex = bestIndex;
   }
 
-  result.push(data[data.length - 1]); // Always include last point
+  result.push(data.at(-1)!); // Always include last point
   return result;
 }

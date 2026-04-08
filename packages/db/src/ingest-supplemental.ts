@@ -8,11 +8,11 @@
  *   pnpm --filter *inferencex-db db:ingest:supplemental
  */
 
-import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
 import {
@@ -25,13 +25,8 @@ import {
 import { bulkIngestBenchmarkRows, bulkUpsertAvailability } from './etl/benchmark-ingest';
 import { ingestEvalRow } from './etl/eval-ingest';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 5,
   idle_timeout: 60,
 });
@@ -71,7 +66,7 @@ async function ingestSupplementalEvals(
     return;
   }
 
-  const data: SupplementalEval[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const data: SupplementalEval[] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   console.log(`  Loaded ${data.length} supplemental eval entries`);
 
   const { getOrCreateConfig } = configCache;
@@ -93,14 +88,14 @@ async function ingestSupplementalEvals(
     const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
     if (!modelKey) {
       console.warn(`  Skipped: unknown model ${entry.model}`);
-      skipped++;
+      skipped++; // oxlint-disable-line no-useless-assignment -- used after loop
       continue;
     }
 
     const hw = hwToGpuKey(entry.hw);
     if (!hw) {
       console.warn(`  Skipped: unknown hardware ${entry.hw}`);
-      skipped++;
+      skipped++; // oxlint-disable-line no-useless-assignment -- used after loop
       continue;
     }
     const { framework, disagg } = normalizeFramework(entry.framework, false);
@@ -130,7 +125,7 @@ async function ingestSupplementalEvals(
 
       const outcome = await ingestEvalRow(
         sql,
-        async () => configId,
+        () => Promise.resolve(configId),
         {
           config: {} as any,
           task: entry.task,
@@ -153,8 +148,8 @@ async function ingestSupplementalEvals(
       );
       if (outcome === 'new') ingested++;
       else skipped++;
-    } catch (err: any) {
-      console.warn(`  Error ingesting ${entry.hw} ${entry.framework}: ${err.message}`);
+    } catch (error: any) {
+      console.warn(`  Error ingesting ${entry.hw} ${entry.framework}: ${error.message}`);
       skipped++;
     }
   }
@@ -193,7 +188,7 @@ async function ingestSupplementalBmk(
     return;
   }
 
-  const data: SupplementalBmk[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const data: SupplementalBmk[] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   if (data.length === 0) {
     console.log('  supplemental-bmk.json is empty, skipping.');
     return;
@@ -222,27 +217,27 @@ async function ingestSupplementalBmk(
       conclusion: 'success',
     }))!;
 
-    const rows: Array<{
+    const rows: {
       configId: number;
       isl: number;
       osl: number;
       conc: number;
       image: string | null;
       metrics: Record<string, number>;
-    }> = [];
+    }[] = [];
 
     for (const entry of entries) {
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
       if (!modelKey) {
         console.warn(`  Skipped: unknown model ${entry.model}`);
-        totalDup++;
+        totalDup++; // oxlint-disable-line no-useless-assignment -- used after loop
         continue;
       }
 
       const hw = hwToGpuKey(entry.hw);
       if (!hw) {
         console.warn(`  Skipped: unknown hardware ${entry.hw}`);
-        totalDup++;
+        totalDup++; // oxlint-disable-line no-useless-assignment -- used after loop
         continue;
       }
 
@@ -297,7 +292,7 @@ async function ingestSupplementalBmk(
     // Entries that failed model/hw resolution were skipped via `continue` in the loop,
     // and getOrCreateConfig failures propagate (no try/catch), so `entries` that made it
     // to `rows` are exactly the valid ones.
-    const availRows: Array<{
+    const availRows: {
       model: string;
       isl: number;
       osl: number;
@@ -306,7 +301,7 @@ async function ingestSupplementalBmk(
       framework: string;
       specMethod: string;
       disagg: boolean;
-    }> = [];
+    }[] = [];
     for (const entry of entries) {
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
       const hw = hwToGpuKey(entry.hw);
@@ -353,17 +348,14 @@ async function main(): Promise<void> {
   await ingestSupplementalEvals(configCache, getOrCreateWorkflowRun);
   await ingestSupplementalBmk(configCache, getOrCreateWorkflowRun);
 
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s done`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== db:ingest:supplemental complete ===');
 }
 
 main()
-  .catch((err) => {
-    console.error('ingest-supplemental failed:', err);
+  .catch((error) => {
+    console.error('ingest-supplemental failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

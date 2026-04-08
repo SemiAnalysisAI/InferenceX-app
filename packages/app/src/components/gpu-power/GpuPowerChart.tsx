@@ -4,8 +4,12 @@ import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { GpuMetricKey, GpuMetricRow } from './types';
-import { ALL_METRIC_OPTIONS, detectTdpFromArtifactName } from './types';
+import {
+  type GpuMetricKey,
+  type GpuMetricRow,
+  ALL_METRIC_OPTIONS,
+  detectTdpFromArtifactName,
+} from './types';
 
 interface ParsedPoint {
   seconds: number;
@@ -182,7 +186,7 @@ const GpuMetricsChart = React.memo(
             key: 'gpu-lines',
             lines: lineData,
             config: {
-              getColor: (key) => GPU_COLORS[parseInt(key) % GPU_COLORS.length],
+              getColor: (key) => GPU_COLORS[parseInt(key, 10) % GPU_COLORS.length],
               strokeWidth: 1.5,
               curve: d3.curveMonotoneX,
             },

@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 import {
   GPU_ALIAS_TO_CANONICAL,
   GPU_KEY_ALIASES,
-  GPU_SPECS,
-  HARDWARE_CONFIG,
-  MODEL_ORDER,
   getGpuSpecs,
   getHardwareConfig,
   getModelSortIndex,
+  isKnownGpu,
 } from '@/lib/constants';
 
 // ===========================================================================
@@ -23,10 +23,10 @@ describe('GPU_KEY_ALIASES', () => {
     expect(GPU_KEY_ALIASES['gb200_dynamo-trt_mtp']).toContain('gb200_dynamo-trtllm_mtp');
   });
 
-  it('alias keys all exist in HARDWARE_CONFIG', () => {
+  it('alias keys resolve to known GPUs', () => {
     for (const aliases of Object.values(GPU_KEY_ALIASES)) {
       for (const alias of aliases) {
-        expect(HARDWARE_CONFIG).toHaveProperty(alias);
+        expect(isKnownGpu(alias)).toBe(true);
       }
     }
   });
@@ -69,37 +69,46 @@ describe('getHardwareConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns the config for an exact key match', () => {
+  it('returns the config for a base key', () => {
     const config = getHardwareConfig('h100');
-    expect(config).toBe(HARDWARE_CONFIG.h100);
+    expect(config).toEqual({
+      name: 'h100',
+      label: 'H100',
+      suffix: '',
+      gpu: "NVIDIA 'Hopper' H100",
+    });
   });
 
-  it('returns the config for a compound exact key match (e.g. h100_vllm)', () => {
+  it('returns the config for a compound key (e.g. h100_vllm)', () => {
     const config = getHardwareConfig('h100_vllm');
-    expect(config).toBe(HARDWARE_CONFIG.h100_vllm);
+    expect(config).toEqual({
+      name: 'h100-vllm',
+      label: 'H100',
+      suffix: '(vLLM)',
+      gpu: "NVIDIA 'Hopper' H100 vLLM",
+    });
   });
 
-  it('falls back to base key when the full key is not in HARDWARE_CONFIG', () => {
-    // 'h100_nonexistent' is not in config; base key split on [-_] → 'h100'
+  it('derives config for any key with a known base GPU', () => {
     const config = getHardwareConfig('h100_nonexistent');
-    expect(config).toBe(HARDWARE_CONFIG.h100);
+    expect(config.label).toBe('H100');
+    expect(config.suffix).toBe('(NONEXISTENT)');
   });
 
-  it('falls back to base key for dash-separated unknown suffix', () => {
-    // 'h200-customsuffix' → base 'h200' which IS in config
-    const config = getHardwareConfig('h200-customsuffix');
-    expect(config).toBe(HARDWARE_CONFIG.h200);
+  it('handles GB200 NVL72 label vs gpu name divergence', () => {
+    const config = getHardwareConfig('gb200_dynamo-trt');
+    expect(config.label).toBe('GB200 NVL72');
+    expect(config.gpu).toBe("NVIDIA 'Blackwell' GB200 Dynamo TRT");
   });
 
-  it('returns the unknown config when key is completely unrecognized (no base match)', () => {
+  it('returns unknown config when base GPU is not recognised', () => {
     const config = getHardwareConfig('completelynew');
-    expect(config).toBe(HARDWARE_CONFIG.unknown);
+    expect(config.label).toBe('Unknown');
   });
 
-  it('returns the unknown config when neither key nor base is in config', () => {
-    // 'completelynew_variant' → base 'completelynew' → also not in config → unknown
+  it('returns unknown config when neither key nor base is recognised', () => {
     const config = getHardwareConfig('completelynew_variant');
-    expect(config).toBe(HARDWARE_CONFIG.unknown);
+    expect(config.label).toBe('Unknown');
   });
 
   it('always returns an object with required fields (name, label)', () => {
@@ -118,17 +127,17 @@ describe('getHardwareConfig', () => {
     warnSpy.mockRestore();
   });
 
-  it('GPU_SPECS has non-zero power for all entries', () => {
-    for (const [, specs] of Object.entries(GPU_SPECS)) {
-      expect(specs.power).toBeGreaterThan(0);
+  it('HW_REGISTRY has non-zero power for all entries', () => {
+    for (const entry of Object.values(HW_REGISTRY)) {
+      expect(entry.power).toBeGreaterThan(0);
     }
   });
 
-  it('GPU_SPECS has non-negative cost rates for all entries', () => {
-    for (const specs of Object.values(GPU_SPECS)) {
-      expect(specs.costh).toBeGreaterThanOrEqual(0);
-      expect(specs.costn).toBeGreaterThanOrEqual(0);
-      expect(specs.costr).toBeGreaterThanOrEqual(0);
+  it('HW_REGISTRY has non-negative cost rates for all entries', () => {
+    for (const entry of Object.values(HW_REGISTRY)) {
+      expect(entry.costh).toBeGreaterThanOrEqual(0);
+      expect(entry.costn).toBeGreaterThanOrEqual(0);
+      expect(entry.costr).toBeGreaterThanOrEqual(0);
     }
   });
 });
@@ -164,10 +173,11 @@ describe('getGpuSpecs', () => {
     expect(specs.costr).toBe(0);
   });
 
-  it('returns correct specs for all base GPUs in GPU_SPECS', () => {
-    for (const [base, specs] of Object.entries(GPU_SPECS)) {
+  it('returns correct specs for all base GPUs in HW_REGISTRY', () => {
+    for (const [base, entry] of Object.entries(HW_REGISTRY)) {
       const result = getGpuSpecs(base);
-      expect(result).toBe(specs);
+      expect(result.power).toBe(entry.power);
+      expect(result.costh).toBe(entry.costh);
     }
   });
 });
@@ -176,93 +186,28 @@ describe('getGpuSpecs', () => {
 // getModelSortIndex
 // ===========================================================================
 describe('getModelSortIndex', () => {
-  it('returns correct index for "gb300" hardware', () => {
-    expect(getModelSortIndex('gb300')).toBe(MODEL_ORDER.indexOf('gb300'));
+  it('extracts base key from compound keys', () => {
+    expect(getModelSortIndex('h100_vllm')).toBe(getModelSortIndex('h100'));
+    expect(getModelSortIndex('gb200_dynamo-trt')).toBe(getModelSortIndex('gb200'));
   });
 
-  it('returns correct index for "gb200" (starts with "gb")', () => {
-    expect(getModelSortIndex('gb200')).toBe(MODEL_ORDER.indexOf('gb'));
+  it('gb300 sorts before gb200', () => {
+    expect(getModelSortIndex('gb300')).toBeLessThan(getModelSortIndex('gb200'));
   });
 
-  it('returns correct index for "gb200_trt" (starts with "gb")', () => {
-    expect(getModelSortIndex('gb200_trt')).toBe(MODEL_ORDER.indexOf('gb'));
-  });
-
-  it('returns correct index for "b300" hardware', () => {
-    expect(getModelSortIndex('b300')).toBe(MODEL_ORDER.indexOf('b300'));
-  });
-
-  it('returns correct index for "b200" (starts with "b")', () => {
-    expect(getModelSortIndex('b200')).toBe(MODEL_ORDER.indexOf('b'));
-  });
-
-  it('returns correct index for "h100" hardware', () => {
-    const idx = MODEL_ORDER.indexOf('h100');
-    expect(getModelSortIndex('h100')).toBe(idx);
-  });
-
-  it('returns correct index for "h100_vllm" (starts with "h100")', () => {
-    // h100 doesn't start with "gb", "b", "mi355x", "h200", "mi325x"
-    // but does start with "h100"
-    const idx = MODEL_ORDER.indexOf('h100');
-    expect(getModelSortIndex('h100_vllm')).toBe(idx);
-  });
-
-  it('returns correct index for "h200" hardware', () => {
-    const idx = MODEL_ORDER.indexOf('h200');
-    expect(getModelSortIndex('h200')).toBe(idx);
-  });
-
-  it('returns correct index for "mi300x" hardware', () => {
-    const idx = MODEL_ORDER.indexOf('mi300x');
-    expect(getModelSortIndex('mi300x')).toBe(idx);
-  });
-
-  it('returns MODEL_ORDER.length for unknown hardware', () => {
-    expect(getModelSortIndex('unknown_gpu')).toBe(MODEL_ORDER.length);
-  });
-
-  it('returns MODEL_ORDER.length for empty string', () => {
-    expect(getModelSortIndex('')).toBe(MODEL_ORDER.length);
-  });
-
-  it('gb300 sorts before gb200 (gb300 precedes gb in MODEL_ORDER)', () => {
-    expect(MODEL_ORDER.indexOf('gb300')).toBeLessThan(MODEL_ORDER.indexOf('gb'));
-  });
-
-  it('b300 sorts before b200 (b300 precedes b in MODEL_ORDER)', () => {
-    expect(MODEL_ORDER.indexOf('b300')).toBeLessThan(MODEL_ORDER.indexOf('b'));
+  it('b300 sorts before b200', () => {
+    expect(getModelSortIndex('b300')).toBeLessThan(getModelSortIndex('b200'));
   });
 
   it('h200 sorts before h100', () => {
-    expect(MODEL_ORDER.indexOf('h200')).toBeLessThan(MODEL_ORDER.indexOf('h100'));
+    expect(getModelSortIndex('h200')).toBeLessThan(getModelSortIndex('h100'));
   });
 
-  it('MODEL_ORDER contains expected entries', () => {
-    expect(MODEL_ORDER).toContain('gb300');
-    expect(MODEL_ORDER).toContain('gb');
-    expect(MODEL_ORDER).toContain('b300');
-    expect(MODEL_ORDER).toContain('b');
-    expect(MODEL_ORDER).toContain('h200');
-    expect(MODEL_ORDER).toContain('h100');
-  });
-});
-
-// ===========================================================================
-// MODEL_ORDER
-// ===========================================================================
-describe('MODEL_ORDER', () => {
-  it('is a non-empty array', () => {
-    expect(MODEL_ORDER.length).toBeGreaterThan(0);
+  it('returns a high index for unknown hardware', () => {
+    expect(getModelSortIndex('unknown_gpu')).toBeGreaterThanOrEqual(9);
   });
 
-  it('has all unique entries', () => {
-    expect(new Set(MODEL_ORDER).size).toBe(MODEL_ORDER.length);
-  });
-
-  it('contains only lowercase strings', () => {
-    for (const entry of MODEL_ORDER) {
-      expect(entry).toBe(entry.toLowerCase());
-    }
+  it('returns a high index for empty string', () => {
+    expect(getModelSortIndex('')).toBeGreaterThanOrEqual(9);
   });
 });

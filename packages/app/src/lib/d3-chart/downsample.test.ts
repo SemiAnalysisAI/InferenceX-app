@@ -44,7 +44,7 @@ describe('lttbDownsample', () => {
     const data = Array.from({ length: 100 }, (_, i) => ({ x: i, y: Math.sin(i / 10) }));
     const result = lttbDownsample(data, 10, getX, getY);
     expect(result[0]).toBe(data[0]);
-    expect(result[result.length - 1]).toBe(data[data.length - 1]);
+    expect(result.at(-1)).toBe(data.at(-1));
   });
 
   it('returns exactly target number of points', () => {

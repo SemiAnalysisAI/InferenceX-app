@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { InferenceData } from '@/components/inference/types';
+import type { InferenceData } from '@/components/inference/types';
 
 import { interpolateMetricAtInteractivity } from './useInterpolatedTrendData';
 
@@ -87,9 +87,9 @@ describe('interpolateMetricAtInteractivity', () => {
 
   it('works with cost metrics (costh)', () => {
     const points = [
-      makePoint({ x: 20, tpPerGpu: { y: 800, roof: false }, costh: { y: 1.0, roof: false } }),
+      makePoint({ x: 20, tpPerGpu: { y: 800, roof: false }, costh: { y: 1, roof: false } }),
       makePoint({ x: 40, tpPerGpu: { y: 600, roof: false }, costh: { y: 1.5, roof: false } }),
-      makePoint({ x: 60, tpPerGpu: { y: 400, roof: false }, costh: { y: 2.0, roof: false } }),
+      makePoint({ x: 60, tpPerGpu: { y: 400, roof: false }, costh: { y: 2, roof: false } }),
     ];
     const result = interpolateMetricAtInteractivity(points, 30, 'costh');
     expect(result).not.toBeNull();
@@ -142,17 +142,17 @@ describe('interpolateMetricAtInteractivity', () => {
       makePoint({
         x: 40,
         tpPerGpu: { y: 600, roof: false },
-        jTotal: { y: 3.0, roof: false },
+        jTotal: { y: 3, roof: false },
       }),
       makePoint({
         x: 60,
         tpPerGpu: { y: 400, roof: false },
-        jTotal: { y: 4.0, roof: false },
+        jTotal: { y: 4, roof: false },
       }),
     ];
     const result = interpolateMetricAtInteractivity(points, 30, 'jTotal');
     expect(result).not.toBeNull();
-    expect(result!).toBeGreaterThan(2.0);
+    expect(result!).toBeGreaterThan(2);
     expect(result!).toBeLessThan(3.5);
   });
 

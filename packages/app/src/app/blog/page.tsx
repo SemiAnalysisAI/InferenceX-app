@@ -36,7 +36,7 @@ export default async function BlogPage({
 }) {
   const { tag: activeTag } = await searchParams;
   const posts = getAllPosts();
-  const allTags = [...new Set(posts.flatMap((p) => p.tags ?? []))].sort();
+  const allTags = [...new Set(posts.flatMap((p) => p.tags ?? []))].toSorted();
   const filtered = activeTag ? posts.filter((p) => p.tags?.includes(activeTag)) : posts;
 
   return (
@@ -78,7 +78,7 @@ export default async function BlogPage({
                       <article className="min-w-0">
                         <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
                           <time dateTime={post.date}>
-                            {new Date(post.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+                            {new Date(`${post.date}T00:00:00Z`).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',

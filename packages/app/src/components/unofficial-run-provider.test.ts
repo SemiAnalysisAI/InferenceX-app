@@ -164,7 +164,7 @@ describe('buildChartData', () => {
       stubRow({ model: 'dsr1', isl: 1024, osl: 8192, conc: 64 }),
     ];
     const result = buildChartData(rows);
-    const keys = Object.keys(result).sort();
+    const keys = Object.keys(result).toSorted();
     expect(keys).toEqual(['DeepSeek-R1-0528_1k/1k', 'DeepSeek-R1-0528_1k/8k']);
   });
 
@@ -185,13 +185,13 @@ describe('buildChartData', () => {
         model: 'dsr1',
         isl: 1024,
         osl: 1024,
-        metrics: { tput_per_gpu: 100, median_e2el: 5.0, median_intvty: 150, mean_ttft: 0.5 },
+        metrics: { tput_per_gpu: 100, median_e2el: 5, median_intvty: 150, mean_ttft: 0.5 },
       }),
     ];
     const result = buildChartData(rows);
     const group = result['DeepSeek-R1-0528_1k/1k'];
     // e2e chart x-axis is median_e2el
-    expect(group.e2e.data[0].x).toBe(5.0);
+    expect(group.e2e.data[0].x).toBe(5);
     // interactivity chart x-axis is median_intvty
     expect(group.interactivity.data[0].x).toBe(150);
   });

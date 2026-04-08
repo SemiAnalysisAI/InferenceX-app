@@ -17,6 +17,7 @@ export const VALID_TABS = [
   'gpu-specs',
   'ai-chart',
   'gpu-metrics',
+  'submissions',
 ] as const;
 
 export type TabKey = (typeof VALID_TABS)[number];
@@ -61,6 +62,11 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
     title: 'GPU Power & Efficiency Metrics',
     description:
       'GPU power consumption and efficiency metrics during AI inference workloads. Compare tokens-per-watt across hardware.',
+  },
+  submissions: {
+    title: 'Benchmark Submissions',
+    description:
+      'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes across GPU vendors.',
   },
 };
 

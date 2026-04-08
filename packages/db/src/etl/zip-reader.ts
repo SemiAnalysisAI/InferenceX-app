@@ -10,7 +10,7 @@ export function readZipJson(zipPath: string): unknown {
     const zip = new AdmZip(zipPath);
     const entry = zip.getEntries().find((e) => !e.isDirectory && e.name.endsWith('.json'));
     if (!entry) return null;
-    return JSON.parse(entry.getData().toString('utf-8'));
+    return JSON.parse(entry.getData().toString('utf8'));
   } catch {
     return null;
   }
@@ -22,7 +22,7 @@ export function readZipText(zipPath: string, name: string): string | null {
     const zip = new AdmZip(zipPath);
     const entry = zip.getEntries().find((e) => !e.isDirectory && e.name === name);
     if (!entry) return null;
-    return entry.getData().toString('utf-8');
+    return entry.getData().toString('utf8');
   } catch {
     return null;
   }
@@ -39,7 +39,7 @@ export function readZipJsonMap(zipPath: string): Map<string, unknown> | null {
     for (const entry of zip.getEntries()) {
       if (!entry.isDirectory && entry.name.endsWith('.json')) {
         try {
-          out.set(entry.name, JSON.parse(entry.getData().toString('utf-8')));
+          out.set(entry.name, JSON.parse(entry.getData().toString('utf8')));
         } catch {
           out.set(entry.name, null);
         }

@@ -2,15 +2,11 @@ import * as d3 from 'd3';
 import { describe, expect, it, vi } from 'vitest';
 
 import { asMock, createMockGroup } from './test-helpers';
-import { renderPoints, updatePointsOnZoom } from './points';
-import type { PointConfig } from './points';
+import { renderPoints, updatePointsOnZoom, type PointConfig } from './points';
 
 // Mock the downsample module so we can control when LTTB triggers
 vi.mock('../downsample', () => ({
-  lttbDownsample: vi.fn((data: any[], target: number) => {
-    // Simple mock: just return first `target` items
-    return data.slice(0, target);
-  }),
+  lttbDownsample: vi.fn((data: any[], target: number) => data.slice(0, target)),
 }));
 
 import { lttbDownsample } from '../downsample';
@@ -263,13 +259,13 @@ describe('renderPoints', () => {
 
 // ── updatePointsOnZoom ───────────────────────────────────────────────
 
+const newGetCx = (d: TestPoint) => d.px * 2;
+const newGetCy = (d: TestPoint) => d.py * 0.5;
+
 describe('updatePointsOnZoom', () => {
   it('updates cx and cy on existing points', () => {
     const group = createMockGroup();
     renderPoints(group as any, SAMPLE_DATA, makeConfig());
-
-    const newGetCx = (d: TestPoint) => d.px * 2;
-    const newGetCy = (d: TestPoint) => d.py * 0.5;
 
     updatePointsOnZoom(group as any, newGetCx, newGetCy);
 

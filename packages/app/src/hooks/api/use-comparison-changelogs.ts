@@ -20,7 +20,7 @@ export function useComparisonChangelogs(
   availableDates: string[],
 ) {
   const hasGPUs = selectedGPUs.length > 0;
-  const hasDateRange = !!selectedDateRange.startDate && !!selectedDateRange.endDate;
+  const hasDateRange = Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate);
 
   // When GPUs selected: fetch all available dates. When date range also set: limit to range.
   const datesToQuery = useMemo(() => {
@@ -40,7 +40,7 @@ export function useComparisonChangelogs(
   const queries = useQueries({
     queries: datesToQuery.map((date) => ({
       queryKey: ['workflow-info', date],
-      queryFn: () => fetchWorkflowInfo(date),
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchWorkflowInfo(date, signal),
       enabled: hasGPUs,
     })),
   });
@@ -59,8 +59,8 @@ export function useComparisonChangelogs(
 
       results.push({
         date: datesToQuery[i],
-        headRef: data.changelogs[data.changelogs.length - 1]?.head_ref,
-        runUrl: data.runs[data.runs.length - 1]?.html_url ?? undefined,
+        headRef: data.changelogs.at(-1)?.head_ref,
+        runUrl: data.runs.at(-1)?.html_url ?? undefined,
         entries: data.changelogs.map((c: ChangelogRow) => ({
           config_keys: c.config_keys,
           description: c.description,
@@ -72,16 +72,7 @@ export function useComparisonChangelogs(
     return results;
   }, [hasGPUs, datesToQuery, queries]);
 
-  // Intermediate dates with any changelog entries (excluding start/end when date range is set)
-  const intermediateDates = useMemo(() => {
-    if (!hasGPUs || !hasDateRange) return [];
-    return changelogs
-      .filter((c) => c.date !== selectedDateRange.startDate && c.date !== selectedDateRange.endDate)
-      .map((c) => c.date)
-      .sort();
-  }, [hasGPUs, hasDateRange, changelogs, selectedDateRange.startDate, selectedDateRange.endDate]);
-
   const loading = queries.some((q) => q.isLoading);
 
-  return { changelogs, intermediateDates, loading, totalDatesQueried: datesToQuery.length };
+  return { changelogs, loading, totalDatesQueried: datesToQuery.length };
 }

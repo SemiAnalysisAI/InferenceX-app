@@ -6,7 +6,7 @@ Instructions for Claude agents implementing new entity additions.
 >
 > If data for a new model or GPU is ingested before the normalizer mappings exist, those rows are **silently skipped** — `resolveModelKey()` / `hwToGpuKey()` returns `null`, the skip tracker logs them, but nothing is written to the DB. The data isn't lost (source artifacts remain in GCS), but recovering requires a full re-ingest after adding the mappings.
 >
-> **Always warn the user:** the `packages/db` and `packages/constants` changes (normalizers, GPU_KEYS, DB_MODEL_TO_DISPLAY) must be merged and deployed before the first benchmark run containing the new entity. Frontend changes can follow later otherwise the new entity will be missing from dropdowns and charts.
+> **Always warn the user:** the `packages/db` and `packages/constants` changes (normalizers, HW_REGISTRY, DB_MODEL_TO_DISPLAY) must be merged and deployed before the first benchmark run containing the new entity. Frontend changes can follow later otherwise the new entity will be missing from dropdowns and charts.
 
 ---
 
@@ -84,40 +84,32 @@ Ask for the run URL first (see [Workflow](#workflow)). The user may not have one
 Present what you inferred and ask about anything not visible in artifacts:
 
 1. What is the **base GPU key**? (canonical lowercase, e.g. `l20`, `h200`)
-2. What **vendor**: NVIDIA, AMD, or other?
-3. What is the **all-in power per GPU** in kW? Does it depend on framework variant? etc.
-4. What are the **cost rates** in $/GPU/hr? (hyperscaler, neocloud, 3-year rental)
-5. Which **framework variants** will run on it? (e.g. `sglang`, `trt`, `dynamo-trt`, `vllm`, with/without `mtp`)
-6. Where should it **sort** relative to existing GPUs in legends?
-7. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc-slurm`, `-dgxc`, `-nb`)?
-8. Do you have the **full hardware specs** for the GPU Specs tab? (memory GB, memory bandwidth TB/s, FP4/FP8/BF16 TFLOPS, interconnect tech, scale-up bandwidth, NIC model, scale-out topology)
+2. What **vendor** and **architecture codename**? (e.g. NVIDIA Blackwell, AMD CDNA 4)
+3. What is the **display label**? (e.g. `H200`, `GB200 NVL72`)
+4. What is the **all-in power per GPU** in kW?
+5. What are the **cost rates** in $/GPU/hr? (hyperscaler, neocloud, retail)
+6. What is the **TDP** in watts?
+7. Where should it **sort** relative to existing GPUs in legends? (lower = first)
+8. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc-slurm`, `-dgxc`, `-nb`)?
+9. Do you have the **full hardware specs** for the GPU Specs tab? (memory GB, memory bandwidth TB/s, FP4/FP8/BF16 TFLOPS, interconnect tech, scale-up bandwidth, NIC model, scale-out topology)
 
 ### Then apply
 
-**`packages/constants/src/gpu-keys.ts`**:
+**`packages/constants/src/gpu-keys.ts`** (single source of truth):
 
-- Add to `GPU_KEYS` Set
+- Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costn`, `costr`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
+- If this is a **new vendor** (not NVIDIA or AMD), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type in `src/lib/dynamic-colors.ts`.
 
 **`packages/db/src/etl/normalizers.ts`**:
 
-- `hwToGpuKey()` — add `.replace()` for any new suffixes
-
-**`packages/app/src/lib/constants.ts`**:
-
-1. `GPU_SPECS` — add `{ power, costh, costn, costr }`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
-2. `HARDWARE_CONFIG` — add entry per variant (`base`, `base-sglang`, `base-trt`, etc.) with `name`, `label`, `suffix`, `gpu`, `color`
-3. `MODEL_ORDER` — add prefix string at desired sort position
-4. `COLOR_FAMILIES` — if the vendor is **not NVIDIA or AMD**, add a new color family (e.g. `aws: [...]`)
-5. `getColorFamily()` — add vendor detection for the new GPU key prefix (e.g. `hwKey.startsWith('trainium')`)
-
-**`packages/app/src/app/globals.css`**:
-
-- Add `--<hwKey>: oklch(...)` and `--color-<hwKey>: var(--<hwKey>)` per variant. Use green hues for NVIDIA, red for AMD, yellow-orange for AWS. Gradient from light to dark within each GPU's variants.
+- `hwToGpuKey()` — add `.replace()` for any new artifact suffixes
 
 **`packages/app/src/lib/gpu-specs.ts`** (if specs provided):
 
 - Add `GpuSpec` entry with full hardware data
 - Add topology config in `getTopologyConfig()` / `getScaleUpTopologyConfig()`
+
+**No other files need changes.** Display labels, sort order, cost/power data, framework variant configs, and chart colors are all derived automatically from `HW_REGISTRY`.
 
 ---
 
@@ -199,23 +191,21 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 1. What is the **framework name** as it appears in artifact names? (e.g. from `bmk_glm5_1k1k_fp8_sglang_tp8-...`, the framework segment is `sglang`)
 2. Does it need **normalization**? Currently `sglang-disagg` in raw data is normalized to `mori-sglang` (AMD MoRI). Similarly `dynamo-trtllm` → `dynamo-trt` (rename). Should this new framework be stored as-is, or renamed?
-3. Which **GPUs** will use this framework, if any already known? (determines HARDWARE_CONFIG variants needed)
 
 > **Note:** When asking the user, show concrete examples from the artifacts — quote the exact artifact name and highlight which segment you're reading as the framework. Don't ask vague questions. You **MUST** include the normalization example in question 2 (currently `sglang-disagg` → `mori-sglang`, `dynamo-trtllm` → `dynamo-trt`) so the user understands what "normalization" means concretely.
 
 ### Then apply
 
+**`packages/constants/src/framework-aliases.ts`** (single source of truth):
+
+- Add one entry to `FW_REGISTRY` with `{ label }` (the display name)
+- If the framework is a **rename/alias** of an existing one, add to `FRAMEWORK_ALIASES` instead
+
 **`packages/db/src/etl/normalizers.ts`**:
 
 - `normalizeFramework()` — add special case only if name needs transformation
 
-**`packages/app/src/lib/constants.ts`**:
-
-- `HARDWARE_CONFIG` — add entries per GPU+framework combination
-
-**`packages/app/src/app/globals.css`**:
-
-- Add CSS color variables for the new framework variants
+**No other files need changes.** Display labels, `FRAMEWORK_KEYS`, and `FRAMEWORK_LABELS` are all derived automatically from `FW_REGISTRY` and `FRAMEWORK_ALIASES`.
 
 ---
 

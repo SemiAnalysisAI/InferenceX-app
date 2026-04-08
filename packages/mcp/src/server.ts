@@ -6,10 +6,15 @@ import {
   PRECISION_KEYS,
   SPEC_METHOD_KEYS,
 } from '@semianalysisai/inferencex-constants';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { postgresOptionsForUrl } from '@semianalysisai/inferencex-db/connection';
+import postgres from 'postgres';
 import { z } from 'zod';
 
+const url = process.env.DATABASE_READONLY_URL!;
+const db = postgres(url, postgresOptionsForUrl(url));
 const MAX_ROWS = 5_000;
+
+const roundMetric = (v: unknown) => (typeof v === 'number' ? Math.round(v * 10000) / 10000 : v);
 
 /**
  * Defense-in-depth query filter. The readonly DB role enforces permissions,
@@ -22,14 +27,14 @@ const BLOCKED_PATTERN =
 const QUERY_TIMEOUT_MS = 5_000;
 
 // ── Enum arrays for JSON Schema constraints ──────────────────────────────
-const HW_ENUM = [...GPU_KEYS].sort() as [string, ...string[]];
-const MODEL_ENUM = Object.keys(DB_MODEL_TO_DISPLAY).sort() as [string, ...string[]];
-const FW_ENUM = [...FRAMEWORK_KEYS].sort() as [string, ...string[]];
-const PREC_ENUM = [...PRECISION_KEYS].sort() as [string, ...string[]];
-const SPEC_ENUM = [...SPEC_METHOD_KEYS].sort() as [string, ...string[]];
+const HW_ENUM = [...GPU_KEYS].toSorted() as [string, ...string[]];
+const MODEL_ENUM = Object.keys(DB_MODEL_TO_DISPLAY).toSorted() as [string, ...string[]];
+const FW_ENUM = [...FRAMEWORK_KEYS].toSorted() as [string, ...string[]];
+const PREC_ENUM = [...PRECISION_KEYS].toSorted() as [string, ...string[]];
+const SPEC_ENUM = [...SPEC_METHOD_KEYS].toSorted() as [string, ...string[]];
 
 const modelMapping = Object.entries(DB_MODEL_TO_DISPLAY)
-  .sort(([a], [b]) => a.localeCompare(b))
+  .toSorted(([a], [b]) => a.localeCompare(b))
   .map(([k, v]) => `${k}=${v}`)
   .join(', ');
 
@@ -108,9 +113,10 @@ export function createServer(): McpServer {
         'Get full schema overview: tables, column names, enum values, metric keys, and example SQL. Call this if you need details beyond what the server instructions provide.',
       annotations: { readOnlyHint: true },
     },
-    async () => ({
-      content: [{ type: 'text' as const, text: DOMAIN_OVERVIEW }],
-    }),
+    () =>
+      Promise.resolve({
+        content: [{ type: 'text' as const, text: DOMAIN_OVERVIEW }],
+      }),
   );
 
   // ── High-level query tools ───────────────────────────────────────────
@@ -123,7 +129,6 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const db = getDb();
       const rows = (await db`SELECT DISTINCT hardware FROM configs ORDER BY hardware`) as {
         hardware: string;
       }[];
@@ -146,7 +151,6 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const db = getDb();
       const rows = (await db`SELECT DISTINCT model FROM configs ORDER BY model`) as {
         model: string;
       }[];
@@ -174,7 +178,6 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true },
     },
     async ({ hardware, model }) => {
-      const db = getDb();
       const rows = (await db`
         SELECT DISTINCT hardware, framework, model, precision, spec_method, disagg
         FROM configs
@@ -253,7 +256,6 @@ export function createServer(): McpServer {
       metrics: requestedMetrics,
       limit,
     }) => {
-      const db = getDb();
       const rowLimit = Math.min(limit ?? 200, MAX_ROWS);
       // Allowlisted sort keys to prevent SQL injection via JSONB key
       const SORT_KEYS = new Set([
@@ -325,13 +327,11 @@ export function createServer(): McpServer {
       if (osl) appliedFilters.osl = osl;
       if (conc) appliedFilters.conc = conc;
 
-      const round = (v: unknown) => (typeof v === 'number' ? Math.round(v * 10000) / 10000 : v);
-
       const processedRows = rows.map((row) => {
         const m = row.metrics as Record<string, number> | null;
         const extracted: Record<string, unknown> = {};
         if (extractKeys) {
-          for (const key of extractKeys) extracted[key] = round(m?.[key] ?? null);
+          for (const key of extractKeys) extracted[key] = roundMetric(m?.[key] ?? null);
         }
         const out: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(row)) {
@@ -352,7 +352,7 @@ export function createServer(): McpServer {
           {
             type: 'text' as const,
             text: JSON.stringify({
-              ...(Object.keys(appliedFilters).length ? { filters: appliedFilters } : {}),
+              ...(Object.keys(appliedFilters).length > 0 ? { filters: appliedFilters } : {}),
               rows: processedRows,
               count: processedRows.length,
               truncated,
@@ -388,18 +388,16 @@ export function createServer(): McpServer {
           isError: true,
         };
       }
-      const db = getDb();
+
       try {
-        const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), QUERY_TIMEOUT_MS);
-        let rows: Record<string, unknown>[];
-        try {
-          rows = (await db.query(query, [], {
-            fetchOptions: { signal: ac.signal },
-          })) as Record<string, unknown>[];
-        } finally {
-          clearTimeout(timer);
-        }
+        const rows = (await Promise.race([
+          db.unsafe(query),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Query timed out'));
+            }, QUERY_TIMEOUT_MS);
+          }),
+        ])) as Record<string, unknown>[];
         const truncated = rows.length > MAX_ROWS;
         const result = truncated ? rows.slice(0, MAX_ROWS) : rows;
         return {
@@ -410,12 +408,12 @@ export function createServer(): McpServer {
             },
           ],
         };
-      } catch (err) {
+      } catch (error) {
         return {
           content: [
             {
               type: 'text' as const,
-              text: `SQL error: ${err instanceof Error ? err.message : String(err)}`,
+              text: `SQL error: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

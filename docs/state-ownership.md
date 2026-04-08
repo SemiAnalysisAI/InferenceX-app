@@ -80,7 +80,7 @@ Depends on: `GlobalFilterProvider` (reads all filter state and availability, inc
 
 **Derived availability** (GPU-level, computed from `availabilityRows` inherited from GlobalFilterContext):
 
-- `availableGPUs` — hardware configs that have data for the current model + sequence + precisions AND exist in `HARDWARE_CONFIG`
+- `availableGPUs` — hardware configs that have data for the current model + sequence + precisions AND have a known base GPU in `HW_REGISTRY`
 - `dateRangeAvailableDates` — dates available for the current filter combination, further narrowed by `selectedGPUs`
 - `hwTypesWithData` — `Set<string>` of GPU keys currently present in fetched chart data
 
@@ -198,7 +198,7 @@ GlobalFilterProvider
 InferenceProvider (receives availabilityRows from GlobalFilterContext)
   → availableGPUs     = availabilityRows filtered to (model, effectiveSequence, effectivePrecisions)
                         → hwKey extracted via buildAvailabilityHwKey()
-                        → intersection with HARDWARE_CONFIG keys
+                        → filtered by isKnownGpu() (base GPU in HW_REGISTRY)
                         → sorted by getModelSortIndex
   → selectedGPUs      (user pick, subset of availableGPUs)
   → dateRangeAvailableDates = availableDates, narrowed further to dates where selectedGPUs have data

@@ -155,7 +155,7 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 1. `page-content.tsx`: Add to `VALID_TABS`, add `TabsTrigger` (desktop), `SelectItem` (mobile), `TabsContent`
 2. Create a per-section context provider (see `InferenceContext.tsx`, `EvaluationContext.tsx` for patterns)
-3. Use `ChartLegend` with `variant="sidebar"`, sorted by `MODEL_ORDER`, default expanded
+3. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
 4. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
 
 ## Subsystem Docs

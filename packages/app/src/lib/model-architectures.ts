@@ -286,20 +286,27 @@ export function getArchitectureSummary(arch: ModelArchitecture): string {
  */
 export function getAttentionLabel(type: AttentionType): string {
   switch (type) {
-    case 'MHA':
+    case 'MHA': {
       return 'Multi-Head Attention';
-    case 'GQA':
+    }
+    case 'GQA': {
       return 'Grouped Query Attention';
-    case 'MLA':
+    }
+    case 'MLA': {
       return 'Multi-head Latent Attention';
-    case 'Linear':
+    }
+    case 'Linear': {
       return 'Linear Attention';
-    case 'Hybrid':
+    }
+    case 'Hybrid': {
       return 'Hybrid Attention';
-    case 'AlternatingSinkGQA':
+    }
+    case 'AlternatingSinkGQA': {
       return 'Alternating Sink/Full GQA';
-    default:
+    }
+    default: {
       return type;
+    }
   }
 }
 

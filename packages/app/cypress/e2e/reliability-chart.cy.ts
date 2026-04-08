@@ -115,7 +115,7 @@ describe('Reliability Chart — Content & Interactions', () => {
       .find('.tick text')
       .should('have.length.greaterThan', 0)
       .then(($ticks) => {
-        const texts = Array.from($ticks).map((el) => el.textContent || '');
+        const texts = [...$ticks].map((el) => el.textContent || '');
         const hasPercentage = texts.some((t) => /\d+%/.test(t));
         expect(hasPercentage).to.equal(true);
       });

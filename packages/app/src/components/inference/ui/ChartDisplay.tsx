@@ -1,16 +1,15 @@
 'use client';
 import { track } from '@/lib/analytics';
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 import { useInference } from '@/components/inference/InferenceContext';
-import { InferenceData, OverlayData, TrendDataPoint } from '@/components/inference/types';
+import type { InferenceData, OverlayData, TrendDataPoint } from '@/components/inference/types';
 import { processOverlayChartData } from '@/components/inference/utils';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import {
@@ -20,21 +19,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { ShareButton } from '@/components/ui/share-button';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { GPU_SPECS } from '@/lib/constants';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
   isModelExperimental,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
@@ -95,10 +90,8 @@ function E2eXAxisDropdown({
 }
 
 /**
- * Renders a display of scatter charts based on filtered graph data.
- * It maps through the filtered graphs from the InferenceChartContext and renders a Card for each,
- * containing a heading and a ScatterGraph component.
- * @returns {JSX.Element[]} An array of JSX.Element representing the chart displays.
+ * Renders the inference chart cards, captions, overlay controls, and trend drill-down dialog for
+ * the current filtered benchmark data.
  */
 export default function ChartDisplay() {
   const {
@@ -111,6 +104,8 @@ export default function ChartDisplay() {
     selectedE2eXAxisMetric,
     selectedGPUs,
     selectedPrecisions,
+    selectedDates,
+    setSelectedDates,
     selectedDateRange,
     dateRangeAvailableDates,
     selectedModel,
@@ -127,7 +122,6 @@ export default function ChartDisplay() {
 
   const {
     changelogs,
-    intermediateDates,
     loading: changelogsLoading,
     totalDatesQueried,
   } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
@@ -147,7 +141,7 @@ export default function ChartDisplay() {
       rawData: { data: InferenceData[]; hardwareConfig: any } | null,
       chartType: 'e2e' | 'interactivity',
     ): OverlayData | null => {
-      if (!rawData || !rawData.data.length) return null;
+      if (!rawData || rawData.data.length === 0) return null;
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
       const processed = processOverlayChartData(
@@ -240,7 +234,7 @@ export default function ChartDisplay() {
   const isFirstLoad = loading && graphs.length === 0;
 
   const displayGraphs = isFirstLoad
-    ? [...Array(2)].map((_, index) => (
+    ? Array.from({ length: 2 }).map((_, index) => (
         <Card key={`skeleton-${index}`}>
           <Skeleton className="h-7 w-2/4 mb-1" />
           <Skeleton className="h-5 w-3/4 mb-2" />
@@ -370,7 +364,7 @@ export default function ChartDisplay() {
                           <>
                             {' '}
                             • Updated:{' '}
-                            {new Date(selectedRunDate + 'T00:00:00Z').toLocaleDateString('en-US', {
+                            {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: '2-digit',
                               day: '2-digit',
@@ -379,213 +373,7 @@ export default function ChartDisplay() {
                           </>
                         )}
                       </p>
-                      {(selectedYAxisMetric === 'y_tpPerMw' ||
-                        selectedYAxisMetric === 'y_inputTputPerMw' ||
-                        selectedYAxisMetric === 'y_outputTputPerMw') && (
-                        <>
-                          <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
-                            All in Power/GPU:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}: {specs.power}kW
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/datacenter-industry-model/"
-                              >
-                                SemiAnalysis Datacenter Industry Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      {(selectedYAxisMetric === 'y_costh' ||
-                        selectedYAxisMetric === 'y_costn' ||
-                        selectedYAxisMetric === 'y_costr') && (
-                        <>
-                          <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
-                            TCO $/GPU/hr:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}:{' '}
-                                {selectedYAxisMetric === 'y_costh'
-                                  ? specs.costh
-                                  : selectedYAxisMetric === 'y_costn'
-                                    ? specs.costn
-                                    : specs.costr}
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
-                              >
-                                SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      {(selectedYAxisMetric === 'y_costhOutput' ||
-                        selectedYAxisMetric === 'y_costnOutput' ||
-                        selectedYAxisMetric === 'y_costrOutput') && (
-                        <>
-                          <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
-                            TCO $/GPU/hr:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}:{' '}
-                                {selectedYAxisMetric === 'y_costhOutput'
-                                  ? specs.costh
-                                  : selectedYAxisMetric === 'y_costnOutput'
-                                    ? specs.costn
-                                    : specs.costr}
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
-                              >
-                                SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      {(selectedYAxisMetric === 'y_costhi' ||
-                        selectedYAxisMetric === 'y_costni' ||
-                        selectedYAxisMetric === 'y_costri') && (
-                        <>
-                          <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
-                            TCO $/GPU/hr:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}:{' '}
-                                {selectedYAxisMetric === 'y_costhi'
-                                  ? specs.costh
-                                  : selectedYAxisMetric === 'y_costni'
-                                    ? specs.costn
-                                    : specs.costr}
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
-                              >
-                                SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          selectedYAxisMetric.startsWith('y_cost')
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate cost per decode GPU or per prefill GPU,
-                          rather than per total GPU count. This makes direct cost comparison with
-                          aggregated configs not an apples-to-apples comparison.
-                        </p>
-                      </div>
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          selectedYAxisMetric === 'y_inputTputPerGpu' ||
-                          selectedYAxisMetric === 'y_outputTputPerGpu'
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate cost per decode GPU or per prefill GPU,
-                          rather than per total GPU count. This makes direct cost comparison with
-                          aggregated configs not an apples-to-apples comparison.
-                        </p>
-                      </div>
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          selectedYAxisMetric === 'y_tpPerMw' ||
-                          selectedYAxisMetric === 'y_inputTputPerMw' ||
-                          selectedYAxisMetric === 'y_outputTputPerMw'
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate power per decode GPU or per prefill GPU,
-                          rather than per total GPU count. This makes direct power comparison with
-                          aggregated configs not an apples-to-apples comparison.
-                        </p>
-                      </div>
-                      {selectedYAxisMetric.startsWith('y_j') && (
-                        <>
-                          <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
-                            All in Power/GPU:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}: {specs.power}kW
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/datacenter-industry-model/"
-                              >
-                                SemiAnalysis Datacenter Industry Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          selectedYAxisMetric.startsWith('y_j')
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate Joules per decode GPU or per prefill GPU,
-                          rather than per total GPU count. This makes direct Joules per token
-                          comparison with aggregated configs not an apples-to-apples comparison.
-                        </p>
-                      </div>
+                      <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
                       <div
                         className={`overflow-hidden transition-all duration-200 ease-in-out ${
                           isModelExperimental(selectedModel)
@@ -669,15 +457,9 @@ export default function ChartDisplay() {
                   and serving parameters.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <ShareButton />
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <ShareTwitterButton />
-                  <ShareLinkedInButton />
-                </div>
-              </div>
+              <ChartShareActions />
             </div>
-            <ChartControls intermediateDates={intermediateDates} />
+            <ChartControls />
             <ModelArchitectureDiagram model={selectedModel} />
             {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
             {selectedGPUs.length > 0 && (
@@ -687,6 +469,21 @@ export default function ChartDisplay() {
                 selectedPrecisions={selectedPrecisions}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
+                selectedDates={selectedDates}
+                selectedDateRange={selectedDateRange}
+                onAddDate={(date) => {
+                  if (!selectedDates.includes(date)) {
+                    setSelectedDates([...selectedDates, date]);
+                  }
+                }}
+                onRemoveDate={(date) => {
+                  setSelectedDates(selectedDates.filter((d) => d !== date));
+                }}
+                onAddAllDates={(dates) => {
+                  const merged = [...new Set([...selectedDates, ...dates])];
+                  setSelectedDates(merged);
+                }}
+                firstAvailableDate={dateRangeAvailableDates[0]}
               />
             )}
           </div>

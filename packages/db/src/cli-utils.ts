@@ -15,3 +15,8 @@ export function confirm(prompt: string): Promise<boolean> {
 export function hasYesFlag(): boolean {
   return process.argv.includes('--yes') || process.argv.includes('-y');
 }
+
+/** Returns true if --no-ssl was passed as a CLI arg. */
+export function hasNoSslFlag(): boolean {
+  return process.argv.includes('--no-ssl');
+}

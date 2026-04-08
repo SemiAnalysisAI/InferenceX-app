@@ -4,9 +4,11 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import { useEffect, useMemo, useRef } from 'react';
 
-import { HardwareConfig } from '@/components/inference/types';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import type { HardwareConfig } from '@/components/inference/types';
+import { getHardwareConfig } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
+import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -17,7 +19,13 @@ import type {
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { getDisplayLabel } from '@/lib/utils';
 
-import { BarMetric, CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
+import type {
+  BarMetric,
+  CalculatorMode,
+  CostProvider,
+  CostType,
+  InterpolatedResult,
+} from './types';
 
 interface ThroughputBarChartProps {
   results: InterpolatedResult[];
@@ -31,7 +39,7 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Optional color resolver — when provided, overrides static HARDWARE_CONFIG colors. */
+  /** Optional color resolver — when provided, overrides static hardware config colors. */
   colorResolver?: (hwKey: string) => string;
 }
 
@@ -55,12 +63,15 @@ export function getMetricValue(
   costType: CostType,
 ): number {
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return getTpPerMwForType(d, costType);
-    case 'cost':
+    }
+    case 'cost': {
       return getCostForType(d, costType);
-    default:
+    }
+    default: {
       return getThroughputForType(d, costType);
+    }
   }
 }
 
@@ -71,14 +82,17 @@ export function getMetricLabel(
 ): string {
   const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return `${tokenTypePrefix}Tokens per Provisioned All-in Megawatt (tok/s/MW)`;
-    case 'cost':
+    }
+    case 'cost': {
       return `Cost ($${getCostTypeLabel(costType)})`;
-    default:
+    }
+    default: {
       return mode === 'interactivity_to_throughput'
         ? `${tokenTypePrefix}Throughput per GPU (tok/s/gpu)`
         : 'Interactivity (tok/s/user)';
+    }
   }
 }
 
@@ -89,25 +103,31 @@ export function getValueLabel(
   costType: CostType,
 ): string {
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return `${getTpPerMwForType(d, costType).toFixed(0)} tok/s/MW`;
-    case 'cost':
+    }
+    case 'cost': {
       return `$${getCostForType(d, costType).toFixed(3)}${getCostTypeLabel(costType)}`;
-    default:
+    }
+    default: {
       return mode === 'interactivity_to_throughput'
         ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/gpu`
         : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+    }
   }
 }
 
 export function getCostProviderLabel(provider: CostProvider): string {
   switch (provider) {
-    case 'costh':
+    case 'costh': {
       return 'Owning - Hyperscaler';
-    case 'costn':
+    }
+    case 'costn': {
       return 'Owning - Neocloud';
-    case 'costr':
+    }
+    case 'costr': {
       return 'Renting - 3yr Rental';
+    }
   }
 }
 
@@ -127,16 +147,18 @@ export function getChartTitle(
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       return `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt at ${targetLabel}`;
+    }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
       return `Cost per Million ${tokenTypeLabel} Tokens (${providerLabel}) at ${targetLabel}`;
     }
-    default:
+    default: {
       return mode === 'interactivity_to_throughput'
         ? `${tokenTypeLabel} Token Throughput per GPU at ${targetLabel}`
         : `Interactivity at ${targetLabel}`;
+    }
   }
 }
 
@@ -147,18 +169,21 @@ export function getSortedResults(
 ): InterpolatedResult[] {
   const sorted = [...results];
   switch (barMetric) {
-    case 'power':
+    case 'power': {
       // Most efficient first (descending)
       sorted.sort((a, b) => getTpPerMwForType(b, costType) - getTpPerMwForType(a, costType));
       return sorted;
-    case 'cost':
+    }
+    case 'cost': {
       // Cheapest first (ascending cost)
       sorted.sort((a, b) => getCostForType(a, costType) - getCostForType(b, costType));
       return sorted;
-    default:
+    }
+    default: {
       // Highest throughput first (descending, using token-type-appropriate value)
       sorted.sort((a, b) => getThroughputForType(b, costType) - getThroughputForType(a, costType));
       return sorted;
+    }
   }
 }
 
@@ -183,7 +208,7 @@ export function generateTooltipHTML(
   runUrl?: string,
   isPinned?: boolean,
 ): string {
-  const config = hardwareConfig[d.hwKey] || HARDWARE_CONFIG[d.hwKey];
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
   const label = d.precision ? `${baseName} (${d.precision.toUpperCase()})` : baseName;
   const costLabel = getCostTypeLabel(costType);
@@ -216,10 +241,10 @@ export function generateTooltipHTML(
   const precision = nearest?.precision ?? '';
   const disagg = nearest?.disagg;
 
-  let parallelismHtml = '';
-  if (ep != null && ep > 1 && tp === ep) {
+  let parallelismHtml: string;
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Parallelism:</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
-  } else if (ep != null && ep > 1) {
+  } else if (ep !== null && ep !== undefined && ep > 1) {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}, <strong>EP:</strong> ${ep}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
   } else {
     parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP:</strong> ${tp}${dpAttn ? ', <strong>DPA:</strong> True' : ''}</div>`;
@@ -263,7 +288,7 @@ export function generateTooltipHTML(
 // ── Helpers at module scope for use in memos and layers ──
 
 function getLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
-  const config = hardwareConfig[d.hwKey] || HARDWARE_CONFIG[d.hwKey];
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
   if (d.precision) return `${baseName} (${d.precision.toUpperCase()})`;
   return baseName;
@@ -285,14 +310,16 @@ function positionLabelPairs(
   const valueLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.overlay-label');
 
-  // Build a map of max text width per resultKey
+  // Build a map of max text width per resultKey (pretext, no reflow)
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
-    maxWidths.set(d.resultKey, this.getComputedTextLength());
+    const text = d3.select(this).text();
+    maxWidths.set(d.resultKey, measureTextWidth(text, '600 12px sans-serif'));
   });
   overlayLabels.each(function (d) {
+    const text = d3.select(this).text();
     const prev = maxWidths.get(d.resultKey) ?? 0;
-    maxWidths.set(d.resultKey, Math.max(prev, this.getComputedTextLength()));
+    maxWidths.set(d.resultKey, Math.max(prev, measureTextWidth(text, '500 10px sans-serif')));
   });
 
   const apply = (sel: d3.Selection<SVGTextElement, InterpolatedResult, SVGGElement, unknown>) => {
@@ -351,19 +378,16 @@ export default function ThroughputBarChart({
     return Math.max(600, barCount * 55 + 120);
   }, [sortedResults.length]);
 
-  // Dynamic left margin: measure longest Y-axis label via canvas
+  // Dynamic left margin: measure longest Y-axis label via pretext
   const dynamicMargin = useMemo(() => {
-    if (typeof document === 'undefined' || sortedResults.length === 0)
-      return { top: 20, right: 20, bottom: 60, left: 80 };
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    ctx.font = '12px sans-serif';
-    let maxWidth = 0;
-    for (const r of sortedResults) {
-      const w = ctx.measureText(getLabel(r, hardwareConfig)).width;
-      if (w > maxWidth) maxWidth = w;
-    }
-    return { top: 20, right: 20, bottom: 60, left: Math.max(80, Math.ceil(maxWidth * 0.6) + 12) };
+    if (sortedResults.length === 0) return { top: 20, right: 20, bottom: 60, left: 80 };
+    const labels = sortedResults.map((r) => getLabel(r, hardwareConfig));
+    return {
+      top: 20,
+      right: 20,
+      bottom: 60,
+      left: computeLeftMargin(labels, { split: 'parens', minMargin: 80, padding: 12 }),
+    };
   }, [sortedResults, hardwareConfig]);
 
   // X domain
@@ -374,7 +398,7 @@ export default function ThroughputBarChart({
 
   // Y domain — reversed because useD3ChartRenderer builds band scale with range [height, 0]
   const yDomain = useMemo(
-    () => [...sortedResults].reverse().map((r) => r.resultKey),
+    () => [...sortedResults].toReversed().map((r) => r.resultKey),
     [sortedResults],
   );
 
@@ -486,37 +510,7 @@ export default function ThroughputBarChart({
 
   // ── Y axis customize: two-line GPU labels ──
 
-  const yAxisConfig = useMemo(
-    () => ({
-      customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-        axisGroup.selectAll('.tick text').each(function (d) {
-          const el = d3.select(this);
-          const r = sortedResults.find((item) => item.resultKey === (d as string));
-          const fullLabel = r ? getLabel(r, hardwareConfig) : (d as string);
-          const match = fullLabel.match(/^(.+?)(\s*\(.+\))$/);
-          el.text(null);
-          if (match) {
-            el.append('tspan')
-              .text(match[1])
-              .attr('x', -8)
-              .attr('dy', '-0.4em')
-              .attr('font-size', '12px')
-              .attr('font-weight', '600');
-            el.append('tspan')
-              .text(match[2].trim())
-              .attr('x', -8)
-              .attr('dy', '1.2em')
-              .attr('font-size', '10px')
-              .style('fill', 'var(--muted-foreground)');
-          } else {
-            el.text(fullLabel).attr('font-size', '12px');
-          }
-          el.attr('text-anchor', 'end');
-        });
-      },
-    }),
-    [sortedResults, hardwareConfig],
-  );
+  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels({ split: 'parens' }) }), []);
 
   const xAxisConfig = useMemo(() => ({ tickCount: 6 }), []);
 

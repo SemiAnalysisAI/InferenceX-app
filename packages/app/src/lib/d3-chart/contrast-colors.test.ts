@@ -8,6 +8,9 @@ const mockCtx = {
   clearRect: vi.fn(),
   fillRect: vi.fn(),
   getImageData: vi.fn(() => mockImageData),
+  get fillStyle(): string {
+    return '';
+  },
   set fillStyle(_: string) {
     /* noop — the test controls output via mockImageData */
   },

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
@@ -9,8 +9,8 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 export const dynamic = 'force-dynamic';
 
 const getCachedServerLog = cachedQuery(
-  async (id: number) => {
-    if (JSON_MODE) return jsonProvider.getServerLog(id);
+  (id: number) => {
+    if (JSON_MODE) return Promise.resolve(jsonProvider.getServerLog(id));
     return getServerLog(getDb(), id);
   },
   'server-log',

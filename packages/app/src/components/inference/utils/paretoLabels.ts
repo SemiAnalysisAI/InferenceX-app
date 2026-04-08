@@ -71,8 +71,8 @@ export const labelSimilarity = (a: string, b: string): number => {
 export const computeParetoPointLabels = (
   rooflinePoints: InferenceData[],
   colorMap: Map<string, string>,
-): ParetoPointLabel[] => {
-  return rooflinePoints.map((point) => {
+): ParetoPointLabel[] =>
+  rooflinePoints.map((point) => {
     const label = getParetoLabel(point);
     return {
       point,
@@ -80,7 +80,6 @@ export const computeParetoPointLabels = (
       color: colorMap.get(label) || '#888',
     };
   });
-};
 
 /**
  * Builds a lookup from data point reference → gradient label color.
@@ -118,7 +117,7 @@ export const computeGradientStops = (
 
   const stops: { offset: number; color: string }[] = [];
   const totalMinPx = xScale(pointLabels[0].point.x);
-  const totalMaxPx = xScale(pointLabels[pointLabels.length - 1].point.x);
+  const totalMaxPx = xScale(pointLabels.at(-1)!.point.x);
   const totalRange = totalMaxPx - totalMinPx;
   if (totalRange <= 0) return null;
 
@@ -154,11 +153,9 @@ export const computeGradientStops = (
         stops.push({ offset: toOffset(rightPx - blendSize), color: curr.color });
         // Blend zone
         stops.push({ offset: toOffset(rightPx + blendSize), color: next.color });
-      } else {
+      } else if (i === 0) {
         // Same label, just add the territory start
-        if (i === 0) {
-          stops.push({ offset: toOffset(leftPx), color: curr.color });
-        }
+        stops.push({ offset: toOffset(leftPx), color: curr.color });
       }
     } else {
       // Last point — add final stop
@@ -170,8 +167,8 @@ export const computeGradientStops = (
   if (stops.length > 0 && stops[0].offset > 0) {
     stops.unshift({ offset: 0, color: stops[0].color });
   }
-  if (stops.length > 0 && stops[stops.length - 1].offset < 1) {
-    stops.push({ offset: 1, color: stops[stops.length - 1].color });
+  if (stops.length > 0 && stops.at(-1)!.offset < 1) {
+    stops.push({ offset: 1, color: stops.at(-1)!.color });
   }
 
   return stops;

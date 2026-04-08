@@ -1,6 +1,6 @@
 import { resolveFrameworkAliasesInString } from '@semianalysisai/inferencex-constants';
 
-import { MODEL_PREFIX_MAPPING, Precision, getPrecisionLabel } from '@/lib/data-mappings';
+import { type Precision, MODEL_PREFIX_MAPPING, getPrecisionLabel } from '@/lib/data-mappings';
 import { getFrameworkLabel } from '@/lib/utils';
 
 export function formatChangelogDescription(desc: string | string[]) {
@@ -31,7 +31,7 @@ export function formatChangelogDescription(desc: string | string[]) {
  */
 export function configKeyMatchesHwKey(configKey: string, hwKey: string): boolean {
   const gpuAndFramework = resolveFrameworkAliasesInString(configKey.split('-').slice(2).join('-'));
-  const normalizedHwKey = hwKey.replace(/_/g, '-');
+  const normalizedHwKey = hwKey.replaceAll('_', '-');
   return gpuAndFramework === normalizedHwKey;
 }
 

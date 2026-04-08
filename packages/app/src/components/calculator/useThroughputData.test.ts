@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { GPUDataPoint } from './types';
+import type { GPUDataPoint } from './types';
 import {
   getCostField,
   hermiteInterpolate,
@@ -25,7 +25,7 @@ function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
     tp: 8,
     precision: 'fp8',
     costh: 1.5,
-    costn: 2.0,
+    costn: 2,
     costr: 1.2,
     costhi: 0.8,
     costni: 1.1,
@@ -64,7 +64,7 @@ describe('sign', () => {
 describe('getCostField', () => {
   const p = makePoint({
     costh: 1.5,
-    costn: 2.0,
+    costn: 2,
     costr: 1.2,
     costhi: 0.8,
     costni: 1.1,
@@ -76,7 +76,7 @@ describe('getCostField', () => {
 
   it('returns total cost for each provider', () => {
     expect(getCostField(p, 'costh', 'total')).toBe(1.5);
-    expect(getCostField(p, 'costn', 'total')).toBe(2.0);
+    expect(getCostField(p, 'costn', 'total')).toBe(2);
     expect(getCostField(p, 'costr', 'total')).toBe(1.2);
   });
 
@@ -97,17 +97,17 @@ describe('getCostField', () => {
 // paretoFrontUpperLeft()
 // =========================================================================
 
-describe('paretoFrontUpperLeft', () => {
-  const getX = (p: GPUDataPoint) => p.interactivity;
-  const getY = (p: GPUDataPoint) => p.throughput;
+const getParetoX = (p: GPUDataPoint) => p.interactivity;
+const getParetoY = (p: GPUDataPoint) => p.throughput;
 
+describe('paretoFrontUpperLeft', () => {
   it('returns empty array for empty input', () => {
-    expect(paretoFrontUpperLeft([], getX, getY)).toEqual([]);
+    expect(paretoFrontUpperLeft([], getParetoX, getParetoY)).toEqual([]);
   });
 
   it('returns the single point for single-element input', () => {
     const p = makePoint({ interactivity: 10, throughput: 100 });
-    const result = paretoFrontUpperLeft([p], getX, getY);
+    const result = paretoFrontUpperLeft([p], getParetoX, getParetoY);
     expect(result).toHaveLength(1);
     expect(result[0]).toBe(p);
   });
@@ -121,7 +121,7 @@ describe('paretoFrontUpperLeft', () => {
       makePoint({ interactivity: 30, throughput: 400 }),
       makePoint({ interactivity: 40, throughput: 200 }),
     ];
-    const result = paretoFrontUpperLeft(points, getX, getY);
+    const result = paretoFrontUpperLeft(points, getParetoX, getParetoY);
     expect(result).toHaveLength(4);
   });
 
@@ -134,15 +134,15 @@ describe('paretoFrontUpperLeft', () => {
       makePoint({ interactivity: 20, throughput: 700 }),
       makePoint({ interactivity: 30, throughput: 300 }),
     ];
-    const result = paretoFrontUpperLeft(points, getX, getY);
+    const result = paretoFrontUpperLeft(points, getParetoX, getParetoY);
     // The frontier should be: (10, 800), (20, 700), (30, 300)
     // (15, 100) is below 800, so it's dominated; but (20, 700) < 800 so it stays
     // Actually the algorithm is upper-left: for increasing x, y must decrease
     // (10,800) -> (20,700) y decreased, ok. (20,700) -> (30,300) y decreased, ok.
     // (15,100): x=15, y=100. After (10,800), y=100 < 800, so it gets pushed.
     // But then (20,700): y=700 >= 100, so it pops (15,100) and pushes (20,700).
-    const xs = result.map(getX);
-    const ys = result.map(getY);
+    const xs = result.map(getParetoX);
+    const ys = result.map(getParetoY);
     expect(xs).toEqual([10, 20, 30]);
     expect(ys).toEqual([800, 700, 300]);
   });
@@ -153,7 +153,7 @@ describe('paretoFrontUpperLeft', () => {
       makePoint({ interactivity: 10, throughput: 800 }),
       makePoint({ interactivity: 20, throughput: 400 }),
     ];
-    const result = paretoFrontUpperLeft(points, getX, getY);
+    const result = paretoFrontUpperLeft(points, getParetoX, getParetoY);
     // At x=10, should keep y=800
     expect(result[0].throughput).toBe(800);
   });
@@ -164,7 +164,7 @@ describe('paretoFrontUpperLeft', () => {
       makePoint({ interactivity: 10, throughput: 800 }),
     ];
     const original = [...points];
-    paretoFrontUpperLeft(points, getX, getY);
+    paretoFrontUpperLeft(points, getParetoX, getParetoY);
     expect(points).toEqual(original);
   });
 
@@ -174,7 +174,7 @@ describe('paretoFrontUpperLeft', () => {
       makePoint({ interactivity: 10, throughput: 300 }),
       makePoint({ interactivity: 10, throughput: 200 }),
     ];
-    const result = paretoFrontUpperLeft(points, getX, getY);
+    const result = paretoFrontUpperLeft(points, getParetoX, getParetoY);
     expect(result).toHaveLength(1);
     expect(result[0].throughput).toBe(300);
   });
@@ -253,18 +253,18 @@ describe('hermiteInterpolate', () => {
 
   it('returns the single y value for single-point arrays', () => {
     expect(hermiteInterpolate([5], [42], [0], 5)).toBe(42);
-    // Also returns same value regardless of targetX for single point
+    // Also returns same value regardless of targetParetoX for single point
     expect(hermiteInterpolate([5], [42], [0], 100)).toBe(42);
   });
 
-  it('clamps to first value when targetX is below range', () => {
+  it('clamps to first value when targetParetoX is below range', () => {
     const xs = [10, 20, 30];
     const ys = [100, 200, 300];
     const m = monotoneSlopes(xs, ys);
     expect(hermiteInterpolate(xs, ys, m, 5)).toBe(100);
   });
 
-  it('clamps to last value when targetX is above range', () => {
+  it('clamps to last value when targetParetoX is above range', () => {
     const xs = [10, 20, 30];
     const ys = [100, 200, 300];
     const m = monotoneSlopes(xs, ys);
@@ -391,7 +391,7 @@ describe('interpolateForGPU', () => {
 
   it('uses the specified cost provider', () => {
     const points = [
-      makePoint({ interactivity: 10, throughput: 800, costh: 1.0, costn: 2.0, costr: 3.0 }),
+      makePoint({ interactivity: 10, throughput: 800, costh: 1, costn: 2, costr: 3 }),
       makePoint({ interactivity: 30, throughput: 400, costh: 1.5, costn: 2.5, costr: 3.5 }),
     ];
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh');
@@ -587,8 +587,8 @@ describe('monotoneSlopes — monotonicity preservation', () => {
     const slopes = monotoneSlopes(xs, ys);
 
     // All slopes should be non-negative for strictly increasing data
-    for (let i = 0; i < slopes.length; i++) {
-      expect(slopes[i]).toBeGreaterThanOrEqual(0);
+    for (const slope of slopes) {
+      expect(slope).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -598,8 +598,8 @@ describe('monotoneSlopes — monotonicity preservation', () => {
     const slopes = monotoneSlopes(xs, ys);
 
     // All slopes should be non-positive for strictly decreasing data
-    for (let i = 0; i < slopes.length; i++) {
-      expect(slopes[i]).toBeLessThanOrEqual(0);
+    for (const slope of slopes) {
+      expect(slope).toBeLessThanOrEqual(0);
     }
   });
 
@@ -665,19 +665,19 @@ describe('hermiteInterpolate — mid-range and boundary behavior', () => {
     expect(result).toBeLessThan(75);
   });
 
-  it('returns first y value when targetX equals first x exactly', () => {
+  it('returns first y value when targetParetoX equals first x exactly', () => {
     const xs = [10, 20, 30];
     const ys = [100, 200, 300];
     const slopes = monotoneSlopes(xs, ys);
-    // targetX <= xs[0] → clamps to ys[0]
+    // targetParetoX <= xs[0] → clamps to ys[0]
     expect(hermiteInterpolate(xs, ys, slopes, 10)).toBe(100);
   });
 
-  it('returns last y value when targetX equals last x exactly', () => {
+  it('returns last y value when targetParetoX equals last x exactly', () => {
     const xs = [10, 20, 30];
     const ys = [100, 200, 300];
     const slopes = monotoneSlopes(xs, ys);
-    // targetX >= xs[n-1] → clamps to ys[n-1]
+    // targetParetoX >= xs[n-1] → clamps to ys[n-1]
     expect(hermiteInterpolate(xs, ys, slopes, 30)).toBe(300);
   });
 
@@ -730,7 +730,7 @@ describe('interpolateForGPU — cost provider consistency', () => {
         interactivity: 10,
         throughput: 800,
         costh: 0.5,
-        costn: 1.0,
+        costn: 1,
         costr: 0.3,
         costhi: 0.25,
         costni: 0.5,

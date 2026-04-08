@@ -27,11 +27,11 @@
  *   pnpm admin:db:ingest:gcs
  */
 
-import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 
-import { confirm, hasYesFlag } from './cli-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
@@ -57,13 +57,8 @@ const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
 const CONCURRENCY = 20;
 const DB_CONCURRENCY = 10;
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 20,
   idle_timeout: 60,
 });
@@ -82,10 +77,10 @@ interface WorkflowMapResult {
   createdAt: string;
   ghInfo: GithubRunInfo | null;
   /** Per-ZIP benchmark rows, ready for configId lookup + bulk insert in phase 2. */
-  bmkZips: Array<{ zipFile: string; rows: BenchmarkParams[]; serverLogPath?: string }>;
-  statsRows: Array<{ hardware: string; nSuccess: number; total: number }>;
+  bmkZips: { zipFile: string; rows: BenchmarkParams[]; serverLogPath?: string }[];
+  statsRows: { hardware: string; nSuccess: number; total: number }[];
   evalRows: EvalParams[];
-  changelogs: Array<{ baseRef: string; headRef: string; entries: ChangelogEntry[] }>;
+  changelogs: { baseRef: string; headRef: string; entries: ChangelogEntry[] }[];
   /** True when the changelog declares evals-only — benchmark/stats data is dropped. */
   evalsOnly: boolean;
   /** Skip counts from mapping phase (dbError is tracked separately in phase 2). */
@@ -128,8 +123,8 @@ async function pMap<T, R>(
       const i = next++;
       try {
         results[i] = await fn(items[i]);
-      } catch (err: any) {
-        console.error(`  [ERROR] mapping task ${i} failed: ${err.message}`);
+      } catch (error: any) {
+        console.error(`  [ERROR] mapping task ${i} failed: ${error.message}`);
       }
     }
   }
@@ -162,7 +157,7 @@ async function mapWorkflowDir(
   const metaPath = path.join(artifactsPath, 'artifacts_metadata.json');
   if (fs.existsSync(metaPath)) {
     try {
-      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
       if (Array.isArray(meta)) {
         for (const a of meta) {
           if (typeof a?.id === 'number' && typeof a?.created_at === 'string') {
@@ -222,7 +217,7 @@ async function mapWorkflowDir(
   const runName =
     workflowDir
       .replace(/_\d{10,}$/, '')
-      .replace(/_/g, ' ')
+      .replaceAll('_', ' ')
       .trim() || `Run ${githubRunId}`;
 
   // GitHub API fetch — the main reason this runs concurrently
@@ -244,7 +239,7 @@ async function mapWorkflowDir(
   // Sort bmk ZIPs by artifact created_at ascending so that when multiple
   // artifacts map to the same DB conflict key, the newest is processed last
   // and wins the ON CONFLICT DO UPDATE (latest-attempt-wins).
-  const sortedBmkZips = [...bmkZipFiles].sort((a, b) => {
+  const sortedBmkZips = [...bmkZipFiles].toSorted((a, b) => {
     const idA = a.match(/_(\d{10,})\.zip$/)?.[1];
     const idB = b.match(/_(\d{10,})\.zip$/)?.[1];
     const tsA = idA ? (artifactCreatedAt.get(Number(idA)) ?? '') : '';
@@ -484,11 +479,15 @@ async function main(): Promise<void> {
   const dateDirs = fs
     .readdirSync(GCS_DIR)
     .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-    .sort();
+    .toSorted();
   console.log(`  ${dateDirs.length} date directories  (${dateDirs[0]} → ${dateDirs.at(-1)})`);
 
   // Build flat task list with a sync FS walk
-  type Task = { dateDir: string; workflowDir: string; datePath: string };
+  interface Task {
+    dateDir: string;
+    workflowDir: string;
+    datePath: string;
+  }
   const tasks: Task[] = [];
   for (const dateDir of dateDirs) {
     const datePath = path.join(GCS_DIR, dateDir);
@@ -554,15 +553,15 @@ async function main(): Promise<void> {
     });
     if (workflowRunId === null) return wr;
 
-    const allInserted: Array<BenchmarkParams & { configId: number }> = [];
+    const allInserted: (BenchmarkParams & { configId: number })[] = [];
     for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
-      const toInsert: Array<BenchmarkParams & { configId: number }> = [];
+      const toInsert: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
         try {
           const configId = await getOrCreateConfig(row.config);
           toInsert.push({ ...row, configId });
-        } catch (err: any) {
-          tracker.recordDbError(`config for ${zipFile}`, err);
+        } catch (error: any) {
+          tracker.recordDbError(`config for ${zipFile}`, error);
         }
       }
       if (toInsert.length > 0) {
@@ -584,18 +583,18 @@ async function main(): Promise<void> {
             const serverLog = readZipText(serverLogPath, 'server.log');
             if (serverLog) {
               // Strip null bytes — some logs contain 0x00 which PostgreSQL text columns reject
-              const clean = serverLog.replaceAll('\x00', '');
+              const clean = serverLog.replaceAll('\u0000', '');
               await insertServerLog(sql, insertedIds, clean);
             }
           }
-        } catch (err: any) {
-          tracker.recordDbError(zipFile, err);
+        } catch (error: any) {
+          tracker.recordDbError(zipFile, error);
         }
       }
     }
 
     // Upsert availability rows only for successfully resolved configs
-    const availRows: Array<{
+    const availRows: {
       model: string;
       isl: number;
       osl: number;
@@ -604,7 +603,7 @@ async function main(): Promise<void> {
       framework: string;
       specMethod: string;
       disagg: boolean;
-    }> = [];
+    }[] = [];
     for (const r of allInserted) {
       availRows.push({
         model: r.config.model,
@@ -620,8 +619,8 @@ async function main(): Promise<void> {
     if (availRows.length > 0) {
       try {
         await bulkUpsertAvailability(sql, availRows, result.dateDir);
-      } catch (err: any) {
-        tracker.recordDbError('availability batch', err);
+      } catch (error: any) {
+        tracker.recordDbError('availability batch', error);
       }
     }
 
@@ -635,8 +634,8 @@ async function main(): Promise<void> {
         );
         wr.newStats += newCount;
         wr.dupStats += dupCount;
-      } catch (err: any) {
-        tracker.recordDbError('run_stats batch', err);
+      } catch (error: any) {
+        tracker.recordDbError('run_stats batch', error);
       }
     }
 
@@ -650,8 +649,8 @@ async function main(): Promise<void> {
           result.dateDir,
         );
         if (outcome === 'new') wr.evals++;
-      } catch (err: any) {
-        tracker.recordDbError('eval row', err);
+      } catch (error: any) {
+        tracker.recordDbError('eval row', error);
       }
     }
 
@@ -666,8 +665,8 @@ async function main(): Promise<void> {
           entries,
         );
         wr.changelogs += inserted;
-      } catch (err: any) {
-        tracker.recordDbError('changelog', err);
+      } catch (error: any) {
+        tracker.recordDbError('changelog', error);
       }
     }
 
@@ -689,7 +688,7 @@ async function main(): Promise<void> {
   );
 
   // Accumulate totals per date, then print one line per date in sorted order.
-  type DateTotal = {
+  interface DateTotal {
     newBmk: number;
     dupBmk: number;
     newStats: number;
@@ -697,7 +696,7 @@ async function main(): Promise<void> {
     evals: number;
     changelogs: number;
     warnings: string[];
-  };
+  }
   const dateTotals = new Map<string, DateTotal>();
   for (let i = 0; i < allResults.length; i++) {
     const result = allResults[i];
@@ -762,10 +761,7 @@ async function main(): Promise<void> {
 
   console.log('\n=== Maintenance ===');
 
-  process.stdout.write('  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s done`);
+  await refreshLatestBenchmarks(sql);
 
   process.stdout.write('  Vacuuming tables...');
   const vacuumEnd = Date.now();
@@ -828,8 +824,8 @@ async function main(): Promise<void> {
 }
 
 main()
-  .catch((err) => {
-    console.error('ingest-gcs-backup failed:', err);
+  .catch((error) => {
+    console.error('ingest-gcs-backup failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

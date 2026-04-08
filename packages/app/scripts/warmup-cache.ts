@@ -35,9 +35,9 @@ async function hit(path: string): Promise<void> {
       failed++;
       console.log(`  ✗ ${path}  ${res.status} (${ms}ms)`);
     }
-  } catch (err) {
+  } catch (error) {
     failed++;
-    console.log(`  ✗ ${path}  ${(err as Error).message}`);
+    console.log(`  ✗ ${path}  ${(error as Error).message}`);
   }
 }
 
@@ -85,8 +85,8 @@ async function warmupCaches() {
       const cutoffStr = cutoff.toISOString().split('T')[0];
       availableDates = [...new Set(rows.map((r) => r.date))]
         .filter((d) => d >= cutoffStr)
-        .sort()
-        .reverse();
+        .toSorted()
+        .toReversed();
     }
   } catch {
     // fall through — dates will be empty, skip date-specific sections
@@ -129,7 +129,7 @@ async function warmupCaches() {
   console.log(`\nDone: ${ok}/${total} succeeded, ${failed} failed (${elapsed}s)`);
 }
 
-warmupCaches().catch((err) => {
-  console.error('warmup-cache failed:', err);
+warmupCaches().catch((error) => {
+  console.error('warmup-cache failed:', error);
   process.exitCode = 1;
 });

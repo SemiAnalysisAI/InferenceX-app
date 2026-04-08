@@ -95,7 +95,7 @@ const TAB_PARAM_PREFIXES: Record<string, string[]> = {
 };
 
 /** In-memory store of current param values (kept in sync via writeUrlParams). */
-let currentState: Record<string, string> = {};
+const currentState: Record<string, string> = {};
 
 // On module load: snapshot share-link params from the URL.
 // Cleanup is deferred so it runs after Next.js hydration finishes.

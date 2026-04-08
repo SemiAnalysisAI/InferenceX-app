@@ -5,6 +5,6 @@ import { fetchEvaluations } from '@/lib/api';
 export function useEvaluations() {
   return useQuery({
     queryKey: ['evaluations'],
-    queryFn: fetchEvaluations,
+    queryFn: ({ signal }) => fetchEvaluations(signal),
   });
 }

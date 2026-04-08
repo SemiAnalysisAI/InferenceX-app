@@ -1,4 +1,4 @@
-import type { NeonClient } from '../connection.js';
+import type { DbClient } from '../connection.js';
 
 export interface WorkflowRunRow {
   github_run_id: number;
@@ -33,7 +33,7 @@ export interface DateConfigRow {
 
 /** Get benchmark workflow runs for a specific date (latest attempt per run, any completed conclusion). */
 export async function getWorkflowRunsByDate(
-  sql: NeonClient,
+  sql: DbClient,
   date: string,
 ): Promise<WorkflowRunRow[]> {
   const rows = await sql`
@@ -47,7 +47,7 @@ export async function getWorkflowRunsByDate(
 }
 
 /** Get changelog entries for a set of workflow run DB IDs. */
-export async function getChangelogByDate(sql: NeonClient, date: string): Promise<ChangelogRow[]> {
+export async function getChangelogByDate(sql: DbClient, date: string): Promise<ChangelogRow[]> {
   const rows = await sql`
     SELECT
       wr.github_run_id as workflow_run_id,
@@ -66,7 +66,7 @@ export async function getChangelogByDate(sql: NeonClient, date: string): Promise
 }
 
 /** Get distinct model/sequence/precision/hardware combos for a date. */
-export async function getDateConfigs(sql: NeonClient, date: string): Promise<DateConfigRow[]> {
+export async function getDateConfigs(sql: DbClient, date: string): Promise<DateConfigRow[]> {
   const rows = await sql`
     SELECT DISTINCT
       c.model,
@@ -99,7 +99,7 @@ export interface AvailabilityRow {
 }
 
 /** Get available (model, ISL/OSL, precision, hardware, framework, spec_method, date) combos for the availability API. */
-export async function getAvailabilityData(sql: NeonClient): Promise<AvailabilityRow[]> {
+export async function getAvailabilityData(sql: DbClient): Promise<AvailabilityRow[]> {
   const rows = await sql`
     SELECT a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.date::text
     FROM availability a

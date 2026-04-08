@@ -362,13 +362,13 @@ export function getTopologyConfig(spec: GpuSpec): TopologyConfig | null {
   // B200 (Google gIB SKU): 4 servers per rail-pod, 4 rail-pods, 2 spine switches (different leaf/spine models)
   // B300: 32 servers per rail-pod, 1 rail-pod, 4 spine switches
   // MI300/MI325/MI355: 64 servers per rail-pod, 1 rail-pod, 4 spine switches
-  let spineCount: number;
-  let serversPerPod: number;
-  let podCount: number;
+  // Defaults: 1 pod, spine = half of leaf count
+  let podCount = 1;
+  let spineCount = Math.floor(railCount / 2);
+  let serversPerPod = 8;
 
   if (spec.name === 'H100 SXM' || spec.name === 'H200 SXM') {
     serversPerPod = 32;
-    podCount = 1;
     spineCount = 4;
   } else if (spec.name === 'B200 SXM') {
     serversPerPod = 4;
@@ -376,17 +376,8 @@ export function getTopologyConfig(spec: GpuSpec): TopologyConfig | null {
     spineCount = 2;
   } else if (spec.name === 'B300 SXM') {
     serversPerPod = 32;
-    podCount = 1;
-    spineCount = Math.floor(railCount / 2);
   } else if (spec.name.startsWith('MI')) {
     serversPerPod = 64;
-    podCount = 1;
-    spineCount = Math.floor(railCount / 2);
-  } else {
-    // Default: spine = half of leaf count
-    serversPerPod = 8;
-    podCount = 1;
-    spineCount = Math.floor(railCount / 2);
   }
 
   return {

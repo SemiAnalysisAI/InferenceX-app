@@ -29,12 +29,16 @@ vi.mock('@/components/gpu-power/types', () => ({
 }));
 
 vi.mock('adm-zip', () => {
+  const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
     getEntries() {
-      return [{ entryName: 'gpu_metrics_0.csv', isDirectory: false }];
-    }
-    readAsText() {
-      return 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
+      return [
+        {
+          entryName: 'gpu_metrics_0.csv',
+          isDirectory: false,
+          getData: () => Buffer.from(csvContent),
+        },
+      ];
     }
   }
   return { default: MockAdmZip };
@@ -102,26 +106,27 @@ describe('GET /api/gpu-metrics', () => {
       // 1st call: fetch workflow run info
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => mockRunData,
+        json: () => Promise.resolve(mockRunData),
       })
       // 2nd call: fetch artifacts list (page 1)
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          artifacts: [
-            {
-              id: 1,
-              name: 'gpu_metrics_dsr1_h200',
-              archive_download_url: 'https://example.com/dl/1',
-            },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                id: 1,
+                name: 'gpu_metrics_dsr1_h200',
+                archive_download_url: 'https://example.com/dl/1',
+              },
+            ],
+          }),
       })
       // 3rd call: download artifact zip
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '1024' }),
-        arrayBuffer: async () => new ArrayBuffer(0),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       });
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
@@ -168,28 +173,30 @@ describe('GET /api/gpu-metrics', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          id: 12345,
-          name: 'Run',
-          head_branch: 'main',
-          head_sha: 'a',
-          created_at: '',
-          html_url: '',
-          conclusion: '',
-          status: '',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 12345,
+            name: 'Run',
+            head_branch: 'main',
+            head_sha: 'a',
+            created_at: '',
+            html_url: '',
+            conclusion: '',
+            status: '',
+          }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          artifacts: [
-            {
-              id: 1,
-              name: 'benchmark_results',
-              archive_download_url: 'https://example.com/dl/1',
-            },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                id: 1,
+                name: 'benchmark_results',
+                archive_download_url: 'https://example.com/dl/1',
+              },
+            ],
+          }),
       });
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
@@ -203,33 +210,35 @@ describe('GET /api/gpu-metrics', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          id: 12345,
-          name: 'Run',
-          head_branch: 'main',
-          head_sha: 'a',
-          created_at: '',
-          html_url: '',
-          conclusion: '',
-          status: '',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 12345,
+            name: 'Run',
+            head_branch: 'main',
+            head_sha: 'a',
+            created_at: '',
+            html_url: '',
+            conclusion: '',
+            status: '',
+          }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          artifacts: [
-            {
-              id: 1,
-              name: 'gpu_metrics_dsr1_h200',
-              archive_download_url: 'https://example.com/dl/1',
-            },
-            {
-              id: 2,
-              name: 'gpu_metrics_dsr1_b200',
-              archive_download_url: 'https://example.com/dl/2',
-            },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                id: 1,
+                name: 'gpu_metrics_dsr1_h200',
+                archive_download_url: 'https://example.com/dl/1',
+              },
+              {
+                id: 2,
+                name: 'gpu_metrics_dsr1_b200',
+                archive_download_url: 'https://example.com/dl/2',
+              },
+            ],
+          }),
       })
       // First artifact download fails
       .mockResolvedValueOnce({
@@ -240,7 +249,7 @@ describe('GET /api/gpu-metrics', () => {
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '512' }),
-        arrayBuffer: async () => new ArrayBuffer(0),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       });
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
@@ -256,45 +265,47 @@ describe('GET /api/gpu-metrics', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          id: 12345,
-          name: 'Run',
-          head_branch: 'main',
-          head_sha: 'a',
-          created_at: '',
-          html_url: '',
-          conclusion: '',
-          status: '',
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 12345,
+            name: 'Run',
+            head_branch: 'main',
+            head_sha: 'a',
+            created_at: '',
+            html_url: '',
+            conclusion: '',
+            status: '',
+          }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          artifacts: [
-            {
-              id: 1,
-              name: 'gpu_metrics_dsr1_h200',
-              archive_download_url: 'https://example.com/dl/1',
-            },
-            {
-              id: 2,
-              name: 'gpu_metrics_dsr1_b200',
-              archive_download_url: 'https://example.com/dl/2',
-            },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                id: 1,
+                name: 'gpu_metrics_dsr1_h200',
+                archive_download_url: 'https://example.com/dl/1',
+              },
+              {
+                id: 2,
+                name: 'gpu_metrics_dsr1_b200',
+                archive_download_url: 'https://example.com/dl/2',
+              },
+            ],
+          }),
       })
       // First artifact too large
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': String(60 * 1024 * 1024) }),
-        arrayBuffer: async () => new ArrayBuffer(0),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       })
       // Second artifact ok
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '512' }),
-        arrayBuffer: async () => new ArrayBuffer(0),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       });
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
