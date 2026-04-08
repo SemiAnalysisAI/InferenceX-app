@@ -11,6 +11,9 @@ import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { ShareButton } from '@/components/ui/share-button';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
   Select,
   SelectContent,
@@ -22,16 +25,34 @@ import {
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
-import type {
-  GpuMetricKey,
-  GpuMetricsArtifact,
-  GpuPowerApiResponse,
-  GpuPowerRunInfo,
+import {
+  type GpuMetricKey,
+  type GpuMetricsArtifact,
+  type GpuPowerApiResponse,
+  type GpuPowerRunInfo,
+  ALL_METRIC_OPTIONS,
+  getAvailableMetrics,
 } from './types';
-import { ALL_METRIC_OPTIONS, getAvailableMetrics } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
 const FEATURE_GATE_KEY = 'inferencex-feature-gate';
+
+type GpuMetricsView = 'chart' | 'correlation';
+
+const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
+  {
+    value: 'chart',
+    icon: <BarChart3 className="h-3.5 w-3.5" />,
+    ariaLabel: 'Line chart',
+    title: 'Line chart',
+  },
+  {
+    value: 'correlation',
+    icon: <ScatterChart className="h-3.5 w-3.5" />,
+    ariaLabel: 'Correlation scatter',
+    title: 'Correlation scatter',
+  },
+];
 
 export default function GpuMetricsDisplay() {
   const router = useRouter();
@@ -47,7 +68,7 @@ export default function GpuMetricsDisplay() {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [downsample, setDownsample] = useState(true);
   // View toggle + correlation
-  const [chartView, setChartView] = useState<'chart' | 'correlation'>('chart');
+  const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
   // URL state
@@ -73,7 +94,7 @@ export default function GpuMetricsDisplay() {
 
         const pending = pendingUrlState.current;
         const targetArtifact =
-          pending?.artifact && apiResult.artifacts.find((a) => a.name === pending.artifact)
+          pending?.artifact && apiResult.artifacts.some((a) => a.name === pending.artifact)
             ? pending.artifact
             : (apiResult.artifacts[0]?.name ?? '');
         setSelectedArtifact(targetArtifact);
@@ -86,8 +107,8 @@ export default function GpuMetricsDisplay() {
         const targetData = apiResult.artifacts.find((a) => a.name === targetArtifact)?.data ?? [];
         const gpuIndices = new Set(targetData.map((d) => d.index));
         setVisibleGpus(gpuIndices);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
         setArtifacts([]);
         setRunInfo(null);
         setSelectedArtifact('');
@@ -136,9 +157,10 @@ export default function GpuMetricsDisplay() {
     setSelectedMetric(value as GpuMetricKey);
   }, []);
 
-  const currentData = useMemo(() => {
-    return artifacts.find((a) => a.name === selectedArtifact)?.data ?? [];
-  }, [artifacts, selectedArtifact]);
+  const currentData = useMemo(
+    () => artifacts.find((a) => a.name === selectedArtifact)?.data ?? [],
+    [artifacts, selectedArtifact],
+  );
 
   const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
 
@@ -179,10 +201,10 @@ export default function GpuMetricsDisplay() {
     } catch {
       const textArea = document.createElement('textarea');
       textArea.value = url;
-      document.body.appendChild(textArea);
+      document.body.append(textArea);
       textArea.select();
       document.execCommand('copy');
-      document.body.removeChild(textArea);
+      textArea.remove();
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -192,7 +214,7 @@ export default function GpuMetricsDisplay() {
   const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === selectedMetric)!;
 
   const allGpuIndices = useMemo(
-    () => Array.from(new Set(currentData.map((d) => d.index))).sort((a, b) => a - b),
+    () => [...new Set(currentData.map((d) => d.index))].toSorted((a, b) => a - b),
     [currentData],
   );
 
@@ -203,32 +225,46 @@ export default function GpuMetricsDisplay() {
     track('gpu_metrics_gpu_reset_filter');
   }, [allGpuIndices]);
 
+  const handleChartViewChange = useCallback((value: GpuMetricsView) => {
+    setChartView(value);
+    track('gpu_metrics_view_changed', { view: value });
+  }, []);
+
   return (
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">PowerX</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 text-xs text-muted-foreground"
-              onClick={() => {
-                localStorage.removeItem(FEATURE_GATE_KEY);
-                window.dispatchEvent(new Event('inferencex:powerx:locked'));
-                track('powerx_relocked');
-                router.push('/inference');
-              }}
-              title="Re-lock PowerX"
-            >
-              <Lock className="h-3 w-3" />
-              Lock
-            </Button>
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">PowerX</h2>
+              <p className="text-muted-foreground text-sm">
+                Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-muted-foreground"
+                onClick={() => {
+                  localStorage.removeItem(FEATURE_GATE_KEY);
+                  window.dispatchEvent(new Event('inferencex:feature-gate:locked'));
+                  track('powerx_relocked');
+                  router.push('/inference');
+                }}
+                title="Re-lock feature gate"
+              >
+                <Lock className="h-3 w-3" />
+                Re-lock feature gate
+              </Button>
+              <ShareButton />
+              <div className="hidden sm:flex items-center gap-1.5">
+                <ShareTwitterButton />
+                <ShareLinkedInButton />
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
-          </p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 max-w-sm space-y-1">
               <Label htmlFor="gpu-metrics-run-id">Run ID</Label>
@@ -349,33 +385,16 @@ export default function GpuMetricsDisplay() {
           >
             <div className="flex items-center justify-end mb-2">
               <div className="flex items-center gap-1.5 no-export">
-                {/* View toggle */}
-                <div className="flex items-center border rounded-md" role="tablist">
-                  <button
-                    role="tab"
-                    aria-selected={chartView === 'chart'}
-                    className={`p-1.5 ${chartView === 'chart' ? 'bg-muted' : 'hover:bg-muted/50'} rounded-l-md`}
-                    onClick={() => {
-                      setChartView('chart');
-                      track('gpu_metrics_view_changed', { view: 'chart' });
-                    }}
-                    title="Line chart"
-                  >
-                    <BarChart3 className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    role="tab"
-                    aria-selected={chartView === 'correlation'}
-                    className={`p-1.5 ${chartView === 'correlation' ? 'bg-muted' : 'hover:bg-muted/50'} rounded-r-md`}
-                    onClick={() => {
-                      setChartView('correlation');
-                      track('gpu_metrics_view_changed', { view: 'correlation' });
-                    }}
-                    title="Correlation scatter"
-                  >
-                    <ScatterChart className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <SegmentedToggle
+                  value={chartView}
+                  options={GPU_METRICS_VIEW_OPTIONS}
+                  onValueChange={handleChartViewChange}
+                  ariaLabel="View mode"
+                  className="rounded-md border p-0 gap-0"
+                  buttonClassName="p-1.5 rounded-none first:rounded-l-md last:rounded-r-md"
+                  activeButtonClassName="bg-muted text-foreground"
+                  inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                />
                 <Button
                   variant="outline"
                   size="sm"

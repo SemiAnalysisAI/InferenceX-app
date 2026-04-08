@@ -2,6 +2,7 @@
 title: 'InferenceX v2: NVIDIA Blackwell Vs AMD vs Hopper - Formerly InferenceMAX'
 subtitle: 'GB300 NVL72, MI355X, B200, H100, Disaggregated Serving, Wide Expert Parallelism, Large Mixture of Experts, SGLang, vLLM, TRTLLM'
 date: '2026-02-16'
+publishDate: '2026-02-16'
 tags:
   - benchmark
   - gpu
@@ -869,3 +870,74 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 ---
 
 _This article continues on our Substack. [Subscribe to SemiAnalysis](https://newsletter.semianalysis.com/subscribe) to read the complete article._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much faster is NVIDIA Blackwell vs Hopper for inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GB300 NVL72 FP4 delivers up to 100x better performance compared to a strong H100 disagg+wideEP FP8 baseline, and up to 65x on FP8 vs FP8. Even factoring in higher total cost of ownership, Blackwell achieves 9.7x to 65x improvement in tokens per dollar compared to Hopper."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is disaggregated prefill in LLM inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Disaggregated prefill separates the compute-intensive prefill phase and memory-intensive decode phase of LLM inference onto separate pools of GPUs. This eliminates resource contention between phases, enables independent scaling and tuning, and improves both time-to-first-token and inter-token latency compared to running both on the same GPUs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is wide expert parallelism (WideEP)?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Wide expert parallelism scales EP across multiple nodes rather than replicating independent instances. For example, on a 64-GPU cluster running DeepSeek R1, WideEP places only 4 experts per GPU instead of 32, freeing HBM for KV cache, increasing tokens-per-expert for better compute utilization, and providing 8x aggregate memory bandwidth compared to single-node EP8."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does the NVIDIA B200 compare to AMD MI355X for inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On FP8 disaggregated prefill, MI355X is competitive with B200 using SGLang. However, on FP4 disagg+wideEP workloads used by frontier labs, B200 significantly outperforms MI355X due to AMD's composability issues when combining multiple inference optimizations. AMD's single-node FP8 performance is strong, but multi-node FP4 distributed inference lags behind."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the cost per million tokens for DeepSeek R1 inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Using B200 with Dynamo TRT-LLM FP4, DeepSeek R1 inference costs approximately $0.251 per million total tokens. Enabling MTP can push costs down to $0.057 per million total tokens. On GB300 NVL72 FP4 at 150 tok/s/user, enabling MTP reduces cost from $2.35 to approximately $0.11 per million tokens, a 21x reduction."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What advantage does the GB200 NVL72 rack-scale architecture provide?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The GB200 NVL72 connects 72 GPUs via NVLink at 900 GB/s per GPU, over 9x the bandwidth of InfiniBand scale-out networks used between B200 nodes. This massive bandwidth advantage directly drives lower cost per token for large MoE models like DeepSeek R1 that require wide expert parallelism with all-to-all communication across many GPUs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does Multi-Token Prediction (MTP) improve inference performance?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MTP uses auxiliary prediction heads built into the model to propose multiple future tokens from the same representation, avoiding the need for a separate draft model. Across all GPU SKUs tested, enabling MTP increases throughput with no significant impact on model accuracy, and can reduce cost per million tokens by up to 21x at high interactivity levels."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does Blackwell Ultra GB300 compare to Blackwell GB200?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Despite having the same memory bandwidth and FP8 specs on paper, Blackwell Ultra achieves up to 1.5x better FP8 performance than Blackwell in practice. However, FP4 performance is only 1.1x better, likely because software is not yet fully optimized for the newly released Blackwell Ultra GPU."
+      }
+    }
+  ]
+}`}</JsonLd>

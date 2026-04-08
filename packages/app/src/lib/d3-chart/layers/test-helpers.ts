@@ -223,12 +223,12 @@ function makeSel<D>(
       const currentData = sel._data;
 
       const newEls: MockElement[] = [];
-      for (let i = 0; i < currentData.length; i++) {
-        const el = createMockElement(tag, currentData[i]);
+      for (const datum of currentData) {
+        const el = createMockElement(tag, datum);
         newEls.push(el);
       }
       store.set(selectorStr, { elements: newEls, data: currentData as unknown[] });
-      parentEl.children = parentEl.children.concat(newEls);
+      parentEl.children = [...parentEl.children, ...newEls];
       return makeSel(newEls, currentData, parentEl, selectorStr);
     },
 
@@ -326,11 +326,11 @@ function makeEnterSel<D>(parent: MockElement, enterData: D[], selector: string):
     const existing = store.get(selector) ?? { elements: [], data: [] };
 
     const created: MockElement[] = [];
-    for (let i = 0; i < enterData.length; i++) {
-      const el = createMockElement(tag, enterData[i]);
+    for (const datum of enterData) {
+      const el = createMockElement(tag, datum);
       created.push(el);
       existing.elements.push(el);
-      existing.data.push(enterData[i] as unknown);
+      existing.data.push(datum as unknown);
       parent.children.push(el);
     }
     store.set(selector, existing);

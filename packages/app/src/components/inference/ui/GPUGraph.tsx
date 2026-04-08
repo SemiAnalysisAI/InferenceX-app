@@ -7,14 +7,18 @@ import { useTheme } from 'next-themes';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
-import { getModelSortIndex, HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { D3ChartHandle, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
-import { applyHoverState, applyNormalState } from '@/lib/chart-rendering';
-import { formatLargeNumber, logTickFormat } from '@/lib/chart-rendering';
+import {
+  applyHoverState,
+  applyNormalState,
+  formatLargeNumber,
+  logTickFormat,
+} from '@/lib/chart-rendering';
 import {
   paretoFrontLowerLeft,
   paretoFrontLowerRight,
@@ -69,11 +73,12 @@ const GPUGraph = React.memo(
         dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
       }
       dates.push(...selectedDates);
-      dates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-      const sortedGPUs = [...selectedGPUs].sort(
+      const deduplicated = [...new Set(dates)];
+      deduplicated.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      const sortedGPUs = [...selectedGPUs].toSorted(
         (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
       );
-      return { dates, sortedGPUs };
+      return { dates: deduplicated, sortedGPUs };
     }, [selectedDateRange, selectedDates, selectedGPUs]);
 
     const graphIdentifiers = useMemo(() => {
@@ -152,7 +157,7 @@ const GPUGraph = React.memo(
         | 'lower_left'
         | 'lower_right'
         | undefined;
-      for (const key in groupedData) {
+      for (const key of Object.keys(groupedData)) {
         result[key] =
           dir === 'upper_right'
             ? paretoFrontUpperRight(groupedData[key])
@@ -199,11 +204,7 @@ const GPUGraph = React.memo(
       if (logScale) {
         const dataMin = yExtent[0];
         yMin =
-          dataMin <= 0
-            ? 0.1
-            : dataMin < 1
-              ? Math.pow(10, Math.floor(Math.log10(dataMin)))
-              : dataMin * 0.95;
+          dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
       } else {
         yMin = Math.max(0, yExtent[0] - yRange * 0.05);
       }
@@ -211,29 +212,32 @@ const GPUGraph = React.memo(
     }, [filteredData, logScale]);
 
     // Color resolver for points/rooflines
-    const getColor = useMemo(() => {
-      return (d: InferenceData) => {
+    const getColor = useMemo(
+      () => (d: InferenceData) => {
         const graphIndex = allGraphs.findIndex(
           ({ date, hwKey }) => d.date === date && d.hwKey === hwKey,
         );
-        return graphIndex >= 0 ? allGraphs[graphIndex].color : '#6b7280';
-      };
-    }, [allGraphs]);
+        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+      },
+      [allGraphs],
+    );
 
-    const getRooflineColor = useMemo(() => {
-      return (key: string) => {
+    const getRooflineColor = useMemo(
+      () => (key: string) => {
         const graphId = key.split('_').slice(0, -1).join('_');
         const graphIndex = allGraphs.findIndex((d) => d.id === graphId);
-        return graphIndex >= 0 ? allGraphs[graphIndex].color : '#6b7280';
-      };
-    }, [allGraphs]);
+        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+      },
+      [allGraphs],
+    );
 
-    const isRooflineVisible = useMemo(() => {
-      return (key: string) => {
+    const isRooflineVisible = useMemo(
+      () => (key: string) => {
         const graphId = key.split('_').slice(0, -1).join('_');
         return activeDates.has(graphId);
-      };
-    }, [activeDates]);
+      },
+      [activeDates],
+    );
 
     // Dismiss tooltip when pinned point's combo is hidden
     useEffect(() => {
@@ -417,7 +421,7 @@ const GPUGraph = React.memo(
                 hw: id,
                 label: date,
                 color,
-                title: HARDWARE_CONFIG[hwKey] ? getDisplayLabel(HARDWARE_CONFIG[hwKey]) : hwKey,
+                title: getDisplayLabel(getHardwareConfig(hwKey)),
                 isActive: activeDates.has(id),
                 onClick: () => {
                   toggleActiveDate(id);
@@ -450,7 +454,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-hide-non-optimal',
-                label: 'Hide Non-Optimal',
+                label: 'Optimal Only',
                 checked: hideNonOptimal,
                 onCheckedChange: (c) => {
                   setHideNonOptimal(c);

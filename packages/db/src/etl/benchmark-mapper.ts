@@ -151,11 +151,16 @@ export function mapBenchmarkRow(
     const tp = parseInt2(row.tp) ?? 1;
     const ep = parseInt2(row.ep) ?? 1;
     const dpAttn = parseBool(row.dp_attention);
-    prefillTp = decodeTp = tp;
-    prefillEp = decodeEp = ep;
-    prefillDpAttn = decodeDpAttn = dpAttn;
-    prefillNumWorkers = decodeNumWorkers = 0;
-    numPrefillGpu = numDecodeGpu = tp * ep;
+    prefillTp = tp;
+    decodeTp = tp;
+    prefillEp = ep;
+    decodeEp = ep;
+    prefillDpAttn = dpAttn;
+    decodeDpAttn = dpAttn;
+    prefillNumWorkers = 0;
+    decodeNumWorkers = 0;
+    numPrefillGpu = tp * ep;
+    numDecodeGpu = tp * ep;
   }
 
   // Auto-capture all numeric fields not reserved for config/routing dimensions.
@@ -178,7 +183,7 @@ export function mapBenchmarkRow(
   }
 
   // Artifact names encode '/' as '#' to avoid path separators; restore the URI.
-  const image = row.image ? String(row.image).replace(/#/g, '/') : null;
+  const image = row.image ? String(row.image).replaceAll('#', '/') : null;
 
   return {
     config: {

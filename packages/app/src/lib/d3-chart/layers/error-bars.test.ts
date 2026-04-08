@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createMockGroup } from './test-helpers';
-import { renderErrorBars, updateErrorBarsOnZoom } from './error-bars';
-import type { ErrorBarConfig } from './error-bars';
+import { renderErrorBars, updateErrorBarsOnZoom, type ErrorBarConfig } from './error-bars';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 

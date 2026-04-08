@@ -1,33 +1,141 @@
+export interface HwEntry {
+  /** GPU vendor (e.g. "NVIDIA", "AMD") */
+  vendor: string;
+  /** Architecture codename (e.g. "Hopper", "Blackwell", "CDNA 4") */
+  arch: string;
+  /** Display label (e.g. "H100", "GB200 NVL72") */
+  label: string;
+  /** Chart sort order (lower = first) */
+  sort: number;
+  /** Thermal design power in watts */
+  tdp: number;
+  /** kW per GPU (for energy calculations) */
+  power: number;
+  /** $/GPU/hr — hyperscaler tier */
+  costh: number;
+  /** $/GPU/hr — neocloud tier */
+  costn: number;
+  /** $/GPU/hr — retail tier */
+  costr: number;
+}
+
+/** Single source of truth for GPU metadata. Add new GPUs here. */
+export const HW_REGISTRY: Record<string, HwEntry> = {
+  h100: {
+    vendor: 'NVIDIA',
+    arch: 'Hopper',
+    label: 'H100',
+    sort: 7,
+    tdp: 700,
+    power: 1.73,
+    costh: 1.3,
+    costn: 1.69,
+    costr: 1.3,
+  },
+  h200: {
+    vendor: 'NVIDIA',
+    arch: 'Hopper',
+    label: 'H200',
+    sort: 5,
+    tdp: 700,
+    power: 1.73,
+    costh: 1.41,
+    costn: 1.74,
+    costr: 1.6,
+  },
+  b200: {
+    vendor: 'NVIDIA',
+    arch: 'Blackwell',
+    label: 'B200',
+    sort: 3,
+    tdp: 1000,
+    power: 2.17,
+    costh: 1.95,
+    costn: 2.34,
+    costr: 2.9,
+  },
+  // TODO: B300 pricing is temporary - using 1.2x B200 pricing until official pricing is available
+  b300: {
+    vendor: 'NVIDIA',
+    arch: 'Blackwell',
+    label: 'B300',
+    sort: 2,
+    tdp: 1200,
+    power: 2.17,
+    costh: 2.34,
+    costn: 2.808,
+    costr: 3.48,
+  },
+  gb200: {
+    vendor: 'NVIDIA',
+    arch: 'Blackwell',
+    label: 'GB200 NVL72',
+    sort: 1,
+    tdp: 1200,
+    power: 2.1,
+    costh: 2.21,
+    costn: 2.75,
+    costr: 3.3,
+  },
+  // TODO: GB300 pricing is temporary - using 1.2x GB200 pricing until official pricing is available
+  gb300: {
+    vendor: 'NVIDIA',
+    arch: 'Blackwell',
+    label: 'GB300 NVL72',
+    sort: 0,
+    tdp: 1400,
+    power: 2.1,
+    costh: 2.652,
+    costn: 3.3,
+    costr: 3.96,
+  },
+  mi300x: {
+    vendor: 'AMD',
+    arch: 'CDNA 3',
+    label: 'MI300X',
+    sort: 8,
+    tdp: 750,
+    power: 1.79,
+    costh: 1.12,
+    costn: 1.4,
+    costr: 1.55,
+  },
+  mi325x: {
+    vendor: 'AMD',
+    arch: 'CDNA 3',
+    label: 'MI325X',
+    sort: 6,
+    tdp: 1000,
+    power: 2.18,
+    costh: 1.28,
+    costn: 1.59,
+    costr: 1.8,
+  },
+  mi355x: {
+    vendor: 'AMD',
+    arch: 'CDNA 4',
+    label: 'MI355X',
+    sort: 4,
+    tdp: 1400,
+    power: 2.65,
+    costh: 1.48,
+    costn: 1.9,
+    costr: 2.1,
+  },
+};
+
 /** Canonical set of GPU key strings used across all packages. */
-export const GPU_KEYS = new Set([
-  'h100',
-  'h200',
-  'b200',
-  'b300',
-  'gb200',
-  'gb300',
-  'mi300x',
-  'mi325x',
-  'mi355x',
-]);
+export const GPU_KEYS = new Set(Object.keys(HW_REGISTRY));
 
 /** Maps each GPU key to its vendor for display grouping. */
-export const GPU_VENDORS: Record<string, string> = {
-  h100: 'NVIDIA',
-  h200: 'NVIDIA',
-  b200: 'NVIDIA',
-  b300: 'NVIDIA',
-  gb200: 'NVIDIA',
-  gb300: 'NVIDIA',
-  mi300x: 'AMD',
-  mi325x: 'AMD',
-  mi355x: 'AMD',
-};
+export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
+  Object.entries(HW_REGISTRY).map(([k, v]) => [k, v.vendor]),
+);
 
 // ---------------------------------------------------------------------------
 // Vendor color zones
 //
-// To add a new vendor: add entries to GPU_VENDORS above, then add color
+// To add a new vendor: add an entry to HW_REGISTRY above, then add color
 // zones to both maps below (OKLch for normal mode, HSL for high-contrast).
 // ---------------------------------------------------------------------------
 

@@ -9,32 +9,14 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import postgres from 'postgres';
+import { TABLE_INSERT_ORDER } from '@semianalysisai/inferencex-constants';
 
-import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
+import { hasNoSslFlag } from './cli-utils';
+import { createAdminSql } from './etl/db-utils';
 
-if (!process.env.DATABASE_READONLY_URL) {
-  console.error('DATABASE_READONLY_URL is required');
-  process.exit(1);
-}
-
-const sql = postgres(process.env.DATABASE_READONLY_URL, {
-  ssl: 'require',
-  max: 1,
-});
+const sql = createAdminSql({ noSsl: hasNoSslFlag(), readonly: true, max: 1 });
 
 const CURSOR_BATCH = 100;
-
-const TABLES = [
-  TABLE_NAMES.configs,
-  TABLE_NAMES.workflowRuns,
-  TABLE_NAMES.serverLogs,
-  TABLE_NAMES.benchmarkResults,
-  TABLE_NAMES.runStats,
-  TABLE_NAMES.evalResults,
-  TABLE_NAMES.availability,
-  TABLE_NAMES.changelogEntries,
-];
 
 /** Stream a table to a JSON file using a cursor, writing row-by-row. */
 async function streamTable(table: string, outPath: string): Promise<number> {
@@ -53,19 +35,25 @@ async function streamTable(table: string, outPath: string): Promise<number> {
   }
 
   out.write('\n]\n');
-  await new Promise<void>((res, rej) => out.end(() => res()).on('error', rej));
+  await new Promise<void>((res, rej) => {
+    out
+      .end(() => {
+        res();
+      })
+      .on('error', rej);
+  });
   return count;
 }
 
 async function dump(): Promise<void> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-').slice(0, 19);
   const outDir = resolve(process.argv[2] ?? `inferencex-dump-${timestamp}`);
   mkdirSync(outDir, { recursive: true });
 
   console.log('=== db:dump ===\n');
   console.log(`  Output: ${outDir}\n`);
 
-  for (const table of TABLES) {
+  for (const table of TABLE_INSERT_ORDER) {
     process.stdout.write(`  ${table}...`);
     const outPath = resolve(outDir, `${table}.json`);
     const count = await streamTable(table, outPath);
@@ -76,8 +64,8 @@ async function dump(): Promise<void> {
 }
 
 dump()
-  .catch((err) => {
-    console.error('db:dump failed:', err);
+  .catch((error) => {
+    console.error('db:dump failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

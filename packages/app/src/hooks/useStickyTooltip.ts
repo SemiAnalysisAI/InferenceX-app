@@ -55,9 +55,7 @@ export const useStickyTooltip = <T = any>() => {
    * Checks if a tooltip is currently pinned.
    * Uses the ref for D3 event handlers to get the most current value.
    */
-  const isPinned = useCallback(() => {
-    return pinnedPointRef.current !== null;
-  }, []);
+  const isPinned = useCallback(() => pinnedPointRef.current !== null, []);
 
   /**
    * Hides the tooltip and guide elements visually (for D3 elements).

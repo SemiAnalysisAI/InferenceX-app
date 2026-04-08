@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
+import { type DateRange, DateRangePicker } from '@/components/ui/date-range-picker';
 
 function DateRangePickerHarness({
   initialRange = { startDate: '', endDate: '' },
@@ -77,5 +77,13 @@ describe('DateRangePicker', () => {
     cy.mount(<DateRangePickerHarness availableDates={['2026-01-01']} />);
     cy.contains('Select date range').click();
     cy.contains('Only 1 date available').should('be.visible');
+  });
+
+  it('view anyway button selects the single available date and closes dialog', () => {
+    cy.mount(<DateRangePickerHarness availableDates={['2026-01-01']} />);
+    cy.contains('Select date range').click();
+    cy.contains('button', 'View anyway').click();
+    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[data-testid="date-range-output"]').should('contain', '2026-01-01 to 2026-01-01');
   });
 });

@@ -1,4 +1,4 @@
-import * as d3 from 'd3';
+import type * as d3 from 'd3';
 
 import { lttbDownsample } from '../downsample';
 import type { ContinuousScale } from '../types';

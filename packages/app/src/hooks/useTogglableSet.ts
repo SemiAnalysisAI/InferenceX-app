@@ -18,18 +18,15 @@ export function computeToggle(prev: Set<string>, item: string, allItems: Set<str
     } else if (prev.size === 1) {
       // Restore all: re-enable everything
       return allItems;
-    } else {
-      // Remove the clicked item
-      const next = new Set(prev);
-      next.delete(item);
-      return next;
     }
-  } else {
-    // Add the clicked item
+    // Remove the clicked item
     const next = new Set(prev);
-    next.add(item);
+    next.delete(item);
     return next;
   }
+  // Add the clicked item
+  const next = new Set([...prev, item]);
+  return next;
 }
 
 /**

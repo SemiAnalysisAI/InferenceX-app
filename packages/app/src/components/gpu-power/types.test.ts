@@ -561,7 +561,7 @@ describe('detectAnomalies', () => {
     const anomalies = detectAnomalies(rows, 'temperature');
     const thermals = anomalies.filter((a) => a.type === 'thermal');
     expect(thermals).toHaveLength(2);
-    expect(thermals.map((a) => a.gpuIndex).sort()).toEqual([0, 1]);
+    expect(thermals.map((a) => a.gpuIndex).toSorted()).toEqual([0, 1]);
   });
 
   it('skips GPU groups with fewer than 3 samples for MAD detection', () => {
@@ -657,7 +657,7 @@ describe('computeGpuStats', () => {
       makeRow({ timestamp: `2026/03/07 00:20:${37 + i}.000`, index: 0, power: v }),
     );
     const stats = computeGpuStats(rows, 'power');
-    expect(stats[0].stddev).toBeCloseTo(2.0, 1);
+    expect(stats[0].stddev).toBeCloseTo(2, 1);
   });
 
   it('works with temperature metric', () => {

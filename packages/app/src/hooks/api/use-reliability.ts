@@ -5,6 +5,6 @@ import { fetchReliability } from '@/lib/api';
 export function useReliability() {
   return useQuery({
     queryKey: ['reliability'],
-    queryFn: fetchReliability,
+    queryFn: ({ signal }) => fetchReliability(signal),
   });
 }

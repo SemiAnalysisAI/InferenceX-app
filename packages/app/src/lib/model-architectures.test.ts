@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { Model } from '@/lib/data-mappings';
 
-import type { SubBlockFlow } from './model-architectures';
 import {
+  type SubBlockFlow,
   formatContextWindow,
   formatParamCount,
   getArchitectureSummary,

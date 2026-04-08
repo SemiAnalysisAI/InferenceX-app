@@ -4,7 +4,7 @@ import { useInference } from '@/components/inference/InferenceContext';
 
 interface TooltipContentProps<TValue, _TName> {
   active?: boolean;
-  payload?: Array<{
+  payload?: {
     payload?: {
       hwKey?: string | number;
       tp?: number;
@@ -14,19 +14,20 @@ interface TooltipContentProps<TValue, _TName> {
       [key: string]: unknown;
     };
     [key: string]: unknown;
-  }>;
+  }[];
   [key: string]: unknown;
 }
 
 export default function ChartTooltip({ active, payload }: TooltipContentProps<number, string>) {
   const { hardwareConfig } = useInference();
-  const pointPayload = payload?.[payload.length - 1]?.payload;
+  const pointPayload = payload?.at(-1)?.payload;
   if (active && pointPayload) {
     return (
       <div className="bg-accent p-2 border rounded-sm">
         <p>{`GPU: ${hardwareConfig[pointPayload.hwKey as keyof typeof hardwareConfig].gpu}`}</p>
         <p>{`Total GPUs: ${pointPayload.tp}`}</p>
-        {pointPayload.ep != null || pointPayload.prefill_ep != null ? (
+        {(pointPayload.ep !== null && pointPayload.ep !== undefined) ||
+        (pointPayload.prefill_ep !== null && pointPayload.prefill_ep !== undefined) ? (
           pointPayload.is_multinode && pointPayload.disagg ? (
             <>
               <p>{`Prefill: ${pointPayload.num_prefill_gpu ?? '?'} GPUs, TP: ${pointPayload.prefill_tp ?? pointPayload.tp}, EP: ${pointPayload.prefill_ep ?? pointPayload.ep ?? 0}, DPA: ${(pointPayload.prefill_dp_attention ?? pointPayload.dp_attention) ? 'True' : 'False'}, Workers: ${pointPayload.prefill_num_workers ?? 1}`}</p>
@@ -35,7 +36,9 @@ export default function ChartTooltip({ active, payload }: TooltipContentProps<nu
           ) : (
             <>
               <p>{`Tensor Parallelism: ${pointPayload.tp}`}</p>
-              {pointPayload.ep != null && <p>{`Expert Parallelism: ${pointPayload.ep}`}</p>}
+              {pointPayload.ep !== null && pointPayload.ep !== undefined && (
+                <p>{`Expert Parallelism: ${pointPayload.ep}`}</p>
+              )}
               <p>{`DP Attention: ${pointPayload.dp_attention ? 'True' : 'False'}`}</p>
             </>
           )

@@ -42,8 +42,8 @@ function useFeatureGate(): boolean {
       ) {
         localStorage.setItem(FEATURE_GATE_KEY, '1');
         setUnlocked(true);
-        window.dispatchEvent(new Event('inferencex:powerx:unlocked'));
-        track('powerx_unlocked');
+        window.dispatchEvent(new Event('inferencex:feature-gate:unlocked'));
+        track('feature_gate_unlocked');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -53,11 +53,11 @@ function useFeatureGate(): boolean {
   useEffect(() => {
     const handleLock = () => setUnlocked(false);
     const handleUnlock = () => setUnlocked(true);
-    window.addEventListener('inferencex:powerx:locked', handleLock);
-    window.addEventListener('inferencex:powerx:unlocked', handleUnlock);
+    window.addEventListener('inferencex:feature-gate:locked', handleLock);
+    window.addEventListener('inferencex:feature-gate:unlocked', handleUnlock);
     return () => {
-      window.removeEventListener('inferencex:powerx:locked', handleLock);
-      window.removeEventListener('inferencex:powerx:unlocked', handleUnlock);
+      window.removeEventListener('inferencex:feature-gate:locked', handleLock);
+      window.removeEventListener('inferencex:feature-gate:unlocked', handleUnlock);
     };
   }, []);
 
@@ -69,10 +69,13 @@ const TAB_LINKS = [
   { href: '/evaluation', label: 'Accuracy Evals', testId: 'tab-trigger-evaluation' },
   { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },
   { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
-  { href: '/reliability', label: 'GPU Reliability', testId: 'tab-trigger-reliability' },
   { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
+  { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart', gated: true },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
+  { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions', gated: true },
 ] as const;
+
+const TAB_VALUES = new Set(TAB_LINKS.map((t) => t.href.slice(1)));
 
 function activeTab(pathname: string): string {
   const seg = pathname.split('/').filter(Boolean)[0] || 'inference';
@@ -84,6 +87,7 @@ export function TabNav() {
   const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
   const current = activeTab(pathname);
+  const selectedTab = TAB_VALUES.has(current) ? current : '';
 
   const handleMobileChange = (value: string) => {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
@@ -104,9 +108,9 @@ export function TabNav() {
         <Card>
           <div className="space-y-2">
             <Label htmlFor="chart-select">Select Chart</Label>
-            <Select value={current} onValueChange={handleMobileChange}>
+            <Select value={selectedTab} onValueChange={handleMobileChange}>
               <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select Chart" />
               </SelectTrigger>
               <SelectContent>
                 {TAB_LINKS.map((tab) => {

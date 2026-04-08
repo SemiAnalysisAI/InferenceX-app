@@ -8,8 +8,8 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedAvailability = cachedQuery(async () => {
-  if (JSON_MODE) return jsonProvider.getAvailabilityData();
+const getCachedAvailability = cachedQuery(() => {
+  if (JSON_MODE) return Promise.resolve(jsonProvider.getAvailabilityData());
   return getAvailabilityData(getDb());
 }, 'availability');
 

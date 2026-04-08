@@ -10,17 +10,13 @@
  *   pnpm admin:db:verify
  */
 
-import postgres from 'postgres';
-
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
-if (!process.env.DATABASE_WRITE_URL) {
-  console.error('DATABASE_WRITE_URL is required');
-  process.exit(1);
-}
+import { hasNoSslFlag } from './cli-utils';
+import { createAdminSql } from './etl/db-utils';
 
-const sql = postgres(process.env.DATABASE_WRITE_URL, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });
@@ -349,8 +345,8 @@ async function verify(): Promise<void> {
 }
 
 verify()
-  .catch((err) => {
-    console.error('db:verify failed:', err);
+  .catch((error) => {
+    console.error('db:verify failed:', error);
     process.exitCode = 1;
   })
   .finally(() => sql.end());

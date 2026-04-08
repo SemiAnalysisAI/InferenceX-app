@@ -170,9 +170,9 @@ describe('computeParetoPointLabels', () => {
   });
 });
 
-describe('computeGradientStops', () => {
-  const linearScale = (x: number) => x; // identity scale for simplicity
+const linearScale = (x: number) => x; // identity scale for simplicity
 
+describe('computeGradientStops', () => {
   const makeParetoLabel = (x: number, label: string, color: string): ParetoPointLabel => ({
     point: makePoint({ x, y: 100 }),
     label,

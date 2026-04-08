@@ -4,24 +4,24 @@ import { track } from '@/lib/analytics';
 import { type ReactNode, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { HARDWARE_CONFIG, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { LayerConfig } from '@/lib/d3-chart/D3Chart';
+import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
+import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
-import { ModelSuccessRateData } from '@/components/reliability/types';
+import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import ChartLegend from '@/components/ui/chart-legend';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
-const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 70 };
+const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
 const generateReliabilityTooltipContent = (data: ChartItem, isPinned: boolean): string => {
-  const modelLabel =
-    HARDWARE_CONFIG[data.model as keyof typeof HARDWARE_CONFIG]?.label || data.model;
+  const modelLabel = getHardwareConfig(data.model).label;
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
@@ -44,11 +44,15 @@ function positionLabelPairs(
 
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
-    maxWidths.set(d.modelLabel, this.getComputedTextLength());
+    maxWidths.set(
+      d.modelLabel,
+      measureTextWidth(`${d.successRate.toFixed(1)}%`, '600 12px sans-serif'),
+    );
   });
   overlayLabels.each(function (d) {
     const prev = maxWidths.get(d.modelLabel) ?? 0;
-    maxWidths.set(d.modelLabel, Math.max(prev, this.getComputedTextLength()));
+    const w = measureTextWidth(`${d.n_success}/${d.total} runs`, '500 10px sans-serif');
+    maxWidths.set(d.modelLabel, Math.max(prev, w));
   });
 
   const apply = (sel: d3.Selection<SVGTextElement, ChartItem, SVGGElement, unknown>) => {
@@ -89,7 +93,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const sortedModels = useMemo(
     () =>
       [...filteredReliabilityData]
-        .sort(
+        .toSorted(
           (a, b) =>
             getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
             a.model.localeCompare(b.model),
@@ -111,14 +115,14 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const legendItems = useMemo(
     () =>
       [...filteredReliabilityData]
-        .sort(
+        .toSorted(
           (a, b) =>
             getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
             a.model.localeCompare(b.model),
         )
         .map((data) => ({
           name: data.model,
-          label: HARDWARE_CONFIG[data.model as keyof typeof HARDWARE_CONFIG]?.label || data.model,
+          label: getHardwareConfig(data.model).label,
           color: resolveColor(data.model),
           isActive: enabledModels.has(data.model),
           onClick: () => {
@@ -132,7 +136,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   // Sort chart data by model sort index (same as legend)
   const sortedChartData = useMemo(
     () =>
-      [...chartData].sort(
+      [...chartData].toSorted(
         (a, b) =>
           getModelSortIndex(a.model) - getModelSortIndex(b.model) || a.model.localeCompare(b.model),
       ),
@@ -205,43 +209,15 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
 
   // Reverse so first in sort order appears at top (band scale range is [height, 0])
   const yDomain = useMemo(
-    () => [...sortedChartData].reverse().map((d) => d.modelLabel),
+    () => [...sortedChartData].toReversed().map((d) => d.modelLabel),
     [sortedChartData],
   );
 
-  const yAxisConfig = useMemo(
-    () => ({
-      customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-        axisGroup.selectAll('.tick text').each(function () {
-          const el = d3.select(this);
-          const fullLabel = el.text();
-          const lastSpace = fullLabel.lastIndexOf(' ');
-          el.text(null);
-          if (lastSpace > 0) {
-            el.append('tspan')
-              .text(fullLabel.slice(0, lastSpace))
-              .attr('x', -8)
-              .attr('dy', '-0.4em')
-              .attr('font-size', '12px')
-              .attr('font-weight', '600');
-            el.append('tspan')
-              .text(fullLabel.slice(lastSpace + 1))
-              .attr('x', -8)
-              .attr('dy', '1.2em')
-              .attr('font-size', '10px')
-              .style('fill', 'var(--muted-foreground)');
-          } else {
-            el.append('tspan')
-              .text(fullLabel)
-              .attr('x', -8)
-              .attr('font-size', '12px')
-              .attr('font-weight', '600');
-          }
-          el.attr('text-anchor', 'end');
-        });
-      },
-    }),
-    [],
+  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels() }), []);
+
+  const chartMargin = useMemo(
+    () => ({ ...BASE_MARGIN, left: computeLeftMargin(yDomain) }),
+    [yDomain],
   );
 
   const xAxisConfig = useMemo(
@@ -271,7 +247,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         chartId="reliability-chart"
         data={sortedChartData}
         height={dynamicHeight}
-        margin={CHART_MARGIN}
+        margin={chartMargin}
         watermark="logo"
         grabCursor
         clipContent={false}

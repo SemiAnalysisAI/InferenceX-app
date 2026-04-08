@@ -55,7 +55,7 @@ export function BlogToc({ headings }: BlogTocProps) {
 
   useEffect(() => {
     const elements = headings
-      .map((h) => document.getElementById(h.id))
+      .map((h) => document.querySelector(`#${CSS.escape(h.id)}`))
       .filter(Boolean) as HTMLElement[];
 
     if (elements.length === 0) return;
@@ -79,7 +79,7 @@ export function BlogToc({ headings }: BlogTocProps) {
     function onScrollEnd() {
       const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
       if (atBottom && headings.length > 0) {
-        setActiveId(headings[headings.length - 1].id);
+        setActiveId(headings.at(-1)!.id);
       }
     }
 
@@ -106,7 +106,7 @@ export function BlogToc({ headings }: BlogTocProps) {
 
   function handleClick(heading: TocHeading) {
     track('blog_toc_clicked', { heading: heading.text });
-    const el = document.getElementById(heading.id);
+    const el = document.querySelector<HTMLElement>(`#${CSS.escape(heading.id)}`);
     if (!el) return;
     const top = el.getBoundingClientRect().top + window.scrollY - 32;
     window.scrollTo({ top, behavior: 'smooth' });

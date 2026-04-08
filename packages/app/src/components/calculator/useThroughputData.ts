@@ -4,14 +4,18 @@ import { useCallback, useMemo } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import { HardwareConfig } from '@/components/inference/types';
+import type { HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/data-mappings';
 
-import { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+
+/** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
+const computeGpuCost = (costPerHour: number, tps: number) =>
+  costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
 
 // ---------------------------------------------------------------------------
 // Pareto front — matches the main inference chart's roofline algorithm
@@ -39,7 +43,7 @@ export function paretoFrontUpperLeft<T>(
   if (points.length === 0) return [];
 
   // Sort by x ascending, then y descending for ties
-  const sorted = [...points].sort((a, b) => {
+  const sorted = [...points].toSorted((a, b) => {
     const ax = getX(a);
     const bx = getX(b);
     if (ax === bx) return getY(b) - getY(a);
@@ -53,15 +57,15 @@ export function paretoFrontUpperLeft<T>(
     const py = getY(point);
 
     // Deduplicate same x: keep highest y
-    if (front.length > 0 && getX(front[front.length - 1]) === px) {
-      if (py > getY(front[front.length - 1])) {
+    if (front.length > 0 && getX(front.at(-1)!) === px) {
+      if (py > getY(front.at(-1)!)) {
         front[front.length - 1] = point;
       }
       continue;
     }
 
     // Remove dominated points: pop while current point's y >= last front point's y
-    while (front.length >= 1 && py >= getY(front[front.length - 1])) {
+    while (front.length > 0 && py >= getY(front.at(-1)!)) {
       front.pop();
     }
     front.push(point);
@@ -212,10 +216,10 @@ export function interpolateForGPU(
   if (frontier.length === 0) return null;
 
   // Sort frontier by input value ascending for spline interpolation
-  const sorted = [...frontier].sort((a, b) => getInputValue(a) - getInputValue(b));
+  const sorted = [...frontier].toSorted((a, b) => getInputValue(a) - getInputValue(b));
 
   const minInput = getInputValue(sorted[0]);
-  const maxInput = getInputValue(sorted[sorted.length - 1]);
+  const maxInput = getInputValue(sorted.at(-1)!);
 
   // Skip if target is outside the frontier's data range (no extrapolation)
   if (targetValue < minInput || targetValue > maxInput) {
@@ -378,10 +382,6 @@ export function useThroughputData(
       const specs = getGpuSpecs(hwKey);
       const power = specs.power;
 
-      // Cost calculations: costPerHour / (tokPerSec * 3600 / 1_000_000)
-      const computeCost = (costPerHour: number, tps: number) =>
-        costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
-
       const groupKey = multiPrecision ? `${hwKey}__${row.precision}` : hwKey;
       if (!grouped[groupKey]) grouped[groupKey] = [];
 
@@ -397,15 +397,15 @@ export function useThroughputData(
         ep: row.decode_ep,
         dp_attention: row.decode_dp_attention,
         disagg: row.disagg,
-        costh: computeCost(specs.costh, tput),
-        costn: computeCost(specs.costn, tput),
-        costr: computeCost(specs.costr, tput),
-        costhi: computeCost(specs.costh, inputTput),
-        costni: computeCost(specs.costn, inputTput),
-        costri: computeCost(specs.costr, inputTput),
-        costhOutput: computeCost(specs.costh, outputTput),
-        costnOutput: computeCost(specs.costn, outputTput),
-        costrOutput: computeCost(specs.costr, outputTput),
+        costh: computeGpuCost(specs.costh, tput),
+        costn: computeGpuCost(specs.costn, tput),
+        costr: computeGpuCost(specs.costr, tput),
+        costhi: computeGpuCost(specs.costh, inputTput),
+        costni: computeGpuCost(specs.costn, inputTput),
+        costri: computeGpuCost(specs.costr, inputTput),
+        costhOutput: computeGpuCost(specs.costh, outputTput),
+        costnOutput: computeGpuCost(specs.costn, outputTput),
+        costrOutput: computeGpuCost(specs.costr, outputTput),
         tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
         inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
         outputTpPerMw: power && power > 0 ? (outputTput * 1000) / power : 0,
@@ -413,7 +413,7 @@ export function useThroughputData(
     }
 
     // Sort hardware config
-    const sortedKeys = Object.keys(hwConfigMap).sort(
+    const sortedKeys = Object.keys(hwConfigMap).toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
     );
     const config: HardwareConfig = {};

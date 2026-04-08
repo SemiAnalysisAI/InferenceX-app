@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { useInference } from '@/components/inference/InferenceContext';
-import {
+import type {
   ChartDefinition,
   HardwareConfig,
   InferenceData,
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 
 import ScatterGraph from './ScatterGraph';
 
@@ -56,10 +56,10 @@ export function UnofficialChartDisplay() {
   ]);
 
   // Generate the key to look up unofficial data
-  const dataKey = useMemo(() => {
-    // Model and Sequence enum values are the strings used as API response keys directly
-    return `${selectedModel}_${selectedSequence}`;
-  }, [selectedModel, selectedSequence]);
+  const dataKey = useMemo(
+    () => `${selectedModel}_${selectedSequence}`,
+    [selectedModel, selectedSequence],
+  );
 
   // Create graphs with hardware config for unofficial data
   interface UnofficialGraph extends RenderableGraph {
@@ -106,7 +106,7 @@ export function UnofficialChartDisplay() {
         hardwareConfig: Object.fromEntries(
           Object.entries(dataForChart.gpus || {}).map(([k, v]) => [
             k,
-            { ...v, ...HARDWARE_CONFIG[k] },
+            { ...getHardwareConfig(k), ...v },
           ]),
         ),
       };

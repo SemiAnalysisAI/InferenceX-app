@@ -13,6 +13,10 @@ import {
   logTickFormat,
 } from '@/lib/chart-rendering';
 
+function mockScale(min: number, max: number) {
+  return { domain: () => [min, max] } as any;
+}
+
 // ===========================================================================
 // SHAPE_CONFIG
 // ===========================================================================
@@ -128,10 +132,6 @@ describe('formatLargeNumber', () => {
 // logTickFormat
 // ===========================================================================
 describe('logTickFormat', () => {
-  function mockScale(min: number, max: number) {
-    return { domain: () => [min, max] } as any;
-  }
-
   it('shows all labels when logRange < 2', () => {
     const formatter = logTickFormat(mockScale(10, 50));
     expect(formatter(25)).toBe(formatLargeNumber(25));
@@ -348,10 +348,6 @@ describe('applyNormalState / applyHoverState — additional coverage', () => {
 // logTickFormat — additional edge cases
 // ===========================================================================
 describe('logTickFormat — edge cases', () => {
-  function mockScale(min: number, max: number) {
-    return { domain: () => [min, max] } as any;
-  }
-
   it('shows all labels at narrow zoom (logRange < 2) including non-powers-of-10', () => {
     // domain [100, 500] → logRange = log10(500) - log10(100) ≈ 0.7
     const formatter = logTickFormat(mockScale(100, 500));

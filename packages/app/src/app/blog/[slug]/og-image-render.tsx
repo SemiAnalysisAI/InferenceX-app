@@ -67,7 +67,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
   let subtitle = meta.subtitle;
   if (subtitle.length > maxSubtitleChars && maxSubtitleChars > 0) {
-    subtitle = subtitle.slice(0, maxSubtitleChars).replace(/\s\S*$/, '') + '…';
+    subtitle = `${subtitle.slice(0, maxSubtitleChars).replace(/\s\S*$/, '')}…`;
   } else if (maxSubtitleChars <= 0) {
     subtitle = '';
   }
@@ -173,7 +173,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 28, color: '#d4d4d8' }}>
-            {new Date(meta.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+            {new Date(`${meta.date}T00:00:00Z`).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
               day: 'numeric',

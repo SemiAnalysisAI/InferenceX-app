@@ -18,8 +18,13 @@ title: string
 subtitle: string
 date: YYYY-MM-DD
 modifiedDate?: YYYY-MM-DD # Used in sitemap and JSON-LD
+publishDate?: YYYY-MM-DD # Scheduled publishing, hidden in production until this date
 tags?: string[] # Used for filtering on /blog and in RSS categories
 ```
+
+### Scheduled Publishing (`publishDate`)
+
+Posts without `publishDate` are hidden in production — this field is required for a post to be visible. If `publishDate` is set to a future date, the post is hidden until that date arrives. In development, all posts are visible regardless. This allows articles to be merged to `master` via PR and go live automatically when the date arrives. All downstream consumers (sitemap, RSS, llms.txt) automatically respect the filter since they call `getAllPosts()`. `getPostBySlug()` still returns the post regardless of `publishDate` (for direct URL preview).
 
 Slug is derived from the filename (e.g., `my-post.mdx` -> `my-post`), not from frontmatter. Reading time is calculated at 265 WPM.
 
@@ -32,6 +37,7 @@ Slug is derived from the filename (e.g., `my-post.mdx` -> `my-post`), not from f
 | `![alt](src)`                                  | Images                           | Rendered via `next/image` with lazy loading (first image is eager)                |
 | `<Figure src="..." alt="..." caption="..." />` | Captioned figures                | Uses `<img>` (not `next/image`) for external URLs                                 |
 | `<Blur>...</Blur>`                             | Paywall teaser blur overlay      | Content is blurred, unselectable, and not clickable                               |
+| `<JsonLd>{...}</JsonLd>`                       | Structured data (JSON-LD)        | Renders `<script type="application/ld+json">`. Validates JSON before rendering.   |
 
 Heading ID deduplication: if two headings share a slug, the second gets prefixed with its parent heading's slug (e.g., `overview-details`). If no parent exists, a level suffix is appended (`intro-2`).
 
@@ -111,7 +117,7 @@ All blog analytics use the `blog_` prefix per the `[section]_[action]` conventio
 ## Adding a New Blog Post
 
 1. Create `packages/app/content/blog/<slug>.mdx` with required frontmatter (`title`, `subtitle`, `date`)
-2. Add optional `tags` and `modifiedDate` frontmatter
+2. Add optional `tags`, `modifiedDate`, and `publishDate` frontmatter
 3. Write content using standard Markdown + available MDX components
 4. The post automatically appears in: blog list, sitemap, RSS feed, llms.txt, OG image generation
 5. No code changes needed — just the MDX file

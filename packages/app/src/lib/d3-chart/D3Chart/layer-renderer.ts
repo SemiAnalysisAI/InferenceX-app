@@ -1,4 +1,4 @@
-import * as d3 from 'd3';
+import type * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
@@ -29,7 +29,7 @@ export function renderLayer<T>(
   const { width, height } = layout;
 
   switch (layer.type) {
-    case 'bar':
+    case 'bar': {
       return renderBars(
         group,
         layer.data,
@@ -38,8 +38,9 @@ export function renderLayer<T>(
         height,
         layer.config,
       );
+    }
 
-    case 'horizontalBar':
+    case 'horizontalBar': {
       return renderHorizontalBars(
         group,
         layer.data,
@@ -47,8 +48,9 @@ export function renderLayer<T>(
         xScale as ContinuousScale,
         layer.config,
       );
+    }
 
-    case 'point':
+    case 'point': {
       return renderPoints(
         group,
         layer.data,
@@ -56,11 +58,13 @@ export function renderLayer<T>(
         layer.config.getX ? (xScale as ContinuousScale) : undefined,
         layer.config.getY ? (yScale as ContinuousScale) : undefined,
       );
+    }
 
-    case 'errorBar':
+    case 'errorBar': {
       return renderErrorBars(group, layer.data, layer.config);
+    }
 
-    case 'line':
+    case 'line': {
       renderLines(
         group,
         layer.lines,
@@ -69,8 +73,9 @@ export function renderLayer<T>(
         layer.config,
       );
       return null;
+    }
 
-    case 'roofline':
+    case 'roofline': {
       renderRooflines(
         group,
         layer.rooflines,
@@ -79,8 +84,9 @@ export function renderLayer<T>(
         layer.config,
       );
       return null;
+    }
 
-    case 'barLabel':
+    case 'barLabel': {
       renderBarLabels(
         group,
         layer.data,
@@ -90,8 +96,9 @@ export function renderLayer<T>(
         layer.config,
       );
       return null;
+    }
 
-    case 'scatter':
+    case 'scatter': {
       return renderScatterPoints(
         group,
         layer.data,
@@ -100,16 +107,19 @@ export function renderLayer<T>(
         layer.config,
         layer.keyFn,
       );
+    }
 
-    case 'radar':
+    case 'radar': {
       return renderRadar(group, layer.data, width, height, layer.config);
+    }
 
-    case 'custom':
+    case 'custom': {
       if (layer.render) {
         const result = layer.render(group, ctx);
         return result ?? null;
       }
       return null;
+    }
   }
 }
 
@@ -129,13 +139,15 @@ export function updateLayerOnZoom<T>(
   const { height } = layout;
 
   switch (layer.type) {
-    case 'bar':
+    case 'bar': {
       updateBarsOnZoom(group, newYScale as ContinuousScale, height, layer.config.getY);
       break;
+    }
 
-    case 'horizontalBar':
+    case 'horizontalBar': {
       updateHorizontalBarsOnZoom(group, newXScale as ContinuousScale, layer.config.getX);
       break;
+    }
 
     case 'point': {
       const { getX, getY, getCx, getCy } = layer.config;
@@ -147,11 +159,12 @@ export function updateLayerOnZoom<T>(
       break;
     }
 
-    case 'errorBar':
+    case 'errorBar': {
       updateErrorBarsOnZoom(group, layer.config);
       break;
+    }
 
-    case 'line':
+    case 'line': {
       updateLinesOnZoom(
         group,
         layer.lines,
@@ -160,8 +173,9 @@ export function updateLayerOnZoom<T>(
         layer.config,
       );
       break;
+    }
 
-    case 'roofline':
+    case 'roofline': {
       updateRooflinesOnZoom(
         group,
         layer.rooflines,
@@ -169,8 +183,9 @@ export function updateLayerOnZoom<T>(
         newYScale as ContinuousScale,
       );
       break;
+    }
 
-    case 'barLabel':
+    case 'barLabel': {
       updateBarLabelsOnZoom(
         group,
         layer.data,
@@ -180,19 +195,23 @@ export function updateLayerOnZoom<T>(
         layer.config,
       );
       break;
+    }
 
-    case 'scatter':
+    case 'scatter': {
       updateScatterPointsOnZoom(group, newXScale as ContinuousScale, newYScale as ContinuousScale);
       break;
+    }
 
-    case 'radar':
+    case 'radar': {
       // Radar charts don't support zoom
       break;
+    }
 
-    case 'custom':
+    case 'custom': {
       if (layer.onZoom) {
         layer.onZoom(group, ctx);
       }
       break;
+    }
   }
 }

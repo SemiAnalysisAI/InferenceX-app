@@ -20,7 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: BASE_URL,
       lastModified: now,
       changeFrequency: 'daily',
-      priority: 1.0,
+      priority: 1,
     },
     ...TABS.map((tab) => ({
       url: `${BASE_URL}/${tab}`,
@@ -35,6 +35,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     },
     {
+      url: `${BASE_URL}/land-acknowledgement`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.4,
+    },
+    {
       url: `${BASE_URL}/blog`,
       lastModified: now,
       changeFrequency: 'weekly',
@@ -42,7 +48,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     ...getAllPosts().map((post) => ({
       url: `${BASE_URL}/blog/${post.slug}`,
-      lastModified: new Date((post.modifiedDate ?? post.date) + 'T00:00:00Z').toISOString(),
+      lastModified: new Date(`${post.modifiedDate ?? post.date}T00:00:00Z`).toISOString(),
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     })),

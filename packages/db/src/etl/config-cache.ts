@@ -5,7 +5,7 @@
  * across many artifacts in a single run.
  */
 
-import postgres from 'postgres';
+import type postgres from 'postgres';
 
 type Sql = ReturnType<typeof postgres>;
 

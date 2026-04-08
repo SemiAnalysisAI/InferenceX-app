@@ -16,7 +16,7 @@ import { updateRepoUrl } from '@/lib/utils';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useInference } from '@/components/inference/InferenceContext';
-import { WorkflowInfo } from '@/components/inference/types';
+import type { WorkflowInfo } from '@/components/inference/types';
 import {
   formatChangelogDescription,
   formatConfigKeys,
@@ -69,13 +69,9 @@ export default function WorkflowInfoDisplay({
   const runIds = availableRuns ? Object.keys(availableRuns) : [];
   const currentRunIndex = runIds.indexOf(selectedRunId);
 
-  const canGoPreviousRun = () => {
-    return currentRunIndex > 0;
-  };
+  const canGoPreviousRun = () => currentRunIndex > 0;
 
-  const canGoNextRun = () => {
-    return currentRunIndex >= 0 && currentRunIndex < runIds.length - 1;
-  };
+  const canGoNextRun = () => currentRunIndex !== -1 && currentRunIndex < runIds.length - 1;
 
   const handleGoPreviousRun = () => {
     if (canGoPreviousRun()) {

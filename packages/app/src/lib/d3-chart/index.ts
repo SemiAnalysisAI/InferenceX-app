@@ -4,6 +4,14 @@ export type { ChartLayout, ChartMargin, ChartSetupConfig, ContinuousScale } from
 export type { AnyScale, AxisUpdateConfig } from './chart-update';
 export * from './layers';
 export { contrastColors } from './contrast-colors';
+export { twoRowYAxisLabels, splitLabel } from './axis-labels';
+export type { TwoRowLabelOptions, LabelSplitMode } from './axis-labels';
+export {
+  measureTextWidth,
+  computeLeftMargin,
+  computeBottomMargin,
+  computeDynamicMargins,
+} from './dynamic-margins';
 export { D3Chart } from './D3Chart';
 export type {
   D3ChartHandle,

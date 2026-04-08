@@ -114,7 +114,7 @@ describe('mapEvalRow', () => {
     const evs = mapEvalRow(makeMeta(), results, tracker);
 
     expect(evs).toHaveLength(2);
-    const tasks = evs.map((e) => e.task).sort();
+    const tasks = evs.map((e) => e.task).toSorted();
     expect(tasks).toEqual(['gsm8k', 'humaneval']);
   });
 

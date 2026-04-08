@@ -1,12 +1,11 @@
-import { Model } from '@/lib/data-mappings';
-import { HARDWARE_CONFIG } from '@/lib/constants';
+import type { Model } from '@/lib/data-mappings';
 
 /**
  * Represents a single eval data point for the chart
  */
 export interface EvaluationChartData {
   configId: number;
-  hwKey: keyof typeof HARDWARE_CONFIG;
+  hwKey: string;
   configLabel: string; // Display label like "H100 (vLLM)" or "B200 (TRT)"
   score: number; // eval benchmark score (midpoint when aggregated)
   scoreError?: number; // standard error of the score (or half range when aggregated)
@@ -54,6 +53,7 @@ export interface EvaluationChartContextType {
   availableModels: Model[];
   availableDates: string[];
   chartData: EvaluationChartData[];
+  unofficialChartData: EvaluationChartData[];
   unfilteredChartData: EvaluationChartData[];
   enabledHardware: Set<string>;
   toggleHardware: (hwKey: string) => void;

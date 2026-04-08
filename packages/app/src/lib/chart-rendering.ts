@@ -14,15 +14,13 @@ const TRIANGLE_SIZE = 5;
 const TRIANGLE_HOVER_SIZE = 7;
 const getTrianglePath = (size: number) => {
   const h = (size * Math.sqrt(3)) / 2;
-  return `M 0 ${(-h * 2) / 3} L ${size} ${(h * 1) / 3} L ${-size} ${(h * 1) / 3} Z`;
+  return `M 0 ${(-h * 2) / 3} L ${size} ${Number(h) / 3} L ${-size} ${Number(h) / 3} Z`;
 };
 
 // Diamond path for INT4 precision
 const DIAMOND_SIZE = 5;
 const DIAMOND_HOVER_SIZE = 7;
-const getDiamondPath = (size: number) => {
-  return `M 0 ${-size} L ${size} 0 L 0 ${size} L ${-size} 0 Z`;
-};
+const getDiamondPath = (size: number) => `M 0 ${-size} L ${size} 0 L 0 ${size} L ${-size} 0 Z`;
 
 // Shape configuration for different precisions
 export const SHAPE_CONFIG = {

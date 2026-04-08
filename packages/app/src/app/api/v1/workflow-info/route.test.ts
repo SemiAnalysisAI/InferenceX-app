@@ -20,7 +20,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
 }));
 
 vi.mock('@/lib/api-cache', () => ({
-  cachedQuery: (fn: Function) => fn,
+  cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (data: unknown) => Response.json(data),
 }));
 

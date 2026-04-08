@@ -64,7 +64,7 @@ Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 - Cost fields — GPU hourly cost divided by tokens-per-hour (in millions): `costh` / `costn` / `costr` for hyperscaler / neocloud / 3-year-rental pricing respectively. Three token variants exist: combined (`costh`/`costn`/`costr`), output-only (`costhOutput`/`costnOutput`/`costrOutput`), input-only (`costhi`/`costni`/`costri`).
 - Energy fields — `jTotal` / `jOutput` / `jInput`: `(hardwarePower * 1000) / tputPerGpu` (Joules per token, where power in kW is converted to W).
 
-**GPU specs lookup** — `createChartDataPoint` calls `getGpuSpecs(hwKey)` (`lib/constants.ts`) which splits on `[-_]` to extract the base GPU token (e.g. `"b200_trt_mtp"` → `"b200"`) and looks it up in `GPU_SPECS`. `GPU_SPECS` stores power (kW per GPU) and three cost tiers ($ per GPU-hour). Missing keys return zeroed specs, which produces `0` cost/energy values rather than crashing.
+**GPU specs lookup** — `createChartDataPoint` calls `getGpuSpecs(hwKey)` (`lib/constants.ts`) which splits on `[-_]` to extract the base GPU token (e.g. `"b200_trt_mtp"` → `"b200"`) and looks it up in `HW_REGISTRY`. `HW_REGISTRY` stores power (kW per GPU) and three cost tiers ($ per GPU-hour). Missing keys return zeroed specs, which produces `0` cost/energy values rather than crashing.
 
 ### Step 3: Filtering, memoization, and rendering (`hooks/useChartData.ts`)
 
@@ -89,15 +89,15 @@ This is the most complex and bug-prone part of the pipeline. A bad hardware key 
 **`getHardwareKey(entry)`** (`lib/chart-utils.ts`) — builds the canonical key:
 
 1. Base GPU: `entry.hw.split('-')[0]` strips any `-DP` / `-MN` variant suffix from the hardware field (e.g. `"h100-8"` → `"h100"`).
-2. Framework suffix: appends `_${entry.framework}`. The direct key (`h100_trt`) is tested first. If the direct key is absent and `entry.disagg` is true, a `-disagg` variant is tried (`h100_trt-disagg`). If neither is in `HARDWARE_CONFIG`, the direct form is used anyway (it will warn at `getHardwareConfig` time).
+2. Framework suffix: appends `_${entry.framework}`. The direct key (`h100_trt`) is tested via `isKnownGpu()` (checks whether the base GPU exists in `HW_REGISTRY`). If the direct key's base is unknown and `entry.disagg` is true, a `-disagg` variant is tried.
 3. Spec decoding suffix: if `entry.mtp === 'on'` or `entry.spec_decoding === 'mtp'`, appends `_mtp`. Otherwise, any non-`'none'` `spec_decoding` value is appended as-is (e.g. `_eagle`).
 
-The resulting key must exactly match an entry in `HARDWARE_CONFIG`. A key that does not match falls back silently to the `unknown` hardware config.
+The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label, suffix, gpu tooltip) are derived dynamically by `getHardwareConfig()`. Unrecognised base GPUs fall back to the `unknown` hardware config.
 
 **Three variants exist for different data sources:**
 
 - `getHardwareKey(entry: AggDataEntry)` — for benchmark data (the normal path described above).
-- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/chart-utils.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the result is not in `HARDWARE_CONFIG`.
+- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/chart-utils.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the base GPU is not in `HW_REGISTRY`.
 - `buildAvailabilityHwKey(hardware, framework?, specMethod?, disagg?)` (`lib/chart-utils.ts`) — for availability rows. Follows the same disagg-variant logic as `getHardwareKey` but uses `resolveFrameworkAlias` to normalize framework aliases before lookup.
 
 **Alias remapping** (`lib/constants.ts`) — `GPU_KEY_ALIASES` maps a canonical key to one or more legacy keys (e.g. `gb200_dynamo-trtllm` was renamed to `gb200_dynamo-trt`). The inverse map `GPU_ALIAS_TO_CANONICAL` is used in `filterByGPU` to treat alias keys as their canonical equivalent when the user selects a GPU from the filter panel.

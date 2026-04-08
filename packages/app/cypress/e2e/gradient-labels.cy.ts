@@ -98,23 +98,23 @@ describe('Gradient Labels Toggle', () => {
   });
 });
 
+const selectMetricAndEnableGradient = (metricLabel: string) => {
+  // Switch to the target Y-axis metric
+  cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+  cy.contains('[role="option"]', metricLabel).click({ force: true });
+
+  // Wait for chart to re-render with new metric
+  cy.get('[data-testid="scatter-graph"]').should('be.visible');
+  cy.get('[data-testid="scatter-graph"]').should('not.contain.text', 'No data available');
+
+  // Enable gradient labels
+  cy.get('#scatter-gradient-labels').click();
+  cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
+};
+
 describe('Gradient Labels with non-default Y-axis metrics', () => {
   // Regression tests: gradient labels must render SVG linearGradient defs
   // for metrics that use paretoFrontLowerRight (cost, energy).
-
-  const selectMetricAndEnableGradient = (metricLabel: string) => {
-    // Switch to the target Y-axis metric
-    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.contains('[role="option"]', metricLabel).click({ force: true });
-
-    // Wait for chart to re-render with new metric
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    cy.get('[data-testid="scatter-graph"]').should('not.contain.text', 'No data available');
-
-    // Enable gradient labels
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-  };
 
   before(() => {
     cy.visit('/inference', {

@@ -65,10 +65,10 @@ export function renderGrid(
   xScale: AnyScale,
   yScale: ContinuousScale | d3.ScaleBand<string>,
   yTickCount?: number,
-  transitionDuration?: number,
+  transitionDuration = 0,
 ): void {
   const { width, height, gridGroup } = layout;
-  const dur = transitionDuration ?? 0;
+  const dur = transitionDuration;
 
   // Vertical grid lines — reuse existing group, join updates lines in place
   let vGroup = gridGroup.select<SVGGElement>('.grid-v');

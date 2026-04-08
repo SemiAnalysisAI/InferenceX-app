@@ -1,3 +1,17 @@
+const selectCustomCostMetric = () => {
+  cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+  cy.get('[role="option"]')
+    .contains('Cost per Million Total Tokens (Custom User Values)')
+    .click({ force: true });
+};
+
+const selectCustomPowerMetric = () => {
+  cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
+  cy.get('[role="option"]')
+    .contains('Token Throughput per All in Utility MW (Custom User Values)')
+    .click({ force: true });
+};
+
 describe('Custom User Values', () => {
   before(() => {
     cy.window().then((win) => {
@@ -6,20 +20,6 @@ describe('Custom User Values', () => {
     cy.visit('/inference');
     cy.get('[data-testid="model-selector"]').should('be.visible');
   });
-
-  const selectCustomCostMetric = () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('[role="option"]')
-      .contains('Cost per Million Total Tokens (Custom User Values)')
-      .click({ force: true });
-  };
-
-  const selectCustomPowerMetric = () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('[role="option"]')
-      .contains('Token Throughput per All in Utility MW (Custom User Values)')
-      .click({ force: true });
-  };
 
   describe('Custom GPU Costs', () => {
     it('renders the custom costs input section when custom cost metric is selected', () => {

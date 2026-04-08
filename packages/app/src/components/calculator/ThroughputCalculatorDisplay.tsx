@@ -2,13 +2,13 @@
 
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
-import { BarChart3, Download, FileSpreadsheet, Image, RotateCcw, Table2 } from 'lucide-react';
+import { BarChart3, Table2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   ModelSelector,
@@ -28,20 +28,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  type Model,
+  type Precision,
+  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-  Model,
-  Precision,
-  Sequence,
 } from '@/lib/data-mappings';
-import { getModelSortIndex, GPU_SPECS, HARDWARE_CONFIG } from '@/lib/constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useChartExport } from '@/hooks/useChartExport';
 import { getDisplayLabel } from '@/lib/utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
@@ -51,7 +51,7 @@ import ThroughputBarChart, {
   getThroughputForType,
   getTpPerMwForType,
 } from './ThroughputBarChart';
-import { BarMetric, CostProvider, CostType, InterpolatedResult } from './types';
+import type { BarMetric, CostProvider, CostType, InterpolatedResult } from './types';
 import { useThroughputData } from './useThroughputData';
 
 const COST_PROVIDER_OPTIONS: { value: CostProvider; label: string }[] = [
@@ -72,133 +72,31 @@ const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'cost', label: 'Cost' },
 ];
 
-function CalculatorChartButtons({
-  viewMode,
-  setViewMode,
-  chartId,
-  onExportCsv,
-  setIsLegendExpanded,
-  exportFileName,
-}: {
-  viewMode: 'chart' | 'table';
-  setViewMode: (v: 'chart' | 'table') => void;
-  chartId: string;
-  onExportCsv: () => void;
-  setIsLegendExpanded?: (expanded: boolean) => void;
-  exportFileName?: string;
-}) {
-  const { isExporting, exportToImage } = useChartExport({
-    chartId,
-    setIsLegendExpanded,
-    exportFileName,
-  });
-  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
+const getBarMetricLabel = (metric: BarMetric) => {
+  if (metric === 'throughput') return 'Throughput';
+  if (metric === 'cost') return 'Cost';
+  return 'tok/s/MW';
+};
 
-  const handleExportPng = () => {
-    setExportPopoverOpen(false);
-    track('calculator_chart_exported');
-    exportToImage();
-  };
+type CalculatorViewMode = 'chart' | 'table';
 
-  const handleExportCsv = () => {
-    setExportPopoverOpen(false);
-    track('calculator_csv_exported');
-    onExportCsv();
-    window.dispatchEvent(new CustomEvent('inferencex:action'));
-  };
+const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] = [
+  {
+    value: 'chart',
+    label: 'Chart',
+    icon: <BarChart3 className="size-3.5" />,
+    testId: 'calculator-chart-view-btn',
+  },
+  {
+    value: 'table',
+    label: 'Table',
+    icon: <Table2 className="size-3.5" />,
+    testId: 'calculator-table-view-btn',
+  },
+];
 
-  return (
-    <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 no-export export-buttons gap-1 z-10">
-      <div
-        className="inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
-        role="tablist"
-        aria-label="View mode"
-        data-testid="calculator-view-toggle"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewMode === 'chart'}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-            viewMode === 'chart'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => {
-            setViewMode('chart');
-            track('calculator_view_changed', { view: 'chart' });
-          }}
-          data-testid="calculator-chart-view-btn"
-        >
-          <BarChart3 className="size-3.5" />
-          Chart
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={viewMode === 'table'}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-            viewMode === 'table'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => {
-            setViewMode('table');
-            track('calculator_view_changed', { view: 'table' });
-          }}
-          data-testid="calculator-table-view-btn"
-        >
-          <Table2 className="size-3.5" />
-          Table
-        </button>
-      </div>
-      <Popover open={exportPopoverOpen} onOpenChange={setExportPopoverOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            data-testid="export-button"
-            variant="outline"
-            size={isExporting ? 'default' : 'icon'}
-            className={`h-7 shrink-0 ${isExporting ? '' : 'w-7'}`}
-            disabled={isExporting}
-          >
-            <Download className={isExporting ? 'mr-2' : ''} size={16} />
-            {isExporting && 'Exporting...'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-44 p-1">
-          <button
-            data-testid="export-png-button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-            onClick={handleExportPng}
-          >
-            <Image size={14} />
-            Download PNG
-          </button>
-          <button
-            data-testid="export-csv-button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-            onClick={handleExportCsv}
-          >
-            <FileSpreadsheet size={14} />
-            Download CSV
-          </button>
-        </PopoverContent>
-      </Popover>
-      <Button
-        data-testid="zoom-reset-button"
-        variant="outline"
-        size="icon"
-        className="h-7 w-7"
-        onClick={() => {
-          track('calculator_zoom_reset_button');
-          window.dispatchEvent(new CustomEvent(`d3chart_zoom_reset_${chartId}`));
-        }}
-      >
-        <RotateCcw size={16} />
-      </Button>
-    </div>
-  );
-}
+const CALCULATOR_MOBILE_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] =
+  CALCULATOR_VIEW_MODE_OPTIONS.map(({ testId: _testId, ...option }) => option);
 
 export default function ThroughputCalculatorDisplay() {
   const {
@@ -225,7 +123,7 @@ export default function ThroughputCalculatorDisplay() {
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
 
   const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
@@ -243,7 +141,7 @@ export default function ThroughputCalculatorDisplay() {
   // Reset visible GPUs when the available set changes (model/sequence/precision change or customer filter toggle)
   useEffect(() => {
     if (availableHwKeys.length === 0) return;
-    const key = [...availableHwKeys].sort().join(',');
+    const key = [...availableHwKeys].toSorted().join(',');
     if (key !== prevAvailableKeyRef.current) {
       prevAvailableKeyRef.current = key;
       setVisibleHwKeys(new Set(availableHwKeys));
@@ -266,9 +164,7 @@ export default function ThroughputCalculatorDisplay() {
     return getResults(targetValue, mode, costProvider, visibleHwKeys);
   }, [hasData, targetValue, mode, costProvider, getResults, visibleHwKeys]);
 
-  const currentRange = useMemo(() => {
-    return ranges.interactivity;
-  }, [ranges]);
+  const currentRange = useMemo(() => ranges.interactivity, [ranges]);
 
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
@@ -349,18 +245,15 @@ export default function ThroughputCalculatorDisplay() {
           } else if (prev.size === 1) {
             // If only one visible and clicking it, show all
             return new Set(availableHwKeys);
-          } else {
-            // Remove it
-            const next = new Set(prev);
-            next.delete(hwKey);
-            return next;
           }
-        } else {
-          // Add it
+          // Remove it
           const next = new Set(prev);
-          next.add(hwKey);
+          next.delete(hwKey);
           return next;
         }
+        // Add it
+        const next = new Set([...prev, hwKey]);
+        return next;
       });
       track('calculator_gpu_toggled', { gpu: hwKey });
     },
@@ -377,11 +270,16 @@ export default function ThroughputCalculatorDisplay() {
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = calculatorChartToCsv(results, targetValue, (hwKey) => {
-      const config = hardwareConfig[hwKey] || HARDWARE_CONFIG[hwKey];
+      const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
       return config ? getDisplayLabel(config) : hwKey;
     });
     exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
   }, [results, targetValue, hardwareConfig]);
+
+  const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
+    setViewMode(value);
+    track('calculator_view_changed', { view: value });
+  }, []);
 
   const handleResetGpus = useCallback(() => {
     setVisibleHwKeys(new Set(availableHwKeys));
@@ -423,7 +321,7 @@ export default function ThroughputCalculatorDisplay() {
     if (selectedResults.length < 2) return null;
 
     const getLabel = (r: InterpolatedResult) => {
-      const config = hardwareConfig[r.hwKey] || HARDWARE_CONFIG[r.hwKey];
+      const config = hardwareConfig[r.hwKey] || getHardwareConfig(r.hwKey);
       const baseName = config ? getDisplayLabel(config) : r.hwKey;
       if (r.precision) return `${baseName} (${r.precision.toUpperCase()})`;
       return baseName;
@@ -481,7 +379,7 @@ export default function ThroughputCalculatorDisplay() {
     const availableSet = new Set(availableHwKeys);
     return Object.entries(hardwareConfig)
       .filter(([key]) => availableSet.has(key))
-      .sort(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+      .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map(([key, config]) => ({
         name: config.name,
         label: getDisplayLabel(config),
@@ -492,12 +390,6 @@ export default function ThroughputCalculatorDisplay() {
         onClick: () => toggleGpuVisibility(key),
       }));
   }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
-
-  const getBarMetricLabel = (metric: BarMetric) => {
-    if (metric === 'throughput') return 'Throughput';
-    if (metric === 'cost') return 'Cost';
-    return 'tok/s/MW';
-  };
 
   if (!loading && error) {
     console.error(error);
@@ -696,13 +588,23 @@ export default function ThroughputCalculatorDisplay() {
       {/* Chart / Table */}
       <section data-testid="calculator-chart-section">
         <figure data-testid="calculator-figure" className="relative rounded-lg">
-          <CalculatorChartButtons
-            viewMode={viewMode}
-            setViewMode={setViewMode}
+          <ChartButtons
             chartId="calculator-chart"
+            analyticsPrefix="calculator"
+            zoomResetEvent="d3chart_zoom_reset_calculator-chart"
             onExportCsv={handleExportCsv}
             setIsLegendExpanded={setIsLegendExpanded}
             exportFileName={`InferenceX_calculator_${selectedModel}`}
+            leadingControls={
+              <SegmentedToggle
+                value={viewMode}
+                options={CALCULATOR_VIEW_MODE_OPTIONS}
+                onValueChange={handleViewModeChange}
+                ariaLabel="View mode"
+                testId="calculator-view-toggle"
+                className="shrink-0"
+              />
+            }
           />
           <Card>
             {loading ? (
@@ -710,56 +612,19 @@ export default function ThroughputCalculatorDisplay() {
             ) : (
               <>
                 {(() => {
-                  const mobileToggle = (
-                    <div
-                      className="md:hidden inline-flex items-center rounded-lg border border-border p-0.5 gap-0.5 shrink-0"
-                      role="tablist"
-                      aria-label="View mode"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={viewMode === 'chart'}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                          viewMode === 'chart'
-                            ? 'bg-muted text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        onClick={() => {
-                          setViewMode('chart');
-                          track('calculator_view_changed', { view: 'chart' });
-                        }}
-                      >
-                        <BarChart3 className="size-3.5" />
-                        Chart
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={viewMode === 'table'}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                          viewMode === 'table'
-                            ? 'bg-muted text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        onClick={() => {
-                          setViewMode('table');
-                          track('calculator_view_changed', { view: 'table' });
-                        }}
-                      >
-                        <Table2 className="size-3.5" />
-                        Table
-                      </button>
-                    </div>
-                  );
-
                   const captionContent = (
                     <>
                       <div className="flex items-start justify-between gap-4">
                         <h2 className="text-lg font-semibold">
                           {getChartTitle(barMetric, mode, targetValue, costType, costProvider)}
                         </h2>
-                        {mobileToggle}
+                        <SegmentedToggle
+                          value={viewMode}
+                          options={CALCULATOR_MOBILE_VIEW_MODE_OPTIONS}
+                          onValueChange={handleViewModeChange}
+                          ariaLabel="View mode"
+                          className="md:hidden shrink-0"
+                        />
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         {getModelLabel(selectedModel)} •{' '}
@@ -776,7 +641,7 @@ export default function ThroughputCalculatorDisplay() {
                             data-testid="calculator-cost-badges"
                           >
                             All in Power/GPU:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
+                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                               <Badge key={base} variant="outline">
                                 {base.toUpperCase()}: {specs.power}kW
                               </Badge>
@@ -804,7 +669,7 @@ export default function ThroughputCalculatorDisplay() {
                             data-testid="calculator-cost-badges"
                           >
                             TCO $/GPU/hr:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
+                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                               <Badge key={base} variant="outline">
                                 {base.toUpperCase()}: $
                                 {(costProvider === 'costh'
@@ -922,7 +787,7 @@ export default function ThroughputCalculatorDisplay() {
                             className="absolute inset-0 pointer-events-none flex items-center justify-center"
                             aria-hidden="true"
                           >
-                            <img src="/brand/logo-color.png" alt="" className="w-48 opacity-10" />
+                            <img src="/brand/logo-color.webp" alt="" className="w-48 opacity-10" />
                           </div>
                           <table className="w-full text-sm relative">
                             <thead>
@@ -1023,7 +888,7 @@ export default function ThroughputCalculatorDisplay() {
                       const resultKey = [...selectedBars][0];
                       const r = results.find((res) => res.resultKey === resultKey);
                       if (!r) return resultKey;
-                      const config = hardwareConfig[r.hwKey] || HARDWARE_CONFIG[r.hwKey];
+                      const config = hardwareConfig[r.hwKey] || getHardwareConfig(r.hwKey);
                       const baseName = config ? getDisplayLabel(config) : r.hwKey;
                       return r.precision ? `${baseName} (${r.precision.toUpperCase()})` : baseName;
                     })()}{' '}

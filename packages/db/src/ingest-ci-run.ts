@@ -20,13 +20,14 @@
  */
 
 import { execSync } from 'child_process';
-import postgres from 'postgres';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
+import { hasNoSslFlag } from './cli-utils';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
@@ -88,11 +89,10 @@ if (isDownloadMode) {
 
   const artifactListJson = execSync(
     `gh api "repos/${REPO}/actions/runs/${runIdStr}/artifacts" --paginate --jq '.artifacts[]'`,
-    { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+    { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
   );
 
-  const allArtifacts: Array<{ name: string; archive_download_url: string; created_at: string }> =
-    [];
+  const allArtifacts: { name: string; archive_download_url: string; created_at: string }[] = [];
   for (const line of artifactListJson.trim().split('\n')) {
     if (!line) continue;
     try {
@@ -126,7 +126,7 @@ if (isDownloadMode) {
   // Fetch run attempt from API
   const attemptStr = execSync(
     `gh api "repos/${REPO}/actions/runs/${runIdStr}" --jq '.run_attempt'`,
-    { encoding: 'utf-8' },
+    { encoding: 'utf8' },
   ).trim();
   runAttemptNum = parseInt(attemptStr || '1', 10);
 } else {
@@ -163,8 +163,8 @@ if (PURGED_RUNS.has(runIdNum)) {
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
-const sql = postgres(process.env.DATABASE_WRITE_URL!, {
-  ssl: 'require',
+const sql = createAdminSql({
+  noSsl: hasNoSslFlag(),
   max: 5,
   idle_timeout: 60,
 });
@@ -179,9 +179,9 @@ const ARTIFACT_NAMES = {
 
 function readJson(filePath: string): unknown {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  } catch (err: any) {
-    console.warn(`  [WARN] Failed to parse ${path.basename(filePath)}: ${err.message}`);
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (error: any) {
+    console.warn(`  [WARN] Failed to parse ${path.basename(filePath)}: ${error.message}`);
     return null;
   }
 }
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
   }
   console.log(`  Workflow run DB id: ${workflowRunId}`);
 
-  const availRows: Array<{
+  const availRows: {
     model: string;
     isl: number;
     osl: number;
@@ -246,7 +246,7 @@ async function main(): Promise<void> {
     framework: string;
     specMethod: string;
     disagg: boolean;
-  }> = [];
+  }[] = [];
 
   let totalNewBmk = 0,
     totalDupBmk = 0;
@@ -258,11 +258,11 @@ async function main(): Promise<void> {
   // ── Check for evals-only flag in changelog ────────────────────────────
   const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
   const changelogFiles = findJsonFiles(changelogDir);
-  const parsedChangelogs: Array<{
+  const parsedChangelogs: {
     baseRef: string;
     headRef: string;
     entries: ReturnType<typeof parseChangelogEntries>;
-  }> = [];
+  }[] = [];
   for (const file of changelogFiles) {
     const data = readJson(file) as Record<string, any> | null;
     if (!data || typeof data !== 'object') continue;
@@ -331,8 +331,8 @@ async function main(): Promise<void> {
         try {
           const configId = await getOrCreateConfig(row.config);
           toInsert.push({ ...row, configId });
-        } catch (err: any) {
-          tracker.recordDbError(`config for ${path.basename(file)}`, err);
+        } catch (error: any) {
+          tracker.recordDbError(`config for ${path.basename(file)}`, error);
         }
       }
 
@@ -367,15 +367,15 @@ async function main(): Promise<void> {
             const logPath = serverLogPaths.get(configKey);
             if (logPath) {
               try {
-                const serverLog = fs.readFileSync(logPath, 'utf-8').replaceAll('\x00', '');
+                const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
                 await insertServerLog(sql, insertedIds, serverLog);
-              } catch (err: any) {
-                tracker.recordDbError(`server_log for ${configKey}`, err);
+              } catch (error: any) {
+                tracker.recordDbError(`server_log for ${configKey}`, error);
               }
             }
           }
-        } catch (err: any) {
-          tracker.recordDbError(path.basename(file), err);
+        } catch (error: any) {
+          tracker.recordDbError(path.basename(file), error);
         }
       }
     }
@@ -385,8 +385,8 @@ async function main(): Promise<void> {
       try {
         await bulkUpsertAvailability(sql, availRows, date);
         console.log(`  Availability: ${availRows.length} row(s) upserted`);
-      } catch (err: any) {
-        tracker.recordDbError('availability', err);
+      } catch (error: any) {
+        tracker.recordDbError('availability', error);
       }
     }
   }
@@ -400,7 +400,7 @@ async function main(): Promise<void> {
     const statsDir = path.join(artifactsDir, ARTIFACT_NAMES.runStats);
     const statsFiles = findJsonFiles(statsDir);
 
-    const statsRows: Array<{ hardware: string; nSuccess: number; total: number }> = [];
+    const statsRows: { hardware: string; nSuccess: number; total: number }[] = [];
     for (const file of statsFiles) {
       const data = readJson(file) as Record<string, any> | null;
       if (!data || typeof data !== 'object' || Array.isArray(data)) continue;
@@ -421,8 +421,8 @@ async function main(): Promise<void> {
         );
         totalNewStats = newCount;
         totalDupStats = dupCount;
-      } catch (err: any) {
-        tracker.recordDbError('run_stats', err);
+      } catch (error: any) {
+        tracker.recordDbError('run_stats', error);
       }
     }
     console.log(`  Run stats: +${totalNewStats} new, ${totalDupStats} dup`);
@@ -446,8 +446,8 @@ async function main(): Promise<void> {
       try {
         const outcome = await ingestEvalRow(sql, getOrCreateConfig, mapped, workflowRunId, date);
         if (outcome === 'new') totalEvals++;
-      } catch (err: any) {
-        tracker.recordDbError('eval row', err);
+      } catch (error: any) {
+        tracker.recordDbError('eval row', error);
       }
     }
   }
@@ -467,8 +467,8 @@ async function main(): Promise<void> {
         entries,
       );
       totalChangelogs += inserted;
-    } catch (err: any) {
-      tracker.recordDbError('changelog', err);
+    } catch (error: any) {
+      tracker.recordDbError('changelog', error);
     }
   }
   console.log(`  Changelog: +${totalChangelogs} new`);
@@ -547,17 +547,14 @@ async function main(): Promise<void> {
     );
   }
 
-  process.stdout.write('\n  Refreshing latest_benchmarks materialized view...');
-  const mvStart = Date.now();
-  await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`;
-  console.log(` ${Math.round((Date.now() - mvStart) / 1000)}s`);
+  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
 }
 
 main()
-  .catch((err) => {
-    console.error('ingest-ci-run failed:', err);
+  .catch((error) => {
+    console.error('ingest-ci-run failed:', error);
     process.exitCode = 1;
   })
   .finally(() => {

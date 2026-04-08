@@ -2,6 +2,7 @@ packages:
   - packages/*
 
 onlyBuiltDependencies:
+  - '@posthog/cli'
   - core-js
   - cypress
   - esbuild

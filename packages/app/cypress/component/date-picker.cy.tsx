@@ -27,7 +27,7 @@ function DatePickerWrapper({
       onChange={setDate}
       availableDates={availableDates}
       minDate={availableDates[0]}
-      maxDate={availableDates[availableDates.length - 1]}
+      maxDate={availableDates.at(-1)}
       placeholder="Select date"
     />
   );

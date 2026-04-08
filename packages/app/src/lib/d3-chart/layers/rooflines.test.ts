@@ -1,8 +1,7 @@
 import * as d3 from 'd3';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createMockGroup, mockD3Select } from './test-helpers';
-import type { MockElement } from './test-helpers';
+import { createMockGroup, mockD3Select, type MockElement } from './test-helpers';
 
 // Partially mock d3 so that `d3.select(this)` inside .each() works with MockElements.
 // We keep all real d3 exports and only replace `select`.
@@ -20,8 +19,7 @@ vi.mock('d3', async () => {
   };
 });
 
-import { renderRooflines, updateRooflinesOnZoom } from './rooflines';
-import type { RooflineConfig } from './rooflines';
+import { renderRooflines, updateRooflinesOnZoom, type RooflineConfig } from './rooflines';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -30,7 +28,10 @@ const COLORS: Record<string, string> = {
   modelB: '#0f0',
 };
 
-type Point = { x: number; y: number };
+interface Point {
+  x: number;
+  y: number;
+}
 
 const SAMPLE_ROOFLINES: Record<string, Point[]> = {
   modelA: [
@@ -250,12 +251,12 @@ describe('renderRooflines', () => {
     const { xScale, yScale } = makeScales();
 
     const config = makeConfig({
-      getOpacity: (key) => (key === 'modelA' ? 0.5 : 1.0),
+      getOpacity: (key) => (key === 'modelA' ? 0.5 : 1),
     });
 
     // We can verify getOpacity is called correctly by checking the config
     expect(config.getOpacity!('modelA')).toBe(0.5);
-    expect(config.getOpacity!('modelB')).toBe(1.0);
+    expect(config.getOpacity!('modelB')).toBe(1);
 
     // The render should not throw even though .each uses d3.select(this)
     // In our mock, `this` will be a MockElement

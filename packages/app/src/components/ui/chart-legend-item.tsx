@@ -39,7 +39,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
 }) => {
   const id = `checkbox-${hw || name}`; // Unique ID for accessibility
   const isLongText = (label ?? '').length > 8;
-  const canRemove = isActive && !!onRemove;
+  const canRemove = isActive && Boolean(onRemove);
 
   const content = (
     <>

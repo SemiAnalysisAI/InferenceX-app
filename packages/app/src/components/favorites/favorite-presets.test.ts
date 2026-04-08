@@ -179,33 +179,33 @@ describe('description/config alignment', () => {
 
 // ── findConfigChangeDates ─────────────────────────────────────────────
 
-describe('findConfigChangeDates', () => {
-  const row = (
-    date: string,
-    hw: string,
-    fw: string,
-    conc: number,
-    tp: number,
-    ep: number,
-    dpa: boolean,
-    prec = 'fp4',
-  ) => ({
-    hardware: hw,
-    framework: fw,
-    precision: prec,
-    conc,
-    decode_tp: tp,
-    decode_ep: ep,
-    decode_dp_attention: dpa,
-    date,
-  });
+const makeConfigRow = (
+  date: string,
+  hw: string,
+  fw: string,
+  conc: number,
+  tp: number,
+  ep: number,
+  dpa: boolean,
+  prec = 'fp4',
+) => ({
+  hardware: hw,
+  framework: fw,
+  precision: prec,
+  conc,
+  decode_tp: tp,
+  decode_ep: ep,
+  decode_dp_attention: dpa,
+  date,
+});
 
+describe('findConfigChangeDates', () => {
   it('returns empty array for no matching rows', () => {
     expect(findConfigChangeDates([], ['b200'], ['fp4'], '2025-01-01', '2025-12-31')).toEqual([]);
   });
 
   it('returns single date when only one date has data', () => {
-    const rows = [row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false)];
+    const rows = [makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false)];
     expect(
       findConfigChangeDates(rows, ['b200_sglang'], ['fp4'], '2025-01-01', '2025-12-31'),
     ).toEqual(['2025-10-01']);
@@ -214,19 +214,19 @@ describe('findConfigChangeDates', () => {
   it('returns dates where config set differs from previous date', () => {
     const rows = [
       // Oct 1: config A
-      row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
       // Oct 2: same config A → should be skipped (no change)
-      row('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
       // Oct 3: config A + new config B → config set changed
-      row('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
-      row('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
+      makeConfigRow('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
       // Oct 4: same as Oct 3 → should be skipped (no change)
-      row('2025-10-04', 'b200', 'sglang', 1, 8, 8, false),
-      row('2025-10-04', 'b200', 'sglang', 2, 16, 16, true),
+      makeConfigRow('2025-10-04', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-04', 'b200', 'sglang', 2, 16, 16, true),
       // Oct 5: only config B (subset of Oct 4) → config set changed (removal)
-      row('2025-10-05', 'b200', 'sglang', 2, 16, 16, true),
+      makeConfigRow('2025-10-05', 'b200', 'sglang', 2, 16, 16, true),
       // Oct 6: new config C → config set changed
-      row('2025-10-06', 'b200', 'sglang', 4, 32, 32, true),
+      makeConfigRow('2025-10-06', 'b200', 'sglang', 4, 32, 32, true),
     ];
     const result = findConfigChangeDates(
       rows,
@@ -241,14 +241,14 @@ describe('findConfigChangeDates', () => {
   it('detects config removals as changes', () => {
     const rows = [
       // Oct 1: full run with configs A, B, C
-      row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      row('2025-10-01', 'b200', 'sglang', 2, 16, 16, true),
-      row('2025-10-01', 'b200', 'sglang', 4, 32, 32, false),
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 2, 16, 16, true),
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 4, 32, 32, false),
       // Oct 2: partial run with only config A → config set changed (B, C removed)
-      row('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
       // Oct 3: partial run with configs A, B → config set changed (B added back)
-      row('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
-      row('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
+      makeConfigRow('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
     ];
     const result = findConfigChangeDates(
       rows,
@@ -262,8 +262,8 @@ describe('findConfigChangeDates', () => {
 
   it('filters by GPU prefix', () => {
     const rows = [
-      row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      row('2025-10-02', 'h200', 'sglang', 1, 8, 8, false), // different GPU
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-10-02', 'h200', 'sglang', 1, 8, 8, false), // different GPU
     ];
     const result = findConfigChangeDates(
       rows,
@@ -277,8 +277,8 @@ describe('findConfigChangeDates', () => {
 
   it('filters by precision', () => {
     const rows = [
-      row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false, 'fp4'),
-      row('2025-10-02', 'b200', 'sglang', 1, 8, 8, false, 'fp8'), // different precision
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false, 'fp4'),
+      makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false, 'fp8'), // different precision
     ];
     const result = findConfigChangeDates(
       rows,
@@ -292,9 +292,9 @@ describe('findConfigChangeDates', () => {
 
   it('filters by date range', () => {
     const rows = [
-      row('2025-09-01', 'b200', 'sglang', 1, 8, 8, false), // before range
-      row('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      row('2025-12-01', 'b200', 'sglang', 1, 8, 8, false), // after range
+      makeConfigRow('2025-09-01', 'b200', 'sglang', 1, 8, 8, false), // before range
+      makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
+      makeConfigRow('2025-12-01', 'b200', 'sglang', 1, 8, 8, false), // after range
     ];
     const result = findConfigChangeDates(
       rows,
@@ -312,7 +312,7 @@ describe('findConfigChangeDates', () => {
 describe('findClosestDate + subtractMonths integration', () => {
   it('finds a reasonable start date for a 2-month range', () => {
     const dates = ['2025-01-05', '2025-01-20', '2025-02-10', '2025-03-01', '2025-03-15'];
-    const latest = dates[dates.length - 1];
+    const latest = dates.at(-1)!;
     const target = subtractMonths(latest, 2);
     const start = findClosestDate(dates, target);
     expect(dates).toContain(start);

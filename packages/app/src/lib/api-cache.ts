@@ -1,5 +1,4 @@
-import { revalidateTag } from 'next/cache';
-import { unstable_cache } from 'next/cache';
+import { revalidateTag, unstable_cache } from 'next/cache';
 
 import { JSON_MODE } from '@semianalysisai/inferencex-db/connection';
 
@@ -37,7 +36,7 @@ export function cachedQuery<T, Args extends unknown[]>(
   }
 
   const nextCached = unstable_cache(fn, [keyPrefix], { tags: ['db'] });
-  return async (...args: Args): Promise<T> => nextCached(...args);
+  return (...args: Args): Promise<T> => nextCached(...args);
 }
 
 /** Purge both unstable_cache (via revalidateTag) and blob storage. */
@@ -47,9 +46,9 @@ export async function purgeAll(): Promise<number> {
   return deleted;
 }
 
-/** 1 year — Vercel max. Purged on demand via revalidateTag('db'), no TTL needed. */
+/** 1 day. Purged on demand via revalidateTag('db'). */
 const CDN_HEADERS = {
-  'Cache-Control': 'public, max-age=0, s-maxage=31536000',
+  'Cache-Control': 'public, max-age=0, s-maxage=86400',
   'Vercel-Cache-Tag': 'db',
 };
 

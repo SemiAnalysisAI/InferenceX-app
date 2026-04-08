@@ -4,7 +4,7 @@
  * `getOrCreateWorkflowRun`.
  */
 
-import postgres from 'postgres';
+import type postgres from 'postgres';
 
 import { GITHUB_API_BASE, GITHUB_REPOS } from '@semianalysisai/inferencex-constants';
 
@@ -89,8 +89,8 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
       };
       githubRunCache.set(runId, info);
       return info;
-    } catch (err: any) {
-      console.warn(`  [WARN] GitHub API run ${runId}: ${err.message}`);
+    } catch (error: any) {
+      console.warn(`  [WARN] GitHub API run ${runId}: ${error.message}`);
       githubRunCache.set(runId, null);
       return null;
     }

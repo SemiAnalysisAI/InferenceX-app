@@ -61,9 +61,7 @@ export interface ModelSuccessRateData {
  * @interface DateRangeSuccessRateData
  * @property {Record<string, SuccessRateStats>} [dateRange: string] - Date range keys (e.g., "last-7-days") mapping to model success rate statistics.
  */
-export interface DateRangeSuccessRateData {
-  [dateRange: string]: Record<string, SuccessRateStats>;
-}
+export type DateRangeSuccessRateData = Record<string, Record<string, SuccessRateStats>>;
 
 /**
  * Defines the shape of the context object provided by `ReliabilityChartContext`.

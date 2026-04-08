@@ -27,7 +27,7 @@ describe('CSV Export', () => {
   });
 
   it('reliability chart has CSV export option', () => {
-    cy.get('[data-testid="tab-trigger-reliability"]').click();
+    cy.visit('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
 
     cy.get('[data-testid="export-button"]').first().click();

@@ -2,7 +2,7 @@
  * Bulk DB insert functions for `benchmark_results` and `run_stats`.
  */
 
-import postgres from 'postgres';
+import type postgres from 'postgres';
 import type { BenchmarkParams } from './benchmark-mapper';
 
 type Sql = ReturnType<typeof postgres>;
@@ -21,7 +21,7 @@ type Sql = ReturnType<typeof postgres>;
  */
 export async function bulkIngestBenchmarkRows(
   sql: Sql,
-  rows: Array<BenchmarkParams & { configId: number }>,
+  rows: (BenchmarkParams & { configId: number })[],
   workflowRunId: number,
   date: string,
 ): Promise<{ newCount: number; dupCount: number; insertedIds: number[] }> {
@@ -110,7 +110,7 @@ export async function insertServerLog(
  */
 export async function bulkIngestRunStats(
   sql: Sql,
-  rows: Array<{ hardware: string; nSuccess: number; total: number }>,
+  rows: { hardware: string; nSuccess: number; total: number }[],
   workflowRunId: number,
   date: string,
 ): Promise<{ newCount: number; dupCount: number }> {
@@ -145,7 +145,7 @@ export async function bulkIngestRunStats(
  */
 export async function bulkUpsertAvailability(
   sql: Sql,
-  rows: Array<{
+  rows: {
     model: string;
     isl: number;
     osl: number;
@@ -154,7 +154,7 @@ export async function bulkUpsertAvailability(
     framework: string;
     specMethod: string;
     disagg: boolean;
-  }>,
+  }[],
   date: string,
 ): Promise<void> {
   if (rows.length === 0) return;

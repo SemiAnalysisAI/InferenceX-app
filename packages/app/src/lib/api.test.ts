@@ -30,11 +30,35 @@ function mockError(status: number, statusText: string) {
   });
 }
 
+describe('abort signal', () => {
+  it('passes signal to fetch and rejects with AbortError when aborted', async () => {
+    const controller = new AbortController();
+    mockFetch.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          controller.signal.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        }),
+    );
+    const promise = fetchBenchmarks('dsr1', undefined, undefined, controller.signal);
+    controller.abort();
+    await expect(promise).rejects.toThrow('The operation was aborted.');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+});
+
 describe('fetchBenchmarks', () => {
   it('fetches with correct URL and params', async () => {
     mockOk([]);
     await fetchBenchmarks('DeepSeek-R1-0528');
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/benchmarks?model=DeepSeek-R1-0528');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/benchmarks?model=DeepSeek-R1-0528',
+      expect.objectContaining({}),
+    );
   });
 
   it('includes date param when provided', async () => {
@@ -42,6 +66,7 @@ describe('fetchBenchmarks', () => {
     await fetchBenchmarks('DeepSeek-R1-0528', '2026-02-27');
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-02-27',
+      expect.objectContaining({}),
     );
   });
 
@@ -62,7 +87,10 @@ describe('fetchWorkflowInfo', () => {
   it('fetches with correct URL', async () => {
     mockOk({ runs: [], changelogs: [], configs: [] });
     await fetchWorkflowInfo('2026-03-01');
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/workflow-info?date=2026-03-01');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/workflow-info?date=2026-03-01',
+      expect.objectContaining({}),
+    );
   });
 });
 
@@ -74,7 +102,7 @@ describe('fetchAvailability', () => {
     ];
     mockOk(data);
     const result = await fetchAvailability();
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/availability');
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/availability', expect.objectContaining({}));
     expect(result).toHaveLength(2);
     expect(result[0].model).toBe('dsr1');
   });
@@ -84,7 +112,7 @@ describe('fetchReliability', () => {
   it('fetches from /api/v1/reliability', async () => {
     mockOk([{ hardware: 'h100', date: '2026-03-01', n_success: 10, total: 10 }]);
     const result = await fetchReliability();
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/reliability');
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/reliability', expect.objectContaining({}));
     expect(result).toHaveLength(1);
     expect(result[0].hardware).toBe('h100');
   });
@@ -94,7 +122,7 @@ describe('fetchEvaluations', () => {
   it('fetches from /api/v1/evaluations', async () => {
     mockOk([{ task: 'gsm8k', model: 'dsr1' }]);
     const result = await fetchEvaluations();
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/evaluations');
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/evaluations', expect.objectContaining({}));
     expect(result[0].task).toBe('gsm8k');
   });
 });

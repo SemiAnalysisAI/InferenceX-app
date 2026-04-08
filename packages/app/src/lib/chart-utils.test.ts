@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import {
   buildAvailabilityHwKey,
@@ -20,7 +21,7 @@ import {
 // mock constants so createChartDataPoint (also in this module) doesn't call
 // the real HARDWARE_CONFIG during module initialisation.
 vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/constants')>();
+  const actual = await importOriginal<typeof ConstantsModule>();
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
@@ -53,10 +54,10 @@ function pt(
     precision: 'fp16',
     tpPerGpu: { y: tpPerGpuY, roof: false },
     tpPerMw: { y: 5, roof: false },
-    costh: { y: opts.costhY ?? 1.0, roof: false },
+    costh: { y: opts.costhY ?? 1, roof: false },
     costn: { y: 1.5, roof: false },
     costr: { y: 1.2, roof: false },
-    costhi: { y: 2.0, roof: false },
+    costhi: { y: 2, roof: false },
     costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
     ...(opts.outputTputY !== undefined
@@ -171,10 +172,10 @@ function fullPt(
     precision: 'fp8',
     tpPerGpu: { y: vals.tpPerGpuY, roof: false },
     tpPerMw: { y: 5, roof: false },
-    costh: { y: vals.costhY ?? 1.0, roof: false },
+    costh: { y: vals.costhY ?? 1, roof: false },
     costn: { y: 1.5, roof: false },
     costr: { y: 1.2, roof: false },
-    costhi: { y: 2.0, roof: false },
+    costhi: { y: 2, roof: false },
     costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
     ...(vals.costhOutputY !== undefined
@@ -268,35 +269,36 @@ describe('buildAvailabilityHwKey', () => {
 // ===========================================================================
 // generateHighContrastColors
 // ===========================================================================
+
+/** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
+function parseRgb(color: string): [number, number, number] {
+  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
+  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  throw new Error(`Cannot parse color: ${color}`);
+}
+
+/** Euclidean distance in RGB — rough proxy (palette is perceptually uniform by construction). */
+function rgbDist(a: [number, number, number], b: [number, number, number]): number {
+  return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+}
+
+/** Not red/pink — green, teal, yellow-green, cyan all count. */
+function isNotReddish(rgb: [number, number, number]): boolean {
+  const [r, g, b] = rgb;
+  // Reject if red-dominant with low green (the "looks red/pink" zone)
+  return !(r > g * 1.2 && r > b);
+}
+
+/** Not green — red, magenta, orange, pink all count. */
+function isNotGreenish(rgb: [number, number, number]): boolean {
+  const [r, g, b] = rgb;
+  // Reject if green-dominant with low red and blue
+  return !(g > r * 1.2 && g > b * 1.2);
+}
+
 describe('generateHighContrastColors', () => {
-  /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
-  function parseRgb(color: string): [number, number, number] {
-    const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
-    const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-    if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
-    throw new Error(`Cannot parse color: ${color}`);
-  }
-
-  /** Euclidean distance in RGB — rough proxy (palette is perceptually uniform by construction). */
-  function rgbDist(a: [number, number, number], b: [number, number, number]): number {
-    return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
-  }
-
-  /** Not red/pink — green, teal, yellow-green, cyan all count. */
-  function isNotReddish(rgb: [number, number, number]): boolean {
-    const [r, g, b] = rgb;
-    // Reject if red-dominant with low green (the "looks red/pink" zone)
-    return !(r > g * 1.2 && r > b);
-  }
-
-  /** Not green — red, magenta, orange, pink all count. */
-  function isNotGreenish(rgb: [number, number, number]): boolean {
-    const [r, g, b] = rgb;
-    // Reject if green-dominant with low red and blue
-    return !(g > r * 1.2 && g > b * 1.2);
-  }
-
   /** Assert every pair has at least `min` RGB distance. */
   function assertMinDist(colors: Record<string, string>, min: number) {
     const rgbs = Object.values(colors).map(parseRgb);
@@ -343,7 +345,7 @@ describe('generateHighContrastColors', () => {
     ];
     const dark = generateHighContrastColors(keys, 'dark');
     const light = generateHighContrastColors(keys, 'light');
-    expect(Object.values(dark).join()).not.toEqual(Object.values(light).join());
+    expect(Object.values(dark).join(',')).not.toEqual(Object.values(light).join(','));
   });
 
   // ---------- Tier 1: few items → brand zone ----------
@@ -603,7 +605,7 @@ describe('computeAllRooflines', () => {
 
   const groupedData = {
     h100: [
-      pt(1, 0, 'h100', { tpPerGpuY: 50, costhY: 2.0 }),
+      pt(1, 0, 'h100', { tpPerGpuY: 50, costhY: 2 }),
       pt(2, 0, 'h100', { tpPerGpuY: 80, costhY: 1.5 }),
       pt(3, 0, 'h100', { tpPerGpuY: 60, costhY: 1.8 }),
     ],
@@ -632,7 +634,7 @@ describe('computeAllRooflines', () => {
     // lower_left sorted by x: A(1,2.0) added, B(1.5<2.0) added, C(1.8>1.5) skipped
     expect(front).toHaveLength(2);
     expect(front[0].x).toBe(1);
-    expect(front[0].y).toBe(2.0);
+    expect(front[0].y).toBe(2);
     expect(front[1].x).toBe(2);
     expect(front[1].y).toBe(1.5);
   });
@@ -757,7 +759,7 @@ describe('markRooflinePoints', () => {
       y_costh_roofline: 'lower_left',
     };
     // costh values: A(x=1, costh.y=2.0), B(x=2, costh.y=1.5), C(x=3, costh.y=1.8)
-    const pA = pt(1, 0, 'h100', { tpPerGpuY: 50, costhY: 2.0 });
+    const pA = pt(1, 0, 'h100', { tpPerGpuY: 50, costhY: 2 });
     const pB = pt(2, 0, 'h100', { tpPerGpuY: 80, costhY: 1.5 });
     const pC = pt(3, 0, 'h100', { tpPerGpuY: 60, costhY: 1.8 });
     const group = { h100: [pA, pB, pC] };
@@ -1376,18 +1378,18 @@ describe('computeAllRooflines edge cases', () => {
       y_jTotal_roofline: 'lower_left',
     } as any;
     const p1 = pt(1, 0, 'h100');
-    (p1 as any).jTotal = { y: 5.0, roof: false };
+    (p1 as any).jTotal = { y: 5, roof: false };
     const p2 = pt(2, 0, 'h100');
-    (p2 as any).jTotal = { y: 3.0, roof: false };
+    (p2 as any).jTotal = { y: 3, roof: false };
     const p3 = pt(3, 0, 'h100');
-    (p3 as any).jTotal = { y: 4.0, roof: false };
+    (p3 as any).jTotal = { y: 4, roof: false };
 
     const groupedData = { h100: [p1, p2, p3] };
     const result = computeAllRooflines(groupedData, chartDef);
     // lower_left front: p1(1,5.0) added, p2(2,3.0) < 5.0 so added, p3(3,4.0) > 3.0 so skipped
     expect(result.h100.y_jTotal).toHaveLength(2);
-    expect(result.h100.y_jTotal[0].y).toBe(5.0);
-    expect(result.h100.y_jTotal[1].y).toBe(3.0);
+    expect(result.h100.y_jTotal[0].y).toBe(5);
+    expect(result.h100.y_jTotal[1].y).toBe(3);
   });
 
   it('handles chartDef with no roofline keys at all', () => {
@@ -1432,9 +1434,9 @@ describe('markRooflinePoints energy and output fields', () => {
       y_jTotal_roofline: 'lower_left',
     } as any;
 
-    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, jTotalY: 10.0 });
-    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, jTotalY: 5.0 });
-    const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, jTotalY: 8.0 });
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, jTotalY: 10 });
+    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, jTotalY: 5 });
+    const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, jTotalY: 8 });
 
     const groupedData = { h100: [p1, p2, p3] };
     const rooflines = computeAllRooflines(groupedData, chartDef);
@@ -1460,7 +1462,7 @@ describe('markRooflinePoints energy and output fields', () => {
       y_costhOutput_roofline: 'lower_left',
     } as any;
 
-    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, costhOutputY: 3.0 });
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, costhOutputY: 3 });
     const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, costhOutputY: 1.5 });
     const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, costhOutputY: 2.5 });
 
@@ -1628,8 +1630,8 @@ describe('markRooflinePoints energy and output fields', () => {
 
     // p1: low jOutput (on front), high jInput (not on front alone)
     // p2: high jOutput (not on front), low jInput (on front)
-    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, jOutputY: 2.0, jInputY: 10.0 });
-    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, jOutputY: 5.0, jInputY: 4.0 });
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, jOutputY: 2, jInputY: 10 });
+    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, jOutputY: 5, jInputY: 4 });
 
     const groupedData = { h100: [p1, p2] };
     const rooflines = computeAllRooflines(groupedData, chartDef);
@@ -1662,13 +1664,13 @@ describe('markRooflinePoints energy and output fields', () => {
 
     const p1 = fullPt(1, 'h100', {
       tpPerGpuY: 50,
-      costnOutputY: 3.0,
-      costrOutputY: 2.0,
+      costnOutputY: 3,
+      costrOutputY: 2,
     });
     const p2 = fullPt(2, 'h100', {
       tpPerGpuY: 80,
       costnOutputY: 1.5,
-      costrOutputY: 1.0,
+      costrOutputY: 1,
     });
     const p3 = fullPt(3, 'h100', {
       tpPerGpuY: 60,
