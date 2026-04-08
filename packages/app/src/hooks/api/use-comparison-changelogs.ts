@@ -40,7 +40,7 @@ export function useComparisonChangelogs(
   const queries = useQueries({
     queries: datesToQuery.map((date) => ({
       queryKey: ['workflow-info', date],
-      queryFn: () => fetchWorkflowInfo(date),
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchWorkflowInfo(date, signal),
       enabled: hasGPUs,
     })),
   });

@@ -11,7 +11,7 @@ export function benchmarkQueryOptions(
 ) {
   return {
     queryKey: ['benchmarks', model, date, exact ? 'exact' : 'latest'] as const,
-    queryFn: () => fetchBenchmarks(model, date, exact),
+    queryFn: ({ signal }: { signal: AbortSignal }) => fetchBenchmarks(model, date, exact, signal),
     enabled: enabled && Boolean(model),
   };
 }
