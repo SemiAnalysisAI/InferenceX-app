@@ -48,6 +48,7 @@ async function* streamJsonArray(filePath: string): AsyncGenerator<Record<string,
   let objectStart = -1;
 
   for await (const chunk of stream) {
+    /* oxlint-disable no-useless-assignment -- false positives: loop state persists across iterations */
     for (const ch of chunk) {
       if (escape) {
         escape = false;
@@ -71,6 +72,7 @@ async function* streamJsonArray(filePath: string): AsyncGenerator<Record<string,
         buffer += ch;
         continue;
       }
+      /* oxlint-enable no-useless-assignment */
 
       if (ch === '{') {
         if (depth === 0) objectStart = buffer.length;

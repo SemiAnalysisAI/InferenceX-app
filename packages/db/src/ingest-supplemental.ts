@@ -88,14 +88,14 @@ async function ingestSupplementalEvals(
     const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
     if (!modelKey) {
       console.warn(`  Skipped: unknown model ${entry.model}`);
-      skipped++;
+      skipped++; // oxlint-disable-line no-useless-assignment -- used after loop
       continue;
     }
 
     const hw = hwToGpuKey(entry.hw);
     if (!hw) {
       console.warn(`  Skipped: unknown hardware ${entry.hw}`);
-      skipped++;
+      skipped++; // oxlint-disable-line no-useless-assignment -- used after loop
       continue;
     }
     const { framework, disagg } = normalizeFramework(entry.framework, false);
@@ -230,14 +230,14 @@ async function ingestSupplementalBmk(
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
       if (!modelKey) {
         console.warn(`  Skipped: unknown model ${entry.model}`);
-        totalDup++;
+        totalDup++; // oxlint-disable-line no-useless-assignment -- used after loop
         continue;
       }
 
       const hw = hwToGpuKey(entry.hw);
       if (!hw) {
         console.warn(`  Skipped: unknown hardware ${entry.hw}`);
-        totalDup++;
+        totalDup++; // oxlint-disable-line no-useless-assignment -- used after loop
         continue;
       }
 

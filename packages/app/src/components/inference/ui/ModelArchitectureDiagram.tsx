@@ -293,7 +293,7 @@ function renderDiagram(
   let ffnExpandedStartY = 0;
   let merge2Y = 0;
   let norm2Y = 0;
-  let txEnd = 0;
+  let txEnd = 0; // oxlint-disable-line no-useless-assignment -- overwritten when txExpanded
 
   if (hasAlternatingLayers) {
     // Layout two separate transformer blocks with alternating indicator between them
