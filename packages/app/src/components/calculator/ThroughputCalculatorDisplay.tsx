@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import CalculatorTable from '@/components/calculator/CalculatorTable';
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -780,93 +781,11 @@ export default function ThroughputCalculatorDisplay() {
                   ) : (
                     <>
                       <figcaption>{captionContent}</figcaption>
-                      <div data-testid="calculator-results-table">
-                        <div className="overflow-x-auto relative">
-                          {/* Watermark */}
-                          <div
-                            className="absolute inset-0 pointer-events-none flex items-center justify-center"
-                            aria-hidden="true"
-                          >
-                            <img src="/brand/logo-color.webp" alt="" className="w-48 opacity-10" />
-                          </div>
-                          <table className="w-full text-sm relative">
-                            <thead>
-                              <tr className="border-b border-border">
-                                <th className="text-left py-2 px-3 font-medium text-muted-foreground">
-                                  GPU
-                                </th>
-                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                                  {costType === 'input'
-                                    ? 'Input'
-                                    : costType === 'output'
-                                      ? 'Output'
-                                      : 'Total'}{' '}
-                                  Throughput (tok/s/gpu)
-                                </th>
-                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                                  Cost ($/M{' '}
-                                  {costType === 'input'
-                                    ? 'input'
-                                    : costType === 'output'
-                                      ? 'output'
-                                      : ''}{' '}
-                                  tok)
-                                </th>
-                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                                  {costType === 'input'
-                                    ? 'Input'
-                                    : costType === 'output'
-                                      ? 'Output'
-                                      : ''}{' '}
-                                  tok/s/MW
-                                </th>
-                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                                  Concurrency
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {results.map((r) => {
-                                const config = hardwareConfig[r.hwKey];
-                                const baseName = config ? getDisplayLabel(config) : r.hwKey;
-                                const label = r.precision
-                                  ? `${baseName} (${r.precision.toUpperCase()})`
-                                  : baseName;
-                                return (
-                                  <tr
-                                    key={r.resultKey}
-                                    className="border-b border-border/50 hover:bg-muted/30"
-                                  >
-                                    <td className="py-2 px-3 font-medium">{label}</td>
-                                    <td className="text-right py-2 px-3 tabular-nums">
-                                      {getThroughputForType(r, costType).toFixed(1)}
-                                    </td>
-                                    <td className="text-right py-2 px-3 tabular-nums">
-                                      $
-                                      {(costType === 'input'
-                                        ? r.costInput
-                                        : costType === 'output'
-                                          ? r.costOutput
-                                          : r.cost
-                                      ).toFixed(3)}
-                                    </td>
-                                    <td className="text-right py-2 px-3 tabular-nums">
-                                      {getTpPerMwForType(r, costType).toFixed(0)}
-                                    </td>
-                                    <td className="text-right py-2 px-3 tabular-nums">
-                                      ~{r.concurrency}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-3">
-                          Values are interpolated from real InferenceMAX benchmark data points. Only
-                          GPUs with data in the measured range are shown.
-                        </p>
-                      </div>
+                      <CalculatorTable
+                        results={results}
+                        costType={costType}
+                        hardwareConfig={hardwareConfig}
+                      />
                     </>
                   );
                 })()}
