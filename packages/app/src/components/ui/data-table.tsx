@@ -142,7 +142,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div data-testid={testId} className="mt-3">
+    <div data-testid={testId} className="mt-3 border-t border-border pt-3">
       {/* Search */}
       <div className="mb-3 max-w-xs relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -184,7 +184,7 @@ export function DataTable<T>({
         )}
         <table className="w-full text-sm relative">
           <thead className="sticky top-0 bg-background z-1">
-            <tr className="border-b border-border">
+            <tr className="border-b-2 border-border">
               {columns.map((col, i) => {
                 const sortable = Boolean(col.sortValue);
                 const sortIcon =
