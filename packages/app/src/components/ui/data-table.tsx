@@ -7,13 +7,11 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  Columns3,
   Search,
   X,
 } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -23,8 +21,6 @@ import {
 } from '@/components/ui/select';
 
 export interface DataTableColumn<T> {
-  /** Unique key for the column (used for visibility state). Defaults to header text. */
-  key?: string;
   /** Column header text. */
   header: string;
   /** Right-align the column (default: false = left-aligned). */
@@ -35,8 +31,6 @@ export interface DataTableColumn<T> {
   sortValue?: (row: T) => number | string;
   /** Additional className for header and body cells. */
   className?: string;
-  /** Whether this column is hidden by default (default: false). */
-  defaultHidden?: boolean;
 }
 
 type SortDir = 'asc' | 'desc' | null;
@@ -73,10 +67,6 @@ const SORT_ICON = {
   none: <ArrowUpDown className="inline h-3 w-3 opacity-30" />,
 };
 
-function colKey(col: { key?: string; header: string }): string {
-  return col.key ?? col.header;
-}
-
 export function DataTable<T>({
   data,
   columns,
@@ -88,18 +78,10 @@ export function DataTable<T>({
   const [pageSize, setPageSize] = useState<number>(25);
   const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
   const [search, setSearch] = useState('');
-  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
-    () => new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key ?? c.header)),
-  );
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const visibleColumns = useMemo(
-    () => columns.filter((c) => !hiddenColumns.has(colKey(c))),
-    [columns, hiddenColumns],
-  );
-
   const handleSort = (colIndex: number) => {
-    const col = visibleColumns[colIndex];
+    const col = columns[colIndex];
     if (!col.sortValue) return;
     setSort((prev) => {
       let nextDir: SortDir;
@@ -132,7 +114,7 @@ export function DataTable<T>({
 
   const sorted = useMemo(() => {
     if (sort.dir === null || sort.columnIndex < 0) return filtered;
-    const col = visibleColumns[sort.columnIndex];
+    const col = columns[sort.columnIndex];
     if (!col?.sortValue) return filtered;
     const extract = col.sortValue;
     const multiplier = sort.dir === 'asc' ? 1 : -1;
@@ -145,7 +127,7 @@ export function DataTable<T>({
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * multiplier;
       return String(av).localeCompare(String(bv)) * multiplier;
     });
-  }, [filtered, sort, visibleColumns]);
+  }, [filtered, sort, columns]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
@@ -159,83 +141,36 @@ export function DataTable<T>({
     );
   }
 
-  const toggleColumn = (col: DataTableColumn<T>) => {
-    const key = colKey(col);
-    setHiddenColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      track(`${analyticsPrefix}_column_toggled`, { column: col.header, visible: !next.has(key) });
-      return next;
-    });
-  };
-
   return (
     <div data-testid={testId}>
-      {/* Toolbar: search + column visibility */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="relative grow max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            ref={searchRef}
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+      {/* Search */}
+      <div className="mb-3 max-w-xs relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <input
+          ref={searchRef}
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Search..."
+          className="w-full h-7 pl-8 pr-7 text-xs bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Search table"
+        />
+        {search && (
+          <button
+            onClick={() => {
+              setSearch('');
               setPage(0);
+              searchRef.current?.focus();
             }}
-            placeholder="Search..."
-            className="w-full h-7 pl-8 pr-7 text-xs bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
-            aria-label="Search table"
-          />
-          {search && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setPage(0);
-                searchRef.current?.focus();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              className="inline-flex items-center gap-1.5 h-7 px-2 text-xs font-medium border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Toggle columns"
-            >
-              <Columns3 className="h-3.5 w-3.5" />
-              Columns
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-48 p-1">
-            {columns.map((col) => {
-              const key = colKey(col);
-              const visible = !hiddenColumns.has(key);
-              return (
-                <button
-                  key={key}
-                  className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer ${visible ? '' : 'opacity-50'}`}
-                  onClick={() => toggleColumn(col)}
-                >
-                  <span
-                    className={`h-3.5 w-3.5 rounded-sm border ${visible ? 'bg-primary border-primary' : 'border-border'} flex items-center justify-center`}
-                  >
-                    {visible && <span className="text-primary-foreground text-[10px]">✓</span>}
-                  </span>
-                  {col.header}
-                </button>
-              );
-            })}
-          </PopoverContent>
-        </Popover>
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto relative">
@@ -248,9 +183,9 @@ export function DataTable<T>({
           </div>
         )}
         <table className="w-full text-sm relative">
-          <thead className="sticky top-0 bg-background z-[1]">
+          <thead className="sticky top-0 bg-background z-1">
             <tr className="border-b border-border">
-              {visibleColumns.map((col, i) => {
+              {columns.map((col, i) => {
                 const sortable = Boolean(col.sortValue);
                 const sortIcon =
                   sort.columnIndex === i && sort.dir
@@ -260,7 +195,7 @@ export function DataTable<T>({
                       : null;
                 return (
                   <th
-                    key={colKey(col)}
+                    key={i}
                     className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
                     tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
@@ -293,7 +228,7 @@ export function DataTable<T>({
             {pageData.length === 0 ? (
               <tr>
                 <td
-                  colSpan={visibleColumns.length}
+                  colSpan={columns.length}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
                   No results match &quot;{search}&quot;
@@ -302,9 +237,9 @@ export function DataTable<T>({
             ) : (
               pageData.map((row, rowIndex) => (
                 <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
-                  {visibleColumns.map((col) => (
+                  {columns.map((col, colIndex) => (
                     <td
-                      key={colKey(col)}
+                      key={colIndex}
                       className={`py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''}`}
                     >
                       {col.cell(row, safePage * pageSize + rowIndex)}
