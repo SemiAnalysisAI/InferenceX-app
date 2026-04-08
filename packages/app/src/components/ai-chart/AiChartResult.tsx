@@ -6,17 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import type { InferenceData } from '@/components/inference/types';
 import {
   D3Chart,
-  type BarLayerConfig,
+  type HorizontalBarLayerConfig,
   type ScatterLayerConfig,
+  type LineLayerConfig,
+  type RadarLayerConfig,
   type TooltipConfig,
   type ScaleConfig,
   type AxisConfig,
 } from '@/lib/d3-chart/D3Chart';
+import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
+import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 
+import { getHardwareConfig } from '@/lib/constants';
 import DOMPurify from 'dompurify';
 
 import type { AiChartBarPoint, AiChartSpec } from './types';
-import type { AiSingleChartResult } from '@/hooks/api/use-ai-chart';
+import type { AiSingleChartResult, AiRadarItem } from '@/hooks/api/use-ai-chart';
 
 /** Sanitize tooltip HTML that may contain LLM-generated strings. */
 function sanitize(html: string): string {
@@ -26,65 +31,53 @@ function sanitize(html: string): string {
   });
 }
 
-const CHART_INSTRUCTIONS = 'Hover for details';
-
 interface AiChartResultProps {
   charts: AiSingleChartResult[];
   summary: string | null;
 }
 
-function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }) {
-  const xScale = useMemo<ScaleConfig>(
-    () => ({
-      type: 'band',
-      domain: data.map((d) => d.label),
-      padding: 0.3,
-    }),
-    [data],
-  );
+// ---------------------------------------------------------------------------
+// Bar Chart (horizontal)
+// ---------------------------------------------------------------------------
 
-  const yMax = useMemo(() => Math.max(...data.map((d) => d.value), 1), [data]);
+function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }) {
+  const labels = useMemo(() => data.map((d) => d.label), [data]);
 
   const yScale = useMemo<ScaleConfig>(
-    () => ({
-      type: 'linear',
-      domain: [0, yMax * 1.15],
-      nice: true,
-    }),
-    [yMax],
+    () => ({ type: 'band', domain: labels, padding: 0.3 }),
+    [labels],
   );
 
-  const maxLabelLen = useMemo(() => Math.max(...data.map((d) => d.label.length), 0), [data]);
-  const firstLabelLen = data[0]?.label.length ?? 0;
-  const sin32 = Math.sin((32 * Math.PI) / 180);
-  const charWidth = 6.5;
-  const bottomMargin = Math.max(50, Math.min(maxLabelLen * charWidth * sin32, 120));
-  const leftMargin = Math.max(60, Math.min(firstLabelLen * charWidth * sin32 + 20, 140));
+  const xMax = useMemo(() => Math.max(...data.map((d) => d.value), 1), [data]);
+  const xScale = useMemo<ScaleConfig>(
+    () => ({ type: 'linear', domain: [0, xMax * 1.15], nice: true }),
+    [xMax],
+  );
 
-  const xAxis = useMemo<AxisConfig>(
+  const margin = useMemo(
     () => ({
-      label: '',
-      customize: (g) => {
-        g.selectAll('text')
-          .attr('transform', 'rotate(-32)')
-          .attr('text-anchor', 'end')
-          .attr('dx', '-0.5em')
-          .attr('dy', '0.25em');
-      },
+      top: 24,
+      right: 24,
+      bottom: 48,
+      left: computeLeftMargin(labels, { split: 'parens' }),
     }),
+    [labels],
+  );
+
+  const xAxis = useMemo<AxisConfig>(() => ({ label: spec.yAxisLabel }), [spec.yAxisLabel]);
+  const yAxis = useMemo<AxisConfig>(
+    () => ({ label: '', customize: twoRowYAxisLabels({ split: 'parens' }) }),
     [],
   );
-  const yAxis = useMemo<AxisConfig>(() => ({ label: spec.yAxisLabel }), [spec.yAxisLabel]);
 
   const layers = useMemo(() => {
-    const barLayer: BarLayerConfig<AiChartBarPoint> = {
-      type: 'bar',
+    const barLayer: HorizontalBarLayerConfig<AiChartBarPoint> = {
+      type: 'horizontalBar',
       data,
       config: {
-        getX: (d) => d.label,
-        getY: (d) => d.value,
+        getY: (d) => d.label,
+        getX: (d) => d.value,
         getColor: (d) => d.color,
-        getForeground: () => 'var(--foreground)',
         rx: 4,
       },
     };
@@ -112,8 +105,8 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     <D3Chart
       chartId="ai-chart-bar"
       data={data}
-      height={Math.max(300, data.length * 40 + bottomMargin + 24)}
-      margin={{ top: 24, right: 10, bottom: bottomMargin, left: leftMargin }}
+      height={Math.max(300, data.length * 40 + margin.top + margin.bottom)}
+      margin={margin}
       xScale={xScale}
       yScale={yScale}
       xAxis={xAxis}
@@ -121,10 +114,13 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
       layers={layers}
       tooltip={tooltip}
       watermark="logo"
-      instructions={CHART_INSTRUCTIONS}
     />
   );
 }
+
+// ---------------------------------------------------------------------------
+// Scatter Chart
+// ---------------------------------------------------------------------------
 
 function ScatterChart({
   data,
@@ -149,7 +145,6 @@ function ScatterChart({
     () => ({ type: 'linear', domain: xExtent, nice: true }),
     [xExtent],
   );
-
   const yScale = useMemo<ScaleConfig>(
     () => ({ type: 'linear', domain: yExtent, nice: true }),
     [yExtent],
@@ -162,9 +157,7 @@ function ScatterChart({
     const scatterLayer: ScatterLayerConfig<InferenceData> = {
       type: 'scatter',
       data,
-      config: {
-        getColor: (d) => colorMap[d.hwKey ?? ''] ?? '#888',
-      },
+      config: { getColor: (d) => colorMap[d.hwKey ?? ''] ?? '#888' },
     };
     return [scatterLayer];
   }, [data, colorMap]);
@@ -205,11 +198,234 @@ function ScatterChart({
       tooltip={tooltip}
       watermark="logo"
       grabCursor
-      instructions={`${CHART_INSTRUCTIONS} • Scroll to zoom • Drag to pan`}
+      instructions="Scroll to zoom &bull; Drag to pan"
       zoom={{ enabled: true, axes: 'both', scaleExtent: [0.7, 20] }}
     />
   );
 }
+
+// ---------------------------------------------------------------------------
+// Line Chart
+// ---------------------------------------------------------------------------
+
+interface LinePoint {
+  hwKey: string;
+  precision: string;
+  x: number;
+  y: number;
+}
+
+function LineChart({
+  lineData,
+  spec,
+  colorMap,
+}: {
+  lineData: Record<string, { x: number; y: number }[]>;
+  spec: AiChartSpec;
+  colorMap: Record<string, string>;
+}) {
+  const flatPoints = useMemo<LinePoint[]>(
+    () =>
+      Object.entries(lineData).flatMap(([hwKey, pts]) =>
+        pts.map((p) => ({ hwKey, precision: 'fp8', x: p.x, y: p.y })),
+      ),
+    [lineData],
+  );
+
+  const xExtent = useMemo(() => {
+    const xs = flatPoints.map((d) => d.x);
+    return [Math.min(...xs) * 0.95, Math.max(...xs) * 1.05] as [number, number];
+  }, [flatPoints]);
+
+  const yExtent = useMemo(() => {
+    const ys = flatPoints.map((d) => d.y);
+    return [Math.min(...ys, 0) * 0.95, Math.max(...ys) * 1.1] as [number, number];
+  }, [flatPoints]);
+
+  const xScale = useMemo<ScaleConfig>(
+    () => ({ type: 'linear', domain: xExtent, nice: true }),
+    [xExtent],
+  );
+  const yScale = useMemo<ScaleConfig>(
+    () => ({ type: 'linear', domain: yExtent, nice: true }),
+    [yExtent],
+  );
+
+  const xAxis = useMemo<AxisConfig>(() => ({ label: 'Interactivity (tok/s/user)' }), []);
+  const yAxis = useMemo<AxisConfig>(() => ({ label: spec.yAxisLabel }), [spec.yAxisLabel]);
+
+  const layers = useMemo(() => {
+    const lineLayer: LineLayerConfig = {
+      type: 'line',
+      lines: lineData,
+      config: {
+        getColor: (key) => colorMap[key] ?? '#888',
+        strokeWidth: 2.5,
+      },
+    };
+    const scatterLayer: ScatterLayerConfig<LinePoint> = {
+      type: 'scatter',
+      data: flatPoints,
+      config: {
+        getColor: (d) => colorMap[d.hwKey] ?? '#888',
+        hideLabels: true,
+      },
+    };
+    return [lineLayer, scatterLayer];
+  }, [lineData, flatPoints, colorMap]);
+
+  const tooltip = useMemo<TooltipConfig<LinePoint>>(
+    () => ({
+      rulerType: 'crosshair',
+      content: (d) => {
+        const color = colorMap[d.hwKey] ?? '#888';
+        const config = getHardwareConfig(d.hwKey);
+        const label = config
+          ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}`
+          : d.hwKey;
+        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
+            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${label}</span>
+          </div>
+          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
+            <strong>Interactivity:</strong> ${d.x.toFixed(1)} tok/s/user
+          </div>
+          <div style="color: var(--muted-foreground); font-size: 11px;">
+            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </div>
+        </div>`);
+      },
+      getRulerX: (d, xS) => (xS as any)(d.x),
+      getRulerY: (d, yS) => (yS as any)(d.y),
+      attachToLayer: 1,
+    }),
+    [colorMap, spec.yAxisLabel],
+  );
+
+  return (
+    <D3Chart
+      chartId="ai-chart-line"
+      data={flatPoints}
+      height={500}
+      xScale={xScale}
+      yScale={yScale}
+      xAxis={xAxis}
+      yAxis={yAxis}
+      layers={layers}
+      tooltip={tooltip}
+      watermark="logo"
+      grabCursor
+      instructions="Scroll to zoom &bull; Drag to pan"
+      zoom={{ enabled: true, axes: 'both', scaleExtent: [0.7, 20] }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Radar Chart
+// ---------------------------------------------------------------------------
+
+function RadarChart({
+  data,
+  axes,
+}: {
+  data: AiRadarItem[];
+  axes: { label: string; unit?: string }[];
+}) {
+  const layers = useMemo(() => {
+    const radarLayer: RadarLayerConfig<AiRadarItem> = {
+      type: 'radar',
+      data,
+      config: {
+        axes,
+        getValue: (d, i) => d.values[i] ?? null,
+        getRawValue: (d, i) => d.rawValues[i] ?? null,
+        getColor: (d) => d.color,
+        getLabel: (d) => d.label,
+        keyFn: (d) => d.hwKey,
+        levels: 5,
+        labelMargin: 40,
+      },
+    };
+    return [radarLayer];
+  }, [data, axes]);
+
+  const tooltip = useMemo<TooltipConfig<AiRadarItem>>(
+    () => ({
+      rulerType: 'none',
+      content: (d) => {
+        const metricRows = axes
+          .map((axis, i) => {
+            const raw = d.rawValues[i];
+            return raw !== null
+              ? `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`
+              : '';
+          })
+          .filter(Boolean)
+          .join('');
+        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
+            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
+          </div>
+          <div style="color: var(--muted-foreground); font-size: 11px;">${metricRows}</div>
+        </div>`);
+      },
+    }),
+    [axes],
+  );
+
+  // Radar ignores scales/axes — it draws its own grid. Provide dummy scales.
+  const dummyScale = useMemo<ScaleConfig>(() => ({ type: 'linear', domain: [0, 1] }), []);
+
+  return (
+    <D3Chart
+      chartId="ai-chart-radar"
+      data={data}
+      height={500}
+      xScale={dummyScale}
+      yScale={dummyScale}
+      layers={layers}
+      tooltip={tooltip}
+      watermark="logo"
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline Legend
+// ---------------------------------------------------------------------------
+
+function InlineLegend({ items }: { items: { label: string; color: string }[] }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-sm shrink-0"
+            style={{ background: item.color }}
+          />
+          {item.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildLegendItems(colorMap: Record<string, string>): { label: string; color: string }[] {
+  return Object.entries(colorMap).map(([hwKey, color]) => {
+    const config = getHardwareConfig(hwKey);
+    return {
+      label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
+      color,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main Result Component
+// ---------------------------------------------------------------------------
 
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   return (
@@ -225,7 +441,28 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
               <BarChart data={chart.barData} spec={chart.spec} />
             )}
             {chart.spec.chartType === 'scatter' && chart.scatterData.length > 0 && (
-              <ScatterChart data={chart.scatterData} spec={chart.spec} colorMap={chart.colorMap} />
+              <>
+                <InlineLegend items={buildLegendItems(chart.colorMap)} />
+                <ScatterChart
+                  data={chart.scatterData}
+                  spec={chart.spec}
+                  colorMap={chart.colorMap}
+                />
+              </>
+            )}
+            {chart.spec.chartType === 'line' && Object.keys(chart.lineData).length > 0 && (
+              <>
+                <InlineLegend items={buildLegendItems(chart.colorMap)} />
+                <LineChart lineData={chart.lineData} spec={chart.spec} colorMap={chart.colorMap} />
+              </>
+            )}
+            {chart.spec.chartType === 'radar' && chart.radarData.length > 0 && (
+              <>
+                <InlineLegend
+                  items={chart.radarData.map((d) => ({ label: d.label, color: d.color }))}
+                />
+                <RadarChart data={chart.radarData} axes={chart.radarAxes} />
+              </>
             )}
           </CardContent>
         </Card>
