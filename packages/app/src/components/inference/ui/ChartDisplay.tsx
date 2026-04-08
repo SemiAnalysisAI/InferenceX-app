@@ -145,10 +145,11 @@ export default function ChartDisplay() {
     totalDatesQueried,
   } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
 
-  const [viewMode, setViewMode] = useState<InferenceViewMode>('chart');
-  const handleViewModeChange = (value: InferenceViewMode) => {
-    setViewMode(value);
-    track('inference_view_changed', { view: value });
+  const [viewModes, setViewModes] = useState<Record<number, InferenceViewMode>>({});
+  const getViewMode = (index: number): InferenceViewMode => viewModes[index] ?? 'chart';
+  const handleViewModeChange = (index: number, value: InferenceViewMode) => {
+    setViewModes((prev) => ({ ...prev, [index]: value }));
+    track('inference_view_changed', { view: value, chartIndex: index });
   };
 
   const { unofficialRunInfo, getOverlayData, isUnofficialRun } = useUnofficialRun();
@@ -284,9 +285,9 @@ export default function ChartDisplay() {
                 }
                 leadingControls={
                   <SegmentedToggle
-                    value={viewMode}
+                    value={getViewMode(graphIndex)}
                     options={VIEW_MODE_OPTIONS}
-                    onValueChange={handleViewModeChange}
+                    onValueChange={(v) => handleViewModeChange(graphIndex, v)}
                     ariaLabel="View mode"
                     testId={`inference-view-toggle-${graphIndex}`}
                   />
@@ -426,7 +427,7 @@ export default function ChartDisplay() {
                     </>
                   );
 
-                  if (viewMode === 'table') {
+                  if (getViewMode(graphIndex) === 'table') {
                     return (
                       <>
                         {chartCaption}
