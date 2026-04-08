@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
 import { setupChartStructure } from '../chart-setup';
@@ -88,7 +88,9 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const prevDataRef = useRef(data);
   const prevScalesRef = useRef({ xScaleConfig, yScaleConfig });
 
-  useEffect(() => {
+  // useLayoutEffect ensures D3 renders synchronously before browser paint,
+  // preventing a frame where dots and lines are out of sync during y-axis metric changes.
+  useLayoutEffect(() => {
     if (!svgRef.current || !tooltipRef.current || dimensions.width === 0) return;
     if (data.length === 0 && layers.every((l) => l.type !== 'custom')) return;
 
@@ -100,7 +102,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     prevDataRef.current = data;
     prevScalesRef.current = { xScaleConfig, yScaleConfig };
 
-    const timeoutId = setTimeout(() => {
+    {
       if (!svgRef.current || !tooltipRef.current) return;
 
       // Preserve zoom transform before structure rebuild
@@ -353,9 +355,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
       // ── User onRender callback ──
       onRender?.(ctx);
-    }, 0);
-
-    return () => clearTimeout(timeoutId);
+    }
     // We intentionally list specific deps rather than the entire props object.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
