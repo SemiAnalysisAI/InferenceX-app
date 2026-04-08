@@ -4,7 +4,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 export type AiProvider = 'openai' | 'anthropic' | 'xai' | 'google';
 
-export type AiChartType = 'bar' | 'scatter';
+export type AiChartType = 'bar' | 'scatter' | 'line' | 'radar';
 
 export type AiDataSource = 'benchmarks' | 'evaluations' | 'reliability' | 'history';
 
@@ -18,6 +18,8 @@ export interface AiChartSpec {
   yAxisMetric: string;
   yAxisLabel: string;
   targetInteractivity?: number;
+  /** For radar charts: list of y-axis metric keys to plot as axes. */
+  radarMetrics?: string[];
   title: string;
   description: string;
 }
@@ -36,7 +38,7 @@ export interface AiChartBarPoint {
 // Validation whitelists
 // ---------------------------------------------------------------------------
 
-const VALID_CHART_TYPES = new Set<string>(['bar', 'scatter']);
+const VALID_CHART_TYPES = new Set<string>(['bar', 'scatter', 'line', 'radar']);
 const VALID_DATA_SOURCES = new Set<string>(['benchmarks', 'evaluations', 'reliability', 'history']);
 const VALID_MODELS = new Set<string>(Object.values(Model));
 const VALID_SEQUENCES = new Set<string>(Object.values(Sequence));
@@ -81,6 +83,9 @@ export function validateSpec(raw: Record<string, unknown>): AiChartSpec {
       ? raw.targetInteractivity
       : 40;
 
+  const rawRadarMetrics = Array.isArray(raw.radarMetrics) ? (raw.radarMetrics as string[]) : [];
+  const radarMetrics = rawRadarMetrics.filter((m) => VALID_Y_METRICS.has(m));
+
   return {
     chartType,
     dataSource,
@@ -91,6 +96,7 @@ export function validateSpec(raw: Record<string, unknown>): AiChartSpec {
     yAxisMetric,
     yAxisLabel: typeof raw.yAxisLabel === 'string' ? raw.yAxisLabel.slice(0, 100) : yAxisMetric,
     targetInteractivity,
+    radarMetrics: radarMetrics.length > 0 ? radarMetrics : undefined,
     title: typeof raw.title === 'string' ? raw.title.slice(0, 200) : 'AI Generated Chart',
     description: typeof raw.description === 'string' ? raw.description.slice(0, 500) : '',
   };

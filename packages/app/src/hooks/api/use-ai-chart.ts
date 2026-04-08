@@ -33,10 +33,21 @@ import chartDefinitions from '@/components/inference/inference-chart-config.json
 // Result types
 // ---------------------------------------------------------------------------
 
+export interface AiRadarItem {
+  hwKey: string;
+  label: string;
+  color: string;
+  values: (number | null)[];
+  rawValues: (number | null)[];
+}
+
 export interface AiSingleChartResult {
   spec: AiChartSpec;
   barData: AiChartBarPoint[];
   scatterData: InferenceData[];
+  lineData: Record<string, { x: number; y: number }[]>;
+  radarData: AiRadarItem[];
+  radarAxes: { label: string; unit?: string }[];
   colorMap: Record<string, string>;
 }
 
@@ -222,6 +233,120 @@ function buildReliabilityBarData(
 // Resolve a single spec into chart data
 // ---------------------------------------------------------------------------
 
+const METRIC_LABELS: Record<string, string> = {
+  y_tpPerGpu: 'Throughput/GPU',
+  y_outputTputPerGpu: 'Output Tput/GPU',
+  y_inputTputPerGpu: 'Input Tput/GPU',
+  y_tpPerMw: 'Tput/MW',
+  y_costh: 'Cost (Hyper)',
+  y_costn: 'Cost (Neo)',
+  y_costr: 'Cost (Rental)',
+  y_jTotal: 'J/Token',
+  y_jOutput: 'J/Output',
+  y_jInput: 'J/Input',
+};
+
+const EMPTY_RESULT: Pick<AiSingleChartResult, 'lineData' | 'radarData' | 'radarAxes'> = {
+  lineData: {},
+  radarData: [],
+  radarAxes: [],
+};
+
+function buildLineData(
+  points: InferenceData[],
+  spec: AiChartSpec,
+  colorMap: Record<string, string>,
+): Record<string, { x: number; y: number }[]> {
+  const chartDef = (chartDefinitions as any[])[0];
+  const yFieldPath: string = chartDef[spec.yAxisMetric] ?? 'tpPerGpu.y';
+
+  const lines: Record<string, { x: number; y: number }[]> = {};
+  for (const p of points) {
+    const hwKey = p.hwKey ?? '';
+    if (!hwKey || !colorMap[hwKey]) continue;
+    if (!lines[hwKey]) lines[hwKey] = [];
+    lines[hwKey].push({ x: p.x, y: getNestedYValue(p, yFieldPath) });
+  }
+  // Sort each line by x
+  for (const pts of Object.values(lines)) {
+    pts.sort((a, b) => a.x - b.x);
+  }
+  return lines;
+}
+
+function buildRadarData(
+  points: InferenceData[],
+  spec: AiChartSpec,
+  colorMap: Record<string, string>,
+): { items: AiRadarItem[]; axes: { label: string; unit?: string }[] } {
+  const metrics = spec.radarMetrics ?? ['y_tpPerGpu', 'y_outputTputPerGpu', 'y_costh', 'y_jTotal'];
+  const chartDef = (chartDefinitions as any[])[0];
+  const target = spec.targetInteractivity ?? 40;
+
+  // Group by hwKey and pick the point closest to target interactivity
+  const groups = new Map<string, InferenceData>();
+  for (const p of points) {
+    const hwKey = p.hwKey ?? '';
+    if (!hwKey) continue;
+    const existing = groups.get(hwKey);
+    if (!existing || Math.abs(p.x - target) < Math.abs(existing.x - target)) {
+      groups.set(hwKey, p);
+    }
+  }
+
+  // Extract raw values per metric per GPU
+  const rawMatrix = new Map<string, number[]>();
+  for (const [hwKey, point] of groups) {
+    const vals = metrics.map((m) => {
+      const path: string = chartDef[m] ?? m;
+      return getNestedYValue(point, path);
+    });
+    rawMatrix.set(hwKey, vals);
+  }
+
+  // Find min/max per metric for normalization
+  const mins = metrics.map(() => Infinity);
+  const maxs = metrics.map(() => -Infinity);
+  for (const vals of rawMatrix.values()) {
+    for (let i = 0; i < vals.length; i++) {
+      if (vals[i] > 0) {
+        mins[i] = Math.min(mins[i], vals[i]);
+        maxs[i] = Math.max(maxs[i], vals[i]);
+      }
+    }
+  }
+
+  // For cost/energy metrics, invert normalization (lower is better)
+  const invertMetric = new Set([
+    'y_costh',
+    'y_costn',
+    'y_costr',
+    'y_jTotal',
+    'y_jOutput',
+    'y_jInput',
+  ]);
+
+  const items: AiRadarItem[] = [];
+  for (const [hwKey, rawVals] of rawMatrix) {
+    const config = getHardwareConfig(hwKey);
+    const normalized = rawVals.map((v, i) => {
+      if (v <= 0 || !isFinite(mins[i]) || maxs[i] === mins[i]) return null;
+      const norm = (v - mins[i]) / (maxs[i] - mins[i]);
+      return invertMetric.has(metrics[i]) ? 1 - norm : norm;
+    });
+    items.push({
+      hwKey,
+      label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
+      color: colorMap[hwKey] ?? '#888',
+      values: normalized,
+      rawValues: rawVals.map((v) => (v > 0 ? v : null)),
+    });
+  }
+
+  const axes = metrics.map((m) => ({ label: METRIC_LABELS[m] ?? m }));
+  return { items, axes };
+}
+
 async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   if (spec.dataSource === 'evaluations') {
     const rows = await fetchEvaluations();
@@ -230,13 +355,13 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
     ];
     const colorMap = generateHighContrastColors(hwKeys, 'dark');
     const barData = buildEvalBarData(rows, spec, colorMap);
-    // Re-color with final keys
     const finalKeys = barData.map((b) => b.hwKey);
     const finalColors = generateHighContrastColors(finalKeys, 'dark');
     return {
       spec,
       barData: barData.map((b) => ({ ...b, color: finalColors[b.hwKey] ?? b.color })),
       scatterData: [],
+      ...EMPTY_RESULT,
       colorMap: finalColors,
     };
   }
@@ -252,6 +377,7 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
       spec,
       barData: barData.map((b) => ({ ...b, color: finalColors[b.hwKey] ?? b.color })),
       scatterData: [],
+      ...EMPTY_RESULT,
       colorMap: finalColors,
     };
   }
@@ -296,10 +422,17 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   const hwKeys = [...new Set(points.map((p) => p.hwKey ?? '').filter(Boolean))];
   const colorMap = generateHighContrastColors(hwKeys, 'dark');
 
+  const lineData = spec.chartType === 'line' ? buildLineData(points, spec, colorMap) : {};
+  const { items: radarData, axes: radarAxes } =
+    spec.chartType === 'radar' ? buildRadarData(points, spec, colorMap) : { items: [], axes: [] };
+
   return {
     spec,
     barData: spec.chartType === 'bar' ? buildBenchmarkBarData(points, spec, colorMap) : [],
     scatterData: spec.chartType === 'scatter' ? points : [],
+    lineData,
+    radarData,
+    radarAxes,
     colorMap,
   };
 }
@@ -333,7 +466,13 @@ export function useAiChart(): UseAiChartReturn {
       const charts = await Promise.all(specs.map(resolveSpec));
 
       // Check if any chart has data
-      const hasData = charts.some((c) => c.barData.length > 0 || c.scatterData.length > 0);
+      const hasData = charts.some(
+        (c) =>
+          c.barData.length > 0 ||
+          c.scatterData.length > 0 ||
+          Object.keys(c.lineData).length > 0 ||
+          c.radarData.length > 0,
+      );
       if (!hasData) {
         const models = [...new Set(specs.map((s) => s.model))].join(', ');
         setError(`No data found for ${models}. Try a different model or configuration.`);
