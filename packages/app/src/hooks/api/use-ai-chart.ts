@@ -281,7 +281,12 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
   if (spec.dataSource !== 'history') {
     points = points.filter((p) => {
       const entry = p as any;
-      if (entry.isl !== null && entry.osl !== null) {
+      if (
+        entry.isl !== undefined &&
+        entry.isl !== null &&
+        entry.osl !== undefined &&
+        entry.osl !== null
+      ) {
         return entry.isl === isl && entry.osl === osl;
       }
       return true;
