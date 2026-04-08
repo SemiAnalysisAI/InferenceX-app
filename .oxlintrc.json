@@ -1,10 +1,10 @@
 {
   "categories": {
-    "correctness": "warn",
-    "suspicious": "warn",
-    "pedantic": "warn",
-    "style": "warn",
-    "nursery": "warn"
+    "correctness": "deny",
+    "suspicious": "deny",
+    "pedantic": "deny",
+    "style": "deny",
+    "nursery": "deny"
   },
   "rules": {
     "capitalized-comments": "off",
