@@ -15,7 +15,7 @@ interface InferenceTableProps {
   selectedYAxisMetric: string;
 }
 
-const PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500] as const;
 
 /** Format a number for table display — picks sensible precision based on magnitude. */
 function fmt(value: number, decimals?: number): string {
@@ -32,7 +32,7 @@ export default function InferenceTable({
   selectedYAxisMetric,
 }: InferenceTableProps) {
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [pageSize, setPageSize] = useState<number>(25);
 
   // Resolve Y-axis config from chart definition
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
