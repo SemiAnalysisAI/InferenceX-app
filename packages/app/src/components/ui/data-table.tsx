@@ -100,6 +100,9 @@ export function DataTable<T>({
     return [...data].toSorted((a, b) => {
       const av = extract(a);
       const bv = extract(b);
+      if ((av === null || av === undefined) && (bv === null || bv === undefined)) return 0;
+      if (av === null || av === undefined) return 1;
+      if (bv === null || bv === undefined) return -1;
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * multiplier;
       return String(av).localeCompare(String(bv)) * multiplier;
     });
@@ -143,13 +146,24 @@ export function DataTable<T>({
                   <th
                     key={i}
                     className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
+                    tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
+                    onKeyDown={
+                      sortable
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSort(i);
+                            }
+                          }
+                        : undefined
+                    }
                     aria-sort={
                       sort.columnIndex === i && sort.dir
                         ? sort.dir === 'asc'
                           ? 'ascending'
                           : 'descending'
-                        : undefined
+                        : 'none'
                     }
                   >
                     {col.header}
