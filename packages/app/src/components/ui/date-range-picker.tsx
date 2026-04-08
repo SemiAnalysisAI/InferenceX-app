@@ -70,6 +70,9 @@ export function DateRangePicker({
       return placeholder;
     }
     if (dateRange.startDate && dateRange.endDate) {
+      if (dateRange.startDate === dateRange.endDate) {
+        return formatDisplayDate(dateRange.startDate);
+      }
       return `${formatDisplayDate(dateRange.startDate)} - ${formatDisplayDate(dateRange.endDate)}`;
     }
     if (dateRange.startDate) {

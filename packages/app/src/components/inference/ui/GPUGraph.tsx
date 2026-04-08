@@ -73,11 +73,12 @@ const GPUGraph = React.memo(
         dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
       }
       dates.push(...selectedDates);
-      dates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      const deduplicated = [...new Set(dates)];
+      deduplicated.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
       const sortedGPUs = [...selectedGPUs].toSorted(
         (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
       );
-      return { dates, sortedGPUs };
+      return { dates: deduplicated, sortedGPUs };
     }, [selectedDateRange, selectedDates, selectedGPUs]);
 
     const graphIdentifiers = useMemo(() => {
