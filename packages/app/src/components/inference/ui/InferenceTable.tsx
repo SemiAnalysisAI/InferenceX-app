@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { track } from '@/lib/analytics';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue } from '@/lib/chart-utils';
@@ -12,6 +14,8 @@ interface InferenceTableProps {
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
 }
+
+const PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
 
 /** Format a number for table display — picks sensible precision based on magnitude. */
 function fmt(value: number, decimals?: number): string {
@@ -27,12 +31,15 @@ export default function InferenceTable({
   chartDefinition,
   selectedYAxisMetric,
 }: InferenceTableProps) {
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(50);
+
   // Resolve Y-axis config from chart definition
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const yLabel = chartDefinition[`${selectedYAxisMetric}_label` as keyof ChartDefinition] as string;
   const xLabel = chartDefinition.x_label;
 
-  // Sort by Y value descending (higher = better for throughput metrics)
+  // Sort by Y value — direction depends on roofline orientation
   const rooflineDir = chartDefinition[
     `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
   ] as string | undefined;
@@ -46,6 +53,11 @@ export default function InferenceTable({
       return yAscending ? ay - by : by - ay;
     });
   }, [data, yPath, yAscending]);
+
+  // Reset to first page when data or page size changes
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageData = sorted.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   if (sorted.length === 0) {
     return (
@@ -92,7 +104,7 @@ export default function InferenceTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((point, i) => {
+            {pageData.map((point, i) => {
               const config = getHardwareConfig(point.hwKey);
               const gpuLabel = getDisplayLabel(config);
               const yValue = yPath ? getNestedYValue(point, yPath) : point.y;
@@ -127,6 +139,60 @@ export default function InferenceTable({
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination controls */}
+      <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span>
+            {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of{' '}
+            {sorted.length}
+          </span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              const size = Number(e.target.value);
+              setPageSize(size);
+              setPage(0);
+              track('inference_table_page_size_changed', { size });
+            }}
+            className="bg-transparent border border-border rounded px-1.5 py-0.5 text-xs"
+            aria-label="Rows per page"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size} / page
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => {
+              setPage((p) => Math.max(0, p - 1));
+              track('inference_table_page_changed', { direction: 'prev' });
+            }}
+            disabled={safePage === 0}
+            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span>
+            {safePage + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => {
+              setPage((p) => Math.min(totalPages - 1, p + 1));
+              track('inference_table_page_changed', { direction: 'next' });
+            }}
+            disabled={safePage >= totalPages - 1}
+            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
