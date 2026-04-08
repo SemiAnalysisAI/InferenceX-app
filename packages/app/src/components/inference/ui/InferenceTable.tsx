@@ -8,6 +8,13 @@ import type { ChartDefinition, InferenceData } from '@/components/inference/type
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue } from '@/lib/chart-utils';
 import { getDisplayLabel } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface InferenceTableProps {
   data: InferenceData[];
@@ -148,23 +155,26 @@ export default function InferenceTable({
             {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of{' '}
             {sorted.length}
           </span>
-          <select
-            value={pageSize}
-            onChange={(e) => {
-              const size = Number(e.target.value);
+          <Select
+            value={String(pageSize)}
+            onValueChange={(v) => {
+              const size = Number(v);
               setPageSize(size);
               setPage(0);
               track('inference_table_page_size_changed', { size });
             }}
-            className="bg-transparent border border-border rounded px-1.5 py-0.5 text-xs"
-            aria-label="Rows per page"
           >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size} / page
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs" aria-label="Rows per page">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size} / page
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-1">
           <button
