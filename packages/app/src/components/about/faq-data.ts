@@ -5,8 +5,8 @@ import {
   PRECISION_KEYS,
   GITHUB_OWNER,
   GITHUB_REPO,
+  FRAMEWORK_LABELS,
 } from '@semianalysisai/inferencex-constants';
-import { FRAMEWORK_LABELS } from '@/lib/constants';
 import { CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
 
 export interface FaqLink {

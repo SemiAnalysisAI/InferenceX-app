@@ -3,8 +3,9 @@ import { uniq } from 'lodash-es';
 import { twMerge } from 'tailwind-merge';
 
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
-import { FRAMEWORK_LABELS, getGpuSpecs } from './constants';
+import { getGpuSpecs } from './constants';
 /**
  * Combines Tailwind CSS classes and other class values into a single string.
  * This utility helps in conditionally applying classes and merging them efficiently,

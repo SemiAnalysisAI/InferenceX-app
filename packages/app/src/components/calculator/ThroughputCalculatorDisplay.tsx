@@ -38,7 +38,8 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/data-mappings';
-import { getHardwareConfig, getModelSortIndex, GPU_SPECS } from '@/lib/constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
 import { getDisplayLabel } from '@/lib/utils';
@@ -640,7 +641,7 @@ export default function ThroughputCalculatorDisplay() {
                             data-testid="calculator-cost-badges"
                           >
                             All in Power/GPU:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
+                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                               <Badge key={base} variant="outline">
                                 {base.toUpperCase()}: {specs.power}kW
                               </Badge>
@@ -668,7 +669,7 @@ export default function ThroughputCalculatorDisplay() {
                             data-testid="calculator-cost-badges"
                           >
                             TCO $/GPU/hr:{' '}
-                            {Object.entries(GPU_SPECS).map(([base, specs]) => (
+                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
                               <Badge key={base} variant="outline">
                                 {base.toUpperCase()}: $
                                 {(costProvider === 'costh'

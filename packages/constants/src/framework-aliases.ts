@@ -1,14 +1,22 @@
+export interface FwEntry {
+  /** Human-readable display name used in charts and tooltips */
+  label: string;
+}
+
+/** Single source of truth for framework metadata. Add new frameworks here. */
+export const FW_REGISTRY: Record<string, FwEntry> = {
+  atom: { label: 'ATOM¹' },
+  'dynamo-sglang': { label: 'Dynamo SGLang' },
+  'dynamo-trt': { label: 'Dynamo TRT' },
+  'dynamo-vllm': { label: 'Dynamo vLLM' },
+  'mori-sglang': { label: 'MoRI SGLang' },
+  sglang: { label: 'SGLang' },
+  trt: { label: 'TRT' },
+  vllm: { label: 'vLLM' },
+};
+
 /** Canonical set of framework key strings used across all packages. */
-export const FRAMEWORK_KEYS = new Set([
-  'atom',
-  'dynamo-sglang',
-  'dynamo-trt',
-  'dynamo-vllm',
-  'mori-sglang',
-  'sglang',
-  'trt',
-  'vllm',
-]);
+export const FRAMEWORK_KEYS = new Set(Object.keys(FW_REGISTRY));
 
 /** Canonical set of speculative decoding method strings. */
 export const SPEC_METHOD_KEYS = new Set(['mtp', 'none']);
@@ -21,6 +29,21 @@ export const FRAMEWORK_ALIASES: Record<string, { canonical: string; disagg?: boo
   'sglang-disagg': { canonical: 'mori-sglang', disagg: true },
   trtllm: { canonical: 'trt' },
   'dynamo-trtllm': { canonical: 'dynamo-trt' },
+};
+
+/**
+ * Framework label lookup — includes canonical keys and aliases.
+ * Aliases resolve to their canonical framework's label.
+ */
+export const FRAMEWORK_LABELS: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(FW_REGISTRY).map(([k, v]) => [k, v.label])),
+  ...Object.fromEntries(
+    Object.entries(FRAMEWORK_ALIASES).map(([alias, { canonical }]) => [
+      alias,
+      FW_REGISTRY[canonical]?.label ?? canonical,
+    ]),
+  ),
+  mtp: 'MTP',
 };
 
 /**

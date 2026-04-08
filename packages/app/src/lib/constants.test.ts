@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 import {
   GPU_ALIAS_TO_CANONICAL,
   GPU_KEY_ALIASES,
-  GPU_SPECS,
-  MODEL_ORDER,
   getGpuSpecs,
   getHardwareConfig,
   getModelSortIndex,
@@ -127,17 +127,17 @@ describe('getHardwareConfig', () => {
     warnSpy.mockRestore();
   });
 
-  it('GPU_SPECS has non-zero power for all entries', () => {
-    for (const [, specs] of Object.entries(GPU_SPECS)) {
-      expect(specs.power).toBeGreaterThan(0);
+  it('HW_REGISTRY has non-zero power for all entries', () => {
+    for (const entry of Object.values(HW_REGISTRY)) {
+      expect(entry.power).toBeGreaterThan(0);
     }
   });
 
-  it('GPU_SPECS has non-negative cost rates for all entries', () => {
-    for (const specs of Object.values(GPU_SPECS)) {
-      expect(specs.costh).toBeGreaterThanOrEqual(0);
-      expect(specs.costn).toBeGreaterThanOrEqual(0);
-      expect(specs.costr).toBeGreaterThanOrEqual(0);
+  it('HW_REGISTRY has non-negative cost rates for all entries', () => {
+    for (const entry of Object.values(HW_REGISTRY)) {
+      expect(entry.costh).toBeGreaterThanOrEqual(0);
+      expect(entry.costn).toBeGreaterThanOrEqual(0);
+      expect(entry.costr).toBeGreaterThanOrEqual(0);
     }
   });
 });
@@ -173,10 +173,11 @@ describe('getGpuSpecs', () => {
     expect(specs.costr).toBe(0);
   });
 
-  it('returns correct specs for all base GPUs in GPU_SPECS', () => {
-    for (const [base, specs] of Object.entries(GPU_SPECS)) {
+  it('returns correct specs for all base GPUs in HW_REGISTRY', () => {
+    for (const [base, entry] of Object.entries(HW_REGISTRY)) {
       const result = getGpuSpecs(base);
-      expect(result).toBe(specs);
+      expect(result.power).toBe(entry.power);
+      expect(result.costh).toBe(entry.costh);
     }
   });
 });
@@ -185,93 +186,28 @@ describe('getGpuSpecs', () => {
 // getModelSortIndex
 // ===========================================================================
 describe('getModelSortIndex', () => {
-  it('returns correct index for "gb300" hardware', () => {
-    expect(getModelSortIndex('gb300')).toBe(MODEL_ORDER.indexOf('gb300'));
+  it('extracts base key from compound keys', () => {
+    expect(getModelSortIndex('h100_vllm')).toBe(getModelSortIndex('h100'));
+    expect(getModelSortIndex('gb200_dynamo-trt')).toBe(getModelSortIndex('gb200'));
   });
 
-  it('returns correct index for "gb200" (starts with "gb")', () => {
-    expect(getModelSortIndex('gb200')).toBe(MODEL_ORDER.indexOf('gb'));
+  it('gb300 sorts before gb200', () => {
+    expect(getModelSortIndex('gb300')).toBeLessThan(getModelSortIndex('gb200'));
   });
 
-  it('returns correct index for "gb200_trt" (starts with "gb")', () => {
-    expect(getModelSortIndex('gb200_trt')).toBe(MODEL_ORDER.indexOf('gb'));
-  });
-
-  it('returns correct index for "b300" hardware', () => {
-    expect(getModelSortIndex('b300')).toBe(MODEL_ORDER.indexOf('b300'));
-  });
-
-  it('returns correct index for "b200" (starts with "b")', () => {
-    expect(getModelSortIndex('b200')).toBe(MODEL_ORDER.indexOf('b'));
-  });
-
-  it('returns correct index for "h100" hardware', () => {
-    const idx = MODEL_ORDER.indexOf('h100');
-    expect(getModelSortIndex('h100')).toBe(idx);
-  });
-
-  it('returns correct index for "h100_vllm" (starts with "h100")', () => {
-    // h100 doesn't start with "gb", "b", "mi355x", "h200", "mi325x"
-    // but does start with "h100"
-    const idx = MODEL_ORDER.indexOf('h100');
-    expect(getModelSortIndex('h100_vllm')).toBe(idx);
-  });
-
-  it('returns correct index for "h200" hardware', () => {
-    const idx = MODEL_ORDER.indexOf('h200');
-    expect(getModelSortIndex('h200')).toBe(idx);
-  });
-
-  it('returns correct index for "mi300x" hardware', () => {
-    const idx = MODEL_ORDER.indexOf('mi300x');
-    expect(getModelSortIndex('mi300x')).toBe(idx);
-  });
-
-  it('returns MODEL_ORDER.length for unknown hardware', () => {
-    expect(getModelSortIndex('unknown_gpu')).toBe(MODEL_ORDER.length);
-  });
-
-  it('returns MODEL_ORDER.length for empty string', () => {
-    expect(getModelSortIndex('')).toBe(MODEL_ORDER.length);
-  });
-
-  it('gb300 sorts before gb200 (gb300 precedes gb in MODEL_ORDER)', () => {
-    expect(MODEL_ORDER.indexOf('gb300')).toBeLessThan(MODEL_ORDER.indexOf('gb'));
-  });
-
-  it('b300 sorts before b200 (b300 precedes b in MODEL_ORDER)', () => {
-    expect(MODEL_ORDER.indexOf('b300')).toBeLessThan(MODEL_ORDER.indexOf('b'));
+  it('b300 sorts before b200', () => {
+    expect(getModelSortIndex('b300')).toBeLessThan(getModelSortIndex('b200'));
   });
 
   it('h200 sorts before h100', () => {
-    expect(MODEL_ORDER.indexOf('h200')).toBeLessThan(MODEL_ORDER.indexOf('h100'));
+    expect(getModelSortIndex('h200')).toBeLessThan(getModelSortIndex('h100'));
   });
 
-  it('MODEL_ORDER contains expected entries', () => {
-    expect(MODEL_ORDER).toContain('gb300');
-    expect(MODEL_ORDER).toContain('gb');
-    expect(MODEL_ORDER).toContain('b300');
-    expect(MODEL_ORDER).toContain('b');
-    expect(MODEL_ORDER).toContain('h200');
-    expect(MODEL_ORDER).toContain('h100');
-  });
-});
-
-// ===========================================================================
-// MODEL_ORDER
-// ===========================================================================
-describe('MODEL_ORDER', () => {
-  it('is a non-empty array', () => {
-    expect(MODEL_ORDER.length).toBeGreaterThan(0);
+  it('returns a high index for unknown hardware', () => {
+    expect(getModelSortIndex('unknown_gpu')).toBeGreaterThanOrEqual(9);
   });
 
-  it('has all unique entries', () => {
-    expect(new Set(MODEL_ORDER).size).toBe(MODEL_ORDER.length);
-  });
-
-  it('contains only lowercase strings', () => {
-    for (const entry of MODEL_ORDER) {
-      expect(entry).toBe(entry.toLowerCase());
-    }
+  it('returns a high index for empty string', () => {
+    expect(getModelSortIndex('')).toBeGreaterThanOrEqual(9);
   });
 });

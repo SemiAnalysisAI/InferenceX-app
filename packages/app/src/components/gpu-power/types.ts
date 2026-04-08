@@ -1,3 +1,5 @@
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 export interface GpuMetricRow {
   timestamp: string;
   index: number;
@@ -101,19 +103,6 @@ export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => row[m.key] !== undefined));
 }
 
-/** TDP (Thermal Design Power) per GPU SKU in watts. */
-const GPU_TDP_MAP: Record<string, number> = {
-  h100: 700,
-  h200: 700,
-  b200: 1000,
-  b300: 1200,
-  gb200: 1200,
-  gb300: 1400,
-  mi300x: 750,
-  mi325x: 1000,
-  mi355x: 1400,
-};
-
 /**
  * Detect GPU SKU from an artifact name and return its TDP in watts.
  * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
@@ -122,11 +111,11 @@ export function detectTdpFromArtifactName(
   artifactName: string,
 ): { sku: string; tdp: number } | null {
   const lower = artifactName.toLowerCase();
-  // Check longer names first to avoid partial matches (e.g., gb200 before b200)
-  const orderedSkus = Object.keys(GPU_TDP_MAP).toSorted((a, b) => b.length - a.length);
-  for (const sku of orderedSkus) {
-    if (lower.includes(sku)) {
-      return { sku: sku.toUpperCase(), tdp: GPU_TDP_MAP[sku] };
+  // Sorted longest-first to avoid partial matches (e.g., gb200 before b200)
+  const keys = Object.keys(HW_REGISTRY).toSorted((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (lower.includes(key)) {
+      return { sku: key.toUpperCase(), tdp: HW_REGISTRY[key].tdp };
     }
   }
   return null;

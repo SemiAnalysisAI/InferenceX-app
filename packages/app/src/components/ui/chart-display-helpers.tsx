@@ -7,7 +7,7 @@ import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-butt
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
-import { GPU_SPECS } from '@/lib/constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
@@ -16,7 +16,7 @@ const TOTAL_COST_METRICS = new Set(['y_costh', 'y_costn', 'y_costr']);
 const OUTPUT_COST_METRICS = new Set(['y_costhOutput', 'y_costnOutput', 'y_costrOutput']);
 const INPUT_COST_METRICS = new Set(['y_costhi', 'y_costni', 'y_costri']);
 const POWER_VALUES = Object.fromEntries(
-  Object.entries(GPU_SPECS).map(([base, specs]) => [base, `${specs.power}kW`]),
+  Object.entries(HW_REGISTRY).map(([base, specs]) => [base, `${specs.power}kW`]),
 );
 
 function MetricBadges({
@@ -79,7 +79,7 @@ function DisaggCaveat({
 
 function getCostValues(selectedYAxisMetric: string) {
   return Object.fromEntries(
-    Object.entries(GPU_SPECS).map(([base, specs]) => [
+    Object.entries(HW_REGISTRY).map(([base, specs]) => [
       base,
       selectedYAxisMetric === 'y_costh' ||
       selectedYAxisMetric === 'y_costhOutput' ||

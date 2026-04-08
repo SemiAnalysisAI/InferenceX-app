@@ -20,9 +20,7 @@ import {
 } from '@/components/ui/input-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics';
-import { GPU_SPECS } from '@/lib/constants';
-
-type GpuSpec = (typeof GPU_SPECS)[keyof typeof GPU_SPECS];
+import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
 type GpuValuePanelKind = 'costs' | 'powers';
 
 const PANEL_CONFIG: Record<
@@ -35,7 +33,7 @@ const PANEL_CONFIG: Record<
     inputIdPrefix: string;
     resetEvent: string;
     calculatedEvent: string;
-    getDefaultValue: (specs: GpuSpec) => number;
+    getDefaultValue: (specs: HwEntry) => number;
   }
 > = {
   costs: {
@@ -153,7 +151,7 @@ const CustomGpuValuePanel = memo(
 
     const stableGpus = React.useMemo(
       () =>
-        Object.entries(GPU_SPECS)
+        Object.entries(HW_REGISTRY)
           .filter(([, specs]) => config.getDefaultValue(specs) > 0)
           .map(([base, specs]) => ({ base, label: base.toUpperCase(), specs })),
       [config],

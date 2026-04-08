@@ -1,4 +1,4 @@
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { FRAMEWORK_LABELS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 /** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
 export const TABLEAU_10 = [
@@ -21,20 +21,7 @@ export interface GpuSpecs {
   costr: number;
 }
 
-/** Per-base-GPU power and cost constants used for energy/cost calculations. */
-export const GPU_SPECS: Record<string, GpuSpecs> = {
-  h100: { power: 1.73, costh: 1.3, costn: 1.69, costr: 1.3 },
-  h200: { power: 1.73, costh: 1.41, costn: 1.74, costr: 1.6 },
-  b200: { power: 2.17, costh: 1.95, costn: 2.34, costr: 2.9 },
-  // TODO: B300 pricing is temporary - using 1.2x B200 pricing until official pricing is available
-  b300: { power: 2.17, costh: 2.34, costn: 2.808, costr: 3.48 },
-  gb200: { power: 2.1, costh: 2.21, costn: 2.75, costr: 3.3 },
-  // TODO: GB300 pricing is temporary - using 1.2x GB200 pricing until official pricing is available
-  gb300: { power: 2.1, costh: 2.652, costn: 3.3, costr: 3.96 },
-  mi300x: { power: 1.79, costh: 1.12, costn: 1.4, costr: 1.55 },
-  mi325x: { power: 2.18, costh: 1.28, costn: 1.59, costr: 1.8 },
-  mi355x: { power: 2.65, costh: 1.48, costn: 1.9, costr: 2.1 },
-};
+const DEFAULT_SPECS: GpuSpecs = { power: 0, costh: 0, costn: 0, costr: 0 };
 
 /**
  * Look up power/cost specs for a hardware key by extracting the base GPU name.
@@ -42,12 +29,14 @@ export const GPU_SPECS: Record<string, GpuSpecs> = {
  */
 export function getGpuSpecs(hwKey: string): GpuSpecs {
   const base = hwKey.split(/[-_]/)[0];
-  return GPU_SPECS[base] ?? { power: 0, costh: 0, costn: 0, costr: 0 };
+  const entry = HW_REGISTRY[base];
+  if (!entry) return DEFAULT_SPECS;
+  return { power: entry.power, costh: entry.costh, costn: entry.costn, costr: entry.costr };
 }
 
 /** Build the vendor prefix string for the `gpu` tooltip field. */
 function getVendorPrefix(base: string): string {
-  const entry = HW_REGISTRY[base as keyof typeof HW_REGISTRY];
+  const entry = HW_REGISTRY[base];
   if (!entry) return 'Unknown';
   return `${entry.vendor} '${entry.arch}'`;
 }
@@ -73,7 +62,7 @@ const UNKNOWN_HARDWARE: HardwareEntry = {
  */
 function buildHardwareEntry(hwKey: string): HardwareEntry | null {
   const base = hwKey.split('_')[0];
-  const reg = HW_REGISTRY[base as keyof typeof HW_REGISTRY];
+  const reg = HW_REGISTRY[base];
   if (!reg) return null;
 
   const parts = hwKey.split('_').slice(1);
@@ -88,20 +77,6 @@ function buildHardwareEntry(hwKey: string): HardwareEntry | null {
     gpu: [getVendorPrefix(base), gpuName, ...partLabels].join(' '),
   };
 }
-
-export const FRAMEWORK_LABELS: Record<string, string> = {
-  trt: 'TRT',
-  trtllm: 'TRT',
-  vllm: 'vLLM',
-  sglang: 'SGLang',
-  'dynamo-sglang': 'Dynamo SGLang',
-  'dynamo-trtllm': 'Dynamo TRT',
-  'dynamo-trt': 'Dynamo TRT',
-  'dynamo-vllm': 'Dynamo vLLM',
-  'mori-sglang': 'MoRI SGLang',
-  atom: 'ATOM¹',
-  mtp: 'MTP',
-};
 
 /**
  * Maps a canonical GPU key to one or more legacy/alias keys whose data should be
@@ -127,21 +102,10 @@ export const GPU_ALIAS_TO_CANONICAL: Record<string, string> = Object.fromEntries
     aliases.map((alias) => [alias, canonical]),
   ),
 );
-export const MODEL_ORDER = [
-  'gb300',
-  'gb',
-  'b300',
-  'b',
-  'mi355x',
-  'h200',
-  'mi325x',
-  'h100',
-  'mi300x',
-];
-
 export function getModelSortIndex(hwKey: string): number {
-  const idx = MODEL_ORDER.findIndex((m) => hwKey.startsWith(m));
-  return idx === -1 ? MODEL_ORDER.length : idx;
+  const base = hwKey.split('_')[0];
+  const entry = HW_REGISTRY[base];
+  return entry?.sort ?? Object.keys(HW_REGISTRY).length;
 }
 
 /** Returns true if the base GPU in a hardware key is recognized. */
