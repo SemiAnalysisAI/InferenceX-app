@@ -17,6 +17,7 @@ import {
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import { getHardwareConfig } from '@/lib/constants';
 import DOMPurify from 'dompurify';
 
@@ -198,8 +199,13 @@ function ScatterChart({
       tooltip={tooltip}
       watermark="logo"
       grabCursor
-      instructions="Scroll to zoom &bull; Drag to pan"
-      zoom={{ enabled: true, axes: 'both', scaleExtent: [0.7, 20] }}
+      instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
+      zoom={{
+        enabled: true,
+        axes: 'both',
+        scaleExtent: [0.7, 20],
+        resetEventName: 'ai_chart_zoom_reset_ai-chart-scatter',
+      }}
     />
   );
 }
@@ -316,8 +322,13 @@ function LineChart({
       tooltip={tooltip}
       watermark="logo"
       grabCursor
-      instructions="Scroll to zoom &bull; Drag to pan"
-      zoom={{ enabled: true, axes: 'both', scaleExtent: [0.7, 20] }}
+      instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
+      zoom={{
+        enabled: true,
+        axes: 'both',
+        scaleExtent: [0.7, 20],
+        resetEventName: 'ai_chart_zoom_reset_ai-chart-line',
+      }}
     />
   );
 }
@@ -399,7 +410,7 @@ function RadarChart({
 
 function InlineLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 mb-3">
       {items.map((item) => (
         <div key={item.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span
@@ -430,43 +441,54 @@ function buildLegendItems(colorMap: Record<string, string>): { label: string; co
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   return (
     <div className="flex flex-col gap-4">
-      {charts.map((chart, i) => (
-        <Card key={i}>
-          <CardHeader>
-            <CardTitle>{chart.spec.title}</CardTitle>
-            <CardDescription>{chart.spec.description}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {chart.spec.chartType === 'bar' && chart.barData.length > 0 && (
-              <BarChart data={chart.barData} spec={chart.spec} />
-            )}
-            {chart.spec.chartType === 'scatter' && chart.scatterData.length > 0 && (
-              <>
-                <InlineLegend items={buildLegendItems(chart.colorMap)} />
-                <ScatterChart
-                  data={chart.scatterData}
-                  spec={chart.spec}
-                  colorMap={chart.colorMap}
-                />
-              </>
-            )}
-            {chart.spec.chartType === 'line' && Object.keys(chart.lineData).length > 0 && (
-              <>
-                <InlineLegend items={buildLegendItems(chart.colorMap)} />
-                <LineChart lineData={chart.lineData} spec={chart.spec} colorMap={chart.colorMap} />
-              </>
-            )}
-            {chart.spec.chartType === 'radar' && chart.radarData.length > 0 && (
-              <>
-                <InlineLegend
-                  items={chart.radarData.map((d) => ({ label: d.label, color: d.color }))}
-                />
-                <RadarChart data={chart.radarData} axes={chart.radarAxes} />
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      {charts.map((chart, i) => {
+        const chartId = `ai-chart-${chart.spec.chartType}`;
+        const hasZoom = chart.spec.chartType === 'scatter' || chart.spec.chartType === 'line';
+        return (
+          <figure key={i} className="relative rounded-lg">
+            <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
+            <Card>
+              <CardHeader>
+                <CardTitle>{chart.spec.title}</CardTitle>
+                <CardDescription>{chart.spec.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {chart.spec.chartType === 'bar' && chart.barData.length > 0 && (
+                  <BarChart data={chart.barData} spec={chart.spec} />
+                )}
+                {chart.spec.chartType === 'scatter' && chart.scatterData.length > 0 && (
+                  <>
+                    <InlineLegend items={buildLegendItems(chart.colorMap)} />
+                    <ScatterChart
+                      data={chart.scatterData}
+                      spec={chart.spec}
+                      colorMap={chart.colorMap}
+                    />
+                  </>
+                )}
+                {chart.spec.chartType === 'line' && Object.keys(chart.lineData).length > 0 && (
+                  <>
+                    <InlineLegend items={buildLegendItems(chart.colorMap)} />
+                    <LineChart
+                      lineData={chart.lineData}
+                      spec={chart.spec}
+                      colorMap={chart.colorMap}
+                    />
+                  </>
+                )}
+                {chart.spec.chartType === 'radar' && chart.radarData.length > 0 && (
+                  <>
+                    <InlineLegend
+                      items={chart.radarData.map((d) => ({ label: d.label, color: d.color }))}
+                    />
+                    <RadarChart data={chart.radarData} axes={chart.radarAxes} />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </figure>
+        );
+      })}
 
       {summary && (
         <Card>
