@@ -249,7 +249,7 @@ export default function GpuMetricsDisplay() {
                 className="h-7 gap-1.5 text-xs text-muted-foreground"
                 onClick={() => {
                   localStorage.removeItem(FEATURE_GATE_KEY);
-                  window.dispatchEvent(new Event('inferencex:powerx:locked'));
+                  window.dispatchEvent(new Event('inferencex:feature-gate:locked'));
                   track('powerx_relocked');
                   router.push('/inference');
                 }}

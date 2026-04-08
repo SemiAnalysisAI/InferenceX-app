@@ -81,7 +81,7 @@ export default function SubmissionsDisplay() {
                 className="h-7 gap-1.5 text-xs text-muted-foreground"
                 onClick={() => {
                   localStorage.removeItem(FEATURE_GATE_KEY);
-                  window.dispatchEvent(new Event('inferencex:powerx:locked'));
+                  window.dispatchEvent(new Event('inferencex:feature-gate:locked'));
                   track('submissions_relocked');
                   router.push('/inference');
                 }}

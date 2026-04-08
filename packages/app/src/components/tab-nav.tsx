@@ -42,8 +42,8 @@ function useFeatureGate(): boolean {
       ) {
         localStorage.setItem(FEATURE_GATE_KEY, '1');
         setUnlocked(true);
-        window.dispatchEvent(new Event('inferencex:powerx:unlocked'));
-        track('powerx_unlocked');
+        window.dispatchEvent(new Event('inferencex:feature-gate:unlocked'));
+        track('feature_gate_unlocked');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -53,11 +53,11 @@ function useFeatureGate(): boolean {
   useEffect(() => {
     const handleLock = () => setUnlocked(false);
     const handleUnlock = () => setUnlocked(true);
-    window.addEventListener('inferencex:powerx:locked', handleLock);
-    window.addEventListener('inferencex:powerx:unlocked', handleUnlock);
+    window.addEventListener('inferencex:feature-gate:locked', handleLock);
+    window.addEventListener('inferencex:feature-gate:unlocked', handleUnlock);
     return () => {
-      window.removeEventListener('inferencex:powerx:locked', handleLock);
-      window.removeEventListener('inferencex:powerx:unlocked', handleUnlock);
+      window.removeEventListener('inferencex:feature-gate:locked', handleLock);
+      window.removeEventListener('inferencex:feature-gate:unlocked', handleUnlock);
     };
   }, []);
 
@@ -70,7 +70,7 @@ const TAB_LINKS = [
   { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },
   { href: '/calculator', label: 'TCO Calculator', testId: 'tab-trigger-calculator' },
   { href: '/gpu-specs', label: 'GPU Specs', testId: 'tab-trigger-gpu-specs' },
-  { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart' },
+  { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart', gated: true },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
   { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions', gated: true },
 ] as const;
