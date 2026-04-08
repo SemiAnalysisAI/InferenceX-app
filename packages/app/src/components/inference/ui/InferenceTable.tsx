@@ -102,12 +102,6 @@ export default function InferenceTable({
               <th className="text-right py-2 px-3 font-medium text-muted-foreground">
                 Median Interactivity (tok/s)
               </th>
-              <th
-                className="text-center py-2 px-3 font-medium text-muted-foreground"
-                title="Pareto optimal"
-              >
-                ★
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -115,14 +109,6 @@ export default function InferenceTable({
               const config = getHardwareConfig(point.hwKey);
               const gpuLabel = getDisplayLabel(config);
               const yValue = yPath ? getNestedYValue(point, yPath) : point.y;
-              const isRoofline = yPath
-                ? (() => {
-                    const parts = yPath.split('.');
-                    const obj = point[parts[0] as keyof InferenceData];
-                    return typeof obj === 'object' && obj !== null && 'roof' in obj && obj.roof;
-                  })()
-                : false;
-
               return (
                 <tr key={i} className="border-b border-border/50 hover:bg-muted/30">
                   <td className="py-2 px-3 font-medium whitespace-nowrap">{gpuLabel}</td>
@@ -140,7 +126,6 @@ export default function InferenceTable({
                   <td className="text-right py-2 px-3 tabular-nums">
                     {fmt(point.median_intvty ?? 0, 1)}
                   </td>
-                  <td className="text-center py-2 px-3">{isRoofline ? '★' : ''}</td>
                 </tr>
               );
             })}
