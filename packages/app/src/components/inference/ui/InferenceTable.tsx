@@ -1,28 +1,18 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useMemo } from 'react';
 
-import { track } from '@/lib/analytics';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
+import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue } from '@/lib/chart-utils';
 import { getDisplayLabel } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface InferenceTableProps {
   data: InferenceData[];
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
 }
-
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500] as const;
 
 /** Format a number for table display — picks sensible precision based on magnitude. */
 function fmt(value: number, decimals?: number): string {
@@ -38,15 +28,10 @@ export default function InferenceTable({
   chartDefinition,
   selectedYAxisMetric,
 }: InferenceTableProps) {
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(25);
-
-  // Resolve Y-axis config from chart definition
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const yLabel = chartDefinition[`${selectedYAxisMetric}_label` as keyof ChartDefinition] as string;
   const xLabel = chartDefinition.x_label;
 
-  // Sort by Y value — direction depends on roofline orientation
   const rooflineDir = chartDefinition[
     `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
   ] as string | undefined;
@@ -61,135 +46,60 @@ export default function InferenceTable({
     });
   }, [data, yPath, yAscending]);
 
-  // Reset to first page when data or page size changes
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, totalPages - 1);
-  const pageData = sorted.slice(safePage * pageSize, (safePage + 1) * pageSize);
-
-  if (sorted.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-8 text-center">
-        No data available for the current filters.
-      </p>
-    );
-  }
+  const columns = useMemo<DataTableColumn<InferenceData>[]>(
+    () => [
+      {
+        header: 'GPU',
+        cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey)),
+        className: 'font-medium whitespace-nowrap',
+      },
+      {
+        header: 'Precision',
+        cell: (row) => row.precision?.toUpperCase(),
+        className: 'whitespace-nowrap',
+      },
+      { header: 'TP', align: 'right', cell: (row) => row.tp, className: 'tabular-nums' },
+      { header: 'Conc', align: 'right', cell: (row) => row.conc, className: 'tabular-nums' },
+      {
+        header: yLabel,
+        align: 'right',
+        cell: (row) => fmt(yPath ? getNestedYValue(row, yPath) : row.y),
+        className: 'tabular-nums',
+      },
+      {
+        header: xLabel,
+        align: 'right',
+        cell: (row) => fmt(row.x),
+        className: 'tabular-nums',
+      },
+      {
+        header: 'Throughput/GPU (tok/s)',
+        align: 'right',
+        cell: (row) => fmt(row.tput_per_gpu ?? 0, 1),
+        className: 'tabular-nums',
+      },
+      {
+        header: 'Median TTFT (ms)',
+        align: 'right',
+        cell: (row) => fmt((row.median_ttft ?? 0) * 1000, 0),
+        className: 'tabular-nums',
+      },
+      {
+        header: 'Median Interactivity (tok/s)',
+        align: 'right',
+        cell: (row) => fmt(row.median_intvty ?? 0, 1),
+        className: 'tabular-nums',
+      },
+    ],
+    [yPath, yLabel, xLabel],
+  );
 
   return (
-    <div data-testid="inference-results-table">
-      <div className="overflow-x-auto relative">
-        {/* Watermark */}
-        <div
-          className="absolute inset-0 pointer-events-none flex items-center justify-center"
-          aria-hidden="true"
-        >
-          <img src="/brand/logo-color.webp" alt="" className="w-48 opacity-10" />
-        </div>
-        <table className="w-full text-sm relative">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 px-3 font-medium text-muted-foreground">GPU</th>
-              <th className="text-left py-2 px-3 font-medium text-muted-foreground">Precision</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">TP</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">Conc</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">{yLabel}</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">{xLabel}</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                Throughput/GPU (tok/s)
-              </th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                Median TTFT (ms)
-              </th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">
-                Median Interactivity (tok/s)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageData.map((point, i) => {
-              const config = getHardwareConfig(point.hwKey);
-              const gpuLabel = getDisplayLabel(config);
-              const yValue = yPath ? getNestedYValue(point, yPath) : point.y;
-              return (
-                <tr key={i} className="border-b border-border/50 hover:bg-muted/30">
-                  <td className="py-2 px-3 font-medium whitespace-nowrap">{gpuLabel}</td>
-                  <td className="py-2 px-3 whitespace-nowrap">{point.precision?.toUpperCase()}</td>
-                  <td className="text-right py-2 px-3 tabular-nums">{point.tp}</td>
-                  <td className="text-right py-2 px-3 tabular-nums">{point.conc}</td>
-                  <td className="text-right py-2 px-3 tabular-nums">{fmt(yValue)}</td>
-                  <td className="text-right py-2 px-3 tabular-nums">{fmt(point.x)}</td>
-                  <td className="text-right py-2 px-3 tabular-nums">
-                    {fmt(point.tput_per_gpu ?? 0, 1)}
-                  </td>
-                  <td className="text-right py-2 px-3 tabular-nums">
-                    {fmt((point.median_ttft ?? 0) * 1000, 0)}
-                  </td>
-                  <td className="text-right py-2 px-3 tabular-nums">
-                    {fmt(point.median_intvty ?? 0, 1)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination controls */}
-      <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span>
-            {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of{' '}
-            {sorted.length}
-          </span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(v) => {
-              const size = Number(v);
-              setPageSize(size);
-              setPage(0);
-              track('inference_table_page_size_changed', { size });
-            }}
-          >
-            <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs" aria-label="Rows per page">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span>per page</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => {
-              setPage((p) => Math.max(0, p - 1));
-              track('inference_table_page_changed', { direction: 'prev' });
-            }}
-            disabled={safePage === 0}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span>
-            {safePage + 1} / {totalPages}
-          </span>
-          <button
-            onClick={() => {
-              setPage((p) => Math.min(totalPages - 1, p + 1));
-              track('inference_table_page_changed', { direction: 'next' });
-            }}
-            disabled={safePage >= totalPages - 1}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Next page"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
+    <DataTable
+      data={sorted}
+      columns={columns}
+      testId="inference-results-table"
+      analyticsPrefix="inference_table"
+    />
   );
 }
