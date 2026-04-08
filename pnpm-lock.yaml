@@ -33,8 +33,8 @@ importers:
   packages/app:
     dependencies:
       '@chenglou/pretext':
-        specifier: ^0.0.4
-        version: 0.0.4
+        specifier: ^0.0.5
+        version: 0.0.5
       '@jpinsonneau/html-to-image':
         specifier: ^1.11.13
         version: 1.11.13
@@ -351,8 +351,8 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
-  '@chenglou/pretext@0.0.4':
-    resolution: {integrity: sha512-FnPAFMid1/p1j2V2gRPUVBarGUIb2PhkkC9YNnTOfPtTDgHKh8siO8PP9pCxpFfYlcodWPJpE1UbSHGQqt8pQQ==}
+  '@chenglou/pretext@0.0.5':
+    resolution: {integrity: sha512-A8GZN10REdFGsyuiUgLV8jjPDDFMg5GmgxGWV0I3igxBOnzj+jgz2VMmVD7g+SFyoctfeqHFxbNatKSzVRWtRg==}
 
   '@csstools/color-helpers@6.0.2':
     resolution: {integrity: sha512-LMGQLS9EuADloEFkcTBR3BwV/CGHV7zyDxVRtVDTwdI2Ca4it0CCVTT9wCkxSgokjE5Ho41hEPgb8OEUwoXr6Q==}
@@ -2537,6 +2537,11 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  baseline-browser-mapping@2.10.16:
+    resolution: {integrity: sha512-Lyf3aK28zpsD1yQMiiHD4RvVb6UdMoo8xzG2XzFIfR9luPzOpcBlAsT/qfB1XWS1bxWT+UtE4WmQgsp297FYOA==}
+    engines: {node: '>=6.0.0'}
+    hasBin: true
+
   bcrypt-pbkdf@1.0.2:
     resolution: {integrity: sha512-qeFIXtP4MSoi6NLqO12WfqARWWuCKi2Rn/9hJLEmtB5yTNr9DqFWkJRCf2qShWzPeAMRnOgCrq0sg/KLv5ES9w==}
 
@@ -2589,6 +2594,9 @@ packages:
 
   caniuse-lite@1.0.30001785:
     resolution: {integrity: sha512-blhOL/WNR+Km1RI/LCVAvA73xplXA7ZbjzI4YkMK9pa6T/P3F2GxjNpEkyw5repTw9IvkyrjyHpwjnhZ5FOvYQ==}
+
+  caniuse-lite@1.0.30001787:
+    resolution: {integrity: sha512-mNcrMN9KeI68u7muanUpEejSLghOKlVhRqS/Za2IeyGllJ9I9otGpR9g3nsw7n4W378TE/LyIteA0+/FOZm4Kg==}
 
   caseless@0.12.0:
     resolution: {integrity: sha512-4tYFyifaFfGacoiObjJegolkwSU4xQNGbVgUiNYVUxbQ2x2lUsFvY4hVgVzGiIe6WLOPqycWXA40l+PWsxthUw==}
@@ -2980,8 +2988,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  electron-to-chromium@1.5.332:
-    resolution: {integrity: sha512-7OOtytmh/rINMLwaFTbcMVvYXO3AUm029X0LcyfYk0B557RlPkdpTpnH9+htMlfu5dKwOmT0+Zs2Aw+lnn6TeQ==}
+  electron-to-chromium@1.5.334:
+    resolution: {integrity: sha512-mgjZAz7Jyx1SRCwEpy9wefDS7GvNPazLthHg8eQMJ76wBdGQQDW33TCrUTvQ4wzpmOrv2zrFoD3oNufMdyMpog==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -4113,6 +4121,10 @@ packages:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postcss@8.5.9:
+    resolution: {integrity: sha512-7a70Nsot+EMX9fFU3064K/kdHWZqGVY+BADLyXc8Dfv+mTLLVl6JzJpPaCZ2kQL9gIJvKXSLMHhqdRRjwQeFtw==}
+    engines: {node: ^10 || ^12 || >=14}
+
   postgres-array@2.0.0:
     resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
     engines: {node: '>=4'}
@@ -4520,6 +4532,10 @@ packages:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
     engines: {node: '>=6'}
 
+  tapable@2.3.2:
+    resolution: {integrity: sha512-1MOpMXuhGzGL5TTCZFItxCc0AARf1EZFQkGqMm7ERKj8+Hgr5oLvJOVFcC+lRmR8hCe2S3jC4T5D7Vg/d7/fhA==}
+    engines: {node: '>=6'}
+
   terser-webpack-plugin@5.4.0:
     resolution: {integrity: sha512-Bn5vxm48flOIfkdl5CaD2+1CiUVbonWQ3KQPyP7/EuIl9Gbzq/gQFOzaMFUEgVjB1396tcK0SG8XcNJ/2kDH8g==}
     engines: {node: '>= 10.13.0'}
@@ -4563,6 +4579,10 @@ packages:
 
   tinyglobby@0.2.15:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
+
+  tinyglobby@0.2.16:
+    resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
 
   tinypool@2.1.0:
@@ -4998,7 +5018,7 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@chenglou/pretext@0.0.4': {}
+  '@chenglou/pretext@0.0.5': {}
 
   '@csstools/color-helpers@6.0.2': {}
 
@@ -6810,6 +6830,8 @@ snapshots:
 
   baseline-browser-mapping@2.10.15: {}
 
+  baseline-browser-mapping@2.10.16: {}
+
   bcrypt-pbkdf@1.0.2:
     dependencies:
       tweetnacl: 0.14.5
@@ -6842,9 +6864,9 @@ snapshots:
 
   browserslist@4.28.2:
     dependencies:
-      baseline-browser-mapping: 2.10.15
-      caniuse-lite: 1.0.30001785
-      electron-to-chromium: 1.5.332
+      baseline-browser-mapping: 2.10.16
+      caniuse-lite: 1.0.30001787
+      electron-to-chromium: 1.5.334
       node-releases: 2.0.37
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
 
@@ -6872,6 +6894,8 @@ snapshots:
       get-intrinsic: 1.3.0
 
   caniuse-lite@1.0.30001785: {}
+
+  caniuse-lite@1.0.30001787: {}
 
   caseless@0.12.0: {}
 
@@ -7290,7 +7314,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  electron-to-chromium@1.5.332: {}
+  electron-to-chromium@1.5.334: {}
 
   emoji-regex@8.0.0: {}
 
@@ -8777,6 +8801,12 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  postcss@8.5.9:
+    dependencies:
+      nanoid: 3.3.11
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
   postgres-array@2.0.0: {}
 
   postgres-bytea@1.0.1: {}
@@ -9304,6 +9334,8 @@ snapshots:
 
   tapable@2.3.0: {}
 
+  tapable@2.3.2: {}
+
   terser-webpack-plugin@5.4.0(esbuild@0.28.0)(webpack@5.105.4(esbuild@0.28.0)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -9336,6 +9368,11 @@ snapshots:
   tinyexec@1.0.4: {}
 
   tinyglobby@0.2.15:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
+
+  tinyglobby@0.2.16:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
@@ -9527,9 +9564,9 @@ snapshots:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.8
+      postcss: 8.5.9
       rollup: 4.60.1
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.5.2
       fsevents: 2.3.3
@@ -9613,7 +9650,7 @@ snapshots:
       mime-types: 2.1.35
       neo-async: 2.6.2
       schema-utils: 4.3.3
-      tapable: 2.3.0
+      tapable: 2.3.2
       terser-webpack-plugin: 5.4.0(esbuild@0.28.0)(webpack@5.105.4(esbuild@0.28.0))
       watchpack: 2.5.1
       webpack-sources: 3.3.4
