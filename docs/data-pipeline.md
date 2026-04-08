@@ -75,7 +75,7 @@ API returns flat `BenchmarkRow[]`. Charts need `InferenceData[]` with:
 
 This transform runs client-side because:
 
-1. It depends on HARDWARE_CONFIG (frontend constant with colors, costs, power)
+1. It depends on HW_REGISTRY (shared constants with vendor, arch, costs, power)
 2. Different chart types need different x/y metric extractions
 3. Roofline computation depends on the user's selected metric direction
 
@@ -113,7 +113,7 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 
 1. Lowercase and **strip runner index suffix** with `/_\d+$/` (e.g. `mi355x_0` → `mi355x`).
 2. **Strip known framework/config suffixes** in a fixed order: `-trt`, `-multinode-slurm`, `-multinode`, `-nvs`, `-disagg`, `-amds`, `-amd`, `-nvd`, `-dgxc`, `-nb`, `-nv`. The order matters — longer suffixes (`-multinode-slurm`) are matched before their substrings (`-multinode`, `-slurm`).
-3. **Validate against `GPU_KEYS`** (the canonical set from `@semianalysisai/inferencex-constants`).
+3. **Validate against `HW_REGISTRY`** (the canonical GPU registry from `@semianalysisai/inferencex-constants`).
 4. **Return null** if the stripped base is not in the set. The raw value is added to `tracker.unmappedHws`.
 
 ### Framework Normalization

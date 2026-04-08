@@ -86,4 +86,4 @@ This relabeling is scoped to `useChartData` in the inference tab. Evaluation, re
 
 **Bug pattern**: Custom user cost for H100 doesn't apply to H100-TRT variant.
 
-`getGpuSpecs(hwKey)` strips framework suffixes from the hwKey to look up the base GPU entry in `GPU_SPECS`. User-provided cost and power overrides must therefore be keyed by the base GPU name (e.g. `h100`), not the full hwKey (e.g. `h100-trt`). If overrides are stored or applied against the full hwKey, variants that share the same physical GPU won't inherit the override because the base lookup finds the unmodified default entry.
+`getGpuSpecs(hwKey)` strips framework suffixes from the hwKey to look up the base GPU entry in `HW_REGISTRY`. User-provided cost and power overrides must therefore be keyed by the base GPU name (e.g. `h100`), not the full hwKey (e.g. `h100-trt`). If overrides are stored or applied against the full hwKey, variants that share the same physical GPU won't inherit the override because the base lookup finds the unmodified default entry.
