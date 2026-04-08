@@ -170,11 +170,12 @@ export default function InferenceTable({
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <SelectItem key={size} value={String(size)}>
-                  {size} / page
+                  {size}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <span>per page</span>
         </div>
         <div className="flex items-center gap-1">
           <button
