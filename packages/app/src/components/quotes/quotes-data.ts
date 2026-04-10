@@ -91,9 +91,9 @@ export const QUOTES: Quote[] = [
   {
     text: 'The benchmark is good sir',
     name: 'Michael Goin',
-    title: 'vLLM Maintainer',
-    org: 'vLLM',
-    logo: 'vllm.svg',
+    title: 'vLLM Core Maintainer & Senior Principal Engineer at Red Hat',
+    org: 'Red Hat',
+    logo: 'redhat.svg',
     link: 'https://www.linkedin.com/in/michael-goin/',
   },
   {
@@ -341,6 +341,7 @@ export const CAROUSEL_ORGS = [
   'UC Berkeley',
   'Lambda',
   'UC San Diego',
+  'Red Hat',
 ] as const;
 
 /** Display label overrides for carousel orgs. */
