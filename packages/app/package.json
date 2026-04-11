@@ -53,7 +53,7 @@
     "iwanthue": "^2.0.0",
     "lodash-es": "^4.18.1",
     "lucide-react": "^1.7.0",
-    "next": "16.2.2",
+    "next": "16.2.3",
     "next-mdx-remote": "^6.0.0",
     "next-themes": "^0.4.6",
     "posthog-js": "^1.365.1",
