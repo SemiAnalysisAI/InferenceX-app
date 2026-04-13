@@ -49,29 +49,15 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 /**
- * Layout group for a path. Next.js soft navigation breaks when crossing
- * layout boundaries, so we use plain <a> tags for those transitions.
- */
-function layoutGroup(path: string): 'dashboard' | 'blog' | 'root' {
-  if (DASHBOARD_TABS.some((tab) => path.startsWith(tab))) return 'dashboard';
-  if (path.startsWith('/blog')) return 'blog';
-  return 'root';
-}
-
-/**
- * Use Next.js Link for same-layout-group navigation (soft nav),
- * plain <a> when crossing layout boundaries (full page nav)
- * to work around Next.js soft navigation bugs between route groups.
+ * Always use Next.js Link for client-side navigation so the root layout
+ * (and its persistent state like the Minecraft music player) stays mounted.
  */
 function NavLink({
   href,
-  currentPath,
+  currentPath: _currentPath,
   ...props
 }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; currentPath: string }) {
-  if (layoutGroup(currentPath) === layoutGroup(href)) {
-    return <Link href={href} {...props} />;
-  }
-  return <a href={href} {...props} />;
+  return <Link href={href} {...props} />;
 }
 
 export const Header = ({ starCount }: { starCount?: number | null }) => {
