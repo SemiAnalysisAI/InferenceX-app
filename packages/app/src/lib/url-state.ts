@@ -118,11 +118,59 @@ if (typeof window !== 'undefined') {
     const s = sp.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${s ? `?${s}` : ''}`);
   }, 0);
+
+  // Intercept pushState so client-side navigations (e.g. Next.js <Link>)
+  // read, clear, and broadcast any share-link params in the new URL.
+  if (typeof history !== 'undefined' && history.pushState) {
+    const origPushState = history.pushState.bind(history);
+    history.pushState = (...args: Parameters<typeof history.pushState>) => {
+      origPushState(...args);
+      // Defer so the event fires after Next.js's useInsertionEffect completes
+      setTimeout(() => {
+        const fresh = refreshUrlParams();
+        if (Object.keys(fresh).length > 0) {
+          window.dispatchEvent(new CustomEvent('urlparamschange', { detail: fresh }));
+        }
+      }, 0);
+    };
+  }
 }
 
 /** Returns the share-link params that were in the URL at page load. */
 export function readUrlParams(): UrlStateParams {
   return _initialParams;
+}
+
+/**
+ * Re-read share-link params from the current URL, update internal state,
+ * clear them from the URL bar, and return the fresh params.
+ * Use this to pick up params from client-side navigations.
+ */
+export function refreshUrlParams(): UrlStateParams {
+  if (typeof window === 'undefined') return {};
+  const searchParams = new URLSearchParams(window.location.search);
+  const fresh: UrlStateParams = {};
+  let found = false;
+  for (const key of URL_STATE_KEYS) {
+    const value = searchParams.get(key);
+    if (value !== null) {
+      fresh[key] = value;
+      currentState[key] = value;
+      found = true;
+    }
+  }
+  if (!found) return {};
+
+  // Update cached initial params so getUrlParam() returns fresh values
+  Object.assign(_initialParams, fresh);
+
+  // Clear share-link params from URL
+  const sp = new URLSearchParams(window.location.search);
+  for (const key of URL_STATE_KEYS) sp.delete(key);
+  const s = sp.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${s ? `?${s}` : ''}`);
+
+  return fresh;
 }
 
 /** Check whether the current URL has any share-link params. */

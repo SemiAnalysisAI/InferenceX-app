@@ -465,9 +465,15 @@ export function InferenceProvider({
   // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
   // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
   const precisionsKey = effectivePrecisions.join(',');
+  const needsHwResetRef = useRef(false);
   useEffect(() => {
+    needsHwResetRef.current = true;
+  }, [selectedModel, effectiveSequence, precisionsKey]);
+  useEffect(() => {
+    if (!needsHwResetRef.current) return;
     if (pendingHwFilterRef.current) return;
     if (hwTypesWithData.size === 0) return;
+    needsHwResetRef.current = false;
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
       const filterSet = new Set(presetFilter);
@@ -478,7 +484,12 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey]);
+  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData]);
+
+  // Reset selected GPUs when model changes (comparison configs are model-specific)
+  useEffect(() => {
+    setSelectedGPUs((prev) => (prev.length > 0 ? [] : prev));
+  }, [selectedModel]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {

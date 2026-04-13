@@ -1,18 +1,19 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   type UrlStateKey,
   type UrlStateParams,
   readUrlParams,
+  refreshUrlParams,
   writeUrlParams,
 } from '@/lib/url-state';
 
 /**
  * React hook for URL state synchronization.
- * Reads URL params once on mount (cached in ref), and provides
- * functions to write params back to the URL.
+ * Reads URL params on mount and on client-side navigations (pushState / popstate),
+ * clears them from the URL bar, and exposes fresh values via `latestParams`.
  */
 export function useUrlState() {
   const initialParams = useRef<UrlStateParams | null>(null);
@@ -21,6 +22,33 @@ export function useUrlState() {
   if (initialParams.current === null) {
     initialParams.current = readUrlParams();
   }
+
+  const [latestParams, setLatestParams] = useState<UrlStateParams>(initialParams.current);
+
+  useEffect(() => {
+    // pushState handler: params already read & cleared centrally, just apply the result
+    const pushHandler = (e: Event) => {
+      const fresh = (e as CustomEvent<UrlStateParams>).detail;
+      if (fresh && Object.keys(fresh).length > 0) {
+        initialParams.current = { ...initialParams.current, ...fresh };
+        setLatestParams((prev) => ({ ...prev, ...fresh }));
+      }
+    };
+    // popstate handler: browser back/forward — need to read & clear ourselves
+    const popHandler = () => {
+      const fresh = refreshUrlParams();
+      if (Object.keys(fresh).length > 0) {
+        initialParams.current = { ...initialParams.current, ...fresh };
+        setLatestParams((prev) => ({ ...prev, ...fresh }));
+      }
+    };
+    window.addEventListener('urlparamschange', pushHandler);
+    window.addEventListener('popstate', popHandler);
+    return () => {
+      window.removeEventListener('urlparamschange', pushHandler);
+      window.removeEventListener('popstate', popHandler);
+    };
+  }, []);
 
   const hasUrlParam = useCallback((key: UrlStateKey): boolean => {
     const value = initialParams.current?.[key];
@@ -42,6 +70,7 @@ export function useUrlState() {
 
   return {
     initialParams: initialParams.current,
+    latestParams,
     hasUrlParam,
     getUrlParam,
     setUrlParam,

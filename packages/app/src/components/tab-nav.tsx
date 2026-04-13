@@ -103,8 +103,7 @@ export function TabNav() {
   return (
     <>
       {/* Mobile: Dropdown */}
-      <div className="lg:hidden mb-4">
-        <div className="w-full pb-6" />
+      <div className="lg:hidden">
         <Card>
           <div className="space-y-2">
             <Label htmlFor="chart-select">Select Chart</Label>
@@ -129,7 +128,7 @@ export function TabNav() {
       </div>
 
       {/* Desktop: Nav links */}
-      <div className="hidden lg:flex flex-col mb-4">
+      <div className="hidden lg:flex flex-col">
         <Card className="overflow-x-auto py-6 md:py-6">
           <nav
             data-testid="chart-section-tabs"

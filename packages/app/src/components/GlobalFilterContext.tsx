@@ -108,7 +108,7 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
 }
 
 export function GlobalFilterProvider({ children }: { children: ReactNode }) {
-  const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
+  const { hasUrlParam, getUrlParam, setUrlParams, latestParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<Model>(() => {
@@ -144,6 +144,38 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   const [selectedRunDateRev, setSelectedRunDateRev] = useState(0);
 
   const [selectedRunId, setSelectedRunId] = useState<string>(() => getUrlParam('g_runid') || '');
+
+  // When true, keep the user's date if available; otherwise always use latest
+  const userPickedDateRef = useRef(Boolean(getUrlParam('g_rundate')));
+
+  // ── Apply URL params from client-side navigations (e.g. banner clicks) ───
+  const appliedParamsRef = useRef(latestParams);
+  useEffect(() => {
+    if (latestParams === appliedParamsRef.current) return;
+    appliedParamsRef.current = latestParams;
+
+    const model = latestParams.g_model;
+    if (model && Object.values(Model).includes(model as Model)) {
+      setSelectedModel(model as Model);
+    }
+    const seq = latestParams.i_seq;
+    if (seq && Object.values(Sequence).includes(seq as Sequence)) {
+      setSelectedSequence(seq as Sequence);
+    }
+    const prec = latestParams.i_prec;
+    if (prec) {
+      const precs = prec.split(',').filter((p) => PRECISION_OPTIONS.includes(p as Precision));
+      if (precs.length > 0) setSelectedPrecisions(precs);
+    }
+    const runDate = latestParams.g_rundate;
+    if (runDate) {
+      userPickedDateRef.current = true;
+      setSelectedRunDateBase(runDate);
+      setSelectedRunDateRev((v) => v + 1);
+    }
+    const runId = latestParams.g_runid;
+    if (runId) setSelectedRunId(runId);
+  }, [latestParams, setSelectedPrecisions]);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
@@ -212,9 +244,6 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     }
     return [...new Set(rows.map((r) => r.date))].toSorted();
   }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
-
-  // When true, keep the user's date if available; otherwise always use latest
-  const userPickedDateRef = useRef(Boolean(getUrlParam('g_rundate')));
 
   const setSelectedRunDateManual = useCallback((date: string) => {
     userPickedDateRef.current = true;
