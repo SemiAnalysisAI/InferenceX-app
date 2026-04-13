@@ -48,6 +48,7 @@ export function renderAxes(
     const bandAxisGen = d3
       .axisLeft(yScale as d3.ScaleBand<string>)
       .tickSize(yTickSize ?? 0) as unknown as d3.Axis<d3.AxisDomain>;
+    if (yTickFormat) bandAxisGen.tickFormat(yTickFormat as any);
     const yBandTarget = dur > 0 ? layout.yAxisGroup.transition().duration(dur) : layout.yAxisGroup;
     (yBandTarget as any).call(bandAxisGen as any);
   } else {

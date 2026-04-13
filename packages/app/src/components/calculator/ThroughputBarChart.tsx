@@ -508,9 +508,15 @@ export default function ThroughputBarChart({
     [hardwareConfig, mode, barMetric, costType, runUrl],
   );
 
-  // ── Y axis customize: two-line GPU labels ──
+  // ── Y axis customize: map resultKey → display label, then split into two-line GPU labels ──
 
-  const yAxisConfig = useMemo(() => ({ customize: twoRowYAxisLabels({ split: 'parens' }) }), []);
+  const yAxisConfig = useMemo(() => {
+    const labelMap = new Map(sortedResults.map((r) => [r.resultKey, getLabel(r, hardwareConfig)]));
+    return {
+      tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
+      customize: twoRowYAxisLabels({ split: 'parens' }),
+    };
+  }, [sortedResults, hardwareConfig]);
 
   const xAxisConfig = useMemo(() => ({ tickCount: 6 }), []);
 
