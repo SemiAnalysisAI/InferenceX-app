@@ -136,6 +136,7 @@ export default function ChartDisplay() {
     clearTrackedConfigs,
     logScale,
     activeHwTypes,
+    activeDates,
     setSelectedE2eXAxisMetric,
   } = useInference();
 
@@ -296,10 +297,15 @@ export default function ChartDisplay() {
                 setIsLegendExpanded={setIsLegendExpanded}
                 exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                 onExportCsv={() => {
-                  const visibleData = graph.data.filter(
-                    (d) =>
-                      activeHwTypes.has(d.hwKey as string) &&
-                      selectedPrecisions.includes(d.precision),
+                  const isTimeline =
+                    selectedDateRange.startDate &&
+                    selectedDateRange.endDate &&
+                    selectedGPUs.length > 0;
+                  const visibleData = graph.data.filter((d) =>
+                    isTimeline
+                      ? activeDates.has(`${d.date}_${d.hwKey}`)
+                      : activeHwTypes.has(d.hwKey as string) &&
+                        selectedPrecisions.includes(d.precision),
                   );
                   const { headers, rows } = inferenceChartToCsv(
                     visibleData,
