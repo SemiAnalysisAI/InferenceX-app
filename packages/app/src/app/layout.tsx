@@ -174,11 +174,6 @@ export default async function RootLayout({
         <link rel="preload" as="image" href="/brand/left-pattern-full.svg" fetchPriority="high" />
         <link rel="preconnect" href="https://us-assets.i.posthog.com" />
         <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var t=localStorage.getItem('theme');if(t==='minecraft'){document.documentElement.classList.add('minecraft')}})()`,
-          }}
-        />
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <CircuitBackground />
