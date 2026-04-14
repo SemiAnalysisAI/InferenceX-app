@@ -2,12 +2,13 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
+import { navigateInApp } from '@/lib/client-navigation';
 import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
@@ -50,6 +51,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export const Header = ({ starCount }: { starCount?: number | null }) => {
   const pathname = usePathname() ?? '/';
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -118,7 +120,10 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                     ? 'text-brand bg-brand/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                 )}
-                onClick={() => track(event)}
+                onClick={(e) => {
+                  track(event);
+                  if (href === '/inference') navigateInApp(e, router, href);
+                }}
               >
                 {label}
               </Link>
@@ -168,7 +173,10 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                           ? 'text-brand bg-brand/10'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                       )}
-                      onClick={() => track(event)}
+                      onClick={(e) => {
+                        track(event);
+                        if (href === '/inference') navigateInApp(e, router, href);
+                      }}
                     >
                       {label}
                     </Link>

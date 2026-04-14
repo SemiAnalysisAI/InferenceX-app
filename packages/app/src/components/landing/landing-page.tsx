@@ -2,6 +2,7 @@
 
 import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { Card } from '@/components/ui/card';
@@ -10,8 +11,11 @@ import { IntroSection } from '@/components/intro-section';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { track } from '@/lib/analytics';
+import { navigateInApp } from '@/lib/client-navigation';
 
 export function LandingPage() {
+  const router = useRouter();
+
   useEffect(() => {
     track('landing_page_viewed');
   }, []);
@@ -41,7 +45,10 @@ export function LandingPage() {
             <div className="mt-auto">
               <Link
                 href="/inference"
-                onClick={() => track('landing_full_dashboard_clicked')}
+                onClick={(e) => {
+                  track('landing_full_dashboard_clicked');
+                  navigateInApp(e, router, '/inference');
+                }}
                 className="inline-flex items-center justify-center gap-2 rounded-md text-sm sm:text-base font-medium h-12 px-8 bg-brand text-primary-foreground hover:bg-brand/90 transition-colors"
               >
                 Open Dashboard
