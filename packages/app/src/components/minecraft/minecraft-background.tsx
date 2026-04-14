@@ -25,10 +25,12 @@ if (typeof document !== 'undefined') {
 }
 
 /** Song start timestamps (in seconds) within the Minecraft OST compilation video. */
+const MINECRAFT_OST_VIDEO_ID = 'bIOiV4d1SVI';
+
 const SONGS = [
   { name: 'Subwoofer Lullaby', start: 0 },
   { name: 'Living Mice', start: 207 },
-  { name: 'Haggstrom', start: 370 },
+  { name: 'Haggstorm', start: 370 },
   { name: 'Minecraft', start: 572 },
   { name: 'Mice on Venus', start: 817 },
   { name: 'Dry Hands', start: 1099 },
@@ -37,6 +39,23 @@ const SONGS = [
   { name: 'Sweden', start: 1418 },
   { name: 'Danny', start: 1631 },
 ];
+
+function getInitialMusicStart(): number {
+  try {
+    const raw = sessionStorage.getItem('minecraft-music-pos');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Date.now() - parsed.ts < 30_000 && typeof parsed.time === 'number' && parsed.time > 0) {
+        return Math.floor(parsed.time);
+      }
+    }
+  } catch {
+    /* ignore parse errors */
+  }
+
+  const song = SONGS[Math.floor(Math.random() * SONGS.length)];
+  return song.start;
+}
 
 /**
  * Renders the floating 3D Minecraft blocks background, plays
@@ -198,49 +217,30 @@ export function MinecraftBackground() {
       wrapperRef.current.append(el);
 
       let started = false;
+      const startSeconds = getInitialMusicStart();
+
       function nudge() {
         if (started) return;
         playerRef.current?.playVideo();
       }
       nudgeRef.current = nudge;
-      function onStarted(player: YT.Player) {
+      function onStarted() {
         started = true;
         document.removeEventListener('pointerdown', nudge, true);
         document.removeEventListener('keydown', nudge, true);
         nudgeRef.current = null;
-
-        // Resume from saved position if recent (< 30s ago), otherwise pick a random song
-        let resumeTime: number | null = null;
-        try {
-          const raw = sessionStorage.getItem('minecraft-music-pos');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Date.now() - parsed.ts < 30_000 && typeof parsed.time === 'number') {
-              resumeTime = parsed.time;
-            }
-          }
-        } catch {
-          /* ignore parse errors */
-        }
-
-        if (resumeTime !== null && resumeTime > 0) {
-          player.seekTo(resumeTime, true);
-        } else {
-          // Fresh session — seek to the start of a random song
-          const song = SONGS[Math.floor(Math.random() * SONGS.length)];
-          player.seekTo(song.start, true);
-        }
       }
 
       try {
         playerRef.current = new YT.Player(el, {
           height: '1',
           width: '1',
+          videoId: MINECRAFT_OST_VIDEO_ID,
           playerVars: {
-            list: 'RDbIOiV4d1SVI',
-            listType: 'playlist',
             autoplay: 1,
             loop: 1,
+            playlist: MINECRAFT_OST_VIDEO_ID,
+            start: startSeconds,
             controls: 0,
             disablekb: 1,
             modestbranding: 1,
@@ -270,8 +270,8 @@ export function MinecraftBackground() {
             },
             onStateChange: (e: YT.PlayerEvent & { data: number }) => {
               // YT.PlayerState.PLAYING === 1
-              if (e.data === 1 && !started) onStarted(e.target);
-              // YT.PlayerState.ENDED === 0 — loop the playlist
+              if (e.data === 1 && !started) onStarted();
+              // YT.PlayerState.ENDED === 0 — loop the single allowed video
               if (e.data === 0) e.target.playVideo();
             },
           },
@@ -311,12 +311,8 @@ export function MinecraftBackground() {
       if (player) {
         try {
           const time = player.getCurrentTime();
-          const index = player.getPlaylistIndex();
           if (time > 0) {
-            sessionStorage.setItem(
-              'minecraft-music-pos',
-              JSON.stringify({ time, index, ts: Date.now() }),
-            );
+            sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
           }
         } catch {
           /* ignore */
