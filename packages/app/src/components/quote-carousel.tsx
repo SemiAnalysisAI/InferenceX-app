@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -205,13 +206,13 @@ export function QuoteCarousel({
 
       {moreHref && (
         <div className="flex justify-end">
-          <a
+          <Link
             href={moreHref}
             className="text-xs font-bold text-brand hover:underline"
             onClick={() => track('quote_carousel_see_more_clicked')}
           >
             See more supporters &rarr;
-          </a>
+          </Link>
         </div>
       )}
     </div>
