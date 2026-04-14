@@ -2001,7 +2001,13 @@ export default function ModelArchitectureDiagram({
 
   useEffect(() => {
     if (isExpanded && svgRef.current && arch) {
-      renderDiagram(svgRef.current, arch, resolvedTheme === 'dark', expandedBlocks, toggleBlock);
+      renderDiagram(
+        svgRef.current,
+        arch,
+        resolvedTheme === 'dark' || resolvedTheme === 'minecraft',
+        expandedBlocks,
+        toggleBlock,
+      );
     }
   }, [isExpanded, arch, resolvedTheme, model, expandedBlocks, toggleBlock]);
 
@@ -2010,7 +2016,13 @@ export default function ModelArchitectureDiagram({
 
     const observer = new ResizeObserver(() => {
       if (svgRef.current && arch) {
-        renderDiagram(svgRef.current, arch, resolvedTheme === 'dark', expandedBlocks, toggleBlock);
+        renderDiagram(
+          svgRef.current,
+          arch,
+          resolvedTheme === 'dark' || resolvedTheme === 'minecraft',
+          expandedBlocks,
+          toggleBlock,
+        );
       }
     });
 

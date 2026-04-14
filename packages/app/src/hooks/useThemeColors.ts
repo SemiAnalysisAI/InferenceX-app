@@ -91,7 +91,7 @@ export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsRe
   // generate dynamic vendor-aware colors for active keys
   const vendorColorMap = useMemo(() => {
     if (!activeKeys || activeKeys.length === 0) return null;
-    const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+    const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
     return generateVendorColors(activeKeys, theme);
   }, [activeKeys, resolvedTheme]);
 
