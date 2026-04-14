@@ -61,7 +61,7 @@ export const generateHighContrastColors = (
   if (keys.length === 0) return {};
 
   const colors: Record<string, string> = {};
-  const [lmin, lmax] = theme === 'dark' ? [50, 100] : [30, 65];
+  const [lmin, lmax] = theme === 'dark' || theme === 'minecraft' ? [50, 100] : [30, 65];
 
   // Group keys by vendor
   const groups = new Map<Vendor, string[]>();

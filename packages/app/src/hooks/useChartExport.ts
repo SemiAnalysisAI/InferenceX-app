@@ -141,7 +141,9 @@ function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
 
       // Draw watermark bar
       const isDark =
-        document.documentElement.classList.contains('dark') || bgColor.includes('0 0%');
+        document.documentElement.classList.contains('dark') ||
+        document.documentElement.classList.contains('minecraft') ||
+        bgColor.includes('0 0%');
       ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
       ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
 
