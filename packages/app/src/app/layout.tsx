@@ -10,7 +10,7 @@ import localFont from 'next/font/local';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { CircuitBackground } from '@/components/circuit-background';
-import { MinecraftBackground } from '@/components/minecraft/minecraft-background';
+import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -177,7 +177,7 @@ export default async function RootLayout({
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <CircuitBackground />
-        <MinecraftBackground />
+        <MinecraftBackgroundLazy />
         <PostHogProvider>
           <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
           <QueryProvider>

@@ -51,16 +51,18 @@ export function MinecraftBackground() {
   // Preload the click sound into an AudioBuffer for instant playback
   useEffect(() => {
     if (!isMinecraft) return;
+    let cancelled = false;
     const ctx = new AudioContext();
     audioCtxRef.current = ctx;
     fetch('/minecraft-click.mp3')
       .then((r) => r.arrayBuffer())
       .then((buf) => ctx.decodeAudioData(buf))
       .then((decoded) => {
-        bufferRef.current = decoded;
+        if (!cancelled) bufferRef.current = decoded;
       })
       .catch(() => {});
     return () => {
+      cancelled = true;
       ctx.close();
       audioCtxRef.current = null;
       bufferRef.current = null;
@@ -91,6 +93,7 @@ export function MinecraftBackground() {
   const [musicEnabled, setMusicEnabled] = useState(false);
   const playerRef = useRef<YT.Player | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const nudgeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     function check() {
@@ -180,10 +183,12 @@ export function MinecraftBackground() {
         if (started) return;
         playerRef.current?.playVideo();
       }
+      nudgeRef.current = nudge;
       function onStarted(player: YT.Player) {
         started = true;
-        document.removeEventListener('pointerdown', nudge);
-        document.removeEventListener('keydown', nudge);
+        document.removeEventListener('pointerdown', nudge, true);
+        document.removeEventListener('keydown', nudge, true);
+        nudgeRef.current = null;
 
         // Resume from saved position if recent (< 30s ago), otherwise random
         let savedPos: { time: number; index: number; ts: number } | null = null;
@@ -224,43 +229,49 @@ export function MinecraftBackground() {
         }
       }
 
-      playerRef.current = new YT.Player(el, {
-        height: '1',
-        width: '1',
-        playerVars: {
-          list: 'RDbIOiV4d1SVI',
-          listType: 'playlist',
-          autoplay: 1,
-          loop: 1,
-          controls: 0,
-          disablekb: 1,
-          modestbranding: 1,
-        },
-        events: {
-          onReady: (e: YT.PlayerEvent) => {
-            e.target.setVolume(30);
-            e.target.playVideo();
-            // Browsers block autoplay without a prior user gesture.
-            // Keep retrying on every interaction until the player
-            // actually starts (onStateChange fires PLAYING).
-            document.addEventListener('pointerdown', nudge, true);
-            document.addEventListener('keydown', nudge, true);
+      try {
+        playerRef.current = new YT.Player(el, {
+          height: '1',
+          width: '1',
+          playerVars: {
+            list: 'RDbIOiV4d1SVI',
+            listType: 'playlist',
+            autoplay: 1,
+            loop: 1,
+            controls: 0,
+            disablekb: 1,
+            modestbranding: 1,
           },
-          onStateChange: (e: YT.PlayerEvent & { data: number }) => {
-            // YT.PlayerState.PLAYING === 1
-            if (e.data === 1 && !started) onStarted(e.target);
-            // YT.PlayerState.ENDED === 0 — loop the playlist
-            if (e.data === 0) e.target.playVideo();
+          events: {
+            onReady: (e: YT.PlayerEvent) => {
+              e.target.setVolume(30);
+              e.target.playVideo();
+              // Browsers block autoplay without a prior user gesture.
+              // Keep retrying on every interaction until the player
+              // actually starts (onStateChange fires PLAYING).
+              document.addEventListener('pointerdown', nudge, true);
+              document.addEventListener('keydown', nudge, true);
+            },
+            onStateChange: (e: YT.PlayerEvent & { data: number }) => {
+              // YT.PlayerState.PLAYING === 1
+              if (e.data === 1 && !started) onStarted(e.target);
+              // YT.PlayerState.ENDED === 0 — loop the playlist
+              if (e.data === 0) e.target.playVideo();
+            },
           },
-        },
-      });
+        });
+      } catch {
+        // YouTube API failed (blocked by firewall/ad-blocker) — degrade silently
+      }
     }
 
     // YT API might already be loaded
-    if (typeof YT !== 'undefined' && YT.Player) {
+    let installedCallback = false;
+    if (typeof YT !== 'undefined' && typeof YT.Player === 'function') {
       createPlayer();
     } else {
       // Wait for the API to load
+      installedCallback = true;
       const prev = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
         prev?.();
@@ -269,6 +280,16 @@ export function MinecraftBackground() {
     }
 
     return () => {
+      // Restore global callback to prevent stale closure chain growth
+      if (installedCallback) {
+        window.onYouTubeIframeAPIReady = undefined;
+      }
+      // Clean up nudge listeners if playback never started
+      if (nudgeRef.current) {
+        document.removeEventListener('pointerdown', nudgeRef.current, true);
+        document.removeEventListener('keydown', nudgeRef.current, true);
+        nudgeRef.current = null;
+      }
       // Save position before destroying
       const player = playerRef.current;
       if (player) {
