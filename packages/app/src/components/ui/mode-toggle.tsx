@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { Pickaxe } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -59,28 +60,7 @@ export function ModeToggle() {
       onClick={toggleTheme}
     >
       {theme === 'minecraft' ? (
-        /* Pixel-art pickaxe icon */
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 16 16"
-          aria-hidden="true"
-          className="fill-current"
-        >
-          <rect x="0" y="0" width="2" height="2" />
-          <rect x="2" y="0" width="2" height="2" />
-          <rect x="4" y="0" width="2" height="2" />
-          <rect x="6" y="2" width="2" height="2" />
-          <rect x="4" y="4" width="2" height="2" />
-          <rect x="2" y="4" width="2" height="2" />
-          <rect x="2" y="6" width="2" height="2" />
-          <rect x="0" y="8" width="2" height="2" />
-          <rect x="8" y="4" width="2" height="2" />
-          <rect x="10" y="6" width="2" height="2" />
-          <rect x="12" y="8" width="2" height="2" />
-          <rect x="14" y="10" width="2" height="2" />
-        </svg>
+        <Pickaxe size={20} aria-hidden="true" />
       ) : theme === 'dark' ? (
         /* Sun icon — shows what clicking will cycle PAST (dark → minecraft) */
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" className="fill-current">
