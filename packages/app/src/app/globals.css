@@ -285,8 +285,8 @@
   display: none;
 }
 
-/* Minecraft splash text — yellow bouncing rotated text like the title screen */
-@keyframes minecraft-splash-bounce {
+/* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
+@keyframes splash-bounce {
   0%,
   100% {
     transform: rotate(-15deg) scale(1);
@@ -296,7 +296,7 @@
   }
 }
 
-.minecraft-splash-wrapper {
+.splash-wrapper {
   position: absolute;
   top: -1.75rem;
   right: 0;
@@ -305,22 +305,22 @@
   overflow: visible;
 }
 
-.minecraft-splash {
+.splash-text {
   display: inline-block;
   color: #ffff00;
   font-weight: bold;
   font-size: 0.85rem;
   white-space: nowrap;
   text-shadow: 2px 2px 0px #3f3f00;
-  animation: minecraft-splash-bounce 1.5s ease-in-out infinite;
+  animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: right center;
 }
 
 @media (min-width: 640px) {
-  .minecraft-splash {
+  .splash-text {
     font-size: 1.1rem;
   }
-  .minecraft-splash-wrapper {
+  .splash-wrapper {
     top: -2rem;
     right: 1rem;
   }

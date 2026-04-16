@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 const SPLASHES = [
   'Now with more tokens!',
@@ -36,40 +36,21 @@ const SPLASHES = [
 ];
 
 /**
- * Minecraft-style splash text — yellow, rotated, bouncing text
- * that appears on the landing page when minecraft mode is active.
+ * Splash text — yellow, rotated, bouncing text (Minecraft title screen style)
+ * that appears on the landing page in all UI modes.
  */
 export function MinecraftSplash() {
-  const [isMinecraft, setIsMinecraft] = useState(false);
   const [splash, setSplash] = useState('');
-  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    function check() {
-      setIsMinecraft(document.documentElement.classList.contains('minecraft'));
-    }
-    check();
-
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+    setSplash(SPLASHES[Math.floor(Math.random() * SPLASHES.length)]);
   }, []);
 
-  useEffect(() => {
-    if (isMinecraft && !hasInitialized.current) {
-      hasInitialized.current = true;
-      setSplash(SPLASHES[Math.floor(Math.random() * SPLASHES.length)]);
-    }
-    if (!isMinecraft) {
-      hasInitialized.current = false;
-    }
-  }, [isMinecraft]);
-
-  if (!isMinecraft || !splash) return null;
+  if (!splash) return null;
 
   return (
-    <div className="minecraft-splash-wrapper">
-      <span className="minecraft-splash">{splash}</span>
+    <div className="splash-wrapper">
+      <span className="splash-text">{splash}</span>
     </div>
   );
 }
