@@ -314,6 +314,10 @@
   text-shadow: 2px 2px 0px #3f3f00;
   animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: right center;
+  /* Always use Minecraft font & style regardless of active theme */
+  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
 }
 
 @media (min-width: 640px) {
