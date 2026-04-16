@@ -1,7 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// @ts-expect-error -- internal Next.js context, no public types
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-// @ts-expect-error -- internal Next.js context, no public types
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { Header } from '@/components/header/header';
