@@ -58,10 +58,10 @@ function getInitialMusicStart(): number {
 }
 
 /**
- * Renders the floating 3D Minecraft blocks background, plays
- * the classic button click sound on interactive element presses,
- * and streams background music from the Minecraft OST playlist.
- * Only active when the minecraft theme is enabled.
+ * Plays the classic Minecraft button click sound on interactive
+ * element presses in every theme. The floating 3D blocks background
+ * and the YouTube-streamed Minecraft OST are only active when the
+ * minecraft theme is enabled.
  */
 export function MinecraftBackground() {
   const [isMinecraft, setIsMinecraft] = useState(false);
@@ -96,7 +96,6 @@ export function MinecraftBackground() {
 
   // Preload the click sound into an AudioBuffer for instant playback
   useEffect(() => {
-    if (!isMinecraft) return;
     let cancelled = false;
     const ctx = new AudioContext();
     audioCtxRef.current = ctx;
@@ -113,11 +112,11 @@ export function MinecraftBackground() {
       audioCtxRef.current = null;
       bufferRef.current = null;
     };
-  }, [isMinecraft]);
+  }, []);
 
   // Play Minecraft click sound on any interactive element press
   useEffect(() => {
-    if (!isMinecraft || !soundEnabled) return;
+    if (!soundEnabled) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null;
       if (!target?.closest(INTERACTIVE)) return;
@@ -133,7 +132,7 @@ export function MinecraftBackground() {
     }
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [isMinecraft, soundEnabled]);
+  }, [soundEnabled]);
 
   // ── Background music (YouTube IFrame API) ──
   const [musicEnabled, setMusicEnabled] = useState(false);
@@ -324,7 +323,11 @@ export function MinecraftBackground() {
     };
   }, [showMusic]);
 
-  if (!isMinecraft) return null;
+  if (!isMinecraft) {
+    // Component must stay mounted so the click-sound effects keep running
+    // in every theme; only the 3D scene and music are minecraft-only.
+    return null;
+  }
 
   return (
     <>
