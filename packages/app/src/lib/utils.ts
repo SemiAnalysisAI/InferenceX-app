@@ -1,5 +1,4 @@
 import { type ClassValue, clsx } from 'clsx';
-import { uniq } from 'lodash-es';
 import { twMerge } from 'tailwind-merge';
 
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
@@ -145,7 +144,7 @@ export function getHardwareLabel(entry: AggDataEntry) {
   if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
     suffixes.push(entry['spec_decoding']);
   }
-  suffixes = uniq(suffixes);
+  suffixes = [...new Set(suffixes)];
   return (
     baseHw.toUpperCase() +
     (suffixes.length > 0

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "exports": {
     "./connection": "./src/connection.ts",
     "./etl/*": "./src/etl/*.ts",
@@ -27,13 +28,13 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@semianalysisai/inferencex-constants": "workspace:*",
-    "adm-zip": "^0.5.17",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
+    "adm-zip": "^0.5.17",
     "dotenv-cli": "^11.0.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",

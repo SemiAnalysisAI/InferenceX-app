@@ -1,5 +1,6 @@
 'use client';
 import { track } from '@/lib/analytics';
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
 
@@ -41,8 +42,12 @@ import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
-import ModelArchitectureDiagram from './ModelArchitectureDiagram';
 import TrendChart from './TrendChart';
+
+const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-40 w-full" />,
+});
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 
 /** Controlled popover dropdown for the e2e chart x-axis toggle. */

@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'd3'],
+  },
   images: {
     remotePatterns: [
       { hostname: 'placehold.co' },
