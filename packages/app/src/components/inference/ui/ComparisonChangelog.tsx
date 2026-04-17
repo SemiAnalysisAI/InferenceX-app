@@ -108,15 +108,17 @@ export default function ComparisonChangelog({
 
   return (
     <div className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden transition-all">
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between gap-2 px-4 py-2">
         <button
           type="button"
           onClick={handleToggle}
-          className="flex items-center gap-2 hover:bg-muted/50 transition-colors rounded px-1 -mx-1"
+          className="flex flex-1 items-center justify-between gap-2 hover:bg-muted/50 transition-colors rounded px-1 -mx-1"
           aria-expanded={isExpanded}
         >
-          <FileText className="size-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm font-medium">{label}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <span className="text-sm font-medium truncate">{label}</span>
+          </div>
           {isExpanded ? (
             <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
           ) : (
