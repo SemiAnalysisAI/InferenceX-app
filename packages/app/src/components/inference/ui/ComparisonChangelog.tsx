@@ -115,12 +115,12 @@ export default function ComparisonChangelog({
           className="flex items-center gap-2 hover:bg-muted/50 transition-colors rounded px-1 -mx-1"
           aria-expanded={isExpanded}
         >
-          <FileText className="size-4 text-muted-foreground" />
+          <FileText className="size-4 shrink-0 text-muted-foreground" />
           <span className="text-sm font-medium">{label}</span>
           {isExpanded ? (
-            <ChevronUp className="size-4 text-muted-foreground" />
+            <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
           ) : (
-            <ChevronDown className="size-4 text-muted-foreground" />
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
           )}
         </button>
         {isExpanded && addableDates.length > 0 && (

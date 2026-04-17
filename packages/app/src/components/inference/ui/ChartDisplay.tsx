@@ -590,7 +590,7 @@ export default function ChartDisplay() {
                 style={{ borderColor: config.color, color: config.color }}
               >
                 <span
-                  className="inline-block size-2 rounded-full"
+                  className="inline-block size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: config.color }}
                 />
                 {config.label}

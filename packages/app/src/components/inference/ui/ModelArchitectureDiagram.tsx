@@ -2056,7 +2056,7 @@ export default function ModelArchitectureDiagram({
       >
         <div className="flex items-center gap-2">
           <svg
-            className="size-4 text-muted-foreground"
+            className="size-4 shrink-0 text-muted-foreground"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -2078,9 +2078,9 @@ export default function ModelArchitectureDiagram({
           </Badge>
         </div>
         {isExpanded ? (
-          <ChevronUp className="size-4 text-muted-foreground" />
+          <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronDown className="size-4 text-muted-foreground" />
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
         )}
       </button>
 
