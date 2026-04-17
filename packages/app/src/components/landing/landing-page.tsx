@@ -31,7 +31,7 @@ export function LandingPage() {
           {/* Left - Full Dashboard */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="h-5 w-5 text-brand" />
+              <BarChart3 className="size-5 text-brand" />
               <h2 className="text-lg font-semibold">Full Dashboard</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-2">
@@ -52,7 +52,7 @@ export function LandingPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-md text-sm sm:text-base font-medium h-12 px-8 bg-brand text-primary-foreground hover:bg-brand/90 transition-colors"
               >
                 Open Dashboard
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="size-4" />
               </Link>
             </div>
           </Card>
@@ -60,7 +60,7 @@ export function LandingPage() {
           {/* Right - Curated Presets */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="h-5 w-5 text-brand" />
+              <Sparkles className="size-5 text-brand" />
               <h2 className="text-lg font-semibold">Quick Comparisons</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">

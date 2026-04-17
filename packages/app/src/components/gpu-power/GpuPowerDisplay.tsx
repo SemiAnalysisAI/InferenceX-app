@@ -42,13 +42,13 @@ type GpuMetricsView = 'chart' | 'correlation';
 const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
   {
     value: 'chart',
-    icon: <BarChart3 className="h-3.5 w-3.5" />,
+    icon: <BarChart3 className="size-3.5" />,
     ariaLabel: 'Line chart',
     title: 'Line chart',
   },
   {
     value: 'correlation',
-    icon: <ScatterChart className="h-3.5 w-3.5" />,
+    icon: <ScatterChart className="size-3.5" />,
     ariaLabel: 'Correlation scatter',
     title: 'Correlation scatter',
   },
@@ -255,7 +255,7 @@ export default function GpuMetricsDisplay() {
                 }}
                 title="Re-lock feature gate"
               >
-                <Lock className="h-3 w-3" />
+                <Lock className="size-3" />
                 Re-lock feature gate
               </Button>
               <ShareButton />
@@ -286,7 +286,7 @@ export default function GpuMetricsDisplay() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                   Loading...
                 </>
               ) : (
@@ -405,12 +405,12 @@ export default function GpuMetricsDisplay() {
                 >
                   {copied ? (
                     <>
-                      <Check className="h-3 w-3" />
+                      <Check className="size-3" />
                       Copied
                     </>
                   ) : (
                     <>
-                      <LinkIcon className="h-3 w-3" />
+                      <LinkIcon className="size-3" />
                       Share
                     </>
                   )}

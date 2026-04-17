@@ -81,7 +81,7 @@ export function BottomToast({
           className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Dismiss"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="size-3.5" />
         </button>
 
         <div className="shrink-0 mt-0.5 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</div>

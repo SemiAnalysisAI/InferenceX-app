@@ -25,7 +25,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
         <h3 className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200">
           {preset.title}
         </h3>
-        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
+        <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed mt-1.5 line-clamp-2">
         {preset.description}

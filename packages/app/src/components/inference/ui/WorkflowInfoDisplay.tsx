@@ -41,7 +41,7 @@ function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
   const label = CONCLUSION_LABELS[conclusion] ?? conclusion;
   return (
     <span
-      className={`inline-block h-2 w-2 mr-1 rounded-full ${color} cursor-help`}
+      className={`inline-block size-2 mr-1 rounded-full ${color} cursor-help`}
       aria-label={label}
       role="img"
     />
@@ -138,9 +138,9 @@ export default function WorkflowInfoDisplay({
             size="icon"
             onClick={handleGoPreviousRun}
             disabled={!canGoPreviousRun()}
-            className="h-8 w-8"
+            className="size-8"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="size-4" />
           </Button>
           <Select
             value={selectedRunId}
@@ -202,9 +202,9 @@ export default function WorkflowInfoDisplay({
             size="icon"
             onClick={handleGoNextRun}
             disabled={!canGoNextRun()}
-            className="h-8 w-8"
+            className="size-8"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       ) : null}

@@ -34,7 +34,7 @@ function DeprecatedLabel({ reason }: { reason: string }) {
         Deprecated
         <TooltipRoot>
           <TooltipTrigger asChild>
-            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+            <Info className="size-3 text-muted-foreground cursor-help" />
           </TooltipTrigger>
           <TooltipContent side="top" collisionPadding={10}>
             <span>{reason}</span>

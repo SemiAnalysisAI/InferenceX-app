@@ -18,7 +18,7 @@ export function LabelWithTooltip({ htmlFor, label, tooltip }: LabelWithTooltipPr
       <Label htmlFor={htmlFor}>{label}</Label>
       <TooltipRoot>
         <TooltipTrigger asChild>
-          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+          <Info className="size-3.5 text-muted-foreground cursor-help" />
         </TooltipTrigger>
         <TooltipContent side="top" collisionPadding={10}>
           <span>{tooltip}</span>

@@ -142,7 +142,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 type="button"
                 data-testid="mobile-menu-toggle"
                 onClick={toggleMenu}
-                className="flex items-center justify-center w-9 h-9 rounded-md transition-colors hover:bg-muted cursor-pointer"
+                className="flex items-center justify-center size-9 rounded-md transition-colors hover:bg-muted cursor-pointer"
                 aria-expanded={mobileMenuOpen}
                 aria-label="Navigation menu"
               >

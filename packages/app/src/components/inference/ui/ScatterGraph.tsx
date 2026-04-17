@@ -1599,7 +1599,7 @@ const ScatterGraph = React.memo(
           <div className="flex flex-col items-center justify-center min-h-100 text-center">
             <div className="text-muted-foreground">
               <svg
-                className="mx-auto h-12 w-12 mb-4"
+                className="mx-auto size-12 mb-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

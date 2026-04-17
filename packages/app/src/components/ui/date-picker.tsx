@@ -203,10 +203,10 @@ export function DatePicker({
           size="icon"
           onClick={handleGoPrevious}
           disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
-          className="h-8 w-8"
+          className="size-8"
           suppressHydrationWarning
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="size-4" />
         </Button>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
@@ -214,7 +214,7 @@ export function DatePicker({
               variant="ghost"
               className="!px-5 min-w-[200px] dark:bg-input/90 dark:hover:bg-input/50"
             >
-              <Calendar className="mr-0 h-4 w-4" />
+              <Calendar className="mr-0 size-4" />
               <strong>Run Date:</strong>
               <span className="tabular-nums inline-block w-[6.5em] text-left">
                 {getDisplayText()}
@@ -240,7 +240,7 @@ export function DatePicker({
               {isCheckingAvailableDates && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                   <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <Loader2 className="size-6 animate-spin text-primary" />
                     <p className="text-sm text-muted-foreground">Checking available dates...</p>
                   </div>
                 </div>
@@ -273,9 +273,9 @@ export function DatePicker({
           size="icon"
           onClick={handleGoNext}
           disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
-          className="h-8 w-8"
+          className="size-8"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="size-4" />
         </Button>
       </div>
     </div>

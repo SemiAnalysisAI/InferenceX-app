@@ -21,7 +21,7 @@ export function UnofficialBanner({ runInfo, onDismiss }: UnofficialBannerProps) 
     <div className="bg-red-600 text-white px-4 py-3 relative">
       <div className="container mx-auto flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <AlertTriangle className="h-6 w-6 flex-shrink-0" />
+          <AlertTriangle className="size-6 flex-shrink-0" />
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
             <span className="text-xl font-bold tracking-wide">NON-OFFICIAL</span>
             <span className="text-sm opacity-90">
@@ -41,7 +41,7 @@ export function UnofficialBanner({ runInfo, onDismiss }: UnofficialBannerProps) 
             className="flex items-center gap-1 text-sm bg-red-700 hover:bg-red-800 px-3 py-1.5 rounded transition-colors"
           >
             View Run
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="size-3.5" />
           </a>
           {onDismiss && (
             <button
@@ -52,7 +52,7 @@ export function UnofficialBanner({ runInfo, onDismiss }: UnofficialBannerProps) 
               className="p-1.5 hover:bg-red-700 rounded transition-colors"
               aria-label="Dismiss banner"
             >
-              <X className="h-4 w-4" />
+              <X className="size-4" />
             </button>
           )}
         </div>

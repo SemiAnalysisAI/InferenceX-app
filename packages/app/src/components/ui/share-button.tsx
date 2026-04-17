@@ -46,12 +46,12 @@ export function ShareButton() {
     >
       {copied ? (
         <>
-          <Check className="h-3 w-3" />
+          <Check className="size-3" />
           Copied
         </>
       ) : (
         <>
-          <LinkIcon className="h-3 w-3" />
+          <LinkIcon className="size-3" />
           Share
         </>
       )}

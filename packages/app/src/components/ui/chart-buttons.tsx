@@ -141,7 +141,7 @@ export function ChartButtons({
           data-testid="zoom-reset-button"
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="size-7"
           disabled={hideImageExport}
           onClick={() => {
             track(`${analyticsPrefix}_zoom_reset_button`);

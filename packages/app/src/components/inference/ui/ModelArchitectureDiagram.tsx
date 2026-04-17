@@ -2056,7 +2056,7 @@ export default function ModelArchitectureDiagram({
       >
         <div className="flex items-center gap-2">
           <svg
-            className="h-4 w-4 text-muted-foreground"
+            className="size-4 text-muted-foreground"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -2078,9 +2078,9 @@ export default function ModelArchitectureDiagram({
           </Badge>
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          <ChevronUp className="size-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronDown className="size-4 text-muted-foreground" />
         )}
       </button>
 
@@ -2111,7 +2111,7 @@ export default function ModelArchitectureDiagram({
                       track('model_architecture_source_clicked', { url: arch.sourceUrl! })
                     }
                   >
-                    Source <ExternalLink className="h-3 w-3" />
+                    Source <ExternalLink className="size-3" />
                   </Link>
                 )}
               </div>

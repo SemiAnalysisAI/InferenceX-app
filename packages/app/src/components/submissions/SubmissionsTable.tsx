@@ -30,7 +30,7 @@ function DetailItem({
       <span className="text-muted-foreground">{label}</span>
       <TooltipRoot>
         <TooltipTrigger asChild>
-          <Info className="h-3 w-3 text-muted-foreground/50 cursor-help shrink-0" />
+          <Info className="size-3 text-muted-foreground/50 cursor-help shrink-0" />
         </TooltipTrigger>
         <TooltipContent side="top" collisionPadding={10}>
           <span className="text-xs">{tip}</span>
@@ -200,12 +200,12 @@ function SubmissionRow({
     <>
       <tr className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={onToggle}>
         <td className="px-2 py-2 text-muted-foreground">
-          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         </td>
         <td className="px-3 py-2 font-medium">
           <span className="flex items-center gap-1.5">
             <span
-              className={`inline-block w-2 h-2 rounded-full ${vendor === 'NVIDIA' ? 'bg-green-500' : vendor === 'AMD' ? 'bg-red-500' : 'bg-gray-400'}`}
+              className={`inline-block size-2 rounded-full ${vendor === 'NVIDIA' ? 'bg-green-500' : vendor === 'AMD' ? 'bg-red-500' : 'bg-gray-400'}`}
             />
             {row.hardware.toUpperCase()}
           </span>

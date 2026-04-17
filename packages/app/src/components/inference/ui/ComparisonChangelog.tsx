@@ -115,12 +115,12 @@ export default function ComparisonChangelog({
           className="flex items-center gap-2 hover:bg-muted/50 transition-colors rounded px-1 -mx-1"
           aria-expanded={isExpanded}
         >
-          <FileText className="h-4 w-4 text-muted-foreground" />
+          <FileText className="size-4 text-muted-foreground" />
           <span className="text-sm font-medium">{label}</span>
           {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            <ChevronUp className="size-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="size-4 text-muted-foreground" />
           )}
         </button>
         {isExpanded && addableDates.length > 0 && (
@@ -132,7 +132,7 @@ export default function ComparisonChangelog({
             }}
             className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-1"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="size-3" />
             Add all to chart
           </button>
         )}
@@ -191,12 +191,12 @@ export default function ComparisonChangelog({
                         }}
                         className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="size-3" />
                         Remove from chart
                       </button>
                     ) : (
                       <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                        <Lock className="h-3 w-3" />
+                        <Lock className="size-3" />
                         On chart
                       </span>
                     )
@@ -209,7 +209,7 @@ export default function ComparisonChangelog({
                       }}
                       className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                     >
-                      <Plus className="h-3 w-3" />
+                      <Plus className="size-3" />
                       Add to chart
                     </button>
                   )}

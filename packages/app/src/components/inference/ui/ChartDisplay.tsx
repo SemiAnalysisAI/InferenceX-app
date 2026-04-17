@@ -66,7 +66,7 @@ function E2eXAxisDropdown({
           onClick={(e) => e.stopPropagation()}
         >
           vs. {xAxisLabel}
-          <ChevronDown className="no-export h-3.5 w-3.5 shrink-0 opacity-60" />
+          <ChevronDown className="no-export size-3.5 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-1" align="start">
@@ -590,7 +590,7 @@ export default function ChartDisplay() {
                 style={{ borderColor: config.color, color: config.color }}
               >
                 <span
-                  className="inline-block w-2 h-2 rounded-full"
+                  className="inline-block size-2 rounded-full"
                   style={{ backgroundColor: config.color }}
                 />
                 {config.label}

@@ -151,7 +151,7 @@ export function DateRangePicker({
               className,
             )}
           >
-            <Calendar className="mr-2 h-4 w-4" />
+            <Calendar className="mr-2 size-4" />
             {getDisplayText()}
           </Button>
         </DialogTrigger>
@@ -195,7 +195,7 @@ export function DateRangePicker({
             {isCheckingAvailableDates && (
               <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                 <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <Loader2 className="size-6 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">Checking available dates...</p>
                 </div>
               </div>

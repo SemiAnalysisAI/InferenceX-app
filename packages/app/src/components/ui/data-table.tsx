@@ -62,9 +62,9 @@ const ALIGN_CLASSES = {
 } as const;
 
 const SORT_ICON = {
-  asc: <ArrowUp className="inline h-3 w-3" />,
-  desc: <ArrowDown className="inline h-3 w-3" />,
-  none: <ArrowUpDown className="inline h-3 w-3 opacity-30" />,
+  asc: <ArrowUp className="inline size-3" />,
+  desc: <ArrowDown className="inline size-3" />,
+  none: <ArrowUpDown className="inline size-3 opacity-30" />,
 };
 
 export function DataTable<T>({
@@ -145,7 +145,7 @@ export function DataTable<T>({
     <div data-testid={testId} className="mt-3">
       {/* Search */}
       <div className="mb-3 max-w-xs relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
         <input
           ref={searchRef}
           type="text"
@@ -168,7 +168,7 @@ export function DataTable<T>({
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             aria-label="Clear search"
           >
-            <X className="h-3 w-3" />
+            <X className="size-3" />
           </button>
         )}
       </div>
@@ -294,7 +294,7 @@ export function DataTable<T>({
             className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             aria-label="Previous page"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="size-4" />
           </button>
           <span>
             {safePage + 1} / {totalPages}
@@ -308,7 +308,7 @@ export function DataTable<T>({
             className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             aria-label="Next page"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="size-4" />
           </button>
         </div>
       </div>

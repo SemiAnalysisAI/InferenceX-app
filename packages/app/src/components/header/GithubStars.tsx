@@ -45,7 +45,7 @@ export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
         viewBox="0 0 24 24"
         fill="#eab308"
         stroke="#eab308"
-        className="w-4 h-4"
+        className="size-4"
       >
         <path
           strokeLinecap="round"

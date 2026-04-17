@@ -135,7 +135,7 @@ export function MultiDatePicker({
               className,
             )}
           >
-            <Calendar className="mr-2 h-4 w-4" />
+            <Calendar className="mr-2 size-4" />
             {getDisplayText()}
           </Button>
         </DialogTrigger>
@@ -186,7 +186,7 @@ export function MultiDatePicker({
                         className="ml-1 hover:bg-primary-foreground/20 rounded-sm p-0.5 transition-colors"
                         aria-label={`Remove ${formatDisplayDate(dateStr)}`}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="size-3" />
                       </button>
                     </div>
                   ))}

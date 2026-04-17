@@ -37,7 +37,7 @@ export function StarButton({ starCount }: { starCount?: number | null }) {
         window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
       }}
     >
-      <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+      <Star className="size-3.5 text-yellow-500 fill-yellow-500" />
       <span>Star</span>
       {stars !== null && (
         <span className="font-semibold text-muted-foreground">{stars.toLocaleString()}</span>

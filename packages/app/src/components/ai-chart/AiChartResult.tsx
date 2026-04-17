@@ -414,7 +414,7 @@ function InlineLegend({ items }: { items: { label: string; color: string }[] }) 
       {items.map((item) => (
         <div key={item.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span
-            className="inline-block h-2.5 w-2.5 rounded-sm shrink-0"
+            className="inline-block size-2.5 rounded-sm shrink-0"
             style={{ background: item.color }}
           />
           {item.label}

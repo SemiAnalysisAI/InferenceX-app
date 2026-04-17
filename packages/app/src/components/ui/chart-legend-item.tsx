@@ -60,10 +60,10 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         onMouseEnter={onHover && isActive ? () => onHover(hw || name) : undefined}
         onMouseLeave={onHoverEnd && isActive ? onHoverEnd : undefined}
       >
-        <span className="relative inline-flex items-center justify-center w-3 h-3 mr-2 flex-shrink-0">
+        <span className="relative inline-flex items-center justify-center size-3 mr-2 flex-shrink-0">
           <span
             className={cn(
-              'w-3 h-3 rounded-full transition-opacity',
+              'size-3 rounded-full transition-opacity',
               canRemove && 'group-hover/item:opacity-0!',
             )}
             style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}

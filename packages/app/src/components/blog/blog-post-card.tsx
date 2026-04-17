@@ -21,7 +21,7 @@ export function BlogPostCard({ slug, title, children }: BlogPostCardProps) {
       <div className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-brand/60 transition-all duration-200 group-hover:bg-brand group-hover:inset-y-2" />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">{children}</div>
-        <ArrowRight className="h-5 w-5 shrink-0 mt-1 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
+        <ArrowRight className="size-5 shrink-0 mt-1 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
       </div>
     </Link>
   );

@@ -87,7 +87,7 @@ export default function SubmissionsDisplay() {
                 }}
                 title="Re-lock feature gate"
               >
-                <Lock className="h-3 w-3" />
+                <Lock className="size-3" />
                 Re-lock feature gate
               </Button>
               <ShareButton />
