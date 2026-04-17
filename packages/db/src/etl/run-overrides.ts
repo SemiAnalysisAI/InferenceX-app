@@ -31,4 +31,5 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   24152261349, // 2026-04-08 | Reason: accidental merge
   24440780992, // 2026-04-15 | Reason: runner name changed causing runner launcher to not be found
   24566910305, // 2026-04-17 | Reason: misconfigured diff on original pr causing sweep to fail
+  24567302524, // 2026-04-17 | Reason: misconfigured diff on original pr causing sweep to fail
 ]);
