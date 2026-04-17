@@ -12,6 +12,11 @@ import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './run-overrides.js';
 
 type Sql = ReturnType<typeof postgres>;
 
+export interface GithubPullRequestRef {
+  number: number;
+  htmlUrl: string;
+}
+
 export interface GithubRunInfo {
   name: string;
   status: string;
@@ -22,6 +27,7 @@ export interface GithubRunInfo {
   headSha: string | null;
   headBranch: string | null;
   runAttempt: number | null;
+  pullRequests: GithubPullRequestRef[];
 }
 
 /**
@@ -76,6 +82,16 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
         return null;
       }
       const d = (await resp.json()) as Record<string, any>;
+      const repoHtmlUrl = String(d.repository?.html_url ?? '');
+      const pullRequests: GithubPullRequestRef[] = Array.isArray(d.pull_requests)
+        ? d.pull_requests
+            .map((pr: Record<string, any>): GithubPullRequestRef | null => {
+              const num = typeof pr?.number === 'number' ? pr.number : null;
+              if (num === null || !repoHtmlUrl) return null;
+              return { number: num, htmlUrl: `${repoHtmlUrl}/pull/${num}` };
+            })
+            .filter((pr: GithubPullRequestRef | null): pr is GithubPullRequestRef => pr !== null)
+        : [];
       const info: GithubRunInfo = {
         name: String(d.name ?? ''),
         status: String(d.status ?? 'completed'),
@@ -86,6 +102,7 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
         headSha: d.head_sha ? String(d.head_sha) : null,
         headBranch: d.head_branch ? String(d.head_branch) : null,
         runAttempt: typeof d.run_attempt === 'number' ? d.run_attempt : null,
+        pullRequests,
       };
       githubRunCache.set(runId, info);
       return info;

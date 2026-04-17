@@ -197,16 +197,27 @@ function findJsonFiles(dir: string): string[] {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  const tracker = createSkipTracker();
+  const configCache = createConfigCache(sql);
+  const { getOrCreateConfig, preloadConfigs } = configCache;
+  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN);
+
+  const runId = parseInt(runIdStr, 10);
+  const ghInfo = await fetchGithubRun(runId);
+
   console.log('\n=== ingest-ci-run ===');
   console.log(`  Run ID:      ${runIdStr}`);
   console.log(`  Attempt:     ${runAttemptNum}`);
   console.log(`  Artifacts:   ${artifactsDir}`);
   console.log(`  Repo:        ${REPO}`);
-
-  const tracker = createSkipTracker();
-  const configCache = createConfigCache(sql);
-  const { getOrCreateConfig, preloadConfigs } = configCache;
-  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN);
+  if (ghInfo?.htmlUrl) {
+    console.log(`  Run URL:     ${ghInfo.htmlUrl}/attempts/${runAttemptNum}`);
+  }
+  if (ghInfo?.pullRequests && ghInfo.pullRequests.length > 0) {
+    for (const pr of ghInfo.pullRequests) {
+      console.log(`  PR #${pr.number}:      ${pr.htmlUrl}`);
+    }
+  }
 
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);
@@ -215,8 +226,6 @@ async function main(): Promise<void> {
     throw new Error(`Artifacts directory does not exist: ${artifactsDir}`);
   }
 
-  const runId = parseInt(runIdStr, 10);
-  const ghInfo = await fetchGithubRun(runId);
   const date = ghInfo?.createdAt
     ? ghInfo.createdAt.split('T')[0]
     : new Date().toISOString().split('T')[0];
