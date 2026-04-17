@@ -11,6 +11,7 @@ import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
 import { historicalTrendToCsv } from '@/lib/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -311,6 +312,7 @@ export default function HistoricalTrendsDisplay() {
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                     />
+                    <UnofficialDomainNotice />
                     <div
                       className={`overflow-hidden transition-all duration-200 ease-in-out ${
                         isModelExperimental(selectedModel)

@@ -20,6 +20,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ShareButton } from '@/components/ui/share-button';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
@@ -724,6 +725,7 @@ export default function ThroughputCalculatorDisplay() {
                           comparison with aggregated configs not an apples-to-apples comparison.
                         </p>
                       </div>
+                      <UnofficialDomainNotice />
                     </>
                   );
 

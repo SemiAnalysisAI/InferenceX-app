@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
   Select,
@@ -466,7 +467,12 @@ export default function GpuMetricsDisplay() {
                 metricKey={selectedMetric}
                 artifactName={selectedArtifact}
                 maxPoints={downsample ? 2000 : Infinity}
-                caption={<h2 className="text-lg font-semibold">{metricConfig.label} over Time</h2>}
+                caption={
+                  <>
+                    <h2 className="text-lg font-semibold">{metricConfig.label} over Time</h2>
+                    <UnofficialDomainNotice />
+                  </>
+                }
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
@@ -517,7 +523,12 @@ export default function GpuMetricsDisplay() {
                 xMetric={corrXMetric}
                 yMetric={corrYMetric}
                 maxPoints={downsample ? 2000 : Infinity}
-                caption={<h2 className="text-lg font-semibold">Metric Correlation</h2>}
+                caption={
+                  <>
+                    <h2 className="text-lg font-semibold">Metric Correlation</h2>
+                    <UnofficialDomainNotice />
+                  </>
+                }
                 legendElement={
                   <ChartLegend
                     variant="sidebar"

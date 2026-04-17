@@ -6,6 +6,7 @@ import { useReliabilityContext } from '@/components/reliability/ReliabilityConte
 import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
 import { reliabilityChartToCsv } from '@/lib/csv-export-helpers';
 
@@ -54,6 +55,7 @@ export default function ReliabilityChartDisplay() {
             <>
               <h3 className="text-lg font-semibold">Success Rate by GPU Model</h3>
               <p className="text-sm text-muted-foreground">Source: SemiAnalysis InferenceX™</p>
+              <UnofficialDomainNotice />
             </>
           }
         />

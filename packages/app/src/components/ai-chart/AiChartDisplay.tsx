@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 
 import type { AiProvider } from './types';
 import { EXAMPLE_PROMPTS } from './example-prompts';
@@ -166,7 +167,12 @@ export default function AiChartDisplay() {
       )}
 
       {/* Result */}
-      {result && <AiChartResult charts={result.charts} summary={result.summary} />}
+      {result && (
+        <>
+          <UnofficialDomainNotice />
+          <AiChartResult charts={result.charts} summary={result.summary} />
+        </>
+      )}
 
       {/* Example prompts (shown when no result) */}
       {!result && !isLoading && !error && (

@@ -7,6 +7,7 @@ import { BarChart3, Radar, Table2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
   formatTflops,
@@ -342,6 +343,7 @@ export function GpuSpecsContent() {
               testId="gpu-specs-view-toggle"
             />
           </div>
+          <UnofficialDomainNotice />
 
           {viewMode === 'table' && (
             <>

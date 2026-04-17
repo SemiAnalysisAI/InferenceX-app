@@ -9,6 +9,7 @@ import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
@@ -97,6 +98,7 @@ export default function EvaluationChartDisplay() {
           experimental.
         </p>
       </div>
+      <UnofficialDomainNotice />
     </>
   );
 

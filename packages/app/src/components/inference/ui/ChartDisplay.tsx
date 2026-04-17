@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import {
@@ -421,6 +422,7 @@ export default function ChartDisplay() {
                         )}
                       </p>
                       <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
+                      <UnofficialDomainNotice />
                       <div
                         className={`overflow-hidden transition-all duration-200 ease-in-out ${
                           isModelExperimental(selectedModel)
