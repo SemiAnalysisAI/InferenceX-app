@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
   experimental: {
-    optimizePackageImports: ['lucide-react', 'd3'],
+    optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
   },
   images: {
     remotePatterns: [
