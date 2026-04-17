@@ -27,12 +27,12 @@ describe('GpuSpecsBarChart', () => {
     cy.mount(<BarChartWrapper />);
     // The legend swatches use inline style={{ background: '#76b900' }} and style={{ background: '#ed1c24' }}
     // NVIDIA swatch: green
-    cy.get('[data-testid="gpu-specs-bar-chart"] div.w-3.h-3.rounded-sm').should('have.length', 2);
-    cy.get('[data-testid="gpu-specs-bar-chart"] div.w-3.h-3.rounded-sm')
+    cy.get('[data-testid="gpu-specs-bar-chart"] div.size-3.rounded-sm').should('have.length', 2);
+    cy.get('[data-testid="gpu-specs-bar-chart"] div.size-3.rounded-sm')
       .first()
       .should('have.css', 'background-color', 'rgb(118, 185, 0)');
     // AMD swatch: red
-    cy.get('[data-testid="gpu-specs-bar-chart"] div.w-3.h-3.rounded-sm')
+    cy.get('[data-testid="gpu-specs-bar-chart"] div.size-3.rounded-sm')
       .last()
       .should('have.css', 'background-color', 'rgb(237, 28, 36)');
   });
