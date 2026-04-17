@@ -289,14 +289,15 @@
 @keyframes splash-bounce {
   0%,
   100% {
-    transform: rotate(-15deg) scale(1);
+    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1);
   }
   50% {
-    transform: rotate(-15deg) scale(1.1);
+    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1.1);
   }
 }
 
 .splash-wrapper {
+  display: none;
   position: absolute;
   top: -1.75rem;
   right: 0;
@@ -313,7 +314,7 @@
   white-space: nowrap;
   text-shadow: 2px 2px 0px #3f3f00;
   animation: splash-bounce 1.5s ease-in-out infinite;
-  transform-origin: right center;
+  transform-origin: center;
   /* Always use Minecraft font & style regardless of active theme */
   font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
   -webkit-font-smoothing: none;
@@ -324,7 +325,11 @@
   .splash-text {
     font-size: 1.1rem;
   }
+}
+
+@media (min-width: 1024px) {
   .splash-wrapper {
+    display: block;
     top: -2rem;
     right: 1rem;
   }
