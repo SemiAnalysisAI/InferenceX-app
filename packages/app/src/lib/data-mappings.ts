@@ -36,18 +36,18 @@ export function groupByCategory<T>(
  * 2. Add one entry here.
  */
 const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: CategoryTag }> = {
-  [Model.Llama3_3_70B]: { label: 'Llama 3.3 70B Instruct', prefix: '70b', category: 'deprecated' },
-  [Model.Llama3_1_70B]: { label: 'Llama 3.1 70B Instruct', prefix: '', category: 'hidden' },
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
-  [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'default' },
-  [Model.Qwen3_5]: { label: 'Qwen 3.5 397B-A17B', prefix: 'qwen3.5', category: 'experimental' },
-  [Model.Kimi_K2_5]: { label: 'Kimi K2.5 1T', prefix: 'kimik2.5', category: 'experimental' },
+  [Model.Kimi_K2_5]: { label: 'Kimi K2.5 1T', prefix: 'kimik2.5', category: 'default' },
+  [Model.Qwen3_5]: { label: 'Qwen 3.5 397B-A17B', prefix: 'qwen3.5', category: 'default' },
+  [Model.GLM_5]: { label: 'GLM 5', prefix: 'glm5', category: 'default' },
   [Model.MiniMax_M2_5]: {
     label: 'MiniMax M2.5 230B-A10B',
     prefix: 'minimaxm2.5',
-    category: 'experimental',
+    category: 'default',
   },
-  [Model.GLM_5]: { label: 'GLM 5', prefix: 'glm5', category: 'experimental' },
+  [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'default' },
+  [Model.Llama3_3_70B]: { label: 'Llama 3.3 70B Instruct', prefix: '70b', category: 'deprecated' },
+  [Model.Llama3_1_70B]: { label: 'Llama 3.1 70B Instruct', prefix: '', category: 'hidden' },
 };
 
 function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
@@ -58,9 +58,9 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
   );
 }
 
-export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
-  .filter((m) => MODEL_CONFIG[m].category !== 'hidden')
-  .toSorted((a, b) => a.localeCompare(b));
+export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
+  (m) => MODEL_CONFIG[m].category !== 'hidden',
+);
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
 export const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');
