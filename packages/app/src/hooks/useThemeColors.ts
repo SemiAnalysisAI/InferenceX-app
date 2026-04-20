@@ -22,6 +22,22 @@ export interface UseThemeColorsOptions {
    * instead of falling back to static HARDWARE_CONFIG.color values.
    */
   activeKeys?: string[];
+
+  /**
+   * Optional override for the keys used to generate the high-contrast color map.
+   * Use when HC should key off a different namespace than `activeKeys` (which
+   * drives vendor colors). Example: evaluation rows are keyed by configLabel
+   * for HC but by hwKey for vendor grouping.
+   * Falls back to activeKeys (then identifiers) when not provided.
+   */
+  hcKeys?: string[];
+
+  /**
+   * Optional resolver mapping each hcKey to a vendor-classifiable key (e.g. hwKey).
+   * Needed when hcKeys are not themselves hwKeys, so HC color generation can
+   * still apply per-vendor preferred hue zones and banned-hue rules.
+   */
+  hcVendorKeyFor?: (hcKey: string) => string;
 }
 
 export interface ThemeColors {
@@ -65,7 +81,7 @@ export interface UseThemeColorsResult {
  * Consolidates common theme color patterns across all D3 charts
  */
 export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsResult {
-  const { highContrast, identifiers = [], activeKeys } = options;
+  const { highContrast, identifiers = [], activeKeys, hcKeys, hcVendorKeyFor } = options;
   const { resolvedTheme } = useTheme();
 
   // get base theme colors
@@ -83,10 +99,19 @@ export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsRe
   // Use activeKeys when available so only visible items get hues — fewer items = more separation
   const colorMap = useMemo(() => {
     if (!highContrast) return null;
-    const keysForHc = activeKeys && activeKeys.length > 0 ? activeKeys : identifiers;
+    const usingHcKeys = hcKeys && hcKeys.length > 0;
+    const keysForHc = usingHcKeys
+      ? hcKeys
+      : activeKeys && activeKeys.length > 0
+        ? activeKeys
+        : identifiers;
     if (keysForHc.length === 0) return null;
-    return generateHighContrastColors(keysForHc, resolvedTheme || 'light');
-  }, [highContrast, activeKeys, identifiers, resolvedTheme]);
+    return generateHighContrastColors(
+      keysForHc,
+      resolvedTheme || 'light',
+      usingHcKeys ? hcVendorKeyFor : undefined,
+    );
+  }, [highContrast, hcKeys, hcVendorKeyFor, activeKeys, identifiers, resolvedTheme]);
 
   // generate dynamic vendor-aware colors for active keys
   const vendorColorMap = useMemo(() => {
