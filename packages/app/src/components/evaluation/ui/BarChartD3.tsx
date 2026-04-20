@@ -246,10 +246,33 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     ],
     [configurations, unofficialConfigurations, effectiveOfficialHardware, activeOverlayHwTypes],
   );
+  const activeConfigLabels = useMemo(
+    () => [
+      ...configurations
+        .filter((c) => effectiveOfficialHardware.has(c.hwKey))
+        .map((c) => c.configLabel),
+      ...unofficialConfigurations
+        .filter((c) => activeOverlayHwTypes.has(c.hwKey))
+        .map((c) => c.configLabel),
+    ],
+    [configurations, unofficialConfigurations, effectiveOfficialHardware, activeOverlayHwTypes],
+  );
+  const configLabelToHwKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of configurations) map.set(c.configLabel, c.hwKey);
+    for (const c of unofficialConfigurations) map.set(c.configLabel, c.hwKey);
+    return map;
+  }, [configurations, unofficialConfigurations]);
+  const hcVendorKeyFor = useCallback(
+    (configLabel: string) => configLabelToHwKey.get(configLabel) ?? configLabel,
+    [configLabelToHwKey],
+  );
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast,
     identifiers: sortedConfigLabels,
     activeKeys: activeHwKeys,
+    hcKeys: activeConfigLabels,
+    hcVendorKeyFor,
   });
 
   useEffect(() => {

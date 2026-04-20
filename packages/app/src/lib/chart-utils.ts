@@ -57,16 +57,20 @@ const BAN_MAX = 10;
 export const generateHighContrastColors = (
   keys: string[],
   theme: string,
+  vendorKeyFor?: (key: string) => string,
 ): Record<string, string> => {
   if (keys.length === 0) return {};
 
   const colors: Record<string, string> = {};
   const [lmin, lmax] = theme === 'dark' || theme === 'minecraft' ? [50, 100] : [30, 65];
 
-  // Group keys by vendor
+  // Group keys by vendor. When vendorKeyFor is provided, vendor is derived
+  // from the mapped key (e.g. a hwKey) so callers can output colors keyed by
+  // a display identifier (e.g. configLabel) while still getting vendor-aware
+  // preferred-zone and banned-hue logic.
   const groups = new Map<Vendor, string[]>();
   for (const key of keys) {
-    const vendor = getVendor(key);
+    const vendor = getVendor(vendorKeyFor ? vendorKeyFor(key) : key);
     let list = groups.get(vendor);
     if (!list) {
       list = [];
