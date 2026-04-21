@@ -318,18 +318,19 @@ const STRIP_HISTORY_KEYS = new Set([
 ]);
 
 export function getLatestBenchmarks(
-  modelKey: string,
+  modelKey: string | string[],
   date?: string,
   exact?: boolean,
 ): BenchmarkRow[] {
   const s = getStore();
   const dateStr = date ? toDateString(date) : undefined;
+  const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
 
   // Filter to successful benchmarks for this model with a valid latest workflow run
   const candidates = s.benchmarks.filter((br) => {
     if (br.error !== null && br.error !== undefined) return false;
     const c = s.configs.get(br.config_id);
-    if (!c || c.model !== modelKey) return false;
+    if (!c || !modelKeys.has(c.model)) return false;
     if (!s.latestRunsById.has(br.workflow_run_id)) return false;
     if (dateStr) {
       const brDate = toDateString(br.date);
@@ -355,18 +356,19 @@ export function getLatestBenchmarks(
 }
 
 export function getAllBenchmarksForHistory(
-  modelKey: string,
+  modelKey: string | string[],
   isl: number,
   osl: number,
 ): BenchmarkRow[] {
   const s = getStore();
+  const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
 
   const results: BenchmarkRow[] = [];
   for (const br of s.benchmarks) {
     if (br.error !== null && br.error !== undefined) continue;
     if (br.isl !== isl || br.osl !== osl) continue;
     const c = s.configs.get(br.config_id);
-    if (!c || c.model !== modelKey) continue;
+    if (!c || !modelKeys.has(c.model)) continue;
     const wr = s.latestRunsById.get(br.workflow_run_id);
     if (!wr) continue;
 

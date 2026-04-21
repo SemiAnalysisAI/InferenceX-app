@@ -53,7 +53,12 @@ describe('GET /api/v1/benchmarks', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockRows);
-    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', 'dsr1', undefined, undefined);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      undefined,
+      undefined,
+    );
   });
 
   it('passes date param to query when provided', async () => {
@@ -63,7 +68,7 @@ describe('GET /api/v1/benchmarks', () => {
     expect(res.status).toBe(200);
     expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
       'mock-sql',
-      'dsr1',
+      ['dsr1'],
       '2026-03-01',
       undefined,
     );
@@ -76,7 +81,7 @@ describe('GET /api/v1/benchmarks', () => {
       req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01&exact=true'),
     );
     expect(res.status).toBe(200);
-    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', 'dsr1', '2026-03-01', true);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', ['dsr1'], '2026-03-01', true);
   });
 
   it('returns 500 when query throws', async () => {

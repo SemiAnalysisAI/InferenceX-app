@@ -46,15 +46,15 @@ export function buildEvaluationChartRows(
 ): EvaluationChartData[] {
   if (!selectedBenchmark || !selectedModel) return [];
 
-  const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-  if (!dbModelKey) return [];
+  const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
+  if (!dbModelKeys || dbModelKeys.length === 0) return [];
 
   const showPrecision = selectedPrecisions.length > 1;
   const allData = rawData
     .filter(
       (item) =>
         item.task === selectedBenchmark &&
-        item.model === dbModelKey &&
+        dbModelKeys.includes(item.model) &&
         (!selectedRunDate || item.date <= selectedRunDate) &&
         selectedPrecisions.includes(item.precision),
     )
@@ -167,8 +167,8 @@ export function buildEvalChangelogEntries(
 ): EvalChangelogEntry[] {
   if (!selectedRunDate || !selectedModel) return [];
 
-  const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-  if (!dbModelKey) return [];
+  const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
+  if (!dbModelKeys || dbModelKeys.length === 0) return [];
 
   const showPrecision = selectedPrecisions.length > 1;
   const rows = rawData
@@ -176,7 +176,7 @@ export function buildEvalChangelogEntries(
       const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
       return (
         item.date === selectedRunDate &&
-        item.model === dbModelKey &&
+        dbModelKeys.includes(item.model) &&
         selectedPrecisions.includes(item.precision) &&
         score !== 0
       );

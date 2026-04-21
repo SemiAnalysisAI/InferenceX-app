@@ -166,8 +166,8 @@ export function InferenceProvider({
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
-  const dbModelKey = useMemo(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? selectedModel,
+  const dbModelKeys = useMemo<string[]>(
+    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
   );
 
@@ -175,7 +175,7 @@ export function InferenceProvider({
     if (selectedGPUs.length === 0) return availableDates;
     if (!availabilityRows) return availableDates;
     const rows = availabilityRows.filter((r) => {
-      if (r.model !== dbModelKey) return false;
+      if (!dbModelKeys.includes(r.model)) return false;
       if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) return false;
       if (!effectivePrecisions.includes(r.precision)) return false;
       if (!r.hardware) return false;
@@ -186,7 +186,7 @@ export function InferenceProvider({
     return dates.length > 0 ? dates : availableDates;
   }, [
     availabilityRows,
-    dbModelKey,
+    dbModelKeys,
     effectiveSequence,
     effectivePrecisions,
     selectedGPUs,
@@ -200,7 +200,7 @@ export function InferenceProvider({
     if (!availabilityRows) return [];
     const hwKeys = new Set<string>();
     for (const r of availabilityRows) {
-      if (r.model !== dbModelKey) continue;
+      if (!dbModelKeys.includes(r.model)) continue;
       if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) continue;
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
@@ -213,7 +213,7 @@ export function InferenceProvider({
         value: hw,
         label: getDisplayLabel(getHardwareConfig(hw)),
       }));
-  }, [availabilityRows, dbModelKey, effectiveSequence, effectivePrecisions]);
+  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions]);
 
   // --- Tracked config functions ---
   const buildTrackedConfigId = useCallback((point: InferenceData): string => {

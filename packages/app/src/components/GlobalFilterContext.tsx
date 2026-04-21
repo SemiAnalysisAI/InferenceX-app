@@ -148,23 +148,23 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
 
-  const dbModelKey = useMemo(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? selectedModel,
+  const dbModelKeys = useMemo<string[]>(
+    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
   );
 
   // Pre-filter availability rows by model once
   const modelRows = useMemo(
-    () => availabilityRows?.filter((r) => r.model === dbModelKey) ?? [],
-    [availabilityRows, dbModelKey],
+    () => availabilityRows?.filter((r) => dbModelKeys.includes(r.model)) ?? [],
+    [availabilityRows, dbModelKeys],
   );
 
   // Models that have any data
   const availableModels = useMemo(() => {
     if (!availabilityRows) return MODEL_OPTIONS;
     return MODEL_OPTIONS.filter((m) => {
-      const key = DISPLAY_MODEL_TO_DB[m] ?? m;
-      return availabilityRows.some((r) => r.model === key);
+      const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
+      return availabilityRows.some((r) => keys.includes(r.model));
     });
   }, [availabilityRows]);
 

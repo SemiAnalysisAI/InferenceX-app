@@ -10,10 +10,10 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarkHistory = cachedQuery(
-  (modelKey: string, isl: number, osl: number) => {
+  (modelKeys: string[], isl: number, osl: number) => {
     if (JSON_MODE)
-      return Promise.resolve(jsonProvider.getAllBenchmarksForHistory(modelKey, isl, osl));
-    return getAllBenchmarksForHistory(getDb(), modelKey, isl, osl);
+      return Promise.resolve(jsonProvider.getAllBenchmarksForHistory(modelKeys, isl, osl));
+    return getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl);
   },
   'benchmark-history',
   { blobOnly: true },
@@ -29,11 +29,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const modelKey = DISPLAY_MODEL_TO_DB[model];
-    if (!modelKey) {
+    const modelKeys = DISPLAY_MODEL_TO_DB[model];
+    if (!modelKeys || modelKeys.length === 0) {
       return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
     }
-    const rows = await getCachedBenchmarkHistory(modelKey, isl, osl);
+    const rows = await getCachedBenchmarkHistory(modelKeys, isl, osl);
     return cachedJson(rows);
   } catch (error) {
     console.error('Error fetching benchmark history:', error);

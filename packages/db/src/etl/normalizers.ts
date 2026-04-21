@@ -52,10 +52,6 @@ const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/i;
 /** Explicit aliases for prefixes that don't match any DB key after suffix stripping. */
 const PREFIX_ALIASES: Record<string, string> = {
   gptoss: 'gptoss120b',
-  // Point-release variants bucketed with the base model
-  'glm5.1': 'glm5',
-  'kimik2.6': 'kimik2.5',
-  'minimaxm2.7': 'minimaxm2.5',
 };
 
 function resolvePrefixToKey(prefix: string): string | null {
@@ -107,7 +103,7 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   // GLM-5
   'zai-org/GLM-5-FP8': 'glm5',
-  'amd/GLM-5.1-MXFP4': 'glm5',
+  'amd/GLM-5.1-MXFP4': 'glm5.1',
 };
 
 /**
