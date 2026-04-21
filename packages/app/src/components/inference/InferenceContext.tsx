@@ -500,6 +500,9 @@ export function InferenceProvider({
   useEffect(() => {
     if (!selectedDateRange.startDate || !selectedDateRange.endDate) return;
     if (selectedGPUs.length === 0) return;
+    // Skip while availability is still loading — empty here means "not loaded yet",
+    // not "no dates", so clearing would wipe URL-restored selections on mount.
+    if (dateRangeAvailableDates.length === 0) return;
     const dateSet = new Set(dateRangeAvailableDates);
     if (!dateSet.has(selectedDateRange.startDate) || !dateSet.has(selectedDateRange.endDate)) {
       setSelectedDateRange({ startDate: '', endDate: '' });
