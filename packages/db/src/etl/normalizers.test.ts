@@ -153,6 +153,13 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ model: 'MiniMaxAI/MiniMax-M2.5' })).toBe('minimaxm2.5');
     expect(resolveModelKey({ model: 'zai-org/GLM-5-FP8' })).toBe('glm5');
   });
+
+  it('buckets point-release variants under the base model', () => {
+    expect(resolveModelKey({ infmax_model_prefix: 'glm5.1' })).toBe('glm5');
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.6' })).toBe('kimik2.5');
+    expect(resolveModelKey({ infmax_model_prefix: 'minimaxm2.7' })).toBe('minimaxm2.5');
+    expect(resolveModelKey({ model: 'amd/GLM-5.1-MXFP4' })).toBe('glm5');
+  });
 });
 
 describe('MODEL_TO_KEY', () => {
