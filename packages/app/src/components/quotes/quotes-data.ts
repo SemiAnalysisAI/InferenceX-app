@@ -322,7 +322,7 @@ export const QUOTES: Quote[] = [
     name: 'Alex Yeh',
     title: 'Founder & CEO, GMI Cloud',
     org: 'GMI Cloud',
-    logo: 'gmi-cloud.webp',
+    logo: 'gmi-cloud.svg',
     link: 'https://www.linkedin.com/in/gmi-yeh',
   },
 ];
