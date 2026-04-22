@@ -131,6 +131,12 @@ export function resolveModelKey(row: Record<string, any>): string | null {
  * Handles special cases: `sglang-disagg` is normalized to `mori-sglang` + `disagg=true`;
  * `dynamo-trtllm` is renamed to `dynamo-trt`.
  *
+ * Framework name carries disagg semantics: any canonical framework starting
+ * with `dynamo-` or `mori-` implies disagg, regardless of what the artifact
+ * wrote in its `disagg` field. Older artifacts (pre-2026-04) sometimes set
+ * `disagg=false` under these frameworks, which produced mixed-date legend
+ * lines in the frontend — see migration 002.
+ *
  * @param fw - Raw framework value from the artifact (e.g. `"sglang"`, `"sglang-disagg"` → `"mori-sglang"`).
  * @param disaggField - Raw disagg field from the artifact (boolean or string `"True"`/`"true"`).
  * @returns An object with the canonical `framework` string and the `disagg` boolean flag.
@@ -141,9 +147,11 @@ export function normalizeFramework(
 ): { framework: string; disagg: boolean } {
   const lower = fw.toLowerCase();
   const alias = FRAMEWORK_ALIASES[lower];
-  const disagg =
+  const canonical = alias?.canonical ?? lower;
+  const rawDisagg =
     alias?.disagg ?? (disaggField === true || disaggField === 'True' || disaggField === 'true');
-  return { framework: alias?.canonical ?? lower, disagg };
+  const disagg = rawDisagg || canonical.startsWith('dynamo-') || canonical.startsWith('mori-');
+  return { framework: canonical, disagg };
 }
 
 /** Vendor-specific precision aliases → canonical DB key. */

@@ -190,14 +190,14 @@ describe('normalizeFramework', () => {
     });
   });
 
-  it('renames dynamo-trtllm to dynamo-trt', () => {
+  it('renames dynamo-trtllm to dynamo-trt and forces disagg=true (framework implies it)', () => {
     expect(normalizeFramework('dynamo-trtllm', false)).toEqual({
       framework: 'dynamo-trt',
-      disagg: false,
+      disagg: true,
     });
   });
 
-  it('reads disagg flag from disaggField', () => {
+  it('reads disagg flag from disaggField for non-dynamo/mori frameworks', () => {
     expect(normalizeFramework('vllm', true)).toEqual({ framework: 'vllm', disagg: true });
     expect(normalizeFramework('vllm', 'True')).toEqual({ framework: 'vllm', disagg: true });
     expect(normalizeFramework('vllm', 'true')).toEqual({ framework: 'vllm', disagg: true });
@@ -211,6 +211,37 @@ describe('normalizeFramework', () => {
       framework: 'mori-sglang',
       disagg: true,
     });
+  });
+
+  it('forces disagg=true for dynamo-* canonicals regardless of disaggField', () => {
+    expect(normalizeFramework('dynamo-trt', false)).toEqual({
+      framework: 'dynamo-trt',
+      disagg: true,
+    });
+    expect(normalizeFramework('dynamo-sglang', 'false')).toEqual({
+      framework: 'dynamo-sglang',
+      disagg: true,
+    });
+    expect(normalizeFramework('dynamo-vllm', null)).toEqual({
+      framework: 'dynamo-vllm',
+      disagg: true,
+    });
+  });
+
+  it('forces disagg=true for mori-* canonicals regardless of disaggField', () => {
+    expect(normalizeFramework('mori-sglang', false)).toEqual({
+      framework: 'mori-sglang',
+      disagg: true,
+    });
+    expect(normalizeFramework('mori-sglang', null)).toEqual({
+      framework: 'mori-sglang',
+      disagg: true,
+    });
+  });
+
+  it('does not force disagg for plain sglang or trt (framework does not imply disagg)', () => {
+    expect(normalizeFramework('sglang', false)).toEqual({ framework: 'sglang', disagg: false });
+    expect(normalizeFramework('trt', false)).toEqual({ framework: 'trt', disagg: false });
   });
 });
 

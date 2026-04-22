@@ -61,3 +61,6 @@
 # wsl shenanigans
 C:*
 .vercel
+
+# one-off local scripts (ad-hoc DB migrations, scratch SQL, etc.)
+**/scratch/
