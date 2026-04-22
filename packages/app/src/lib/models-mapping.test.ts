@@ -19,15 +19,19 @@ describe('DB_MODEL_TO_DISPLAY', () => {
 });
 
 describe('DISPLAY_MODEL_TO_DB', () => {
-  it('is the exact inverse of DB_MODEL_TO_DISPLAY', () => {
+  it('is the complete inverse of DB_MODEL_TO_DISPLAY (many DB keys may back one display)', () => {
     for (const [dbKey, displayName] of Object.entries(DB_MODEL_TO_DISPLAY)) {
-      expect(DISPLAY_MODEL_TO_DB[displayName]).toBe(dbKey);
+      expect(DISPLAY_MODEL_TO_DB[displayName]).toContain(dbKey);
     }
   });
 
-  it('maps display names back to DB keys', () => {
-    expect(DISPLAY_MODEL_TO_DB['DeepSeek-R1-0528']).toBe('dsr1');
-    expect(DISPLAY_MODEL_TO_DB['gpt-oss-120b']).toBe('gptoss120b');
+  it('maps display names back to arrays of DB keys', () => {
+    expect(DISPLAY_MODEL_TO_DB['DeepSeek-R1-0528']).toEqual(['dsr1']);
+    expect(DISPLAY_MODEL_TO_DB['gpt-oss-120b']).toEqual(['gptoss120b']);
+  });
+
+  it('groups point-release DB keys under one display', () => {
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(expect.arrayContaining(['glm5', 'glm5.1']));
   });
 });
 

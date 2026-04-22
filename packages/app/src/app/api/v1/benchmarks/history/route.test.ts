@@ -78,7 +78,7 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockRows);
-    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', 'dsr1', 1024, 1024);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 1024);
   });
 
   it('returns 500 when query throws', async () => {
@@ -101,6 +101,6 @@ describe('GET /api/v1/benchmarks/history', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
-    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', 'dsr1', 1024, 8192);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 8192);
   });
 });

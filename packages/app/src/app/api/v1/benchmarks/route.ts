@@ -10,10 +10,10 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarks = cachedQuery(
-  (dbModelKey: string, date?: string, exact?: boolean) => {
+  (dbModelKeys: string[], date?: string, exact?: boolean) => {
     if (JSON_MODE)
-      return Promise.resolve(jsonProvider.getLatestBenchmarks(dbModelKey, date, exact));
-    return getLatestBenchmarks(getDb(), dbModelKey, date, exact);
+      return Promise.resolve(jsonProvider.getLatestBenchmarks(dbModelKeys, date, exact));
+    return getLatestBenchmarks(getDb(), dbModelKeys, date, exact);
   },
   'benchmarks',
   { blobOnly: true },
@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
   const model = params.get('model') ?? '';
   const date = params.get('date') ?? undefined;
   const exact = params.get('exact') === 'true';
-  const dbModelKey = DISPLAY_MODEL_TO_DB[model];
-  if (!dbModelKey) {
+  const dbModelKeys = DISPLAY_MODEL_TO_DB[model];
+  if (!dbModelKeys || dbModelKeys.length === 0) {
     return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
   }
 
   try {
-    const rows = await getCachedBenchmarks(dbModelKey, date, exact || undefined);
+    const rows = await getCachedBenchmarks(dbModelKeys, date, exact || undefined);
     return cachedJson(rows);
   } catch (error) {
     console.error('Error fetching benchmarks:', error);

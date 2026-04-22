@@ -317,6 +317,14 @@ export const QUOTES: Quote[] = [
     logo: 'uc-san-diego.svg',
     link: 'https://haozhang.ai/',
   },
+  {
+    text: 'At GMI Cloud, we believe inference has become the center of AI value creation. SemiAnalysis has done something the industry has long needed with InferenceX—they’ve turned inference from a black box into a continuously measured, real-world system. By benchmarking not just hardware, but the full stack—models, runtimes, and distributed systems—InferenceX reflects how AI actually runs in production, not how it’s marketed.',
+    name: 'Alex Yeh',
+    title: 'Founder & CEO, GMI Cloud',
+    org: 'GMI Cloud',
+    logo: 'gmi-cloud.svg',
+    link: 'https://www.linkedin.com/in/gmi-yeh',
+  },
 ];
 
 /** Orgs featured in the landing page carousel. */

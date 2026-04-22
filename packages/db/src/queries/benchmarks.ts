@@ -28,19 +28,22 @@ export interface BenchmarkRow {
 }
 
 /**
- * Fetch the latest benchmark results for a model across ALL sequences, up to a given date.
- * Returns the most recent result per (config, concurrency, isl, osl) — so every GPU/framework
- * + sequence combo that has been benchmarked appears, with the newest data winning.
+ * Fetch the latest benchmark results for one or more model DB keys across ALL sequences,
+ * up to a given date. Multiple keys support point-release grouping — e.g. passing
+ * `['glm5', 'glm5.1']` unions both buckets under the one display. Returns the most recent
+ * result per (config, concurrency, isl, osl) — so every GPU/framework + sequence combo
+ * that has been benchmarked appears, with the newest data winning.
  *
  * The frontend filters by sequence client-side. This eliminates API round-trips when
  * switching sequences — the data is already cached by React Query.
  */
 export async function getLatestBenchmarks(
   sql: DbClient,
-  modelKey: string,
+  modelKey: string | string[],
   date?: string,
   exact?: boolean,
 ): Promise<BenchmarkRow[]> {
+  const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   if (date) {
     // Date-filtered: use base table with DISTINCT ON (the view only has the absolute latest)
     // exact=true: only return data from this exact date (for GPU comparison)
@@ -75,7 +78,7 @@ export async function getLatestBenchmarks(
       FROM benchmark_results br
       JOIN configs c ON c.id = br.config_id
       JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-      WHERE c.model = ${modelKey}
+      WHERE c.model = ANY(${modelKeys})
         AND br.error IS NULL
         AND ${dateFilter}
       ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
@@ -113,7 +116,7 @@ export async function getLatestBenchmarks(
     FROM latest_benchmarks lb
     JOIN configs c ON c.id = lb.config_id
     JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
-    WHERE c.model = ${modelKey}
+    WHERE c.model = ANY(${modelKeys})
     ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
   `;
   return rows as unknown as BenchmarkRow[];
@@ -126,10 +129,11 @@ export async function getLatestBenchmarks(
  */
 export async function getAllBenchmarksForHistory(
   sql: DbClient,
-  modelKey: string,
+  modelKey: string | string[],
   isl: number,
   osl: number,
 ): Promise<BenchmarkRow[]> {
+  const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   const rows = await sql`
     SELECT
       c.hardware,
@@ -161,7 +165,7 @@ export async function getAllBenchmarksForHistory(
       AND br.osl = ${osl}
       AND br.error IS NULL
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    WHERE c.model = ${modelKey}
+    WHERE c.model = ANY(${modelKeys})
     ORDER BY br.date, c.id, br.conc
   `;
   return rows as unknown as BenchmarkRow[];

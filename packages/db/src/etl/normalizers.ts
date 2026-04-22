@@ -103,6 +103,7 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   // GLM-5
   'zai-org/GLM-5-FP8': 'glm5',
+  'amd/GLM-5.1-MXFP4': 'glm5.1',
 };
 
 /**

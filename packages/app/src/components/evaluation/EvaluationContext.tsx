@@ -100,10 +100,10 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [rawData, unofficialRawData]);
 
   const availableDates = useMemo(() => {
-    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
+    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [];
     const dates = new Set(
       rawData
-        .filter((item) => item.model === dbModelKey)
+        .filter((item) => dbModelKeys.includes(item.model))
         .map((item) => item.date)
         .filter(Boolean),
     );
@@ -171,12 +171,12 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   useAutoInitializeToggleSet(availableHardware, enabledHardware, setEnabledHardware);
 
   const availablePrecisions = useMemo(() => {
-    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-    if (!dbModelKey) return globalAvailablePrecisions;
+    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
+    if (!dbModelKeys || dbModelKeys.length === 0) return globalAvailablePrecisions;
     const precs = [
       ...new Set(
         [...rawData, ...unofficialRawData]
-          .filter((r) => r.model === dbModelKey)
+          .filter((r) => dbModelKeys.includes(r.model))
           .map((r) => r.precision),
       ),
     ].toSorted();
@@ -238,8 +238,8 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 
   const modelHasEvalData = useMemo(() => {
     if (!selectedModel) return false;
-    const dbModelKey = DISPLAY_MODEL_TO_DB[selectedModel];
-    return [...rawData, ...unofficialRawData].some((item) => item.model === dbModelKey);
+    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [];
+    return [...rawData, ...unofficialRawData].some((item) => dbModelKeys.includes(item.model));
   }, [rawData, unofficialRawData, selectedModel]);
 
   const hwTypesWithData = useMemo(

@@ -79,13 +79,13 @@ export function QuotesContent() {
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               {orgLogos.map(({ org, logo }) => (
-                <div key={org} className="flex items-center justify-center h-10 px-2" title={org}>
+                <div key={org} className="flex items-center justify-center h-10 px-3" title={org}>
                   <img
                     src={`/logos/${logo}`}
                     alt={org}
-                    width={80}
+                    width={96}
                     height={40}
-                    className="h-8 max-w-20 object-contain grayscale opacity-70 dark:invert"
+                    className="h-8 max-w-24 object-contain grayscale opacity-70 dark:invert"
                   />
                 </div>
               ))}
