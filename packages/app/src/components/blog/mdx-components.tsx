@@ -122,6 +122,21 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
       </div>
     ),
     Blur,
+    DashboardCTA: (props: { href?: string; children?: ReactNode }) => {
+      const href = props.href ?? 'https://inferencex.semianalysis.com';
+      return (
+        <div className="my-6 flex justify-center">
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-0 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+          >
+            {props.children ?? 'See full InferenceX Dashboard'}
+          </a>
+        </div>
+      );
+    },
     JsonLd: (props: { children?: ReactNode }) => {
       const raw = childrenToText(props.children).trim();
       if (!raw) return null;

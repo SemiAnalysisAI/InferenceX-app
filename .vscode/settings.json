@@ -64,6 +64,7 @@
     "protobufjs",
     "qwen",
     "renderable",
+    "rocm",
     "semianalysis",
     "semianalysisai",
     "sglang",
