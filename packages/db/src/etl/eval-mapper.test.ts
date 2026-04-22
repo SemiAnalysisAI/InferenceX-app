@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { configCacheKey } from './config-cache';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';
 
@@ -129,6 +130,33 @@ describe('mapEvalRow', () => {
     expect(cfg.decodeEp).toBe(2);
     expect(cfg.numPrefillGpu).toBe(8);
     expect(cfg.numDecodeGpu).toBe(8);
+  });
+
+  it('uses v2 prefill_*/decode_* when present on meta_env', () => {
+    const tracker = createSkipTracker();
+    const meta = makeMeta({
+      is_multinode: true,
+      tp: 4,
+      ep: 1,
+      prefill_tp: 4,
+      prefill_ep: 1,
+      prefill_dp_attention: 'true',
+      prefill_num_workers: 7,
+      decode_tp: 8,
+      decode_ep: 8,
+      decode_dp_attention: 'true',
+      decode_num_workers: 1,
+    });
+    const result = mapEvalRow(meta, makeResults(), tracker);
+    const cfg = result[0].config;
+
+    expect(cfg.isMultinode).toBe(true);
+    expect(cfg.disagg).toBe(true);
+    expect(cfg.prefillTp).toBe(4);
+    expect(cfg.prefillNumWorkers).toBe(7);
+    expect(cfg.decodeTp).toBe(8);
+    expect(cfg.decodeEp).toBe(8);
+    expect(cfg.decodeNumWorkers).toBe(1);
   });
 
   it('returns null isl/osl/conc when missing from meta', () => {
@@ -300,11 +328,112 @@ describe('mapAggEvalRow', () => {
     expect(result!.config.numDecodeGpu).toBe(8);
   });
 
-  it('sets isMultinode to false always', () => {
+  it('sets isMultinode to false when row omits it', () => {
     const tracker = createSkipTracker();
     const result = mapAggEvalRow(makeAggRow(), tracker);
 
     expect(result!.config.isMultinode).toBe(false);
+  });
+
+  describe('v2 schema (disagg / multinode)', () => {
+    /** Row carrying the v2 prefill/decode fields produced by disagg CI runs. */
+    function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
+      return makeAggRow({
+        hw: 'B300',
+        framework: 'dynamo-trt',
+        is_multinode: true,
+        tp: 4,
+        ep: 1,
+        dp_attention: 'true',
+        prefill_tp: 4,
+        prefill_ep: 1,
+        prefill_dp_attention: 'true',
+        prefill_num_workers: 7,
+        decode_tp: 8,
+        decode_ep: 8,
+        decode_dp_attention: 'true',
+        decode_num_workers: 1,
+        conc: 3072,
+        ...overrides,
+      });
+    }
+
+    it('reads prefill_*/decode_* instead of top-level tp/ep', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(makeV2Row(), tracker);
+      const cfg = result!.config;
+
+      expect(cfg.prefillTp).toBe(4);
+      expect(cfg.prefillEp).toBe(1);
+      expect(cfg.prefillNumWorkers).toBe(7);
+      expect(cfg.prefillDpAttn).toBe(true);
+      expect(cfg.decodeTp).toBe(8);
+      expect(cfg.decodeEp).toBe(8);
+      expect(cfg.decodeNumWorkers).toBe(1);
+      expect(cfg.decodeDpAttn).toBe(true);
+    });
+
+    it('preserves is_multinode', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(makeV2Row(), tracker);
+
+      expect(result!.config.isMultinode).toBe(true);
+    });
+
+    it('marks disagg=true when is_multinode is set', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(makeV2Row(), tracker);
+
+      expect(result!.config.disagg).toBe(true);
+    });
+
+    it('marks disagg=true when either side has num_workers > 0 (single-node disagg)', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(
+        makeV2Row({ is_multinode: false, prefill_num_workers: 1, decode_num_workers: 2 }),
+        tracker,
+      );
+
+      expect(result!.config.disagg).toBe(true);
+    });
+
+    it('keeps disagg=false when v2 fields are all zero workers and not multinode', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(
+        makeV2Row({ is_multinode: false, prefill_num_workers: 0, decode_num_workers: 0 }),
+        tracker,
+      );
+
+      // Symmetric no-disagg v2 row — framework alias is plain dynamo-trt so nothing forces disagg.
+      expect(result!.config.disagg).toBe(false);
+    });
+
+    it('reads explicit num_prefill_gpu / num_decode_gpu when present', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(makeV2Row({ num_prefill_gpu: 28, num_decode_gpu: 64 }), tracker);
+
+      expect(result!.config.numPrefillGpu).toBe(28);
+      expect(result!.config.numDecodeGpu).toBe(64);
+    });
+
+    it('does not collide distinct disagg variants onto the same config key', () => {
+      const tracker = createSkipTracker();
+      const a = mapAggEvalRow(makeV2Row(), tracker)!.config;
+      const b = mapAggEvalRow(
+        makeV2Row({
+          prefill_tp: 2,
+          prefill_ep: 2,
+          prefill_num_workers: 11,
+          decode_tp: 4,
+          decode_ep: 4,
+          decode_num_workers: 3,
+        }),
+        tracker,
+      )!.config;
+
+      // Any difference in the natural-key fields is enough to separate configs.
+      expect(configCacheKey(a)).not.toBe(configCacheKey(b));
+    });
   });
 
   describe('skip tracking', () => {

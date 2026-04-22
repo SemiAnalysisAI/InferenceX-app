@@ -278,6 +278,15 @@ export function createMockEvaluationChartData(
     ep: 0,
     dp_attention: false,
     conc: 1,
+    disagg: false,
+    isMultinode: false,
+    prefillTp: 8,
+    prefillEp: 0,
+    prefillDpAttention: false,
+    prefillNumWorkers: 0,
+    decodeNumWorkers: 0,
+    numPrefillGpu: 8,
+    numDecodeGpu: 8,
     ...overrides,
   };
 }

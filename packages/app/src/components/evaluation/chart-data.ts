@@ -6,16 +6,56 @@ import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getFrameworkLabel } from '@/lib/utils';
 
-const evalGroupKeyFn = (item: EvaluationChartData) =>
-  `${item.hwKey}_${item.framework}_${item.specDecode}_${item.precision}`;
+interface EvalLabelParams {
+  disagg?: boolean;
+  /** Decode-side (or single-node) TP. Not shown when undefined. */
+  decodeTp?: number;
+  /** Decode-side (or single-node) EP. Not shown when undefined. */
+  decodeEp?: number;
+  /** Decode-side (or single-node) DPA flag. */
+  decodeDpa?: boolean;
+  /** Decode-side worker count (disagg only). */
+  decodeNw?: number;
+  /** Prefill-side TP (disagg only). */
+  prefillTp?: number;
+  /** Prefill-side EP (disagg only). */
+  prefillEp?: number;
+  /** Prefill-side DPA flag (disagg only). */
+  prefillDpa?: boolean;
+  /** Prefill-side worker count (disagg only). */
+  prefillNw?: number;
+}
 
+/** Format a disagg side's tuple, omitting default dpa=false and nw=1 tokens. */
+function fmtSide(
+  side: 'P' | 'D',
+  tp: number,
+  ep: number,
+  dpa: boolean | undefined,
+  nw: number | undefined,
+): string {
+  const parts: string[] = [`tp${tp}`, `ep${ep}`];
+  if (dpa) parts.push('dpaT');
+  if (nw !== undefined && nw > 1) parts.push(`nw${nw}`);
+  return `${side}(${parts.join('/')})`;
+}
+
+/**
+ * Legend/x-axis label format:
+ * - single-node: `{hw} ({framework}[, {spec}])\nC{conc} T{tp} E{ep} [DPA]`
+ * - disagg:      `{hw} ({framework}[, {spec}])\nC{conc} P(tp{n}/ep{n}[/dpaT][/nw{n>1}]) D(tp{n}/ep{n}[/dpaT][/nw{n>1}])`
+ *
+ * The P(…)/D(…) tuple format itself signals disagg (vs single-node's T#/E#),
+ * so the header doesn't repeat "Disagg". Default values (dpa=false, nw=1) are
+ * omitted from the tuples to keep labels compact.
+ */
 function buildConfigLabel(
   hwLabel: string,
   framework: string,
   specMethod: string,
   precision: string,
   conc: number | null,
-  tp: number | undefined,
+  params: EvalLabelParams,
   showPrecision: boolean,
 ): string {
   const headerSuffixes: string[] = [];
@@ -25,10 +65,26 @@ function buildConfigLabel(
   const detailSuffixes: string[] = [];
   if (precision && showPrecision) detailSuffixes.push(precision.toUpperCase());
   if (conc) detailSuffixes.push(`C${conc}`);
-  if (tp !== undefined) detailSuffixes.push(`TP${tp}`);
+
+  if (params.disagg) {
+    if (params.prefillTp !== undefined && params.prefillEp !== undefined) {
+      detailSuffixes.push(
+        fmtSide('P', params.prefillTp, params.prefillEp, params.prefillDpa, params.prefillNw),
+      );
+    }
+    if (params.decodeTp !== undefined && params.decodeEp !== undefined) {
+      detailSuffixes.push(
+        fmtSide('D', params.decodeTp, params.decodeEp, params.decodeDpa, params.decodeNw),
+      );
+    }
+  } else {
+    if (params.decodeTp !== undefined) detailSuffixes.push(`T${params.decodeTp}`);
+    if (params.decodeEp !== undefined) detailSuffixes.push(`E${params.decodeEp}`);
+    if (params.decodeDpa) detailSuffixes.push('DPA');
+  }
 
   const line1 = headerSuffixes.length > 0 ? `${hwLabel} (${headerSuffixes.join(', ')})` : hwLabel;
-  return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(', ')}` : line1;
+  return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(' ')}` : line1;
 }
 
 /**
@@ -59,11 +115,21 @@ export function buildEvaluationChartRows(
         selectedPrecisions.includes(item.precision),
     )
     .map((item): EvaluationChartData | null => {
-      const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
-      if (score === 0) return null;
+      const score = item.metrics.em_strict ?? item.metrics.score;
+      if (score === undefined) {
+        console.warn(
+          `[evaluation] dropped row with missing metrics: config_id=${item.config_id} ${item.hardware} ${item.framework} ${item.task}`,
+        );
+        return null;
+      }
 
       const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      if (hwKey === 'unknown') return null;
+      if (hwKey === 'unknown') {
+        console.warn(
+          `[evaluation] dropped row with unknown hardware mapping: hardware=${item.hardware} framework=${item.framework} spec=${item.spec_method}`,
+        );
+        return null;
+      }
 
       const hwConfig = getHardwareConfig(hwKey);
       const hwLabel = hwConfig.label;
@@ -77,7 +143,17 @@ export function buildEvaluationChartRows(
           item.spec_method,
           item.precision,
           item.conc,
-          item.decode_tp,
+          {
+            disagg: item.disagg,
+            decodeTp: item.decode_tp,
+            decodeEp: item.decode_ep,
+            decodeDpa: item.decode_dp_attention,
+            decodeNw: item.decode_num_workers,
+            prefillTp: item.prefill_tp,
+            prefillEp: item.prefill_ep,
+            prefillDpa: item.prefill_dp_attention,
+            prefillNw: item.prefill_num_workers,
+          },
           showPrecision,
         ),
         score,
@@ -93,33 +169,52 @@ export function buildEvaluationChartRows(
         ep: item.decode_ep,
         dp_attention: item.decode_dp_attention,
         conc: item.conc ?? 0,
+        disagg: item.disagg,
+        isMultinode: item.is_multinode,
+        prefillTp: item.prefill_tp,
+        prefillEp: item.prefill_ep,
+        prefillDpAttention: item.prefill_dp_attention,
+        prefillNumWorkers: item.prefill_num_workers,
+        decodeNumWorkers: item.decode_num_workers,
+        numPrefillGpu: item.num_prefill_gpu,
+        numDecodeGpu: item.num_decode_gpu,
         runUrl: item.run_url ?? undefined,
       };
     })
     .filter((item): item is EvaluationChartData => item !== null);
 
-  const latestDateForGroup = new Map<string, string>();
+  // Dedup by configId so each distinct config (unique prefill/decode geometry,
+  // spec method, precision, etc.) gets its own "latest date" slot. Prior code
+  // keyed by (hwKey, framework, spec, precision), which coalesced disagg
+  // variants and risked dropping one's history when another backfilled.
+  const latestDateForConfig = new Map<number, string>();
   for (const item of allData) {
-    const key = evalGroupKeyFn(item);
-    const existing = latestDateForGroup.get(key);
-    if (!existing || item.date > existing) latestDateForGroup.set(key, item.date);
+    const existing = latestDateForConfig.get(item.configId);
+    if (!existing || item.date > existing) latestDateForConfig.set(item.configId, item.date);
   }
 
   return allData
-    .filter((item) => item.date === latestDateForGroup.get(evalGroupKeyFn(item)))
+    .filter((item) => item.date === latestDateForConfig.get(item.configId))
     .toSorted((a, b) => a.configLabel.localeCompare(b.configLabel));
 }
 
-/** Aggregate repeated eval rows by config label and keep min/max/error range metadata. */
+/**
+ * Aggregate repeated eval rows for the same config (retries, reruns on the same
+ * date, etc.) into a single data point with min/max/error range metadata.
+ *
+ * Grouping is by `configId` rather than `configLabel`: two distinct configs
+ * could theoretically render the same label — `configId` keys directly off the
+ * row identity from the configs natural key.
+ */
 export function aggregateEvaluationChartRows(
   unfilteredChartData: EvaluationChartData[],
   enabledHardware: Set<string>,
 ): EvaluationChartData[] {
-  const grouped = new Map<string, EvaluationChartData[]>();
+  const grouped = new Map<number, EvaluationChartData[]>();
   for (const data of unfilteredChartData) {
     if (!enabledHardware.has(String(data.hwKey))) continue;
-    if (!grouped.has(data.configLabel)) grouped.set(data.configLabel, []);
-    grouped.get(data.configLabel)!.push(data);
+    if (!grouped.has(data.configId)) grouped.set(data.configId, []);
+    grouped.get(data.configId)!.push(data);
   }
 
   return [...grouped.values()]
@@ -173,18 +268,20 @@ export function buildEvalChangelogEntries(
   const showPrecision = selectedPrecisions.length > 1;
   const rows = rawData
     .filter((item) => {
-      const score = item.metrics.em_strict ?? item.metrics.score ?? 0;
+      const rawScore = item.metrics.em_strict ?? item.metrics.score;
       return (
         item.date === selectedRunDate &&
         dbModelKeys.includes(item.model) &&
         selectedPrecisions.includes(item.precision) &&
-        score !== 0
+        rawScore !== undefined
       );
     })
     .map((item) => {
       const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
       const hwConfig = getHardwareConfig(hwKey);
       const hwLabel = hwConfig.label;
+      // Changelog labels historically omit TP/EP; keep that behavior while
+      // still surfacing the disagg marker.
       return {
         benchmark: item.task,
         configLabel: buildConfigLabel(
@@ -193,7 +290,11 @@ export function buildEvalChangelogEntries(
           item.spec_method,
           item.precision,
           item.conc,
-          undefined,
+          {
+            disagg: item.disagg,
+            prefillDpa: item.prefill_dp_attention,
+            decodeDpa: item.decode_dp_attention,
+          },
           showPrecision,
         ),
       };

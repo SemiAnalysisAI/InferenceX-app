@@ -83,36 +83,25 @@ export function mapEvalRow(
   const taskEntries = Object.entries(tasksDict as Record<string, any>);
   if (taskEntries.length === 0) return [];
 
-  const { framework, disagg } = normalizeFramework(String(meta.framework ?? ''), meta.disagg);
-  const tp = parseInt2(meta.tp) ?? 1;
-  const ep = parseInt2(meta.ep) ?? 1;
-  const dpAttn = parseBool(meta.dp_attention);
+  const { framework, disagg: disaggFromFw } = normalizeFramework(
+    String(meta.framework ?? ''),
+    meta.disagg,
+  );
   const precision = normalizePrecision(String(meta.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }
   const specMethod = normalizeSpecMethod(meta.spec_decoding);
   const lmEvalVersion = results.lm_eval_version ? String(results.lm_eval_version) : null;
-
-  const config = {
-    hardware: gpuKey,
+  const config = buildEvalConfig(
+    meta,
+    gpuKey,
     framework,
-    model: modelKey,
+    modelKey,
     precision,
     specMethod,
-    disagg,
-    isMultinode: false,
-    prefillTp: tp,
-    prefillEp: ep,
-    prefillDpAttn: dpAttn,
-    prefillNumWorkers: 0,
-    decodeTp: tp,
-    decodeEp: ep,
-    decodeDpAttn: dpAttn,
-    decodeNumWorkers: 0,
-    numPrefillGpu: tp * ep,
-    numDecodeGpu: tp * ep,
-  };
+    disaggFromFw,
+  );
 
   const nSamples = results['n-samples'] as Record<string, any> | undefined;
 
@@ -177,10 +166,10 @@ export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): E
   const task = String(row.task ?? '').toLowerCase();
   if (!task) return null;
 
-  const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
-  const tp = parseInt2(row.tp) ?? 1;
-  const ep = parseInt2(row.ep) ?? 1;
-  const dpAttn = parseBool(row.dp_attention);
+  const { framework, disagg: disaggFromFw } = normalizeFramework(
+    String(row.framework ?? ''),
+    row.disagg,
+  );
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
@@ -204,30 +193,95 @@ export function mapAggEvalRow(row: Record<string, any>, tracker: SkipTracker): E
   add('score_se', row.score_se);
 
   return {
-    config: {
-      hardware: gpuKey,
-      framework,
-      model: modelKey,
-      precision,
-      specMethod,
-      disagg,
-      isMultinode: false,
-      prefillTp: tp,
-      prefillEp: ep,
-      prefillDpAttn: dpAttn,
-      prefillNumWorkers: 0,
-      decodeTp: tp,
-      decodeEp: ep,
-      decodeDpAttn: dpAttn,
-      decodeNumWorkers: 0,
-      numPrefillGpu: tp * ep,
-      numDecodeGpu: tp * ep,
-    },
+    config: buildEvalConfig(row, gpuKey, framework, modelKey, precision, specMethod, disaggFromFw),
     task,
     isl: islOsl?.isl ?? null,
     osl: islOsl?.osl ?? null,
     conc: parseInt2(row.conc) ?? null,
     lmEvalVersion: null,
     metrics,
+  };
+}
+
+/**
+ * Build a `ConfigParams` from an eval source row (either an agg row or a meta_env dict).
+ *
+ * Handles both schemas that appear in the artifacts:
+ * - **v1** (legacy single-node): only `tp`/`ep`/`dp_attention` — prefill = decode,
+ *   `num_workers` defaults to 0, `is_multinode` is false.
+ * - **v2** (disagg / multinode, 2025-12-19+): separate `prefill_tp`/`decode_tp` etc.
+ *   with `prefill_num_workers`/`decode_num_workers` and `is_multinode`. Presence of
+ *   `prefill_tp` on the source selects the v2 branch.
+ *
+ * `disagg` is true if the framework alias forced it (e.g. `sglang-disagg`), or if
+ * the row carries `is_multinode: true`, or if either side has workers > 0 —
+ * this keeps disagg eval configs from collapsing onto non-disagg ones via the
+ * natural key (which would otherwise merge them because eval-mapper used to
+ * copy v1 `tp`/`ep` into both prefill and decode slots).
+ */
+function buildEvalConfig(
+  src: Record<string, any>,
+  hardware: string,
+  framework: string,
+  model: string,
+  precision: string,
+  specMethod: string,
+  disaggFromFw: boolean,
+): ConfigParams {
+  const isMultinode = parseBool(src.is_multinode);
+
+  let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
+  let decodeTp: number, decodeEp: number, decodeDpAttn: boolean, decodeNumWorkers: number;
+  let numPrefillGpu: number, numDecodeGpu: number;
+
+  if ('prefill_tp' in src) {
+    prefillTp = parseInt2(src.prefill_tp) ?? 1;
+    prefillEp = parseInt2(src.prefill_ep) ?? 1;
+    prefillDpAttn = parseBool(src.prefill_dp_attention);
+    prefillNumWorkers = parseInt2(src.prefill_num_workers) ?? 0;
+    decodeTp = parseInt2(src.decode_tp) ?? 1;
+    decodeEp = parseInt2(src.decode_ep) ?? 1;
+    decodeDpAttn = parseBool(src.decode_dp_attention);
+    decodeNumWorkers = parseInt2(src.decode_num_workers) ?? 0;
+    numPrefillGpu =
+      parseInt2(src.num_prefill_gpu) ?? prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
+    numDecodeGpu =
+      parseInt2(src.num_decode_gpu) ?? decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
+  } else {
+    const tp = parseInt2(src.tp) ?? 1;
+    const ep = parseInt2(src.ep) ?? 1;
+    const dpAttn = parseBool(src.dp_attention);
+    prefillTp = tp;
+    decodeTp = tp;
+    prefillEp = ep;
+    decodeEp = ep;
+    prefillDpAttn = dpAttn;
+    decodeDpAttn = dpAttn;
+    prefillNumWorkers = 0;
+    decodeNumWorkers = 0;
+    numPrefillGpu = tp * ep;
+    numDecodeGpu = tp * ep;
+  }
+
+  const disagg = disaggFromFw || isMultinode || prefillNumWorkers > 0 || decodeNumWorkers > 0;
+
+  return {
+    hardware,
+    framework,
+    model,
+    precision,
+    specMethod,
+    disagg,
+    isMultinode,
+    prefillTp,
+    prefillEp,
+    prefillDpAttn,
+    prefillNumWorkers,
+    decodeTp,
+    decodeEp,
+    decodeDpAttn,
+    decodeNumWorkers,
+    numPrefillGpu,
+    numDecodeGpu,
   };
 }

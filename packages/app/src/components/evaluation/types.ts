@@ -20,21 +20,25 @@ export interface EvaluationChartData {
   datetime: string;
   precision: string;
   framework: string; // vllm, trt, etc.
-  tp: number; // tensor parallelism
-  ep: number; // expert parallelism
-  dp_attention: boolean; // data parallel attention
+  tp: number; // tensor parallelism (decode-side for disagg)
+  ep: number; // expert parallelism (decode-side for disagg)
+  dp_attention: boolean; // data parallel attention (decode-side for disagg)
   conc: number; // concurrency
+  disagg: boolean; // disaggregated prefill/decode
+  isMultinode: boolean;
+  prefillTp: number;
+  prefillEp: number;
+  prefillDpAttention: boolean;
+  prefillNumWorkers: number;
+  decodeNumWorkers: number;
+  numPrefillGpu: number;
+  numDecodeGpu: number;
   runUrl?: string; // GitHub Actions run URL
 }
 
 export interface EvalChangelogEntry {
   benchmark: string;
   configs: string[];
-}
-
-export interface SelectOption {
-  value: string;
-  label: string;
 }
 
 /**

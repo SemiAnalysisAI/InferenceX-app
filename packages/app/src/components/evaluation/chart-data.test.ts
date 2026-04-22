@@ -17,9 +17,18 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
     model: 'dsr1',
     precision: 'fp8',
     spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 0,
     decode_tp: 8,
     decode_ep: 1,
     decode_dp_attention: false,
+    decode_num_workers: 0,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
     task: 'gsm8k',
     date: '2026-03-01',
     conc: 128,
@@ -55,10 +64,17 @@ describe('buildEvaluationChartRows', () => {
     expect(result[0]).toMatchObject({
       configId: 1,
       hwKey: 'h200_sglang',
-      configLabel: 'H200 (SGLang)\nC128, TP8',
+      configLabel: 'H200 (SGLang)\nC128 T8 E1',
       score: 0.8,
       framework: 'sglang',
       precision: 'fp8',
+      prefillTp: 8,
+      prefillEp: 1,
+      prefillNumWorkers: 0,
+      decodeNumWorkers: 0,
+      numPrefillGpu: 8,
+      numDecodeGpu: 8,
+      isMultinode: false,
     });
   });
 
@@ -87,28 +103,91 @@ describe('buildEvaluationChartRows', () => {
       '2026-03-01',
     );
 
-    expect(result[0].configLabel).toBe('H200 (Dynamo TRT, MTP)\nFP4, C128, TP8');
+    expect(result[0].configLabel).toBe('H200 (Dynamo TRT, MTP)\nFP4 C128 T8 E1');
   });
 
-  it('drops zero-score rows and unknown hardware rows', () => {
-    const result = buildEvaluationChartRows(
-      [evalRow({ metrics: { em_strict: 0 } }), evalRow({ hardware: 'unknown-gpu', framework: '' })],
+  it('renders DPA flags distinguishing prefill/decode sides', () => {
+    const rows = buildEvaluationChartRows(
+      [
+        evalRow({ config_id: 10, decode_dp_attention: true }),
+        evalRow({
+          config_id: 11,
+          framework: 'dynamo-trt',
+          disagg: true,
+          prefill_dp_attention: true,
+          decode_dp_attention: false,
+        }),
+        evalRow({
+          config_id: 12,
+          framework: 'dynamo-trt',
+          disagg: true,
+          prefill_dp_attention: false,
+          decode_dp_attention: true,
+          conc: 256,
+        }),
+        evalRow({
+          config_id: 13,
+          framework: 'dynamo-trt',
+          disagg: true,
+          prefill_dp_attention: true,
+          decode_dp_attention: true,
+          conc: 512,
+        }),
+      ],
       'gsm8k',
       Model.DeepSeek_R1,
       [Precision.FP8],
       '2026-03-01',
     );
 
-    expect(result).toEqual([]);
+    const labels = rows.map((r) => r.configLabel).toSorted();
+    expect(labels).toEqual([
+      'H200 (Dynamo TRT)\nC128 P(tp8/ep1/dpaT) D(tp8/ep1)',
+      'H200 (Dynamo TRT)\nC256 P(tp8/ep1) D(tp8/ep1/dpaT)',
+      'H200 (Dynamo TRT)\nC512 P(tp8/ep1/dpaT) D(tp8/ep1/dpaT)',
+      'H200 (SGLang)\nC128 T8 E1 DPA',
+    ]);
+  });
+
+  it('drops rows with missing metrics and unknown hardware rows, but keeps legitimate zero scores', () => {
+    const result = buildEvaluationChartRows(
+      [
+        evalRow({ config_id: 1, metrics: {} as never }),
+        evalRow({ config_id: 2, hardware: 'unknown-gpu', framework: '' }),
+        evalRow({ config_id: 3, metrics: { em_strict: 0, em_strict_se: 0 } }),
+      ],
+      'gsm8k',
+      Model.DeepSeek_R1,
+      [Precision.FP8],
+      '2026-03-01',
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ configId: 3, score: 0 });
   });
 });
 
 describe('aggregateEvaluationChartRows', () => {
-  it('averages repeated config rows and keeps min/max/error bounds', () => {
+  it('averages repeated rows of the same config and keeps min/max/error bounds', () => {
+    // Same config_id (same configs.id row) run on the same date with different
+    // scores — e.g. a rerun on the same workflow. Dedup groups by configId so
+    // they collapse into one bar with mean/min/max/error-range metadata.
     const rows = buildEvaluationChartRows(
       [
-        evalRow({ config_id: 1, conc: 128, metrics: { em_strict: 0.8, em_strict_se: 0.1 } }),
-        evalRow({ config_id: 2, conc: 128, metrics: { em_strict: 0.9, em_strict_se: 0.05 } }),
+        evalRow({
+          config_id: 1,
+          conc: 128,
+          metrics: { em_strict: 0.8, em_strict_se: 0.1 },
+          date: '2026-03-01',
+          timestamp: '2026-03-01T00:00:00Z',
+        }),
+        evalRow({
+          config_id: 1,
+          conc: 128,
+          metrics: { em_strict: 0.9, em_strict_se: 0.05 },
+          date: '2026-03-01',
+          timestamp: '2026-03-01T01:00:00Z',
+        }),
       ],
       'gsm8k',
       Model.DeepSeek_R1,
@@ -124,6 +203,26 @@ describe('aggregateEvaluationChartRows', () => {
     expect(result[0].maxScore).toBe(0.9);
     expect(result[0].errorMin).toBeCloseTo(0.7, 5);
     expect(result[0].errorMax).toBeCloseTo(0.95, 5);
+  });
+
+  it('keeps distinct configs as separate bars even when labels overlap', () => {
+    // Two rows with different configIds should render as two bars, not merge.
+    const rows = buildEvaluationChartRows(
+      [
+        evalRow({ config_id: 1, metrics: { em_strict: 0.8 } }),
+        evalRow({ config_id: 2, metrics: { em_strict: 0.9 } }),
+      ],
+      'gsm8k',
+      Model.DeepSeek_R1,
+      [Precision.FP8],
+      '2026-03-01',
+    );
+
+    const result = aggregateEvaluationChartRows(rows, new Set(['h200_sglang']));
+
+    expect(result).toHaveLength(2);
+    const scores = result.map((r) => r.score).toSorted();
+    expect(scores).toEqual([0.8, 0.9]);
   });
 
   it('filters out disabled hardware keys', () => {

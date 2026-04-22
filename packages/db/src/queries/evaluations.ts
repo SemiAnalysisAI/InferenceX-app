@@ -7,9 +7,18 @@ export interface EvalRow {
   model: string;
   precision: string;
   spec_method: string;
+  disagg: boolean;
+  is_multinode: boolean;
+  prefill_tp: number;
+  prefill_ep: number;
+  prefill_dp_attention: boolean;
+  prefill_num_workers: number;
   decode_tp: number;
   decode_ep: number;
   decode_dp_attention: boolean;
+  decode_num_workers: number;
+  num_prefill_gpu: number;
+  num_decode_gpu: number;
   task: string;
   date: string;
   conc: number | null;
@@ -28,9 +37,18 @@ export async function getAllEvalResults(sql: DbClient): Promise<EvalRow[]> {
       c.model,
       c.precision,
       c.spec_method,
+      c.disagg,
+      c.is_multinode,
+      c.prefill_tp,
+      c.prefill_ep,
+      c.prefill_dp_attention,
+      c.prefill_num_workers,
       c.decode_tp,
       c.decode_ep,
       c.decode_dp_attention,
+      c.decode_num_workers,
+      c.num_prefill_gpu,
+      c.num_decode_gpu,
       er.task,
       er.date::text,
       er.conc,

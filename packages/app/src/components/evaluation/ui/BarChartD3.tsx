@@ -50,6 +50,36 @@ const runLinkHTML = (runUrl?: string) =>
       </div>`
     : '';
 
+const row = (label: string, value: string) =>
+  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
+
+const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number) =>
+  `TP ${tp}, EP ${ep}, DPA ${dpa ? 'True' : 'False'}, NW ${nw}`;
+
+const parallelismHTML = (data: EvaluationChartData): string => {
+  if (!data.disagg) {
+    return (
+      row('Tensor Parallelism', String(data.tp)) +
+      row('Expert Parallelism', String(data.ep)) +
+      row('Data Parallel Attention', data.dp_attention ? 'True' : 'False')
+    );
+  }
+  return (
+    row('Multinode', data.isMultinode ? 'True' : 'False') +
+    row(
+      'Prefill',
+      fmtSideTooltip(
+        data.prefillTp,
+        data.prefillEp,
+        data.prefillDpAttention,
+        data.prefillNumWorkers,
+      ),
+    ) +
+    row('Decode', fmtSideTooltip(data.tp, data.ep, data.dp_attention, data.decodeNumWorkers)) +
+    row('GPUs', `${data.numPrefillGpu} prefill / ${data.numDecodeGpu} decode`)
+  );
+};
+
 const generateEvaluationTooltipContent = (
   data: EvaluationChartData,
   isPinned: boolean,
@@ -64,19 +94,17 @@ const generateEvaluationTooltipContent = (
       ${
         unofficialBranch
           ? `<div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">✕ UNOFFICIAL RUN</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Branch:</strong> ${unofficialBranch}</div>`
+      ${row('Branch', unofficialBranch)}`
           : ''
       }
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${data.configLabel.replaceAll('\n', '<br>')}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Date:</strong> ${data.date}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Mean Score:</strong> ${data.score.toFixed(4)}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Min Score:</strong> ${minScore.toFixed(4)}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Max Score:</strong> ${maxScore.toFixed(4)}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Concurrency:</strong> ${data.conc}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Precision:</strong> ${getPrecisionLabel(data.precision as Precision)}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Tensor Parallelism:</strong> ${data.tp}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Expert Parallelism:</strong> ${data.ep}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>Data Parallel Attention:</strong> ${data.dp_attention ? 'True' : 'False'}</div>
+      ${row('Date', data.date)}
+      ${row('Mean Score', data.score.toFixed(4))}
+      ${row('Min Score', minScore.toFixed(4))}
+      ${row('Max Score', maxScore.toFixed(4))}
+      ${row('Concurrency', String(data.conc))}
+      ${row('Precision', getPrecisionLabel(data.precision as Precision))}
+      ${parallelismHTML(data)}
       ${runLinkHTML(data.runUrl)}
     </div>
   `;
@@ -357,6 +385,25 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     () => chartData.filter((d) => d.errorMin !== undefined && d.errorMax !== undefined),
     [chartData],
   );
+
+  const hasDisaggConfigs = useMemo(
+    () => [...chartData, ...unofficialChartData].some((d) => d.disagg),
+    [chartData, unofficialChartData],
+  );
+
+  const parallelismKey = hasDisaggConfigs ? (
+    <div className="mt-2 px-1 pr-2 text-[10px] text-muted-foreground/80 leading-tight no-export">
+      <div>
+        <span className="font-semibold">Disagg:</span>{' '}
+        <span className="font-mono">P(tp/ep/dpa/nw)</span> prefill
+        <span className="mx-1">·</span>
+        <span className="font-mono">D(tp/ep/dpa/nw)</span> decode
+      </div>
+      <div>
+        <span className="font-mono">T</span>/<span className="font-mono">F</span> = DPA true/false
+      </div>
+    </div>
+  ) : null;
   const unofficialErrorData = useMemo(
     () => unofficialChartData.filter((d) => d.errorMin !== undefined && d.errorMax !== undefined),
     [unofficialChartData],
@@ -866,6 +913,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               : []
           }
           enableTooltips={true}
+          keyIndicators={parallelismKey}
         />
       }
     />
