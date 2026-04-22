@@ -447,6 +447,48 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
     expect(hardwareConfig).toHaveProperty('mi300x_vllm');
   });
 
+  // Regression: disagg and non-disagg rows for the same (hw, framework) must
+  // produce distinct hwKeys, otherwise their scatter points collapse onto one
+  // legend line with mixed actual measurement dates.
+  // Reported bug: dsr1 / 8k1k / fp4 / gb200 / dynamo-trt / spec=none on the
+  // latest run date showed points from 2025-11-17 (disagg=false) mixed with
+  // 2026-03-23 (disagg=true) under a single "GB200 Dynamo TRT" legend entry.
+  it('splits disagg=true and disagg=false into distinct hwKeys for gb200 dynamo-trt', () => {
+    const rows = [
+      makeRow({
+        hardware: 'gb200',
+        framework: 'dynamo-trt',
+        precision: 'fp4',
+        disagg: false,
+        date: '2025-11-17',
+        conc: 128,
+      }),
+      makeRow({
+        hardware: 'gb200',
+        framework: 'dynamo-trt',
+        precision: 'fp4',
+        disagg: true,
+        date: '2026-03-23',
+        conc: 512,
+      }),
+    ];
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    const hwKeys = Object.keys(hardwareConfig).toSorted();
+    expect(hwKeys).toEqual(['gb200_dynamo-trt', 'gb200_dynamo-trt-disagg']);
+
+    // Every chart point on each hwKey must carry a single consistent date.
+    for (const chart of chartData) {
+      const byKey = new Map<string, Set<string>>();
+      for (const p of chart) {
+        const k = String(p.hwKey);
+        if (!byKey.has(k)) byKey.set(k, new Set());
+        byKey.get(k)!.add(String(p.date));
+      }
+      expect(byKey.get('gb200_dynamo-trt')).toEqual(new Set(['2025-11-17']));
+      expect(byKey.get('gb200_dynamo-trt-disagg')).toEqual(new Set(['2026-03-23']));
+    }
+  });
+
   it('falls back to unknown config for completely unrecognized hardware', () => {
     // Suppress expected console warnings from getHardwareConfig
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
