@@ -126,7 +126,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       sequence: Sequence.EightK_OneK,
       precisions: ['fp4'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['gb200_dynamo-trt', 'b200_dynamo-trt'],
+      hwFilter: ['gb200_dynamo-trt-disagg', 'b200_dynamo-trt-disagg'],
     },
   },
   // 2 — NVIDIA
@@ -142,7 +142,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       sequence: Sequence.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['b200_dynamo-trt', 'h200_dynamo-trt'],
+      hwFilter: ['b200_dynamo-trt-disagg', 'h200_dynamo-trt-disagg'],
     },
   },
   // 3 — AMD
