@@ -394,12 +394,13 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const parallelismKey = hasDisaggConfigs ? (
     <div className="mt-2 px-1 pr-2 text-[10px] text-muted-foreground/80 leading-tight no-export">
       <div>
-        <span className="font-semibold">Disagg:</span>{' '}
-        <span className="font-mono">P(tp/ep/dpa/nw)</span> prefill
+        <span className="font-mono">P(·/·/·/·)</span> prefill
         <span className="mx-1">·</span>
-        <span className="font-mono">D(tp/ep/dpa/nw)</span> decode
+        <span className="font-mono">D(·/·/·/·)</span> decode
       </div>
       <div>
+        slots: <span className="font-mono">tp/ep/dpa/nw</span>
+        <span className="mx-1">·</span>
         <span className="font-mono">T</span>/<span className="font-mono">F</span> = DPA true/false
       </div>
     </div>
