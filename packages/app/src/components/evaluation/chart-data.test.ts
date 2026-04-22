@@ -142,9 +142,9 @@ describe('buildEvaluationChartRows', () => {
 
     const labels = rows.map((r) => r.configLabel).toSorted();
     expect(labels).toEqual([
-      'H200 (Dynamo TRT)\nC128 P(tp8/ep1/dpaT) D(tp8/ep1)',
-      'H200 (Dynamo TRT)\nC256 P(tp8/ep1) D(tp8/ep1/dpaT)',
-      'H200 (Dynamo TRT)\nC512 P(tp8/ep1/dpaT) D(tp8/ep1/dpaT)',
+      'H200 (Dynamo TRT)\nC128 P(8/1/T/0) D(8/1/F/0)',
+      'H200 (Dynamo TRT)\nC256 P(8/1/F/0) D(8/1/T/0)',
+      'H200 (Dynamo TRT)\nC512 P(8/1/T/0) D(8/1/T/0)',
       'H200 (SGLang)\nC128 T8 E1 DPA',
     ]);
   });

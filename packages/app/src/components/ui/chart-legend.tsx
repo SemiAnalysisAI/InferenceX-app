@@ -43,6 +43,8 @@ export interface ChartLegendProps {
   actions?: LegendActionConfig[];
   grouped?: boolean;
   showFpShapeIndicators?: boolean;
+  /** Optional extra key/legend explanation rendered alongside the FP indicators. */
+  keyIndicators?: React.ReactNode;
   enableTooltips?: boolean;
   maxHeight?: number;
   /** Override styles on the outer legend container (e.g. maxHeight to constrain scrollable area) */
@@ -62,6 +64,7 @@ export default function ChartLegend({
   actions,
   grouped = false,
   showFpShapeIndicators = false,
+  keyIndicators,
   enableTooltips = false,
   maxHeight,
   containerStyle,
@@ -178,6 +181,7 @@ export default function ChartLegend({
   const hasSidebarControls =
     isSidebar &&
     (showFpShapeIndicators ||
+      keyIndicators ||
       (switches && switches.length > 0) ||
       (actions && actions.length > 0) ||
       hasLongText);
@@ -364,12 +368,18 @@ export default function ChartLegend({
 
   // Bottom controls (switches, FP indicators, expand button, actions)
   const hasBottomControls =
-    switchElements || actionElements || fpIndicators || expandButton || hasAtomFootnote;
+    switchElements ||
+    actionElements ||
+    fpIndicators ||
+    keyIndicators ||
+    expandButton ||
+    hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
     <div className="shrink-0 grow-0">
       {actionElements}
       {switchElements}
       {fpIndicators}
+      {keyIndicators}
       {expandButton}
       {hasAtomFootnote && (
         <p className="mt-2 text-[10px] text-muted-foreground/70 leading-tight no-export">

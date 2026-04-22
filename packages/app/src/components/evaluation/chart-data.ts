@@ -26,7 +26,7 @@ interface EvalLabelParams {
   prefillNw?: number;
 }
 
-/** Format a disagg side's tuple, omitting default dpa=false and nw=1 tokens. */
+/** Format a disagg side's tuple positionally as `(tp/ep/dpa/nw)`. */
 function fmtSide(
   side: 'P' | 'D',
   tp: number,
@@ -34,20 +34,17 @@ function fmtSide(
   dpa: boolean | undefined,
   nw: number | undefined,
 ): string {
-  const parts: string[] = [`tp${tp}`, `ep${ep}`];
-  if (dpa) parts.push('dpaT');
-  if (nw !== undefined && nw > 1) parts.push(`nw${nw}`);
-  return `${side}(${parts.join('/')})`;
+  return `${side}(${tp}/${ep}/${dpa ? 'T' : 'F'}/${nw ?? 1})`;
 }
 
 /**
  * Legend/x-axis label format:
  * - single-node: `{hw} ({framework}[, {spec}])\nC{conc} T{tp} E{ep} [DPA]`
- * - disagg:      `{hw} ({framework}[, {spec}])\nC{conc} P(tp{n}/ep{n}[/dpaT][/nw{n>1}]) D(tp{n}/ep{n}[/dpaT][/nw{n>1}])`
+ * - disagg:      `{hw} ({framework}[, {spec}])\nC{conc} P(tp/ep/dpa/nw) D(tp/ep/dpa/nw)`
  *
- * The P(…)/D(…) tuple format itself signals disagg (vs single-node's T#/E#),
- * so the header doesn't repeat "Disagg". Default values (dpa=false, nw=1) are
- * omitted from the tuples to keep labels compact.
+ * The P(…)/D(…) tuple format itself signals disagg (vs single-node's T#/E#).
+ * Tuples are positional — the order `tp/ep/dpa/nw` is documented in the chart
+ * caption so that legend items stay compact and uniformly shaped.
  */
 function buildConfigLabel(
   hwLabel: string,

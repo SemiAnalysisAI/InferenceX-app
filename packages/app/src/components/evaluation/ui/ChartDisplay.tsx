@@ -53,7 +53,7 @@ export default function EvaluationChartDisplay() {
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
 
-  const [viewMode, setViewMode] = useState<EvalViewMode>('chart');
+  const [viewMode, setViewMode] = useState<EvalViewMode>('table');
   const handleViewModeChange = (value: EvalViewMode) => {
     setViewMode(value);
     track('evaluation_view_changed', { view: value });
