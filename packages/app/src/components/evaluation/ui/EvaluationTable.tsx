@@ -11,6 +11,7 @@ interface EvaluationTableProps {
 
 export default function EvaluationTable({ data }: EvaluationTableProps) {
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
+  const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
 
   const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(
     () => [
@@ -78,11 +79,28 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
   );
 
   return (
-    <DataTable
-      data={sorted}
-      columns={columns}
-      testId="evaluation-results-table"
-      analyticsPrefix="evaluation_table"
-    />
+    <>
+      {hasDisaggConfigs && (
+        <div className="mt-2 mb-2 text-[11px] text-muted-foreground/80 leading-tight">
+          <div>
+            <span className="font-mono">P(·/·/·/·)</span> prefill
+            <span className="mx-1">·</span>
+            <span className="font-mono">D(·/·/·/·)</span> decode
+          </div>
+          <div>
+            slots: <span className="font-mono">tp/ep/dpa/nw</span>
+            <span className="mx-1">·</span>
+            <span className="font-mono">T</span>/<span className="font-mono">F</span> = DPA
+            true/false
+          </div>
+        </div>
+      )}
+      <DataTable
+        data={sorted}
+        columns={columns}
+        testId="evaluation-results-table"
+        analyticsPrefix="evaluation_table"
+      />
+    </>
   );
 }
