@@ -32,6 +32,7 @@ describe('High Contrast Mode', () => {
   it('visiting evaluation with e_hc=1 applies to evaluation chart', () => {
     cy.visit('/evaluation?e_hc=1');
     cy.get('[data-testid="evaluation-chart-display"]').should('exist');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
     cy.get('#eval-high-contrast').first().should('have.attr', 'data-state', 'checked');
   });
 

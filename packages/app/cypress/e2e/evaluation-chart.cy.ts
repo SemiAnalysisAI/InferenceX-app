@@ -5,6 +5,7 @@ describe('Evaluation Chart', () => {
     });
     cy.visit('/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('exist');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
   });
 
   it('shows the Accuracy Evals heading', () => {
@@ -46,6 +47,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
     });
     cy.visit('/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
   });
 
   it('renders SVG data points (circles) inside the evaluation chart after data loads', () => {
