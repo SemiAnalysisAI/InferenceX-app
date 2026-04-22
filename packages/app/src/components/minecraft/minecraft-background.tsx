@@ -58,10 +58,9 @@ function getInitialMusicStart(): number {
 }
 
 /**
- * Plays the classic Minecraft button click sound on interactive
- * element presses in every theme. The floating 3D blocks background
- * and the YouTube-streamed Minecraft OST are only active when the
- * minecraft theme is enabled.
+ * Renders the floating 3D blocks background, plays the classic Minecraft
+ * button click sound on interactive element presses, and streams the
+ * Minecraft OST from YouTube — all only when the minecraft theme is enabled.
  */
 export function MinecraftBackground() {
   const [isMinecraft, setIsMinecraft] = useState(false);
@@ -116,7 +115,7 @@ export function MinecraftBackground() {
 
   // Play Minecraft click sound on any interactive element press
   useEffect(() => {
-    if (!soundEnabled) return;
+    if (!isMinecraft || !soundEnabled) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null;
       if (!target?.closest(INTERACTIVE)) return;
@@ -132,7 +131,7 @@ export function MinecraftBackground() {
     }
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [soundEnabled]);
+  }, [isMinecraft, soundEnabled]);
 
   // ── Background music (YouTube IFrame API) ──
   const [musicEnabled, setMusicEnabled] = useState(false);
@@ -323,11 +322,7 @@ export function MinecraftBackground() {
     };
   }, [showMusic]);
 
-  if (!isMinecraft) {
-    // Component must stay mounted so the click-sound effects keep running
-    // in every theme; only the 3D scene and music are minecraft-only.
-    return null;
-  }
+  if (!isMinecraft) return null;
 
   return (
     <>

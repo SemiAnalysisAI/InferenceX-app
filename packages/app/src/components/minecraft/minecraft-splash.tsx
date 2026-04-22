@@ -37,16 +37,27 @@ const SPLASHES = [
 
 /**
  * Splash text — yellow, rotated, bouncing text (Minecraft title screen style)
- * that appears on the landing page in all UI modes.
+ * that appears on the landing page only when the minecraft theme is active.
  */
 export function MinecraftSplash() {
   const [splash, setSplash] = useState('');
+  const [isMinecraft, setIsMinecraft] = useState(false);
 
   useEffect(() => {
     setSplash(SPLASHES[Math.floor(Math.random() * SPLASHES.length)]);
   }, []);
 
-  if (!splash) return null;
+  useEffect(() => {
+    function check() {
+      setIsMinecraft(document.documentElement.classList.contains('minecraft'));
+    }
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  if (!splash || !isMinecraft) return null;
 
   return (
     <div className="splash-wrapper">

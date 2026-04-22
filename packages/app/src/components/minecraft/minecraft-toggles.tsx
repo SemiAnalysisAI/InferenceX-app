@@ -13,8 +13,8 @@ const toggleClasses = cn(
 );
 
 /**
- * Header toggles for Minecraft audio. The click-sound toggle renders in every
- * theme (the click sound plays everywhere); the music toggle is minecraft-only.
+ * Header toggles for Minecraft audio — both the click-sound and music
+ * toggles only render when the minecraft theme is active.
  */
 export function MinecraftToggles() {
   const [isMinecraft, setIsMinecraft] = useState(false);
@@ -62,26 +62,26 @@ export function MinecraftToggles() {
     track('minecraft_sound_toggled', { enabled: next });
   }
 
+  if (!isMinecraft) return null;
+
   return (
     <>
-      {isMinecraft && (
-        <button
-          type="button"
-          className={toggleClasses}
-          onClick={toggleMusic}
-          title={musicOn ? 'Mute music' : 'Unmute music'}
-          aria-label={musicOn ? 'Mute music' : 'Unmute music'}
-        >
-          <span className="relative">
-            <Music className="w-[20px] h-[20px]" />
-            {!musicOn && (
-              <span className="absolute inset-0 flex items-center justify-center">
-                <span className="block w-[22px] h-[2px] bg-current rotate-45" />
-              </span>
-            )}
-          </span>
-        </button>
-      )}
+      <button
+        type="button"
+        className={toggleClasses}
+        onClick={toggleMusic}
+        title={musicOn ? 'Mute music' : 'Unmute music'}
+        aria-label={musicOn ? 'Mute music' : 'Unmute music'}
+      >
+        <span className="relative">
+          <Music className="w-[20px] h-[20px]" />
+          {!musicOn && (
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="block w-[22px] h-[2px] bg-current rotate-45" />
+            </span>
+          )}
+        </span>
+      </button>
       <button
         type="button"
         className={toggleClasses}
