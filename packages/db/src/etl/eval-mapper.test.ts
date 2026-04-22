@@ -397,14 +397,30 @@ describe('mapAggEvalRow', () => {
       expect(result!.config.disagg).toBe(true);
     });
 
-    it('keeps disagg=false when v2 fields are all zero workers and not multinode', () => {
+    it('framework dynamo-trt forces disagg=true even with zero workers / not multinode', () => {
       const tracker = createSkipTracker();
       const result = mapAggEvalRow(
         makeV2Row({ is_multinode: false, prefill_num_workers: 0, decode_num_workers: 0 }),
         tracker,
       );
 
-      // Symmetric no-disagg v2 row — framework alias is plain dynamo-trt so nothing forces disagg.
+      // dynamo-* / mori-* canonicals carry disagg semantics via their name — the
+      // standalone disagg signal (workers, multinode) is moot under these frameworks.
+      expect(result!.config.disagg).toBe(true);
+    });
+
+    it('keeps disagg=false for a non-dynamo/mori framework with zero workers / not multinode', () => {
+      const tracker = createSkipTracker();
+      const result = mapAggEvalRow(
+        makeV2Row({
+          framework: 'vllm',
+          is_multinode: false,
+          prefill_num_workers: 0,
+          decode_num_workers: 0,
+        }),
+        tracker,
+      );
+
       expect(result!.config.disagg).toBe(false);
     });
 

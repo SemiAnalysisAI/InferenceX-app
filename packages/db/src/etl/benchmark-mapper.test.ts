@@ -303,12 +303,12 @@ describe('mapBenchmarkRow', () => {
       expect(result!.config.disagg).toBe(true);
     });
 
-    it('normalizes dynamo-trtllm to dynamo-trt', () => {
+    it('normalizes dynamo-trtllm to dynamo-trt and forces disagg=true (framework implies it)', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(makeV1Row({ framework: 'dynamo-trtllm' }), tracker);
 
       expect(result!.config.framework).toBe('dynamo-trt');
-      expect(result!.config.disagg).toBe(false);
+      expect(result!.config.disagg).toBe(true);
     });
   });
 
