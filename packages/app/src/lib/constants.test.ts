@@ -127,6 +127,27 @@ describe('getHardwareConfig', () => {
     warnSpy.mockRestore();
   });
 
+  it('renders -disagg suffix as "Disagg" alongside the framework label', () => {
+    const cfg = getHardwareConfig('gb200_dynamo-trt-disagg');
+    expect(cfg.suffix).toContain('Dynamo TRT');
+    expect(cfg.suffix).toContain('Disagg');
+    expect(cfg.gpu).toContain('Dynamo TRT');
+    expect(cfg.gpu).toContain('Disagg');
+  });
+
+  it('non-disagg variant has no Disagg in suffix', () => {
+    const cfg = getHardwareConfig('gb200_dynamo-trt');
+    expect(cfg.suffix).toContain('Dynamo TRT');
+    expect(cfg.suffix).not.toContain('Disagg');
+  });
+
+  it('disagg variant with mtp: both Disagg and MTP appear', () => {
+    const cfg = getHardwareConfig('gb200_dynamo-trt-disagg_mtp');
+    expect(cfg.suffix).toContain('Dynamo TRT');
+    expect(cfg.suffix).toContain('Disagg');
+    expect(cfg.suffix).toContain('MTP');
+  });
+
   it('HW_REGISTRY has non-zero power for all entries', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
       expect(entry.power).toBeGreaterThan(0);

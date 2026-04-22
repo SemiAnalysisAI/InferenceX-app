@@ -68,7 +68,16 @@ function buildHardwareEntry(hwKey: string): HardwareEntry | null {
   const parts = hwKey.split('_').slice(1);
   const label = reg.label;
   const gpuName = base.toUpperCase(); // always raw uppercase for gpu string
-  const partLabels = parts.map((p) => FRAMEWORK_LABELS[p] ?? p.toUpperCase());
+  const partLabels = parts.flatMap((p) => {
+    // A part ending in "-disagg" (e.g. "dynamo-trt-disagg") is rendered as two
+    // separate tokens so the framework label resolves cleanly and the disagg
+    // flag shows up as its own word.
+    if (p.endsWith('-disagg')) {
+      const fw = p.slice(0, -'-disagg'.length);
+      return [FRAMEWORK_LABELS[fw] ?? fw.toUpperCase(), 'Disagg'];
+    }
+    return [FRAMEWORK_LABELS[p] ?? p.toUpperCase()];
+  });
 
   return {
     name: hwKey.replaceAll('_', '-'),
