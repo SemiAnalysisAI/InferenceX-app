@@ -23,6 +23,25 @@ describe('GPU_KEY_ALIASES', () => {
     expect(GPU_KEY_ALIASES['gb200_dynamo-trt_mtp']).toContain('gb200_dynamo-trtllm_mtp');
   });
 
+  it('maps gb200_dynamo-trt-disagg to its legacy trtllm-disagg key', () => {
+    expect(GPU_KEY_ALIASES['gb200_dynamo-trt-disagg']).toContain('gb200_dynamo-trtllm-disagg');
+  });
+
+  it('maps gb200_dynamo-trt-disagg_mtp to its legacy trtllm-disagg_mtp key', () => {
+    expect(GPU_KEY_ALIASES['gb200_dynamo-trt-disagg_mtp']).toContain(
+      'gb200_dynamo-trtllm-disagg_mtp',
+    );
+  });
+
+  it('maps gb300_dynamo-trt-disagg to its legacy trtllm-disagg key', () => {
+    expect(GPU_KEY_ALIASES['gb300_dynamo-trt-disagg']).toContain('gb300_dynamo-trtllm-disagg');
+  });
+
+  it('keeps legacy short mori-sglang key as alias of canonical -disagg variant', () => {
+    expect(GPU_KEY_ALIASES['mi355x_mori-sglang-disagg']).toContain('mi355x_mori-sglang');
+    expect(GPU_KEY_ALIASES['mi355x_mori-sglang-disagg_mtp']).toContain('mi355x_mori-sglang_mtp');
+  });
+
   it('alias keys resolve to known GPUs', () => {
     for (const aliases of Object.values(GPU_KEY_ALIASES)) {
       for (const alias of aliases) {
@@ -39,6 +58,16 @@ describe('GPU_ALIAS_TO_CANONICAL', () => {
 
   it('maps legacy trtllm_mtp key back to canonical trt_mtp key', () => {
     expect(GPU_ALIAS_TO_CANONICAL['gb200_dynamo-trtllm_mtp']).toBe('gb200_dynamo-trt_mtp');
+  });
+
+  it('maps legacy trtllm-disagg key back to canonical trt-disagg key', () => {
+    expect(GPU_ALIAS_TO_CANONICAL['gb200_dynamo-trtllm-disagg']).toBe('gb200_dynamo-trt-disagg');
+    expect(GPU_ALIAS_TO_CANONICAL['gb300_dynamo-trtllm-disagg']).toBe('gb300_dynamo-trt-disagg');
+  });
+
+  it('maps legacy short mori-sglang key back to canonical -disagg variant', () => {
+    expect(GPU_ALIAS_TO_CANONICAL['mi355x_mori-sglang']).toBe('mi355x_mori-sglang-disagg');
+    expect(GPU_ALIAS_TO_CANONICAL['mi355x_mori-sglang_mtp']).toBe('mi355x_mori-sglang-disagg_mtp');
   });
 
   it('is the inverse of GPU_KEY_ALIASES', () => {

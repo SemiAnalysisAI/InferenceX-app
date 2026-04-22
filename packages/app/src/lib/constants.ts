@@ -92,14 +92,22 @@ function buildHardwareEntry(hwKey: string): HardwareEntry | null {
  * merged in transparently. When a user selects the canonical key, availability and
  * chart data from alias keys is included and the alias hwKey is remapped to canonical.
  *
- * Use case: the GB200 NVL72 TRT backend was renamed from `trtllm` → `trt` around
- * Dec 7 2025, splitting the date history across two keys in availability.json.
+ * Use cases:
+ * - GB200 NVL72 TRT backend renamed from `trtllm` → `trt` around Dec 7 2025.
+ * - Disagg/non-disagg split: `mi355x_mori-sglang` used to cover all mori-sglang rows
+ *   (always disagg=true), so the legacy short key maps to the new `-disagg` variant.
  */
 export const GPU_KEY_ALIASES: Record<string, string[]> = {
   'gb200_dynamo-trt': ['gb200_dynamo-trtllm'],
+  'gb200_dynamo-trt-disagg': ['gb200_dynamo-trtllm-disagg'],
   'gb200_dynamo-trt_mtp': ['gb200_dynamo-trtllm_mtp'],
+  'gb200_dynamo-trt-disagg_mtp': ['gb200_dynamo-trtllm-disagg_mtp'],
   'gb300_dynamo-trt': ['gb300_dynamo-trtllm'],
+  'gb300_dynamo-trt-disagg': ['gb300_dynamo-trtllm-disagg'],
   'gb300_dynamo-trt_mtp': ['gb300_dynamo-trtllm_mtp'],
+  'gb300_dynamo-trt-disagg_mtp': ['gb300_dynamo-trtllm-disagg_mtp'],
+  'mi355x_mori-sglang-disagg': ['mi355x_mori-sglang'],
+  'mi355x_mori-sglang-disagg_mtp': ['mi355x_mori-sglang_mtp'],
 };
 
 /**
