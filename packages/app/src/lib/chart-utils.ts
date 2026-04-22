@@ -222,15 +222,9 @@ export function buildAvailabilityHwKey(
   let hwKey = hardware.split('-')[0];
   const fw = framework ? resolveFrameworkAlias(framework) : undefined;
   if (fw) {
-    // Try framework as-is first, then disagg variant if it exists
-    const candidateDirect = `${hwKey}_${fw}`;
-    if (isKnownGpu(candidateDirect)) {
-      hwKey = candidateDirect;
-    } else if (disagg) {
-      const candidateDisagg = `${hwKey}_${fw}-disagg`;
-      hwKey = isKnownGpu(candidateDisagg) ? candidateDisagg : candidateDirect;
-    } else {
-      hwKey = candidateDirect;
+    hwKey = `${hwKey}_${fw}`;
+    if (disagg) {
+      hwKey = `${hwKey}-disagg`;
     }
   }
   if (specMethod === 'mtp') hwKey = `${hwKey}_mtp`;

@@ -221,15 +221,15 @@ describe('buildAvailabilityHwKey', () => {
     expect(buildAvailabilityHwKey('mi355x', 'sglang')).toBe('mi355x_sglang');
   });
 
-  it('builds mori-sglang key when framework is mori-sglang', () => {
+  it('builds mori-sglang-disagg key when framework is mori-sglang with disagg', () => {
     expect(buildAvailabilityHwKey('mi355x', 'mori-sglang', undefined, true)).toBe(
-      'mi355x_mori-sglang',
+      'mi355x_mori-sglang-disagg',
     );
   });
 
-  it('appends _mtp for mtp spec method with mori-sglang', () => {
+  it('appends _mtp for mtp spec method with mori-sglang disagg', () => {
     expect(buildAvailabilityHwKey('mi355x', 'mori-sglang', 'mtp', true)).toBe(
-      'mi355x_mori-sglang_mtp',
+      'mi355x_mori-sglang-disagg_mtp',
     );
   });
 
@@ -253,16 +253,38 @@ describe('buildAvailabilityHwKey', () => {
     expect(buildAvailabilityHwKey('b200', undefined, undefined)).toBe('b200');
   });
 
-  it('normalizes old sglang-disagg framework to mori-sglang', () => {
+  it('normalizes old sglang-disagg framework to mori-sglang-disagg', () => {
     expect(buildAvailabilityHwKey('mi355x', 'sglang-disagg', undefined, true)).toBe(
-      'mi355x_mori-sglang',
+      'mi355x_mori-sglang-disagg',
     );
   });
 
   it('normalizes sglang-disagg with mtp spec method', () => {
     expect(buildAvailabilityHwKey('mi355x', 'sglang-disagg', 'mtp', true)).toBe(
-      'mi355x_mori-sglang_mtp',
+      'mi355x_mori-sglang-disagg_mtp',
     );
+  });
+
+  it('appends -disagg when disagg is true (known base GPU)', () => {
+    expect(buildAvailabilityHwKey('gb200', 'dynamo-trt', 'none', true)).toBe(
+      'gb200_dynamo-trt-disagg',
+    );
+  });
+
+  it('does not append -disagg when disagg is false', () => {
+    expect(buildAvailabilityHwKey('gb200', 'dynamo-trt', 'none', false)).toBe('gb200_dynamo-trt');
+  });
+
+  it('disagg=true with mtp: framework-disagg_mtp', () => {
+    expect(buildAvailabilityHwKey('gb200', 'dynamo-trt', 'mtp', true)).toBe(
+      'gb200_dynamo-trt-disagg_mtp',
+    );
+  });
+
+  it('agrees with getHardwareKey on the disagg variant', () => {
+    const availKey = buildAvailabilityHwKey('gb200', 'dynamo-trt', 'none', true);
+    const benchKey = getHardwareKey(entry({ hw: 'gb200', framework: 'dynamo-trt', disagg: true }));
+    expect(availKey).toBe(benchKey);
   });
 });
 
