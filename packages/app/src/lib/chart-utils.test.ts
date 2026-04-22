@@ -888,6 +888,42 @@ describe('getHardwareKey', () => {
   it('handles hw with no dashes', () => {
     expect(getHardwareKey(entry({ hw: 'h100', framework: '' }))).toBe('h100');
   });
+
+  it('appends -disagg to framework when disagg is true', () => {
+    expect(getHardwareKey(entry({ hw: 'gb200', framework: 'dynamo-trt', disagg: true }))).toBe(
+      'gb200_dynamo-trt-disagg',
+    );
+  });
+
+  it('does not append -disagg when disagg is false', () => {
+    expect(getHardwareKey(entry({ hw: 'gb200', framework: 'dynamo-trt', disagg: false }))).toBe(
+      'gb200_dynamo-trt',
+    );
+  });
+
+  it('disagg and non-disagg rows produce distinct keys for the same hw+framework', () => {
+    const agg = getHardwareKey(entry({ hw: 'gb200', framework: 'dynamo-sglang', disagg: false }));
+    const dis = getHardwareKey(entry({ hw: 'gb200', framework: 'dynamo-sglang', disagg: true }));
+    expect(agg).not.toBe(dis);
+  });
+
+  it('combines disagg with mtp suffix: framework-disagg_mtp', () => {
+    expect(
+      getHardwareKey(entry({ hw: 'gb200', framework: 'dynamo-trt', disagg: true, mtp: 'on' })),
+    ).toBe('gb200_dynamo-trt-disagg_mtp');
+  });
+
+  it('combines disagg with non-mtp spec_decoding suffix', () => {
+    expect(
+      getHardwareKey(
+        entry({ hw: 'b200', framework: 'dynamo-trt', disagg: true, spec_decoding: 'eagle' }),
+      ),
+    ).toBe('b200_dynamo-trt-disagg_eagle');
+  });
+
+  it('disagg=true with no framework returns base GPU only (no stray suffix)', () => {
+    expect(getHardwareKey(entry({ hw: 'h100-sxm', framework: '', disagg: true }))).toBe('h100');
+  });
 });
 
 // ===========================================================================

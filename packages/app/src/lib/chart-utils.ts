@@ -158,15 +158,9 @@ export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
   if (entry.framework) {
-    // Try framework as-is first, then disagg variant if it exists
-    const candidateDirect = `${normalizedHwName}_${entry.framework}`;
-    if (isKnownGpu(candidateDirect)) {
-      normalizedHwName = candidateDirect;
-    } else if (entry.disagg) {
-      const candidateDisagg = `${normalizedHwName}_${entry.framework}-disagg`;
-      normalizedHwName = isKnownGpu(candidateDisagg) ? candidateDisagg : candidateDirect;
-    } else {
-      normalizedHwName = candidateDirect;
+    normalizedHwName = `${normalizedHwName}_${entry.framework}`;
+    if (entry.disagg) {
+      normalizedHwName = `${normalizedHwName}-disagg`;
     }
   }
   if (entry.mtp === 'on' || entry['spec_decoding'] === 'mtp') {
