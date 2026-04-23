@@ -96,18 +96,53 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
     },
     a: CustomLink,
     img: CustomImage,
-    Figure: (props: { src: string; alt?: string; caption?: string }) => {
+    Figure: (props: {
+      src?: string;
+      srcLight?: string;
+      srcDark?: string;
+      alt?: string;
+      caption?: string;
+    }) => {
       const isFirst = figureCount === 0;
       figureCount++;
+      const loading = isFirst ? 'eager' : 'lazy';
+      const lightSrc = props.srcLight ?? props.src;
+      const darkSrc = props.srcDark ?? props.src;
+      const hasThemedVariants = Boolean(props.srcLight || props.srcDark) && lightSrc !== darkSrc;
       return (
         <figure className="my-6 flex flex-col items-center">
-          <img
-            src={props.src}
-            alt={props.alt ?? ''}
-            loading={isFirst ? 'eager' : 'lazy'}
-            decoding="async"
-            className="rounded-lg w-full md:w-3/4"
-          />
+          {hasThemedVariants ? (
+            <>
+              {lightSrc && (
+                <img
+                  src={lightSrc}
+                  alt={props.alt ?? ''}
+                  loading={loading}
+                  decoding="async"
+                  className="rounded-lg w-full md:w-3/4 block dark:hidden"
+                />
+              )}
+              {darkSrc && (
+                <img
+                  src={darkSrc}
+                  alt={props.alt ?? ''}
+                  loading={loading}
+                  decoding="async"
+                  className="rounded-lg w-full md:w-3/4 hidden dark:block"
+                />
+              )}
+            </>
+          ) : (
+            (lightSrc || darkSrc) && (
+              <img
+                src={lightSrc ?? darkSrc}
+                alt={props.alt ?? ''}
+                loading={loading}
+                decoding="async"
+                className="rounded-lg w-full md:w-3/4"
+              />
+            )
+          )}
           {props.caption && (
             <figcaption className="text-center text-sm text-muted-foreground mt-2">
               {props.caption}
@@ -130,7 +165,7 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-0 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-0 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
           >
             {props.children ?? 'See full InferenceX Dashboard'}
           </a>
