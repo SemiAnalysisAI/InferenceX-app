@@ -43,6 +43,7 @@ import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
+import ParetoUpliftPanel from './ParetoUpliftPanel';
 import TrendChart from './TrendChart';
 
 const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
@@ -144,6 +145,7 @@ export default function ChartDisplay() {
     activeHwTypes,
     activeDates,
     setSelectedE2eXAxisMetric,
+    hardwareConfig,
   } = useInference();
 
   const {
@@ -501,6 +503,29 @@ export default function ChartDisplay() {
                     </div>
                   );
                 })()}
+                <ParetoUpliftPanel
+                  data={graph.data}
+                  chartDefinition={graph.chartDefinition}
+                  selectedYAxisMetric={selectedYAxisMetric}
+                  hardwareConfig={hardwareConfig}
+                  activeHwTypes={activeHwTypes}
+                  activeDates={activeDates}
+                  selectedPrecisions={selectedPrecisions}
+                  selectedRunDate={selectedRunDate}
+                  selectedDates={selectedDates}
+                  selectedDateRange={selectedDateRange}
+                  isTimelineMode={Boolean(
+                    selectedDateRange.startDate &&
+                    selectedDateRange.endDate &&
+                    selectedGPUs.length > 0,
+                  )}
+                  overlayData={
+                    graph.chartDefinition.chartType === 'e2e'
+                      ? (overlayDataByChartType.e2e ?? undefined)
+                      : (overlayDataByChartType.interactivity ?? undefined)
+                  }
+                  chartType={graph.chartDefinition.chartType}
+                />
               </Card>
             </figure>
           </section>
