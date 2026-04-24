@@ -52,6 +52,7 @@ const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/i;
 /** Explicit aliases for prefixes that don't match any DB key after suffix stripping. */
 const PREFIX_ALIASES: Record<string, string> = {
   gptoss: 'gptoss120b',
+  dsv4pro: 'dsv4',
 };
 
 function resolvePrefixToKey(prefix: string): string | null {

@@ -116,6 +116,11 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'gptoss' })).toBe('gptoss120b');
   });
 
+  it('resolves dsv4pro alias from prefix', () => {
+    expect(resolveModelKey({ infmax_model_prefix: 'dsv4pro' })).toBe('dsv4');
+    expect(resolveModelKey({ infmax_model_prefix: 'dsv4pro-fp8' })).toBe('dsv4');
+  });
+
   it('falls back to MODEL_TO_KEY when prefix not present', () => {
     expect(resolveModelKey({ model: 'deepseek-ai/DeepSeek-R1' })).toBe('dsr1');
     expect(resolveModelKey({ model: 'nvidia/Llama-3.3-70B-Instruct-FP8' })).toBe('llama70b');
