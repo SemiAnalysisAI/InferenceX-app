@@ -172,6 +172,27 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     });
   }, [availabilityRows, unofficialAvailable]);
 
+  // Auto-switch the selected model when an unofficial run is loaded that
+  // doesn't include the currently selected model. Without this, navigating
+  // to `?unofficialrun=<id>` while the default `g_model=DeepSeek-R1` sticks
+  // leaves the user staring at a chart with no overlay points — they'd have
+  // to know to open the dropdown and pick the run's model themselves.
+  //
+  // Skipped when `g_model` was set explicitly in the URL (respect the user's
+  // intent) and when the current model is already covered by the overlay.
+  const autoSwitchedRef = useRef(false);
+  useEffect(() => {
+    if (autoSwitchedRef.current) return;
+    if (unofficialAvailable.length === 0) return;
+    const urlModel = getUrlParam('g_model');
+    if (urlModel) return;
+    const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
+    if (unofficialModels.has(selectedModel)) return;
+    const target = unofficialAvailable[0].model;
+    autoSwitchedRef.current = true;
+    setSelectedModel(target);
+  }, [unofficialAvailable, selectedModel]);
+
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
   const availableSequences = useMemo(() => {
     const unofficialSeqs = unofficialAvailable
