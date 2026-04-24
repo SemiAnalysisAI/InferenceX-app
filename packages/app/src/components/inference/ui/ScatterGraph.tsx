@@ -21,7 +21,11 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
-import { overlayFilterForRunIndex, overlayRunIndex } from '@/lib/overlay-run-style';
+import {
+  overlayFilterForRunIndex,
+  overlayRooflineDasharray,
+  overlayRunIndex,
+} from '@/lib/overlay-run-style';
 import {
   POINT_SIZE,
   HIT_AREA_RADIUS,
@@ -201,14 +205,18 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
       return keys;
     }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
-    const activeOfficialKeys = useMemo(
-      () => [...effectiveOfficialHwTypes],
-      [effectiveOfficialHwTypes],
+    // Vendor color map keys — include overlay hw keys (unprefixed) so overlay
+    // strokes resolve to a real hue instead of falling through to the muted
+    // fallback. Without this, `hue-rotate` on overlay lines would be a no-op
+    // because the input is gray.
+    const activeVendorKeys = useMemo(
+      () => [...new Set([...effectiveOfficialHwTypes, ...activeOverlayHwTypes])],
+      [effectiveOfficialHwTypes, activeOverlayHwTypes],
     );
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
-      activeKeys: activeOfficialKeys,
+      activeKeys: activeVendorKeys,
     });
 
     // --- Changelog ---
@@ -1314,7 +1322,7 @@ const ScatterGraph = React.memo(
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
-                .attr('stroke-dasharray', '6 3')
+                .attr('stroke-dasharray', (d) => overlayRooflineDasharray(d.runIndex))
                 .attr('d', (d) => lineGen(d.points))
                 .style('filter', (d) => overlayFilterForRunIndex(d.runIndex));
 
