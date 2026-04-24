@@ -186,10 +186,10 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.Llama3_1_70B)).toBe('Llama 3.1 70B Instruct');
     expect(getModelLabel(Model.DeepSeek_R1)).toBe('DeepSeek R1 0528');
     expect(getModelLabel(Model.GptOss)).toBe('gpt-oss 120B');
-    expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B Architecture');
-    expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.6 1T Architecture');
-    expect(getModelLabel(Model.GLM_5)).toBe('GLM5.1 Architecture');
-    expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.7 Architecture');
+    expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5');
+    expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5');
+    expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1');
+    expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5');
   });
 
   it('falls back to the model value for unknown model', () => {

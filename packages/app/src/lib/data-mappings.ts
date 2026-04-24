@@ -40,14 +40,14 @@ const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: Cat
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
   [Model.DeepSeek_V4_Pro]: { label: 'DeepSeek V4 Pro', prefix: 'dsv4', category: 'experimental' },
   [Model.Kimi_K2_5]: {
-    label: 'Kimi K2.6 1T Architecture',
+    label: 'Kimi K2.5',
     prefix: 'kimik2.5',
     category: 'default',
   },
-  [Model.Qwen3_5]: { label: 'Qwen3.5 397B Architecture', prefix: 'qwen3.5', category: 'default' },
-  [Model.GLM_5]: { label: 'GLM5.1 Architecture', prefix: 'glm5', category: 'default' },
+  [Model.Qwen3_5]: { label: 'Qwen3.5', prefix: 'qwen3.5', category: 'default' },
+  [Model.GLM_5]: { label: 'GLM5/5.1', prefix: 'glm5', category: 'default' },
   [Model.MiniMax_M2_5]: {
-    label: 'MiniMax M2.7 Architecture',
+    label: 'MiniMax M2.5',
     prefix: 'minimaxm2.5',
     category: 'default',
   },
