@@ -285,32 +285,39 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         return m !== null && m[1] === runId;
       };
 
-      let filteredChartData: UnofficialChartData | null = null;
-      setUnofficialChartData((prev) => {
-        if (!prev) return prev;
-        const next: UnofficialChartData = {};
-        for (const [key, group] of Object.entries(prev)) {
-          const e2eData = group.e2e.data.filter((d) => !belongsToDismissed(d.run_url));
-          const intvData = group.interactivity.data.filter((d) => !belongsToDismissed(d.run_url));
-          if (e2eData.length === 0 && intvData.length === 0) continue;
-          next[key] = {
-            e2e: { data: e2eData, gpus: group.e2e.gpus },
-            interactivity: { data: intvData, gpus: group.interactivity.gpus },
-          };
-        }
-        filteredChartData = next;
-        return next;
-      });
+      // Compute the filtered chart data BEFORE any setState so we can pass the
+      // same value to setUnofficialChartData and parseAvailableModelsAndSequences.
+      // Writing to an outer variable from inside a setState updater and then
+      // reading it synchronously is unsafe: React 18 invokes updaters during
+      // render, not at the call site, so the read would see the initial null.
+      const nextChartData: UnofficialChartData | null = unofficialChartData
+        ? (() => {
+            const next: UnofficialChartData = {};
+            for (const [key, group] of Object.entries(unofficialChartData)) {
+              const e2eData = group.e2e.data.filter((d) => !belongsToDismissed(d.run_url));
+              const intvData = group.interactivity.data.filter(
+                (d) => !belongsToDismissed(d.run_url),
+              );
+              if (e2eData.length === 0 && intvData.length === 0) continue;
+              next[key] = {
+                e2e: { data: e2eData, gpus: group.e2e.gpus },
+                interactivity: { data: intvData, gpus: group.interactivity.gpus },
+              };
+            }
+            return next;
+          })()
+        : null;
+      setUnofficialChartData(nextChartData);
       // Re-derive available (model, sequence) pairs from surviving runs so the
       // model/sequence picker doesn't still offer combos that only existed in
       // the dismissed run.
-      setAvailableModelsAndSequences(parseAvailableModelsAndSequences(filteredChartData));
+      setAvailableModelsAndSequences(parseAvailableModelsAndSequences(nextChartData));
 
       setUnofficialEvalRows((prev) =>
         prev ? prev.filter((row) => !belongsToDismissed(row.run_url)) : prev,
       );
     },
-    [unofficialRunInfos],
+    [unofficialRunInfos, unofficialChartData],
   );
 
   // Build a url → index lookup. Keyed by the full run.url AND by the numeric id
