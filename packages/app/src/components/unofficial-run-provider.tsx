@@ -261,7 +261,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       }
       for (const key of existingKeys) url.searchParams.delete(key);
       if (remaining.length > 0) {
-        url.searchParams.set('unofficialrun', remaining.map((r) => r.id).join(','));
+        url.searchParams.set('unofficialruns', remaining.map((r) => r.id).join(','));
       }
       window.history.pushState({}, '', url);
 
