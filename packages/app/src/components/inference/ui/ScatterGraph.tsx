@@ -21,6 +21,7 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import { overlayFilterForRunIndex, overlayRunIndex } from '@/lib/overlay-run-style';
 import {
   POINT_SIZE,
   HIT_AREA_RADIUS,
@@ -62,29 +63,6 @@ const getXPath = (size: number) => {
   const s = size * 0.7;
   return `M ${-s} ${-s} L ${s} ${s} M ${s} ${-s} L ${-s} ${s}`;
 };
-
-/**
- * CSS filter to visually distinguish overlay points from multiple unofficial
- * runs when more than one is loaded. The first run (index 0) is untouched so
- * the common single-run case is unaffected. Applied via `style('filter', ...)`
- * on SVG groups — works regardless of whether the underlying stroke color is
- * a CSS variable, oklch, or hex.
- */
-const OVERLAY_HUE_STEP_DEG = 55;
-function overlayFilterForRunIndex(idx: number): string | null {
-  if (idx <= 0) return null;
-  const hue = (idx * OVERLAY_HUE_STEP_DEG) % 360;
-  return `hue-rotate(${hue}deg) saturate(1.2)`;
-}
-function overlayRunIndex(runUrl: string | null | undefined, map: Record<string, number>): number {
-  if (!runUrl) return 0;
-  if (runUrl in map) return map[runUrl];
-  // Fall back to the numeric run id parsed from the URL — handles cases where
-  // `updateRepoUrl` rewrote the host/org and the full-URL key no longer matches.
-  const idMatch = runUrl.match(/\/runs\/(\d+)/);
-  if (idMatch && idMatch[1] in map) return map[idMatch[1]];
-  return 0;
-}
 
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {

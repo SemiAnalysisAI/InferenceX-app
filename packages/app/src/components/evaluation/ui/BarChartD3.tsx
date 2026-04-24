@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { computeToggle } from '@/hooks/useTogglableSet';
+import { overlayFilterForRunIndex, overlayRunIndex } from '@/lib/overlay-run-style';
 
 const BASE_MARGIN = { top: 24, right: 24, bottom: 52 };
 const OVERLAY_X_SIZE = 6;
@@ -164,6 +165,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     resetOverlayHwTypes,
     localOfficialOverride,
     setLocalOfficialOverride,
+    runIndexByUrl,
   } = useUnofficialRun();
   const chartRef = useRef<D3ChartHandle>(null);
 
@@ -535,6 +537,9 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               return bar;
             });
 
+          bars.style('filter', (d) =>
+            overlayFilterForRunIndex(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
+          );
           bars
             .selectAll<SVGLineElement, EvaluationChartData>(
               '.unofficial-eb-stem, .unofficial-eb-cap-top, .unofficial-eb-cap-bot',
@@ -684,6 +689,11 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             (d) =>
               `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
           );
+          // Per-run hue shift at the group level so the X-mark + score label
+          // inherit the same tone and stay visually grouped.
+          overlayPoints.style('filter', (d) =>
+            overlayFilterForRunIndex(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
+          );
 
           overlayPoints
             .select('.unofficial-eval-x')
@@ -775,6 +785,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       unofficialChartData,
       unofficialErrorData,
       unofficialRunInfo,
+      runIndexByUrl,
     ],
   );
 
