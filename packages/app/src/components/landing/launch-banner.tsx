@@ -71,7 +71,7 @@ export function LaunchBanner() {
               </span>
             </p>
             <p className="text-xs text-muted-foreground leading-snug truncate">
-              First inference numbers on Blackwell, click to explore.
+              First inference numbers on NVIDIA, click to explore.
             </p>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">

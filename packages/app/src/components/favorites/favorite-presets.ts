@@ -117,19 +117,19 @@ export function findConfigChangeDates(
 export const FAVORITE_PRESETS: FavoritePreset[] = [
   // 0 — DeepSeek V4 Pro launch
   {
-    id: 'dsv4-launch-blackwell',
-    title: 'DeepSeek V4 Pro — Blackwell First Look',
+    id: 'dsv4-launch-nvidia',
+    title: 'DeepSeek V4 Pro — NVIDIA First Look',
     description:
-      'First benchmarks of DeepSeek V4 Pro on NVIDIA Blackwell (GB200 NVL72 vs B200) Dynamo TRT at FP4.',
-    tags: ['DeepSeek', 'V4-Pro', 'GB200', 'B200', 'FP4', 'New'],
+      'First benchmarks of DeepSeek V4 Pro on NVIDIA GPUs. New configurations appear here as they come online.',
+    tags: ['DeepSeek', 'V4-Pro', 'NVIDIA', 'New'],
     category: 'comparison',
     wide: true,
     config: {
       model: Model.DeepSeek_V4_Pro,
       sequence: Sequence.EightK_OneK,
-      precisions: ['fp4'],
+      precisions: ['fp4', 'fp4fp8', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['gb200_dynamo-trt', 'b200_dynamo-trt'],
+      hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300'],
     },
   },
   // 1 — NVIDIA
