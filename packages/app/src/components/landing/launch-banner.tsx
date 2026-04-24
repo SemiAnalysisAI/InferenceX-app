@@ -1,12 +1,9 @@
 'use client';
 
 import { ArrowRight, Sparkles, X } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { track } from '@/lib/analytics';
-import { navigateInApp } from '@/lib/client-navigation';
 
 const DISMISS_KEY = 'inferencex-dsv4-banner-dismissed';
 const BANNER_ID = 'dsv4-launch';
@@ -21,7 +18,6 @@ function isDismissed(): boolean {
 }
 
 export function LaunchBanner() {
-  const router = useRouter();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -47,14 +43,20 @@ export function LaunchBanner() {
 
   const href = `/inference?preset=${PRESET_ID}`;
 
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    track('launch_banner_clicked', { banner_id: BANNER_ID, preset_id: PRESET_ID });
+    // Hard navigation so the `?preset=` param is guaranteed to be in the URL
+    // when InferenceContext first mounts and reads window.location.search.
+    window.location.href = href;
+  };
+
   return (
     <section className="relative">
-      <Link
+      <a
         href={href}
-        onClick={(e) => {
-          track('launch_banner_clicked', { banner_id: BANNER_ID, preset_id: PRESET_ID });
-          navigateInApp(e, router, href);
-        }}
+        onClick={handleClick}
         className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-brand/40 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-4 py-3 transition-all duration-200 hover:border-brand/70 hover:shadow-lg hover:shadow-brand/10"
         data-testid="launch-banner"
       >
@@ -88,7 +90,7 @@ export function LaunchBanner() {
         >
           <X className="size-4" />
         </button>
-      </Link>
+      </a>
     </section>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
 import { track } from '@/lib/analytics';
@@ -10,15 +9,22 @@ import type { FavoritePreset } from '@/components/favorites/favorite-presets';
 export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
   const isNew = preset.tags.some((t) => t.toLowerCase() === 'new');
   const visibleTags = preset.tags.filter((t) => t.toLowerCase() !== 'new');
+  const href = `/inference?preset=${preset.id}`;
+  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    track('landing_curated_view_clicked', {
+      preset_id: preset.id,
+      preset_title: preset.title,
+    });
+    // Hard navigation so the `?preset=` param is guaranteed to be in the URL
+    // when InferenceContext first mounts and reads window.location.search.
+    window.location.href = href;
+  };
   return (
-    <Link
-      href={`/inference?preset=${preset.id}`}
-      onClick={() =>
-        track('landing_curated_view_clicked', {
-          preset_id: preset.id,
-          preset_title: preset.title,
-        })
-      }
+    <a
+      href={href}
+      onClick={onClick}
       className={`group relative flex flex-col rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-5 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]${preset.wide ? ' sm:col-span-2' : ''}`}
       data-testid={`curated-view-${preset.id}`}
     >
@@ -48,6 +54,6 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
           </Badge>
         ))}
       </div>
-    </Link>
+    </a>
   );
 }
