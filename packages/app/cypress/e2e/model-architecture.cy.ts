@@ -150,7 +150,7 @@ describe('Model Architecture Diagram', () => {
         doc.body.style.removeProperty('pointer-events');
       });
       cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('Kimi K2.6').click();
+      cy.get('[role="option"]').contains('Kimi K2.5').click();
 
       cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
       cy.get('body').then(($body) => {
@@ -198,7 +198,7 @@ describe('Model Architecture Diagram', () => {
         doc.body.style.removeProperty('pointer-events');
       });
       cy.get('[role="combobox"]').filter(':visible').first().click();
-      cy.get('[role="option"]').contains('MiniMax M2.7').click();
+      cy.get('[role="option"]').contains('MiniMax M2.5').click();
 
       cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
       cy.get('body').then(($body) => {
