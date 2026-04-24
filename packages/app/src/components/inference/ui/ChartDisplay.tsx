@@ -678,6 +678,7 @@ export default function ChartDisplay() {
               lineConfigs={trackedConfigs}
               yLabel={currentYLabel}
               logScale={logScale}
+              selectedPrecisions={selectedPrecisions}
             />
           </div>
           <div className="relative">
@@ -692,6 +693,7 @@ export default function ChartDisplay() {
               lineConfigs={trackedConfigs}
               yLabel={currentXLabel}
               logScale={logScale}
+              selectedPrecisions={selectedPrecisions}
             />
           </div>
         </DialogContent>

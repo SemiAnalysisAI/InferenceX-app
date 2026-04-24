@@ -2,7 +2,9 @@ import * as d3 from 'd3';
 
 import {
   HIT_AREA_RADIUS,
+  type ShapeKey,
   getShapeConfig,
+  getShapeKeyForPrecision,
   applyNormalState,
   applyHoverState,
 } from '@/lib/chart-rendering';
@@ -17,7 +19,18 @@ export interface ScatterPointConfig<T> {
   getLabelText?: (d: T) => string;
   foreground?: string;
   dataAttrs?: Record<string, (d: T) => string>;
+  /**
+   * Selected precisions, in selection order. Controls shape assignment:
+   * first precision → circle, second → square, third → triangle, fourth → diamond.
+   * Defaults to `[d.precision]` per-point (all points render as circles).
+   */
+  selectedPrecisions?: readonly string[];
 }
+
+const resolveShapeKey = (precision: string, selectedPrecisions?: readonly string[]): ShapeKey =>
+  selectedPrecisions && selectedPrecisions.length > 0
+    ? getShapeKeyForPrecision(precision, selectedPrecisions)
+    : 'circle';
 
 /**
  * Render scatter points into a zoom group: group → hit area → shape → optional label.
@@ -45,23 +58,8 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     .attr('fill', 'transparent')
     .attr('cursor', 'pointer');
 
-  // Visible shape (enter only)
-  entered.each(function (d) {
-    const pointGroup = d3.select(this);
-    const shapeConfig = getShapeConfig(d.precision);
-    const shape = pointGroup
-      .append(shapeConfig.type)
-      .attr('class', 'visible-shape')
-      .attr('fill', config.getColor(d))
-      .attr('stroke', 'none')
-      .attr('cursor', 'pointer') as d3.Selection<
-      SVGCircleElement | SVGRectElement | SVGPathElement,
-      unknown,
-      null,
-      undefined
-    >;
-    applyNormalState(shape, d.precision);
-  });
+  // Visible shape is created (or swapped, if selectedPrecisions changed) in the
+  // merged update pass below.
 
   // Label (enter only)
   if (!config.hideLabels && config.getLabelText && config.foreground) {
@@ -97,8 +95,38 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     }
   }
 
-  // Update colors on existing shapes (handles hw color changes)
-  points.select('.visible-shape').attr('fill', config.getColor as any);
+  // Update shape type (if selectedPrecisions changed) + colors on all points.
+  // The shape element is swapped (remove/append) when its SVG tag needs to change.
+  // The chosen shape key is stamped on the element so other code (e.g.
+  // useStickyTooltip's reset path) can restore normal-state attrs without
+  // knowing selectedPrecisions.
+  points.each(function (d) {
+    const g = d3.select(this);
+    const shapeKey = resolveShapeKey(d.precision, config.selectedPrecisions);
+    const targetType = getShapeConfig(shapeKey).type;
+    const existing = g.select<SVGElement>('.visible-shape').node();
+    const currentType = existing?.tagName.toLowerCase();
+    if (!existing || currentType !== targetType) {
+      g.select('.visible-shape').remove();
+      const shape = g
+        .append(targetType)
+        .attr('class', 'visible-shape')
+        .attr('data-shape-key', shapeKey)
+        .attr('fill', config.getColor(d))
+        .attr('stroke', 'none')
+        .attr('cursor', 'pointer') as d3.Selection<
+        SVGCircleElement | SVGRectElement | SVGPathElement,
+        unknown,
+        null,
+        undefined
+      >;
+      applyNormalState(shape, shapeKey);
+    } else {
+      const shape = g.select<SVGElement>('.visible-shape');
+      shape.attr('fill', config.getColor(d)).attr('data-shape-key', shapeKey);
+      applyNormalState(shape as any, shapeKey);
+    }
+  });
 
   // Update labels: use data join so labels are created/removed properly on toggle
   if (!config.hideLabels && config.getLabelText && config.foreground) {
@@ -152,6 +180,8 @@ export function attachScatterTooltipHandlers<
     onPointDblClick?: (event: MouseEvent, d: T) => void;
     /** Ref to current scales — when provided, avoids stale-closure bugs after scale recalculation */
     scalesRef?: React.RefObject<{ xScale: ContinuousScale; yScale: ContinuousScale } | null>;
+    /** Selected precisions, in selection order; controls hover shape key. */
+    selectedPrecisions?: readonly string[];
   },
 ): void {
   const {
@@ -170,12 +200,16 @@ export function attachScatterTooltipHandlers<
     onPointClick,
     onPointDblClick,
     scalesRef,
+    selectedPrecisions,
   } = config;
 
   points
     .on('mouseenter', function (_event, d) {
       if (isPinned()) return;
-      applyHoverState(d3.select(this).select('.visible-shape') as any, d.precision);
+      applyHoverState(
+        d3.select(this).select('.visible-shape') as any,
+        resolveShapeKey(d.precision, selectedPrecisions),
+      );
       tooltip.style('opacity', 1).style('display', 'block').style('pointer-events', 'none');
       const curXScale = scalesRef?.current?.xScale ?? xScale;
       const curYScale = scalesRef?.current?.yScale ?? yScale;
@@ -197,7 +231,10 @@ export function attachScatterTooltipHandlers<
     })
     .on('mouseleave', function (_event, d) {
       if (isPinned()) return;
-      applyNormalState(d3.select(this).select('.visible-shape') as any, d.precision);
+      applyNormalState(
+        d3.select(this).select('.visible-shape') as any,
+        resolveShapeKey(d.precision, selectedPrecisions),
+      );
       tooltip.style('opacity', 0).style('display', 'none');
       rulerGroup.style('display', 'none');
     })

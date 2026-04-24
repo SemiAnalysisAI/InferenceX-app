@@ -22,31 +22,25 @@ const DIAMOND_SIZE = 5;
 const DIAMOND_HOVER_SIZE = 7;
 const getDiamondPath = (size: number) => `M 0 ${-size} L ${size} 0 L 0 ${size} L ${-size} 0 Z`;
 
-// Shape configuration for different precisions
+export type ShapeKey = 'circle' | 'square' | 'triangle' | 'diamond';
+
+// Shape assignment order: first selected precision gets circle, second square, etc.
+export const SHAPE_ORDER: readonly ShapeKey[] = ['circle', 'square', 'triangle', 'diamond'];
+
+// Shape configuration keyed by shape name (not precision).
 export const SHAPE_CONFIG = {
-  bf16: {
-    type: 'path' as const,
+  circle: {
+    type: 'circle' as const,
     normal: {
-      d: getTrianglePath(TRIANGLE_SIZE),
+      r: POINT_SIZE,
       strokeWidth: STROKE_WIDTH,
     },
     hover: {
-      d: getTrianglePath(TRIANGLE_HOVER_SIZE),
+      r: HOVER_POINT_SIZE,
       strokeWidth: HOVER_STROKE_WIDTH,
     },
   },
-  int4: {
-    type: 'path' as const,
-    normal: {
-      d: getDiamondPath(DIAMOND_SIZE),
-      strokeWidth: STROKE_WIDTH,
-    },
-    hover: {
-      d: getDiamondPath(DIAMOND_HOVER_SIZE),
-      strokeWidth: HOVER_STROKE_WIDTH,
-    },
-  },
-  fp8: {
+  square: {
     type: 'rect' as const,
     normal: {
       x: -POINT_SIZE,
@@ -63,33 +57,52 @@ export const SHAPE_CONFIG = {
       strokeWidth: HOVER_STROKE_WIDTH,
     },
   },
-  default: {
-    type: 'circle' as const,
+  triangle: {
+    type: 'path' as const,
     normal: {
-      r: POINT_SIZE,
+      d: getTrianglePath(TRIANGLE_SIZE),
       strokeWidth: STROKE_WIDTH,
     },
     hover: {
-      r: HOVER_POINT_SIZE,
+      d: getTrianglePath(TRIANGLE_HOVER_SIZE),
+      strokeWidth: HOVER_STROKE_WIDTH,
+    },
+  },
+  diamond: {
+    type: 'path' as const,
+    normal: {
+      d: getDiamondPath(DIAMOND_SIZE),
+      strokeWidth: STROKE_WIDTH,
+    },
+    hover: {
+      d: getDiamondPath(DIAMOND_HOVER_SIZE),
       strokeWidth: HOVER_STROKE_WIDTH,
     },
   },
 };
 
-// Helper function to get shape config based on precision
-export const getShapeConfig = (precision: string) => {
-  if (precision === 'bf16') return SHAPE_CONFIG.bf16;
-  if (precision === 'int4') return SHAPE_CONFIG.int4;
-  if (precision === 'fp8') return SHAPE_CONFIG.fp8;
-  return SHAPE_CONFIG.default;
+/**
+ * Resolve a precision's shape based on its position in the selectedPrecisions list.
+ * First selected → circle, second → square, third → triangle, fourth → diamond.
+ * Precisions not in the list (or beyond the 4th slot) fall back to circle.
+ */
+export const getShapeKeyForPrecision = (
+  precision: string,
+  selectedPrecisions: readonly string[],
+): ShapeKey => {
+  const idx = selectedPrecisions.indexOf(precision);
+  if (idx === -1 || idx >= SHAPE_ORDER.length) return 'circle';
+  return SHAPE_ORDER[idx];
 };
+
+export const getShapeConfig = (shapeKey: ShapeKey) => SHAPE_CONFIG[shapeKey];
 
 // Helper function to apply normal state attributes to a shape
 export const applyNormalState = (
   shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,
-  precision: string,
+  shapeKey: ShapeKey,
 ) => {
-  const config = getShapeConfig(precision);
+  const config = getShapeConfig(shapeKey);
   if (config.type === 'path') {
     (shape as d3.Selection<SVGPathElement, unknown, null, undefined>)
       .attr('d', config.normal.d)
@@ -111,9 +124,9 @@ export const applyNormalState = (
 // Helper function to apply hover state attributes to a shape
 export const applyHoverState = (
   shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,
-  precision: string,
+  shapeKey: ShapeKey,
 ) => {
-  const config = getShapeConfig(precision);
+  const config = getShapeConfig(shapeKey);
   if (config.type === 'path') {
     (shape as d3.Selection<SVGPathElement, unknown, null, undefined>)
       .attr('d', config.hover.d)

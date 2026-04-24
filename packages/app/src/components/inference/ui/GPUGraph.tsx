@@ -17,6 +17,7 @@ import {
   applyHoverState,
   applyNormalState,
   formatLargeNumber,
+  getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/chart-rendering';
 import {
@@ -355,6 +356,7 @@ const GPUGraph = React.memo(
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
               },
+              selectedPrecisions,
             },
           },
         ]}
@@ -390,9 +392,15 @@ const GPUGraph = React.memo(
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
-            applyHoverState(sel.select('.visible-shape') as any, d.precision),
+            applyHoverState(
+              sel.select('.visible-shape') as any,
+              getShapeKeyForPrecision(d.precision, selectedPrecisions),
+            ),
           onHoverEnd: (sel, d) =>
-            applyNormalState(sel.select('.visible-shape') as any, d.precision),
+            applyNormalState(
+              sel.select('.visible-shape') as any,
+              getShapeKeyForPrecision(d.precision, selectedPrecisions),
+            ),
           attachToLayer: 1,
         }}
         onRender={(ctx: RenderContext) => {
@@ -490,7 +498,7 @@ const GPUGraph = React.memo(
                 },
               },
             ]}
-            showFpShapeIndicators={selectedPrecisions.length > 1}
+            precisionIndicators={selectedPrecisions}
           />
         }
       />
