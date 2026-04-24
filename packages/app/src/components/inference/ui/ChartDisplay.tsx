@@ -4,8 +4,14 @@ import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
 
+import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { useInference } from '@/components/inference/InferenceContext';
-import type { InferenceData, OverlayData, TrendDataPoint } from '@/components/inference/types';
+import type {
+  ChartDefinition,
+  InferenceData,
+  OverlayData,
+  TrendDataPoint,
+} from '@/components/inference/types';
 import { processOverlayChartData } from '@/components/inference/utils';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
@@ -266,6 +272,23 @@ export default function ChartDisplay() {
   // keeps old graphs visible so we never flash skeletons when switching filters.
   const isFirstLoad = loading && graphs.length === 0;
 
+  // When the selected model has no DB data but an unofficial run provides overlay
+  // data for this (model, sequence), synthesize empty-data stub graphs from the
+  // chart-config so the overlay has a base chart to render on.
+  const effectiveGraphs = useMemo(() => {
+    if (graphs.length > 0) return graphs;
+    const hasOverlay =
+      (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.data.length ?? 0) > 0;
+    if (!hasOverlay) return graphs;
+    return (chartDefinitions as ChartDefinition[]).map((chartDefinition) => ({
+      model: selectedModel,
+      sequence: selectedSequence,
+      chartDefinition,
+      data: [] as InferenceData[],
+    }));
+  }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
+
   const displayGraphs = isFirstLoad
     ? Array.from({ length: 2 }).map((_, index) => (
         <Card key={`skeleton-${index}`}>
@@ -274,9 +297,9 @@ export default function ChartDisplay() {
           <Skeleton className="h-[600px] w-full" />
         </Card>
       ))
-    : graphs.length === 0
+    : effectiveGraphs.length === 0
       ? []
-      : graphs.map((graph, graphIndex) => (
+      : effectiveGraphs.map((graph, graphIndex) => (
           <section key={graphIndex} className="pt-8 md:pt-0">
             <figure data-testid="chart-figure" className="relative rounded-lg">
               <ChartButtons
