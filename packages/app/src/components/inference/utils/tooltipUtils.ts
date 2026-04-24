@@ -204,6 +204,8 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
   const { data: d, isPinned, xLabel, yLabel, overlayData } = config;
   const hwConfig = overlayData.hardwareConfig[d.hwKey];
+  const perRow = overlayData.getRunForRow?.(d);
+  const branch = perRow?.branch ?? overlayData.label;
 
   return `
     <div style="background: var(--popover); border: 2px solid #dc2626; border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -215,7 +217,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
         ${hwConfig ? getDisplayLabel(hwConfig) : d.hwKey}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Branch:</strong> ${overlayData.label}
+        <strong>Branch:</strong> ${branch}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Date:</strong> ${d.actualDate ?? d.date}

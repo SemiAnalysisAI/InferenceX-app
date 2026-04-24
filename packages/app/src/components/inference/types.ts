@@ -311,10 +311,17 @@ export interface OverlayData {
   data: InferenceData[];
   /** Hardware configuration for the overlay data (may have different hardware types) */
   hardwareConfig: HardwareConfig;
-  /** Label for the overlay (e.g., branch name) */
+  /** Fallback label — branch of the first loaded run. Used when {@link getRunForRow} is absent
+   *  or returns undefined (legacy single-run callers). */
   label: string;
-  /** URL to the workflow run */
+  /** Fallback URL — workflow URL of the first loaded run. */
   runUrl?: string;
+  /**
+   * Per-point run lookup. Returns `{ branch, url }` of the run that produced
+   * the given overlay point. When multiple runs are loaded each point still
+   * shows its own branch/URL in the tooltip rather than the first run's.
+   */
+  getRunForRow?: (row: InferenceData) => { branch: string; url: string } | undefined;
 }
 
 export interface ScatterGraphProps {

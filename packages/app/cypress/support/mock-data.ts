@@ -443,6 +443,7 @@ export function createMockUnofficialRunContext(
     loading: false,
     error: null,
     clearUnofficialRun: namedStub('clearUnofficialRun'),
+    dismissRun: namedStub('dismissRun'),
     availableModelsAndSequences: [],
     getOverlayData: cy
       .stub()

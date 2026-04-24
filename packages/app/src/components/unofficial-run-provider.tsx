@@ -65,7 +65,14 @@ export interface UnofficialRunContextType {
   unofficialEvalRows: EvalRow[] | null;
   loading: boolean;
   error: string | null;
+  /** Clear every unofficial run. Wipes state + URL. */
   clearUnofficialRun: () => void;
+  /**
+   * Drop a single run ID. Rewrites the URL to the remaining IDs and filters
+   * local state (chart data + eval rows + run infos) by `run_url` without
+   * refetching the others.
+   */
+  dismissRun: (runId: string) => void;
   availableModelsAndSequences: AvailableModelSequence[];
   getOverlayData: (
     model: Model,
@@ -234,6 +241,78 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     window.history.pushState({}, '', url);
   }, []);
 
+  /**
+   * Drop a single run from the URL + state. Since benchmark rows are tagged
+   * with `run_url` and eval rows have their own `run_url`, we can filter local
+   * state by the dismissed run's URL/id without refetching the remaining runs.
+   */
+  const dismissRun = useCallback(
+    (runId: string) => {
+      const target = unofficialRunInfos.find((r) => String(r.id) === runId);
+      if (!target) return;
+
+      const remaining = unofficialRunInfos.filter((r) => String(r.id) !== runId);
+
+      // Rewrite URL to the remaining IDs (or drop param if none left).
+      const url = new URL(window.location.href);
+      const existingKeys: string[] = [];
+      for (const key of url.searchParams.keys()) {
+        if (UNOFFICIAL_RUN_PARAM_RE.test(key)) existingKeys.push(key);
+      }
+      for (const key of existingKeys) url.searchParams.delete(key);
+      if (remaining.length > 0) {
+        url.searchParams.set('unofficialrun', remaining.map((r) => r.id).join(','));
+      }
+      window.history.pushState({}, '', url);
+
+      if (remaining.length === 0) {
+        setUnofficialRunInfos([]);
+        setUnofficialChartData(null);
+        setUnofficialEvalRows(null);
+        setError(null);
+        setAvailableModelsAndSequences([]);
+        return;
+      }
+
+      setUnofficialRunInfos(remaining);
+
+      // Filter chart data by stamped `run_url`. A row belongs to the dismissed
+      // run if its URL matches exactly OR the numeric id parses to the same.
+      const belongsToDismissed = (rowUrl?: string | null) => {
+        if (!rowUrl) return false;
+        if (rowUrl === target.url) return true;
+        const m = rowUrl.match(/\/runs\/(\d+)/);
+        return m !== null && m[1] === runId;
+      };
+
+      let filteredChartData: UnofficialChartData | null = null;
+      setUnofficialChartData((prev) => {
+        if (!prev) return prev;
+        const next: UnofficialChartData = {};
+        for (const [key, group] of Object.entries(prev)) {
+          const e2eData = group.e2e.data.filter((d) => !belongsToDismissed(d.run_url));
+          const intvData = group.interactivity.data.filter((d) => !belongsToDismissed(d.run_url));
+          if (e2eData.length === 0 && intvData.length === 0) continue;
+          next[key] = {
+            e2e: { data: e2eData, gpus: group.e2e.gpus },
+            interactivity: { data: intvData, gpus: group.interactivity.gpus },
+          };
+        }
+        filteredChartData = next;
+        return next;
+      });
+      // Re-derive available (model, sequence) pairs from surviving runs so the
+      // model/sequence picker doesn't still offer combos that only existed in
+      // the dismissed run.
+      setAvailableModelsAndSequences(parseAvailableModelsAndSequences(filteredChartData));
+
+      setUnofficialEvalRows((prev) =>
+        prev ? prev.filter((row) => !belongsToDismissed(row.run_url)) : prev,
+      );
+    },
+    [unofficialRunInfos],
+  );
+
   // Build a url → index lookup. Keyed by the full run.url AND by the numeric id
   // as a string, since `updateRepoUrl` can rewrite hosts/orgs between the
   // overlay rendering path and the run metadata.
@@ -320,6 +399,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         clearUnofficialRun,
+        dismissRun,
         availableModelsAndSequences,
         getOverlayData,
         activeOverlayHwTypes,
@@ -331,9 +411,13 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         setLocalOfficialOverride,
       }}
     >
-      {unofficialRunInfos.map((info) => (
-        <UnofficialBanner key={info.id} runInfo={info} onDismiss={clearUnofficialRun} />
-      ))}
+      {unofficialRunInfos.length > 0 && (
+        <UnofficialBanner
+          runs={unofficialRunInfos}
+          onDismissRun={dismissRun}
+          onDismissAll={clearUnofficialRun}
+        />
+      )}
       {children}
     </UnofficialRunContext.Provider>
   );

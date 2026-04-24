@@ -165,7 +165,8 @@ export default function ChartDisplay() {
     track('inference_view_changed', { view: value, chartIndex: index });
   };
 
-  const { unofficialRunInfo, getOverlayData, isUnofficialRun } = useUnofficialRun();
+  const { unofficialRunInfo, unofficialRunInfos, runIndexByUrl, getOverlayData, isUnofficialRun } =
+    useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
@@ -175,6 +176,23 @@ export default function ChartDisplay() {
 
     const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e');
     const interactivityRaw = getOverlayData(selectedModel, selectedSequence, 'interactivity');
+
+    // Per-row run lookup used by the overlay tooltip so hovering a point shows
+    // its OWN run's branch, not the banner-level first-run fallback.
+    const getRunForRow = (row: InferenceData) => {
+      const url = row.run_url ?? null;
+      if (!url) return undefined;
+      if (url in runIndexByUrl) {
+        const info = unofficialRunInfos[runIndexByUrl[url]];
+        return info ? { branch: info.branch, url: info.url } : undefined;
+      }
+      const idMatch = url.match(/\/runs\/(\d+)/);
+      if (idMatch && idMatch[1] in runIndexByUrl) {
+        const info = unofficialRunInfos[runIndexByUrl[idMatch[1]]];
+        return info ? { branch: info.branch, url: info.url } : undefined;
+      }
+      return undefined;
+    };
 
     const processData = (
       rawData: { data: InferenceData[]; hardwareConfig: any } | null,
@@ -197,6 +215,7 @@ export default function ChartDisplay() {
         hardwareConfig: rawData.hardwareConfig,
         label: unofficialRunInfo.branch,
         runUrl: unofficialRunInfo.url,
+        getRunForRow,
       };
     };
 
@@ -206,6 +225,8 @@ export default function ChartDisplay() {
     };
   }, [
     unofficialRunInfo,
+    unofficialRunInfos,
+    runIndexByUrl,
     getOverlayData,
     selectedModel,
     selectedSequence,
