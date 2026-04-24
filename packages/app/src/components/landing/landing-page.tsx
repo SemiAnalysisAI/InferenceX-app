@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { GitHubStarModal } from '@/components/github-star-modal';
 import { IntroSection } from '@/components/intro-section';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
+import { LaunchBanner } from '@/components/landing/launch-banner';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { track } from '@/lib/analytics';
 import { navigateInApp } from '@/lib/client-navigation';
@@ -24,6 +25,7 @@ export function LandingPage() {
     <main className="relative">
       <GitHubStarModal />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
+        <LaunchBanner />
         <IntroSection />
 
         {/* Split: Dashboard vs Presets */}
