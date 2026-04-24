@@ -22,8 +22,8 @@ import type {
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 import {
-  overlayFilterForRunIndex,
   overlayRooflineDasharray,
+  overlayRunColor,
   overlayRunIndex,
 } from '@/lib/overlay-run-style';
 import {
@@ -153,6 +153,7 @@ const ScatterGraph = React.memo(
       localOfficialOverride,
       setLocalOfficialOverride,
       runIndexByUrl,
+      unofficialRunInfos,
     } = useUnofficialRun();
     const chartRef = useRef<D3ChartHandle>(null);
 
@@ -205,18 +206,14 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
       return keys;
     }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
-    // Vendor color map keys — include overlay hw keys (unprefixed) so overlay
-    // strokes resolve to a real hue instead of falling through to the muted
-    // fallback. Without this, `hue-rotate` on overlay lines would be a no-op
-    // because the input is gray.
-    const activeVendorKeys = useMemo(
-      () => [...new Set([...effectiveOfficialHwTypes, ...activeOverlayHwTypes])],
-      [effectiveOfficialHwTypes, activeOverlayHwTypes],
+    const activeOfficialKeys = useMemo(
+      () => [...effectiveOfficialHwTypes],
+      [effectiveOfficialHwTypes],
     );
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
-      activeKeys: activeVendorKeys,
+      activeKeys: activeOfficialKeys,
     });
 
     // --- Changelog ---
@@ -1304,7 +1301,8 @@ const ScatterGraph = React.memo(
                   ovEntries.push({
                     key,
                     points: group.points,
-                    stroke: getCssColor(resolveColor(group.hwKey)),
+                    // Color by run — same palette entry the legend uses, so they match.
+                    stroke: overlayRunColor(group.runIndex),
                     runIndex: group.runIndex,
                   });
                 }
@@ -1324,7 +1322,7 @@ const ScatterGraph = React.memo(
                 .attr('stroke-width', 2)
                 .attr('stroke-dasharray', (d) => overlayRooflineDasharray(d.runIndex))
                 .attr('d', (d) => lineGen(d.points))
-                .style('filter', (d) => overlayFilterForRunIndex(d.runIndex));
+                .style('filter', null);
 
               // Overlay X-shape points — index-keyed so every point renders
               const overlayPoints = zoomGroup
@@ -1353,14 +1351,12 @@ const ScatterGraph = React.memo(
                 });
 
               overlayPoints.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
-              // Apply per-run hue shift at the group level so the shape and its
-              // label inherit the same tone and stay visually grouped.
-              overlayPoints.style('filter', (d) =>
-                overlayFilterForRunIndex(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
-              );
+              overlayPoints.style('filter', null);
               overlayPoints
                 .select('.overlay-x')
-                .attr('stroke', (d) => getCssColor(resolveColor(d.hwKey as string)));
+                .attr('stroke', (d) =>
+                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                );
 
               // Labels
               const showLabels = !hidePointLabels && !showGradientLabels;
@@ -1689,32 +1685,35 @@ const ScatterGraph = React.memo(
             onItemHoverEnd={handleLegendHoverEnd}
             onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
             legendItems={[
-              ...(overlayData
-                ? Object.entries(overlayData.hardwareConfig)
-                    .filter(([key]) =>
-                      overlayData.data.some(
-                        (d) => d.hwKey === key && selectedPrecisions.includes(d.precision),
-                      ),
-                    )
-                    .map(([key, hwConfig]) => {
-                      const parsed = parseHwKeyToLabel(key);
+              // Overlay legend: one entry per loaded unofficial run that actually
+              // contributes points to this chart. Colored from the shared palette
+              // so the legend swatch matches the stroke color used in the chart.
+              ...(overlayData && unofficialRunInfos.length > 0
+                ? unofficialRunInfos
+                    .map((info, idx) => {
+                      const hasPoints = overlayData.data.some(
+                        (d) =>
+                          overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
+                          selectedPrecisions.includes(d.precision),
+                      );
+                      if (!hasPoints) return null;
+                      const branch = info.branch || `run ${info.id}`;
                       return {
-                        name: `✕ ${key}`,
-                        label: `✕ ${parsed.label}`,
-                        color: resolveColor(key),
-                        title: `UNOFFICIAL: ${hwConfig.framework || parsed.label}`,
+                        name: `✕ unofficial-run-${info.id}`,
+                        label: `✕ ${branch}`,
+                        color: overlayRunColor(idx),
+                        title: `UNOFFICIAL: ${branch}`,
                         isHighlighted: true,
-                        hw: `overlay-${key}`,
+                        hw: `overlay-run-${info.id}`,
                         isActive: true,
                         onClick: () => {},
                         tooltip: (
                           <div className="font-normal text-xs">
                             <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-                            <div>Branch: {overlayData.label}</div>
-                            <div>Hardware: {parsed.label}</div>
-                            {overlayData.runUrl && (
+                            <div>Branch: {branch}</div>
+                            {info.url && (
                               <a
-                                href={overlayData.runUrl}
+                                href={info.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="underline"
@@ -1726,6 +1725,7 @@ const ScatterGraph = React.memo(
                         ),
                       };
                     })
+                    .filter((x): x is NonNullable<typeof x> => x !== null)
                 : []),
               ...Object.entries(hardwareConfig)
                 .filter(([key]) =>

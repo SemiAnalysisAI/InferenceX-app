@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { overlayFilterForRunIndex, overlayRunIndex } from '@/lib/overlay-run-style';
+import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
 
 const BASE_MARGIN = { top: 24, right: 24, bottom: 52 };
 const OVERLAY_X_SIZE = 6;
@@ -159,6 +159,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const {
     isUnofficialRun,
     unofficialRunInfo,
+    unofficialRunInfos,
     activeOverlayHwTypes,
     setActiveOverlayHwTypes,
     allOverlayHwTypes,
@@ -320,33 +321,45 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
 
   const legendItems = useMemo(
     () => [
-      ...unofficialConfigurations.map(({ hwKey, configLabel }) => ({
-        name: `✕ ${configLabel}`,
-        label: `✕ ${configLabel.replaceAll('\n', ' ')}`,
-        color: resolveColor(configLabel, hwKey),
-        title: `UNOFFICIAL: ${configLabel.replaceAll('\n', ' ')}`,
-        isHighlighted: true,
-        hw: `overlay:${hwKey}`,
-        isActive: true,
-        onClick: () => {},
-        tooltip: (
-          <div className="font-normal text-xs">
-            <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-            <div>Branch: {unofficialRunInfo?.branch}</div>
-            <div>Config: {configLabel.replaceAll('\n', ' ')}</div>
-            {unofficialRunInfo?.url && (
-              <a
-                href={unofficialRunInfo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                View workflow run
-              </a>
-            )}
-          </div>
-        ),
-      })),
+      // Overlay legend: one entry per loaded unofficial run that contributes
+      // points to the current chart. Same palette color as the chart strokes.
+      ...(unofficialConfigurations.length > 0 && unofficialRunInfos.length > 0
+        ? unofficialRunInfos
+            .map((info, idx) => {
+              const hasPoints = unofficialChartData.some(
+                (d) => overlayRunIndex(d.runUrl ?? null, runIndexByUrl) === idx,
+              );
+              if (!hasPoints) return null;
+              const branch = info.branch || `run ${info.id}`;
+              return {
+                name: `✕ unofficial-run-${info.id}`,
+                label: `✕ ${branch}`,
+                color: overlayRunColor(idx),
+                title: `UNOFFICIAL: ${branch}`,
+                isHighlighted: true,
+                hw: `overlay-run-${info.id}`,
+                isActive: true,
+                onClick: () => {},
+                tooltip: (
+                  <div className="font-normal text-xs">
+                    <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
+                    <div>Branch: {branch}</div>
+                    {info.url && (
+                      <a
+                        href={info.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        View workflow run
+                      </a>
+                    )}
+                  </div>
+                ),
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+        : []),
       ...configurations.map(({ hwKey, configLabel }) => ({
         name: configLabel,
         label: configLabel.replaceAll('\n', ' '),
@@ -368,7 +381,9 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       highlightedConfigs,
       resolveColor,
       unofficialConfigurations,
-      unofficialRunInfo,
+      unofficialChartData,
+      unofficialRunInfos,
+      runIndexByUrl,
     ],
   );
 
@@ -537,14 +552,14 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               return bar;
             });
 
-          bars.style('filter', (d) =>
-            overlayFilterForRunIndex(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
-          );
+          bars.style('filter', null);
           bars
             .selectAll<SVGLineElement, EvaluationChartData>(
               '.unofficial-eb-stem, .unofficial-eb-cap-top, .unofficial-eb-cap-bot',
             )
-            .attr('stroke', (d) => getCssColor(resolveColor(d.configLabel, String(d.hwKey))));
+            .attr('stroke', (d) =>
+              overlayRunColor(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
+            );
 
           bars
             .select('.unofficial-eb-stem')
@@ -689,15 +704,13 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             (d) =>
               `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
           );
-          // Per-run hue shift at the group level so the X-mark + score label
-          // inherit the same tone and stay visually grouped.
-          overlayPoints.style('filter', (d) =>
-            overlayFilterForRunIndex(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
-          );
+          overlayPoints.style('filter', null);
 
           overlayPoints
             .select('.unofficial-eval-x')
-            .attr('stroke', (d) => getCssColor(resolveColor(d.configLabel, String(d.hwKey))));
+            .attr('stroke', (d) =>
+              overlayRunColor(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
+            );
 
           overlayPoints.each(function (d) {
             d3.select(this)
