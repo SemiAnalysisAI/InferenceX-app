@@ -7,6 +7,7 @@ export enum Model {
   Kimi_K2_5 = 'Kimi-K2.5',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   GLM_5 = 'GLM-5',
+  DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
 
 export type CategoryTag = 'default' | 'experimental' | 'deprecated' | 'hidden';
@@ -37,6 +38,7 @@ export function groupByCategory<T>(
  */
 const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: CategoryTag }> = {
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
+  [Model.DeepSeek_V4_Pro]: { label: 'DeepSeek V4 Pro', prefix: 'dsv4', category: 'experimental' },
   [Model.Kimi_K2_5]: {
     label: 'Kimi K2.6 1T Architecture',
     prefix: 'kimik2.5',
