@@ -1,7 +1,20 @@
 import * as d3 from 'd3';
 import { useCallback, useRef, useState } from 'react';
 
-import { applyNormalState } from '@/lib/chart-rendering';
+import { type ShapeKey, applyNormalState } from '@/lib/chart-rendering';
+
+const VALID_SHAPE_KEYS: ReadonlySet<ShapeKey> = new Set([
+  'circle',
+  'square',
+  'triangle',
+  'diamond',
+]);
+
+/** Read the shape key that was stamped on the rendered shape element. */
+const readShapeKey = (el: SVGElement): ShapeKey => {
+  const k = el.dataset.shapeKey;
+  return k && VALID_SHAPE_KEYS.has(k as ShapeKey) ? (k as ShapeKey) : 'circle';
+};
 
 /**
  * Custom hook for managing sticky tooltip state in D3 charts.
@@ -78,12 +91,15 @@ export const useStickyTooltip = <T = any>() => {
         svg.select('.ruler-group').style('display', 'none');
         svg.select('.cursor-line').style('opacity', '0');
 
-        // Reset any scatter points stuck in hover state back to normal
+        // Reset any scatter points stuck in hover state back to normal.
+        // Shape key is stamped on the shape element so this doesn't need to
+        // know the caller's selectedPrecisions.
         svg.selectAll('.dot-group').each(function () {
           const group = d3.select(this);
-          const datum = group.datum() as { precision?: string } | null;
-          if (datum?.precision) {
-            applyNormalState(group.select('.visible-shape') as any, datum.precision);
+          const shape = group.select<SVGElement>('.visible-shape');
+          const node = shape.node();
+          if (node) {
+            applyNormalState(shape as any, readShapeKey(node));
           }
         });
       }
