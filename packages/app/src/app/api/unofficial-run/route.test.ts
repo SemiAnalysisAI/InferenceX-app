@@ -206,7 +206,7 @@ describe('normalizeArtifactRows', () => {
 
 describe('normalizeEvalArtifactRows', () => {
   it('converts aggregate eval rows to EvalRow shape with synthetic config ids', () => {
-    const rows = normalizeEvalArtifactRows(
+    const { rows, maxConfigId } = normalizeEvalArtifactRows(
       [rawEvalRow({ task: 'gsm8k', conc: 16 }), rawEvalRow({ task: 'mmlu', conc: 32 })],
       '2026-03-01',
       '2026-03-01T12:34:56Z',
@@ -229,10 +229,26 @@ describe('normalizeEvalArtifactRows', () => {
     });
     expect(rows[1].config_id).toBe(1);
     expect(rows[1].metrics.em_strict).toBe(0.91);
+    expect(maxConfigId).toBe(1);
+  });
+
+  it('offsets config ids when configIdOffset is provided', () => {
+    const { rows, maxConfigId } = normalizeEvalArtifactRows(
+      [rawEvalRow({ task: 'gsm8k', conc: 16 }), rawEvalRow({ task: 'mmlu', hw: 'h200-nv' })],
+      '2026-03-01',
+      '2026-03-01T12:34:56Z',
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+      10,
+    );
+
+    expect(rows).toHaveLength(2);
+    // Two distinct configs (different hw) → local ids 1 and 2, plus offset = 11 and 12
+    expect(rows.map((r) => r.config_id).toSorted()).toEqual([11, 12]);
+    expect(maxConfigId).toBe(12);
   });
 
   it('skips eval rows with unmapped hardware/model/task', () => {
-    const rows = normalizeEvalArtifactRows(
+    const { rows } = normalizeEvalArtifactRows(
       [
         rawEvalRow({ hw: 'unknown-gpu' }),
         rawEvalRow({ model_prefix: 'unknown', model: 'unknown/model' }),
@@ -276,6 +292,13 @@ describe('GET /api/unofficial-run', () => {
   it('returns 400 for non-numeric runId', async () => {
     const res = await GET(makeRequest('runId=abc'));
     expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when comma-separated list contains a non-numeric id', async () => {
+    const res = await GET(makeRequest('runId=123,abc,456'));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('comma-separated');
   });
 
   it('returns 500 when GITHUB_TOKEN is not set', async () => {
@@ -375,10 +398,12 @@ describe('GET /api/unofficial-run', () => {
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.runInfo.id).toBe(123);
-    expect(body.runInfo.isNonMainBranch).toBe(false);
+    expect(body.runInfos).toHaveLength(1);
+    expect(body.runInfos[0].id).toBe(123);
+    expect(body.runInfos[0].isNonMainBranch).toBe(false);
     expect(body.benchmarks).toHaveLength(1);
     expect(body.benchmarks[0].hardware).toBe('h200');
+    expect(body.benchmarks[0].run_url).toBe('http://github.com/run/123');
     expect(body.evaluations).toEqual([]);
   });
 
@@ -466,7 +491,154 @@ describe('GET /api/unofficial-run', () => {
     const res = await GET(makeRequest('runId=456'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.runInfo.isNonMainBranch).toBe(true);
+    expect(body.runInfos).toHaveLength(1);
+    expect(body.runInfos[0].isNonMainBranch).toBe(true);
     expect(body.benchmarks).toHaveLength(0);
+  });
+
+  it('merges data from multiple comma-separated runIds', async () => {
+    // Run 1 metadata
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: 111,
+          name: 'run-1',
+          head_branch: 'feature/a',
+          head_sha: 'aaa',
+          created_at: '2026-01-01T00:00:00Z',
+          html_url: 'http://github.com/run/111',
+          conclusion: 'success',
+          status: 'completed',
+        }),
+    });
+    // Run 1 artifacts
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl-1' }],
+        }),
+    });
+    // Run 1 download
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
+    mockGetEntries.mockReturnValueOnce([
+      { entryName: 'r1.json', getData: () => Buffer.from(JSON.stringify([rawRow()])) },
+    ]);
+
+    // Run 2 metadata
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: 222,
+          name: 'run-2',
+          head_branch: 'feature/b',
+          head_sha: 'bbb',
+          created_at: '2026-01-02T00:00:00Z',
+          html_url: 'http://github.com/run/222',
+          conclusion: 'success',
+          status: 'completed',
+        }),
+    });
+    // Run 2 artifacts
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl-2' }],
+        }),
+    });
+    // Run 2 download
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
+    mockGetEntries.mockReturnValueOnce([
+      {
+        entryName: 'r2.json',
+        getData: () => Buffer.from(JSON.stringify([rawRow({ hw: 'mi355x-amds' })])),
+      },
+    ]);
+
+    const res = await GET(makeRequest('runId=111,222'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.runInfos).toHaveLength(2);
+    expect(body.runInfos.map((r: { id: number }) => r.id)).toEqual([111, 222]);
+    expect(body.benchmarks).toHaveLength(2);
+    // Each benchmark row is tagged with its originating run_url
+    expect(body.benchmarks[0].run_url).toBe('http://github.com/run/111');
+    expect(body.benchmarks[1].run_url).toBe('http://github.com/run/222');
+  });
+
+  it('dedupes repeated runIds in the comma-separated list', async () => {
+    // Only one set of fetches expected since 123 is deduped
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: 123,
+          head_branch: 'main',
+          html_url: 'http://github.com/run/123',
+          created_at: '2026-01-01T00:00:00Z',
+        }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+        }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
+    mockGetEntries.mockReturnValueOnce([]);
+
+    const res = await GET(makeRequest('runId=123,123'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.runInfos).toHaveLength(1);
+    // Only three fetches were made (run, artifacts, download) — not six
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails with the upstream status when any runId in the list errors', async () => {
+    // First run succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: 111,
+          head_branch: 'main',
+          html_url: 'http://github.com/run/111',
+          created_at: '2026-01-01T00:00:00Z',
+        }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+        }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    });
+    mockGetEntries.mockReturnValueOnce([]);
+
+    // Second run 404s on metadata fetch
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
+
+    const res = await GET(makeRequest('runId=111,999'));
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toContain('999');
   });
 });

@@ -24,6 +24,7 @@ import {
 export function normalizeArtifactRows(
   rawRows: Record<string, unknown>[],
   date: string,
+  runUrl: string | null = null,
 ): BenchmarkRow[] {
   const tracker = createSkipTracker();
   const results: BenchmarkRow[] = [];
@@ -55,7 +56,7 @@ export function normalizeArtifactRows(
       image: params.image,
       metrics: params.metrics,
       date,
-      run_url: null,
+      run_url: runUrl,
     });
   }
   return results;
@@ -82,32 +83,40 @@ function evalConfigKey(config: EvalParams['config']): string {
   ].join('|');
 }
 
-/** Normalize aggregate eval rows into the EvalRow shape the frontend expects. */
+/**
+ * Normalize aggregate eval rows into the EvalRow shape the frontend expects.
+ *
+ * When merging rows from multiple runs, pass `configIdOffset` so synthetic config
+ * ids from this batch don't collide with ids already emitted by earlier batches.
+ * Returns the rows and the maximum config id assigned, so the caller can advance
+ * the offset for the next batch.
+ */
 export function normalizeEvalArtifactRows(
   rawRows: Record<string, unknown>[],
   date: string,
   timestamp: string,
   runUrl: string,
-): EvalRow[] {
+  configIdOffset = 0,
+): { rows: EvalRow[]; maxConfigId: number } {
   const tracker = createSkipTracker();
   const configIds = new Map<string, number>();
-  let nextConfigId = 1;
-  const results: EvalRow[] = [];
+  let nextLocalId = 1;
+  const rows: EvalRow[] = [];
 
   for (const raw of rawRows) {
     const params = mapAggEvalRow(raw as Record<string, any>, tracker);
     if (!params) continue;
 
     const key = evalConfigKey(params.config);
-    let configId = configIds.get(key);
-    if (!configId) {
-      configId = nextConfigId;
-      configIds.set(key, configId);
-      nextConfigId += 1;
+    let localId = configIds.get(key);
+    if (!localId) {
+      localId = nextLocalId;
+      configIds.set(key, localId);
+      nextLocalId += 1;
     }
 
-    results.push({
-      config_id: configId,
+    rows.push({
+      config_id: configIdOffset + localId,
       hardware: params.config.hardware,
       framework: params.config.framework,
       model: params.config.model,
@@ -134,7 +143,7 @@ export function normalizeEvalArtifactRows(
     });
   }
 
-  return results;
+  return { rows, maxConfigId: configIdOffset + (nextLocalId - 1) };
 }
 
 /** Extract all valid JSON files from a ZIP buffer; malformed JSON entries are skipped. */
@@ -161,10 +170,111 @@ async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
   return { rows, errorResponse: null };
 }
 
+/** Parse the runId query param into a list of unique numeric ids. */
+function parseRunIds(raw: string | null): { ids: string[]; error: string | null } {
+  if (!raw) return { ids: [], error: 'runId must be provided' };
+  const ids = [
+    ...new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (ids.length === 0 || !ids.every((id) => /^\d+$/.test(id))) {
+    return { ids: [], error: 'runId must be a comma-separated list of numeric values' };
+  }
+  return { ids, error: null };
+}
+
+/** Fetch, download, and normalize data for a single run. Errors bubble as NextResponse. */
+async function processSingleRun(
+  runId: string,
+  githubToken: string,
+  evalConfigIdOffset: number,
+): Promise<
+  | { errorResponse: NextResponse }
+  | {
+      errorResponse: null;
+      runInfo: ReturnType<typeof normalizeGithubRunInfo> & { isNonMainBranch: boolean };
+      benchmarks: BenchmarkRow[];
+      evaluations: EvalRow[];
+      nextEvalConfigIdOffset: number;
+    }
+> {
+  const runResp = await fetchGithubWorkflowRun(runId, githubToken);
+  if (!runResp.ok) {
+    return {
+      errorResponse: NextResponse.json(
+        { error: `GitHub API error for runId ${runId}: ${runResp.statusText}` },
+        { status: runResp.status },
+      ),
+    };
+  }
+  const run = (await runResp.json()) as GithubWorkflowRun;
+
+  const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
+  const bmkArtifact = artifacts
+    .filter((a) => a.name === 'results_bmk')
+    .toSorted((a, b) => b.id - a.id)[0];
+  const evalArtifact = artifacts
+    .filter((a) => a.name === 'eval_results_all')
+    .toSorted((a, b) => b.id - a.id)[0];
+
+  if (!bmkArtifact && !evalArtifact) {
+    return {
+      errorResponse: NextResponse.json(
+        {
+          error: `No results_bmk or eval_results_all artifact found for runId ${runId}`,
+        },
+        { status: 404 },
+      ),
+    };
+  }
+
+  const date = getRunDate(run);
+  const runUrl = run.html_url ?? '';
+  const timestamp = run.created_at ?? `${date}T00:00:00Z`;
+  let benchmarks: BenchmarkRow[] = [];
+  let evaluations: EvalRow[] = [];
+  let nextEvalConfigIdOffset = evalConfigIdOffset;
+
+  if (bmkArtifact) {
+    const { rows, errorResponse } = await downloadArtifactRows(
+      bmkArtifact.archive_download_url,
+      githubToken,
+    );
+    if (errorResponse) return { errorResponse };
+    benchmarks = normalizeArtifactRows(rows, date, runUrl || null);
+  }
+
+  if (evalArtifact) {
+    const { rows, errorResponse } = await downloadArtifactRows(
+      evalArtifact.archive_download_url,
+      githubToken,
+    );
+    if (errorResponse) return { errorResponse };
+    const normalized = normalizeEvalArtifactRows(rows, date, timestamp, runUrl, evalConfigIdOffset);
+    evaluations = normalized.rows;
+    nextEvalConfigIdOffset = normalized.maxConfigId;
+  }
+
+  return {
+    errorResponse: null,
+    runInfo: {
+      ...normalizeGithubRunInfo(run),
+      isNonMainBranch: run.head_branch !== 'main',
+    },
+    benchmarks,
+    evaluations,
+    nextEvalConfigIdOffset,
+  };
+}
+
 export async function GET(request: NextRequest) {
-  const runId = request.nextUrl.searchParams.get('runId');
-  if (!runId || !/^\d+$/.test(runId)) {
-    return NextResponse.json({ error: 'runId must be a numeric value' }, { status: 400 });
+  const { ids: runIds, error: runIdError } = parseRunIds(request.nextUrl.searchParams.get('runId'));
+  if (runIdError) {
+    return NextResponse.json({ error: runIdError }, { status: 400 });
   }
 
   const githubToken = getGithubToken();
@@ -173,63 +283,25 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Fetch workflow run metadata
-    const runResp = await fetchGithubWorkflowRun(runId, githubToken);
-    if (!runResp.ok) {
-      return NextResponse.json(
-        { error: `GitHub API: ${runResp.statusText}` },
-        { status: runResp.status },
-      );
-    }
-    const run = (await runResp.json()) as GithubWorkflowRun;
+    const runInfos: (ReturnType<typeof normalizeGithubRunInfo> & {
+      isNonMainBranch: boolean;
+    })[] = [];
+    const benchmarks: BenchmarkRow[] = [];
+    const evaluations: EvalRow[] = [];
+    let evalConfigIdOffset = 0;
 
-    // Fetch artifacts, find latest benchmark/eval aggregates
-    const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
+    for (const runId of runIds) {
+      const result = await processSingleRun(runId, githubToken, evalConfigIdOffset);
+      if (result.errorResponse) return result.errorResponse;
 
-    const bmkArtifact = artifacts
-      .filter((a) => a.name === 'results_bmk')
-      .toSorted((a, b) => b.id - a.id)[0];
-
-    const evalArtifact = artifacts
-      .filter((a) => a.name === 'eval_results_all')
-      .toSorted((a, b) => b.id - a.id)[0];
-
-    if (!bmkArtifact && !evalArtifact) {
-      return NextResponse.json(
-        { error: 'No results_bmk or eval_results_all artifact found' },
-        { status: 404 },
-      );
-    }
-
-    const date = getRunDate(run);
-    const runUrl = run.html_url ?? '';
-    const timestamp = run.created_at ?? `${date}T00:00:00Z`;
-    let benchmarks: BenchmarkRow[] = [];
-    let evaluations: EvalRow[] = [];
-
-    if (bmkArtifact) {
-      const { rows, errorResponse } = await downloadArtifactRows(
-        bmkArtifact.archive_download_url,
-        githubToken,
-      );
-      if (errorResponse) return errorResponse;
-      benchmarks = normalizeArtifactRows(rows, date);
-    }
-
-    if (evalArtifact) {
-      const { rows, errorResponse } = await downloadArtifactRows(
-        evalArtifact.archive_download_url,
-        githubToken,
-      );
-      if (errorResponse) return errorResponse;
-      evaluations = normalizeEvalArtifactRows(rows, date, timestamp, runUrl);
+      runInfos.push(result.runInfo);
+      benchmarks.push(...result.benchmarks);
+      evaluations.push(...result.evaluations);
+      evalConfigIdOffset = result.nextEvalConfigIdOffset;
     }
 
     return NextResponse.json({
-      runInfo: {
-        ...normalizeGithubRunInfo(run),
-        isNonMainBranch: run.head_branch !== 'main',
-      },
+      runInfos,
       benchmarks,
       evaluations,
     });

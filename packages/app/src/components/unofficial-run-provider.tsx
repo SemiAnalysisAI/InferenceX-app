@@ -51,7 +51,10 @@ interface AvailableModelSequence {
 
 export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
+  /** First run in the loaded set — kept as a convenience alias for overlay labels. */
   unofficialRunInfo: UnofficialRunInfo | null;
+  /** All runs loaded from the `unofficialrun(s)` URL param (comma-separated). */
+  unofficialRunInfos: UnofficialRunInfo[];
   unofficialChartData: UnofficialChartData | null;
   unofficialEvalRows: EvalRow[] | null;
   loading: boolean;
@@ -150,7 +153,8 @@ export function parseAvailableModelsAndSequences(
 }
 
 export function UnofficialRunProvider({ children }: { children: ReactNode }) {
-  const [unofficialRunInfo, setUnofficialRunInfo] = useState<UnofficialRunInfo | null>(null);
+  const [unofficialRunInfos, setUnofficialRunInfos] = useState<UnofficialRunInfo[]>([]);
+  const unofficialRunInfo = unofficialRunInfos[0] ?? null;
   const [unofficialChartData, setUnofficialChartData] = useState<UnofficialChartData | null>(null);
   const [unofficialEvalRows, setUnofficialEvalRows] = useState<EvalRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -212,7 +216,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   );
 
   const clearUnofficialRun = useCallback(() => {
-    setUnofficialRunInfo(null);
+    setUnofficialRunInfos([]);
     setUnofficialChartData(null);
     setUnofficialEvalRows(null);
     setError(null);
@@ -239,15 +243,15 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const load = () => {
       const params = new URLSearchParams(window.location.search);
-      let unofficialRunId: string | undefined;
+      let unofficialRunIdParam: string | undefined;
       for (const [key, value] of params) {
         if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
-          unofficialRunId = value;
+          unofficialRunIdParam = value;
           break;
         }
       }
-      if (!unofficialRunId) {
-        setUnofficialRunInfo(null);
+      if (!unofficialRunIdParam) {
+        setUnofficialRunInfos([]);
         setUnofficialChartData(null);
         setUnofficialEvalRows(null);
         setError(null);
@@ -258,12 +262,14 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      fetch(`/api/unofficial-run?runId=${unofficialRunId}`)
+      // Pass the raw param value through — it may be a single id or a comma-separated list.
+      // encodeURIComponent preserves commas while escaping any accidental whitespace/symbols.
+      fetch(`/api/unofficial-run?runId=${encodeURIComponent(unofficialRunIdParam)}`)
         .then(async (response) => {
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Failed to fetch unofficial run');
 
-          setUnofficialRunInfo(data.runInfo);
+          setUnofficialRunInfos(Array.isArray(data.runInfos) ? data.runInfos : []);
           const chartData = buildChartData(data.benchmarks ?? []);
           setUnofficialChartData(chartData);
           setUnofficialEvalRows(data.evaluations ?? []);
@@ -271,7 +277,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         })
         .catch((caughtError) => {
           setError(caughtError instanceof Error ? caughtError.message : 'Unknown error');
-          setUnofficialRunInfo(null);
+          setUnofficialRunInfos([]);
           setUnofficialChartData(null);
           setUnofficialEvalRows(null);
           setAvailableModelsAndSequences([]);
@@ -287,8 +293,9 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   return (
     <UnofficialRunContext.Provider
       value={{
-        isUnofficialRun: Boolean(unofficialRunInfo),
+        isUnofficialRun: unofficialRunInfos.length > 0,
         unofficialRunInfo,
+        unofficialRunInfos,
         unofficialChartData,
         unofficialEvalRows,
         loading,
@@ -305,9 +312,9 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         setLocalOfficialOverride,
       }}
     >
-      {unofficialRunInfo && (
-        <UnofficialBanner runInfo={unofficialRunInfo} onDismiss={clearUnofficialRun} />
-      )}
+      {unofficialRunInfos.map((info) => (
+        <UnofficialBanner key={info.id} runInfo={info} onDismiss={clearUnofficialRun} />
+      ))}
       {children}
     </UnofficialRunContext.Provider>
   );
