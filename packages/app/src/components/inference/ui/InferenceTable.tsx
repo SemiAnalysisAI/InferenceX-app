@@ -6,6 +6,7 @@ import type { ChartDefinition, InferenceData } from '@/components/inference/type
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue } from '@/lib/chart-utils';
+import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 
 interface InferenceTableProps {
@@ -56,7 +57,7 @@ export default function InferenceTable({
       },
       {
         header: 'Precision',
-        cell: (row) => row.precision?.toUpperCase(),
+        cell: (row) => (row.precision ? getPrecisionLabel(row.precision as Precision) : ''),
         sortValue: (row) => row.precision ?? '',
         className: 'whitespace-nowrap',
       },

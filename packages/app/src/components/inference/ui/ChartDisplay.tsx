@@ -465,11 +465,20 @@ export default function ChartDisplay() {
                   );
 
                   if (getViewMode(graphIndex) === 'table') {
+                    const overlay =
+                      graph.chartDefinition.chartType === 'e2e'
+                        ? overlayDataByChartType.e2e
+                        : overlayDataByChartType.interactivity;
+                    const overlayRows = (overlay?.data ?? []).filter((p) =>
+                      selectedPrecisions.includes(p.precision),
+                    );
                     return (
                       <>
                         {chartCaption}
                         <InferenceTable
-                          data={graph.data}
+                          data={
+                            overlayRows.length > 0 ? [...graph.data, ...overlayRows] : graph.data
+                          }
                           chartDefinition={graph.chartDefinition}
                           selectedYAxisMetric={selectedYAxisMetric}
                         />
