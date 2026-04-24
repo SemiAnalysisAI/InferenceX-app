@@ -15,24 +15,22 @@
  */
 
 /**
- * Palette for overlay runs, in load-order. Tuned for dark mode primarily but
- * readable on light backgrounds too. Each entry is a saturated OKLch string
- * so it shows even when the underlying theme colors are muted.
+ * Number of entries in the overlay-run palette. The actual color values are
+ * theme-aware CSS custom properties defined in `globals.css` as
+ * `--overlay-run-0` .. `--overlay-run-<N-1>`; light mode uses darker/saturated
+ * hues for contrast on a light background, dark/minecraft modes use the
+ * lighter hues this file used to hard-code.
  */
-const RUN_PALETTE: readonly string[] = [
-  'oklch(0.72 0.22 25)', // warm red
-  'oklch(0.75 0.20 190)', // teal
-  'oklch(0.78 0.20 90)', // amber
-  'oklch(0.70 0.22 290)', // violet
-  'oklch(0.75 0.20 150)', // green
-  'oklch(0.70 0.22 330)', // magenta
-  'oklch(0.72 0.20 230)', // blue
-  'oklch(0.78 0.18 60)', // yellow-orange
-];
+const RUN_PALETTE_SIZE = 8;
 
-/** Return the palette color for a given run index (wraps on overflow). */
+/**
+ * Return the palette color for a given run index (wraps on overflow).
+ * Resolves to a theme-aware CSS variable so charts + legend swatches restain
+ * automatically when the user toggles light/dark.
+ */
 export function overlayRunColor(runIndex: number): string {
-  return RUN_PALETTE[((runIndex % RUN_PALETTE.length) + RUN_PALETTE.length) % RUN_PALETTE.length];
+  const slot = ((runIndex % RUN_PALETTE_SIZE) + RUN_PALETTE_SIZE) % RUN_PALETTE_SIZE;
+  return `var(--overlay-run-${slot})`;
 }
 
 /**
