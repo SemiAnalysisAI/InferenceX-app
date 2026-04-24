@@ -7,6 +7,7 @@ export interface FavoritePreset {
   description: string;
   tags: string[];
   category: 'comparison' | 'improvements';
+  wide?: boolean;
   config: {
     model: Model;
     sequence: Sequence;
@@ -122,42 +123,13 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
       'First benchmarks of DeepSeek V4 Pro on NVIDIA Blackwell (GB200 NVL72 vs B200) Dynamo TRT at FP4.',
     tags: ['DeepSeek', 'V4-Pro', 'GB200', 'B200', 'FP4', 'New'],
     category: 'comparison',
+    wide: true,
     config: {
       model: Model.DeepSeek_V4_Pro,
       sequence: Sequence.EightK_OneK,
       precisions: ['fp4'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['gb200_dynamo-trt', 'b200_dynamo-trt'],
-    },
-  },
-  {
-    id: 'dsv4-vs-dsr1-blackwell',
-    title: 'DeepSeek V4 Pro vs R1 — Generational Step-Up',
-    description:
-      'Side-by-side throughput on B200 Dynamo TRT to see how V4 Pro compares to R1 at FP4.',
-    tags: ['DeepSeek', 'V4-Pro', 'R1', 'B200', 'FP4', 'New'],
-    category: 'comparison',
-    config: {
-      model: Model.DeepSeek_V4_Pro,
-      sequence: Sequence.EightK_OneK,
-      precisions: ['fp4'],
-      yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['b200_dynamo-trt'],
-    },
-  },
-  {
-    id: 'dsv4-cross-vendor',
-    title: 'DeepSeek V4 Pro — NVIDIA vs AMD',
-    description:
-      'Cross-vendor look at V4 Pro: B200 Dynamo TRT vs MI355X MoRI SGLang at FP8 on DeepSeek V4 Pro (8k/1k).',
-    tags: ['DeepSeek', 'V4-Pro', 'B200', 'MI355X', 'FP8', 'New'],
-    category: 'comparison',
-    config: {
-      model: Model.DeepSeek_V4_Pro,
-      sequence: Sequence.EightK_OneK,
-      precisions: ['fp8'],
-      yAxisMetric: 'y_tpPerGpu',
-      hwFilter: ['b200_dynamo-trt', 'mi355x_mori-sglang'],
     },
   },
   // 1 — NVIDIA

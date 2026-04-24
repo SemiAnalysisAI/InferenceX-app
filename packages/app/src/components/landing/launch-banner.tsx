@@ -63,15 +63,15 @@ export function LaunchBanner() {
           <Sparkles className="size-4 animate-pulse" />
         </span>
         <div className="relative flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
-          <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
-            New
-          </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold leading-tight truncate">
-              DeepSeek V4 Pro benchmarks are live
+              <span className="align-middle">DeepSeek V4 Pro benchmarks are live</span>
+              <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                New
+              </span>
             </p>
             <p className="text-xs text-muted-foreground leading-snug truncate">
-              First inference numbers on Blackwell, Hopper, and MI355X — click to explore.
+              First inference numbers on Blackwell, click to explore.
             </p>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">
