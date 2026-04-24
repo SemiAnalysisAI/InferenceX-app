@@ -16,6 +16,7 @@ import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inference
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
   Model,
   MODEL_OPTIONS,
@@ -147,6 +148,7 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
+  const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
   const dbModelKeys = useMemo<string[]>(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -159,27 +161,31 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     [availabilityRows, dbModelKeys],
   );
 
-  // Models that have any data
+  // Models that have any data (DB ∪ unofficial run)
   const availableModels = useMemo(() => {
     if (!availabilityRows) return MODEL_OPTIONS;
+    const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     return MODEL_OPTIONS.filter((m) => {
+      if (unofficialModels.has(m)) return true;
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
       return availabilityRows.some((r) => keys.includes(r.model));
     });
-  }, [availabilityRows]);
+  }, [availabilityRows, unofficialAvailable]);
 
-  // Sequences available for the selected model
+  // Sequences available for the selected model (DB ∪ unofficial run for this model)
   const availableSequences = useMemo(() => {
-    if (!availabilityRows) return SEQUENCE_OPTIONS;
-    const seqs = [
-      ...new Set(
-        modelRows
-          .map((r) => islOslToSequence(r.isl, r.osl))
-          .filter((s): s is Sequence => s !== null),
-      ),
-    ];
-    return seqs.length > 0 ? seqs : SEQUENCE_OPTIONS;
-  }, [availabilityRows, modelRows]);
+    const unofficialSeqs = unofficialAvailable
+      .filter((a) => a.model === selectedModel)
+      .map((a) => a.sequence as Sequence);
+    if (!availabilityRows) {
+      return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : SEQUENCE_OPTIONS;
+    }
+    const dbSeqs = modelRows
+      .map((r) => islOslToSequence(r.isl, r.osl))
+      .filter((s): s is Sequence => s !== null);
+    const merged = [...new Set([...dbSeqs, ...unofficialSeqs])];
+    return merged.length > 0 ? merged : SEQUENCE_OPTIONS;
+  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
 
   // Synchronously validated sequence
   const effectiveSequence = useMemo(() => {
