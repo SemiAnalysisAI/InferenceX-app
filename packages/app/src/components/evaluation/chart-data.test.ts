@@ -78,20 +78,24 @@ describe('buildEvaluationChartRows', () => {
     });
   });
 
-  it('keeps the latest date for each config group when no date cutoff is provided', () => {
+  it('keeps the latest date per (config, conc) when no date cutoff is provided', () => {
     const rows = [
+      // Same config_id (1), same conc (64): older date should drop.
       evalRow({ date: '2026-03-01', conc: 64, metrics: { em_strict: 0.81 } }),
+      evalRow({ date: '2026-03-04', conc: 64, metrics: { em_strict: 0.85 } }),
+      // Same config_id, different conc: must stay as a separate data point.
       evalRow({ date: '2026-03-04', conc: 256, metrics: { em_strict: 0.92 } }),
     ];
 
     const result = buildEvaluationChartRows(rows, 'gsm8k', Model.DeepSeek_R1, [Precision.FP8]);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      date: '2026-03-04',
-      conc: 256,
-      score: 0.92,
-    });
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => ({ conc: r.conc, score: r.score }))).toEqual(
+      expect.arrayContaining([
+        { conc: 64, score: 0.85 },
+        { conc: 256, score: 0.92 },
+      ]),
+    );
   });
 
   it('includes precision in the config label when multiple precisions are selected', () => {
