@@ -55,6 +55,12 @@ export interface UnofficialRunContextType {
   unofficialRunInfo: UnofficialRunInfo | null;
   /** All runs loaded from the `unofficialrun(s)` URL param (comma-separated). */
   unofficialRunInfos: UnofficialRunInfo[];
+  /**
+   * Position of each run in the loaded set, keyed by both `run.url` and the
+   * numeric id as a string. Used to derive a distinct hue shift per run for
+   * overlay points so multiple runs are visually separable.
+   */
+  runIndexByUrl: Record<string, number>;
   unofficialChartData: UnofficialChartData | null;
   unofficialEvalRows: EvalRow[] | null;
   loading: boolean;
@@ -228,6 +234,18 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     window.history.pushState({}, '', url);
   }, []);
 
+  // Build a url → index lookup. Keyed by the full run.url AND by the numeric id
+  // as a string, since `updateRepoUrl` can rewrite hosts/orgs between the
+  // overlay rendering path and the run metadata.
+  const runIndexByUrl = useMemo(() => {
+    const map: Record<string, number> = {};
+    unofficialRunInfos.forEach((info, idx) => {
+      if (info.url) map[info.url] = idx;
+      if (info.id !== undefined && info.id !== null) map[String(info.id)] = idx;
+    });
+    return map;
+  }, [unofficialRunInfos]);
+
   const getOverlayData = useCallback(
     (model: Model, sequence: Sequence, chartType: 'e2e' | 'interactivity') => {
       if (!unofficialChartData) return null;
@@ -296,6 +314,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         isUnofficialRun: unofficialRunInfos.length > 0,
         unofficialRunInfo,
         unofficialRunInfos,
+        runIndexByUrl,
         unofficialChartData,
         unofficialEvalRows,
         loading,

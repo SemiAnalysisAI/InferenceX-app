@@ -63,6 +63,29 @@ const getXPath = (size: number) => {
   return `M ${-s} ${-s} L ${s} ${s} M ${s} ${-s} L ${-s} ${s}`;
 };
 
+/**
+ * CSS filter to visually distinguish overlay points from multiple unofficial
+ * runs when more than one is loaded. The first run (index 0) is untouched so
+ * the common single-run case is unaffected. Applied via `style('filter', ...)`
+ * on SVG groups — works regardless of whether the underlying stroke color is
+ * a CSS variable, oklch, or hex.
+ */
+const OVERLAY_HUE_STEP_DEG = 55;
+function overlayFilterForRunIndex(idx: number): string | null {
+  if (idx <= 0) return null;
+  const hue = (idx * OVERLAY_HUE_STEP_DEG) % 360;
+  return `hue-rotate(${hue}deg) saturate(1.2)`;
+}
+function overlayRunIndex(runUrl: string | null | undefined, map: Record<string, number>): number {
+  if (!runUrl) return 0;
+  if (runUrl in map) return map[runUrl];
+  // Fall back to the numeric run id parsed from the URL — handles cases where
+  // `updateRepoUrl` rewrote the host/org and the full-URL key no longer matches.
+  const idMatch = runUrl.match(/\/runs\/(\d+)/);
+  if (idMatch && idMatch[1] in map) return map[idMatch[1]];
+  return 0;
+}
+
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
     return (
@@ -147,6 +170,7 @@ const ScatterGraph = React.memo(
       resetOverlayHwTypes,
       localOfficialOverride,
       setLocalOfficialOverride,
+      runIndexByUrl,
     } = useUnofficialRun();
     const chartRef = useRef<D3ChartHandle>(null);
 
@@ -323,17 +347,24 @@ const ScatterGraph = React.memo(
     }, [filteredData, processedOverlayData]);
 
     const overlayRooflines = useMemo(() => {
-      if (processedOverlayData.length === 0) return {};
+      interface Entry {
+        hwKey: string;
+        runIndex: number;
+        points: InferenceData[];
+      }
+      if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
+      // Group by hwKey + precision + runIndex so overlay rooflines from different
+      // unofficial runs stay separate and can be styled with per-run hue shifts.
       const grouped = processedOverlayData.reduce(
         (acc, p) => {
-          const key = `${p.hwKey}_${p.precision}`;
-          if (!acc[key]) acc[key] = [];
-          acc[key].push(p);
+          const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
+          const key = `${p.hwKey}_${p.precision}_run${runIndex}`;
+          if (!acc[key]) acc[key] = { hwKey: String(p.hwKey), runIndex, points: [] };
+          acc[key].points.push(p);
           return acc;
         },
-        {} as Record<string, InferenceData[]>,
+        {} as Record<string, Entry>,
       );
-      const result: Record<string, InferenceData[]> = {};
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
       const dir = chartDefinition[rooflineKey] as
         | 'upper_right'
@@ -341,20 +372,21 @@ const ScatterGraph = React.memo(
         | 'lower_left'
         | 'lower_right'
         | undefined;
-      for (const hw of Object.keys(grouped)) {
+      const result: Record<string, Entry> = {};
+      for (const [key, group] of Object.entries(grouped)) {
         const front =
           dir === 'upper_right'
-            ? paretoFrontUpperRight(grouped[hw])
+            ? paretoFrontUpperRight(group.points)
             : dir === 'upper_left'
-              ? paretoFrontUpperLeft(grouped[hw])
+              ? paretoFrontUpperLeft(group.points)
               : dir === 'lower_left'
-                ? paretoFrontLowerLeft(grouped[hw])
-                : paretoFrontLowerRight(grouped[hw]);
+                ? paretoFrontLowerLeft(group.points)
+                : paretoFrontLowerRight(group.points);
         front.sort((a, b) => a.x - b.x);
-        result[hw] = front;
+        result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }
       return result;
-    }, [processedOverlayData, selectedYAxisMetric, chartDefinition]);
+    }, [processedOverlayData, selectedYAxisMetric, chartDefinition, runIndexByUrl]);
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
@@ -1277,16 +1309,17 @@ const ScatterGraph = React.memo(
                 key: string;
                 points: InferenceData[];
                 stroke: string;
+                runIndex: number;
               }
               const ovEntries: OvEntry[] = [];
-              Object.entries(overlayRooflines).forEach(([key, pts]) => {
-                const hw = key.split('_').slice(0, -1).join('_');
-                const hwCfg = overlayData.hardwareConfig[hw];
-                if (hwCfg && pts.length > 1) {
+              Object.entries(overlayRooflines).forEach(([key, group]) => {
+                const hwCfg = overlayData.hardwareConfig[group.hwKey];
+                if (hwCfg && group.points.length > 1) {
                   ovEntries.push({
                     key,
-                    points: pts,
-                    stroke: getCssColor(resolveColor(hw)),
+                    points: group.points,
+                    stroke: getCssColor(resolveColor(group.hwKey)),
+                    runIndex: group.runIndex,
                   });
                 }
               });
@@ -1304,7 +1337,8 @@ const ScatterGraph = React.memo(
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
                 .attr('stroke-dasharray', '6 3')
-                .attr('d', (d) => lineGen(d.points));
+                .attr('d', (d) => lineGen(d.points))
+                .style('filter', (d) => overlayFilterForRunIndex(d.runIndex));
 
               // Overlay X-shape points — index-keyed so every point renders
               const overlayPoints = zoomGroup
@@ -1333,6 +1367,11 @@ const ScatterGraph = React.memo(
                 });
 
               overlayPoints.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
+              // Apply per-run hue shift at the group level so the shape and its
+              // label inherit the same tone and stay visually grouped.
+              overlayPoints.style('filter', (d) =>
+                overlayFilterForRunIndex(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+              );
               overlayPoints
                 .select('.overlay-x')
                 .attr('stroke', (d) => getCssColor(resolveColor(d.hwKey as string)));
@@ -1445,10 +1484,10 @@ const ScatterGraph = React.memo(
                 .y((d) => newYScale(d.y))
                 .curve(d3.curveMonotoneX);
 
-              Object.entries(overlayRooflines).forEach(([key, pts]) => {
-                if (pts.length < 2) return;
+              Object.entries(overlayRooflines).forEach(([key, group]) => {
+                if (group.points.length < 2) return;
                 const sel = zoomGroup.select<SVGPathElement>(`.overlay-roofline-${key}`);
-                if (!sel.empty()) sel.attr('d', lineGen(pts) as string);
+                if (!sel.empty()) sel.attr('d', lineGen(group.points) as string);
               });
 
               // Update overlay points
@@ -1481,6 +1520,7 @@ const ScatterGraph = React.memo(
       overlayData,
       processedOverlayData,
       overlayRooflines,
+      runIndexByUrl,
       hardwareConfig,
       xLabel,
       yLabel,

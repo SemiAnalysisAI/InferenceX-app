@@ -437,6 +437,7 @@ export function createMockUnofficialRunContext(
     isUnofficialRun: false,
     unofficialRunInfo: null,
     unofficialRunInfos: [],
+    runIndexByUrl: {},
     unofficialChartData: null,
     unofficialEvalRows: null,
     loading: false,
