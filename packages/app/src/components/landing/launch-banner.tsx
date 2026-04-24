@@ -10,7 +10,7 @@ import { navigateInApp } from '@/lib/client-navigation';
 
 const DISMISS_KEY = 'inferencex-dsv4-banner-dismissed';
 const BANNER_ID = 'dsv4-launch';
-const PRESET_ID = 'dsv4-launch-blackwell';
+const PRESET_ID = 'dsv4-launch-nvidia';
 
 function isDismissed(): boolean {
   try {
