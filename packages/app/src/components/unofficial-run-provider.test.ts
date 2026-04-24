@@ -61,7 +61,9 @@ describe('parseAvailableModelsAndSequences', () => {
       },
     };
     const result = parseAvailableModelsAndSequences(chartData);
-    expect(result).toEqual([{ model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK }]);
+    expect(result).toEqual([
+      { model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK, precisions: [] },
+    ]);
   });
 
   it('parses Kimi-K2.5 correctly', () => {
@@ -72,9 +74,21 @@ describe('parseAvailableModelsAndSequences', () => {
     };
     const result = parseAvailableModelsAndSequences(chartData);
     expect(result).toHaveLength(3);
-    expect(result).toContainEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
-    expect(result).toContainEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_EightK });
-    expect(result).toContainEqual({ model: Model.Kimi_K2_5, sequence: Sequence.EightK_OneK });
+    expect(result).toContainEqual({
+      model: Model.Kimi_K2_5,
+      sequence: Sequence.OneK_OneK,
+      precisions: [],
+    });
+    expect(result).toContainEqual({
+      model: Model.Kimi_K2_5,
+      sequence: Sequence.OneK_EightK,
+      precisions: [],
+    });
+    expect(result).toContainEqual({
+      model: Model.Kimi_K2_5,
+      sequence: Sequence.EightK_OneK,
+      precisions: [],
+    });
   });
 
   it('parses Qwen3_5 correctly', () => {
@@ -85,7 +99,9 @@ describe('parseAvailableModelsAndSequences', () => {
       },
     };
     const result = parseAvailableModelsAndSequences(chartData);
-    expect(result).toEqual([{ model: Model.Qwen3_5, sequence: Sequence.OneK_OneK }]);
+    expect(result).toEqual([
+      { model: Model.Qwen3_5, sequence: Sequence.OneK_OneK, precisions: [] },
+    ]);
   });
 
   it('parses MiniMax-M2.5 correctly', () => {
@@ -93,7 +109,9 @@ describe('parseAvailableModelsAndSequences', () => {
       'MiniMax-M2.5_1k/1k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
     const result = parseAvailableModelsAndSequences(chartData);
-    expect(result).toEqual([{ model: Model.MiniMax_M2_5, sequence: Sequence.OneK_OneK }]);
+    expect(result).toEqual([
+      { model: Model.MiniMax_M2_5, sequence: Sequence.OneK_OneK, precisions: [] },
+    ]);
   });
 
   it('skips keys with unknown model names', () => {
@@ -238,8 +256,20 @@ describe('buildChartData', () => {
     ];
     const chartData = buildChartData(rows);
     const available = parseAvailableModelsAndSequences(chartData);
-    expect(available).toContainEqual({ model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK });
-    expect(available).toContainEqual({ model: Model.GptOss, sequence: Sequence.OneK_EightK });
-    expect(available).toContainEqual({ model: Model.Qwen3_5, sequence: Sequence.EightK_OneK });
+    expect(available).toContainEqual({
+      model: Model.DeepSeek_R1,
+      sequence: Sequence.OneK_OneK,
+      precisions: ['fp8'],
+    });
+    expect(available).toContainEqual({
+      model: Model.GptOss,
+      sequence: Sequence.OneK_EightK,
+      precisions: ['fp8'],
+    });
+    expect(available).toContainEqual({
+      model: Model.Qwen3_5,
+      sequence: Sequence.EightK_OneK,
+      precisions: ['fp8'],
+    });
   });
 });

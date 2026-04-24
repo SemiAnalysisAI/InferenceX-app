@@ -145,6 +145,7 @@ const SEQUENCE_PREFIX_MAPPING: Record<string, Sequence> = Object.fromEntries(
 
 export enum Precision {
   FP4 = 'fp4',
+  FP4FP8 = 'fp4fp8',
   FP8 = 'fp8',
   BF16 = 'bf16',
   INT4 = 'int4',
@@ -152,6 +153,7 @@ export enum Precision {
 
 const PRECISION_CONFIG: Record<Precision, { label: string }> = {
   [Precision.FP4]: { label: 'FP4' },
+  [Precision.FP4FP8]: { label: 'FP4+FP8' },
   [Precision.FP8]: { label: 'FP8' },
   [Precision.BF16]: { label: 'BF16' },
   [Precision.INT4]: { label: 'INT4' },

@@ -193,13 +193,19 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     return availableSequences[0] ?? selectedSequence;
   }, [availableSequences, selectedSequence]);
 
-  // Precisions available for the selected model + sequence
+  // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {
-    if (!availabilityRows) return ['fp4'];
+    const unofficialPrecs = unofficialAvailable
+      .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
+      .flatMap((a) => a.precisions);
+    if (!availabilityRows) {
+      return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
+    }
     const rows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
-    const precs = [...new Set(rows.map((r) => r.precision))].toSorted();
-    return precs.length > 0 ? precs : ['fp4'];
-  }, [availabilityRows, modelRows, effectiveSequence]);
+    const dbPrecs = rows.map((r) => r.precision);
+    const merged = [...new Set([...dbPrecs, ...unofficialPrecs])].toSorted();
+    return merged.length > 0 ? merged : ['fp4'];
+  }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
 
   // Synchronously validated precisions
   const effectivePrecisions = useMemo(() => {

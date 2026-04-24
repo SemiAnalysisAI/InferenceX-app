@@ -46,6 +46,7 @@ const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
 interface AvailableModelSequence {
   model: Model;
   sequence: Sequence;
+  precisions: string[];
 }
 
 export interface UnofficialRunContextType {
@@ -133,8 +134,15 @@ export function parseAvailableModelsAndSequences(
     const sequencePart = key.slice(lastUnderscoreIndex + 1);
     const model = allModels.find((m) => m === modelPart);
     const sequence = allSequences.find((s) => s === sequencePart);
-    if (model && sequence && !result.some((r) => r.model === model && r.sequence === sequence)) {
-      result.push({ model, sequence });
+    if (!model || !sequence) continue;
+    const group = chartData[key];
+    const precisions = [
+      ...new Set(
+        [...(group?.e2e.data ?? []), ...(group?.interactivity.data ?? [])].map((d) => d.precision),
+      ),
+    ];
+    if (!result.some((r) => r.model === model && r.sequence === sequence)) {
+      result.push({ model, sequence, precisions });
     }
   }
 

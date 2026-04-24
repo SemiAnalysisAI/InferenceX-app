@@ -220,6 +220,7 @@ describe('getSequenceLabel', () => {
 describe('getPrecisionLabel', () => {
   it('returns correct label for each known precision', () => {
     expect(getPrecisionLabel(Precision.FP4)).toBe('FP4');
+    expect(getPrecisionLabel(Precision.FP4FP8)).toBe('FP4+FP8');
     expect(getPrecisionLabel(Precision.FP8)).toBe('FP8');
     expect(getPrecisionLabel(Precision.BF16)).toBe('BF16');
     expect(getPrecisionLabel(Precision.INT4)).toBe('INT4');
