@@ -38,7 +38,7 @@ export function groupByCategory<T>(
  */
 const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: CategoryTag }> = {
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
-  [Model.DeepSeek_V4_Pro]: { label: 'DeepSeek V4 Pro', prefix: 'dsv4', category: 'experimental' },
+  [Model.DeepSeek_V4_Pro]: { label: 'DeepSeek V4 Pro', prefix: 'dsv4', category: 'default' },
   [Model.Kimi_K2_5]: {
     label: 'Kimi K2.5',
     prefix: 'kimik2.5',
