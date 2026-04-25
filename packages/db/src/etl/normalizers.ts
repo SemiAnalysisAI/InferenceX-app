@@ -34,7 +34,8 @@ export function hwToGpuKey(hw: string): string | null {
     .replace(/-dgxc-slurm$/, '')
     .replace(/-dgxc$/, '')
     .replace(/-nb$/, '')
-    .replace(/-nv$/, '');
+    .replace(/-nv$/, '')
+    .replace(/-cw$/, '');
   return GPU_KEYS.has(base) ? base : null;
 }
 
