@@ -88,6 +88,11 @@ const runLinkHTML = (runUrl?: string) =>
 const tooltipLine = (label: string, value: string | number) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
+const imageTooltipLine = (image: string) =>
+  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
+        <strong>Image:</strong> <span style="display: inline-block; vertical-align: top; overflow-wrap: anywhere;">${image.trim().replace(/\s+/, '<br />')}</span>
+      </div>`;
+
 /**
  * Generates HTML for the parallelism configuration section of a tooltip.
  * Falls back to GPU count for old data without parallelism fields.
@@ -145,9 +150,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${
         d?.image
           ? `
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Image:</strong> ${d?.image}
-      </div>`
+      ${imageTooltipLine(d.image)}`
           : ''
       }
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
@@ -262,9 +265,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${
         d?.image
           ? `
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Image:</strong> ${d?.image}
-      </div>`
+      ${imageTooltipLine(d.image)}`
           : ''
       }
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">

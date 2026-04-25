@@ -178,6 +178,13 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('Image:');
   });
 
+  it('splits image and SHA onto separate lines', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
+    );
+    expect(html).toContain('vllm-v0.6.0<br />abc123');
+  });
+
   it('omits image section when no image', () => {
     const html = generateTooltipContent(tooltipConfig());
     expect(html).not.toContain('Image:');
@@ -350,5 +357,12 @@ describe('generateGPUGraphTooltipContent', () => {
   it('includes precision in uppercase', () => {
     const html = generateGPUGraphTooltipContent(tooltipConfig({ data: pt({ precision: 'bf16' }) }));
     expect(html).toContain('BF16');
+  });
+
+  it('splits image and SHA onto separate lines', () => {
+    const html = generateGPUGraphTooltipContent(
+      tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
+    );
+    expect(html).toContain('vllm-v0.6.0<br />abc123');
   });
 });
