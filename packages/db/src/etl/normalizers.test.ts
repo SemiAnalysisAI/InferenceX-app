@@ -68,6 +68,11 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('b300-nb')).toBe('b300');
   });
 
+  it('strips -dsv4 runner-pool suffix', () => {
+    expect(hwToGpuKey('b200-dsv4')).toBe('b200');
+    expect(hwToGpuKey('B200-DSV4')).toBe('b200');
+  });
+
   it('strips -cw suffix', () => {
     expect(hwToGpuKey('gb300-cw')).toBe('gb300');
   });

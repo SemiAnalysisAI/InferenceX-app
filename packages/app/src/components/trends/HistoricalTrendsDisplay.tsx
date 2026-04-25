@@ -334,6 +334,8 @@ export default function HistoricalTrendsDisplay() {
                 lineConfigs={lineConfigs}
                 yLabel={currentYLabel}
                 logScale={logScale}
+                selectedPrecisions={selectedPrecisions}
+                selectedModel={selectedModel}
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
@@ -396,7 +398,7 @@ export default function HistoricalTrendsDisplay() {
                         : []
                     }
                     enableTooltips={true}
-                    showFpShapeIndicators={true}
+                    precisionIndicators={selectedPrecisions}
                   />
                 }
               />

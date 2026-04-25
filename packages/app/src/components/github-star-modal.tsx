@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { shouldShowDsv4Modal } from '@/components/dsv4-launch-modal';
 import {
   DISMISS_DURATION_MS,
   DISMISS_KEY,
@@ -21,6 +22,9 @@ let sessionDismissed = false;
 
 function shouldShowModal(): boolean {
   if (sessionDismissed) return false;
+  // Defer to the dsv4 launch modal until the user has resolved it — only one
+  // modal at a time, and the launch modal is more time-sensitive.
+  if (shouldShowDsv4Modal()) return false;
   try {
     if (localStorage.getItem(STARRED_KEY)) return false;
     const value = localStorage.getItem(DISMISS_KEY);

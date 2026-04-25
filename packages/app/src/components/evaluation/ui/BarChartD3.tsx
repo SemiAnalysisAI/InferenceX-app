@@ -17,6 +17,7 @@ import {
   type EvalBenchmark,
   type Precision,
   getEvalBenchmarkLabel,
+  getModelWatermark,
   getPrecisionLabel,
 } from '@/lib/data-mappings';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -169,6 +170,26 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     runIndexByUrl,
   } = useUnofficialRun();
   const chartRef = useRef<D3ChartHandle>(null);
+
+  /** Look up the branch for an eval row via its `runUrl`, falling back to the
+   * first loaded run. Used so hovering an overlay bar shows that row's own
+   * branch across multi-run loads. */
+  const branchForRow = useCallback(
+    (datum: EvaluationChartData): string | undefined => {
+      const url = datum.runUrl ?? null;
+      if (url) {
+        const direct = runIndexByUrl[url];
+        if (direct !== undefined) return unofficialRunInfos[direct]?.branch;
+        const idMatch = url.match(/\/runs\/(\d+)/);
+        if (idMatch) {
+          const viaId = runIndexByUrl[idMatch[1]];
+          if (viaId !== undefined) return unofficialRunInfos[viaId]?.branch;
+        }
+      }
+      return unofficialRunInfo?.branch ?? undefined;
+    },
+    [runIndexByUrl, unofficialRunInfos, unofficialRunInfo],
+  );
 
   const effectiveOfficialHardware = localOfficialOverride ?? enabledHardware;
 
@@ -739,13 +760,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 .style('opacity', 1)
                 .style('display', 'block')
                 .style('pointer-events', 'none')
-                .html(
-                  generateEvaluationTooltipContent(
-                    d,
-                    false,
-                    unofficialRunInfo?.branch ?? undefined,
-                  ),
-                );
+                .html(generateEvaluationTooltipContent(d, false, branchForRow(d)));
             })
             .on('mousemove', function (event) {
               if (chartRef.current?.isPinned()) return;
@@ -765,9 +780,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               event.stopPropagation();
               const [mx, my] = d3.pointer(event, container);
               tooltip
-                .html(
-                  generateEvaluationTooltipContent(d, true, unofficialRunInfo?.branch ?? undefined),
-                )
+                .html(generateEvaluationTooltipContent(d, true, branchForRow(d)))
                 .style('opacity', 1)
                 .style('display', 'block')
                 .style('pointer-events', 'auto');
@@ -797,7 +810,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       showLabels,
       unofficialChartData,
       unofficialErrorData,
-      unofficialRunInfo,
+      branchForRow,
       runIndexByUrl,
     ],
   );
@@ -848,7 +861,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       data={chartData}
       height={chartHeight}
       margin={chartMargin}
-      watermark={isUnofficialRun ? 'unofficial' : 'logo'}
+      watermark={getModelWatermark(selectedModel, isUnofficialRun)}
       grabCursor={false}
       caption={caption}
       xScale={{ type: 'linear', domain: xDomain }}

@@ -394,15 +394,22 @@ describe('setupChartStructure', () => {
     it('updates watermark rect dimensions on resize without watermark switch', () => {
       const svgEl = makeSvgEl();
       setupChartStructure(svgEl, defaultConfig({ watermark: 'logo' }));
-      setupChartStructure(
-        svgEl,
-        defaultConfig({ watermark: 'logo', containerWidth: 1200, containerHeight: 900 }),
-      );
+      const cfg = defaultConfig({
+        watermark: 'logo',
+        containerWidth: 1200,
+        containerHeight: 900,
+      });
+      setupChartStructure(svgEl, cfg);
 
       const svg = d3.select(svgEl);
       const rect = svg.select('.watermark-rect');
-      expect(Number(rect.attr('width'))).toBe(1200);
-      expect(Number(rect.attr('height'))).toBe(900);
+      // Rect is masked to the inner chart area, not the full container.
+      const innerW = cfg.containerWidth - cfg.margin.left - cfg.margin.right;
+      const innerH = cfg.containerHeight - cfg.margin.top - cfg.margin.bottom;
+      expect(Number(rect.attr('x'))).toBe(cfg.margin.left);
+      expect(Number(rect.attr('y'))).toBe(cfg.margin.top);
+      expect(Number(rect.attr('width'))).toBe(innerW);
+      expect(Number(rect.attr('height'))).toBe(innerH);
     });
   });
 

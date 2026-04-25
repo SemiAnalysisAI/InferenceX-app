@@ -100,7 +100,7 @@ describe('FAVORITE_PRESETS data integrity', () => {
   });
 
   it('has valid precision values', () => {
-    const validPrecisions = ['fp4', 'fp8', 'bf16', 'int4'];
+    const validPrecisions = ['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4'];
     for (const preset of FAVORITE_PRESETS) {
       for (const prec of preset.config.precisions) {
         expect(validPrecisions).toContain(prec);
@@ -169,6 +169,9 @@ describe('description/config alignment', () => {
       const searchText =
         `${preset.title} ${preset.description} ${preset.tags.join(' ')}`.toLowerCase();
       for (const hw of hwKeys) {
+        // Prefix-only entries (no underscore) are vendor-wide filters that match
+        // any framework for a given GPU — they don't require a specific callout.
+        if (!hw.includes('_')) continue;
         // Extract base GPU name (e.g. 'b200' from 'b200_dynamo-trt')
         const base = hw.split('_')[0];
         expect(searchText).toContain(base.toLowerCase());

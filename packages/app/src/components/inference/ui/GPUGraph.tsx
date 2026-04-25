@@ -8,6 +8,7 @@ import { useTheme } from 'next-themes';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getModelWatermark } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -17,6 +18,7 @@ import {
   applyHoverState,
   applyNormalState,
   formatLargeNumber,
+  getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/chart-rendering';
 import {
@@ -41,6 +43,7 @@ const GPUGraph = React.memo(
   ({ chartId, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
     const {
       hardwareConfig,
+      selectedModel,
       selectedPrecisions,
       selectedYAxisMetric,
       selectedGPUs,
@@ -317,7 +320,7 @@ const GPUGraph = React.memo(
         chartId={chartId}
         data={filteredData}
         margin={CHART_MARGIN}
-        watermark="logo"
+        watermark={getModelWatermark(selectedModel)}
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}
@@ -355,6 +358,7 @@ const GPUGraph = React.memo(
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
               },
+              selectedPrecisions,
             },
           },
         ]}
@@ -390,9 +394,15 @@ const GPUGraph = React.memo(
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
-            applyHoverState(sel.select('.visible-shape') as any, d.precision),
+            applyHoverState(
+              sel.select('.visible-shape') as any,
+              getShapeKeyForPrecision(d.precision, selectedPrecisions),
+            ),
           onHoverEnd: (sel, d) =>
-            applyNormalState(sel.select('.visible-shape') as any, d.precision),
+            applyNormalState(
+              sel.select('.visible-shape') as any,
+              getShapeKeyForPrecision(d.precision, selectedPrecisions),
+            ),
           attachToLayer: 1,
         }}
         onRender={(ctx: RenderContext) => {
@@ -490,7 +500,7 @@ const GPUGraph = React.memo(
                 },
               },
             ]}
-            showFpShapeIndicators={selectedPrecisions.length > 1}
+            precisionIndicators={selectedPrecisions}
           />
         }
       />

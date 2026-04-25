@@ -742,6 +742,7 @@ export default function ThroughputCalculatorDisplay() {
                       selectedBars={selectedBars}
                       onBarSelect={handleBarSelect}
                       colorResolver={resolveColor}
+                      selectedModel={selectedModel}
                       legendElement={
                         availableHwKeys.length > 0 ? (
                           <ChartLegend

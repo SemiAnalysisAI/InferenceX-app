@@ -12,8 +12,17 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { SHAPE_ORDER, type ShapeKey, getShapeKeyForPrecision } from '@/lib/chart-rendering';
+import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { filterAndSortLegendItems } from '@/lib/legend-utils';
 import { cn } from '@/lib/utils';
+
+const SHAPE_ICON: Record<ShapeKey, React.ComponentType<{ size?: number; className?: string }>> = {
+  circle: Circle,
+  square: Square,
+  triangle: Triangle,
+  diamond: Diamond,
+};
 
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
 import { Label } from './label';
@@ -42,7 +51,13 @@ export interface ChartLegendProps {
   switches?: LegendSwitchConfig[];
   actions?: LegendActionConfig[];
   grouped?: boolean;
-  showFpShapeIndicators?: boolean;
+  /**
+   * Selected precisions, in selection order. When 2+ are provided, the legend
+   * renders a shape key: first precision → circle, second → square, third →
+   * triangle, fourth → diamond. Only the selected precisions are listed.
+   * A single precision (or none) hides the shape key entirely.
+   */
+  precisionIndicators?: readonly string[];
   /** Optional extra key/legend explanation rendered alongside the FP indicators. */
   keyIndicators?: React.ReactNode;
   enableTooltips?: boolean;
@@ -63,7 +78,7 @@ export default function ChartLegend({
   switches,
   actions,
   grouped = false,
-  showFpShapeIndicators = false,
+  precisionIndicators,
   keyIndicators,
   enableTooltips = false,
   maxHeight,
@@ -178,9 +193,17 @@ export default function ChartLegend({
     [legendItems],
   );
 
+  const shapeIndicators = useMemo(() => {
+    if (!precisionIndicators || precisionIndicators.length < 2) return null;
+    return precisionIndicators.slice(0, SHAPE_ORDER.length).map((precision) => ({
+      precision,
+      shapeKey: getShapeKeyForPrecision(precision, precisionIndicators),
+    }));
+  }, [precisionIndicators]);
+
   const hasSidebarControls =
     isSidebar &&
-    (showFpShapeIndicators ||
+    (shapeIndicators !== null ||
       keyIndicators ||
       (switches && switches.length > 0) ||
       (actions && actions.length > 0) ||
@@ -271,29 +294,24 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  const fpIndicators = showFpShapeIndicators ? (
+  const fpIndicators = shapeIndicators ? (
     <div
       className={cn(
         'w-full md:w-auto mt-2 px-1 pr-2 gap-x-4 gap-y-1',
         effectiveExpanded ? 'flex flex-wrap' : 'grid grid-cols-2',
       )}
     >
-      <div className="flex items-center gap-2">
-        <Circle size={12} className="inline-block fill-gray-500" />
-        <span className="text-xs text-muted-foreground">FP4</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Square size={12} className="inline-block fill-gray-500" />
-        <span className="text-xs text-muted-foreground">FP8</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Triangle size={12} className="inline-block fill-gray-500" />
-        <span className="text-xs text-muted-foreground">BF16</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Diamond size={12} className="inline-block fill-gray-500" />
-        <span className="text-xs text-muted-foreground">INT4</span>
-      </div>
+      {shapeIndicators.map(({ precision, shapeKey }) => {
+        const Icon = SHAPE_ICON[shapeKey];
+        return (
+          <div key={precision} className="flex items-center gap-2">
+            <Icon size={12} className="inline-block fill-gray-500" />
+            <span className="text-xs text-muted-foreground">
+              {getPrecisionLabel(precision as Precision)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   ) : null;
 

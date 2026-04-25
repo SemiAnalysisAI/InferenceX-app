@@ -2,7 +2,7 @@
 import * as d3 from 'd3';
 import { describe, it, expect } from 'vitest';
 
-import { createLogoWatermark, createUnofficialWatermark } from './watermark';
+import { createDay0Watermark, createLogoWatermark, createUnofficialWatermark } from './watermark';
 
 function makeSvg() {
   const svg = d3.create('svg:svg') as unknown as d3.Selection<
@@ -92,7 +92,7 @@ describe('createLogoWatermark', () => {
     expect(Number(image.attr('y'))).toBe(expectedY);
   });
 
-  it('creates a watermark rect as the first child of SVG', () => {
+  it('inserts a watermark rect masked to the inner chart area', () => {
     const { svg, defs } = makeSvg();
     createLogoWatermark(
       svg,
@@ -108,8 +108,10 @@ describe('createLogoWatermark', () => {
     const rect = svg.select('.watermark-rect');
     expect(rect.empty()).toBe(false);
     expect(rect.attr('fill')).toBe('url(#logo-pattern-test)');
-    expect(Number(rect.attr('width'))).toBe(containerWidth);
-    expect(Number(rect.attr('height'))).toBe(containerHeight);
+    expect(Number(rect.attr('x'))).toBe(margin.left);
+    expect(Number(rect.attr('y'))).toBe(margin.top);
+    expect(Number(rect.attr('width'))).toBe(innerWidth);
+    expect(Number(rect.attr('height'))).toBe(innerHeight);
   });
 
   it('uses smaller dimension to compute logo size for tall charts', () => {
@@ -138,12 +140,13 @@ describe('createLogoWatermark', () => {
 });
 
 describe('createUnofficialWatermark', () => {
-  const containerWidth = 800;
-  const containerHeight = 600;
+  const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+  const innerWidth = 720;
+  const innerHeight = 540;
 
   it('creates a pattern element with id "unofficial-pattern"', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
+    createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
     const pattern = defs.select('#unofficial-pattern-test');
     expect(pattern.empty()).toBe(false);
@@ -153,49 +156,99 @@ describe('createUnofficialWatermark', () => {
     expect(pattern.attr('patternTransform')).toBe('rotate(-45)');
   });
 
-  it('creates a text element with "UNOFFICIAL" inside the pattern', () => {
+  it('creates "UNOFFICIAL" labels with the expected styling', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
+    createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
-    const text = defs.select('#unofficial-pattern-test text');
-    expect(text.empty()).toBe(false);
-    expect(text.text()).toBe('UNOFFICIAL');
-    expect(text.attr('fill')).toBe('#dc2626');
-    expect(text.attr('font-size')).toBe('24px');
-    expect(text.attr('font-weight')).toBe('bold');
-    expect(text.attr('opacity')).toBe('0.15');
+    const texts = defs.selectAll('#unofficial-pattern-test text');
+    expect(texts.size()).toBe(3);
+    texts.each(function () {
+      const t = d3.select(this);
+      expect(t.text()).toBe('UNOFFICIAL');
+      expect(t.attr('fill')).toBe('#dc2626');
+      expect(t.attr('font-size')).toBe('24px');
+      expect(t.attr('font-weight')).toBe('bold');
+      expect(t.attr('opacity')).toBe('0.15');
+    });
   });
 
-  it('centers the text within the 200x200 pattern tile', () => {
+  it('lays out a brick pattern with the second row staggered to the seams', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
+    createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
-    const text = defs.select('#unofficial-pattern-test text');
-    expect(text.attr('x')).toBe('100');
-    expect(text.attr('y')).toBe('100');
-    expect(text.attr('text-anchor')).toBe('middle');
-    expect(text.attr('dominant-baseline')).toBe('middle');
+    const positions = defs
+      .selectAll<SVGTextElement, unknown>('#unofficial-pattern-test text')
+      .nodes()
+      .map((n) => ({ x: n.getAttribute('x'), y: n.getAttribute('y') }));
+    expect(positions).toEqual([
+      { x: '100', y: '50' }, // row 1 centered
+      { x: '0', y: '150' }, // row 2 left seam
+      { x: '200', y: '150' }, // row 2 right seam
+    ]);
   });
 
-  it('creates a watermark rect as the first child of SVG', () => {
+  it('inserts a watermark rect masked to the inner chart area', () => {
     const { svg, defs } = makeSvg();
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
+    createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
     const rect = svg.select('.watermark-rect');
     expect(rect.empty()).toBe(false);
     expect(rect.attr('fill')).toBe('url(#unofficial-pattern-test)');
-    expect(Number(rect.attr('width'))).toBe(containerWidth);
-    expect(Number(rect.attr('height'))).toBe(containerHeight);
+    expect(Number(rect.attr('x'))).toBe(margin.left);
+    expect(Number(rect.attr('y'))).toBe(margin.top);
+    expect(Number(rect.attr('width'))).toBe(innerWidth);
+    expect(Number(rect.attr('height'))).toBe(innerHeight);
   });
 
   it('inserts the rect before other children (first-child)', () => {
     const { svg, defs } = makeSvg();
     // Add a dummy child before calling watermark
     svg.append('g').attr('class', 'pre-existing');
-    createUnofficialWatermark(svg, defs, containerWidth, containerHeight, 'test');
+    createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
     // The watermark rect should be inserted before defs (first child)
     const firstChild = svg.select(':first-child');
     expect(firstChild.attr('class')).toBe('watermark-rect');
+  });
+});
+
+describe('createDay0Watermark', () => {
+  const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+  const innerWidth = 720;
+  const innerHeight = 540;
+
+  it('creates a diagonal pattern with id "day0-pattern-{chartId}"', () => {
+    const { svg, defs } = makeSvg();
+    createDay0Watermark(svg, defs, innerWidth, innerHeight, margin, 'test');
+
+    const pattern = defs.select('#day0-pattern-test');
+    expect(pattern.empty()).toBe(false);
+    expect(pattern.attr('patternUnits')).toBe('userSpaceOnUse');
+    expect(pattern.attr('patternTransform')).toBe('rotate(-45)');
+  });
+
+  it('renders the "EXPERIMENTAL - DAY ZERO" label in blue', () => {
+    const { svg, defs } = makeSvg();
+    createDay0Watermark(svg, defs, innerWidth, innerHeight, margin, 'test');
+
+    const text = defs.select('#day0-pattern-test text');
+    expect(text.empty()).toBe(false);
+    expect(text.text()).toBe('EXPERIMENTAL - DAY ZERO');
+    expect(text.attr('fill')).toBe('#2563eb');
+    expect(text.attr('font-weight')).toBe('bold');
+    expect(text.attr('opacity')).toBe('0.15');
+  });
+
+  it('inserts a watermark rect masked to the inner chart area', () => {
+    const { svg, defs } = makeSvg();
+    createDay0Watermark(svg, defs, innerWidth, innerHeight, margin, 'test');
+
+    const rect = svg.select('.watermark-rect');
+    expect(rect.empty()).toBe(false);
+    expect(rect.attr('fill')).toBe('url(#day0-pattern-test)');
+    expect(Number(rect.attr('x'))).toBe(margin.left);
+    expect(Number(rect.attr('y'))).toBe(margin.top);
+    expect(Number(rect.attr('width'))).toBe(innerWidth);
+    expect(Number(rect.attr('height'))).toBe(innerHeight);
   });
 });

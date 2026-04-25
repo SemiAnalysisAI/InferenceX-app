@@ -175,7 +175,15 @@ function flushPendingParams(): void {
 /**
  * Build a share URL containing only the params relevant to the current tab.
  * Flushes pending writes first so state is up-to-date.
+ *
+ * `unofficialrun` / `unofficialruns` is not part of the in-memory `currentState`
+ * (it's owned by UnofficialRunProvider and written to the address bar via
+ * history.pushState on dismiss/load). We read it straight from the live URL so
+ * a shared link reflects the currently-loaded set of unofficial runs, including
+ * after per-run dismissals.
  */
+const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
+
 export function buildShareUrl(): string {
   flushPendingParams();
 
@@ -186,6 +194,18 @@ export function buildShareUrl(): string {
   for (const [key, value] of Object.entries(currentState)) {
     if (prefixes.some((p) => key.startsWith(p))) {
       filtered.set(key, value);
+    }
+  }
+
+  // Carry over any unofficial-run IDs currently reflected in the address bar.
+  // Only the first match is forwarded and it's always emitted under the plural
+  // `unofficialruns` key — the canonical form the app writes on dismiss/load
+  // and the one we want shared links to use going forward.
+  const liveParams = new URLSearchParams(window.location.search);
+  for (const [key, value] of liveParams) {
+    if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
+      filtered.set('unofficialruns', value);
+      break;
     }
   }
 

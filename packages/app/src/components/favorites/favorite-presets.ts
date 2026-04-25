@@ -7,6 +7,7 @@ export interface FavoritePreset {
   description: string;
   tags: string[];
   category: 'comparison' | 'improvements';
+  wide?: boolean;
   config: {
     model: Model;
     sequence: Sequence;
@@ -114,6 +115,23 @@ export function findConfigChangeDates(
 }
 
 export const FAVORITE_PRESETS: FavoritePreset[] = [
+  // 0 — DeepSeek V4 Pro launch
+  {
+    id: 'dsv4-launch-nvidia',
+    title: 'DeepSeek V4 Pro — NVIDIA First Look',
+    description:
+      'First benchmarks of DeepSeek V4 Pro on NVIDIA GPUs. New configurations appear here as they come online.',
+    tags: ['DeepSeek', 'V4-Pro', 'NVIDIA', 'New'],
+    category: 'comparison',
+    wide: true,
+    config: {
+      model: Model.DeepSeek_V4_Pro,
+      sequence: Sequence.EightK_OneK,
+      precisions: ['fp4', 'fp4fp8', 'fp8'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300'],
+    },
+  },
   // 1 — NVIDIA
   {
     id: 'gb200-vs-b200',

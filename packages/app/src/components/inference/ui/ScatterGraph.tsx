@@ -10,6 +10,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getModelWatermark } from '@/lib/data-mappings';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -33,6 +34,7 @@ import {
   logTickFormat,
   applyHoverState,
   applyNormalState,
+  getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
@@ -116,6 +118,7 @@ const ScatterGraph = React.memo(
       toggleHwType,
       removeHwType,
       hwTypesWithData,
+      selectedModel,
       selectedPrecisions,
       selectedYAxisMetric,
       availableRuns,
@@ -637,9 +640,15 @@ const ScatterGraph = React.memo(
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
-          applyHoverState(sel.select('.visible-shape') as any, d.precision),
+          applyHoverState(
+            sel.select('.visible-shape') as any,
+            getShapeKeyForPrecision(d.precision, selectedPrecisions),
+          ),
         onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
-          applyNormalState(sel.select('.visible-shape') as any, d.precision),
+          applyNormalState(
+            sel.select('.visible-shape') as any,
+            getShapeKeyForPrecision(d.precision, selectedPrecisions),
+          ),
         onPointClick: (d: InferenceData) => {
           track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
           // Attach track-over-time button handler in the tooltip
@@ -675,6 +684,7 @@ const ScatterGraph = React.memo(
         addTrackedConfig,
         removeTrackedConfig,
         chartDefinition.chartType,
+        selectedPrecisions,
       ],
     );
 
@@ -1268,6 +1278,7 @@ const ScatterGraph = React.memo(
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
           },
+          selectedPrecisions,
         },
         keyFn: buildPointConfigId,
       };
@@ -1650,7 +1661,7 @@ const ScatterGraph = React.memo(
         chartId={chartId}
         data={chartScaleData}
         margin={CHART_MARGIN}
-        watermark={isUnofficialRun ? 'unofficial' : 'logo'}
+        watermark={getModelWatermark(selectedModel, isUnofficialRun)}
         testId="scatter-graph"
         grabCursor={true}
         caption={caption}
@@ -1861,7 +1872,7 @@ const ScatterGraph = React.memo(
                   ]
                 : []
             }
-            showFpShapeIndicators={selectedPrecisions.length > 1}
+            precisionIndicators={selectedPrecisions}
             enableTooltips={true}
           />
         }

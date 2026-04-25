@@ -130,6 +130,17 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Overlay-run palette (light mode): darker + saturated so X-shape strokes and
+   * pastel legend swatches stay readable on the #eaebec background. */
+  --overlay-run-0: oklch(0.55 0.23 25); /* deep red */
+  --overlay-run-1: oklch(0.55 0.15 200); /* teal */
+  --overlay-run-2: oklch(0.6 0.17 65); /* burnt amber */
+  --overlay-run-3: oklch(0.5 0.25 290); /* royal violet */
+  --overlay-run-4: oklch(0.55 0.18 150); /* forest green */
+  --overlay-run-5: oklch(0.55 0.22 330); /* magenta */
+  --overlay-run-6: oklch(0.55 0.2 230); /* blue */
+  --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
 }
 
 .dark {
@@ -163,6 +174,18 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Overlay-run palette (dark mode): lighter + saturated so strokes pop on
+   * #131416. Hues align with the light-mode palette so each run index reads as
+   * the same conceptual color across themes. */
+  --overlay-run-0: oklch(0.72 0.22 25);
+  --overlay-run-1: oklch(0.75 0.2 190);
+  --overlay-run-2: oklch(0.78 0.2 90);
+  --overlay-run-3: oklch(0.7 0.22 290);
+  --overlay-run-4: oklch(0.75 0.2 150);
+  --overlay-run-5: oklch(0.7 0.22 330);
+  --overlay-run-6: oklch(0.72 0.2 230);
+  --overlay-run-7: oklch(0.78 0.18 60);
 }
 
 /* ── Minecraft Theme ── */
@@ -204,6 +227,17 @@
 
   /* Kill all border radius — Minecraft has no curves */
   --radius: 0px;
+
+  /* Overlay-run palette (minecraft theme): same as dark since background is
+   * also dark (#1e1e1e). */
+  --overlay-run-0: oklch(0.72 0.22 25);
+  --overlay-run-1: oklch(0.75 0.2 190);
+  --overlay-run-2: oklch(0.78 0.2 90);
+  --overlay-run-3: oklch(0.7 0.22 290);
+  --overlay-run-4: oklch(0.75 0.2 150);
+  --overlay-run-5: oklch(0.7 0.22 330);
+  --overlay-run-6: oklch(0.72 0.2 230);
+  --overlay-run-7: oklch(0.78 0.18 60);
 }
 
 /* Force pixel font on everything in minecraft mode */
