@@ -90,6 +90,20 @@ export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
 }
 
+/**
+ * Pick the chart watermark for a given model + run state. Unofficial-run charts
+ * always get the red "UNOFFICIAL" banner; otherwise dsv4 (day-0 support) gets
+ * the blue "EXPERIMENTAL - DAY ZERO" banner; everything else gets the logo.
+ */
+export function getModelWatermark(
+  model: Model | string | null | undefined,
+  isUnofficialRun = false,
+): 'logo' | 'unofficial' | 'day0' {
+  if (isUnofficialRun) return 'unofficial';
+  if (model === Model.DeepSeek_V4_Pro) return 'day0';
+  return 'logo';
+}
+
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
   (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
     .filter(([, c]) => c.prefix)

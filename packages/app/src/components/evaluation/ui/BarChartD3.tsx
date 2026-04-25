@@ -17,6 +17,7 @@ import {
   type EvalBenchmark,
   type Precision,
   getEvalBenchmarkLabel,
+  getModelWatermark,
   getPrecisionLabel,
 } from '@/lib/data-mappings';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -860,7 +861,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       data={chartData}
       height={chartHeight}
       margin={chartMargin}
-      watermark={isUnofficialRun ? 'unofficial' : 'logo'}
+      watermark={getModelWatermark(selectedModel, isUnofficialRun)}
       grabCursor={false}
       caption={caption}
       xScale={{ type: 'linear', domain: xDomain }}
