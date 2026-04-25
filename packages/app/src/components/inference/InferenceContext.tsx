@@ -466,10 +466,17 @@ export function InferenceProvider({
   // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
   // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
   // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
+  // Track the last applied key with a ref and include hwTypesWithData in the deps so the
+  // reset commits as soon as data for the new model arrives — without this, switching models
+  // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
+  const lastHwResetKeyRef = useRef('');
   useEffect(() => {
     if (pendingHwFilterRef.current) return;
     if (hwTypesWithData.size === 0) return;
+    const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
+    if (lastHwResetKeyRef.current === key) return;
+    lastHwResetKeyRef.current = key;
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
       const filterSet = new Set(presetFilter);
@@ -480,7 +487,7 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey]);
+  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
