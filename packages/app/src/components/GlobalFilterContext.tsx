@@ -180,17 +180,28 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   //
   // Skipped when `g_model` was set explicitly in the URL (respect the user's
   // intent) and when the current model is already covered by the overlay.
-  const autoSwitchedRef = useRef(false);
+  //
+  // We key the "did we already switch?" check against the stringified set of
+  // (model, sequence) pairs from the unofficial run, so navigating from one
+  // run to another with a different model will re-trigger the switch — but
+  // a manual model change while the same run set is loaded will stick.
+  const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
-    if (autoSwitchedRef.current) return;
-    if (unofficialAvailable.length === 0) return;
+    if (unofficialAvailable.length === 0) {
+      lastAutoSwitchKeyRef.current = '';
+      return;
+    }
     const urlModel = getUrlParam('g_model');
     if (urlModel) return;
+    const key = unofficialAvailable
+      .map((a) => `${a.model}|${a.sequence}`)
+      .toSorted()
+      .join(',');
+    if (lastAutoSwitchKeyRef.current === key) return;
+    lastAutoSwitchKeyRef.current = key;
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     if (unofficialModels.has(selectedModel)) return;
-    const target = unofficialAvailable[0].model;
-    autoSwitchedRef.current = true;
-    setSelectedModel(target);
+    setSelectedModel(unofficialAvailable[0].model);
   }, [unofficialAvailable, selectedModel]);
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
