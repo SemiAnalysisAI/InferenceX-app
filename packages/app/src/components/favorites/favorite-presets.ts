@@ -8,6 +8,8 @@ export interface FavoritePreset {
   tags: string[];
   category: 'comparison' | 'improvements';
   wide?: boolean;
+  /** Routable via ?preset=ID but hidden from the landing-page list. */
+  hidden?: boolean;
   config: {
     model: Model;
     sequence: Sequence;
@@ -115,7 +117,25 @@ export function findConfigChangeDates(
 }
 
 export const FAVORITE_PRESETS: FavoritePreset[] = [
-  // 0 — DeepSeek V4 Pro launch
+  // 0 — DeepSeek V4 Pro launch (all configs)
+  {
+    id: 'dsv4-launch',
+    title: 'DeepSeek V4 Pro — First Look',
+    description:
+      'First benchmarks of DeepSeek V4 Pro across every available GPU. New configurations appear here as they come online.',
+    tags: ['DeepSeek', 'V4-Pro', 'New'],
+    category: 'comparison',
+    wide: true,
+    config: {
+      model: Model.DeepSeek_V4_Pro,
+      sequence: Sequence.EightK_OneK,
+      precisions: ['fp4', 'fp4fp8', 'fp8'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
+    },
+  },
+  // Hidden — original NVIDIA-only DeepSeek V4 Pro launch preset, retained so prior
+  // ?preset=dsv4-launch-nvidia links (banner, modal, external shares) keep working.
   {
     id: 'dsv4-launch-nvidia',
     title: 'DeepSeek V4 Pro — NVIDIA First Look',
@@ -124,6 +144,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     tags: ['DeepSeek', 'V4-Pro', 'NVIDIA', 'New'],
     category: 'comparison',
     wide: true,
+    hidden: true,
     config: {
       model: Model.DeepSeek_V4_Pro,
       sequence: Sequence.EightK_OneK,
