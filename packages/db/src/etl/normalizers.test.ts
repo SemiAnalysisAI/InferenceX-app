@@ -73,6 +73,10 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('B200-DSV4')).toBe('b200');
   });
 
+  it('strips -cw suffix', () => {
+    expect(hwToGpuKey('gb300-cw')).toBe('gb300');
+  });
+
   it('strips runner index suffix before other suffixes', () => {
     expect(hwToGpuKey('mi355x-amd_0')).toBe('mi355x');
     expect(hwToGpuKey('mi355x-amd_2')).toBe('mi355x');
