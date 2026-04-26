@@ -33,4 +33,8 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   24566910305, // 2026-04-17 | Reason: misconfigured diff on original pr causing sweep to fail
   24567247324, // 2026-04-17 | Reason: incorrect b300 recipes
   24567302524, // 2026-04-17 | Reason: incorrect b300 recipes
+  24953342301, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
+  24954587925, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
+  24954912912, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
+  24960716250, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
 ]);
