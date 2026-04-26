@@ -37,9 +37,16 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
+import { computeToggle } from '@/hooks/useTogglableSet';
+import {
+  applyMtpEngineExclusion,
+  buildAvailabilityHwKey,
+  getMtpEngineFamily,
+} from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { Model, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { MtpEngineConflictToast } from '@/components/mtp-engine-conflict-toast';
+import { dispatchMtpEngineConflict } from '@/lib/mtp-engine-conflict-event';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
@@ -414,13 +421,42 @@ export function InferenceProvider({
     }
   }, [pendingHwFilter, hwTypesWithData, setActiveHwTypes]);
 
+  const isDsv4 = selectedModel === Model.DeepSeek_V4_Pro;
   const toggleHwType = useCallback(
     (hw: string) => {
+      if (isDsv4) {
+        const proposed = computeToggle(activeHwTypes, hw, hwTypesWithData);
+        const wasActive = activeHwTypes.has(hw);
+        const willBeActive = proposed.has(hw);
+        const newFamily = getMtpEngineFamily(hw);
+        // Hard-block the explicit ADD that introduces a cross-family MTP
+        // conflict. The user is actively trying to enable a second engine's
+        // MTP — refuse and surface a toast explaining why.
+        if (!wasActive && willBeActive && newFamily) {
+          const { droppedFamilies, keptFamily } = applyMtpEngineExclusion(proposed, activeHwTypes);
+          if (droppedFamilies.length > 0 && keptFamily !== newFamily) {
+            dispatchMtpEngineConflict({
+              attempted: newFamily,
+              existing: keptFamily,
+            });
+            return;
+          }
+        }
+        // Other paths (restore-all via solo click) — silently filter so we
+        // never end up with cross-family MTP simultaneously visible.
+        const filtered = applyMtpEngineExclusion(proposed, activeHwTypes);
+        if (filtered.droppedFamilies.length > 0) {
+          setActiveHwTypes(filtered.result);
+          setActivePresetId(null);
+          presetHwFilterRef.current = null;
+          return;
+        }
+      }
       toggleHwRaw(hw, hwTypesWithData);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [toggleHwRaw, hwTypesWithData],
+    [toggleHwRaw, hwTypesWithData, isDsv4, activeHwTypes, setActiveHwTypes],
   );
 
   const removeHwType = useCallback(
@@ -450,10 +486,20 @@ export function InferenceProvider({
     [toggleDateRaw, allDateIds],
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
-  const selectAllHwTypes = useCallback(
-    () => selectAllHwRaw(hwTypesWithData),
-    [selectAllHwRaw, hwTypesWithData],
-  );
+  const selectAllHwTypes = useCallback(() => {
+    if (isDsv4) {
+      const { result, droppedFamilies, keptFamily } = applyMtpEngineExclusion(
+        hwTypesWithData,
+        activeHwTypes,
+      );
+      setActiveHwTypes(result);
+      if (droppedFamilies.length > 0) {
+        dispatchMtpEngineConflict({ attempted: null, existing: keptFamily });
+      }
+      return;
+    }
+    selectAllHwRaw(hwTypesWithData);
+  }, [selectAllHwRaw, hwTypesWithData, isDsv4, activeHwTypes, setActiveHwTypes]);
   const selectAllActiveDates = useCallback(
     () => selectAllDatesRaw(allDateIds),
     [selectAllDatesRaw, allDateIds],
@@ -482,12 +528,19 @@ export function InferenceProvider({
       const filterSet = new Set(presetFilter);
       const filtered = new Set([...hwTypesWithData].filter((k) => filterSet.has(k)));
       if (filtered.size > 0) {
-        setActiveHwTypes(filtered);
+        // For dsv4, dedupe MTP engines silently — auto-reset isn't a user
+        // action, so don't toast. The user-driven toggle/selectAll paths
+        // surface the toast.
+        const next = isDsv4 ? applyMtpEngineExclusion(filtered, activeHwTypes).result : filtered;
+        setActiveHwTypes(next);
         return;
       }
     }
-    setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData]);
+    const next = isDsv4
+      ? applyMtpEngineExclusion(hwTypesWithData, activeHwTypes).result
+      : hwTypesWithData;
+    setActiveHwTypes(next);
+  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData, isDsv4]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
@@ -890,6 +943,7 @@ export function InferenceProvider({
   return (
     <InferenceContext.Provider value={value}>
       {children}
+      <MtpEngineConflictToast />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>

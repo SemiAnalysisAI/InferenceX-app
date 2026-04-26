@@ -3,10 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import {
+  applyMtpEngineExclusion,
   buildAvailabilityHwKey,
   generateHighContrastColors,
   getNestedYValue,
   getHardwareKey,
+  getMtpEngineFamily,
   normalizeEvalHardwareKey,
   createChartDataPoint,
   calculateRoofline,
@@ -2066,5 +2068,73 @@ describe('paretoFrontLowerRight', () => {
     const input = [paretoPt(1, 1), paretoPt(3, 5), paretoPt(2, 3)];
     paretoFrontLowerRight(input);
     expect(input.map((p) => p.x)).toEqual([3, 2, 1]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MTP engine-family helpers (dsv4 cross-engine MTP exclusion)
+// ---------------------------------------------------------------------------
+describe('getMtpEngineFamily', () => {
+  it('returns null for non-MTP keys', () => {
+    expect(getMtpEngineFamily('h100_vllm')).toBeNull();
+    expect(getMtpEngineFamily('gb300_sglang')).toBeNull();
+    expect(getMtpEngineFamily('h100')).toBeNull();
+    expect(getMtpEngineFamily('')).toBeNull();
+  });
+
+  it('extracts the framework segment for MTP keys', () => {
+    expect(getMtpEngineFamily('h100_vllm_mtp')).toBe('vllm');
+    expect(getMtpEngineFamily('gb300_sglang_mtp')).toBe('sglang');
+    expect(getMtpEngineFamily('h100_trt_mtp')).toBe('trt');
+  });
+
+  it('strips dynamo- and mori- engine-family prefixes', () => {
+    expect(getMtpEngineFamily('h100_dynamo-vllm_mtp')).toBe('vllm');
+    expect(getMtpEngineFamily('gb300_dynamo-sglang_mtp')).toBe('sglang');
+    expect(getMtpEngineFamily('h100_dynamo-trt_mtp')).toBe('trt');
+    expect(getMtpEngineFamily('mi355x_mori-sglang_mtp')).toBe('sglang');
+  });
+});
+
+describe('applyMtpEngineExclusion', () => {
+  it('passes through when no MTP keys present', () => {
+    const set = new Set(['h100_vllm', 'gb300_sglang']);
+    const out = applyMtpEngineExclusion(set, new Set());
+    expect(out.result).toBe(set);
+    expect(out.droppedFamilies).toEqual([]);
+    expect(out.keptFamily).toBeNull();
+  });
+
+  it('passes through when only one MTP family present', () => {
+    const set = new Set(['h100_vllm_mtp', 'h100_dynamo-vllm_mtp', 'gb300_sglang']);
+    const out = applyMtpEngineExclusion(set, new Set());
+    expect(out.result).toBe(set);
+    expect(out.droppedFamilies).toEqual([]);
+    expect(out.keptFamily).toBe('vllm');
+  });
+
+  it('drops the non-sticky family when prev had one', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp', 'h100_vllm']);
+    const prev = new Set(['h100_vllm_mtp']);
+    const out = applyMtpEngineExclusion(proposed, prev);
+    expect(out.keptFamily).toBe('vllm');
+    expect([...out.result].toSorted()).toEqual(['h100_vllm', 'h100_vllm_mtp']);
+    expect(out.droppedFamilies).toEqual(['sglang']);
+  });
+
+  it('falls back to alphabetical when neither family was in prev', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = applyMtpEngineExclusion(proposed, new Set());
+    expect(out.keptFamily).toBe('sglang');
+    expect([...out.result]).toEqual(['gb300_sglang_mtp']);
+    expect(out.droppedFamilies).toEqual(['vllm']);
+  });
+
+  it('treats dynamo/mori variants as the same family', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'h100_dynamo-vllm_mtp', 'gb300_dynamo-sglang_mtp']);
+    const out = applyMtpEngineExclusion(proposed, new Set(['h100_vllm_mtp']));
+    expect(out.keptFamily).toBe('vllm');
+    expect([...out.result].toSorted()).toEqual(['h100_dynamo-vllm_mtp', 'h100_vllm_mtp']);
+    expect(out.droppedFamilies).toEqual(['sglang']);
   });
 });

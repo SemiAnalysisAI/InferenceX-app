@@ -245,6 +245,76 @@ export function buildAvailabilityHwKey(
 }
 
 /**
+ * If `hwKey` is an MTP config (ends in `_mtp`), return its base engine family
+ * (`vllm`, `sglang`, `trt`, etc.) by stripping the GPU prefix and any
+ * `dynamo-` / `mori-` engine-family prefix from the framework segment.
+ * Returns null for non-MTP keys.
+ *
+ * Used to enforce the dsv4 rule that MTP configs from different engine
+ * families (e.g. vLLM MTP and SGLang MTP) cannot be shown on the same graph,
+ * since their acceptance-rate forcing implementations differ materially.
+ */
+export function getMtpEngineFamily(hwKey: string): string | null {
+  if (!hwKey.endsWith('_mtp')) return null;
+  const withoutMtp = hwKey.slice(0, -'_mtp'.length);
+  const firstUnderscore = withoutMtp.indexOf('_');
+  if (firstUnderscore === -1) return null;
+  let framework = withoutMtp.slice(firstUnderscore + 1);
+  for (const prefix of ['dynamo-', 'mori-']) {
+    if (framework.startsWith(prefix)) {
+      framework = framework.slice(prefix.length);
+      break;
+    }
+  }
+  return framework || null;
+}
+
+/**
+ * Apply the dsv4 rule that prevents MTP configs from different engine
+ * families being active simultaneously. Given a proposed active set and the
+ * previous set, drops MTP keys for losing families. Sticky: prefers the
+ * family that was already active in `prev`; falls back to alphabetical first.
+ *
+ * Returns the filtered set plus the families that were dropped (for toasts).
+ */
+export function applyMtpEngineExclusion(
+  proposed: Set<string>,
+  prev: Set<string>,
+): { result: Set<string>; droppedFamilies: string[]; keptFamily: string | null } {
+  const mtpByFamily = new Map<string, string[]>();
+  for (const key of proposed) {
+    const fam = getMtpEngineFamily(key);
+    if (!fam) continue;
+    const existing = mtpByFamily.get(fam);
+    if (existing) existing.push(key);
+    else mtpByFamily.set(fam, [key]);
+  }
+  if (mtpByFamily.size <= 1) {
+    return {
+      result: proposed,
+      droppedFamilies: [],
+      keptFamily: mtpByFamily.size === 1 ? [...mtpByFamily.keys()][0] : null,
+    };
+  }
+  const prevFamilies = new Set<string>();
+  for (const key of prev) {
+    const fam = getMtpEngineFamily(key);
+    if (fam) prevFamilies.add(fam);
+  }
+  const families = [...mtpByFamily.keys()];
+  const sticky = families.find((f) => prevFamilies.has(f));
+  const winner = sticky ?? [...families].toSorted()[0];
+  const result = new Set(proposed);
+  const dropped: string[] = [];
+  for (const [fam, keys] of mtpByFamily) {
+    if (fam === winner) continue;
+    for (const k of keys) result.delete(k);
+    dropped.push(fam);
+  }
+  return { result, droppedFamilies: dropped, keptFamily: winner };
+}
+
+/**
  * Creates a single InferenceData point from an AggDataEntry.
  * Spreads all AggDataEntry fields through automatically, then overrides
  * with chart-specific derived fields (coordinates, costs, roofline metrics).
