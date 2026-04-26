@@ -47,9 +47,7 @@ export function MtpEngineConflictToast() {
   const description =
     attempted && existing
       ? `${attempted} and ${existing} use different MTP acceptance-rate implementations, so their numbers aren't directly comparable. Remove the ${existing} MTP config first to switch.`
-      : existing
-        ? `vLLM and SGLang use different MTP acceptance-rate implementations, so only the ${existing} MTP config is shown.`
-        : `vLLM and SGLang use different MTP acceptance-rate implementations and can't be shown on the same graph.`;
+      : `vLLM and SGLang use different MTP acceptance-rate implementations and can't be shown on the same graph. Both MTP configs are disabled by default — enable one from the legend to view it.`;
 
   return (
     <BottomToast

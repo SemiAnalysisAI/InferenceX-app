@@ -442,9 +442,10 @@ export function InferenceProvider({
             return;
           }
         }
-        // Other paths (restore-all via solo click) — silently filter so we
-        // never end up with cross-family MTP simultaneously visible.
-        const filtered = applyMtpEngineExclusion(proposed, activeHwTypes);
+        // Other paths (restore-all via solo click on an active item) —
+        // disable both MTP families silently. The user's solo→restore action
+        // shouldn't accidentally re-enable a hidden cross-family MTP.
+        const filtered = applyMtpEngineExclusion(proposed, activeHwTypes, 'disable-all');
         if (filtered.droppedFamilies.length > 0) {
           setActiveHwTypes(filtered.result);
           setActivePresetId(null);
@@ -488,13 +489,14 @@ export function InferenceProvider({
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
     if (isDsv4) {
-      const { result, droppedFamilies, keptFamily } = applyMtpEngineExclusion(
+      const { result, droppedFamilies } = applyMtpEngineExclusion(
         hwTypesWithData,
         activeHwTypes,
+        'disable-all',
       );
       setActiveHwTypes(result);
       if (droppedFamilies.length > 0) {
-        dispatchMtpEngineConflict({ attempted: null, existing: keptFamily });
+        dispatchMtpEngineConflict({ attempted: null, existing: null });
       }
       return;
     }
@@ -528,18 +530,29 @@ export function InferenceProvider({
       const filterSet = new Set(presetFilter);
       const filtered = new Set([...hwTypesWithData].filter((k) => filterSet.has(k)));
       if (filtered.size > 0) {
-        // For dsv4, dedupe MTP engines silently — auto-reset isn't a user
-        // action, so don't toast. The user-driven toggle/selectAll paths
-        // surface the toast.
-        const next = isDsv4 ? applyMtpEngineExclusion(filtered, activeHwTypes).result : filtered;
-        setActiveHwTypes(next);
+        // Presets explicitly chose hw configs — respect their picks. The
+        // user-toggle guard still prevents simultaneously activating two
+        // engine families' MTP via subsequent clicks.
+        setActiveHwTypes(filtered);
         return;
       }
     }
-    const next = isDsv4
-      ? applyMtpEngineExclusion(hwTypesWithData, activeHwTypes).result
-      : hwTypesWithData;
-    setActiveHwTypes(next);
+    if (isDsv4) {
+      // dsv4: when both vllm and sglang MTP have data, disable both by
+      // default and surface a toast. The user has to opt in to one engine's
+      // MTP explicitly — never both at once.
+      const { result, droppedFamilies } = applyMtpEngineExclusion(
+        hwTypesWithData,
+        activeHwTypes,
+        'disable-all',
+      );
+      setActiveHwTypes(result);
+      if (droppedFamilies.length > 0) {
+        dispatchMtpEngineConflict({ attempted: null, existing: null });
+      }
+      return;
+    }
+    setActiveHwTypes(hwTypesWithData);
   }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData, isDsv4]);
 
   // Remove selected GPUs that no longer have data for current filters

@@ -271,15 +271,23 @@ export function getMtpEngineFamily(hwKey: string): string | null {
 
 /**
  * Apply the dsv4 rule that prevents MTP configs from different engine
- * families being active simultaneously. Given a proposed active set and the
- * previous set, drops MTP keys for losing families. Sticky: prefers the
- * family that was already active in `prev`; falls back to alphabetical first.
+ * families being active simultaneously.
  *
- * Returns the filtered set plus the families that were dropped (for toasts).
+ *  - `mode: 'keep-sticky'` keeps one family's MTP keys when the proposed set
+ *    contains multiple. Sticky to the family already in `prev`; otherwise
+ *    alphabetical first.
+ *  - `mode: 'disable-all'` drops MTP keys for ALL families when multiple are
+ *    present in the proposed set. Used for auto-reset / select-all on dsv4
+ *    so the user has to opt into MTP explicitly (and only one engine at a
+ *    time).
+ *
+ *  When only one MTP family is in the proposed set, both modes pass it
+ *  through unchanged.
  */
 export function applyMtpEngineExclusion(
   proposed: Set<string>,
   prev: Set<string>,
+  mode: 'keep-sticky' | 'disable-all' = 'keep-sticky',
 ): { result: Set<string>; droppedFamilies: string[]; keptFamily: string | null } {
   const mtpByFamily = new Map<string, string[]>();
   for (const key of proposed) {
@@ -295,6 +303,13 @@ export function applyMtpEngineExclusion(
       droppedFamilies: [],
       keptFamily: mtpByFamily.size === 1 ? [...mtpByFamily.keys()][0] : null,
     };
+  }
+  if (mode === 'disable-all') {
+    const result = new Set(proposed);
+    for (const keys of mtpByFamily.values()) {
+      for (const k of keys) result.delete(k);
+    }
+    return { result, droppedFamilies: [...mtpByFamily.keys()], keptFamily: null };
   }
   const prevFamilies = new Set<string>();
   for (const key of prev) {

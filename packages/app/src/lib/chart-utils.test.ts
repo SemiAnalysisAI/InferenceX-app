@@ -2137,4 +2137,20 @@ describe('applyMtpEngineExclusion', () => {
     expect([...out.result].toSorted()).toEqual(['h100_dynamo-vllm_mtp', 'h100_vllm_mtp']);
     expect(out.droppedFamilies).toEqual(['sglang']);
   });
+
+  it('disable-all mode drops every MTP family when multiple present', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp', 'h100_vllm', 'gb300_sglang']);
+    const out = applyMtpEngineExclusion(proposed, new Set(['h100_vllm_mtp']), 'disable-all');
+    expect(out.keptFamily).toBeNull();
+    expect([...out.result].toSorted()).toEqual(['gb300_sglang', 'h100_vllm']);
+    expect(out.droppedFamilies.toSorted()).toEqual(['sglang', 'vllm']);
+  });
+
+  it('disable-all mode preserves a sole MTP family unchanged', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'h100_dynamo-vllm_mtp', 'h100_vllm']);
+    const out = applyMtpEngineExclusion(proposed, new Set(), 'disable-all');
+    expect(out.result).toBe(proposed);
+    expect(out.droppedFamilies).toEqual([]);
+    expect(out.keptFamily).toBe('vllm');
+  });
 });
