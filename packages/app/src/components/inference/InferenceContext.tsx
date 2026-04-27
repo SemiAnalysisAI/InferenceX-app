@@ -37,16 +37,14 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import { computeToggle } from '@/hooks/useTogglableSet';
-import {
-  applyMtpEngineExclusion,
-  buildAvailabilityHwKey,
-  getMtpEngineFamily,
-} from '@/lib/chart-utils';
+import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { Model, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
-import { MtpEngineConflictToast } from '@/components/mtp-engine-conflict-toast';
-import { dispatchMtpEngineConflict } from '@/lib/mtp-engine-conflict-event';
+import { hasMtpEngineExclusion, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import {
+  MtpEngineConflictToast,
+  type MtpEngineConflictDetail,
+} from '@/components/mtp-engine-conflict-toast';
+import { clearAllMtpFamilies, resolveMtpToggle } from '@/lib/mtp-exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
@@ -146,6 +144,10 @@ export function InferenceProvider({
   // Persists the preset's desired hw filter beyond pendingHwFilter consumption.
   // Cleared when the user manually changes filters (clearing the preset).
   const presetHwFilterRef = useRef<string[] | null>(null);
+
+  // --- MTP cross-engine conflict toast state ---
+  const [mtpConflict, setMtpConflict] = useState<MtpEngineConflictDetail | null>(null);
+  const dismissMtpConflict = useCallback(() => setMtpConflict(null), []);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
@@ -421,33 +423,21 @@ export function InferenceProvider({
     }
   }, [pendingHwFilter, hwTypesWithData, setActiveHwTypes]);
 
-  const isDsv4 = selectedModel === Model.DeepSeek_V4_Pro;
+  const mtpExclusion = hasMtpEngineExclusion(selectedModel);
   const toggleHwType = useCallback(
     (hw: string) => {
-      if (isDsv4) {
-        const proposed = computeToggle(activeHwTypes, hw, hwTypesWithData);
-        const wasActive = activeHwTypes.has(hw);
-        const willBeActive = proposed.has(hw);
-        const newFamily = getMtpEngineFamily(hw);
-        // Hard-block the explicit ADD that introduces a cross-family MTP
-        // conflict. The user is actively trying to enable a second engine's
-        // MTP — refuse and surface a toast explaining why.
-        if (!wasActive && willBeActive && newFamily) {
-          const { droppedFamilies, keptFamily } = applyMtpEngineExclusion(proposed, activeHwTypes);
-          if (droppedFamilies.length > 0 && keptFamily !== newFamily) {
-            dispatchMtpEngineConflict({
-              attempted: newFamily,
-              existing: keptFamily,
-            });
-            return;
-          }
+      if (mtpExclusion) {
+        const decision = resolveMtpToggle(activeHwTypes, hw, hwTypesWithData);
+        if (decision.kind === 'block') {
+          setMtpConflict({
+            kind: 'blocked',
+            attempted: decision.attempted,
+            existing: decision.existing,
+          });
+          return;
         }
-        // Other paths (restore-all via solo click on an active item) —
-        // disable both MTP families silently. The user's solo→restore action
-        // shouldn't accidentally re-enable a hidden cross-family MTP.
-        const filtered = applyMtpEngineExclusion(proposed, activeHwTypes, 'disable-all');
-        if (filtered.droppedFamilies.length > 0) {
-          setActiveHwTypes(filtered.result);
+        if (decision.kind === 'silent-disable-all') {
+          setActiveHwTypes(decision.result);
           setActivePresetId(null);
           presetHwFilterRef.current = null;
           return;
@@ -457,7 +447,7 @@ export function InferenceProvider({
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [toggleHwRaw, hwTypesWithData, isDsv4, activeHwTypes, setActiveHwTypes],
+    [toggleHwRaw, hwTypesWithData, mtpExclusion, activeHwTypes, setActiveHwTypes],
   );
 
   const removeHwType = useCallback(
@@ -488,20 +478,16 @@ export function InferenceProvider({
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
-    if (isDsv4) {
-      const { result, droppedFamilies } = applyMtpEngineExclusion(
-        hwTypesWithData,
-        activeHwTypes,
-        'disable-all',
-      );
+    if (mtpExclusion) {
+      const { result, droppedFamilies } = clearAllMtpFamilies(hwTypesWithData);
       setActiveHwTypes(result);
       if (droppedFamilies.length > 0) {
-        dispatchMtpEngineConflict({ attempted: null, existing: null });
+        setMtpConflict({ kind: 'cleared', families: droppedFamilies });
       }
       return;
     }
     selectAllHwRaw(hwTypesWithData);
-  }, [selectAllHwRaw, hwTypesWithData, isDsv4, activeHwTypes, setActiveHwTypes]);
+  }, [selectAllHwRaw, hwTypesWithData, mtpExclusion, setActiveHwTypes]);
   const selectAllActiveDates = useCallback(
     () => selectAllDatesRaw(allDateIds),
     [selectAllDatesRaw, allDateIds],
@@ -537,23 +523,19 @@ export function InferenceProvider({
         return;
       }
     }
-    if (isDsv4) {
-      // dsv4: when both vllm and sglang MTP have data, disable both by
+    if (mtpExclusion) {
+      // When multiple engine families' MTP have data, disable them all by
       // default and surface a toast. The user has to opt in to one engine's
-      // MTP explicitly — never both at once.
-      const { result, droppedFamilies } = applyMtpEngineExclusion(
-        hwTypesWithData,
-        activeHwTypes,
-        'disable-all',
-      );
+      // MTP explicitly — never multiple at once.
+      const { result, droppedFamilies } = clearAllMtpFamilies(hwTypesWithData);
       setActiveHwTypes(result);
       if (droppedFamilies.length > 0) {
-        dispatchMtpEngineConflict({ attempted: null, existing: null });
+        setMtpConflict({ kind: 'cleared', families: droppedFamilies });
       }
       return;
     }
     setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData, isDsv4]);
+  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData, mtpExclusion]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
@@ -956,7 +938,7 @@ export function InferenceProvider({
   return (
     <InferenceContext.Provider value={value}>
       {children}
-      <MtpEngineConflictToast />
+      <MtpEngineConflictToast detail={mtpConflict} onDismiss={dismissMtpConflict} />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>

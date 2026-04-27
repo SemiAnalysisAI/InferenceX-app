@@ -3,51 +3,70 @@
 import { AlertTriangle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
+
 import { track } from '@/lib/analytics';
 import { BottomToast } from '@/components/ui/bottom-toast';
-import {
-  MTP_ENGINE_CONFLICT_EVENT,
-  type MtpEngineConflictDetail,
-} from '@/lib/mtp-engine-conflict-event';
 
-const FRAMEWORK_LABEL: Record<string, string> = {
-  vllm: 'vLLM',
-  sglang: 'SGLang',
-  trt: 'TRT',
-  atom: 'ATOM',
-};
+/**
+ * Discriminated detail for the MTP-engine-conflict toast.
+ *
+ *  - `blocked`: the user explicitly tried to add a second engine family's MTP
+ *    config; the action was refused. Names the attempted and existing families.
+ *  - `cleared`: a non-toggle path (model reset, select-all) saw multiple
+ *    families simultaneously and disabled them all. Names the dropped families.
+ */
+export type MtpEngineConflictDetail =
+  | { kind: 'blocked'; attempted: string; existing: string | null }
+  | { kind: 'cleared'; families: string[] };
 
-function familyLabel(family: string | null): string {
-  if (!family) return '';
-  return FRAMEWORK_LABEL[family] ?? family;
+function familyLabel(family: string): string {
+  return FRAMEWORK_LABELS[family] ?? family;
 }
 
-export function MtpEngineConflictToast() {
-  const [detail, setDetail] = useState<MtpEngineConflictDetail | null>(null);
+function joinList(parts: string[]): string {
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts.at(-1)}`;
+}
+
+function describe(detail: MtpEngineConflictDetail): string {
+  if (detail.kind === 'blocked') {
+    const attempted = familyLabel(detail.attempted);
+    if (detail.existing) {
+      const existing = familyLabel(detail.existing);
+      return `${attempted} and ${existing} use different MTP acceptance-rate implementations, so their numbers aren't directly comparable. Remove the ${existing} MTP config first to switch.`;
+    }
+    return `${attempted} MTP can't be enabled while another engine's MTP is active. Remove the existing MTP config first.`;
+  }
+  const labels = [...detail.families].toSorted().map(familyLabel);
+  if (labels.length === 0) {
+    return `MTP configs from different engines use different acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default — enable one from the legend to view it.`;
+  }
+  return `${joinList(labels)} use different MTP acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default — enable one from the legend to view it.`;
+}
+
+interface Props {
+  detail: MtpEngineConflictDetail | null;
+  onDismiss?: () => void;
+}
+
+export function MtpEngineConflictToast({ detail, onDismiss }: Props) {
   const [seq, setSeq] = useState(0);
 
   useEffect(() => {
-    const handle = (e: Event) => {
-      const next = (e as CustomEvent<MtpEngineConflictDetail>).detail;
-      setDetail(next);
-      setSeq((n) => n + 1);
-      track('inference_mtp_engine_conflict_blocked', {
-        attempted: next?.attempted ?? null,
-        existing: next?.existing ?? null,
-      });
-    };
-    window.addEventListener(MTP_ENGINE_CONFLICT_EVENT, handle);
-    return () => window.removeEventListener(MTP_ENGINE_CONFLICT_EVENT, handle);
-  }, []);
+    if (!detail) return;
+    setSeq((n) => n + 1);
+    track('inference_mtp_engine_conflict_blocked', {
+      kind: detail.kind,
+      attempted: detail.kind === 'blocked' ? detail.attempted : null,
+      existing: detail.kind === 'blocked' ? detail.existing : null,
+      families: detail.kind === 'cleared' ? detail.families : null,
+    });
+  }, [detail]);
 
   if (!detail) return null;
-
-  const attempted = familyLabel(detail.attempted);
-  const existing = familyLabel(detail.existing);
-  const description =
-    attempted && existing
-      ? `${attempted} and ${existing} use different MTP acceptance-rate implementations, so their numbers aren't directly comparable. Remove the ${existing} MTP config first to switch.`
-      : `vLLM and SGLang use different MTP acceptance-rate implementations and can't be shown on the same graph. Both MTP configs are disabled by default — enable one from the legend to view it.`;
 
   return (
     <BottomToast
@@ -55,7 +74,8 @@ export function MtpEngineConflictToast() {
       testId="mtp-engine-conflict-toast"
       icon={<AlertTriangle className="text-amber-500" />}
       title="MTP configs from different engines can't share a graph"
-      description={description}
+      description={describe(detail)}
+      onDismiss={onDismiss}
     />
   );
 }

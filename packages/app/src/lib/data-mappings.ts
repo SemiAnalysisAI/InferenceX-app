@@ -36,9 +36,26 @@ export function groupByCategory<T>(
  * 1. Add an enum member to `Model` above.
  * 2. Add one entry here.
  */
-const MODEL_CONFIG: Record<Model, { label: string; prefix: string; category: CategoryTag }> = {
+interface ModelConfig {
+  label: string;
+  prefix: string;
+  category: CategoryTag;
+  /**
+   * If true, MTP configs from different engine families (e.g. vLLM and SGLang)
+   * cannot be active simultaneously, since their acceptance-rate forcing
+   * implementations differ and aren't directly comparable on the same graph.
+   */
+  mtpEngineExclusion?: boolean;
+}
+
+const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
-  [Model.DeepSeek_V4_Pro]: { label: 'DeepSeek V4 Pro', prefix: 'dsv4', category: 'experimental' },
+  [Model.DeepSeek_V4_Pro]: {
+    label: 'DeepSeek V4 Pro',
+    prefix: 'dsv4',
+    category: 'experimental',
+    mtpEngineExclusion: true,
+  },
   [Model.Kimi_K2_5]: {
     label: 'Kimi K2.5',
     prefix: 'kimik2.5',
@@ -88,6 +105,15 @@ export function getModelCategory(model: Model): CategoryTag {
 
 export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
+}
+
+/**
+ * True if the model enforces the rule that MTP configs from different engine
+ * families can't be shown on the same graph.
+ */
+export function hasMtpEngineExclusion(model: Model | string | null | undefined): boolean {
+  if (!model) return false;
+  return MODEL_CONFIG[model as Model]?.mtpEngineExclusion === true;
 }
 
 /**
