@@ -13,6 +13,7 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   sglang: { label: 'SGLang' },
   trt: { label: 'TRT' },
   vllm: { label: 'vLLM' },
+  'vllm-gaudi': { label: 'vLLM-Gaudi' },
 };
 
 /** Canonical set of framework key strings used across all packages. */

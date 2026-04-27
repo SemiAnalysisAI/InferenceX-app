@@ -122,6 +122,18 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costn: 1.9,
     costr: 2.1,
   },
+  // Intel Gaudi 3 HL-325L: TDP/power and pricing are placeholders pending official figures.
+  gaudi3: {
+    vendor: 'Intel',
+    arch: 'Gaudi 3',
+    label: 'Gaudi 3 HL-325L',
+    sort: 9,
+    tdp: 900,
+    power: 2.1,
+    costh: 1,
+    costn: 1.25,
+    costr: 1.5,
+  },
 };
 
 /** Canonical set of GPU key strings used across all packages. */

@@ -7,6 +7,7 @@ export enum Model {
   Kimi_K2_5 = 'Kimi-K2.5',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   GLM_5 = 'GLM-5',
+  GLM_4_7 = 'GLM-4.7',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
 
@@ -63,6 +64,11 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   },
   [Model.Qwen3_5]: { label: 'Qwen3.5', prefix: 'qwen3.5', category: 'default' },
   [Model.GLM_5]: { label: 'GLM5/5.1', prefix: 'glm5', category: 'default' },
+  [Model.GLM_4_7]: {
+    label: 'GLM-4.7 (Gaudi 3 preview)',
+    prefix: 'glm4.7',
+    category: 'experimental',
+  },
   [Model.MiniMax_M2_5]: {
     label: 'MiniMax M2.5',
     prefix: 'minimaxm2.5',
