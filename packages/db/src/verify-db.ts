@@ -48,6 +48,7 @@ async function verify(): Promise<void> {
     TABLE_NAMES.benchmarkResults,
     TABLE_NAMES.runStats,
     TABLE_NAMES.evalResults,
+    TABLE_NAMES.evalSamples,
     TABLE_NAMES.changelogEntries,
   ];
   for (const t of tables) {

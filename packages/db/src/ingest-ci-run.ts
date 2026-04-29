@@ -661,6 +661,7 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 main()

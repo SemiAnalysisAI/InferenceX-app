@@ -862,6 +862,7 @@ async function main(): Promise<void> {
   }
 
   console.log('\n=== db:ingest:gcs complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 main()

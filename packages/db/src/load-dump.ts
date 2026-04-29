@@ -29,6 +29,7 @@ const SEQUENCES: { seq: string; table: string; col: string }[] = [
   { seq: 'workflow_runs_id_seq', table: TABLE_NAMES.workflowRuns, col: 'id' },
   { seq: 'benchmark_results_id_seq', table: TABLE_NAMES.benchmarkResults, col: 'id' },
   { seq: 'eval_results_id_seq', table: TABLE_NAMES.evalResults, col: 'id' },
+  { seq: 'eval_samples_id_seq', table: TABLE_NAMES.evalSamples, col: 'id' },
   { seq: 'run_stats_id_seq', table: TABLE_NAMES.runStats, col: 'id' },
   { seq: 'changelog_entries_id_seq', table: TABLE_NAMES.changelogEntries, col: 'id' },
 ];
@@ -218,6 +219,7 @@ async function load(): Promise<void> {
   await refreshLatestBenchmarks(sql, false);
 
   console.log('\n=== db:load-dump complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 load()
