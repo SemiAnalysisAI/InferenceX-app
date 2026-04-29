@@ -19,6 +19,11 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
 
   const openDrawer = (row: EvaluationChartData) => {
     setDrawerRow(row);
+    // Notify the first-visit nudge to dismiss itself once the user has
+    // discovered the affordance on their own.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
+    }
     track('evaluation_samples_open', {
       eval_result_id: row.evalResultId,
       task: row.benchmark,
@@ -35,14 +40,15 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
             <button
               type="button"
               onClick={() => openDrawer(row)}
-              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={`View prompts for ${row.configLabel}`}
+              className="inline-flex items-center gap-1 rounded-md border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-medium text-brand hover:border-brand/50 hover:bg-brand/20 transition-colors whitespace-nowrap"
+              aria-label={`View per-sample prompts and responses for ${row.configLabel}`}
               title="View per-sample prompts and responses"
             >
               <MessageSquareText className="size-3.5" />
+              <span className="hidden sm:inline">Prompts</span>
             </button>
           ) : null,
-        className: 'w-8',
+        className: 'whitespace-nowrap',
       },
       {
         header: 'GPU',

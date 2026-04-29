@@ -121,7 +121,11 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
         <div className="flex items-start gap-3 border-b border-border px-4 py-3 pr-10">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-sm font-semibold">
-              {row ? <span className="font-mono whitespace-pre-wrap">{row.configLabel}</span> : ''}
+              {row ? (
+                <span className="font-mono">{row.configLabel.replaceAll('\n', ' ')}</span>
+              ) : (
+                ''
+              )}
             </DialogTitle>
             {row && (
               <div className="mt-1 text-xs text-muted-foreground">
