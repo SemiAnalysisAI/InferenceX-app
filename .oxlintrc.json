@@ -26,6 +26,7 @@
     "no-nested-ternary": "off",
     "no-ternary": "off",
     "no-undef": "off",
+    "no-underscore-dangle": "off",
     "no-useless-undefined": "off",
     "no-warning-comments": "off",
     "prefer-destructuring": "off",
