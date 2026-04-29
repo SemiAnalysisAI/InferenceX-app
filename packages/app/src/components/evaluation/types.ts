@@ -4,6 +4,13 @@ import type { Model } from '@/lib/data-mappings';
  * Represents a single eval data point for the chart
  */
 export interface EvaluationChartData {
+  /**
+   * `eval_results.id` of the row that produced this data point. When rows are
+   * aggregated across retries (`aggregateEvaluationChartRows`), this is the id
+   * of the latest run in the group — the one most likely to have eval_samples
+   * persisted for the drawer.
+   */
+  evalResultId: number;
   configId: number;
   hwKey: string;
   configLabel: string; // Display label like "H100 (vLLM)" or "B200 (TRT)"

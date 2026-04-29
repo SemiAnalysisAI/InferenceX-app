@@ -1,9 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { MessageSquareText } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
+import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { track } from '@/lib/analytics';
 
 interface EvaluationTableProps {
   data: EvaluationChartData[];
@@ -12,9 +15,35 @@ interface EvaluationTableProps {
 export default function EvaluationTable({ data }: EvaluationTableProps) {
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
+  const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
+
+  const openDrawer = (row: EvaluationChartData) => {
+    setDrawerRow(row);
+    track('evaluation_samples_open', {
+      eval_result_id: row.evalResultId,
+      task: row.benchmark,
+      hw_key: row.hwKey,
+    });
+  };
 
   const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(
     () => [
+      {
+        header: '',
+        cell: (row) =>
+          row.evalResultId > 0 ? (
+            <button
+              type="button"
+              onClick={() => openDrawer(row)}
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={`View prompts for ${row.configLabel}`}
+              title="View per-sample prompts and responses"
+            >
+              <MessageSquareText className="size-3.5" />
+            </button>
+          ) : null,
+        className: 'w-8',
+      },
       {
         header: 'GPU',
         cell: (row) => row.configLabel,
@@ -101,6 +130,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         testId="evaluation-results-table"
         analyticsPrefix="evaluation_table"
       />
+      <EvalSamplesDrawer row={drawerRow} onClose={() => setDrawerRow(null)} />
     </>
   );
 }

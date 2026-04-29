@@ -132,6 +132,7 @@ export function buildEvaluationChartRows(
       const hwLabel = hwConfig.label;
 
       return {
+        evalResultId: item.id,
         configId: item.config_id,
         hwKey,
         configLabel: buildConfigLabel(
@@ -237,8 +238,17 @@ export function aggregateEvaluationChartRows(
       }
 
       const meanScore = sum / dataPoints.length;
+      // Pick the highest evalResultId in the group — eval_results uses a
+      // bigserial PK so the highest id is the most recently inserted run,
+      // which is the one most likely to have eval_samples persisted for the
+      // drawer. Falls back to dataPoints[0] when ids aren't set.
+      const latest = dataPoints.reduce(
+        (best, d) => (d.evalResultId > best.evalResultId ? d : best),
+        dataPoints[0],
+      );
       return {
         ...dataPoints[0],
+        evalResultId: latest.evalResultId,
         score: meanScore,
         scoreError: (errMax - errMin) / 2,
         minScore: rawMin,

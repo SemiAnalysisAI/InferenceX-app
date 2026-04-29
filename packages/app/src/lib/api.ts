@@ -77,6 +77,7 @@ export interface ReliabilityRow {
 }
 
 export interface EvalRow {
+  id: number;
   config_id: number;
   hardware: string;
   framework: string;
@@ -160,6 +161,42 @@ export function fetchReliability(signal?: AbortSignal) {
 
 export function fetchEvaluations(signal?: AbortSignal) {
   return fetchJson<EvalRow[]>('/api/v1/evaluations', signal);
+}
+
+export interface EvalSampleRow {
+  docId: number;
+  prompt: string | null;
+  target: string | null;
+  response: string | null;
+  passed: boolean | null;
+  score: number | null;
+  metrics: Record<string, number>;
+}
+
+export interface EvalSamplesResponse {
+  samples: EvalSampleRow[];
+  total: number;
+  passedTotal: number;
+  failedTotal: number;
+  source: 'db' | 'github_artifact';
+}
+
+export type EvalSamplesFilter = 'all' | 'passed' | 'failed';
+
+export function fetchEvalSamples(
+  evalResultId: number,
+  filter: EvalSamplesFilter,
+  offset: number,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    eval_result_id: String(evalResultId),
+    filter,
+    offset: String(offset),
+    limit: String(limit),
+  });
+  return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples?${params}`, signal);
 }
 
 export function fetchSubmissions(signal?: AbortSignal) {

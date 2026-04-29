@@ -123,7 +123,7 @@ async function ingestSupplementalEvals(
         numDecodeGpu: entry.tp * entry.ep,
       });
 
-      const outcome = await ingestEvalRow(
+      const { outcome } = await ingestEvalRow(
         sql,
         () => Promise.resolve(configId),
         {

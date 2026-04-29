@@ -1,6 +1,7 @@
 import type { DbClient } from '../connection.js';
 
 export interface EvalRow {
+  id: number;
   config_id: number;
   hardware: string;
   framework: string;
@@ -31,6 +32,7 @@ export interface EvalRow {
 export async function getAllEvalResults(sql: DbClient): Promise<EvalRow[]> {
   const rows = await sql`
     SELECT
+      er.id,
       er.config_id,
       c.hardware,
       c.framework,
