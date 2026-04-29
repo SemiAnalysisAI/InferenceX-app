@@ -1,10 +1,10 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
-import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics';
 import type { EvalSamplesFilter } from '@/lib/api';
@@ -103,8 +103,9 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
         className="left-auto right-0 top-0 translate-x-0 translate-y-0 h-screen max-w-2xl w-full sm:w-[720px] max-h-screen rounded-none border-l p-0 grid-rows-[auto_auto_1fr_auto] gap-0 data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right"
         aria-describedby={undefined}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+        {/* Header — `DialogContent` renders its own absolute-positioned close
+            button in the top-right, so we leave room with `pr-10`. */}
+        <div className="flex items-start gap-3 border-b border-border px-4 py-3 pr-10">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-sm font-semibold">
               {row ? <span className="font-mono whitespace-pre-wrap">{row.configLabel}</span> : ''}
@@ -119,9 +120,6 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
               </div>
             )}
           </div>
-          <DialogClose className="rounded-sm p-1 hover:bg-muted" aria-label="Close drawer">
-            <X className="size-4" />
-          </DialogClose>
         </div>
 
         {/* Filter chips + search */}
