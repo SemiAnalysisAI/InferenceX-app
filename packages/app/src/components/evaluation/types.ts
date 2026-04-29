@@ -13,6 +13,8 @@ export interface EvaluationChartData {
   evalResultId: number;
   configId: number;
   hwKey: string;
+  /** Bare hardware key (e.g. `b300`, `mi355x`) before composition with framework/spec into `hwKey`. Needed by the live-fetch path to match GHA artifact names. */
+  hardware: string;
   configLabel: string; // Display label like "H100 (vLLM)" or "B200 (TRT)"
   score: number; // eval benchmark score (midpoint when aggregated)
   scoreError?: number; // standard error of the score (or half range when aggregated)

@@ -135,6 +135,7 @@ export function buildEvaluationChartRows(
         evalResultId: item.id,
         configId: item.config_id,
         hwKey,
+        hardware: item.hardware,
         configLabel: buildConfigLabel(
           hwLabel,
           item.framework,

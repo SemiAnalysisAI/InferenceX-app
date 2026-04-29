@@ -35,8 +35,11 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     () => [
       {
         header: '',
-        cell: (row) =>
-          row.evalResultId > 0 ? (
+        cell: (row) => {
+          // Official rows have a real eval_results.id; unofficial rows ship -1 but can
+          // still be served live as long as we have a workflow URL to fetch the artifact from.
+          const canOpen = row.evalResultId > 0 || (row.evalResultId <= 0 && Boolean(row.runUrl));
+          return canOpen ? (
             <button
               type="button"
               onClick={() => openDrawer(row)}
@@ -47,7 +50,8 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
               <MessageSquareText className="size-3.5" />
               <span className="hidden sm:inline">Prompts</span>
             </button>
-          ) : null,
+          ) : null;
+        },
         className: 'whitespace-nowrap',
       },
       {

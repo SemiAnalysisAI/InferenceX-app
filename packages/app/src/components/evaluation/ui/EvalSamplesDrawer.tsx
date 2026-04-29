@@ -7,7 +7,7 @@ import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics';
-import type { EvalSamplesFilter } from '@/lib/api';
+import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
 
 const PAGE_SIZE = 50;
 
@@ -42,8 +42,28 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
     setExpanded(new Set());
   }, [row?.evalResultId, open]);
 
+  // Build a live-fetch context for unofficial runs from the row's identifying
+  // fields. The hook ignores this when `evalResultId > 0` (DB-backed path).
+  const liveContext = useMemo<EvalSamplesLiveContext | null>(() => {
+    if (!row || row.evalResultId > 0) return null;
+    const runId = extractRunIdFromUrl(row.runUrl);
+    if (!runId) return null;
+    return {
+      runId,
+      task: row.benchmark,
+      model: row.model,
+      framework: row.framework,
+      hardware: row.hardware,
+      precision: row.precision,
+      specMethod: row.specDecode,
+      disagg: row.disagg,
+      conc: row.conc,
+    };
+  }, [row]);
+
   const { data, isLoading, isError, error } = useEvalSamples({
     evalResultId: row?.evalResultId ?? null,
+    liveContext,
     filter,
     offset: page * PAGE_SIZE,
     limit: PAGE_SIZE,
@@ -91,6 +111,9 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
   };
 
   const isUnofficial = row !== null && row.evalResultId <= 0;
+  // Unofficial runs are renderable as long as we resolved a runId from the row's url.
+  // If we couldn't (no run_url, malformed url, etc.), fall back to the empty-state copy below.
+  const liveUnavailable = isUnofficial && liveContext === null;
 
   return (
     <Dialog
@@ -176,31 +199,41 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
 
         {/* Body */}
         <div className="overflow-auto px-4 py-3">
-          {isUnofficial && (
+          {liveUnavailable && (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-              This is an unofficial run — per-sample prompts/responses are not available yet for
-              un-ingested runs. Coming soon.
+              Per-sample data isn&apos;t available for this unofficial run — the workflow URL is
+              missing or malformed.
             </p>
           )}
-          {!isUnofficial && isLoading && (
+          {!liveUnavailable && isUnofficial && (
+            <p className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-[11px] text-primary">
+              Unofficial run — samples are streamed live from the workflow artifact. Loads may take
+              a few seconds.
+            </p>
+          )}
+          {!liveUnavailable && isLoading && (
             <p className="py-8 text-center text-sm text-muted-foreground">Loading samples…</p>
           )}
-          {!isUnofficial && isError && (
+          {!liveUnavailable && isError && (
             <p className="py-8 text-center text-sm text-destructive">
               Failed to load samples: {String(error)}
             </p>
           )}
-          {!isUnofficial && !isLoading && !isError && total === 0 && (
+          {!liveUnavailable && !isLoading && !isError && total === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No per-sample data available for this run yet. (Older runs may not have been
               re-ingested with samples enabled.)
             </p>
           )}
-          {!isUnofficial && !isLoading && !isError && filteredSamples.length === 0 && total > 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No samples on this page match &ldquo;{search}&rdquo;.
-            </p>
-          )}
+          {!liveUnavailable &&
+            !isLoading &&
+            !isError &&
+            filteredSamples.length === 0 &&
+            total > 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No samples on this page match &ldquo;{search}&rdquo;.
+              </p>
+            )}
           <ul className="space-y-2">
             {filteredSamples.map((s) => (
               <li
@@ -295,6 +328,18 @@ interface FilterChipProps {
   active: boolean;
   onClick: () => void;
   tone?: 'passed' | 'failed';
+}
+
+/**
+ * Pull the numeric run id out of a GitHub Actions URL.
+ * Accepts both `https://github.com/owner/repo/actions/runs/12345` and
+ * trailing-slash / fragment variants. Returns null on any malformed input —
+ * the caller falls back to a "live unavailable" empty state when null.
+ */
+function extractRunIdFromUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/\/actions\/runs\/(\d+)/);
+  return m ? m[1] : null;
 }
 
 function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {

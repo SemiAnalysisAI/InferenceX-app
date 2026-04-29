@@ -213,6 +213,47 @@ export function fetchEvalSamples(
   return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples?${params}`, signal);
 }
 
+/** Identifying fields used by the live route to locate the right eval artifact. */
+export interface EvalSamplesLiveContext {
+  runId: string;
+  task: string;
+  model: string;
+  framework: string;
+  hardware: string;
+  precision: string;
+  specMethod: string;
+  disagg: boolean;
+  conc: number | null;
+}
+
+/**
+ * Live-fetch variant for unofficial runs — same response shape as `fetchEvalSamples`,
+ * but the server reads samples from the workflow's GHA artifact rather than the DB.
+ */
+export function fetchEvalSamplesLive(
+  ctx: EvalSamplesLiveContext,
+  filter: EvalSamplesFilter,
+  offset: number,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    run_id: ctx.runId,
+    task: ctx.task,
+    model: ctx.model,
+    framework: ctx.framework,
+    hardware: ctx.hardware,
+    precision: ctx.precision,
+    spec_method: ctx.specMethod,
+    disagg: String(ctx.disagg),
+    filter,
+    offset: String(offset),
+    limit: String(limit),
+  });
+  if (ctx.conc !== null) params.set('conc', String(ctx.conc));
+  return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples-live?${params}`, signal);
+}
+
 export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }

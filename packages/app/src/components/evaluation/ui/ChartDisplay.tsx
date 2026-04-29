@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
@@ -49,9 +49,17 @@ export default function EvaluationChartDisplay() {
     selectedBenchmark,
     setIsLegendExpanded,
     chartData,
+    unofficialChartData,
     selectedPrecisions,
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
+  // In unofficial-run mode the bar chart already shows both, but the table only
+  // takes one input. Merge the unofficial rows in so users can drill into samples
+  // for unofficial configs via the live-fetch path.
+  const tableData = useMemo(
+    () => (isUnofficialRun ? [...chartData, ...unofficialChartData] : chartData),
+    [isUnofficialRun, chartData, unofficialChartData],
+  );
 
   const [viewMode, setViewMode] = useState<EvalViewMode>('table');
   const handleViewModeChange = (value: EvalViewMode) => {
@@ -142,7 +150,7 @@ export default function EvaluationChartDisplay() {
         {viewMode === 'table' ? (
           <>
             {caption}
-            <EvaluationTable data={chartData} />
+            <EvaluationTable data={tableData} />
           </>
         ) : (
           <EvalBarChartD3 caption={caption} />
