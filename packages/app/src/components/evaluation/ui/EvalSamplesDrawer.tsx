@@ -100,7 +100,20 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
       }}
     >
       <DialogContent
-        className="left-auto right-0 top-0 translate-x-0 translate-y-0 h-screen max-w-2xl w-full sm:w-[720px] max-h-screen rounded-none border-l p-0 grid-rows-[auto_auto_1fr_auto] gap-0 data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right"
+        className="
+          inset-x-0 bottom-0 top-auto left-auto translate-x-0 translate-y-0
+          w-auto max-w-none h-auto max-h-[85vh]
+          rounded-none rounded-t-lg border-t border-l-0 p-0
+          grid-rows-[auto_auto_1fr_auto] gap-0
+          data-[state=open]:zoom-in-100! data-[state=closed]:zoom-out-100!
+          data-[state=open]:slide-in-from-left-0! data-[state=open]:slide-in-from-bottom!
+          data-[state=closed]:slide-out-to-left-0! data-[state=closed]:slide-out-to-bottom!
+          sm:inset-x-auto sm:right-0 sm:top-0 sm:bottom-auto sm:left-auto
+          sm:w-[90vw] sm:max-w-none sm:h-screen sm:max-h-screen
+          sm:rounded-none sm:border-l sm:border-t-0
+          sm:data-[state=open]:slide-in-from-bottom-0! sm:data-[state=open]:slide-in-from-right!
+          sm:data-[state=closed]:slide-out-to-bottom-0! sm:data-[state=closed]:slide-out-to-right!
+        "
         aria-describedby={undefined}
       >
         {/* Header — `DialogContent` renders its own absolute-positioned close
