@@ -37,17 +37,20 @@ const URL_STATE_KEYS = [
   'i_advlabel',
   'i_gradlabel',
   'i_linelabel',
+  'i_active',
   // Evaluation
   'e_rundate',
   'e_bench',
   'e_hc',
   'e_labels',
   'e_legend',
+  'e_active',
   // Reliability
   'r_range',
   'r_pct',
   'r_hc',
   'r_legend',
+  'r_active',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -76,15 +79,18 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_advlabel: '',
   i_gradlabel: '',
   i_linelabel: '',
+  i_active: '',
   e_rundate: '',
   e_bench: '',
   e_hc: '',
   e_labels: '',
   e_legend: '',
+  e_active: '',
   r_range: 'last-3-months',
   r_pct: '',
   r_hc: '',
   r_legend: '',
+  r_active: '',
 };
 
 /** Which param prefixes are relevant per tab. */

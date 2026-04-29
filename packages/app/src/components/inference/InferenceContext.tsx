@@ -149,6 +149,15 @@ export function InferenceProvider({
   // Cleared when the user manually changes filters (clearing the preset).
   const presetHwFilterRef = useRef<string[] | null>(null);
 
+  // Pending legend-active selection restored from `i_active` URL param.
+  // Consumed once when hwTypesWithData first populates (see effect below).
+  const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
+    const v = getUrlParam('i_active');
+    if (!v) return null;
+    const set = new Set(v.split(',').filter(Boolean));
+    return set.size > 0 ? set : null;
+  });
+
   // --- MTP cross-engine conflict toast state ---
   const [mtpConflict, setMtpConflict] = useState<MtpEngineConflictDetail | null>(null);
   const dismissMtpConflict = useCallback(() => setMtpConflict(null), []);
@@ -514,8 +523,45 @@ export function InferenceProvider({
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
   const lastHwResetKeyRef = useRef('');
+
+  // Restore legend-active selection from URL on first availability of
+  // hwTypesWithData. Sets lastHwResetKeyRef so the reset effect below treats
+  // the current key as already-applied and bails. Empty intersection (e.g.
+  // shared GPUs no longer in availability) falls back to "all available".
+  // Multi-family MTP keys are cleared the same way as the auto-reset path.
+  useEffect(() => {
+    if (!pendingActiveHwTypes) return;
+    if (pendingHwFilterRef.current) return;
+    if (hwTypesWithData.size === 0) return;
+    let restored = new Set([...pendingActiveHwTypes].filter((k) => hwTypesWithData.has(k)));
+    // Empty intersection (e.g. URL referenced GPUs no longer in availability,
+    // or the URL only contained multi-family MTP keys that get sanitized away)
+    // → fall back to the default "all available" set. MTP sanitization is then
+    // applied below so the fallback itself is engine-exclusion safe.
+    if (restored.size === 0) restored = hwTypesWithData;
+    if (mtpExclusion) {
+      const cleared = clearAllMtpFamilies(restored);
+      restored = cleared.result;
+      if (cleared.droppedFamilies.length > 0) {
+        setMtpConflict({ kind: 'cleared', families: cleared.droppedFamilies });
+      }
+    }
+    setActiveHwTypes(restored);
+    lastHwResetKeyRef.current = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
+    setPendingActiveHwTypes(null);
+  }, [
+    pendingActiveHwTypes,
+    hwTypesWithData,
+    mtpExclusion,
+    selectedModel,
+    effectiveSequence,
+    precisionsKey,
+    setActiveHwTypes,
+  ]);
+
   useEffect(() => {
     if (pendingHwFilterRef.current) return;
+    if (pendingActiveHwTypes) return;
     if (hwTypesWithData.size === 0) return;
     const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
     if (lastHwResetKeyRef.current === key) return;
@@ -547,7 +593,14 @@ export function InferenceProvider({
       return;
     }
     setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData, mtpExclusion]);
+  }, [
+    selectedModel,
+    effectiveSequence,
+    precisionsKey,
+    hwTypesWithData,
+    mtpExclusion,
+    pendingActiveHwTypes,
+  ]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
@@ -655,6 +708,23 @@ export function InferenceProvider({
 
   // ── URL sync ──────────────────────────────────────────────────────────────
 
+  // Serialize the legend-active set, omitting (empty string → URL default) when
+  // it equals the full set of items with data. Keeps share URLs short.
+  const iActiveStr = useMemo(() => {
+    if (activeHwTypes.size === 0) return '';
+    if (activeHwTypes.size === hwTypesWithData.size) {
+      let same = true;
+      for (const k of activeHwTypes) {
+        if (!hwTypesWithData.has(k)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return '';
+    }
+    return [...activeHwTypes].toSorted().join(',');
+  }, [activeHwTypes, hwTypesWithData]);
+
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
@@ -673,6 +743,7 @@ export function InferenceProvider({
       i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: showLineLabels ? '1' : '',
+      i_active: iActiveStr,
     },
     [
       selectedYAxisMetric,
@@ -690,6 +761,7 @@ export function InferenceProvider({
       useAdvancedLabels,
       showGradientLabels,
       showLineLabels,
+      iActiveStr,
     ],
   );
 

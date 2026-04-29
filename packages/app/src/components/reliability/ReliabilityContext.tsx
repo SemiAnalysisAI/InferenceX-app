@@ -91,6 +91,15 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     remove: removeModelRaw,
   } = useChartToggleSet();
 
+  // Pending legend-active selection restored from `r_active` URL param.
+  // Consumed once when modelsWithData first populates.
+  const [pendingActiveModels, setPendingActiveModels] = useState<Set<string> | null>(() => {
+    const v = getUrlParam('r_active');
+    if (!v) return null;
+    const set = new Set(v.split(',').filter(Boolean));
+    return set.size > 0 ? set : null;
+  });
+
   const dateRangeSuccessRateData = useMemo(
     () => (rawRows ? aggregateByDateRange(rawRows) : {}),
     [rawRows],
@@ -144,7 +153,14 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
   const removeModel = useCallback((model: string) => removeModelRaw(model), [removeModelRaw]);
 
   useEffect(() => {
-    if (modelsWithData.size > 0) setEnabledModels(modelsWithData);
+    if (modelsWithData.size === 0) return;
+    if (pendingActiveModels) {
+      const restored = new Set([...pendingActiveModels].filter((k) => modelsWithData.has(k)));
+      setEnabledModels(restored.size > 0 ? restored : modelsWithData);
+      setPendingActiveModels(null);
+      return;
+    }
+    setEnabledModels(modelsWithData);
   }, [dateRange, modelsWithData]);
 
   const selectAllModels = useCallback(
@@ -152,14 +168,31 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     [selectAllModelsRaw, modelsWithData],
   );
 
+  // Serialize the legend-active set, omitting when it equals all modelsWithData.
+  const rActiveStr = useMemo(() => {
+    if (enabledModels.size === 0) return '';
+    if (enabledModels.size === modelsWithData.size) {
+      let same = true;
+      for (const k of enabledModels) {
+        if (!modelsWithData.has(k)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return '';
+    }
+    return [...enabledModels].toSorted().join(',');
+  }, [enabledModels, modelsWithData]);
+
   useUrlStateSync(
     {
       r_range: dateRange,
       r_pct: showPercentagesOnBars ? '1' : '',
       r_hc: highContrast ? '1' : '',
       r_legend: isLegendExpanded ? '' : '0',
+      r_active: rActiveStr,
     },
-    [dateRange, showPercentagesOnBars, highContrast, isLegendExpanded],
+    [dateRange, showPercentagesOnBars, highContrast, isLegendExpanded, rActiveStr],
   );
 
   const value = useMemo(

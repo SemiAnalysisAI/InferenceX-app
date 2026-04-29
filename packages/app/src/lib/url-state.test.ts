@@ -56,6 +56,13 @@ describe('PARAM_DEFAULTS', () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
+
+  it('has empty string defaults for legend-active params', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_active).toBe('');
+    expect(PARAM_DEFAULTS.e_active).toBe('');
+    expect(PARAM_DEFAULTS.r_active).toBe('');
+  });
 });
 
 describe('readUrlParams', () => {
@@ -288,6 +295,45 @@ describe('buildShareUrl tab filtering', () => {
 
     const url = buildShareUrl();
     expect(url).not.toContain('?');
+  });
+
+  it('includes i_active on /inference but not e_active or r_active', async () => {
+    setupWindow('', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ i_active: 'h100,b200', e_active: 'h100', r_active: 'dsr1' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    const url = buildShareUrl();
+    expect(url).toMatch(/i_active=h100(?:,|%2C)b200/);
+    expect(url).not.toContain('e_active');
+    expect(url).not.toContain('r_active');
+  });
+
+  it('includes e_active on /evaluation but not i_active or r_active', async () => {
+    setupWindow('', '/evaluation');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ i_active: 'x', e_active: 'h100,b200', r_active: 'y' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    const url = buildShareUrl();
+    expect(url).toMatch(/e_active=h100(?:,|%2C)b200/);
+    expect(url).not.toContain('i_active');
+    expect(url).not.toContain('r_active');
+  });
+
+  it('includes r_active on /reliability but not i_active or e_active', async () => {
+    setupWindow('', '/reliability');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ i_active: 'x', e_active: 'y', r_active: 'dsr1,llama70b' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    const url = buildShareUrl();
+    expect(url).toMatch(/r_active=dsr1(?:,|%2C)llama70b/);
+    expect(url).not.toContain('i_active');
+    expect(url).not.toContain('e_active');
   });
 });
 
