@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -210,7 +210,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                 <button
                   type="button"
                   onClick={() => handleToggleExpand(s.docId)}
-                  className="flex w-full items-start gap-2 px-3 py-2 text-left"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left"
                   aria-expanded={expanded.has(s.docId)}
                 >
                   <PassFailBadge passed={s.passed} />
@@ -326,14 +326,14 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
 function PassFailBadge({ passed }: { passed: boolean | null }) {
   if (passed === null) {
     return (
-      <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
         ?
       </span>
     );
   }
   return (
     <span
-      className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
+      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
         passed
           ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
           : 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400'
@@ -367,7 +367,7 @@ function FewShotBlock({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80"
+        className="flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80"
         aria-expanded={open}
       >
         <ChevronRight
@@ -377,21 +377,25 @@ function FewShotBlock({
         Few-shot examples ({demos.length})
       </button>
       {open && (
-        <div className="space-y-2">
+        <div className="mt-2 space-y-2">
           {demos.map((d, i) => (
             <div
               // eslint-disable-next-line react/no-array-index-key -- demo order is the only stable identifier
               key={i}
-              className="rounded border border-border/40 bg-muted/30 p-2 font-mono text-[11px] leading-snug"
+              className="rounded border border-border/40 bg-muted/30 p-2"
             >
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Example {i + 1} · Question
               </div>
-              <pre className="mb-2 whitespace-pre-wrap break-words">{d.question}</pre>
+              <pre className="mb-2 whitespace-pre-wrap font-mono text-[11px] leading-snug wrap-break-word">
+                {d.question}
+              </pre>
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Example {i + 1} · Answer
               </div>
-              <pre className="whitespace-pre-wrap break-words">{d.answer}</pre>
+              <pre className="whitespace-pre-wrap font-mono text-[11px] leading-snug wrap-break-word">
+                {d.answer}
+              </pre>
             </div>
           ))}
         </div>
@@ -401,18 +405,12 @@ function FewShotBlock({
 }
 
 function Block({ label, value }: { label: string; value: string | null }) {
-  // Use a regular ref-less ref for max-h scroll; pre wrapping preserves
-  // formatting from the raw lm-eval prompt while still wrapping long lines.
-  const ref = useRef<HTMLPreElement>(null);
   return (
     <div>
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <pre
-        ref={ref}
-        className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded border border-border/40 bg-muted/30 p-2 font-mono text-[11px] leading-snug"
-      >
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded border border-border/40 bg-muted/30 p-2 font-mono text-[11px] leading-snug wrap-break-word">
         {value ?? <span className="italic text-muted-foreground">(empty)</span>}
       </pre>
     </div>
