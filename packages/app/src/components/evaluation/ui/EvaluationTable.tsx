@@ -5,14 +5,17 @@ import { useMemo, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics';
+import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
 
 interface EvaluationTableProps {
   data: EvaluationChartData[];
 }
 
 export default function EvaluationTable({ data }: EvaluationTableProps) {
+  const { runIndexByUrl } = useUnofficialRun();
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
@@ -56,7 +59,31 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       },
       {
         header: 'GPU',
-        cell: (row) => row.configLabel,
+        cell: (row) => {
+          const isUnofficial = row.evalResultId <= 0;
+          // Inset a per-run colored dot — same palette the unofficial banner and
+          // overlay chart points use, so a row, its banner chip, and its bar in
+          // the bar chart all share the same color.
+          const runIdx = isUnofficial ? overlayRunIndex(row.runUrl, runIndexByUrl) : 0;
+          return (
+            <span className="inline-flex items-center gap-1.5">
+              {row.configLabel}
+              {isUnofficial && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-sm border border-red-600/50 bg-red-600/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-red-700 dark:text-red-400"
+                  title="Data from an unofficial / un-ingested workflow run"
+                >
+                  <span
+                    aria-hidden
+                    className="inline-block size-1.5 rounded-full"
+                    style={{ backgroundColor: overlayRunColor(runIdx) }}
+                  />
+                  Unofficial
+                </span>
+              )}
+            </span>
+          );
+        },
         sortValue: (row) => row.configLabel,
         className: 'font-medium whitespace-nowrap',
       },
@@ -114,7 +141,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         className: 'whitespace-nowrap',
       },
     ],
-    [],
+    [runIndexByUrl],
   );
 
   return (
