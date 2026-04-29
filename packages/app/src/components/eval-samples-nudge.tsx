@@ -68,7 +68,7 @@ export function EvalSamplesNudge() {
       testId="eval-samples-nudge"
       icon={<MessageSquareText className="text-brand" />}
       title="See the model's actual answers"
-      description="Click Prompts on any row to compare each prompt, the expected answer, and what the model actually responded — sample by sample."
+      description="Click Prompts on any row to compare each prompt, the expected answer, and what the model actually responded."
       onDismiss={handleDismiss}
     />
   );
