@@ -13,7 +13,11 @@ import {
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
-import { FAVORITE_PRESETS, type FavoritePreset } from '@/components/favorites/favorite-presets';
+import {
+  FAVORITE_PRESETS,
+  type FavoritePreset,
+  matchesPresetHwFilter,
+} from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import type {
@@ -375,6 +379,11 @@ export function InferenceProvider({
   // pendingHwFilter effect filters it down in the next — causing a flash/race.
   const pendingHwFilterRef = useRef(pendingHwFilter);
   pendingHwFilterRef.current = pendingHwFilter;
+  // Read selectedModel via a ref so the callback identity below stays stable —
+  // matchesPresetHwFilter only consults the model to gate the bare-prefix MTP
+  // skip (mtpEngineExclusion models), and we want the current value at call time.
+  const selectedModelRef = useRef(selectedModel);
+  selectedModelRef.current = selectedModel;
   // Note: setActiveHwTypes is a useState dispatcher that accepts functional updaters,
   // but useChartToggleSet narrows the type to (set: Set<string>) => void.
   // We cast once here to allow passthrough of functional updaters from useChartDataFilter.
@@ -391,9 +400,9 @@ export function InferenceProvider({
       // Preset filter is active: evaluate updater to get all available items, then filter.
       // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
       const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
-      const matchesHwFilter = (hwKey: string) =>
-        filter.some((f) => hwKey === f || (!f.includes('_') && hwKey.startsWith(`${f}_`)));
-      const filtered = new Set([...base].filter(matchesHwFilter));
+      const filtered = new Set(
+        [...base].filter((k) => matchesPresetHwFilter(k, filter, selectedModelRef.current)),
+      );
       if (filtered.size > 0) {
         setActiveHwTypes(filtered);
         setPendingHwFilter(null);
@@ -414,9 +423,9 @@ export function InferenceProvider({
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
     if (!pendingHwFilter || hwTypesWithData.size === 0) return;
-    const matchesHwFilter = (hwKey: string) =>
-      pendingHwFilter.some((f) => hwKey === f || (!f.includes('_') && hwKey.startsWith(`${f}_`)));
-    const filtered = new Set([...hwTypesWithData].filter(matchesHwFilter));
+    const filtered = new Set(
+      [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, pendingHwFilter, selectedModel)),
+    );
     if (filtered.size > 0) {
       setActiveHwTypes(filtered);
       setPendingHwFilter(null);
