@@ -12,6 +12,15 @@ export interface EvalSampleRow {
    * (e.g. model emits "!!!!!!" or enters a repetition loop).
    */
   raw_response: string | null;
+  /**
+   * lm-eval `arguments` JSONB — the raw prompt payload sent to the model.
+   * Shape varies by task: chat-format tasks emit
+   *   `{ gen_args_0: { arg_0: ['<stringified [{role,content}, …]>'] } }`
+   * while plain-completion tasks emit `[['<full prompt string>']]`.
+   * The API route parses this into structured chat messages for the drawer
+   * to render few-shot demonstrations; raw shape is kept for forward-compat.
+   */
+  arguments_data: unknown;
   passed: boolean | null;
   score: number | null;
   metrics: Record<string, number>;
@@ -53,6 +62,7 @@ export async function getEvalSamples(
   const samples = (await sql`
     select doc_id, prompt, target, response,
            data->'resps'->0->>0 as raw_response,
+           data->'arguments' as arguments_data,
            passed, score, metrics
     from eval_samples
     where eval_result_id = ${evalResultId}

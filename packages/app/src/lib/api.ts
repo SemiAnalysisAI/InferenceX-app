@@ -175,6 +175,13 @@ export interface EvalSampleRow {
    * the real signal lives — the filter may strip it down to nothing.
    */
   rawResponse: string | null;
+  /**
+   * Few-shot demonstrations parsed server-side from lm-eval `arguments.gen_args_0.arg_0`.
+   * Handles both the multi-turn chat-array shape and the pre-concatenated
+   * single-message shape. `null` when the task isn't 5-shot or the prompt format
+   * doesn't match either known shape — the bare `prompt` field is sufficient there.
+   */
+  demonstrations: { question: string; answer: string }[] | null;
   passed: boolean | null;
   score: number | null;
   metrics: Record<string, number>;

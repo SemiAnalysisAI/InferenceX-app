@@ -223,6 +223,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                 </button>
                 {expanded.has(s.docId) && (
                   <div className="space-y-2 border-t border-border/50 px-3 py-3 text-xs">
+                    <FewShotBlock demonstrations={s.demonstrations} />
                     <Block label="Prompt" value={s.prompt} />
                     {s.rawResponse !== null && s.rawResponse !== s.response ? (
                       <>
@@ -340,6 +341,62 @@ function PassFailBadge({ passed }: { passed: boolean | null }) {
     >
       {passed ? '✓' : '✗'}
     </span>
+  );
+}
+
+/**
+ * Render the few-shot demonstration prefix.
+ *
+ * Demonstrations are parsed server-side from lm-eval's `arguments` JSONB; the
+ * route handles both multi-turn chat-array shape and the pre-concatenated
+ * single-message shape. Returns null when there are no demonstrations.
+ *
+ * Default-expanded so the demos are visible immediately — they're the whole
+ * point of clicking a sample on a 5-shot eval.
+ */
+function FewShotBlock({
+  demonstrations,
+}: {
+  demonstrations: { question: string; answer: string }[] | null;
+}) {
+  const [open, setOpen] = useState(true);
+  if (!demonstrations || demonstrations.length === 0) return null;
+  const demos = demonstrations;
+  return (
+    <div className="rounded-md border border-primary/40 bg-primary/5 p-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80"
+        aria-expanded={open}
+      >
+        <ChevronRight
+          className={`size-3.5 transition-transform ${open ? 'rotate-90' : ''}`}
+          aria-hidden="true"
+        />
+        Few-shot examples ({demos.length})
+      </button>
+      {open && (
+        <div className="space-y-2">
+          {demos.map((d, i) => (
+            <div
+              // eslint-disable-next-line react/no-array-index-key -- demo order is the only stable identifier
+              key={i}
+              className="rounded border border-border/40 bg-muted/30 p-2 font-mono text-[11px] leading-snug"
+            >
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Example {i + 1} · Question
+              </div>
+              <pre className="mb-2 whitespace-pre-wrap break-words">{d.question}</pre>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Example {i + 1} · Answer
+              </div>
+              <pre className="whitespace-pre-wrap break-words">{d.answer}</pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
