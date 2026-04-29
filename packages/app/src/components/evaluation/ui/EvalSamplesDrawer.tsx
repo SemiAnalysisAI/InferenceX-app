@@ -207,8 +207,18 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                 {expanded.has(s.docId) && (
                   <div className="space-y-2 border-t border-border/50 px-3 py-3 text-xs">
                     <Block label="Prompt" value={s.prompt} />
-                    <Block label="Target" value={s.target} />
-                    <Block label="Model response" value={s.response} />
+                    {s.rawResponse !== null && s.rawResponse !== s.response ? (
+                      <>
+                        <Block label="Full model output" value={s.rawResponse} />
+                        <Block label="Target" value={s.target} />
+                        <Block label="Extracted answer" value={s.response} />
+                      </>
+                    ) : (
+                      <>
+                        <Block label="Target" value={s.target} />
+                        <Block label="Model response" value={s.response} />
+                      </>
+                    )}
                     {Object.keys(s.metrics).length > 0 && (
                       <Block
                         label="Metrics"

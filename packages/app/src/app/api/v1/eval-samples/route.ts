@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         prompt: s.prompt,
         target: s.target,
         response: s.response,
+        rawResponse: s.raw_response,
         passed: s.passed,
         score: s.score === null ? null : Number(s.score),
         metrics: s.metrics ?? {},

@@ -4,7 +4,14 @@ export interface EvalSampleRow {
   doc_id: number;
   prompt: string | null;
   target: string | null;
+  /** lm-eval `filtered_resps[0]` — the post-filter answer that was scored. */
   response: string | null;
+  /**
+   * lm-eval `resps[0][0]` — the full unfiltered model output.
+   * Useful for failed samples where the filter strips/empties everything
+   * (e.g. model emits "!!!!!!" or enters a repetition loop).
+   */
+  raw_response: string | null;
   passed: boolean | null;
   score: number | null;
   metrics: Record<string, number>;
@@ -44,7 +51,9 @@ export async function getEvalSamples(
         : sql``;
 
   const samples = (await sql`
-    select doc_id, prompt, target, response, passed, score, metrics
+    select doc_id, prompt, target, response,
+           data->'resps'->0->>0 as raw_response,
+           passed, score, metrics
     from eval_samples
     where eval_result_id = ${evalResultId}
       ${passedFilter}

@@ -167,7 +167,14 @@ export interface EvalSampleRow {
   docId: number;
   prompt: string | null;
   target: string | null;
+  /** Filtered answer that was actually scored against `target`. */
   response: string | null;
+  /**
+   * Full unfiltered model output. Often identical to `response`, but for failed
+   * samples (degenerate output, control bytes, repetition loops) this is where
+   * the real signal lives — the filter may strip it down to nothing.
+   */
+  rawResponse: string | null;
   passed: boolean | null;
   score: number | null;
   metrics: Record<string, number>;
