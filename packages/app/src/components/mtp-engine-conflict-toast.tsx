@@ -42,9 +42,9 @@ function describe(detail: MtpEngineConflictDetail): string {
   }
   const labels = [...detail.families].toSorted().map(familyLabel);
   if (labels.length === 0) {
-    return `MTP configs from different engines use different acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default — enable one from the legend to view it.`;
+    return `MTP configs from different engines use different acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default. Enable one from the legend to view it.`;
   }
-  return `${joinList(labels)} use different MTP acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default — enable one from the legend to view it.`;
+  return `${joinList(labels)} use different MTP acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default. Enable one from the legend to view it.`;
 }
 
 interface Props {

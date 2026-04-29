@@ -522,12 +522,15 @@ export function InferenceProvider({
     lastHwResetKeyRef.current = key;
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
-      const filterSet = new Set(presetFilter);
-      const filtered = new Set([...hwTypesWithData].filter((k) => filterSet.has(k)));
+      const filtered = new Set(
+        [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
+      );
       if (filtered.size > 0) {
         // Presets explicitly chose hw configs — respect their picks. The
-        // user-toggle guard still prevents simultaneously activating two
-        // engine families' MTP via subsequent clicks.
+        // matcher already excludes _mtp under bare prefixes for
+        // mtpEngineExclusion models, so we don't fall through to
+        // clearAllMtpFamilies (which would fire the toast). The legend
+        // toggle guard still blocks adding a second engine family later.
         setActiveHwTypes(filtered);
         return;
       }
