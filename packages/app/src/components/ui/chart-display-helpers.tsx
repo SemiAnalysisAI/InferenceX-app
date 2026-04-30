@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
@@ -93,10 +96,16 @@ function getCostValues(selectedYAxisMetric: string) {
 }
 
 export function ChartShareActions() {
+  const pathname = usePathname();
+  if (pathname.startsWith('/embed/')) return null;
+
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="inline-flex items-center gap-1.5 rounded-lg border bg-background/90 px-2 py-1 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <span className="hidden lg:inline text-[11px] font-medium text-muted-foreground whitespace-nowrap">
+        Share this view
+      </span>
       <ShareButton />
-      <div className="hidden sm:flex items-center gap-1.5">
+      <div className="hidden lg:flex items-center gap-1.5">
         <ShareTwitterButton />
         <ShareLinkedInButton />
       </div>

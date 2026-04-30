@@ -103,16 +103,97 @@ const TAB_PARAM_PREFIXES: Record<string, string[]> = {
 /** In-memory store of current param values (kept in sync via writeUrlParams). */
 const currentState: Record<string, string> = {};
 
+const EMBED_MODEL_ALIASES: Record<string, string> = {
+  dsr1: 'DeepSeek-R1-0528',
+  'deepseek-r1': 'DeepSeek-R1-0528',
+  kimi: 'Kimi-K2.5',
+  kimik25: 'Kimi-K2.5',
+};
+
+const EMBED_GPU_ALIASES: Record<string, string> = {
+  h100: 'h100-sxm',
+  h200: 'h200-sxm',
+  b200: 'b200-sxm',
+  b300: 'b300-sxm',
+  gb200: 'gb200-nvl72',
+  gb300: 'gb300-nvl72',
+  mi300x: 'mi300x',
+  mi325x: 'mi325x',
+  mi355x: 'mi355x',
+};
+
+const EMBED_Y_AXIS_ALIASES: Record<string, string> = {
+  tppergpu: 'y_tpPerGpu',
+  tppermw: 'y_tpPerMw',
+  inputtppergpu: 'y_inputTputPerGpu',
+  outputtppergpu: 'y_outputTputPerGpu',
+  costh: 'y_costh',
+  costn: 'y_costn',
+  costr: 'y_costr',
+};
+
+function normalizeEmbedScatterParams(searchParams: URLSearchParams): UrlStateParams {
+  const normalized: UrlStateParams = {};
+
+  const modelRaw = searchParams.get('model');
+  if (modelRaw) {
+    const modelAlias = EMBED_MODEL_ALIASES[modelRaw.toLowerCase()];
+    normalized.g_model = modelAlias ?? modelRaw;
+  }
+
+  const seqRaw = searchParams.get('seq');
+  const islRaw = searchParams.get('isl');
+  const oslRaw = searchParams.get('osl');
+  if (seqRaw) {
+    normalized.i_seq = seqRaw;
+  } else if (islRaw && oslRaw) {
+    normalized.i_seq = `${islRaw}/${oslRaw}`;
+  }
+
+  const precRaw = searchParams.get('prec') || searchParams.get('precision');
+  if (precRaw) normalized.i_prec = precRaw;
+
+  const gpusRaw = searchParams.get('gpus');
+  if (gpusRaw) {
+    normalized.i_gpus = gpusRaw
+      .split(',')
+      .map((gpu) => {
+        const token = gpu.trim();
+        return EMBED_GPU_ALIASES[token.toLowerCase()] ?? token;
+      })
+      .filter(Boolean)
+      .join(',');
+  }
+
+  const yRaw = searchParams.get('y');
+  if (yRaw) {
+    const yAlias = EMBED_Y_AXIS_ALIASES[yRaw.toLowerCase()];
+    normalized.i_metric = yAlias ?? yRaw;
+  }
+
+  return normalized;
+}
+
 // On module load: snapshot share-link params from the URL.
 // Cleanup is deferred so it runs after Next.js hydration finishes.
 const _initialParams: UrlStateParams = {};
 if (typeof window !== 'undefined') {
   const searchParams = new URLSearchParams(window.location.search);
+  const isEmbedScatterRoute = window.location.pathname === '/embed/scatter';
   for (const key of URL_STATE_KEYS) {
     const value = searchParams.get(key);
     if (value !== null) {
       _initialParams[key] = value;
       currentState[key] = value;
+    }
+  }
+  if (isEmbedScatterRoute) {
+    const embedParams = normalizeEmbedScatterParams(searchParams);
+    for (const [key, value] of Object.entries(embedParams)) {
+      if (!value) continue;
+      const typedKey = key as UrlStateKey;
+      _initialParams[typedKey] = value;
+      currentState[typedKey] = value;
     }
   }
   // Defer cleanup so the Next.js router doesn't overwrite it during hydration

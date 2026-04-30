@@ -4,6 +4,7 @@ import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { DM_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 
@@ -167,6 +168,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const requestHeaders = await headers();
+  const isEmbedRoute = requestHeaders.get('x-inferencex-embed') === '1';
   const starCount = await fetchStarCount();
   return (
     <html lang="en" className={monocraft.variable} suppressHydrationWarning>
@@ -189,9 +192,9 @@ export default async function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <Header starCount={starCount} />
+              {!isEmbedRoute && <Header starCount={starCount} />}
               <div className="grow flex flex-col">{children}</div>
-              <Footer starCount={starCount} />
+              {!isEmbedRoute && <Footer starCount={starCount} />}
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}

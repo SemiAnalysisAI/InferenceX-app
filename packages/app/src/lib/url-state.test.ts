@@ -105,6 +105,27 @@ describe('readUrlParams', () => {
     expect(params.g_model).toBe('test');
     expect(params).not.toHaveProperty('unknown_key');
   });
+
+  it('maps embed scatter URL params to inference state keys', async () => {
+    setupWindow(
+      '?model=dsr1&gpus=h200,b200,mi325x&isl=1024&osl=1024&y=tpPerGpu&precision=fp8',
+      '/embed/scatter',
+    );
+    const { readUrlParams } = await import('@/lib/url-state');
+    const params = readUrlParams();
+    expect(params.g_model).toBe('DeepSeek-R1-0528');
+    expect(params.i_gpus).toBe('h200-sxm,b200-sxm,mi325x');
+    expect(params.i_seq).toBe('1024/1024');
+    expect(params.i_metric).toBe('y_tpPerGpu');
+    expect(params.i_prec).toBe('fp8');
+  });
+
+  it('allows explicit seq on embed URLs over isl/osl', async () => {
+    setupWindow('?seq=8k/1k&isl=512&osl=512', '/embed/scatter');
+    const { readUrlParams } = await import('@/lib/url-state');
+    const params = readUrlParams();
+    expect(params.i_seq).toBe('8k/1k');
+  });
 });
 
 describe('hasAnyUrlParams', () => {
