@@ -32,7 +32,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => (
           >
             Continuous open-source inference benchmarking. Real-world, reproducible, auditable
             performance data trusted by trillion dollar AI infrastructure operators like OpenAI,
-            Oracle, Microsoft, etc.
+            Meta, Oracle, Microsoft, etc.
           </p>
         </div>
 

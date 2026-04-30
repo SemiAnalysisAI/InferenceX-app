@@ -52,6 +52,7 @@ async function reset(): Promise<void> {
   console.log('  All tables dropped.');
 
   console.log('\n=== db:reset complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 reset()

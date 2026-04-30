@@ -325,6 +325,14 @@ export const QUOTES: Quote[] = [
     logo: 'gmi-cloud.svg',
     link: 'https://www.linkedin.com/in/gmi-yeh',
   },
+  {
+    text: 'Now commonly hearing "We want to the Semianalysis for X". Testament to what @dylan522p has built.',
+    name: 'Sriram Krishnan',
+    title: 'White House Senior AI Advisor',
+    org: 'White House',
+    logo: 'white-house.svg',
+    link: 'https://x.com/sriramk/status/2048824255702262135',
+  },
 ];
 
 /** Orgs featured in the landing page carousel. */
@@ -350,6 +358,7 @@ export const CAROUSEL_ORGS = [
   'Lambda',
   'UC San Diego',
   'Red Hat',
+  'White House',
 ] as const;
 
 /** Display label overrides for carousel orgs. */

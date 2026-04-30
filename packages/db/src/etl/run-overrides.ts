@@ -36,5 +36,6 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   24953342301, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
   24954587925, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
   24954912912, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
+  24959542295, // 2026-04-25 | Reason: MTP without chat template leads to supernatural AR
   24960716250, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
 ]);

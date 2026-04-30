@@ -13,7 +13,11 @@ import {
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
-import { FAVORITE_PRESETS, type FavoritePreset } from '@/components/favorites/favorite-presets';
+import {
+  FAVORITE_PRESETS,
+  type FavoritePreset,
+  matchesPresetHwFilter,
+} from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import type {
@@ -39,7 +43,12 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { hasMtpEngineExclusion, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import {
+  MtpEngineConflictToast,
+  type MtpEngineConflictDetail,
+} from '@/components/mtp-engine-conflict-toast';
+import { clearAllMtpFamilies, resolveMtpToggle } from '@/lib/mtp-exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
@@ -139,6 +148,19 @@ export function InferenceProvider({
   // Persists the preset's desired hw filter beyond pendingHwFilter consumption.
   // Cleared when the user manually changes filters (clearing the preset).
   const presetHwFilterRef = useRef<string[] | null>(null);
+
+  // Pending legend-active selection restored from `i_active` URL param.
+  // Consumed once when hwTypesWithData first populates (see effect below).
+  const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
+    const v = getUrlParam('i_active');
+    if (!v) return null;
+    const set = new Set(v.split(',').filter(Boolean));
+    return set.size > 0 ? set : null;
+  });
+
+  // --- MTP cross-engine conflict toast state ---
+  const [mtpConflict, setMtpConflict] = useState<MtpEngineConflictDetail | null>(null);
+  const dismissMtpConflict = useCallback(() => setMtpConflict(null), []);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
@@ -366,6 +388,11 @@ export function InferenceProvider({
   // pendingHwFilter effect filters it down in the next — causing a flash/race.
   const pendingHwFilterRef = useRef(pendingHwFilter);
   pendingHwFilterRef.current = pendingHwFilter;
+  // Read selectedModel via a ref so the callback identity below stays stable —
+  // matchesPresetHwFilter only consults the model to gate the bare-prefix MTP
+  // skip (mtpEngineExclusion models), and we want the current value at call time.
+  const selectedModelRef = useRef(selectedModel);
+  selectedModelRef.current = selectedModel;
   // Note: setActiveHwTypes is a useState dispatcher that accepts functional updaters,
   // but useChartToggleSet narrows the type to (set: Set<string>) => void.
   // We cast once here to allow passthrough of functional updaters from useChartDataFilter.
@@ -382,9 +409,9 @@ export function InferenceProvider({
       // Preset filter is active: evaluate updater to get all available items, then filter.
       // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
       const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
-      const matchesHwFilter = (hwKey: string) =>
-        filter.some((f) => hwKey === f || (!f.includes('_') && hwKey.startsWith(`${f}_`)));
-      const filtered = new Set([...base].filter(matchesHwFilter));
+      const filtered = new Set(
+        [...base].filter((k) => matchesPresetHwFilter(k, filter, selectedModelRef.current)),
+      );
       if (filtered.size > 0) {
         setActiveHwTypes(filtered);
         setPendingHwFilter(null);
@@ -405,22 +432,40 @@ export function InferenceProvider({
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
     if (!pendingHwFilter || hwTypesWithData.size === 0) return;
-    const matchesHwFilter = (hwKey: string) =>
-      pendingHwFilter.some((f) => hwKey === f || (!f.includes('_') && hwKey.startsWith(`${f}_`)));
-    const filtered = new Set([...hwTypesWithData].filter(matchesHwFilter));
+    const filtered = new Set(
+      [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, pendingHwFilter, selectedModel)),
+    );
     if (filtered.size > 0) {
       setActiveHwTypes(filtered);
       setPendingHwFilter(null);
     }
   }, [pendingHwFilter, hwTypesWithData, setActiveHwTypes]);
 
+  const mtpExclusion = hasMtpEngineExclusion(selectedModel);
   const toggleHwType = useCallback(
     (hw: string) => {
+      if (mtpExclusion) {
+        const decision = resolveMtpToggle(activeHwTypes, hw, hwTypesWithData);
+        if (decision.kind === 'block') {
+          setMtpConflict({
+            kind: 'blocked',
+            attempted: decision.attempted,
+            existing: decision.existing,
+          });
+          return;
+        }
+        if (decision.kind === 'silent-disable-all') {
+          setActiveHwTypes(decision.result);
+          setActivePresetId(null);
+          presetHwFilterRef.current = null;
+          return;
+        }
+      }
       toggleHwRaw(hw, hwTypesWithData);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [toggleHwRaw, hwTypesWithData],
+    [toggleHwRaw, hwTypesWithData, mtpExclusion, activeHwTypes, setActiveHwTypes],
   );
 
   const removeHwType = useCallback(
@@ -450,10 +495,17 @@ export function InferenceProvider({
     [toggleDateRaw, allDateIds],
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
-  const selectAllHwTypes = useCallback(
-    () => selectAllHwRaw(hwTypesWithData),
-    [selectAllHwRaw, hwTypesWithData],
-  );
+  const selectAllHwTypes = useCallback(() => {
+    if (mtpExclusion) {
+      const { result, droppedFamilies } = clearAllMtpFamilies(hwTypesWithData);
+      setActiveHwTypes(result);
+      if (droppedFamilies.length > 0) {
+        setMtpConflict({ kind: 'cleared', families: droppedFamilies });
+      }
+      return;
+    }
+    selectAllHwRaw(hwTypesWithData);
+  }, [selectAllHwRaw, hwTypesWithData, mtpExclusion, setActiveHwTypes]);
   const selectAllActiveDates = useCallback(
     () => selectAllDatesRaw(allDateIds),
     [selectAllDatesRaw, allDateIds],
@@ -471,23 +523,84 @@ export function InferenceProvider({
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
   const lastHwResetKeyRef = useRef('');
+
+  // Restore legend-active selection from URL on first availability of
+  // hwTypesWithData. Sets lastHwResetKeyRef so the reset effect below treats
+  // the current key as already-applied and bails. Empty intersection (e.g.
+  // shared GPUs no longer in availability) falls back to "all available".
+  // Multi-family MTP keys are cleared the same way as the auto-reset path.
+  useEffect(() => {
+    if (!pendingActiveHwTypes) return;
+    if (pendingHwFilterRef.current) return;
+    if (hwTypesWithData.size === 0) return;
+    let restored = new Set([...pendingActiveHwTypes].filter((k) => hwTypesWithData.has(k)));
+    // Empty intersection (e.g. URL referenced GPUs no longer in availability,
+    // or the URL only contained multi-family MTP keys that get sanitized away)
+    // → fall back to the default "all available" set. MTP sanitization is then
+    // applied below so the fallback itself is engine-exclusion safe.
+    if (restored.size === 0) restored = hwTypesWithData;
+    if (mtpExclusion) {
+      const cleared = clearAllMtpFamilies(restored);
+      restored = cleared.result;
+      if (cleared.droppedFamilies.length > 0) {
+        setMtpConflict({ kind: 'cleared', families: cleared.droppedFamilies });
+      }
+    }
+    setActiveHwTypes(restored);
+    lastHwResetKeyRef.current = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
+    setPendingActiveHwTypes(null);
+  }, [
+    pendingActiveHwTypes,
+    hwTypesWithData,
+    mtpExclusion,
+    selectedModel,
+    effectiveSequence,
+    precisionsKey,
+    setActiveHwTypes,
+  ]);
+
   useEffect(() => {
     if (pendingHwFilterRef.current) return;
+    if (pendingActiveHwTypes) return;
     if (hwTypesWithData.size === 0) return;
     const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
     if (lastHwResetKeyRef.current === key) return;
     lastHwResetKeyRef.current = key;
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
-      const filterSet = new Set(presetFilter);
-      const filtered = new Set([...hwTypesWithData].filter((k) => filterSet.has(k)));
+      const filtered = new Set(
+        [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
+      );
       if (filtered.size > 0) {
+        // Presets explicitly chose hw configs — respect their picks. The
+        // matcher already excludes _mtp under bare prefixes for
+        // mtpEngineExclusion models, so we don't fall through to
+        // clearAllMtpFamilies (which would fire the toast). The legend
+        // toggle guard still blocks adding a second engine family later.
         setActiveHwTypes(filtered);
         return;
       }
     }
+    if (mtpExclusion) {
+      // When multiple engine families' MTP have data, disable them all by
+      // default and surface a toast. The user has to opt in to one engine's
+      // MTP explicitly — never multiple at once.
+      const { result, droppedFamilies } = clearAllMtpFamilies(hwTypesWithData);
+      setActiveHwTypes(result);
+      if (droppedFamilies.length > 0) {
+        setMtpConflict({ kind: 'cleared', families: droppedFamilies });
+      }
+      return;
+    }
     setActiveHwTypes(hwTypesWithData);
-  }, [selectedModel, effectiveSequence, precisionsKey, hwTypesWithData]);
+  }, [
+    selectedModel,
+    effectiveSequence,
+    precisionsKey,
+    hwTypesWithData,
+    mtpExclusion,
+    pendingActiveHwTypes,
+  ]);
 
   // Remove selected GPUs that no longer have data for current filters
   useEffect(() => {
@@ -595,6 +708,23 @@ export function InferenceProvider({
 
   // ── URL sync ──────────────────────────────────────────────────────────────
 
+  // Serialize the legend-active set, omitting (empty string → URL default) when
+  // it equals the full set of items with data. Keeps share URLs short.
+  const iActiveStr = useMemo(() => {
+    if (activeHwTypes.size === 0) return '';
+    if (activeHwTypes.size === hwTypesWithData.size) {
+      let same = true;
+      for (const k of activeHwTypes) {
+        if (!hwTypesWithData.has(k)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return '';
+    }
+    return [...activeHwTypes].toSorted().join(',');
+  }, [activeHwTypes, hwTypesWithData]);
+
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
@@ -613,6 +743,7 @@ export function InferenceProvider({
       i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: showLineLabels ? '1' : '',
+      i_active: iActiveStr,
     },
     [
       selectedYAxisMetric,
@@ -630,6 +761,7 @@ export function InferenceProvider({
       useAdvancedLabels,
       showGradientLabels,
       showLineLabels,
+      iActiveStr,
     ],
   );
 
@@ -890,6 +1022,7 @@ export function InferenceProvider({
   return (
     <InferenceContext.Provider value={value}>
       {children}
+      <MtpEngineConflictToast detail={mtpConflict} onDismiss={dismissMtpConflict} />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>

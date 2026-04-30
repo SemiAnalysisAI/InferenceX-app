@@ -123,7 +123,7 @@ async function ingestSupplementalEvals(
         numDecodeGpu: entry.tp * entry.ep,
       });
 
-      const outcome = await ingestEvalRow(
+      const { outcome } = await ingestEvalRow(
         sql,
         () => Promise.resolve(configId),
         {
@@ -351,6 +351,7 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== db:ingest:supplemental complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 main()

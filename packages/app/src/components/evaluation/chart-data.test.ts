@@ -11,6 +11,7 @@ import {
 
 function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
   return {
+    id: 1,
     config_id: 1,
     hardware: 'h200',
     framework: 'sglang',

@@ -29,6 +29,29 @@ export function readZipText(zipPath: string, name: string): string | null {
 }
 
 /**
+ * Read all text files in a ZIP whose basenames match `predicate`, keyed by basename.
+ * Returns an empty map on ZIP-level errors. Used to pull all `samples_*.jsonl`
+ * entries from an eval ZIP in a single pass.
+ */
+export function readZipTextsMatching(
+  zipPath: string,
+  predicate: (name: string) => boolean,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  try {
+    const zip = new AdmZip(zipPath);
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) continue;
+      if (!predicate(entry.name)) continue;
+      try {
+        out.set(entry.name, entry.getData().toString('utf8'));
+      } catch {}
+    }
+  } catch {}
+  return out;
+}
+
+/**
  * Read all JSON files from a ZIP keyed by filename (basename only).
  * Returns null on any ZIP-level error; individual file parse errors yield null values.
  */

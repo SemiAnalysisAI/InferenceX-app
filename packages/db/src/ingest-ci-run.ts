@@ -39,8 +39,10 @@ import {
   bulkUpsertAvailability,
   insertServerLog,
 } from './etl/benchmark-ingest';
-import { mapAggEvalRow } from './etl/eval-mapper';
+import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
+import { mapEvalSamples } from './etl/eval-samples-mapper';
+import { bulkIngestEvalSamples } from './etl/eval-samples-ingest';
 import {
   parseChangelogEntries,
   ingestChangelogEntries,
@@ -262,6 +264,8 @@ async function main(): Promise<void> {
   let totalNewStats = 0,
     totalDupStats = 0;
   let totalEvals = 0;
+  let totalSamples = 0;
+  let totalSampleFiles = 0;
   let totalChangelogs = 0;
 
   // ── Check for evals-only flag in changelog ────────────────────────────
@@ -438,6 +442,18 @@ async function main(): Promise<void> {
   }
 
   // ── Ingest eval results ───────────────────────────────────────────────
+  //
+  // Two artifact shapes contribute to `eval_results`:
+  //   1. `eval_results_all/agg_eval_all.json` — flat aggregate rows for every
+  //      config (no per-sample data).
+  //   2. `eval_*` per-config dirs — `meta_env.json` + `results_*.json` +
+  //      `samples_<task>_*.jsonl`. These carry the prompt/response detail
+  //      that drives the eval-samples drawer.
+  //
+  // Both flow into the same `eval_results` rows via the unique key
+  // `(workflow_run_id, config_id, task, isl, osl, conc)`. Whichever runs
+  // first inserts; the second hits the conflict path and just refreshes
+  // `metrics`. Samples then attach to the resolved row id.
 
   console.log('\n--- Eval Results ---');
   const evalDir = path.join(artifactsDir, ARTIFACT_NAMES.evals);
@@ -453,14 +469,97 @@ async function main(): Promise<void> {
       if (!mapped) continue;
 
       try {
-        const outcome = await ingestEvalRow(sql, getOrCreateConfig, mapped, workflowRunId, date);
+        const { outcome } = await ingestEvalRow(
+          sql,
+          getOrCreateConfig,
+          mapped,
+          workflowRunId,
+          date,
+        );
         if (outcome === 'new') totalEvals++;
       } catch (error: any) {
         tracker.recordDbError('eval row', error);
       }
     }
   }
-  console.log(`  Eval results: +${totalEvals} new`);
+  console.log(`  Eval results (agg): +${totalEvals} new`);
+
+  // Per-config eval dirs (`eval_*`) — same on-disk shape as the eval ZIPs
+  // handled by `ingest-gcs-backup.ts`, but already unzipped. Each dir holds
+  // one config's meta_env.json, results JSON, and samples JSONL.
+  const perConfigEvalDirs = fs.existsSync(artifactsDir)
+    ? fs
+        .readdirSync(artifactsDir)
+        .filter(
+          (d) =>
+            d.startsWith('eval_') &&
+            !d.startsWith(ARTIFACT_NAMES.evals) &&
+            fs.statSync(path.join(artifactsDir, d)).isDirectory(),
+        )
+        .map((d) => path.join(artifactsDir, d))
+    : [];
+
+  if (perConfigEvalDirs.length > 0) {
+    console.log(`  Found ${perConfigEvalDirs.length} per-config eval dir(s)`);
+  }
+
+  for (const dir of perConfigEvalDirs) {
+    const files = fs.readdirSync(dir);
+    const metaPath = files.includes('meta_env.json') ? path.join(dir, 'meta_env.json') : null;
+    const resultsName = files.find((f) => f.startsWith('results_') && f.endsWith('.json'));
+    if (!metaPath || !resultsName) {
+      console.warn(`  [WARN] ${path.basename(dir)}: missing meta_env.json or results_*.json`);
+      continue;
+    }
+    const meta = readJson(metaPath) as Record<string, any> | null;
+    const results = readJson(path.join(dir, resultsName)) as Record<string, any> | null;
+    if (!meta || !results) continue;
+
+    const evalParamsList = mapEvalRow(meta, results, tracker);
+    if (evalParamsList.length === 0) continue;
+
+    // Map each task name → samples jsonl text. lm-eval names them
+    // `samples_<task>_<timestamp>.jsonl` (one file per task).
+    const samplesByTask = new Map<string, string>();
+    for (const f of files) {
+      if (!f.startsWith('samples_') || !f.endsWith('.jsonl')) continue;
+      const m = f.match(/^samples_(.+?)_[^_]+\.jsonl$/);
+      const task = m ? m[1].toLowerCase() : null;
+      if (!task) continue;
+      try {
+        samplesByTask.set(task, fs.readFileSync(path.join(dir, f), 'utf8'));
+      } catch (error: any) {
+        console.warn(`  [WARN] failed to read ${f}: ${error.message}`);
+      }
+    }
+
+    for (const params of evalParamsList) {
+      try {
+        const { id: evalResultId } = await ingestEvalRow(
+          sql,
+          getOrCreateConfig,
+          params,
+          workflowRunId,
+          date,
+        );
+
+        const samplesText = samplesByTask.get(params.task);
+        if (!samplesText) continue;
+
+        const samples = mapEvalSamples(samplesText, tracker);
+        if (samples.length === 0) continue;
+
+        const { newCount } = await bulkIngestEvalSamples(sql, evalResultId, samples);
+        totalSamples += newCount;
+        totalSampleFiles++;
+      } catch (error: any) {
+        tracker.recordDbError(`samples for ${path.basename(dir)}`, error);
+      }
+    }
+  }
+  if (perConfigEvalDirs.length > 0) {
+    console.log(`  Eval samples: +${totalSamples} new across ${totalSampleFiles} file(s)`);
+  }
 
   // ── Ingest changelog (already parsed above for evals-only check) ─────
 
@@ -488,6 +587,7 @@ async function main(): Promise<void> {
   const [resultCount] = await sql`select count(*)::int as n from benchmark_results`;
   const [statsCount] = await sql`select count(*)::int as n from run_stats`;
   const [evalCount] = await sql`select count(*)::int as n from eval_results`;
+  const [sampleCount] = await sql`select count(*)::bigint as n from eval_samples`;
   const [changelogCount] = await sql`select count(*)::int as n from changelog_entries`;
 
   console.log('\n=== Summary ===');
@@ -498,12 +598,14 @@ async function main(): Promise<void> {
     `  Run stats:         ${totalNewStats} new, ${totalDupStats} duplicate (ON CONFLICT updates)`,
   );
   console.log(`  Eval results:      ${totalEvals} new`);
+  console.log(`  Eval samples:      ${totalSamples} new across ${totalSampleFiles} file(s)`);
   console.log(`  Changelog entries: ${totalChangelogs} new`);
   console.log(`\n  DB totals:`);
   console.log(`    configs           ${configCount.n}`);
   console.log(`    benchmark_results ${resultCount.n}`);
   console.log(`    run_stats         ${statsCount.n}`);
   console.log(`    eval_results      ${evalCount.n}`);
+  console.log(`    eval_samples      ${sampleCount.n}`);
   console.log(`    changelog_entries ${changelogCount.n}`);
 
   const { skips, unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
@@ -559,6 +661,7 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 main()
