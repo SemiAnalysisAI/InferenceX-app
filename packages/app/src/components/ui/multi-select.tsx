@@ -52,9 +52,15 @@ function MultiSelect({
         setIsOpen(false);
       }
     };
+    const handleFocusOutside = (event: FocusEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('focusin', handleFocusOutside);
       searchRef.current?.focus();
     } else {
       // Track search usage when dropdown closes
@@ -67,6 +73,7 @@ function MultiSelect({
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('focusin', handleFocusOutside);
     };
   }, [isOpen]);
 
