@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { track } from '@/lib/analytics';
 
 import { useInference } from '@/components/inference/InferenceContext';
@@ -14,9 +16,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -78,6 +78,14 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const handleDropdownOpenChange = (dropdownKey: string) => (open: boolean) => {
+    if (open) {
+      setOpenDropdown(dropdownKey);
+      return;
+    }
+    setOpenDropdown((current) => (current === dropdownKey ? null : current));
+  };
   const {
     selectedModel,
     setSelectedModel,
@@ -200,18 +208,24 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           <ModelSelector
             value={selectedModel}
             onChange={handleModelChange}
+            open={openDropdown === 'model'}
+            onOpenChange={handleDropdownOpenChange('model')}
             availableModels={availableModels}
             data-testid="model-selector"
           />
           <SequenceSelector
             value={selectedSequence}
             onChange={handleSequenceChange}
+            open={openDropdown === 'sequence'}
+            onOpenChange={handleDropdownOpenChange('sequence')}
             availableSequences={availableSequences}
             data-testid="sequence-selector"
           />
           <PrecisionSelector
             value={selectedPrecisions}
             onChange={handlePrecisionChange}
+            open={openDropdown === 'precision'}
+            onOpenChange={handleDropdownOpenChange('precision')}
             availablePrecisions={availablePrecisions}
             data-testid="precision-multiselect"
           />
@@ -221,27 +235,28 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               label="Y-Axis Metric"
               tooltip="The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values."
             />
-            <Select onValueChange={handleYAxisMetricChange} value={selectedYAxisMetric}>
-              <SelectTrigger
-                id="y-axis-select"
-                data-testid="yaxis-metric-selector"
-                className="w-full"
-              >
-                <SelectValue placeholder="Y-Axis Metric" />
-              </SelectTrigger>
-              <SelectContent>
-                {groupedYAxisOptions.map((group) => (
-                  <SelectGroup key={group.groupLabel}>
-                    <SelectLabel>{group.groupLabel}</SelectLabel>
-                    {group.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={groupedYAxisOptions.flatMap((group) =>
+                group.options.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                })),
+              )}
+              value={[selectedYAxisMetric]}
+              onChange={(values) => {
+                const next = values[0];
+                if (!next) return;
+                handleYAxisMetricChange(next);
+              }}
+              open={openDropdown === 'yaxis'}
+              onOpenChange={handleDropdownOpenChange('yaxis')}
+              placeholder="Y-Axis Metric"
+              minSelections={1}
+              maxSelections={1}
+              showClearAll={false}
+              searchable={false}
+              plainSelectedText
+            />
           </div>
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
@@ -263,7 +278,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent portalled={false}>
                     <SelectItem value="p99_ttft">P99 TTFT</SelectItem>
                     <SelectItem value="median_ttft">Median TTFT</SelectItem>
                   </SelectContent>
@@ -287,7 +302,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent portalled={false}>
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="linear">Linear</SelectItem>
                     <SelectItem value="log">Logarithmic</SelectItem>
@@ -308,6 +323,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   options={availableGPUs}
                   value={selectedGPUs}
                   onChange={handleGPUChange}
+                  open={openDropdown === 'gpu'}
+                  onOpenChange={handleDropdownOpenChange('gpu')}
                   placeholder="Select a GPU Config for comparison"
                   maxSelections={4}
                 />

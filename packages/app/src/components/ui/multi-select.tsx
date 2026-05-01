@@ -15,6 +15,8 @@ interface MultiSelectProps {
   options: MultiSelectOption[];
   value?: string[];
   onChange?: (value: string[]) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   placeholder?: string;
   size?: 'sm' | 'default';
   className?: string;
@@ -23,12 +25,15 @@ interface MultiSelectProps {
   minSelections?: number; // Minimum number of items that must be selected
   showClearAll?: boolean;
   searchable?: boolean;
+  plainSelectedText?: boolean;
 }
 
 function MultiSelect({
   options,
   value = [],
   onChange,
+  open,
+  onOpenChange,
   placeholder = 'Select items...',
   size = 'default',
   className,
@@ -37,17 +42,29 @@ function MultiSelect({
   minSelections,
   showClearAll = true,
   searchable = true,
+  plainSelectedText = false,
 }: MultiSelectProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [internalIsOpen, setInternalIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const containerRef = React.useRef<HTMLDivElement>(null);
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const isControlledOpen = open !== undefined;
+  const isOpen = isControlledOpen ? open : internalIsOpen;
+  const setIsOpen = React.useCallback(
+    (nextOpen: boolean) => {
+      if (!isControlledOpen) {
+        setInternalIsOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [isControlledOpen, onOpenChange],
+  );
 
   const isMaxReached = maxSelections !== undefined && value.length >= maxSelections;
   const isMinReached = minSelections !== undefined && value.length <= minSelections;
 
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handlePointerDownOutside = (event: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -59,7 +76,9 @@ function MultiSelect({
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // Capture-phase pointerdown closes this menu before other dropdown triggers
+      // process the same interaction, enabling smooth one-click handoff.
+      document.addEventListener('pointerdown', handlePointerDownOutside, true);
       document.addEventListener('focusin', handleFocusOutside);
       searchRef.current?.focus();
     } else {
@@ -72,7 +91,7 @@ function MultiSelect({
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('pointerdown', handlePointerDownOutside, true);
       document.removeEventListener('focusin', handleFocusOutside);
     };
   }, [isOpen]);
@@ -102,6 +121,14 @@ function MultiSelect({
     }
 
     if (maxSelections !== undefined && value.length >= maxSelections) {
+      // Single-select mode should replace the previous value in one click.
+      if (maxSelections === 1) {
+        const newValue = [optionValue];
+        track('multi_select_selected', { value: optionValue });
+        onChange?.(newValue);
+        setIsOpen(false);
+        return;
+      }
       return;
     }
 
@@ -162,33 +189,37 @@ function MultiSelect({
       >
         <div className="flex gap-1 flex-1 items-center min-h-5 flex-wrap">
           {value.length > 0 ? (
-            selectedLabels.map((label, index) => (
-              <span
-                key={value[index]}
-                className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
-              >
-                {label}
+            plainSelectedText ? (
+              <span className="text-foreground truncate">{selectedLabels.join(', ')}</span>
+            ) : (
+              selectedLabels.map((label, index) => (
                 <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => handleRemove(value[index], e)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleRemove(value[index], e);
-                    }
-                  }}
-                  className={cn(
-                    'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
-                    (disabled || isMinReached) && 'hidden',
-                  )}
-                  aria-label={`Remove ${label}`}
-                  aria-disabled={disabled || isMinReached}
+                  key={value[index]}
+                  className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
-                  <XIcon className="size-4 text-foreground" />
+                  {label}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => handleRemove(value[index], e)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleRemove(value[index], e);
+                      }
+                    }}
+                    className={cn(
+                      'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
+                      (disabled || isMinReached) && 'hidden',
+                    )}
+                    aria-label={`Remove ${label}`}
+                    aria-disabled={disabled || isMinReached}
+                  >
+                    <XIcon className="size-4 text-foreground" />
+                  </span>
                 </span>
-              </span>
-            ))
+              ))
+            )
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
@@ -276,7 +307,7 @@ function MultiSelect({
             )}
             {filteredOptions.map((option) => {
               const isSelected = value.includes(option.value);
-              const isDisabledOption = !isSelected && isMaxReached;
+              const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
               const isDisabledDeselect = isSelected && isMinReached;
 
               return (
