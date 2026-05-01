@@ -107,6 +107,26 @@ export const FAQ_ITEMS: FaqItem[] = [
       'Most AI benchmarks are static, point-in-time measurements where participants submit purpose-built images that do not reflect real-world serving performance. InferenceX runs continuously on real hardware with fully reproducible configurations. Every recipe is in the repo, benchmark logs are visible on GitHub Actions, and all results are auditable end-to-end.',
   },
   {
+    question: 'How are results reproducible?',
+    answer:
+      'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe (model, framework, precision, parallelism, sequence length, concurrency) is committed to the repo, the run executes on the actual target hardware, and the resulting artifacts (logs, metrics, GPU traces) are uploaded to the run page. Anyone can click through from a tooltip in any chart to the exact GitHub Actions run that produced that point.',
+  },
+  {
+    question: 'Where can I see the raw benchmark logs?',
+    answer:
+      'Click any data point on a chart to open its tooltip. The "GitHub Actions Run" link goes directly to the workflow run that produced it. From there you can inspect the full job logs, the exact framework and driver versions, command line arguments, and download the raw artifacts including request latencies, token counts, and GPU power telemetry.',
+  },
+  {
+    question: 'Can I rerun a benchmark myself?',
+    answer:
+      'Yes. The benchmark recipes live in the /benchmarks directory of the repo as standalone shell scripts. If you have access to the same hardware, you can fork the repo and run the script directly, or trigger the same GitHub Actions workflow to reproduce a result.',
+  },
+  {
+    question: 'Are old runs preserved?',
+    answer:
+      'Yes. GitHub Actions retains workflow run logs and artifacts for 90 days. For longer auditability, we also publish a weekly snapshot of the full benchmark database as a public GitHub Release, so anyone can download the historical dataset and reproduce or reanalyze any chart in the dashboard.',
+  },
+  {
     question: 'Can I use InferenceX data for my own analysis?',
     answer:
       'Yes. All data is freely available. The dashboard lets you filter by GPU, model, framework, and date range, and you can export raw CSV data directly from any chart.',

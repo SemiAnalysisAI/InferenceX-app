@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, BarChart3, Sparkles } from 'lucide-react';
+import { ArrowRight, BarChart3, ShieldCheck, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -14,6 +14,7 @@ import { LaunchBanner } from '@/components/landing/launch-banner';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { track } from '@/lib/analytics';
 import { navigateInApp } from '@/lib/client-navigation';
+import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
 export function LandingPage() {
   const router = useRouter();
@@ -75,6 +76,39 @@ export function LandingPage() {
               {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
                 <CuratedViewCard key={preset.id} preset={preset} />
               ))}
+            </div>
+          </Card>
+
+          {/* Reproducibility callout */}
+          <Card>
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="size-5 shrink-0 text-brand" />
+              <h2 className="text-lg font-semibold">Every Result Is Reproducible</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Every data point on the dashboard is produced by a public GitHub Actions workflow run.
+              The recipe lives in the repo, the run executes on the actual target hardware, and the
+              full logs and artifacts are publicly viewable. Click any point on a chart to jump
+              straight to the run that produced it. All reproducible, auditable, and open source.
+            </p>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <a
+                href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track('landing_reproducibility_actions_clicked')}
+                className="inline-flex items-center gap-1.5 rounded-md bg-brand text-primary-foreground hover:bg-brand/90 px-3 py-1.5 transition-colors font-medium"
+              >
+                View benchmark runs on GitHub Actions
+                <ArrowRight className="size-3.5" />
+              </a>
+              <Link
+                href="/about#reproducibility"
+                onClick={() => track('landing_reproducibility_about_clicked')}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                How it works
+              </Link>
             </div>
           </Card>
         </section>
