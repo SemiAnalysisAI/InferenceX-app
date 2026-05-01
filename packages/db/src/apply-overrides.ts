@@ -2,6 +2,7 @@
  * Enforce all run-overrides.ts entries against the DB:
  *   1. Patch conclusions for CONCLUSION_OVERRIDES
  *   2. Purge runs listed in PURGED_RUNS
+ *   3. Purge specific attempts listed in PURGED_RUN_ATTEMPTS
  *
  * Previews changes (read-only), then confirms before writing.
  *
@@ -12,7 +13,7 @@
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
-import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './etl/run-overrides.js';
+import { CONCLUSION_OVERRIDES, PURGED_RUN_ATTEMPTS, PURGED_RUNS } from './etl/run-overrides.js';
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -75,21 +76,40 @@ interface PurgeTarget {
   changelogs: number;
 }
 
-/** Preview a run: print metadata and row counts. Returns null if not in DB. */
-async function previewPurge(githubRunId: number): Promise<PurgeTarget | null> {
-  const runs = await sql`
-    SELECT id, run_attempt, date::text AS date, name, conclusion
-    FROM workflow_runs
-    WHERE github_run_id = ${githubRunId}
-    ORDER BY run_attempt
-  `;
+/**
+ * Preview a run: print metadata and row counts. Returns null if not in DB.
+ * If `attempts` is provided, only those `run_attempt` values are targeted;
+ * otherwise every attempt for the run is included.
+ */
+async function previewPurge(
+  githubRunId: number,
+  attempts?: ReadonlySet<number>,
+): Promise<PurgeTarget | null> {
+  const runs = attempts
+    ? await sql`
+        SELECT id, run_attempt, date::text AS date, name, conclusion
+        FROM workflow_runs
+        WHERE github_run_id = ${githubRunId}
+          AND run_attempt = ANY(${[...attempts]})
+        ORDER BY run_attempt
+      `
+    : await sql`
+        SELECT id, run_attempt, date::text AS date, name, conclusion
+        FROM workflow_runs
+        WHERE github_run_id = ${githubRunId}
+        ORDER BY run_attempt
+      `;
   if (runs.length === 0) {
-    console.log(`  ${githubRunId} — not in DB, skipping.`);
+    const suffix = attempts ? ` attempts ${[...attempts].toSorted().join(',')}` : '';
+    console.log(`  ${githubRunId}${suffix} — not in DB, skipping.`);
     return null;
   }
 
   const wrIds = runs.map((r) => r.id as number);
-  console.log(`  ${githubRunId}`);
+  const header = attempts
+    ? `${githubRunId} (attempts ${runs.map((r) => r.run_attempt).join(',')})`
+    : `${githubRunId}`;
+  console.log(`  ${header}`);
   for (const r of runs) {
     const shortName = r.name.split('\n')[0].slice(0, 80);
     console.log(
@@ -120,8 +140,12 @@ async function previewPurge(githubRunId: number): Promise<PurgeTarget | null> {
   };
 }
 
-/** Delete all data for a run within a transaction. */
-async function purge(githubRunId: number, wrIds: number[]): Promise<void> {
+/**
+ * Delete data for the given workflow_run rows (one or more attempts) in a transaction.
+ * `wrIds` is the set of `workflow_runs.id` values to remove; sibling attempts of the
+ * same `github_run_id` that aren't in `wrIds` are left intact.
+ */
+async function purge(wrIds: number[]): Promise<void> {
   // postgres TransactionSql Omit drops the call signature — cast to Sql type
   await sql.begin(async (_tx) => {
     const tx = _tx as unknown as Sql;
@@ -192,8 +216,9 @@ async function purge(githubRunId: number, wrIds: number[]): Promise<void> {
       `;
     }
 
-    // Parent last
-    await tx`DELETE FROM workflow_runs WHERE github_run_id = ${githubRunId}`;
+    // Parent last (target the specific workflow_runs rows so partial purges
+    // leave sibling attempts of the same github_run_id intact)
+    await tx`DELETE FROM workflow_runs WHERE id = ANY(${wrIds})`;
   });
 
   console.log(`    deleted.`);
@@ -227,6 +252,20 @@ async function main(): Promise<void> {
       if (result) found.push(result);
     }
   }
+
+  const attemptTargets = [...PURGED_RUN_ATTEMPTS.entries()];
+  if (attemptTargets.length > 0) {
+    console.log(`\n  Purge attempt targets (${attemptTargets.length}):`);
+    for (const [id, attempts] of attemptTargets) {
+      // Skip if the whole run is already covered by PURGED_RUNS
+      if (PURGED_RUNS.has(id)) {
+        console.log(`  ${id} — already in PURGED_RUNS, skipping per-attempt purge.`);
+        continue;
+      }
+      const result = await previewPurge(id, attempts);
+      if (result) found.push(result);
+    }
+  }
   if (found.length > 0) hasWork = true;
 
   if (!hasWork) {
@@ -251,8 +290,8 @@ async function main(): Promise<void> {
 
   if (found.length > 0) {
     console.log('\n  Purging runs...');
-    for (const { githubRunId, wrIds } of found) {
-      await purge(githubRunId, wrIds);
+    for (const { wrIds } of found) {
+      await purge(wrIds);
     }
   }
 

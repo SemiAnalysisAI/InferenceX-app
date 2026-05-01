@@ -28,7 +28,7 @@ import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
-import { PURGED_RUNS } from './etl/run-overrides';
+import { isRunAttemptPurged } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
@@ -158,8 +158,8 @@ if (!process.env.DATABASE_WRITE_URL || !process.env.GITHUB_TOKEN) {
 }
 
 const runIdNum = parseInt(runIdStr, 10);
-if (PURGED_RUNS.has(runIdNum)) {
-  console.log(`  Run ${runIdStr} is in PURGED_RUNS — skipping.`);
+if (isRunAttemptPurged(runIdNum, runAttemptNum)) {
+  console.log(`  Run ${runIdStr} attempt ${runAttemptNum} is purged via run-overrides — skipping.`);
   process.exit(0);
 }
 
@@ -243,7 +243,9 @@ async function main(): Promise<void> {
     ghInfo,
   });
   if (workflowRunId === null) {
-    console.log(`  Run ${runId} is in PURGED_RUNS — skipping ingest.`);
+    console.log(
+      `  Run ${runId} attempt ${runAttemptNum} is purged via run-overrides — skipping ingest.`,
+    );
     return;
   }
   console.log(`  Workflow run DB id: ${workflowRunId}`);
