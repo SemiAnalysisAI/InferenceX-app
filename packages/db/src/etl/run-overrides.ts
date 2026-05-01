@@ -45,7 +45,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
-  [25199291771, new Set([1])], // 2026-05-01 | dsv4 GB200 dynamo-vllm MTP2 | Reason: only 2 of 6 conc=1 points uploaded. re-run pending
+  [25199291771, new Set([1, 2])], // 2026-05-01 | dsv4 GB200 dynamo-vllm MTP2 | Reason: only 2 of 6 conc points uploaded on both attempts. re-run pending
 ]);
 
 /**
