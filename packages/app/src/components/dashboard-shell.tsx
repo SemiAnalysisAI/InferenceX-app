@@ -3,6 +3,7 @@
 import { ExportNudge } from '@/components/export-nudge';
 import { GlobalFilterProvider } from '@/components/GlobalFilterContext';
 import { GradientLabelNudge } from '@/components/gradient-label-nudge';
+import { ReproducibilityNudge } from '@/components/reproducibility-nudge';
 import { StarNudge } from '@/components/star-nudge';
 import { TabNav } from '@/components/tab-nav';
 import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
@@ -10,6 +11,7 @@ import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <ReproducibilityNudge />
       <StarNudge />
       <ExportNudge />
       <GradientLabelNudge />

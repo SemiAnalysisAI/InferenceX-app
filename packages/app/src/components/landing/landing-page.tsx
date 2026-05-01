@@ -62,23 +62,6 @@ export function LandingPage() {
             </div>
           </Card>
 
-          {/* Right - Curated Presets */}
-          <Card>
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="size-5 shrink-0 text-brand" />
-              <h2 className="text-lg font-semibold">Quick Comparisons</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Jump straight into the most popular GPU inference benchmark comparisons, curated and
-              ready to explore.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
-                <CuratedViewCard key={preset.id} preset={preset} />
-              ))}
-            </div>
-          </Card>
-
           {/* Reproducibility callout */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
@@ -91,6 +74,29 @@ export function LandingPage() {
               full logs and artifacts are publicly viewable. Click any point on a chart to jump
               straight to the run that produced it. All reproducible, auditable, and open source.
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="rounded-md border border-border bg-card p-3">
+                <div className="text-sm font-semibold text-foreground">Public Actions runs</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Every benchmark executes on GitHub Actions with full logs visible while the run is
+                  in progress.
+                </div>
+              </div>
+              <div className="rounded-md border border-border bg-card p-3">
+                <div className="text-sm font-semibold text-foreground">Open recipes</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Every model, framework, precision, and parallelism setting is committed to the
+                  public repo as a shell script.
+                </div>
+              </div>
+              <div className="rounded-md border border-border bg-card p-3">
+                <div className="text-sm font-semibold text-foreground">Weekly DB snapshots</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  The full benchmark database is published as a public GitHub Release every week so
+                  the historical dataset stays auditable.
+                </div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-3 text-sm">
               <a
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
@@ -109,6 +115,23 @@ export function LandingPage() {
               >
                 How it works
               </Link>
+            </div>
+          </Card>
+
+          {/* Right - Curated Presets */}
+          <Card>
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="size-5 shrink-0 text-brand" />
+              <h2 className="text-lg font-semibold">Quick Comparisons</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Jump straight into the most popular GPU inference benchmark comparisons, curated and
+              ready to explore.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
+                <CuratedViewCard key={preset.id} preset={preset} />
+              ))}
             </div>
           </Card>
         </section>
