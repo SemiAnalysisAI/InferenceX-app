@@ -66,7 +66,9 @@ export function LandingPage() {
           <Card>
             <div className="flex items-center gap-2 mb-3">
               <ShieldCheck className="size-5 shrink-0 text-brand" />
-              <h2 className="text-lg font-semibold">Every Result Is Transparently done through Public GitHub Actions Automation</h2>
+              <h2 className="text-lg font-semibold">
+                Every Result Is Transparently done through Public GitHub Actions Automation
+              </h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               Every data point on the dashboard is produced by a public GitHub Actions workflow run.
