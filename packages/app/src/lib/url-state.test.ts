@@ -126,6 +126,21 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.i_seq).toBe('8k/1k');
   });
+
+  it('keeps canonical embed params when both canonical and aliases are present', async () => {
+    setupWindow(
+      '?g_model=Kimi-K2.5&i_seq=8k/1k&i_prec=fp4&i_gpus=b300-sxm&i_metric=y_costh&model=dsr1&seq=1024/1024&precision=fp8&gpus=h200,b200&y=tpPerGpu',
+      '/embed/scatter',
+    );
+    const { readUrlParams } = await import('@/lib/url-state');
+    const params = readUrlParams();
+
+    expect(params.g_model).toBe('Kimi-K2.5');
+    expect(params.i_seq).toBe('8k/1k');
+    expect(params.i_prec).toBe('fp4');
+    expect(params.i_gpus).toBe('b300-sxm');
+    expect(params.i_metric).toBe('y_costh');
+  });
 });
 
 describe('hasAnyUrlParams', () => {

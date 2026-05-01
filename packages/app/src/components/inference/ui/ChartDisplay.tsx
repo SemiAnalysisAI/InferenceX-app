@@ -3,6 +3,7 @@ import { track } from '@/lib/analytics';
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { useInference } from '@/components/inference/InferenceContext';
@@ -125,6 +126,11 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
  * the current filtered benchmark data.
  */
 export default function ChartDisplay() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isEmbedRoute = pathname.startsWith('/embed/');
+  const embedChartType = searchParams.get('chart') === 'e2e' ? 'e2e' : 'interactivity';
+
   const {
     graphs,
     loading,
@@ -310,6 +316,10 @@ export default function ChartDisplay() {
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
+  const graphsForRender = isEmbedRoute
+    ? effectiveGraphs.filter((graph) => graph.chartDefinition.chartType === embedChartType)
+    : effectiveGraphs;
+
   const displayGraphs = isFirstLoad
     ? Array.from({ length: 2 }).map((_, index) => (
         <Card key={`skeleton-${index}`}>
@@ -318,58 +328,73 @@ export default function ChartDisplay() {
           <Skeleton className="h-[600px] w-full" />
         </Card>
       ))
-    : effectiveGraphs.length === 0
+    : graphsForRender.length === 0
       ? []
-      : effectiveGraphs.map((graph, graphIndex) => (
+      : graphsForRender.map((graph, graphIndex) => (
           <section key={graphIndex} className="pt-8 md:pt-0">
             <figure data-testid="chart-figure" className="relative rounded-lg">
-              <ChartButtons
-                chartId={`chart-${graphIndex}`}
-                analyticsPrefix={
-                  selectedDateRange.startDate &&
-                  selectedDateRange.endDate &&
-                  selectedGPUs.length > 0
-                    ? 'gpu_timeseries'
-                    : graph.chartDefinition.chartType === 'e2e'
-                      ? 'latency'
-                      : 'interactivity'
-                }
-                leadingControls={
-                  <SegmentedToggle
-                    value={getViewMode(graphIndex)}
-                    options={VIEW_MODE_OPTIONS}
-                    onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                    ariaLabel="View mode"
-                    testId={`inference-view-toggle-${graphIndex}`}
-                  />
-                }
-                hideImageExport={getViewMode(graphIndex) === 'table'}
-                setIsLegendExpanded={setIsLegendExpanded}
-                exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
-                onExportCsv={() => {
-                  const isTimeline =
+              {!isEmbedRoute && (
+                <ChartButtons
+                  chartId={`chart-${graphIndex}`}
+                  analyticsPrefix={
                     selectedDateRange.startDate &&
                     selectedDateRange.endDate &&
-                    selectedGPUs.length > 0;
-                  const visibleData = graph.data.filter((d) =>
-                    isTimeline
-                      ? activeDates.has(`${d.date}_${d.hwKey}`)
-                      : activeHwTypes.has(d.hwKey as string) &&
-                        selectedPrecisions.includes(d.precision),
-                  );
-                  const { headers, rows } = inferenceChartToCsv(
-                    visibleData,
-                    graph.model,
-                    graph.sequence,
-                  );
-                  exportToCsv(
-                    `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
-                    headers,
-                    rows,
-                  );
-                }}
-              />
+                    selectedGPUs.length > 0
+                      ? 'gpu_timeseries'
+                      : graph.chartDefinition.chartType === 'e2e'
+                        ? 'latency'
+                        : 'interactivity'
+                  }
+                  leadingControls={
+                    <SegmentedToggle
+                      value={getViewMode(graphIndex)}
+                      options={VIEW_MODE_OPTIONS}
+                      onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                      ariaLabel="View mode"
+                      testId={`inference-view-toggle-${graphIndex}`}
+                    />
+                  }
+                  hideImageExport={getViewMode(graphIndex) === 'table'}
+                  setIsLegendExpanded={setIsLegendExpanded}
+                  exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
+                  onExportCsv={() => {
+                    const isTimeline =
+                      selectedDateRange.startDate &&
+                      selectedDateRange.endDate &&
+                      selectedGPUs.length > 0;
+                    const visibleData = graph.data.filter((d) =>
+                      isTimeline
+                        ? activeDates.has(`${d.date}_${d.hwKey}`)
+                        : activeHwTypes.has(d.hwKey as string) &&
+                          selectedPrecisions.includes(d.precision),
+                    );
+                    const { headers, rows } = inferenceChartToCsv(
+                      visibleData,
+                      graph.model,
+                      graph.sequence,
+                    );
+                    exportToCsv(
+                      `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+                      headers,
+                      rows,
+                    );
+                  }}
+                />
+              )}
               <Card>
+                {isEmbedRoute && (
+                  <div className="pointer-events-none absolute top-2 right-2 z-20">
+                    <div className="pointer-events-auto">
+                      <SegmentedToggle
+                        value={getViewMode(graphIndex)}
+                        options={VIEW_MODE_OPTIONS}
+                        onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                        ariaLabel="Embed view mode"
+                        testId={`embed-inference-view-toggle-${graphIndex}`}
+                      />
+                    </div>
+                  </div>
+                )}
                 {(() => {
                   const chartCaption = (
                     <>
@@ -558,6 +583,14 @@ export default function ChartDisplay() {
             </figure>
           </section>
         ));
+
+  if (isEmbedRoute) {
+    return (
+      <div data-testid="inference-chart-display-embed" className="flex flex-col gap-4">
+        {displayGraphs}
+      </div>
+    );
+  }
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">

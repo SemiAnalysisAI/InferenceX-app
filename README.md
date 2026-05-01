@@ -82,6 +82,37 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+## Embedding Scatter Chart
+
+Use `/embed/scatter` for iframe-safe inference chart embeds.
+
+### Canonical URL contract (recommended)
+
+Use the same canonical query keys as dashboard state:
+
+- `g_model` (e.g. `DeepSeek-R1-0528`)
+- `i_seq` (e.g. `1024/1024`)
+- `i_prec` (e.g. `fp8`, comma-separated for multi-select)
+- `i_gpus` (e.g. `h200-sxm,b200-sxm,mi325x`)
+- `i_metric` (e.g. `y_tpPerGpu`)
+- `chart` (`interactivity` default, or `e2e`)
+
+Example:
+
+```text
+/embed/scatter?g_model=DeepSeek-R1-0528&i_seq=1024/1024&i_prec=fp8&i_gpus=h200-sxm,b200-sxm,mi325x&i_metric=y_tpPerGpu&chart=e2e
+```
+
+### Quick check links (local)
+
+- [Embed scatter - Interactivity](http://localhost:3000/embed/scatter?model=dsr1&gpus=h200%2Cb200%2Cmi325x&isl=1024&osl=1024&y=tpPerGpu)
+- [Embed scatter - End-to-end Latency](http://localhost:3000/embed/scatter?model=dsr1&gpus=h200%2Cb200%2Cmi325x&isl=1024&osl=1024&y=tpPerGpu&chart=e2e)
+- [Embed scatter - Canonical params](http://localhost:3000/embed/scatter?g_model=DeepSeek-R1-0528&i_seq=1024/1024&i_prec=fp8&i_gpus=h200-sxm,b200-sxm,mi325x&i_metric=y_tpPerGpu&chart=interactivity)
+
+### Alias compatibility
+
+Alias keys are still accepted for backward compatibility (`model`, `isl`/`osl`, `precision`/`prec`, `gpus`, `y`), but if both canonical and alias forms are present, canonical values take precedence.
+
 ## Development Scripts
 
 These are the main scripts you'll use during development. Admin scripts for database and cache management are listed separately below.

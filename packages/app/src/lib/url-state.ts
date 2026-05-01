@@ -135,8 +135,14 @@ const EMBED_Y_AXIS_ALIASES: Record<string, string> = {
 function normalizeEmbedScatterParams(searchParams: URLSearchParams): UrlStateParams {
   const normalized: UrlStateParams = {};
 
+  const hasCanonicalModel = Boolean(searchParams.get('g_model'));
+  const hasCanonicalSeq = Boolean(searchParams.get('i_seq'));
+  const hasCanonicalPrec = Boolean(searchParams.get('i_prec'));
+  const hasCanonicalGpus = Boolean(searchParams.get('i_gpus'));
+  const hasCanonicalMetric = Boolean(searchParams.get('i_metric'));
+
   const modelRaw = searchParams.get('model');
-  if (modelRaw) {
+  if (modelRaw && !hasCanonicalModel) {
     const modelAlias = EMBED_MODEL_ALIASES[modelRaw.toLowerCase()];
     normalized.g_model = modelAlias ?? modelRaw;
   }
@@ -144,17 +150,17 @@ function normalizeEmbedScatterParams(searchParams: URLSearchParams): UrlStatePar
   const seqRaw = searchParams.get('seq');
   const islRaw = searchParams.get('isl');
   const oslRaw = searchParams.get('osl');
-  if (seqRaw) {
+  if (seqRaw && !hasCanonicalSeq) {
     normalized.i_seq = seqRaw;
-  } else if (islRaw && oslRaw) {
+  } else if (islRaw && oslRaw && !hasCanonicalSeq) {
     normalized.i_seq = `${islRaw}/${oslRaw}`;
   }
 
   const precRaw = searchParams.get('prec') || searchParams.get('precision');
-  if (precRaw) normalized.i_prec = precRaw;
+  if (precRaw && !hasCanonicalPrec) normalized.i_prec = precRaw;
 
   const gpusRaw = searchParams.get('gpus');
-  if (gpusRaw) {
+  if (gpusRaw && !hasCanonicalGpus) {
     normalized.i_gpus = gpusRaw
       .split(',')
       .map((gpu) => {
@@ -166,7 +172,7 @@ function normalizeEmbedScatterParams(searchParams: URLSearchParams): UrlStatePar
   }
 
   const yRaw = searchParams.get('y');
-  if (yRaw) {
+  if (yRaw && !hasCanonicalMetric) {
     const yAlias = EMBED_Y_AXIS_ALIASES[yRaw.toLowerCase()];
     normalized.i_metric = yAlias ?? yRaw;
   }
