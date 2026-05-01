@@ -1,13 +1,17 @@
 /**
  * Per-run overrides and special cases for the ingest pipeline.
  *
- * Both are applied at ingest time. Run `pnpm db:apply-overrides` to patch existing DB rows.
+ * All are applied at ingest time. Run `pnpm db:apply-overrides` to patch existing DB rows.
  *
  * CONCLUSION_OVERRIDES — force the conclusion for a run (e.g. 'success' when
  *   the benchmark ran fine but CI failed on a non-benchmark step).
  *
  * PURGED_RUNS — runs to skip on ingest and delete from the DB,
  *   e.g. typically due to experimental runs or features which generate lots of broken data.
+ *
+ * PURGED_RUN_ATTEMPTS — purge only specific attempts of a run, leaving the others intact.
+ *   Use this when a single attempt produced bad data but a later attempt is expected to succeed
+ *   (or has already succeeded), so we can't nuke the entire run.
  *
  * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
  *       but we should keep them around for historical reference. You can find these on github (if available) by filling
@@ -39,3 +43,17 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   24959542295, // 2026-04-25 | Reason: MTP without chat template leads to supernatural AR
   24960716250, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
 ]);
+
+export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
+  [25199291771, new Set([1])], // 2026-05-01 | dsv4 GB200 dynamo-vllm MTP2 | Reason: only 2 of 6 conc=1 points uploaded. re-run pending
+]);
+
+/**
+ * True when the (run, attempt) pair should be skipped on ingest. Pass `runAttempt`
+ * to honor PURGED_RUN_ATTEMPTS; omit it to check whole-run purges only.
+ */
+export function isRunAttemptPurged(githubRunId: number, runAttempt?: number): boolean {
+  if (PURGED_RUNS.has(githubRunId)) return true;
+  if (runAttempt === undefined) return false;
+  return PURGED_RUN_ATTEMPTS.get(githubRunId)?.has(runAttempt) ?? false;
+}
