@@ -209,6 +209,19 @@ describe('ScatterGraph', () => {
           activeOverlayHwTypes: new Set(['b200_trt']),
           allOverlayHwTypes: new Set(['b200_trt']),
           runIndexByUrl: { 'https://github.com/x/y/actions/runs/12345': 0, '12345': 0 },
+          unofficialRunInfos: [
+            {
+              id: 12345,
+              name: 'CI run',
+              branch: 'feature-branch',
+              sha: 'abc123',
+              createdAt: '2026-05-01T00:00:00Z',
+              url: 'https://github.com/x/y/actions/runs/12345',
+              conclusion: 'success',
+              status: 'completed',
+              isNonMainBranch: true,
+            },
+          ],
         },
       },
     );
@@ -227,5 +240,10 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
+    // Overlay label text is the run's branch name (matching the overlay legend),
+    // not the hw label.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
+      .find('text')
+      .should('contain.text', 'feature-branch');
   });
 });

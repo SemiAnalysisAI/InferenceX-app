@@ -997,9 +997,15 @@ const ScatterGraph = React.memo(
               }
 
               // Overlay (unofficial run) rooflines also get line labels using the
-              // run-palette color so they match the legend swatches. Each
-              // (hw, runIndex) pair is a separate label — same hw across runs
-              // intentionally repeats so the user can read run identity from color.
+              // run-palette color so they match the legend swatches. The label
+              // text mirrors the overlay legend ("✕ <branch>" — falls back to the
+              // hw label if run metadata isn't available, e.g. legacy callers).
+              const overlayLabelText = (runIndex: number, hwKey: string): string => {
+                const info = unofficialRunInfos[runIndex];
+                if (!info) return parseHwKeyToLabel(hwKey).label;
+                const branch = info.branch || `run ${info.id}`;
+                return `✕ ${branch}`;
+              };
               const sortedOverlay = Object.entries(overlayRooflines)
                 .filter(
                   ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
@@ -1015,7 +1021,7 @@ const ScatterGraph = React.memo(
                   pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
                   pts.at(-1)!,
                 ];
-                const { label } = parseHwKeyToLabel(group.hwKey);
+                const label = overlayLabelText(group.runIndex, group.hwKey);
                 let placedOverlay = false;
                 for (const pt of candidates) {
                   const px = xScale(pt.x);
@@ -1066,16 +1072,20 @@ const ScatterGraph = React.memo(
                   visible: entry.visible,
                 });
               }
-              // Endpoint labels for overlay rooflines too (one per (hw, runIndex)).
+              // Endpoint labels for overlay rooflines too (one per (hw, runIndex)),
+              // labeled with the run's branch name to mirror the overlay legend.
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
                 if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                const info = unofficialRunInfos[group.runIndex];
+                const labelText = info
+                  ? `✕ ${info.branch || `run ${info.id}`}`
+                  : parseHwKeyToLabel(group.hwKey).label;
                 const labelKey = `overlay-${ovKey}`;
                 const pt = group.points.at(-1)!;
-                const { label } = parseHwKeyToLabel(group.hwKey);
                 lineLabels.push({
                   key: labelKey,
                   hw: group.hwKey,
-                  label,
+                  label: labelText,
                   color: overlayRunColor(group.runIndex),
                   x: xScale(pt.x),
                   y: yScale(pt.y),
@@ -1679,6 +1689,7 @@ const ScatterGraph = React.memo(
       processedOverlayData,
       overlayRooflines,
       activeOverlayHwTypes,
+      unofficialRunInfos,
       runIndexByUrl,
       hardwareConfig,
       xLabel,
