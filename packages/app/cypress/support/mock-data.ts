@@ -213,6 +213,8 @@ export function createMockInferenceContext(
     setShowLineLabels: namedStub('setShowLineLabels'),
     showSpeedOverlay: false,
     setShowSpeedOverlay: namedStub('setShowSpeedOverlay'),
+    showMinecraftOverlay: false,
+    setShowMinecraftOverlay: namedStub('setShowMinecraftOverlay'),
     selectedGPUs: [],
     setSelectedGPUs: namedStub('setSelectedGPUs'),
     availableGPUs: [

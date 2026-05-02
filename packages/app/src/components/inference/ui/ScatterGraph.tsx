@@ -144,6 +144,8 @@ const ScatterGraph = React.memo(
       setShowLineLabels,
       showSpeedOverlay,
       setShowSpeedOverlay,
+      showMinecraftOverlay,
+      setShowMinecraftOverlay,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -1626,41 +1628,80 @@ const ScatterGraph = React.memo(
         render: (_zoomGroup, ctx) => {
           const { g } = ctx.layout;
           g.selectAll('.speed-overlay').remove();
-          if (!showSpeedOverlay) return;
+          if (!showSpeedOverlay && !showMinecraftOverlay) return;
           const w = ctx.width;
           const h = ctx.height;
           const SIZE = 78;
           const PAD = 8;
+          const STACK_GAP = 4;
           const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
           const dir = chartDefinition[rooflineKey] as RooflineDirection | undefined;
           const { busTop, busLeft } = getSpeedOverlayCorners(dir);
-          const busX = busLeft ? PAD : w - SIZE - PAD;
-          const busY = busTop ? PAD : h - SIZE - PAD;
-          const carX = busLeft ? w - SIZE - PAD : PAD;
-          const carY = busTop ? h - SIZE - PAD : PAD;
           const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
-          layer
-            .append('image')
-            .attr('class', 'speed-overlay-bus')
-            .attr('data-testid', 'speed-overlay-bus')
-            .attr('data-corner', `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`)
-            .attr('href', '/decorative/bus.png')
-            .attr('x', busX)
-            .attr('y', busY)
-            .attr('width', SIZE)
-            .attr('height', SIZE)
-            .attr('opacity', 0.85);
-          layer
-            .append('image')
-            .attr('class', 'speed-overlay-car')
-            .attr('data-testid', 'speed-overlay-car')
-            .attr('data-corner', `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`)
-            .attr('href', '/decorative/racing-car.png')
-            .attr('x', carX)
-            .attr('y', carY)
-            .attr('width', SIZE)
-            .attr('height', SIZE)
-            .attr('opacity', 0.85);
+
+          // Each enabled "pair" stacks horizontally inward from the chart corner so
+          // the second pair sits next to (not on top of) the first one when both
+          // toggles are on. The bus-side stays anchored to the batch corner; the
+          // car-side stays anchored to the interactive corner.
+          const enabledPairs: {
+            id: string;
+            slowSrc: string;
+            fastSrc: string;
+          }[] = [];
+          if (showSpeedOverlay) {
+            enabledPairs.push({
+              id: 'speed',
+              slowSrc: '/decorative/bus.png',
+              fastSrc: '/decorative/racing-car.png',
+            });
+          }
+          if (showMinecraftOverlay) {
+            enabledPairs.push({
+              id: 'minecraft',
+              slowSrc: '/decorative/donkey-chest.png',
+              fastSrc: '/decorative/elytra.png',
+            });
+          }
+
+          const slowCornerName = `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`;
+          const fastCornerName = `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`;
+          enabledPairs.forEach((pair, idx) => {
+            const inwardOffset = idx * (SIZE + STACK_GAP);
+            const slowX = busLeft ? PAD + inwardOffset : w - SIZE - PAD - inwardOffset;
+            const slowY = busTop ? PAD : h - SIZE - PAD;
+            const fastX = busLeft ? w - SIZE - PAD - inwardOffset : PAD + inwardOffset;
+            const fastY = busTop ? h - SIZE - PAD : PAD;
+            layer
+              .append('image')
+              .attr('class', `speed-overlay-slow speed-overlay-${pair.id}-slow`)
+              .attr('data-testid', `speed-overlay-${pair.id}-slow`)
+              .attr('data-corner', slowCornerName)
+              .attr('href', pair.slowSrc)
+              .attr('x', slowX)
+              .attr('y', slowY)
+              .attr('width', SIZE)
+              .attr('height', SIZE)
+              .attr('opacity', 0.85);
+            layer
+              .append('image')
+              .attr('class', `speed-overlay-fast speed-overlay-${pair.id}-fast`)
+              .attr('data-testid', `speed-overlay-${pair.id}-fast`)
+              .attr('data-corner', fastCornerName)
+              .attr('href', pair.fastSrc)
+              .attr('x', fastX)
+              .attr('y', fastY)
+              .attr('width', SIZE)
+              .attr('height', SIZE)
+              .attr('opacity', 0.85);
+          });
+
+          // Backwards-compatible aliases so existing E2E tests (speed-overlay.cy.ts)
+          // can still find the bus/car pair via `[data-testid="speed-overlay-bus"]`
+          // and `[data-testid="speed-overlay-car"]`.
+          if (showSpeedOverlay) {
+            layer.select('.speed-overlay-speed-slow').attr('data-testid', 'speed-overlay-bus');
+            layer.select('.speed-overlay-speed-fast').attr('data-testid', 'speed-overlay-car');
+          }
         },
       };
 
@@ -1674,6 +1715,7 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
+      showMinecraftOverlay,
       gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
@@ -2039,6 +2081,15 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setShowSpeedOverlay(checked);
                   track('latency_speed_overlay_toggled', { enabled: checked });
+                },
+              },
+              {
+                id: 'scatter-minecraft-overlay',
+                label: 'Donkey / Elytra',
+                checked: showMinecraftOverlay,
+                onCheckedChange: (checked: boolean) => {
+                  setShowMinecraftOverlay(checked);
+                  track('latency_minecraft_overlay_toggled', { enabled: checked });
                 },
               },
             ]}
