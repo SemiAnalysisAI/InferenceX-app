@@ -77,24 +77,37 @@ describe('Y-Axis Metric Search', () => {
 
   it('renders a search input inside the Y-axis selector dropdown', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('input[placeholder="Search..."]').should('be.visible');
-    // Click outside to close
+    // Other selectors (legend, MultiSelect) reuse the "Search..." placeholder, so
+    // scope every lookup to the open Y-axis dropdown's content.
+    cy.get('[data-slot="select-content"]')
+      .find('input[placeholder="Search..."]')
+      .should('be.visible');
     cy.get('body').click(0, 0);
   });
 
   it('typing in the search filters the option list across groups', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('input[placeholder="Search..."]').type('input token throughput');
-    cy.get('[role="option"]').should('have.length', 2);
-    cy.get('[role="option"]').first().should('contain.text', 'Input Token Throughput');
+    cy.get('[data-slot="select-content"]')
+      .find('input[placeholder="Search..."]')
+      .type('input token throughput');
+    cy.get('[data-slot="select-content"]').find('[role="option"]').should('have.length', 2);
+    cy.get('[data-slot="select-content"]')
+      .find('[role="option"]')
+      .first()
+      .should('contain.text', 'Input Token Throughput');
     cy.get('body').click(0, 0);
   });
 
   it('selecting a filtered option applies the metric and closes the dropdown', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click({ force: true });
-    cy.get('input[placeholder="Search..."]').type('cost per million total');
-    cy.get('[role="option"]').contains('3 Year Rental').click({ force: true });
-    cy.get('[role="option"]').should('not.exist');
+    cy.get('[data-slot="select-content"]')
+      .find('input[placeholder="Search..."]')
+      .type('cost per million total');
+    cy.get('[data-slot="select-content"]')
+      .find('[role="option"]')
+      .contains('3 Year Rental')
+      .click({ force: true });
+    cy.get('[data-slot="select-content"]').should('not.exist');
     cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', '3 Year Rental');
   });
 });

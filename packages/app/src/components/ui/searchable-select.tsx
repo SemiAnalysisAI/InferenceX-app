@@ -111,6 +111,10 @@ export function SearchableSelect({
         )}
       >
         <span
+          // Selected value is derived from client-only state (URL params, persisted
+          // toggles), so the SSR pass renders a default while the client renders the
+          // hydrated value — suppress the harmless mismatch.
+          suppressHydrationWarning
           className={cn('flex-1 text-left truncate', !selectedLabel && 'text-muted-foreground')}
         >
           {selectedLabel ?? placeholder}
