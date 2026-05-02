@@ -95,7 +95,7 @@ export function ModelSelector({
         label="Model"
         tooltip="The language model being benchmarked."
       />
-      <div data-testid={testId}>
+      <div>
         <MultiSelect
           sections={sections}
           value={[value]}
@@ -107,6 +107,8 @@ export function ModelSelector({
           }}
           open={open}
           onOpenChange={onOpenChange}
+          triggerId={id}
+          triggerTestId={testId}
           placeholder="Model"
           minSelections={1}
           maxSelections={1}
@@ -171,7 +173,7 @@ export function SequenceSelector({
         label="ISL / OSL"
         tooltip="Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens)."
       />
-      <div data-testid={testId}>
+      <div>
         <MultiSelect
           sections={sections}
           value={[value]}
@@ -183,6 +185,8 @@ export function SequenceSelector({
           }}
           open={open}
           onOpenChange={onOpenChange}
+          triggerId={id}
+          triggerTestId={testId}
           placeholder="ISL / OSL"
           minSelections={1}
           maxSelections={1}
@@ -222,7 +226,7 @@ export function PrecisionSelector({
         label="Precision"
         tooltip="Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'."
       />
-      <div data-testid={testId}>
+      <div>
         <MultiSelect
           options={availablePrecisions.map((p) => ({
             value: p,
@@ -232,6 +236,8 @@ export function PrecisionSelector({
           onChange={onChange}
           open={open}
           onOpenChange={onOpenChange}
+          triggerId={id}
+          triggerTestId={testId}
           placeholder=""
           minSelections={1}
           showClearAll={false}

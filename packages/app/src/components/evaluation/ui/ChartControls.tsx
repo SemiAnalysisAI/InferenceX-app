@@ -62,7 +62,7 @@ export default function EvaluationChartControls() {
             label="Benchmark"
             tooltip="The standardized test used to measure model performance. Common benchmarks include reasoning, coding, and knowledge-based evaluations."
           />
-          <div data-testid="evaluation-benchmark-selector">
+          <div>
             <MultiSelect
               options={availableBenchmarks.map((benchmark) => ({
                 value: benchmark,
@@ -77,6 +77,8 @@ export default function EvaluationChartControls() {
               }}
               open={openDropdown === 'benchmark'}
               onOpenChange={handleDropdownOpenChange('benchmark')}
+              triggerId="eval-benchmark-select"
+              triggerTestId="evaluation-benchmark-selector"
               placeholder="Select benchmark"
               minSelections={1}
               maxSelections={1}

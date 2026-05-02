@@ -24,6 +24,8 @@ interface MultiSelectProps {
   sections?: MultiSelectSection[];
   value?: string[];
   onChange?: (value: string[]) => void;
+  triggerId?: string;
+  triggerTestId?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   placeholder?: string;
@@ -43,6 +45,8 @@ function MultiSelect({
   sections,
   value = [],
   onChange,
+  triggerId,
+  triggerTestId,
   open,
   onOpenChange,
   placeholder = 'Select items...',
@@ -228,6 +232,11 @@ function MultiSelect({
     <div ref={containerRef} className="relative">
       <button
         type="button"
+        id={triggerId}
+        data-testid={triggerTestId}
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         data-slot="select-trigger"
@@ -379,6 +388,8 @@ function MultiSelect({
                         return (
                           <div
                             key={option.value}
+                            role="option"
+                            aria-selected={isSelected}
                             data-slot="select-item"
                             onClick={() =>
                               !isDisabledOption && !isDisabledDeselect && handleToggle(option.value)
@@ -409,6 +420,8 @@ function MultiSelect({
                   return (
                     <div
                       key={option.value}
+                      role="option"
+                      aria-selected={isSelected}
                       data-slot="select-item"
                       onClick={() =>
                         !isDisabledOption && !isDisabledDeselect && handleToggle(option.value)
