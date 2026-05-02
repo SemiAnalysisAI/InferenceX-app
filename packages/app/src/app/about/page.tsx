@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS } from '@/components/about/faq-data';
-import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = {
   '@context': 'https://schema.org',
@@ -78,6 +78,96 @@ export default function AboutPage() {
               </Link>
               .
             </p>
+          </Card>
+        </section>
+
+        <section id="reproducibility" className="scroll-mt-24">
+          <Card>
+            <h2 className="text-lg font-semibold mb-2">Reproducibility</h2>
+            <p className="text-muted-foreground mb-4">
+              Every data point on the dashboard is the output of a public GitHub Actions workflow
+              run. The recipe, logs, artifacts, and the resulting database row are all linked end to
+              end, so anyone can audit, rerun, or fork a benchmark.
+            </p>
+            <ol className="space-y-3 text-sm text-muted-foreground mb-4">
+              <li className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand font-semibold text-xs">
+                  1
+                </span>
+                <div>
+                  <strong className="text-foreground">Recipe in repo.</strong> Every combination of
+                  hardware, framework, model, and precision is a shell script committed to the
+                  public repo. The exact image, command line, and parallelism are pinned in source.
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand font-semibold text-xs">
+                  2
+                </span>
+                <div>
+                  <strong className="text-foreground">Run on real hardware.</strong> GitHub Actions
+                  schedules the workflow on the actual target accelerator (NVIDIA, AMD, etc.) and
+                  streams the full job log publicly while it runs.
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand font-semibold text-xs">
+                  3
+                </span>
+                <div>
+                  <strong className="text-foreground">Artifacts uploaded.</strong> Request
+                  latencies, token counts, GPU power telemetry, and evaluation samples are attached
+                  to the run page. GitHub Actions retains them for 90 days, and a weekly snapshot of
+                  the full benchmark database is published as a public GitHub Release for longer
+                  auditability.
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand font-semibold text-xs">
+                  4
+                </span>
+                <div>
+                  <strong className="text-foreground">Ingested into the dashboard.</strong>{' '}
+                  Successful runs are loaded into the database and surfaced here. Every chart
+                  tooltip carries a direct link back to the GitHub Actions run that produced the
+                  point. Click any point to audit the source.
+                </div>
+              </li>
+            </ol>
+            <div className="flex flex-wrap gap-3 text-sm">
+              <Link
+                href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                Browse workflow runs
+              </Link>
+              <Link
+                href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/main/benchmarks`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                View benchmark recipes
+              </Link>
+              <Link
+                href="https://github.com/SemiAnalysisAI/InferenceX-app/releases?q=db-dump"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                Weekly DB dumps
+              </Link>
+              <Link
+                href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
+              >
+                Source repository
+              </Link>
+            </div>
           </Card>
         </section>
 
