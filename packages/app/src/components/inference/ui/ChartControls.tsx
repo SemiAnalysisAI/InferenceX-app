@@ -14,12 +14,11 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition } from '@/components/inference/types';
@@ -221,27 +220,18 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               label="Y-Axis Metric"
               tooltip="The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values."
             />
-            <Select onValueChange={handleYAxisMetricChange} value={selectedYAxisMetric}>
-              <SelectTrigger
-                id="y-axis-select"
-                data-testid="yaxis-metric-selector"
-                className="w-full"
-              >
-                <SelectValue placeholder="Y-Axis Metric" />
-              </SelectTrigger>
-              <SelectContent>
-                {groupedYAxisOptions.map((group) => (
-                  <SelectGroup key={group.groupLabel}>
-                    <SelectLabel>{group.groupLabel}</SelectLabel>
-                    {group.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              triggerId="y-axis-select"
+              triggerTestId="yaxis-metric-selector"
+              value={selectedYAxisMetric}
+              onValueChange={handleYAxisMetricChange}
+              placeholder="Y-Axis Metric"
+              trackPrefix="yaxis_metric"
+              groups={groupedYAxisOptions.map((g) => ({
+                label: g.groupLabel,
+                options: g.options,
+              }))}
+            />
           </div>
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
