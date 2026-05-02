@@ -12,12 +12,7 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import {
-  type Model,
-  type Precision,
-  getPrecisionLabel,
-  isModelExperimental,
-} from '@/lib/data-mappings';
+import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
 
@@ -93,19 +88,6 @@ export default function EvaluationChartDisplay() {
           </>
         )}
       </p>
-      <div
-        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-          selectedModel && isModelExperimental(selectedModel as Model)
-            ? 'max-h-20 opacity-100'
-            : 'max-h-0 opacity-0'
-        }`}
-      >
-        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-          <strong>Note:</strong> We at SemiAnalysis InferenceX™ are still in very early stages of
-          adding support for this model. Please keep that in mind that these InferenceX numbers are
-          experimental.
-        </p>
-      </div>
       <UnofficialDomainNotice />
     </>
   );
