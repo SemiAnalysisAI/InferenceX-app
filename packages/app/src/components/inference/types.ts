@@ -499,6 +499,8 @@ export interface InferenceChartContextType {
   setShowLineLabels: (showLineLabels: boolean) => void;
   showSpeedOverlay: boolean;
   setShowSpeedOverlay: (showSpeedOverlay: boolean) => void;
+  showMinecraftOverlay: boolean;
+  setShowMinecraftOverlay: (showMinecraftOverlay: boolean) => void;
   selectedGPUs: string[];
   setSelectedGPUs: (gpus: string[]) => void;
   availableGPUs: { value: string; label: string }[];

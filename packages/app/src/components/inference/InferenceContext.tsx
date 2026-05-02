@@ -137,6 +137,9 @@ export function InferenceProvider({
   );
   const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
   const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
+  const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
+    () => getUrlParam('i_mc') === '1',
+  );
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -745,6 +748,7 @@ export function InferenceProvider({
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: showLineLabels ? '1' : '',
       i_speed: showSpeedOverlay ? '1' : '',
+      i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
     },
     [
@@ -764,6 +768,7 @@ export function InferenceProvider({
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
+      showMinecraftOverlay,
       iActiveStr,
     ],
   );
@@ -962,6 +967,8 @@ export function InferenceProvider({
       setShowLineLabels,
       showSpeedOverlay,
       setShowSpeedOverlay,
+      showMinecraftOverlay,
+      setShowMinecraftOverlay,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -1015,6 +1022,7 @@ export function InferenceProvider({
       showGradientLabels,
       showLineLabels,
       showSpeedOverlay,
+      showMinecraftOverlay,
       userCosts,
       userPowers,
       trackedConfigs,
