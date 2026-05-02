@@ -43,6 +43,7 @@ import {
   paretoFrontUpperLeft,
   paretoFrontUpperRight,
 } from '@/lib/chart-utils';
+import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
   InferenceData,
@@ -1505,26 +1506,8 @@ const ScatterGraph = React.memo(
           const SIZE = 78;
           const PAD = 8;
           const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-          const dir = chartDefinition[rooflineKey] as
-            | 'upper_left'
-            | 'upper_right'
-            | 'lower_left'
-            | 'lower_right'
-            | undefined;
-          // Bus sits at the batch-friendly endpoint of the Pareto frontier; car at the
-          // interactivity-friendly opposite. The roofline direction is post-flipped by
-          // useChartData when X is swapped (e.g. interactivity chart input metrics
-          // showing TTFT), so it always reflects the effective axis directions.
-          //   upper_left  → bus top-left      (e.g. tput vs interactivity)
-          //   upper_right → bus top-right     (e.g. tput vs e2e or vs TTFT)
-          //   lower_left  → bus bottom-right  (e.g. cost vs e2e — batchy = high latency)
-          //   lower_right → bus bottom-left   (e.g. cost vs interactivity — batchy = low int)
-          // I.e. bus.y matches the upper/lower part; bus.x matches the left/right part
-          // for throughput-style metrics and is flipped for cost/energy-style metrics.
-          const isUpperY = dir?.startsWith('upper') ?? true;
-          const rooflineLeft = dir?.endsWith('left') ?? true;
-          const busTop = isUpperY;
-          const busLeft = isUpperY ? rooflineLeft : !rooflineLeft;
+          const dir = chartDefinition[rooflineKey] as RooflineDirection | undefined;
+          const { busTop, busLeft } = getSpeedOverlayCorners(dir);
           const busX = busLeft ? PAD : w - SIZE - PAD;
           const busY = busTop ? PAD : h - SIZE - PAD;
           const carX = busLeft ? w - SIZE - PAD : PAD;
@@ -1532,6 +1515,9 @@ const ScatterGraph = React.memo(
           const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
           layer
             .append('image')
+            .attr('class', 'speed-overlay-bus')
+            .attr('data-testid', 'speed-overlay-bus')
+            .attr('data-corner', `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`)
             .attr('href', '/decorative/bus.png')
             .attr('x', busX)
             .attr('y', busY)
@@ -1540,6 +1526,9 @@ const ScatterGraph = React.memo(
             .attr('opacity', 0.85);
           layer
             .append('image')
+            .attr('class', 'speed-overlay-car')
+            .attr('data-testid', 'speed-overlay-car')
+            .attr('data-corner', `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`)
             .attr('href', '/decorative/racing-car.png')
             .attr('x', carX)
             .attr('y', carY)

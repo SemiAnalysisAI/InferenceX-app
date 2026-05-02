@@ -173,7 +173,10 @@ export function SearchableSelect({
                   return (
                     <div
                       key={option.value}
+                      role="option"
+                      aria-selected={isSelected}
                       data-slot="select-item"
+                      data-value={option.value}
                       onClick={() => handleSelect(option.value)}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
