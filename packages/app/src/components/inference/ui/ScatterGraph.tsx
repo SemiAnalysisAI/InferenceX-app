@@ -1642,38 +1642,49 @@ const ScatterGraph = React.memo(
           // Each enabled "pair" stacks horizontally inward from the chart corner so
           // the second pair sits next to (not on top of) the first one when both
           // toggles are on. The bus-side stays anchored to the batch corner; the
-          // car-side stays anchored to the interactive corner.
-          const enabledPairs: {
+          // car-side stays anchored to the interactive corner. Pair items can have
+          // independent slow/fast sizes so the donkey can be visually heavier than
+          // the elytra without affecting the bus/car pair.
+          interface OverlayPair {
             id: string;
             slowSrc: string;
             fastSrc: string;
-          }[] = [];
+            slowSize: number;
+            fastSize: number;
+          }
+          const enabledPairs: OverlayPair[] = [];
           if (showSpeedOverlay) {
             enabledPairs.push({
               id: 'speed',
               slowSrc: '/decorative/bus.png',
               fastSrc: '/decorative/racing-car.png',
+              slowSize: SIZE,
+              fastSize: SIZE,
             });
           }
           if (showMinecraftOverlay) {
-            // donkey-chest.png — Chested_Donkey_JE5 from minecraft.wiki/w/Donkey
+            // donkey-chest.png — Chested_Donkey_JE5 from minecraft.wiki/w/Donkey,
+            //   rendered 50% larger than the other overlay icons (1.5× SIZE).
             // elytra.png — ElytraNew sprite (front-facing both wings) from the
             //   Minecraft Fandom wiki at 160×160 pixel-art.
             enabledPairs.push({
               id: 'minecraft',
               slowSrc: '/decorative/donkey-chest.png',
               fastSrc: '/decorative/elytra.png',
+              slowSize: Math.round(SIZE * 1.5),
+              fastSize: SIZE,
             });
           }
 
           const slowCornerName = `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`;
           const fastCornerName = `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`;
-          enabledPairs.forEach((pair, idx) => {
-            const inwardOffset = idx * (SIZE + STACK_GAP);
-            const slowX = busLeft ? PAD + inwardOffset : w - SIZE - PAD - inwardOffset;
-            const slowY = busTop ? PAD : h - SIZE - PAD;
-            const fastX = busLeft ? w - SIZE - PAD - inwardOffset : PAD + inwardOffset;
-            const fastY = busTop ? h - SIZE - PAD : PAD;
+          let slowInward = 0;
+          let fastInward = 0;
+          enabledPairs.forEach((pair) => {
+            const slowX = busLeft ? PAD + slowInward : w - pair.slowSize - PAD - slowInward;
+            const slowY = busTop ? PAD : h - pair.slowSize - PAD;
+            const fastX = busLeft ? w - pair.fastSize - PAD - fastInward : PAD + fastInward;
+            const fastY = busTop ? h - pair.fastSize - PAD : PAD;
             layer
               .append('image')
               .attr('class', `speed-overlay-slow speed-overlay-${pair.id}-slow`)
@@ -1682,8 +1693,8 @@ const ScatterGraph = React.memo(
               .attr('href', pair.slowSrc)
               .attr('x', slowX)
               .attr('y', slowY)
-              .attr('width', SIZE)
-              .attr('height', SIZE)
+              .attr('width', pair.slowSize)
+              .attr('height', pair.slowSize)
               .attr('opacity', 0.85);
             layer
               .append('image')
@@ -1693,9 +1704,11 @@ const ScatterGraph = React.memo(
               .attr('href', pair.fastSrc)
               .attr('x', fastX)
               .attr('y', fastY)
-              .attr('width', SIZE)
-              .attr('height', SIZE)
+              .attr('width', pair.fastSize)
+              .attr('height', pair.fastSize)
               .attr('opacity', 0.85);
+            slowInward += pair.slowSize + STACK_GAP;
+            fastInward += pair.fastSize + STACK_GAP;
           });
 
           // Backwards-compatible aliases so existing E2E tests (speed-overlay.cy.ts)
