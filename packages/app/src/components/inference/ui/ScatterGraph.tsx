@@ -141,6 +141,8 @@ const ScatterGraph = React.memo(
       setShowGradientLabels,
       showLineLabels,
       setShowLineLabels,
+      showSpeedOverlay,
+      setShowSpeedOverlay,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -1491,14 +1493,69 @@ const ScatterGraph = React.memo(
           }
         : null;
 
+      const speedOverlayLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'speed-overlay',
+        render: (_zoomGroup, ctx) => {
+          const { g } = ctx.layout;
+          g.selectAll('.speed-overlay').remove();
+          if (!showSpeedOverlay) return;
+          const w = ctx.width;
+          const h = ctx.height;
+          const SIZE = 56;
+          const PAD = 8;
+          const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+          const dir = chartDefinition[rooflineKey] as
+            | 'upper_left'
+            | 'upper_right'
+            | 'lower_left'
+            | 'lower_right'
+            | undefined;
+          // Bus = batch-friendly side; car = interactivity-friendly side.
+          // Throughput-like metrics (roofline starts with "upper") favor higher Y for
+          // the batch end → bus on top. Cost/energy metrics (roofline starts with
+          // "lower") favor lower Y for the batch end → bus on bottom.
+          // On the interactivity chart (X = tok/s/user) the batch end is the LEFT
+          // (low X). On the e2e chart (X = latency, lower = faster) the batch end
+          // is the RIGHT (high latency).
+          const isHigherY = dir?.startsWith('upper') ?? true;
+          const isInteractivity = chartDefinition.chartType === 'interactivity';
+          const busLeft = isInteractivity;
+          const busTop = isHigherY;
+          const busX = busLeft ? PAD : w - SIZE - PAD;
+          const busY = busTop ? PAD : h - SIZE - PAD;
+          const carX = busLeft ? w - SIZE - PAD : PAD;
+          const carY = busTop ? h - SIZE - PAD : PAD;
+          const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
+          layer
+            .append('image')
+            .attr('href', '/decorative/bus.png')
+            .attr('x', busX)
+            .attr('y', busY)
+            .attr('width', SIZE)
+            .attr('height', SIZE)
+            .attr('opacity', 0.85);
+          layer
+            .append('image')
+            .attr('href', '/decorative/racing-car.png')
+            .attr('x', carX)
+            .attr('y', carY)
+            .attr('width', SIZE)
+            .attr('height', SIZE)
+            .attr('opacity', 0.85);
+        },
+      };
+
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
+      result.push(speedOverlayLayer);
       return result;
     }, [
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      showSpeedOverlay,
       gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
@@ -1518,6 +1575,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      chartDefinition,
       chartDefinition.chartType,
     ]);
 
@@ -1852,6 +1910,15 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setShowLineLabels(checked);
                   track('latency_line_labels_toggled', { enabled: checked });
+                },
+              },
+              {
+                id: 'scatter-speed-overlay',
+                label: 'Bus / Race Car',
+                checked: showSpeedOverlay,
+                onCheckedChange: (checked: boolean) => {
+                  setShowSpeedOverlay(checked);
+                  track('latency_speed_overlay_toggled', { enabled: checked });
                 },
               },
             ]}
