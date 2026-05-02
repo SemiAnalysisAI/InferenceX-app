@@ -256,6 +256,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               showClearAll={false}
               searchable={false}
               plainSelectedText
+              showSelectionSummary={false}
             />
           </div>
 

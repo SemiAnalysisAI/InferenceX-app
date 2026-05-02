@@ -160,7 +160,7 @@ export default function HistoricalTrendsDisplay() {
   if (loading || graphs.length === 0 || trendLoading) {
     return (
       <section data-testid="historical-trends-display">
-        <Card>
+        <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-lg font-semibold mb-2">Historical Trends</h2>
@@ -187,7 +187,7 @@ export default function HistoricalTrendsDisplay() {
   return (
     <section data-testid="historical-trends-display" className="flex flex-col gap-4">
       {/* Controls card — same selectors as Inference Performance tab */}
-      <Card>
+      <Card className="relative z-30">
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between">
             <div>

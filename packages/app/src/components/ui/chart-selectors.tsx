@@ -1,8 +1,11 @@
 'use client';
 
+import { Info } from 'lucide-react';
+
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   type Model,
   type Precision,
@@ -14,6 +17,22 @@ import {
   getSequenceLabel,
   groupByCategory,
 } from '@/lib/data-mappings';
+
+function DeprecatedSectionTitle({ reason }: { reason: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      Deprecated
+      <TooltipRoot>
+        <TooltipTrigger asChild>
+          <Info className="size-3 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent side="top" collisionPadding={10}>
+          <span>{reason}</span>
+        </TooltipContent>
+      </TooltipRoot>
+    </span>
+  );
+}
 
 interface ModelSelectorProps {
   id?: string;
@@ -35,10 +54,38 @@ export function ModelSelector({
   'data-testid': testId,
 }: ModelSelectorProps) {
   const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
-  const options = [
-    ...groups.default.map((model) => ({ value: model, label: getModelLabel(model as Model) })),
-    ...groups.experimental.map((model) => ({ value: model, label: getModelLabel(model as Model) })),
-    ...groups.deprecated.map((model) => ({ value: model, label: getModelLabel(model as Model) })),
+  const sections = [
+    {
+      id: 'default',
+      options: groups.default.map((model) => ({
+        value: model,
+        label: getModelLabel(model as Model),
+      })),
+    },
+    ...(groups.experimental.length > 0
+      ? [
+          {
+            id: 'experimental',
+            header: 'Experimental Support (WIP)',
+            options: groups.experimental.map((model) => ({
+              value: model,
+              label: getModelLabel(model as Model),
+            })),
+          },
+        ]
+      : []),
+    ...(groups.deprecated.length > 0
+      ? [
+          {
+            id: 'deprecated',
+            header: <DeprecatedSectionTitle reason="Model is no longer actively benchmarked." />,
+            options: groups.deprecated.map((model) => ({
+              value: model,
+              label: getModelLabel(model as Model),
+            })),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -50,7 +97,7 @@ export function ModelSelector({
       />
       <div data-testid={testId}>
         <MultiSelect
-          options={options}
+          sections={sections}
           value={[value]}
           onChange={(values) => {
             const next = values[0];
@@ -66,6 +113,7 @@ export function ModelSelector({
           showClearAll={false}
           searchable={false}
           plainSelectedText
+          showSelectionSummary={false}
         />
       </div>
     </div>
@@ -92,9 +140,28 @@ export function SequenceSelector({
   'data-testid': testId,
 }: SequenceSelectorProps) {
   const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
-  const options = [
-    ...groups.default.map((seq) => ({ value: seq, label: getSequenceLabel(seq as Sequence) })),
-    ...groups.deprecated.map((seq) => ({ value: seq, label: getSequenceLabel(seq as Sequence) })),
+  const sections = [
+    {
+      id: 'default',
+      options: groups.default.map((seq) => ({
+        value: seq,
+        label: getSequenceLabel(seq as Sequence),
+      })),
+    },
+    ...(groups.deprecated.length > 0
+      ? [
+          {
+            id: 'deprecated',
+            header: (
+              <DeprecatedSectionTitle reason="CI capacity was reallocated to agentic coding and multi-turn chat scenarios." />
+            ),
+            options: groups.deprecated.map((seq) => ({
+              value: seq,
+              label: getSequenceLabel(seq as Sequence),
+            })),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -106,7 +173,7 @@ export function SequenceSelector({
       />
       <div data-testid={testId}>
         <MultiSelect
-          options={options}
+          sections={sections}
           value={[value]}
           onChange={(values) => {
             const next = values[0];
@@ -122,6 +189,7 @@ export function SequenceSelector({
           showClearAll={false}
           searchable={false}
           plainSelectedText
+          showSelectionSummary={false}
         />
       </div>
     </div>
