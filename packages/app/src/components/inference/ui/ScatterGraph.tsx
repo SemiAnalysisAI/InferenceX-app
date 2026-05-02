@@ -1511,17 +1511,20 @@ const ScatterGraph = React.memo(
             | 'lower_left'
             | 'lower_right'
             | undefined;
-          // Bus = batch-friendly side; car = interactivity-friendly side.
-          // Throughput-like metrics (roofline starts with "upper") favor higher Y for
-          // the batch end → bus on top. Cost/energy metrics (roofline starts with
-          // "lower") favor lower Y for the batch end → bus on bottom.
-          // On the interactivity chart (X = tok/s/user) the batch end is the LEFT
-          // (low X). On the e2e chart (X = latency, lower = faster) the batch end
-          // is the RIGHT (high latency).
-          const isHigherY = dir?.startsWith('upper') ?? true;
-          const isInteractivity = chartDefinition.chartType === 'interactivity';
-          const busLeft = isInteractivity;
-          const busTop = isHigherY;
+          // Bus sits at the batch-friendly endpoint of the Pareto frontier; car at the
+          // interactivity-friendly opposite. The roofline direction is post-flipped by
+          // useChartData when X is swapped (e.g. interactivity chart input metrics
+          // showing TTFT), so it always reflects the effective axis directions.
+          //   upper_left  → bus top-left      (e.g. tput vs interactivity)
+          //   upper_right → bus top-right     (e.g. tput vs e2e or vs TTFT)
+          //   lower_left  → bus bottom-right  (e.g. cost vs e2e — batchy = high latency)
+          //   lower_right → bus bottom-left   (e.g. cost vs interactivity — batchy = low int)
+          // I.e. bus.y matches the upper/lower part; bus.x matches the left/right part
+          // for throughput-style metrics and is flipped for cost/energy-style metrics.
+          const isUpperY = dir?.startsWith('upper') ?? true;
+          const rooflineLeft = dir?.endsWith('left') ?? true;
+          const busTop = isUpperY;
+          const busLeft = isUpperY ? rooflineLeft : !rooflineLeft;
           const busX = busLeft ? PAD : w - SIZE - PAD;
           const busY = busTop ? PAD : h - SIZE - PAD;
           const carX = busLeft ? w - SIZE - PAD : PAD;
