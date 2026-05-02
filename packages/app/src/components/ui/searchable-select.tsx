@@ -141,38 +141,41 @@ export function SearchableSelect({
           // No enter animations: tailwindcss-animate sets opacity/scale to 0 at
           // the start of the animation which makes Cypress treat the search
           // input as not visible and fail cy.type().
-          className="bg-popover text-popover-foreground absolute z-50 mt-1 max-h-72 w-full origin-top overflow-hidden rounded-md border shadow-md"
+          className="bg-popover text-popover-foreground absolute z-50 mt-1 w-full origin-top overflow-hidden rounded-md border shadow-md"
         >
-          <div className="p-1 max-h-72 overflow-y-auto custom-scrollbar">
-            {searchable && (
-              <div className="flex items-center gap-1.5 px-2 pb-1 border-b mb-1 sticky top-0 bg-popover z-10">
-                <SearchIcon className="size-3.5 shrink-0 text-muted-foreground mr-2" />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    if (e.target.value) searchUsedRef.current = true;
+          {/* Search header lives outside the scrollable region so it never picks up
+           * `sticky` → `position: fixed` resolution that puts it behind the page
+           * header (and breaks Cypress's visibility check on the input). */}
+          {searchable && (
+            <div className="flex items-center gap-1.5 px-2 py-1 border-b bg-popover">
+              <SearchIcon className="size-3.5 shrink-0 text-muted-foreground mr-2" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  if (e.target.value) searchUsedRef.current = true;
+                }}
+                placeholder="Search..."
+                className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    searchRef.current?.focus();
                   }}
-                  placeholder="Search..."
-                  className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch('');
-                      searchRef.current?.focus();
-                    }}
-                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Clear search"
-                  >
-                    <XIcon className="size-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
+                  className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          <div className="p-1 max-h-72 overflow-y-auto custom-scrollbar">
             {filteredGroups.length === 0 && (
               <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
                 No results
