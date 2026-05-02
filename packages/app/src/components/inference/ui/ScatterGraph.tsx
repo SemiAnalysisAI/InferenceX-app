@@ -1502,7 +1502,7 @@ const ScatterGraph = React.memo(
           if (!showSpeedOverlay) return;
           const w = ctx.width;
           const h = ctx.height;
-          const SIZE = 56;
+          const SIZE = 78;
           const PAD = 8;
           const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
           const dir = chartDefinition[rooflineKey] as
