@@ -1657,8 +1657,8 @@ const ScatterGraph = React.memo(
           }
           if (showMinecraftOverlay) {
             // donkey-chest.png — Chested_Donkey_JE5 from minecraft.wiki/w/Donkey
-            // elytra.png — front-facing inventory sprite (Invicon_Elytra) from
-            //   minecraft.wiki/w/Elytra, scaled to 256×256 pixel-art.
+            // elytra.png — ElytraNew sprite (front-facing both wings) from the
+            //   Minecraft Fandom wiki at 160×160 pixel-art.
             enabledPairs.push({
               id: 'minecraft',
               slowSrc: '/decorative/donkey-chest.png',
