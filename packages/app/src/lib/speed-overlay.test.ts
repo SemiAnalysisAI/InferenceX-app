@@ -40,17 +40,4 @@ describe('getSpeedOverlayCorners', () => {
       busLeft: true,
     });
   });
-
-  it('keeps the car at the diagonal opposite of the bus for every direction', () => {
-    const directions = ['upper_left', 'upper_right', 'lower_left', 'lower_right'] as const;
-    for (const dir of directions) {
-      const { busTop, busLeft } = getSpeedOverlayCorners(dir);
-      // Car corner is implicit in ScatterGraph as `(carTop, carLeft) = (!busTop, !busLeft)`.
-      // This is a contract test: the bus and car must always sit at opposite corners.
-      const carTop = !busTop;
-      const carLeft = !busLeft;
-      expect(carTop).not.toBe(busTop);
-      expect(carLeft).not.toBe(busLeft);
-    }
-  });
 });
