@@ -995,6 +995,65 @@ const ScatterGraph = React.memo(
                   labeledHw.add(entry.hw);
                 }
               }
+
+              // Overlay (unofficial run) rooflines also get line labels using the
+              // run-palette color so they match the legend swatches. The label
+              // text mirrors the overlay legend ("✕ <branch>" — falls back to the
+              // hw label if run metadata isn't available, e.g. legacy callers).
+              const overlayLabelText = (runIndex: number, hwKey: string): string => {
+                const info = unofficialRunInfos[runIndex];
+                if (!info) return parseHwKeyToLabel(hwKey).label;
+                const branch = info.branch || `run ${info.id}`;
+                return `✕ ${branch}`;
+              };
+              const sortedOverlay = Object.entries(overlayRooflines)
+                .filter(
+                  ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
+                )
+                .toSorted(([, a], [, b]) => yScale(a.points[0].y) - yScale(b.points[0].y));
+
+              for (const [ovKey, group] of sortedOverlay) {
+                const labelKey = `overlay-${ovKey}`;
+                const pts = group.points;
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)],
+                  pts[Math.floor(pts.length / 2)],
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                  pts.at(-1)!,
+                ];
+                const label = overlayLabelText(group.runIndex, group.hwKey);
+                let placedOverlay = false;
+                for (const pt of candidates) {
+                  const px = xScale(pt.x);
+                  const py = yScale(pt.y);
+                  if (!collides(px, py)) {
+                    lineLabels.push({
+                      key: labelKey,
+                      hw: group.hwKey,
+                      label,
+                      color: overlayRunColor(group.runIndex),
+                      x: px,
+                      y: py,
+                      visible: true,
+                    });
+                    placed.push({ x: px, y: py });
+                    placedOverlay = true;
+                    break;
+                  }
+                }
+                if (!placedOverlay) {
+                  const pt = pts[0];
+                  lineLabels.push({
+                    key: labelKey,
+                    hw: group.hwKey,
+                    label,
+                    color: overlayRunColor(group.runIndex),
+                    x: xScale(pt.x),
+                    y: yScale(pt.y),
+                    visible: false,
+                  });
+                }
+              }
             } else {
               // TTFT / E2EL: endpoint labels, one per hw key
               const seenHw = new Set<string>();
@@ -1011,6 +1070,26 @@ const ScatterGraph = React.memo(
                   x: xScale(pt.x),
                   y: yScale(pt.y),
                   visible: entry.visible,
+                });
+              }
+              // Endpoint labels for overlay rooflines too (one per (hw, runIndex)),
+              // labeled with the run's branch name to mirror the overlay legend.
+              for (const [ovKey, group] of Object.entries(overlayRooflines)) {
+                if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                const info = unofficialRunInfos[group.runIndex];
+                const labelText = info
+                  ? `✕ ${info.branch || `run ${info.id}`}`
+                  : parseHwKeyToLabel(group.hwKey).label;
+                const labelKey = `overlay-${ovKey}`;
+                const pt = group.points.at(-1)!;
+                lineLabels.push({
+                  key: labelKey,
+                  hw: group.hwKey,
+                  label: labelText,
+                  color: overlayRunColor(group.runIndex),
+                  x: xScale(pt.x),
+                  y: yScale(pt.y),
+                  visible: true,
                 });
               }
               const visible = lineLabels.filter((l) => l.visible);
@@ -1203,6 +1282,43 @@ const ScatterGraph = React.memo(
                 }
               }
 
+              // Overlay (unofficial) rooflines: same greedy placement against
+              // the same `placed` array so they stay non-overlapping with the
+              // official labels post-zoom.
+              const overlayVisible = Object.entries(overlayRooflines)
+                .filter(
+                  ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
+                )
+                .toSorted(([, a], [, b]) => newYScale(a.points[0].y) - newYScale(b.points[0].y));
+              for (const [ovKey, group] of overlayVisible) {
+                const labelKey = `overlay-${ovKey}`;
+                const pts = group.points;
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)],
+                  pts[Math.floor(pts.length / 2)],
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                  pts.at(-1)!,
+                ];
+                let found = false;
+                for (const pt of candidates) {
+                  const px = newXScale(pt.x);
+                  const py = newYScale(pt.y);
+                  if (!collides(px, py)) {
+                    zoomResults.set(labelKey, { x: px, y: py, vis: true });
+                    placed.push({ x: px, y: py });
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  zoomResults.set(labelKey, {
+                    x: newXScale(pts[0].x),
+                    y: newYScale(pts[0].y),
+                    vis: false,
+                  });
+                }
+              }
+
               zoomGroup.selectAll<SVGGElement, unknown>('.line-label').each(function () {
                 const el = d3.select(this);
                 const k = el.attr('data-line-key');
@@ -1231,6 +1347,16 @@ const ScatterGraph = React.memo(
                 const pt = pts.at(-1)!;
                 zoomLabels.push({ key, x: newXScale(pt.x), y: newYScale(pt.y) });
               });
+              // Overlay rooflines: per-(hw, runIndex) endpoint labels.
+              for (const [ovKey, group] of Object.entries(overlayRooflines)) {
+                if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                const pt = group.points.at(-1)!;
+                zoomLabels.push({
+                  key: `overlay-${ovKey}`,
+                  x: newXScale(pt.x),
+                  y: newYScale(pt.y),
+                });
+              }
               if (zoomLabels.length > 1) {
                 const yRange = newYScale.range();
                 const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
@@ -1562,6 +1688,8 @@ const ScatterGraph = React.memo(
       overlayData,
       processedOverlayData,
       overlayRooflines,
+      activeOverlayHwTypes,
+      unofficialRunInfos,
       runIndexByUrl,
       hardwareConfig,
       xLabel,
