@@ -211,6 +211,8 @@ export function createMockInferenceContext(
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,
     setShowLineLabels: namedStub('setShowLineLabels'),
+    showSpeedOverlay: false,
+    setShowSpeedOverlay: namedStub('setShowSpeedOverlay'),
     selectedGPUs: [],
     setSelectedGPUs: namedStub('setSelectedGPUs'),
     availableGPUs: [

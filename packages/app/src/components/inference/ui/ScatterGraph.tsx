@@ -43,6 +43,7 @@ import {
   paretoFrontUpperLeft,
   paretoFrontUpperRight,
 } from '@/lib/chart-utils';
+import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
   InferenceData,
@@ -141,6 +142,8 @@ const ScatterGraph = React.memo(
       setShowGradientLabels,
       showLineLabels,
       setShowLineLabels,
+      showSpeedOverlay,
+      setShowSpeedOverlay,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -1491,14 +1494,60 @@ const ScatterGraph = React.memo(
           }
         : null;
 
+      const speedOverlayLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'speed-overlay',
+        render: (_zoomGroup, ctx) => {
+          const { g } = ctx.layout;
+          g.selectAll('.speed-overlay').remove();
+          if (!showSpeedOverlay) return;
+          const w = ctx.width;
+          const h = ctx.height;
+          const SIZE = 78;
+          const PAD = 8;
+          const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+          const dir = chartDefinition[rooflineKey] as RooflineDirection | undefined;
+          const { busTop, busLeft } = getSpeedOverlayCorners(dir);
+          const busX = busLeft ? PAD : w - SIZE - PAD;
+          const busY = busTop ? PAD : h - SIZE - PAD;
+          const carX = busLeft ? w - SIZE - PAD : PAD;
+          const carY = busTop ? h - SIZE - PAD : PAD;
+          const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
+          layer
+            .append('image')
+            .attr('class', 'speed-overlay-bus')
+            .attr('data-testid', 'speed-overlay-bus')
+            .attr('data-corner', `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`)
+            .attr('href', '/decorative/bus.png')
+            .attr('x', busX)
+            .attr('y', busY)
+            .attr('width', SIZE)
+            .attr('height', SIZE)
+            .attr('opacity', 0.85);
+          layer
+            .append('image')
+            .attr('class', 'speed-overlay-car')
+            .attr('data-testid', 'speed-overlay-car')
+            .attr('data-corner', `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`)
+            .attr('href', '/decorative/racing-car.png')
+            .attr('x', carX)
+            .attr('y', carY)
+            .attr('width', SIZE)
+            .attr('height', SIZE)
+            .attr('opacity', 0.85);
+        },
+      };
+
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
+      result.push(speedOverlayLayer);
       return result;
     }, [
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      showSpeedOverlay,
       gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
@@ -1518,6 +1567,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      chartDefinition,
       chartDefinition.chartType,
     ]);
 
@@ -1852,6 +1902,15 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setShowLineLabels(checked);
                   track('latency_line_labels_toggled', { enabled: checked });
+                },
+              },
+              {
+                id: 'scatter-speed-overlay',
+                label: 'Bus / Race Car',
+                checked: showSpeedOverlay,
+                onCheckedChange: (checked: boolean) => {
+                  setShowSpeedOverlay(checked);
+                  track('latency_speed_overlay_toggled', { enabled: checked });
                 },
               },
             ]}

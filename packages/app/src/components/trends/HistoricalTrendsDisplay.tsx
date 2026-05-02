@@ -27,7 +27,6 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-  isModelExperimental,
 } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -313,21 +312,6 @@ export default function HistoricalTrendsDisplay() {
                       includePowerThroughputCaveat={false}
                     />
                     <UnofficialDomainNotice />
-                    <div
-                      className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                        isModelExperimental(selectedModel)
-                          ? 'max-h-20 opacity-100'
-                          : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                        <strong>Note:</strong> At SemiAnalysis InferenceX™, we're still in the early
-                        stages of adding support for this model. Please note that these InferenceX™
-                        results are experimental. If a GPU SKU is currently missing, it does not
-                        necessarily mean the model is unsupported; it simply means InferenceX™ has
-                        not added that SKU yet. Additional support is coming soon.
-                      </p>
-                    </div>
                   </>
                 }
                 trendLines={trendLines}

@@ -136,6 +136,7 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
+  const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -743,6 +744,7 @@ export function InferenceProvider({
       i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: showLineLabels ? '1' : '',
+      i_speed: showSpeedOverlay ? '1' : '',
       i_active: iActiveStr,
     },
     [
@@ -761,6 +763,7 @@ export function InferenceProvider({
       useAdvancedLabels,
       showGradientLabels,
       showLineLabels,
+      showSpeedOverlay,
       iActiveStr,
     ],
   );
@@ -957,6 +960,8 @@ export function InferenceProvider({
       setShowGradientLabels,
       showLineLabels,
       setShowLineLabels,
+      showSpeedOverlay,
+      setShowSpeedOverlay,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -1009,6 +1014,7 @@ export function InferenceProvider({
       useAdvancedLabels,
       showGradientLabels,
       showLineLabels,
+      showSpeedOverlay,
       userCosts,
       userPowers,
       trackedConfigs,

@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition } from '@/components/inference/types';
@@ -235,28 +236,17 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               label="Y-Axis Metric"
               tooltip="The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values."
             />
-            <MultiSelect
-              options={groupedYAxisOptions.flatMap((group) =>
-                group.options.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                })),
-              )}
-              value={[selectedYAxisMetric]}
-              onChange={(values) => {
-                const next = values[0];
-                if (!next) return;
-                handleYAxisMetricChange(next);
-              }}
-              open={openDropdown === 'yaxis'}
-              onOpenChange={handleDropdownOpenChange('yaxis')}
+            <SearchableSelect
+              triggerId="y-axis-select"
+              triggerTestId="yaxis-metric-selector"
+              value={selectedYAxisMetric}
+              onValueChange={handleYAxisMetricChange}
               placeholder="Y-Axis Metric"
-              minSelections={1}
-              maxSelections={1}
-              showClearAll={false}
-              searchable={false}
-              plainSelectedText
-              showSelectionSummary={false}
+              trackPrefix="yaxis_metric"
+              groups={groupedYAxisOptions.map((g) => ({
+                label: g.groupLabel,
+                options: g.options,
+              }))}
             />
           </div>
 

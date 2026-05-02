@@ -497,6 +497,8 @@ export interface InferenceChartContextType {
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   showLineLabels: boolean;
   setShowLineLabels: (showLineLabels: boolean) => void;
+  showSpeedOverlay: boolean;
+  setShowSpeedOverlay: (showSpeedOverlay: boolean) => void;
   selectedGPUs: string[];
   setSelectedGPUs: (gpus: string[]) => void;
   availableGPUs: { value: string; label: string }[];
