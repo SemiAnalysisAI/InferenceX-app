@@ -44,9 +44,18 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  // Defer the trigger label until the component has mounted on the client.
+  // The selected value derives from URL params / persisted state which only
+  // resolve client-side, so SSR would otherwise lock in the default label and
+  // leave it stale after hydration.
+  const [mounted, setMounted] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const searchUsedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -111,13 +120,12 @@ export function SearchableSelect({
         )}
       >
         <span
-          // Selected value is derived from client-only state (URL params, persisted
-          // toggles), so the SSR pass renders a default while the client renders the
-          // hydrated value — suppress the harmless mismatch.
-          suppressHydrationWarning
-          className={cn('flex-1 text-left truncate', !selectedLabel && 'text-muted-foreground')}
+          className={cn(
+            'flex-1 text-left truncate',
+            (!mounted || !selectedLabel) && 'text-muted-foreground',
+          )}
         >
-          {selectedLabel ?? placeholder}
+          {mounted ? (selectedLabel ?? placeholder) : placeholder}
         </span>
         <ChevronDownIcon
           className={cn(
@@ -130,7 +138,10 @@ export function SearchableSelect({
       {isOpen && (
         <div
           data-slot="select-content"
-          className="bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 absolute z-50 mt-1 max-h-72 w-full origin-top overflow-hidden rounded-md border shadow-md"
+          // No enter animations: tailwindcss-animate sets opacity/scale to 0 at
+          // the start of the animation which makes Cypress treat the search
+          // input as not visible and fail cy.type().
+          className="bg-popover text-popover-foreground absolute z-50 mt-1 max-h-72 w-full origin-top overflow-hidden rounded-md border shadow-md"
         >
           <div className="p-1 max-h-72 overflow-y-auto custom-scrollbar">
             {searchable && (
