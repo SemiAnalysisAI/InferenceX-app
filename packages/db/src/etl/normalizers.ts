@@ -12,31 +12,17 @@ import {
 export { GPU_KEYS };
 
 /**
- * Strip known hw suffixes (-trt, -multinode-slurm, -amds, etc.) from a raw
- * hardware identifier and return the canonical lowercase GPU key.
+ * Strip everything from the first `-` onwards (and any trailing `_<digits>`
+ * runner-index suffix) from a raw hardware identifier and return the canonical
+ * lowercase GPU key. All keys in `GPU_KEYS` are single-segment, so this is
+ * sufficient; unknown bases return `null`.
  *
  * @param hw - Raw hardware string from the benchmark artifact (e.g. `"h200-nv"`, `"mi355x-amds"`).
  * @returns The canonical GPU key (e.g. `"h200"`, `"mi355x"`), or `null` if the
  *   stripped base is not in `GPU_KEYS`.
  */
 export function hwToGpuKey(hw: string): string | null {
-  const base = hw
-    .toLowerCase()
-    .replace(/_\d+$/, '') // strip runner index suffix (e.g. mi355x-amd_0 → mi355x-amd)
-    .replace(/-trt$/, '')
-    .replace(/-multinode-slurm$/, '')
-    .replace(/-multinode$/, '')
-    .replace(/-nvs$/, '')
-    .replace(/-disagg$/, '')
-    .replace(/-amds$/, '')
-    .replace(/-amd$/, '')
-    .replace(/-nvd$/, '')
-    .replace(/-dgxc-slurm$/, '')
-    .replace(/-dgxc$/, '')
-    .replace(/-nb$/, '')
-    .replace(/-dsv4$/, '')
-    .replace(/-cw$/, '')
-    .replace(/-nv$/, '');
+  const base = hw.toLowerCase().split('-')[0];
   return GPU_KEYS.has(base) ? base : null;
 }
 
