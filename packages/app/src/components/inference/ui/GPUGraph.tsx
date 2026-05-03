@@ -13,7 +13,13 @@ import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { D3ChartHandle, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
+import type {
+  CustomLayerConfig,
+  D3ChartHandle,
+  RenderContext,
+  ZoomContext,
+} from '@/lib/d3-chart/D3Chart/types';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
 import {
   applyHoverState,
   applyNormalState,
@@ -65,6 +71,8 @@ const GPUGraph = React.memo(
       highContrast,
       setHighContrast,
       selectAllActiveDates,
+      showLineLabels,
+      setShowLineLabels,
     } = useInference();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
@@ -242,6 +250,286 @@ const GPUGraph = React.memo(
       [activeDates],
     );
 
+    // ── Line labels (date along each roofline) ──
+    // One label per (date, hwKey) pair — keys with multiple precisions for the
+    // same combo dedupe down to the longest roofline so the label rides the
+    // line that has the most placement options. Labels track the active filter
+    // (`activeDates`) so removing a series via the legend hides its label too.
+    const lineLabelLayer: CustomLayerConfig = useMemo(
+      () => ({
+        type: 'custom',
+        key: 'line-labels',
+        render: (zoomGroup, ctx) => {
+          // Always run the data-join so toggling the switch off cleans the DOM.
+          interface LineLabel {
+            key: string;
+            graphId: string;
+            label: string;
+            color: string;
+            x: number;
+            y: number;
+            visible: boolean;
+          }
+
+          if (!showLineLabels) {
+            zoomGroup.selectAll('.line-label').remove();
+            return;
+          }
+
+          const xScale = ctx.xScale as ContinuousScale;
+          const yScale = ctx.yScale as ContinuousScale;
+          const isInteractivity = chartDefinition.chartType === 'interactivity';
+          const LABEL_H = 18;
+          const LABEL_W = 160;
+
+          // Pick longest roofline per (date, hwKey) so we get one label per series.
+          const bestByGraph = new Map<string, { key: string; pts: InferenceData[] }>();
+          for (const [key, pts] of Object.entries(rooflines)) {
+            if (pts.length < 2) continue;
+            const graphId = key.slice(0, key.lastIndexOf('_'));
+            if (!isRooflineVisible(key)) continue;
+            const prev = bestByGraph.get(graphId);
+            if (!prev || pts.length > prev.pts.length) bestByGraph.set(graphId, { key, pts });
+          }
+
+          const lineLabels: LineLabel[] = [];
+
+          // Label text combines the hw config (display label) and the date so
+          // both dimensions of the GPU comparison view are legible on the chart,
+          // not only the legend. Falls back to the raw hwKey if the config
+          // lookup misses (legacy data).
+          const labelTextFor = (pts: InferenceData[]): string => {
+            const hwKey = String(pts[0].hwKey);
+            const date = String(pts[0].date);
+            const cfg = getHardwareConfig(hwKey);
+            const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
+            return `${hwLabel} • ${date}`;
+          };
+
+          if (isInteractivity) {
+            // Greedy placement: try start → midpoint → 2/3-along → endpoint.
+            const placed: { x: number; y: number }[] = [];
+            const collides = (cx: number, cy: number) =>
+              placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+
+            const sorted = [...bestByGraph.entries()].toSorted(
+              ([, a], [, b]) => yScale(a.pts[0].y) - yScale(b.pts[0].y),
+            );
+            for (const [graphId, { key, pts }] of sorted) {
+              const candidates = [
+                pts[Math.min(1, pts.length - 1)],
+                pts[Math.floor(pts.length / 2)],
+                pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                pts.at(-1)!,
+              ];
+              const labelText = labelTextFor(pts);
+              let placedLabel = false;
+              for (const pt of candidates) {
+                const px = xScale(pt.x);
+                const py = yScale(pt.y);
+                if (!collides(px, py)) {
+                  lineLabels.push({
+                    key,
+                    graphId,
+                    label: labelText,
+                    color: getRooflineColor(key),
+                    x: px,
+                    y: py,
+                    visible: true,
+                  });
+                  placed.push({ x: px, y: py });
+                  placedLabel = true;
+                  break;
+                }
+              }
+              if (!placedLabel) {
+                const pt = pts[0];
+                lineLabels.push({
+                  key,
+                  graphId,
+                  label: labelText,
+                  color: getRooflineColor(key),
+                  x: xScale(pt.x),
+                  y: yScale(pt.y),
+                  visible: false,
+                });
+              }
+            }
+          } else {
+            // TTFT / E2EL: endpoint labels with vertical nudge to avoid overlap.
+            for (const [graphId, { key, pts }] of bestByGraph.entries()) {
+              const pt = pts.at(-1)!;
+              lineLabels.push({
+                key,
+                graphId,
+                label: labelTextFor(pts),
+                color: getRooflineColor(key),
+                x: xScale(pt.x),
+                y: yScale(pt.y),
+                visible: true,
+              });
+            }
+            if (lineLabels.length > 1) {
+              const yRange = yScale.range();
+              const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
+              const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
+              lineLabels.sort((a, b) => a.y - b.y);
+              for (let pass = 0; pass < 5; pass++) {
+                for (let i = 1; i < lineLabels.length; i++) {
+                  const overlap = lineLabels[i - 1].y + LABEL_H - lineLabels[i].y;
+                  if (overlap > 0) {
+                    const half = overlap / 2;
+                    lineLabels[i - 1].y -= half;
+                    lineLabels[i].y += half;
+                  }
+                }
+                for (const l of lineLabels) {
+                  l.y = Math.max(top, Math.min(bottom, l.y));
+                }
+              }
+            }
+          }
+
+          zoomGroup
+            .selectAll<SVGGElement, LineLabel>('.line-label')
+            .data(lineLabels, (d) => d.key)
+            .join(
+              (enter) => {
+                const g = enter
+                  .append('g')
+                  .attr('class', 'line-label')
+                  .style('pointer-events', 'none');
+                g.append('rect').attr('class', 'll-bg').attr('rx', 4).attr('ry', 4);
+                g.append('text')
+                  .attr('class', 'll-text')
+                  .attr('text-anchor', 'start')
+                  .attr('dominant-baseline', 'central')
+                  .attr('fill', 'white')
+                  .attr('font-size', '10px')
+                  .attr('font-weight', '600');
+                return g;
+              },
+              (update) => update,
+              (exit) => exit.remove(),
+            )
+            .attr('data-line-key', (d) => d.key)
+            .attr('data-graph-id', (d) => d.graphId)
+            .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
+            .style('opacity', (d) => (d.visible ? 0.95 : 0))
+            .each(function (d) {
+              const g = d3.select(this);
+              const text = g.select<SVGTextElement>('.ll-text').text(d.label);
+              const bbox = (text.node() as SVGTextElement).getBBox();
+              const px = 5;
+              const py = 3;
+              g.select('.ll-bg')
+                .attr('x', bbox.x - px)
+                .attr('y', bbox.y - py)
+                .attr('width', bbox.width + px * 2)
+                .attr('height', bbox.height + py * 2)
+                .attr('fill', d.color);
+            });
+        },
+        onZoom: (zoomGroup, ctx) => {
+          if (!showLineLabels) return;
+          const newXScale = ctx.newXScale as ContinuousScale;
+          const newYScale = ctx.newYScale as ContinuousScale;
+
+          // Mirror the placement algorithm with the zoomed scales so labels
+          // stay anchored to their rooflines without jumping on zoom.
+          const isInteractivity = chartDefinition.chartType === 'interactivity';
+          const LABEL_H = 18;
+          const LABEL_W = 160;
+
+          const bestByGraph = new Map<string, { key: string; pts: InferenceData[] }>();
+          for (const [key, pts] of Object.entries(rooflines)) {
+            if (pts.length < 2 || !isRooflineVisible(key)) continue;
+            const graphId = key.slice(0, key.lastIndexOf('_'));
+            const prev = bestByGraph.get(graphId);
+            if (!prev || pts.length > prev.pts.length) bestByGraph.set(graphId, { key, pts });
+          }
+
+          const zoomResults = new Map<string, { x: number; y: number; vis: boolean }>();
+          if (isInteractivity) {
+            const placed: { x: number; y: number }[] = [];
+            const collides = (cx: number, cy: number) =>
+              placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+            const sorted = [...bestByGraph.entries()].toSorted(
+              ([, a], [, b]) => newYScale(a.pts[0].y) - newYScale(b.pts[0].y),
+            );
+            for (const [, { key, pts }] of sorted) {
+              const candidates = [
+                pts[Math.min(1, pts.length - 1)],
+                pts[Math.floor(pts.length / 2)],
+                pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                pts.at(-1)!,
+              ];
+              let found = false;
+              for (const pt of candidates) {
+                const px = newXScale(pt.x);
+                const py = newYScale(pt.y);
+                if (!collides(px, py)) {
+                  zoomResults.set(key, { x: px, y: py, vis: true });
+                  placed.push({ x: px, y: py });
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                zoomResults.set(key, {
+                  x: newXScale(pts[0].x),
+                  y: newYScale(pts[0].y),
+                  vis: false,
+                });
+              }
+            }
+          } else {
+            interface ZL {
+              key: string;
+              x: number;
+              y: number;
+            }
+            const zls: ZL[] = [];
+            for (const [, { key, pts }] of bestByGraph.entries()) {
+              const pt = pts.at(-1)!;
+              zls.push({ key, x: newXScale(pt.x), y: newYScale(pt.y) });
+            }
+            if (zls.length > 1) {
+              const yRange = newYScale.range();
+              const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
+              const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
+              zls.sort((a, b) => a.y - b.y);
+              for (let pass = 0; pass < 5; pass++) {
+                for (let i = 1; i < zls.length; i++) {
+                  const overlap = zls[i - 1].y + LABEL_H - zls[i].y;
+                  if (overlap > 0) {
+                    const half = overlap / 2;
+                    zls[i - 1].y -= half;
+                    zls[i].y += half;
+                  }
+                }
+                for (const z of zls) z.y = Math.max(top, Math.min(bottom, z.y));
+              }
+            }
+            for (const z of zls) zoomResults.set(z.key, { x: z.x, y: z.y, vis: true });
+          }
+
+          zoomGroup.selectAll<SVGGElement, unknown>('.line-label').each(function () {
+            const el = d3.select(this);
+            const k = el.attr('data-line-key');
+            const zl = zoomResults.get(k);
+            if (zl) {
+              el.attr('transform', `translate(${zl.x + 8},${zl.y - 14})`);
+              el.style('opacity', zl.vis ? 0.95 : 0);
+            } else {
+              el.style('opacity', 0);
+            }
+          });
+        },
+      }),
+      [showLineLabels, rooflines, isRooflineVisible, getRooflineColor, chartDefinition.chartType],
+    );
+
     // Dismiss tooltip when pinned point's combo is hidden
     useEffect(() => {
       const pp = chartRef.current?.getPinnedPoint() as InferenceData | null;
@@ -361,6 +649,7 @@ const GPUGraph = React.memo(
               selectedPrecisions,
             },
           },
+          lineLabelLayer,
         ]}
         zoom={{
           enabled: true,
@@ -487,6 +776,15 @@ const GPUGraph = React.memo(
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
                   track('interactivity_advanced_labels_toggled', { enabled: c });
+                },
+              },
+              {
+                id: 'gpu-line-labels',
+                label: 'Line Labels',
+                checked: showLineLabels,
+                onCheckedChange: (c) => {
+                  setShowLineLabels(c);
+                  track('interactivity_line_labels_toggled', { enabled: c });
                 },
               },
             ]}
