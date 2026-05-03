@@ -23,13 +23,7 @@ import { ShareButton } from '@/components/ui/share-button';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -101,6 +95,15 @@ const CALCULATOR_MOBILE_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewM
   CALCULATOR_VIEW_MODE_OPTIONS.map(({ testId: _testId, ...option }) => option);
 
 export default function ThroughputCalculatorDisplay() {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
+    if (isOpen) {
+      setOpenDropdown(dropdownKey);
+      return;
+    }
+    setOpenDropdown((current) => (current === dropdownKey ? null : current));
+  };
+
   const {
     selectedModel,
     setSelectedModel,
@@ -407,7 +410,7 @@ export default function ThroughputCalculatorDisplay() {
   return (
     <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
-        <Card>
+        <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
@@ -434,6 +437,8 @@ export default function ThroughputCalculatorDisplay() {
                   data-testid="calc-model-selector"
                   value={selectedModel}
                   onChange={handleModelChange}
+                  open={openDropdown === 'model'}
+                  onOpenChange={handleDropdownOpenChange('model')}
                   availableModels={availableModels}
                 />
                 <SequenceSelector
@@ -441,6 +446,8 @@ export default function ThroughputCalculatorDisplay() {
                   data-testid="calc-sequence-selector"
                   value={selectedSequence}
                   onChange={handleSequenceChange}
+                  open={openDropdown === 'sequence'}
+                  onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
                 />
                 <PrecisionSelector
@@ -448,6 +455,8 @@ export default function ThroughputCalculatorDisplay() {
                   data-testid="calc-precision-selector"
                   value={selectedPrecisions}
                   onChange={handlePrecisionChange}
+                  open={openDropdown === 'precision'}
+                  onOpenChange={handleDropdownOpenChange('precision')}
                   availablePrecisions={availablePrecisions}
                 />
 
@@ -457,22 +466,29 @@ export default function ThroughputCalculatorDisplay() {
                     label="Cost Provider"
                     tooltip="The pricing tier used to calculate cost per million tokens. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental."
                   />
-                  <Select value={costProvider} onValueChange={handleCostProviderChange}>
-                    <SelectTrigger
-                      id="calc-cost"
-                      data-testid="calc-cost-selector"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COST_PROVIDER_OPTIONS.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div id="calc-cost" data-testid="calc-cost-selector">
+                    <MultiSelect
+                      options={COST_PROVIDER_OPTIONS.map((c) => ({
+                        value: c.value,
+                        label: c.label,
+                      }))}
+                      value={[costProvider]}
+                      onChange={(values) => {
+                        const next = values[0];
+                        if (!next) return;
+                        handleCostProviderChange(next);
+                      }}
+                      open={openDropdown === 'costProvider'}
+                      onOpenChange={handleDropdownOpenChange('costProvider')}
+                      placeholder="Cost provider"
+                      minSelections={1}
+                      maxSelections={1}
+                      showClearAll={false}
+                      searchable={false}
+                      plainSelectedText
+                      showSelectionSummary={false}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex flex-col space-y-1.5 lg:col-span-1">
@@ -481,22 +497,29 @@ export default function ThroughputCalculatorDisplay() {
                     label="Token Type"
                     tooltip="Whether to show costs for total tokens, input tokens only, or output tokens only."
                   />
-                  <Select value={costType} onValueChange={handleCostTypeChange}>
-                    <SelectTrigger
-                      id="calc-cost-type"
-                      data-testid="calc-cost-type-selector"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COST_TYPE_OPTIONS.map((ct) => (
-                        <SelectItem key={ct.value} value={ct.value}>
-                          {ct.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div id="calc-cost-type" data-testid="calc-cost-type-selector">
+                    <MultiSelect
+                      options={COST_TYPE_OPTIONS.map((ct) => ({
+                        value: ct.value,
+                        label: ct.label,
+                      }))}
+                      value={[costType]}
+                      onChange={(values) => {
+                        const next = values[0];
+                        if (!next) return;
+                        handleCostTypeChange(next);
+                      }}
+                      open={openDropdown === 'costType'}
+                      onOpenChange={handleDropdownOpenChange('costType')}
+                      placeholder="Token type"
+                      minSelections={1}
+                      maxSelections={1}
+                      showClearAll={false}
+                      searchable={false}
+                      plainSelectedText
+                      showSelectionSummary={false}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { track } from '@/lib/analytics';
 
 import { useInference } from '@/components/inference/InferenceContext';
@@ -77,6 +79,14 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const handleDropdownOpenChange = (dropdownKey: string) => (open: boolean) => {
+    if (open) {
+      setOpenDropdown(dropdownKey);
+      return;
+    }
+    setOpenDropdown((current) => (current === dropdownKey ? null : current));
+  };
   const {
     selectedModel,
     setSelectedModel,
@@ -199,18 +209,24 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           <ModelSelector
             value={selectedModel}
             onChange={handleModelChange}
+            open={openDropdown === 'model'}
+            onOpenChange={handleDropdownOpenChange('model')}
             availableModels={availableModels}
             data-testid="model-selector"
           />
           <SequenceSelector
             value={selectedSequence}
             onChange={handleSequenceChange}
+            open={openDropdown === 'sequence'}
+            onOpenChange={handleDropdownOpenChange('sequence')}
             availableSequences={availableSequences}
             data-testid="sequence-selector"
           />
           <PrecisionSelector
             value={selectedPrecisions}
             onChange={handlePrecisionChange}
+            open={openDropdown === 'precision'}
+            onOpenChange={handleDropdownOpenChange('precision')}
             availablePrecisions={availablePrecisions}
             data-testid="precision-multiselect"
           />
@@ -253,7 +269,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent portalled={false}>
                     <SelectItem value="p99_ttft">P99 TTFT</SelectItem>
                     <SelectItem value="median_ttft">Median TTFT</SelectItem>
                   </SelectContent>
@@ -277,7 +293,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent portalled={false}>
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="linear">Linear</SelectItem>
                     <SelectItem value="log">Logarithmic</SelectItem>
@@ -298,6 +314,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   options={availableGPUs}
                   value={selectedGPUs}
                   onChange={handleGPUChange}
+                  open={openDropdown === 'gpu'}
+                  onOpenChange={handleDropdownOpenChange('gpu')}
                   placeholder="Select a GPU Config for comparison"
                   maxSelections={4}
                 />
