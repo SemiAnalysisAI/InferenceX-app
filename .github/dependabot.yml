@@ -7,7 +7,7 @@ updates:
       day: 'monday'
     open-pull-requests-limit: 2
     labels:
-      - 'dependencies'
+      - 'type/dependencies'
     commit-message:
       prefix: 'chore'
     groups:
@@ -30,7 +30,7 @@ updates:
       day: 'monday'
     open-pull-requests-limit: 2
     labels:
-      - 'dependencies'
+      - 'type/dependencies'
     commit-message:
       prefix: 'chore'
     groups:
