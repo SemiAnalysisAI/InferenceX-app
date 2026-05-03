@@ -207,13 +207,18 @@ describe('GPUGraph', () => {
       },
     );
 
-    // One label per visible (date, hwKey) — labels show the date string, not hw.
-    cy.get('#test-gpu-line-labels svg .line-label')
-      .should('have.length', 2)
-      .and('not.contain.text', 'h100')
-      .and('not.contain.text', 'b200');
+    // One label per visible (date, hwKey) — labels carry both the hw config
+    // and the date so the chart-side label is self-contained.
+    cy.get('#test-gpu-line-labels svg .line-label').should('have.length', 2);
     cy.get('#test-gpu-line-labels svg .line-label').should('contain.text', '2025-03-01');
     cy.get('#test-gpu-line-labels svg .line-label').should('contain.text', '2025-03-15');
+    // Hw display labels (e.g. "H100", "B200") appear alongside the dates.
+    cy.get('#test-gpu-line-labels svg .line-label')
+      .invoke('text')
+      .then((txt) => {
+        expect(txt.toLowerCase()).to.match(/h100|h 100/i);
+        expect(txt.toLowerCase()).to.match(/b200|b 200/i);
+      });
     // Each label has the rounded background rect.
     cy.get('#test-gpu-line-labels svg .line-label .ll-bg').should('have.length', 2);
   });

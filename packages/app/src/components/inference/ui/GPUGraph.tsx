@@ -280,7 +280,7 @@ const GPUGraph = React.memo(
           const yScale = ctx.yScale as ContinuousScale;
           const isInteractivity = chartDefinition.chartType === 'interactivity';
           const LABEL_H = 18;
-          const LABEL_W = 90;
+          const LABEL_W = 160;
 
           // Pick longest roofline per (date, hwKey) so we get one label per series.
           const bestByGraph = new Map<string, { key: string; pts: InferenceData[] }>();
@@ -293,6 +293,18 @@ const GPUGraph = React.memo(
           }
 
           const lineLabels: LineLabel[] = [];
+
+          // Label text combines the hw config (display label) and the date so
+          // both dimensions of the GPU comparison view are legible on the chart,
+          // not only the legend. Falls back to the raw hwKey if the config
+          // lookup misses (legacy data).
+          const labelTextFor = (pts: InferenceData[]): string => {
+            const hwKey = String(pts[0].hwKey);
+            const date = String(pts[0].date);
+            const cfg = getHardwareConfig(hwKey);
+            const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
+            return `${hwLabel} • ${date}`;
+          };
 
           if (isInteractivity) {
             // Greedy placement: try start → midpoint → 2/3-along → endpoint.
@@ -310,7 +322,7 @@ const GPUGraph = React.memo(
                 pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
                 pts.at(-1)!,
               ];
-              const date = pts[0].date as string;
+              const labelText = labelTextFor(pts);
               let placedLabel = false;
               for (const pt of candidates) {
                 const px = xScale(pt.x);
@@ -319,7 +331,7 @@ const GPUGraph = React.memo(
                   lineLabels.push({
                     key,
                     graphId,
-                    label: date,
+                    label: labelText,
                     color: getRooflineColor(key),
                     x: px,
                     y: py,
@@ -335,7 +347,7 @@ const GPUGraph = React.memo(
                 lineLabels.push({
                   key,
                   graphId,
-                  label: date,
+                  label: labelText,
                   color: getRooflineColor(key),
                   x: xScale(pt.x),
                   y: yScale(pt.y),
@@ -350,7 +362,7 @@ const GPUGraph = React.memo(
               lineLabels.push({
                 key,
                 graphId,
-                label: pts[0].date as string,
+                label: labelTextFor(pts),
                 color: getRooflineColor(key),
                 x: xScale(pt.x),
                 y: yScale(pt.y),
@@ -427,7 +439,7 @@ const GPUGraph = React.memo(
           // stay anchored to their rooflines without jumping on zoom.
           const isInteractivity = chartDefinition.chartType === 'interactivity';
           const LABEL_H = 18;
-          const LABEL_W = 90;
+          const LABEL_W = 160;
 
           const bestByGraph = new Map<string, { key: string; pts: InferenceData[] }>();
           for (const [key, pts] of Object.entries(rooflines)) {
