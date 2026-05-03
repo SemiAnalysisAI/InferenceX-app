@@ -63,9 +63,16 @@ export function SearchableSelect({
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setIsOpen(false);
+      }
+    };
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
       searchRef.current?.focus();
     } else {
       if (searchUsedRef.current && trackPrefix) {
@@ -74,7 +81,10 @@ export function SearchableSelect({
       }
       setSearch('');
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, search, trackPrefix]);
 
   const filteredGroups = React.useMemo(() => {
@@ -112,6 +122,9 @@ export function SearchableSelect({
         data-testid={triggerTestId}
         data-slot="select-trigger"
         data-size="default"
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={cn(

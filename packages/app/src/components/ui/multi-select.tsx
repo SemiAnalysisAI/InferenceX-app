@@ -98,12 +98,19 @@ function MultiSelect({
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setIsOpen(false);
+      }
+    };
 
     if (isOpen) {
       // Capture-phase pointerdown closes this menu before other dropdown triggers
       // process the same interaction, enabling smooth one-click handoff.
       document.addEventListener('pointerdown', handlePointerDownOutside, true);
       document.addEventListener('focusin', handleFocusOutside);
+      document.addEventListener('keydown', handleKeyDown);
       if (searchableRef.current) {
         searchRef.current?.focus();
       } else {
@@ -114,6 +121,7 @@ function MultiSelect({
     return () => {
       document.removeEventListener('pointerdown', handlePointerDownOutside, true);
       document.removeEventListener('focusin', handleFocusOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -383,7 +391,6 @@ function MultiSelect({
                       {section.options.map((option) => {
                         const isSelected = value.includes(option.value);
                         const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
-                        const isDisabledDeselect = isSelected && isMinReached;
 
                         return (
                           <div
@@ -391,14 +398,12 @@ function MultiSelect({
                             role="option"
                             aria-selected={isSelected}
                             data-slot="select-item"
-                            onClick={() =>
-                              !isDisabledOption && !isDisabledDeselect && handleToggle(option.value)
-                            }
+                            onClick={() => !isDisabledOption && handleToggle(option.value)}
                             className={cn(
                               "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                               'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
                               isSelected && 'bg-primary/10 font-medium',
-                              (isDisabledOption || isDisabledDeselect) &&
+                              isDisabledOption &&
                                 'opacity-50 cursor-not-allowed hover:bg-transparent hover:pl-2 hover:shadow-none',
                             )}
                           >
@@ -415,7 +420,6 @@ function MultiSelect({
               : filteredOptions.map((option) => {
                   const isSelected = value.includes(option.value);
                   const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
-                  const isDisabledDeselect = isSelected && isMinReached;
 
                   return (
                     <div
@@ -423,14 +427,12 @@ function MultiSelect({
                       role="option"
                       aria-selected={isSelected}
                       data-slot="select-item"
-                      onClick={() =>
-                        !isDisabledOption && !isDisabledDeselect && handleToggle(option.value)
-                      }
+                      onClick={() => !isDisabledOption && handleToggle(option.value)}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                         'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
                         isSelected && 'bg-primary/10 font-medium',
-                        (isDisabledOption || isDisabledDeselect) &&
+                        isDisabledOption &&
                           'opacity-50 cursor-not-allowed hover:bg-transparent hover:pl-2 hover:shadow-none',
                       )}
                     >
