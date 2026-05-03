@@ -8,6 +8,8 @@
  * ingest does. No caching — same policy as `/api/unofficial-run`, since GHA
  * artifacts can change while a workflow is still running.
  */
+import { resolveFrameworkAliasesInString } from '@semianalysisai/inferencex-constants/framework-aliases';
+
 import {
   type GithubArtifact,
   downloadGithubArtifact,
@@ -31,6 +33,17 @@ export interface EvalArtifactConfig {
 }
 
 /**
+ * Check whether the artifact's `_conc<N>_` or `_conc<N>x<N>x<...>_` segment
+ * lists `targetConc`. Disagg artifacts pack multiple concurrencies into a
+ * single zip; non-disagg artifacts encode a single conc value.
+ */
+function artifactConcMatches(artifactName: string, targetConc: number): boolean {
+  const m = artifactName.match(/_conc(\d+(?:x\d+)*)_/);
+  if (!m) return false;
+  return m[1].split('x').includes(String(targetConc));
+}
+
+/**
  * Pick the per-config eval artifact matching `config` from a run's artifact list.
  *
  * Artifact names follow lm-eval's CI convention:
@@ -40,6 +53,15 @@ export interface EvalArtifactConfig {
  * `EvalRow`, so when multiple artifacts differ only in sequence length we pick
  * the highest-id (most recent) match. Excludes the aggregate (`eval_results_all`)
  * and gpu-metrics artifacts which share the `eval_` prefix but don't carry samples.
+ *
+ * Two normalization quirks the matcher has to undo:
+ * - The eval row's `framework` is canonicalized via `FRAMEWORK_ALIASES`
+ *   (e.g. `sglang-disagg` → `mori-sglang`), but the artifact name keeps the
+ *   raw alias. We canonicalize the artifact name via `resolveFrameworkAliasesInString`
+ *   before comparing.
+ * - Disagg artifacts pack multiple concurrencies into one zip and encode them
+ *   as `conc<N>x<N>x<N>`, so we parse the conc segment as an x-separated list
+ *   and check membership instead of requiring an exact `_conc<N>_` token.
  */
 export function findEvalSampleArtifact(
   artifacts: GithubArtifact[],
@@ -57,15 +79,18 @@ export function findEvalSampleArtifact(
     `_${config.hardware}-`,
     `_spec-${config.specMethod}_`,
   ];
-  if (config.conc !== null) required.push(`_conc${config.conc}_`);
   // Preferred token — used as a tiebreaker when more than one artifact matches.
   const preferredDisagg = `_disagg-${config.disagg ? 'true' : 'false'}_`;
 
   const matches = artifacts.filter((a) => {
-    const n = a.name.toLowerCase();
+    // Canonicalize legacy framework substrings (e.g. `sglang-disagg` → `mori-sglang`)
+    // so the framework token matches what the eval row was normalized to.
+    const n = resolveFrameworkAliasesInString(a.name.toLowerCase());
     if (!n.startsWith('eval_')) return false;
     if (n.startsWith('eval_results_') || n.startsWith('eval_gpu_metrics_')) return false;
-    return required.every((t) => n.includes(t.toLowerCase()));
+    if (!required.every((t) => n.includes(t.toLowerCase()))) return false;
+    if (config.conc !== null && !artifactConcMatches(n, config.conc)) return false;
+    return true;
   });
   if (matches.length === 0) return null;
   // Prefer artifacts whose disagg flag matches the row, then fall back to newest.
