@@ -319,6 +319,41 @@
   display: none;
 }
 
+/* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
+ * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
+ * and lands the dragon off-screen left so the GIF stops being rendered. */
+@keyframes mc-dragon-flyacross {
+  0% {
+    transform: translate(110vw, 0) scale(1);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(40vw, -3vh) scale(1.05);
+  }
+  92% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-130vw, 1vh) scale(1);
+    opacity: 0;
+  }
+}
+
+.mc-dragon-flyacross {
+  animation: mc-dragon-flyacross 9s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-dragon-flyacross {
+    animation: none;
+    display: none;
+  }
+}
+
 /* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
 @keyframes splash-bounce {
   0%,
