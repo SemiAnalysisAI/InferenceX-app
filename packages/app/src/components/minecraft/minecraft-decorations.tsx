@@ -135,6 +135,30 @@ export function MinecraftDecorations() {
           style={{ width: 'min(280px, 22vw)' }}
         />
       </div>
+
+      <div className="hidden lg:block fixed bottom-1 right-2 z-0 text-[10px] text-foreground/50 text-right leading-tight">
+        <div>
+          art:{' '}
+          <a
+            href="https://minecraft.wiki/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            minecraft.wiki
+          </a>
+        </div>
+        <div>
+          <a
+            href="https://creativecommons.org/licenses/by-nc-sa/3.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            CC BY-NC-SA 3.0
+          </a>
+        </div>
+      </div>
     </>
   );
 }
