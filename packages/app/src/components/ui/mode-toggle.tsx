@@ -1,14 +1,14 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { Pickaxe, Sun } from 'lucide-react';
+import { Atom, Pickaxe, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-type Theme = 'light' | 'dark' | 'minecraft';
-const THEME_CYCLE: Theme[] = ['light', 'dark', 'minecraft'];
+type Theme = 'light' | 'dark' | 'minecraft' | 'rick-morty';
+const THEME_CYCLE: Theme[] = ['light', 'dark', 'minecraft', 'rick-morty'];
 
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();
@@ -61,6 +61,9 @@ export function ModeToggle() {
     >
       {theme === 'minecraft' ? (
         <Pickaxe size={20} aria-hidden="true" />
+      ) : theme === 'rick-morty' ? (
+        // Atom icon evokes Rick's portal-gun / Plumbus tech-genius vibe.
+        <Atom size={20} aria-hidden="true" />
       ) : theme === 'dark' ? (
         <Sun size={20} aria-hidden="true" />
       ) : (

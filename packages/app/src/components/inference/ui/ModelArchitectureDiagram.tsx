@@ -2004,7 +2004,7 @@ export default function ModelArchitectureDiagram({
       renderDiagram(
         svgRef.current,
         arch,
-        resolvedTheme === 'dark' || resolvedTheme === 'minecraft',
+        resolvedTheme === 'dark' || resolvedTheme === 'minecraft' || resolvedTheme === 'rick-morty',
         expandedBlocks,
         toggleBlock,
       );
@@ -2019,7 +2019,9 @@ export default function ModelArchitectureDiagram({
         renderDiagram(
           svgRef.current,
           arch,
-          resolvedTheme === 'dark' || resolvedTheme === 'minecraft',
+          resolvedTheme === 'dark' ||
+            resolvedTheme === 'minecraft' ||
+            resolvedTheme === 'rick-morty',
           expandedBlocks,
           toggleBlock,
         );

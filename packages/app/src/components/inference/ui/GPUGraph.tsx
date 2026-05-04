@@ -109,7 +109,10 @@ const GPUGraph = React.memo(
     const gpuDateColorMap = useMemo(() => {
       const { dates, sortedGPUs } = gpuDatePairs;
       if (sortedGPUs.length === 0 || dates.length === 0) return {};
-      const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+      const theme =
+        resolvedTheme === 'dark' || resolvedTheme === 'minecraft' || resolvedTheme === 'rick-morty'
+          ? 'dark'
+          : 'light';
       return generateGpuDateColors(sortedGPUs, dates.length, theme);
     }, [gpuDatePairs, resolvedTheme]);
 

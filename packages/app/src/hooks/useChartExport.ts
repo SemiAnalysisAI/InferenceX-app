@@ -143,6 +143,7 @@ function addWatermark(dataUrl: string, bgColor: string): Promise<string> {
       const isDark =
         document.documentElement.classList.contains('dark') ||
         document.documentElement.classList.contains('minecraft') ||
+        document.documentElement.classList.contains('rick-morty') ||
         bgColor.includes('0 0%');
       ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
       ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);

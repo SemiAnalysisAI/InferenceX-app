@@ -7,7 +7,7 @@ describe('ModeToggle', () => {
       <ThemeProvider
         attribute="class"
         defaultTheme="light"
-        themes={['light', 'dark', 'minecraft']}
+        themes={['light', 'dark', 'minecraft', 'rick-morty']}
         disableTransitionOnChange
       >
         <ModeToggle />
@@ -28,13 +28,22 @@ describe('ModeToggle', () => {
     cy.get('html').should('have.class', 'minecraft');
   });
 
-  it('clicking toggle three times returns to light mode', () => {
+  it('clicking toggle three times cycles light → dark → minecraft → rick-morty', () => {
     cy.get('[data-testid="theme-toggle"]').click();
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="theme-toggle"]').click();
     cy.get('html').should('have.class', 'minecraft');
     cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('html').should('have.class', 'rick-morty');
+  });
+
+  it('clicking toggle four times returns to light mode', () => {
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]').click();
     cy.get('html').should('not.have.class', 'dark');
     cy.get('html').should('not.have.class', 'minecraft');
+    cy.get('html').should('not.have.class', 'rick-morty');
   });
 });

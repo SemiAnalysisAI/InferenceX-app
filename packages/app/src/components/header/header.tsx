@@ -8,6 +8,7 @@ import { track } from '@/lib/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
+import { RickMortyToggles } from '@/components/rick-morty/rick-morty-toggles';
 import { navigateInApp } from '@/lib/client-navigation';
 import { cn } from '@/lib/utils';
 
@@ -134,6 +135,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
           <div className="ml-auto flex items-center gap-2">
             <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             <MinecraftToggles />
+            <RickMortyToggles />
             <ModeToggle />
 
             {/* Mobile hamburger */}

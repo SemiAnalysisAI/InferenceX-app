@@ -2,8 +2,9 @@
 @import 'tw-animate-css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .rick-morty *));
 @custom-variant minecraft (&:is(.minecraft *));
+@custom-variant rick-morty (&:is(.rick-morty *));
 
 /* Allow hash navigation to clear the fixed navbar */
 .blog-prose h2[id],
@@ -240,6 +241,70 @@
   --overlay-run-7: oklch(0.78 0.18 60);
 }
 
+/* Rick and Morty theme — portal-green / Morty-yellow on deep space dark.
+ * Anchor colors are pulled from the canonical R&M palette: portal green
+ * #97ce4c, Morty yellow #f0e14a, Rick lab-coat blue #0bb4e4, Summer pink
+ * #e89ac7, with Beth purple / Birdperson red rounding out the 8 overlay
+ * slots. References:
+ *   - color-hex.com/color-palette/9134
+ *   - colorswall.com/palette/243091 (schwifty greens)
+ *   - colorswall.com/palette/242810 (Rick blue)
+ */
+.rick-morty {
+  --background: #0d1525;
+  --foreground: #dceea0;
+  --card: #131c33;
+  --card-foreground: #f5fbe1;
+  --popover: #1a2440;
+  --popover-foreground: #f5fbe1;
+  --primary: #97ce4c;
+  --primary-foreground: #0d1525;
+  --secondary: #f0e14a;
+  --secondary-foreground: #0d1525;
+  --brand: var(--primary);
+  --muted: #1f2a47;
+  --muted-foreground: rgba(220, 238, 160, 0.65);
+  --accent: #0bb4e4;
+  --accent-foreground: #0d1525;
+  --destructive: #e63946;
+  --border: #2f4a3e;
+  --border-alt: #1d2a4b;
+  --input: rgba(151, 206, 76, 0.18);
+  --ring: #97ce4c;
+
+  /* Sidebar */
+  --sidebar: #0a1020;
+  --sidebar-foreground: #dceea0;
+  --sidebar-primary: #97ce4c;
+  --sidebar-primary-foreground: #0d1525;
+  --sidebar-accent: #1a2440;
+  --sidebar-accent-foreground: #f5fbe1;
+  --sidebar-border: #2f4a3e;
+  --sidebar-ring: #97ce4c;
+
+  /* Overlay-run palette: main R&M characters / iconic colors, tuned for
+   * legibility on the deep-space dark background. */
+  --overlay-run-0: #97ce4c; /* portal green */
+  --overlay-run-1: #f0e14a; /* Morty yellow */
+  --overlay-run-2: #0bb4e4; /* Rick lab coat blue */
+  --overlay-run-3: #e89ac7; /* Summer pink */
+  --overlay-run-4: #c1f762; /* schwifty bright green */
+  --overlay-run-5: #ffb78c; /* Jerry skin */
+  --overlay-run-6: #b388eb; /* Beth purple */
+  --overlay-run-7: #ff6e54; /* Birdperson red */
+}
+
+/* Subtle portal-green glow on rick-morty headings + the brand name so the
+ * theme has visual identity beyond the palette swap. */
+.rick-morty h1,
+.rick-morty h2,
+.rick-morty h3,
+.rick-morty .brand-name {
+  text-shadow:
+    0 0 6px rgba(151, 206, 76, 0.45),
+    0 0 14px rgba(151, 206, 76, 0.18);
+}
+
 /* Force pixel font on everything in minecraft mode */
 .minecraft,
 .minecraft * {
@@ -317,6 +382,49 @@
 /* Hide circuit background in minecraft mode */
 .minecraft .circuit-bg {
   display: none;
+}
+
+/* Rick-morty: keep the circuit background, but shift its tone toward portal
+ * green so it sits on the deep-space dark surface coherently. */
+.rick-morty .circuit-bg {
+  filter: hue-rotate(60deg) saturate(1.4) brightness(0.85);
+}
+
+/* Jerry-falling — one-shot top→bottom fall on rick-morty theme activation,
+ * triggered from rick-morty-decorations.tsx. Mirrors the minecraft Ender
+ * Dragon fly-across pattern but oriented vertically. Plays once and lands
+ * Jerry off-screen below so the GIF stops being rendered. The drift +
+ * rotation give the fall a flailing-arms cartoon feel. */
+@keyframes rm-jerry-fall {
+  0% {
+    transform: translate(0, -30vh) rotate(-6deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(3vw, 40vh) rotate(10deg);
+  }
+  90% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-2vw, 130vh) rotate(-4deg);
+    opacity: 0;
+  }
+}
+
+.rm-jerry-fall {
+  animation: rm-jerry-fall 7s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-jerry-fall {
+    animation: none;
+    display: none;
+  }
 }
 
 /* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
