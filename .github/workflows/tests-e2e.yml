@@ -18,7 +18,7 @@ jobs:
   component-tests:
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -51,7 +51,7 @@ jobs:
   build:
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -84,7 +84,7 @@ jobs:
     needs: [component-tests, build]
     continue-on-error: ${{ matrix.browser == 'firefox' }}
     timeout-minutes: 15
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     strategy:
