@@ -14,9 +14,7 @@ import { useEffect, useState } from 'react';
  * (animation-iteration-count: 1) — the GIF's wing-flap plays during the
  * traversal so the entrance feels alive.
  *
- * Asset provenance: minecraft.wiki (CC BY-NC-SA 3.0) for blocks/items/dragon;
- * Technoblade body render via mc-heads.net (decorative use, in memory of
- * Technoblade — Minecraft YouTuber whose pig-king skin is iconic).
+ * Asset provenance: minecraft.wiki (CC BY-NC-SA 3.0) for blocks/items/dragon.
  */
 const DECORATIONS = [
   // Top-left: Creeper, lurking from the corner.
@@ -39,17 +37,6 @@ const DECORATIONS = [
       right: '0.5rem',
       width: 'min(110px, 9vw)',
       transform: 'rotate(35deg)',
-    },
-  },
-  // Mid-right: Technoblade, pig-king skin (RIP).
-  {
-    src: '/decorative/minecraft/technoblade.png',
-    alt: 'Technoblade',
-    style: {
-      top: '40%',
-      right: '0',
-      width: 'min(120px, 10vw)',
-      transform: 'rotate(4deg)',
     },
   },
   // Bottom-left: Grass block, classic anchor.
