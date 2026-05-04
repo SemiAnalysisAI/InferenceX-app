@@ -31,6 +31,9 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.PAT }}
       VERCEL_GIT_COMMIT_REF: claude/${{ github.ref_name }}
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: '1'
+      DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+      DATABASE_DRIVER: neon
+      DATABASE_SSL: 'true'
     permissions:
       contents: write
       pull-requests: write
@@ -118,6 +121,9 @@ jobs:
       - name: Install Cypress binary
         if: steps.cypress-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @semianalysisai/inferencex-app exec cypress install
+
+      - name: Stub .env for dotenv-cli
+        run: touch .env
 
       - name: Start dev server
         id: devserver
