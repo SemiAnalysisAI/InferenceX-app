@@ -17,15 +17,18 @@ import { useEffect, useState } from 'react';
  * Asset provenance: minecraft.wiki (CC BY-NC-SA 3.0) for blocks/items/dragon.
  */
 const DECORATIONS = [
-  // Top-left: Creeper, lurking from the corner.
+  // Top-left: Zombified Piglin, mirrored so its sword arm points toward the
+  // middle of the screen rather than off-screen left. Keep the original
+  // -6deg tilt — flipping over X also flips the rotate direction visually,
+  // which lands as a slight forward lean toward the chart area.
   {
-    src: '/decorative/minecraft/creeper.png',
-    alt: 'Creeper',
+    src: '/decorative/minecraft/zombified-piglin.png',
+    alt: 'Zombified Piglin',
     style: {
       top: '5rem',
       left: '0.5rem',
-      width: 'min(100px, 8vw)',
-      transform: 'rotate(-6deg)',
+      width: 'min(110px, 9vw)',
+      transform: 'scaleX(-1) rotate(-6deg)',
     },
   },
   // Top-right: Diamond pickaxe, mining vibe.
