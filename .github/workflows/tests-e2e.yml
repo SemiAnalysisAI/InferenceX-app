@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # actions/cache save + narrow job permissions require actions write (see GitHub token scopes).
+      actions: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
@@ -54,6 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # upload-artifact requires actions:write when job sets explicit permissions (otherwise uploads fail / are invisible).
+      actions: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
@@ -77,6 +81,7 @@ jobs:
         with:
           name: app-build
           path: packages/app/.next
+          if-no-files-found: error
           retention-days: 1
 
   cypress:
@@ -87,6 +92,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # download-artifact (app-build) + upload-artifact (Cypress screenshots) both need actions:write.
+      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -118,8 +125,8 @@ jobs:
         working-directory: packages/app
         run: pnpm exec cypress verify || pnpm exec cypress install
       - name: Download build artifact
-        # Must match upload-artifact major (v7); v5 download cannot see v7 uploads → "Artifact not found".
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        # Match upload-artifact v7+; keep in sync with actions/upload-artifact major in this workflow.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: app-build
           path: packages/app/.next
