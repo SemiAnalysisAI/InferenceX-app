@@ -15,20 +15,17 @@ jobs:
   # Implements features end-to-end: code + browser verification + tests.
   implement:
     name: Claude (implement)
-    if: |
-      (
-        (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
-        contains(github.event.comment.body, '@claude') &&
-        !contains(github.event.comment.body, '@claude-pr') &&
-        contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association)
-      ) ||
-      (
-        github.event_name == 'issues' &&
-        (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
-        !contains(github.event.issue.body, '@claude-pr') &&
-        !contains(github.event.issue.title, '@claude-pr') &&
-        contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.issue.author_association)
-      )
+    if: >-
+      ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment')
+      && contains(github.event.comment.body || '', '@claude')
+      && !contains(github.event.comment.body || '', '@claude-pr')
+      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association))
+      ||
+      (github.event_name == 'issues'
+      && (contains(github.event.issue.body || '', '@claude') || contains(github.event.issue.title || '', '@claude'))
+      && !contains(github.event.issue.body || '', '@claude-pr')
+      && !contains(github.event.issue.title || '', '@claude-pr')
+      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.issue.author_association))
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.PAT }}
@@ -306,13 +303,14 @@ jobs:
   # @claude-pr or auto-on-PR-open. Review-only: no app build, narrow tools.
   review:
     name: Claude (review)
-    if: |
-      (github.event_name == 'pull_request' &&
-       !github.event.pull_request.draft &&
-       contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association)) ||
-      ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
-       contains(github.event.comment.body, '@claude-pr') &&
-       contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association))
+    if: >-
+      (github.event_name == 'pull_request'
+      && !github.event.pull_request.draft
+      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association))
+      ||
+      ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment')
+      && contains(github.event.comment.body || '', '@claude-pr')
+      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     permissions:
       contents: read
