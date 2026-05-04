@@ -81,6 +81,8 @@ jobs:
         with:
           name: app-build
           path: packages/app/.next
+          # upload-artifact v4.4+ excludes hidden paths by default; `.next` is hidden → "no files found".
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 
