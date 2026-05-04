@@ -76,7 +76,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-build
-          path: packages/app/.next/**
+          path: packages/app/.next
           retention-days: 1
 
   cypress:
@@ -118,7 +118,8 @@ jobs:
         working-directory: packages/app
         run: pnpm exec cypress verify || pnpm exec cypress install
       - name: Download build artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        # Must match upload-artifact major (v7); v5 download cannot see v7 uploads → "Artifact not found".
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: app-build
           path: packages/app/.next
