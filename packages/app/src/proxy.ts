@@ -4,7 +4,7 @@ const EMBED_PATH_PREFIX = '/embed/';
 const EMBED_CSP = 'frame-ancestors *';
 const DEFAULT_CSP = "frame-ancestors 'none'";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const isEmbedRoute = request.nextUrl.pathname.startsWith(EMBED_PATH_PREFIX);
   const requestHeaders = new Headers(request.headers);
   if (isEmbedRoute) {
@@ -18,7 +18,3 @@ export function middleware(request: NextRequest) {
   response.headers.set('Content-Security-Policy', isEmbedRoute ? EMBED_CSP : DEFAULT_CSP);
   return response;
 }
-
-export const config = {
-  matcher: [String.raw`/((?!_next|favicon.ico|robots.txt|sitemap.xml|feed.xml|.*\..*).*)`],
-};

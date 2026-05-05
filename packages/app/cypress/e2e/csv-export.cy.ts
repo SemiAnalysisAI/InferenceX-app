@@ -1,5 +1,5 @@
 describe('CSV Export', () => {
-  before(() => {
+  beforeEach(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
