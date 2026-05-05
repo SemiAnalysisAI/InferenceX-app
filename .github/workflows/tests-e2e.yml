@@ -15,8 +15,19 @@ on:
       - 'tsconfig.json'
 
 jobs:
+  fork-pr-note:
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Skip DB-backed E2E on fork PRs
+        run: |
+          echo "Skipping DB-backed Cypress workflow for fork PRs because repository secrets are unavailable."
+          echo "Run E2E in upstream repo context or use local env with DATABASE_READONLY_URL."
+
   cypress:
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft && !github.event.pull_request.head.repo.fork }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
@@ -40,6 +51,21 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
+      - name: Create CI env file
+        env:
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+        run: |
+          if [ -z "$DATABASE_READONLY_URL" ]; then
+            echo "DATABASE_READONLY_URL secret is empty or unavailable in this PR context."
+            exit 1
+          fi
+          cat > .env <<EOF
+          DATABASE_READONLY_URL=$DATABASE_READONLY_URL
+          DATABASE_DRIVER=neon
+          DATABASE_SSL=true
+          GITHUB_TOKEN=$GITHUB_TOKEN
+          EOF
       - name: Cache Cypress binary
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
