@@ -146,13 +146,13 @@ async function main() {
         keepTopDatesPerPartition(availability, (r) => r.model, N),
       ),
     ],
-    [
-      'reliability',
-      await writeFixture(
-        'reliability',
-        keepTopDatesPerPartition(reliability, (r) => r.hardware, N),
-      ),
-    ],
+    // Reliability is not truncated: the chart aggregates per hardware over
+    // user-selectable date windows ("Last 7 days" vs "Last 3 months"), and
+    // tests assert that switching windows changes the bar count. Truncating
+    // to a fixed top-N collapses every hardware onto the same recent dates,
+    // which makes the windows produce identical bar counts and that
+    // assertion fails. Full reliability is small (~270 KB) so we just keep it.
+    ['reliability', await writeFixture('reliability', reliability)],
     [
       'evaluations',
       await writeFixture(
