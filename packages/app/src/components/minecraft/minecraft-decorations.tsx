@@ -112,6 +112,11 @@ export function MinecraftDecorations() {
   // sound when the visual fly-across is suppressed). On the first page load
   // the browser blocks autoplay until a user gesture exists — silent fail is
   // fine; the next theme toggle is itself a gesture and unlocks audio.
+  //
+  // The growl is delayed to land on the dragon's mid-screen pause (35% of
+  // the 12s `mc-dragon-flyacross` keyframes ≈ 4.2s) so the 3s sample plays
+  // in lockstep with the ~3s hover (35%→60%) rather than over a moving
+  // target.
   useEffect(() => {
     if (dragonNonce === 0) return;
     if (localStorage.getItem('minecraft-sound') === 'false') return;
@@ -119,10 +124,13 @@ export function MinecraftDecorations() {
 
     const audio = new Audio('/decorative/minecraft/ender-dragon.mp3');
     audio.volume = 0.5;
-    audio.play().catch(() => {
-      /* browser blocked autoplay — no prior user gesture */
-    });
+    const timeout = window.setTimeout(() => {
+      audio.play().catch(() => {
+        /* browser blocked autoplay — no prior user gesture */
+      });
+    }, 4200);
     return () => {
+      window.clearTimeout(timeout);
       audio.pause();
       audio.src = '';
     };

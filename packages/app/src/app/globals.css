@@ -321,7 +321,10 @@
 
 /* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
  * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
- * and lands the dragon off-screen left so the GIF stops being rendered. */
+ * and lands the dragon off-screen left so the GIF stops being rendered. The
+ * dragon hovers in the center between 35% and 60% (4.2s–7.2s of the 12s
+ * total) so the canonical 3s growl SFX from minecraft-decorations.tsx lines
+ * up with a deliberate mid-screen pause rather than a moving target. */
 @keyframes mc-dragon-flyacross {
   0% {
     transform: translate(110vw, 0) scale(1);
@@ -330,8 +333,11 @@
   8% {
     opacity: 0.95;
   }
-  50% {
-    transform: translate(40vw, -3vh) scale(1.05);
+  35% {
+    transform: translate(40vw, -2vh) scale(1.05);
+  }
+  60% {
+    transform: translate(40vw, -2vh) scale(1.05);
   }
   92% {
     opacity: 0.95;
@@ -343,7 +349,7 @@
 }
 
 .mc-dragon-flyacross {
-  animation: mc-dragon-flyacross 9s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
+  animation: mc-dragon-flyacross 12s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
   will-change: transform, opacity;
 }
 
