@@ -84,7 +84,9 @@ function keepTopDatesPerPartition<T extends { date: string }>(
 }
 
 async function writeFixture(name: string, data: unknown): Promise<number> {
-  const body = JSON.stringify(data);
+  // Pretty-print: matches oxfmt's output so re-running capture doesn't dirty
+  // the working tree on the formatter pass.
+  const body = `${JSON.stringify(data, null, 2)}\n`;
   await writeFile(resolve(fixturesDir, `${name}.json`), body);
   return body.length;
 }
