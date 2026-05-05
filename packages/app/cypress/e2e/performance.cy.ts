@@ -10,7 +10,6 @@ describe('Performance', () => {
   });
 
   it('page is fully interactive quickly', () => {
-    cy.visit('/inference');
     cy.get('[data-testid="scatter-graph"]').should('exist');
   });
 
