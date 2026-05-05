@@ -12,9 +12,8 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { ShareButton } from '@/components/ui/share-button';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import {
   Select,
   SelectContent,
@@ -259,11 +258,7 @@ export default function GpuMetricsDisplay() {
                 <Lock className="size-3" />
                 Re-lock feature gate
               </Button>
-              <ShareButton />
-              <div className="hidden sm:flex items-center gap-1.5">
-                <ShareTwitterButton />
-                <ShareLinkedInButton />
-              </div>
+              <ChartShareActions />
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-3">
