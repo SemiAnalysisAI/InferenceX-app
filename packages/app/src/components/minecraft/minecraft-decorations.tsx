@@ -12,9 +12,12 @@ import { useEffect, useState } from 'react';
  * All static images are `pointer-events: none` at low z-index. The dragon is
  * absolutely positioned and flies right-to-left once per theme activation
  * (animation-iteration-count: 1) — the GIF's wing-flap plays during the
- * traversal so the entrance feels alive.
+ * traversal so the entrance feels alive, accompanied by the canonical
+ * dragon idle/growl SFX (gated on the existing `minecraft-sound` toggle
+ * and on `prefers-reduced-motion`).
  *
- * Asset provenance: minecraft.wiki (CC BY-NC-SA 3.0) for blocks/items/dragon.
+ * Asset provenance: minecraft.wiki (CC BY-NC-SA 3.0) for blocks/items/dragon
+ * (audio + visuals).
  */
 const DECORATIONS = [
   // Top-left: Zombified Piglin, mirrored so its sword arm points toward the
@@ -101,6 +104,37 @@ export function MinecraftDecorations() {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
+
+  // Dragon roar SFX — fires on each dragonNonce bump (off→on theme transition,
+  // and once at mount if the user lands directly on the minecraft theme).
+  // Gated on `minecraft-sound` (the same toggle that controls click sounds in
+  // `minecraft-background.tsx`) and on prefers-reduced-motion (skipping the
+  // sound when the visual fly-across is suppressed). On the first page load
+  // the browser blocks autoplay until a user gesture exists — silent fail is
+  // fine; the next theme toggle is itself a gesture and unlocks audio.
+  //
+  // The growl is delayed to land on the dragon's mid-screen pause (35% of
+  // the 12s `mc-dragon-flyacross` keyframes ≈ 4.2s) so the 3s sample plays
+  // in lockstep with the ~3s hover (35%→60%) rather than over a moving
+  // target.
+  useEffect(() => {
+    if (dragonNonce === 0) return;
+    if (localStorage.getItem('minecraft-sound') === 'false') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const audio = new Audio('/decorative/minecraft/ender-dragon.mp3');
+    audio.volume = 0.5;
+    const timeout = window.setTimeout(() => {
+      audio.play().catch(() => {
+        /* browser blocked autoplay — no prior user gesture */
+      });
+    }, 4200);
+    return () => {
+      window.clearTimeout(timeout);
+      audio.pause();
+      audio.src = '';
+    };
+  }, [dragonNonce]);
 
   if (!active) return null;
 
