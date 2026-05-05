@@ -52,11 +52,6 @@ jobs:
         run: pnpm exec cypress verify || pnpm exec cypress install
       - name: Build app
         run: pnpm build
-        env:
-          BLOB_CACHE_PREFIX: ci-cache
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
-          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
       - name: Run component tests
         working-directory: packages/app
         run: pnpm exec cypress run --component
@@ -71,11 +66,7 @@ jobs:
           wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
         env:
-          BLOB_CACHE_PREFIX: ci-cache
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           CI: true
-          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
-          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
       - name: Upload Cypress artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
