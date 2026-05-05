@@ -95,21 +95,6 @@ function resolveCssVarsForExport(root: HTMLElement) {
   }
 }
 
-/** Collect @font-face rules from all accessible stylesheets */
-function getFontEmbedCSS(): string {
-  const fontFaces: string[] = [];
-  for (const sheet of document.styleSheets) {
-    try {
-      for (const rule of sheet.cssRules || []) {
-        if (rule instanceof CSSFontFaceRule) fontFaces.push(rule.cssText);
-      }
-    } catch {
-      // skip CORS-restricted stylesheets
-    }
-  }
-  return fontFaces.join('\n');
-}
-
 /** Wait for a React re-render to flush */
 function waitForRender(): Promise<void> {
   return new Promise((resolve) => {
@@ -369,7 +354,9 @@ export function useChartExport({
         });
       }
 
-      // Capture chart image
+      // Don't pass `fontEmbedCSS`: raw `@font-face` rules keep relative URLs that
+      // can't resolve inside an SVG data URL. Letting html-to-image run its own
+      // `getWebFontCSS` inlines the woff2 as a data URL, so Monocraft renders.
       const { toPng } = await htmlToImagePromise;
       const chartDataUrl = await toPng(exportElement, {
         quality: 1,
@@ -377,7 +364,6 @@ export function useChartExport({
         backgroundColor: bgColor,
         cacheBust: true,
         skipFonts: false,
-        fontEmbedCSS: getFontEmbedCSS(),
         preferredFontFormat: 'woff2',
         filter: (node) => !node.classList?.contains('no-export'),
         style: {
