@@ -1,3 +1,0 @@
-# Cypress API fixtures are captured snapshots — keep them minified to limit
-# repo size; oxfmt's pretty-print roughly triples the line count.
-packages/app/cypress/fixtures/api/
