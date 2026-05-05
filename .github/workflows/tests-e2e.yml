@@ -15,92 +15,27 @@ on:
       - 'tsconfig.json'
 
 jobs:
-  component-tests:
-    if: ${{ !github.event.pull_request.draft }}
-    timeout-minutes: 15
+  fork-pr-note:
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # actions/cache save + narrow job permissions require actions write (see GitHub token scopes).
-      actions: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: '24'
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Cache Cypress binary
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-chrome-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            cypress-binary-${{ runner.os }}-${{ runner.arch }}-
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: pnpm exec cypress verify || pnpm exec cypress install
-      - name: Run component tests
-        working-directory: packages/app
-        run: pnpm exec cypress run --component --browser chrome
-        env:
-          CI: true
-
-  build:
-    if: ${{ !github.event.pull_request.draft }}
-    timeout-minutes: 15
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # upload-artifact requires actions:write when job sets explicit permissions (otherwise uploads fail / are invisible).
-      actions: write
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: '24'
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Build app
-        run: pnpm build
-        env:
-          BLOB_CACHE_PREFIX: ci-cache
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
-          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-      - name: Upload build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: app-build
-          path: packages/app/.next
-          # upload-artifact v4.4+ excludes hidden paths by default; `.next` is hidden → "no files found".
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
+      - name: Skip DB-backed E2E on fork PRs
+        run: |
+          echo "Skipping DB-backed Cypress workflow for fork PRs because repository secrets are unavailable."
+          echo "Run E2E in upstream repo context or use local env with DATABASE_READONLY_URL."
 
   cypress:
-    if: ${{ !github.event.pull_request.draft }}
-    needs: [component-tests, build]
-    continue-on-error: ${{ matrix.browser == 'firefox' }}
+    if: ${{ !github.event.pull_request.draft && !github.event.pull_request.head.repo.fork }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # download-artifact (app-build) + upload-artifact (Cypress screenshots) both need actions:write.
-      actions: write
     strategy:
       fail-fast: false
       matrix:
         browser: [chrome, firefox]
-        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
@@ -116,6 +51,21 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
+      - name: Create CI env file
+        env:
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+        run: |
+          if [ -z "$DATABASE_READONLY_URL" ]; then
+            echo "DATABASE_READONLY_URL secret is empty or unavailable in this PR context."
+            exit 1
+          fi
+          cat > .env <<EOF
+          DATABASE_READONLY_URL=$DATABASE_READONLY_URL
+          DATABASE_DRIVER=neon
+          DATABASE_SSL=true
+          GITHUB_TOKEN=$GITHUB_TOKEN
+          EOF
       - name: Cache Cypress binary
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -126,90 +76,19 @@ jobs:
       - name: Install Cypress binary if missing
         working-directory: packages/app
         run: pnpm exec cypress verify || pnpm exec cypress install
-      - name: Download build artifact
-        # Match upload-artifact v7+; keep in sync with actions/upload-artifact major in this workflow.
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: app-build
-          path: packages/app/.next
-      - name: Select shard specs
-        id: shard-specs
-        working-directory: packages/app
+      - name: Build app
+        run: pnpm build
         env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_TOTAL: 4
-          BROWSER: ${{ matrix.browser }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-        run: |
-          node <<'EOF'
-          const fs = require('fs');
-          const path = require('path');
-
-          const shardIndex = Number(process.env.SHARD_INDEX);
-          const shardTotal = Number(process.env.SHARD_TOTAL);
-          const browser = process.env.BROWSER;
-          const eventName = process.env.GITHUB_EVENT_NAME;
-          const rootDir = path.resolve(process.cwd(), 'cypress/e2e');
-          const outputFile = process.env.GITHUB_OUTPUT;
-
-          function collectSpecs(dir, acc) {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
-            for (const entry of entries) {
-              const entryPath = path.join(dir, entry.name);
-              if (entry.isDirectory()) {
-                collectSpecs(entryPath, acc);
-                continue;
-              }
-              if (entry.isFile() && entry.name.endsWith('.cy.ts')) {
-                acc.push(path.relative(process.cwd(), entryPath).replaceAll(path.sep, '/'));
-              }
-            }
-          }
-
-          const allSpecs = [];
-          collectSpecs(rootDir, allSpecs);
-          allSpecs.sort((a, b) => a.localeCompare(b));
-
-          const firefoxSmokeRegex = /(\/|^)(sanity|first-load-navigation|tabs|url-params|blog)\.cy\.ts$/;
-          const isFirefoxPullRequest = browser === 'firefox' && eventName === 'pull_request';
-          let candidateSpecs = allSpecs;
-          if (isFirefoxPullRequest) {
-            const smokeSpecs = allSpecs.filter((spec) => firefoxSmokeRegex.test(spec));
-            candidateSpecs = smokeSpecs.length > 0 ? smokeSpecs : allSpecs.slice(0, Math.min(5, allSpecs.length));
-          }
-
-          const shardCounts = Array.from({ length: shardTotal }, () => 0);
-          for (let index = 0; index < candidateSpecs.length; index += 1) {
-            shardCounts[index % shardTotal] += 1;
-          }
-
-          const assignedSpecs = candidateSpecs.filter(
-            (_, index) => index % shardTotal === shardIndex - 1,
-          );
-
-          console.log(`Shard ${shardIndex}/${shardTotal} (${process.env.GITHUB_JOB})`);
-          console.log(`Total specs discovered: ${allSpecs.length}`);
-          console.log(
-            `Selection mode: ${
-              isFirefoxPullRequest ? 'firefox PR smoke-only' : 'full suite'
-            }`,
-          );
-          console.log(`Candidate specs for this mode: ${candidateSpecs.length}`);
-          console.log(`Specs per shard: ${shardCounts.map((count, idx) => `${idx + 1}:${count}`).join(', ')}`);
-          console.log(`Assigned specs for this shard: ${assignedSpecs.length}`);
-          for (const spec of assignedSpecs) {
-            console.log(`- ${spec}`);
-          }
-
-          fs.appendFileSync(outputFile, `specs=${assignedSpecs.join(',')}\n`);
-          fs.appendFileSync(outputFile, `spec_count=${assignedSpecs.length}\n`);
-          fs.appendFileSync(outputFile, `total_specs=${allSpecs.length}\n`);
-          EOF
-      - name: Start shard timer
-        id: shard-timer
-        run: echo "start_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+          BLOB_CACHE_PREFIX: ci-cache
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+      - name: Run component tests
+        working-directory: packages/app
+        run: pnpm exec cypress run --component
+        env:
+          CI: true
       - name: Run integration tests
-        if: ${{ steps.shard-specs.outputs.spec_count != '0' }}
         uses: cypress-io/github-action@c495c3ddffba403ba11be95fffb67e25203b3799 # v7.1.10
         with:
           working-directory: packages/app
@@ -217,34 +96,10 @@ jobs:
           start: pnpm start
           wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
-          spec: ${{ steps.shard-specs.outputs.specs }}
         env:
           CI: true
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-      - name: Log shard execution timing
-        if: ${{ always() }}
-        env:
-          START_EPOCH: ${{ steps.shard-timer.outputs.start_epoch }}
-          SHARD_SPEC_COUNT: ${{ steps.shard-specs.outputs.spec_count }}
-          TOTAL_SPEC_COUNT: ${{ steps.shard-specs.outputs.total_specs }}
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_BROWSER: ${{ matrix.browser }}
-        run: |
-          END_EPOCH="$(date +%s)"
-          DURATION_SEC="$((END_EPOCH - START_EPOCH))"
-          DURATION_MIN="$((DURATION_SEC / 60))"
-          DURATION_REM_SEC="$((DURATION_SEC % 60))"
-          echo "Shard timing summary"
-          echo "Browser: ${SHARD_BROWSER}"
-          echo "Shard: ${SHARD_INDEX}/4"
-          echo "Total specs: ${TOTAL_SPEC_COUNT}"
-          echo "Specs in this shard: ${SHARD_SPEC_COUNT}"
-          if [ "${SHARD_SPEC_COUNT}" = "0" ]; then
-            echo "Integration execution time: skipped (no specs assigned)"
-            exit 0
-          fi
-          echo "Integration execution time: ${DURATION_SEC}s (${DURATION_MIN}m ${DURATION_REM_SEC}s)"
       - name: Upload Cypress artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
