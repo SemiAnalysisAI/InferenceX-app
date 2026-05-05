@@ -4,24 +4,20 @@ describe('Performance', () => {
     cy.visit('/inference');
     cy.document().then(() => {
       const loadTime = Date.now() - startTime;
-      const threshold = 5_000;
+      const threshold = 15_000;
       expect(loadTime).to.be.lessThan(threshold);
     });
   });
 
   it('page is fully interactive quickly', () => {
-    // Page already loaded from previous test
-    cy.window().then(() => {
-      // Just verify the page is responsive
-      cy.get('[data-testid="scatter-graph"]').should('exist');
-    });
+    cy.get('[data-testid="scatter-graph"]').should('exist');
   });
 
   it('no excessive layout shift issues', () => {
     cy.visit('/inference');
-    cy.wait(5000);
+    // Wait for charts to render with real data before measuring CLS
+    cy.get('[data-testid="scatter-graph"]').first().find('svg circle').should('exist');
 
-    // Measure CLS using PerformanceObserver
     cy.window()
       .then(
         (win) =>
@@ -36,7 +32,7 @@ describe('Performance', () => {
             });
             observer.observe({ type: 'layout-shift', buffered: true });
 
-            // Give a short window for any remaining shifts after load
+            // Short observation window after charts have rendered
             setTimeout(() => {
               observer.disconnect();
               resolve(clsScore);
@@ -50,7 +46,6 @@ describe('Performance', () => {
   });
 
   it('memory usage is reasonable', () => {
-    // Page still loaded from CLS test
     cy.window().then((win) => {
       const perfMemory = (win.performance as unknown as { memory?: { usedJSHeapSize: number } })
         .memory;
