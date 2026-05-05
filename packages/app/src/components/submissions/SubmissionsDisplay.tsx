@@ -8,9 +8,8 @@ import { track } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { ShareButton } from '@/components/ui/share-button';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { exportToCsv } from '@/lib/csv-export';
 import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
@@ -90,11 +89,7 @@ export default function SubmissionsDisplay() {
                 <Lock className="size-3" />
                 Re-lock feature gate
               </Button>
-              <ShareButton />
-              <div className="hidden sm:flex items-center gap-1.5">
-                <ShareTwitterButton />
-                <ShareLinkedInButton />
-              </div>
+              <ChartShareActions />
             </div>
           </div>
         </Card>

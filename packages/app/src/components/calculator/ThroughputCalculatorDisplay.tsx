@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import {
   ModelSelector,
   SequenceSelector,
@@ -19,9 +20,7 @@ import {
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { ShareButton } from '@/components/ui/share-button';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -420,13 +419,7 @@ export default function ThroughputCalculatorDisplay() {
                   across all GPUs. Values are interpolated from real benchmark data.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <ShareButton />
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <ShareTwitterButton />
-                  <ShareLinkedInButton />
-                </div>
-              </div>
+              <ChartShareActions />
             </div>
 
             {/* Controls — grid layout matching inference chart controls */}

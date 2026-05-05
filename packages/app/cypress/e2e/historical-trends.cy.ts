@@ -2,13 +2,18 @@
  * Tests for the "Historical Trends" tab.
  * Shows interpolated GPU performance over time at a user-selected interactivity level.
  */
-describe('Historical Trends Tab', () => {
-  before(() => {
-    cy.window().then((win) => {
+const visitHistoricalWithSetup = () => {
+  cy.visit('/historical', {
+    onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    cy.visit('/historical');
-    cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+    },
+  });
+  cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+};
+
+describe('Historical Trends Tab', () => {
+  beforeEach(() => {
+    visitHistoricalWithSetup();
   });
 
   it('renders the Historical Trends tab content', () => {
@@ -35,12 +40,8 @@ describe('Historical Trends Tab', () => {
 });
 
 describe('Historical Trends — Content & Interactions', () => {
-  before(() => {
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    cy.visit('/historical');
-    cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+  beforeEach(() => {
+    visitHistoricalWithSetup();
   });
 
   it('renders SVG trend line paths after data loads', () => {
