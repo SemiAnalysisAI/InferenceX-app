@@ -89,5 +89,4 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       '/evaluation?unofficialruns=999',
     );
   });
-
 });
