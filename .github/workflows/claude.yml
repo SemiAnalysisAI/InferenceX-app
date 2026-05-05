@@ -31,6 +31,9 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.PAT }}
       VERCEL_GIT_COMMIT_REF: claude/${{ github.ref_name }}
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: '1'
+      DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+      DATABASE_DRIVER: neon
+      DATABASE_SSL: 'true'
     permissions:
       contents: write
       pull-requests: write
@@ -128,7 +131,7 @@ jobs:
           LOG=/tmp/next-dev.log
           echo "log=$LOG" >> "$GITHUB_OUTPUT"
 
-          pnpm run dev -- --hostname 0.0.0.0 --port 3000 > "$LOG" 2>&1 &
+          pnpm run dev > "$LOG" 2>&1 &
           DEV_PID=$!
           echo "pid=$DEV_PID" >> "$GITHUB_OUTPUT"
 
@@ -187,7 +190,7 @@ jobs:
 
             If DEV_SERVER_UP is not "true":
             1. `tail -n 200 "$DEV_SERVER_LOG"` and fix the underlying issue in the repo.
-            2. Restart: `pnpm run dev -- --hostname 0.0.0.0 --port 3000 > /tmp/next-dev.log 2>&1 &`
+            2. Restart: `pnpm run dev > /tmp/next-dev.log 2>&1 &`
             3. Confirm reachable: `curl -sSf http://localhost:3000 >/dev/null`
 
             ## Workflow
@@ -250,7 +253,7 @@ jobs:
 
             If DEV_SERVER_UP is not "true":
             1. `tail -n 200 "$DEV_SERVER_LOG"` and fix the underlying issue in the repo.
-            2. Restart: `pnpm run dev -- --hostname 0.0.0.0 --port 3000 > /tmp/next-dev.log 2>&1 &`
+            2. Restart: `pnpm run dev > /tmp/next-dev.log 2>&1 &`
             3. Confirm reachable: `curl -sSf http://localhost:3000 >/dev/null`
 
             ## Workflow
