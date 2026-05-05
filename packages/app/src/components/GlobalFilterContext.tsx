@@ -108,7 +108,23 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
   return runs;
 }
 
-export function GlobalFilterProvider({ children }: { children: ReactNode }) {
+export function GlobalFilterProvider({
+  children,
+  initialModel,
+  initialSequence,
+  initialPrecisions,
+}: {
+  children: ReactNode;
+  /**
+   * Initial values used when no URL params are present. Lets per-route entry
+   * points (e.g. `/compare/[a]-vs-[b]`) seed sensible defaults derived from
+   * actual data — without these, every page falls back to FP4/8K-1K which
+   * has no data for older GPUs (Hopper, CDNA 3).
+   */
+  initialModel?: Model;
+  initialSequence?: Sequence;
+  initialPrecisions?: string[];
+}) {
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
@@ -117,13 +133,13 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     if (urlModel && Object.values(Model).includes(urlModel as Model)) {
       return urlModel as Model;
     }
-    return Model.DeepSeek_R1;
+    return initialModel ?? Model.DeepSeek_R1;
   });
 
   const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
     const urlSeq = getUrlParam('i_seq');
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
-    return Sequence.EightK_OneK;
+    return initialSequence ?? Sequence.EightK_OneK;
   });
 
   const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() => {
@@ -131,6 +147,10 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
     if (urlPrec) {
       const precs = urlPrec.split(',').filter((p) => PRECISION_OPTIONS.includes(p as any));
       if (precs.length > 0) return precs;
+    }
+    if (initialPrecisions && initialPrecisions.length > 0) {
+      const valid = initialPrecisions.filter((p) => PRECISION_OPTIONS.includes(p as any));
+      if (valid.length > 0) return valid;
     }
     return [Precision.FP4];
   });
