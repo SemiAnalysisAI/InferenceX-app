@@ -11,20 +11,21 @@ on:
     types: [opened, synchronize, ready_for_review]
 
 jobs:
-  # @claude (Playwright MCP) or @claude-chrome (Chrome DevTools MCP)
+  # @claude (Playwright MCP) or @claude chrome (Chrome DevTools MCP).
+  # @claude review routes to the review job below, not this one.
   # Implements features end-to-end: code + browser verification + tests.
   implement:
     name: Claude (implement)
     if: >-
       ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment')
       && contains(github.event.comment.body || '', '@claude')
-      && !contains(github.event.comment.body || '', '@claude-pr')
+      && !contains(github.event.comment.body || '', '@claude review')
       && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association))
       ||
       (github.event_name == 'issues'
       && (contains(github.event.issue.body || '', '@claude') || contains(github.event.issue.title || '', '@claude'))
-      && !contains(github.event.issue.body || '', '@claude-pr')
-      && !contains(github.event.issue.title || '', '@claude-pr')
+      && !contains(github.event.issue.body || '', '@claude review')
+      && !contains(github.event.issue.title || '', '@claude review')
       && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.issue.author_association))
     runs-on: ubuntu-latest
     env:
@@ -48,9 +49,9 @@ jobs:
           TITLE: ${{ github.event.issue.title || '' }}
         run: |
           set -euo pipefail
-          if printf '%s\n%s' "$BODY" "$TITLE" | grep -q '@claude-chrome'; then
+          if printf '%s\n%s' "$BODY" "$TITLE" | grep -q '@claude chrome'; then
             MODE=chrome
-            TRIGGER='@claude-chrome'
+            TRIGGER='@claude chrome'
           else
             MODE=frontend
             TRIGGER='@claude'
@@ -303,7 +304,7 @@ jobs:
 
           prompt: ${{ env.PROMPT_BODY }}
 
-  # @claude-pr or auto-on-PR-open. Review-only: no app build, narrow tools.
+  # @claude review or auto-on-PR-open. Review-only: no app build, narrow tools.
   review:
     name: Claude (review)
     if: >-
@@ -312,7 +313,7 @@ jobs:
       && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association))
       ||
       ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment')
-      && contains(github.event.comment.body || '', '@claude-pr')
+      && contains(github.event.comment.body || '', '@claude review')
       && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     permissions:
@@ -333,7 +334,7 @@ jobs:
         uses: anthropics/claude-code-action@fefa07e9c665b7320f08c3b525980457f22f58aa # v1.0.111
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          trigger_phrase: '@claude-pr'
+          trigger_phrase: '@claude review'
           track_progress: true
           allowed_bots: ''
 
@@ -348,10 +349,9 @@ jobs:
             You are reviewing code for the InferenceX App — a Next.js frontend dashboard for ML inference benchmarks. Your job is to provide HIGH-SIGNAL feedback only.
 
             ## Commands:
-            - `@claude-pr review` - Full review of the PR
-            - `@claude-pr re-review` - Re-review only NEW changes since your last review (check your previous comments first)
-            - `@claude-pr review <file>` - Review only a specific file
-            - `@claude-pr` followed by a question - Answer the question about this PR
+            - `@claude review` - Full review of the PR (re-reviews new changes if a previous review exists)
+            - `@claude review <file>` - Review only a specific file
+            - `@claude review <question>` - Answer the question about this PR
 
             ## If this is a re-review:
             1. First, check existing review comments on this PR using `gh pr view`

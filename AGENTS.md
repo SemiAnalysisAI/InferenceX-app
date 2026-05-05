@@ -191,14 +191,10 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 
 ## Claude AI Agents
 
-### `@frontend-claude` (`.github/workflows/claude.yml`)
+### `@claude` (`.github/workflows/claude.yml`)
 
-Triggered by mentioning in issues/comments. Full code implementation + Playwright browser testing. Creates `claude/issue-{N}-*` branches. Must verify charts render real data (no "No data available").
+All Claude AI workflows are dispatched from a single trigger word `@claude`. The next word selects the mode:
 
-### `@chrome-claude` (`.github/workflows/claude-chrome.yml`)
-
-Same as `@frontend-claude` but uses Chrome DevTools MCP instead of Playwright for browser automation. Preferred when you need deeper debugging (network requests, console messages, JS evaluation).
-
-### `@pr-claude` (`.github/workflows/pr-claude.yml`)
-
-Auto-runs on PR open/sync. Code review only. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
+- `@claude` (or `@claude <anything>`) — implementation with Playwright MCP. Triggered by mentioning in issues/comments. Full code implementation + browser testing. Creates `claude/issue-{N}-*` branches. Must verify charts render real data (no "No data available").
+- `@claude chrome` — implementation with Chrome DevTools MCP instead of Playwright. Preferred when you need deeper debugging (network requests, console messages, JS evaluation).
+- `@claude review` — code review only. Also auto-runs on PR open/sync. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
