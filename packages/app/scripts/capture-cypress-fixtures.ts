@@ -83,6 +83,46 @@ function keepTopDatesPerPartition<T extends { date: string }>(
   return out;
 }
 
+/**
+ * Within each partition, keep at most `n` rows by sampling evenly along
+ * `axis` (typically `conc`). Used to shrink benchmark sweeps that have ~20
+ * concurrency levels per config when the chart only needs a handful to
+ * render. Preserves the lowest and highest values so chart axis ranges stay
+ * representative.
+ */
+function sampleAlongAxis<T>(
+  rows: T[],
+  partition: (r: T) => string,
+  axis: (r: T) => number,
+  n: number,
+): T[] {
+  const buckets = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = partition(r);
+    const arr = buckets.get(k);
+    if (arr) arr.push(r);
+    else buckets.set(k, [r]);
+  }
+  const out: T[] = [];
+  for (const arr of buckets.values()) {
+    if (arr.length <= n) {
+      out.push(...arr);
+      continue;
+    }
+    const sorted = [...arr].toSorted((a, b) => axis(a) - axis(b));
+    const step = (sorted.length - 1) / (n - 1);
+    const seen = new Set<number>();
+    for (let i = 0; i < n; i++) {
+      const idx = Math.round(i * step);
+      if (!seen.has(idx)) {
+        seen.add(idx);
+        out.push(sorted[idx]);
+      }
+    }
+  }
+  return out;
+}
+
 async function writeFixture(name: string, data: unknown): Promise<number> {
   // Pretty-print: matches oxfmt's output so re-running capture doesn't dirty
   // the working tree on the formatter pass.
@@ -105,7 +145,17 @@ async function main() {
   const evaluations = await fetchJson<{ date: string; model: string }[]>('/api/v1/evaluations');
 
   // Latest-snapshot: already deduped to one row per config, no date filter.
-  const benchmarks = await fetchJson<unknown[]>(
+  // ~20 conc levels per (hw, fw, prec, isl, osl) — sample down to keep the
+  // scatter visually populated without writing every concurrency point.
+  interface BenchmarkRow {
+    conc: number;
+    hardware: string;
+    framework: string;
+    precision: string;
+    isl: number;
+    osl: number;
+  }
+  const benchmarks = await fetchJson<BenchmarkRow[]>(
     `/api/v1/benchmarks?model=${encodeURIComponent(BENCHMARK_MODEL)}`,
   );
 
@@ -114,6 +164,7 @@ async function main() {
   // point has multi-date data when the user double-clicks it.
   interface HistoryRow {
     date: string;
+    conc: number;
     hardware: string;
     framework: string;
     precision: string;
@@ -160,15 +211,34 @@ async function main() {
         keepTopDatesPerPartition(evaluations, (r) => r.model, N),
       ),
     ],
-    ['benchmarks', await writeFixture('benchmarks', benchmarks)],
+    [
+      'benchmarks',
+      await writeFixture(
+        'benchmarks',
+        sampleAlongAxis(
+          benchmarks,
+          (r) => `${r.hardware}|${r.framework}|${r.precision}|${r.isl}|${r.osl}`,
+          (r) => r.conc,
+          5,
+        ),
+      ),
+    ],
     [
       'benchmarks-history',
+      // Two-pass: trim to top-N dates per config, then sample concurrencies
+      // within each (config, date) so trend lines have multi-date coverage
+      // but each (config, date) point doesn't carry every conc level.
       await writeFixture(
         'benchmarks-history',
-        keepTopDatesPerPartition(
-          historyMerged,
-          (r) => `${r.hardware}|${r.framework}|${r.precision}|${r.isl}|${r.osl}`,
-          N,
+        sampleAlongAxis(
+          keepTopDatesPerPartition(
+            historyMerged,
+            (r) => `${r.hardware}|${r.framework}|${r.precision}|${r.isl}|${r.osl}`,
+            N,
+          ),
+          (r) => `${r.hardware}|${r.framework}|${r.precision}|${r.isl}|${r.osl}|${r.date}`,
+          (r) => r.conc,
+          3,
         ),
       ),
     ],
