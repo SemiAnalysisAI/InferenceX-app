@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { Card } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { UnofficialRunContext } from '@/components/unofficial-run-provider';
 import { cn } from '@/lib/utils';
 
 const FEATURE_GATE_KEY = 'inferencex-feature-gate';
@@ -89,10 +90,38 @@ export function TabNav() {
   const current = activeTab(pathname);
   const selectedTab = TAB_VALUES.has(current) ? current : '';
 
+  // Preserve the `unofficialrun(s)` URL param across tab navigation so an
+  // overlay loaded on /inference doesn't get dropped when switching to
+  // /evaluation, etc. The URL is the source of truth (it's still set during
+  // the in-flight fetch and even when the fetch fails), so we read it from
+  // window.location and re-sync on pathname change, context update
+  // (dismiss/clear writes via history.pushState), and popstate.
+  const unofficialCtx = useContext(UnofficialRunContext);
+  const ctxRunInfos = unofficialCtx?.unofficialRunInfos;
+  const [unofficialIds, setUnofficialIds] = useState('');
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const sync = () => {
+      const sp = new URLSearchParams(window.location.search);
+      for (const [k, v] of sp) {
+        if (/^unofficialruns?$/i.test(k) && v) {
+          setUnofficialIds(v);
+          return;
+        }
+      }
+      setUnofficialIds('');
+    };
+    sync();
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, [pathname, ctxRunInfos]);
+  const tabHref = (path: string) =>
+    unofficialIds ? `${path}?unofficialruns=${unofficialIds}` : path;
+
   const handleMobileChange = (value: string) => {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
     track('tab_changed', { tab: value });
-    router.push(`/${value}`);
+    router.push(tabHref(`/${value}`));
   };
 
   const handleDesktopClick = (tab: string) => {
@@ -140,7 +169,7 @@ export function TabNav() {
               return (
                 <Link
                   key={tab.href}
-                  href={tab.href}
+                  href={tabHref(tab.href)}
                   data-testid={tab.testId}
                   data-ph-capture-attribute-tab={tab.href.slice(1)}
                   onClick={() => handleDesktopClick(tab.href.slice(1))}
