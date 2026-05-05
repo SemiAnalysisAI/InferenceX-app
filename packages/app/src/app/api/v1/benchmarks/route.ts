@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import { getLatestBenchmarks } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
   if (!dbModelKeys || dbModelKeys.length === 0) {
     return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
   }
+  if (FIXTURES_MODE) return cachedJson(loadFixture('benchmarks'));
 
   try {
     const rows = await getCachedBenchmarks(dbModelKeys, date, exact || undefined);

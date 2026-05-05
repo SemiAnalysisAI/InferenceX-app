@@ -13,6 +13,18 @@ export type DbClient = (
 /** True when running off a JSON dump directory instead of a live database (local dev only). */
 export const JSON_MODE = !process.env.DATABASE_READONLY_URL && Boolean(process.env.DUMP_DIR);
 
+/**
+ * Server-side fixtures mode for cypress e2e: every API route returns a
+ * pre-captured fixture instead of querying. Set via E2E_FIXTURES=1 in the
+ * tests-e2e.yml workflow. Avoids relying on cy.intercept (which has a brief
+ * gap on test transitions when cypress resets routes) and works on fork PRs
+ * where DB secrets aren't available.
+ *
+ * Not gated on CI=true because Vercel also sets CI=true during production
+ * builds; using a dedicated var keeps prod safe.
+ */
+export const FIXTURES_MODE = process.env.E2E_FIXTURES === '1';
+
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 interface PostgresConnectionOptions {
