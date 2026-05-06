@@ -8,7 +8,7 @@ import type postgres from 'postgres';
 
 import { GITHUB_API_BASE, GITHUB_REPOS } from '@semianalysisai/inferencex-constants';
 
-import { CONCLUSION_OVERRIDES, PURGED_RUNS } from './run-overrides.js';
+import { CONCLUSION_OVERRIDES, isRunAttemptPurged } from './run-overrides.js';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -148,9 +148,9 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
     runStartedAt?: string | null;
     ghInfo?: GithubRunInfo | null;
   }): Promise<number | null> {
-    if (PURGED_RUNS.has(params.githubRunId)) return null;
-
     const attempt = params.runAttempt ?? params.ghInfo?.runAttempt ?? 0;
+    if (isRunAttemptPurged(params.githubRunId, attempt)) return null;
+
     const cacheKey = `${params.githubRunId}:${attempt}`;
     if (workflowRunCache.has(cacheKey)) return workflowRunCache.get(cacheKey)!;
 

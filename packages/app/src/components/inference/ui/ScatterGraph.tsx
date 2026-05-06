@@ -43,6 +43,7 @@ import {
   paretoFrontUpperLeft,
   paretoFrontUpperRight,
 } from '@/lib/chart-utils';
+import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
   InferenceData,
@@ -141,6 +142,10 @@ const ScatterGraph = React.memo(
       setShowGradientLabels,
       showLineLabels,
       setShowLineLabels,
+      showSpeedOverlay,
+      setShowSpeedOverlay,
+      showMinecraftOverlay,
+      setShowMinecraftOverlay,
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
@@ -992,6 +997,65 @@ const ScatterGraph = React.memo(
                   labeledHw.add(entry.hw);
                 }
               }
+
+              // Overlay (unofficial run) rooflines also get line labels using the
+              // run-palette color so they match the legend swatches. The label
+              // text mirrors the overlay legend ("✕ <branch>" — falls back to the
+              // hw label if run metadata isn't available, e.g. legacy callers).
+              const overlayLabelText = (runIndex: number, hwKey: string): string => {
+                const info = unofficialRunInfos[runIndex];
+                if (!info) return parseHwKeyToLabel(hwKey).label;
+                const branch = info.branch || `run ${info.id}`;
+                return `✕ ${branch}`;
+              };
+              const sortedOverlay = Object.entries(overlayRooflines)
+                .filter(
+                  ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
+                )
+                .toSorted(([, a], [, b]) => yScale(a.points[0].y) - yScale(b.points[0].y));
+
+              for (const [ovKey, group] of sortedOverlay) {
+                const labelKey = `overlay-${ovKey}`;
+                const pts = group.points;
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)],
+                  pts[Math.floor(pts.length / 2)],
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                  pts.at(-1)!,
+                ];
+                const label = overlayLabelText(group.runIndex, group.hwKey);
+                let placedOverlay = false;
+                for (const pt of candidates) {
+                  const px = xScale(pt.x);
+                  const py = yScale(pt.y);
+                  if (!collides(px, py)) {
+                    lineLabels.push({
+                      key: labelKey,
+                      hw: group.hwKey,
+                      label,
+                      color: overlayRunColor(group.runIndex),
+                      x: px,
+                      y: py,
+                      visible: true,
+                    });
+                    placed.push({ x: px, y: py });
+                    placedOverlay = true;
+                    break;
+                  }
+                }
+                if (!placedOverlay) {
+                  const pt = pts[0];
+                  lineLabels.push({
+                    key: labelKey,
+                    hw: group.hwKey,
+                    label,
+                    color: overlayRunColor(group.runIndex),
+                    x: xScale(pt.x),
+                    y: yScale(pt.y),
+                    visible: false,
+                  });
+                }
+              }
             } else {
               // TTFT / E2EL: endpoint labels, one per hw key
               const seenHw = new Set<string>();
@@ -1008,6 +1072,26 @@ const ScatterGraph = React.memo(
                   x: xScale(pt.x),
                   y: yScale(pt.y),
                   visible: entry.visible,
+                });
+              }
+              // Endpoint labels for overlay rooflines too (one per (hw, runIndex)),
+              // labeled with the run's branch name to mirror the overlay legend.
+              for (const [ovKey, group] of Object.entries(overlayRooflines)) {
+                if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                const info = unofficialRunInfos[group.runIndex];
+                const labelText = info
+                  ? `✕ ${info.branch || `run ${info.id}`}`
+                  : parseHwKeyToLabel(group.hwKey).label;
+                const labelKey = `overlay-${ovKey}`;
+                const pt = group.points.at(-1)!;
+                lineLabels.push({
+                  key: labelKey,
+                  hw: group.hwKey,
+                  label: labelText,
+                  color: overlayRunColor(group.runIndex),
+                  x: xScale(pt.x),
+                  y: yScale(pt.y),
+                  visible: true,
                 });
               }
               const visible = lineLabels.filter((l) => l.visible);
@@ -1200,6 +1284,43 @@ const ScatterGraph = React.memo(
                 }
               }
 
+              // Overlay (unofficial) rooflines: same greedy placement against
+              // the same `placed` array so they stay non-overlapping with the
+              // official labels post-zoom.
+              const overlayVisible = Object.entries(overlayRooflines)
+                .filter(
+                  ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
+                )
+                .toSorted(([, a], [, b]) => newYScale(a.points[0].y) - newYScale(b.points[0].y));
+              for (const [ovKey, group] of overlayVisible) {
+                const labelKey = `overlay-${ovKey}`;
+                const pts = group.points;
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)],
+                  pts[Math.floor(pts.length / 2)],
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                  pts.at(-1)!,
+                ];
+                let found = false;
+                for (const pt of candidates) {
+                  const px = newXScale(pt.x);
+                  const py = newYScale(pt.y);
+                  if (!collides(px, py)) {
+                    zoomResults.set(labelKey, { x: px, y: py, vis: true });
+                    placed.push({ x: px, y: py });
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  zoomResults.set(labelKey, {
+                    x: newXScale(pts[0].x),
+                    y: newYScale(pts[0].y),
+                    vis: false,
+                  });
+                }
+              }
+
               zoomGroup.selectAll<SVGGElement, unknown>('.line-label').each(function () {
                 const el = d3.select(this);
                 const k = el.attr('data-line-key');
@@ -1228,6 +1349,16 @@ const ScatterGraph = React.memo(
                 const pt = pts.at(-1)!;
                 zoomLabels.push({ key, x: newXScale(pt.x), y: newYScale(pt.y) });
               });
+              // Overlay rooflines: per-(hw, runIndex) endpoint labels.
+              for (const [ovKey, group] of Object.entries(overlayRooflines)) {
+                if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                const pt = group.points.at(-1)!;
+                zoomLabels.push({
+                  key: `overlay-${ovKey}`,
+                  x: newXScale(pt.x),
+                  y: newYScale(pt.y),
+                });
+              }
               if (zoomLabels.length > 1) {
                 const yRange = newYScale.range();
                 const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
@@ -1491,14 +1622,116 @@ const ScatterGraph = React.memo(
           }
         : null;
 
+      const speedOverlayLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'speed-overlay',
+        render: (_zoomGroup, ctx) => {
+          const { g } = ctx.layout;
+          g.selectAll('.speed-overlay').remove();
+          if (!showSpeedOverlay && !showMinecraftOverlay) return;
+          const w = ctx.width;
+          const h = ctx.height;
+          const SIZE = 78;
+          const PAD = 8;
+          const STACK_GAP = 4;
+          const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
+          const dir = chartDefinition[rooflineKey] as RooflineDirection | undefined;
+          const { busTop, busLeft } = getSpeedOverlayCorners(dir);
+          const layer = g.append('g').attr('class', 'speed-overlay').attr('pointer-events', 'none');
+
+          // Each enabled "pair" stacks horizontally inward from the chart corner so
+          // the second pair sits next to (not on top of) the first one when both
+          // toggles are on. The bus-side stays anchored to the batch corner; the
+          // car-side stays anchored to the interactive corner. Pair items can have
+          // independent slow/fast sizes so the donkey can be visually heavier than
+          // the elytra without affecting the bus/car pair.
+          interface OverlayPair {
+            id: string;
+            slowSrc: string;
+            fastSrc: string;
+            slowSize: number;
+            fastSize: number;
+          }
+          const enabledPairs: OverlayPair[] = [];
+          if (showSpeedOverlay) {
+            enabledPairs.push({
+              id: 'speed',
+              slowSrc: '/decorative/bus.png',
+              fastSrc: '/decorative/racing-car.png',
+              slowSize: SIZE,
+              fastSize: SIZE,
+            });
+          }
+          if (showMinecraftOverlay) {
+            // donkey-chest.png — Chested_Donkey_JE5 from minecraft.wiki/w/Donkey,
+            //   rendered 50% larger than the other overlay icons (1.5× SIZE).
+            // elytra.png — ElytraNew sprite (front-facing both wings) from the
+            //   Minecraft Fandom wiki at 160×160 pixel-art.
+            enabledPairs.push({
+              id: 'minecraft',
+              slowSrc: '/decorative/donkey-chest.png',
+              fastSrc: '/decorative/elytra.png',
+              slowSize: Math.round(SIZE * 1.5),
+              fastSize: SIZE,
+            });
+          }
+
+          const slowCornerName = `${busTop ? 'top' : 'bottom'}-${busLeft ? 'left' : 'right'}`;
+          const fastCornerName = `${busTop ? 'bottom' : 'top'}-${busLeft ? 'right' : 'left'}`;
+          let slowInward = 0;
+          let fastInward = 0;
+          enabledPairs.forEach((pair) => {
+            const slowX = busLeft ? PAD + slowInward : w - pair.slowSize - PAD - slowInward;
+            const slowY = busTop ? PAD : h - pair.slowSize - PAD;
+            const fastX = busLeft ? w - pair.fastSize - PAD - fastInward : PAD + fastInward;
+            const fastY = busTop ? h - pair.fastSize - PAD : PAD;
+            layer
+              .append('image')
+              .attr('class', `speed-overlay-slow speed-overlay-${pair.id}-slow`)
+              .attr('data-testid', `speed-overlay-${pair.id}-slow`)
+              .attr('data-corner', slowCornerName)
+              .attr('href', pair.slowSrc)
+              .attr('x', slowX)
+              .attr('y', slowY)
+              .attr('width', pair.slowSize)
+              .attr('height', pair.slowSize)
+              .attr('opacity', 0.85);
+            layer
+              .append('image')
+              .attr('class', `speed-overlay-fast speed-overlay-${pair.id}-fast`)
+              .attr('data-testid', `speed-overlay-${pair.id}-fast`)
+              .attr('data-corner', fastCornerName)
+              .attr('href', pair.fastSrc)
+              .attr('x', fastX)
+              .attr('y', fastY)
+              .attr('width', pair.fastSize)
+              .attr('height', pair.fastSize)
+              .attr('opacity', 0.85);
+            slowInward += pair.slowSize + STACK_GAP;
+            fastInward += pair.fastSize + STACK_GAP;
+          });
+
+          // Backwards-compatible aliases so existing E2E tests (speed-overlay.cy.ts)
+          // can still find the bus/car pair via `[data-testid="speed-overlay-bus"]`
+          // and `[data-testid="speed-overlay-car"]`.
+          if (showSpeedOverlay) {
+            layer.select('.speed-overlay-speed-slow').attr('data-testid', 'speed-overlay-bus');
+            layer.select('.speed-overlay-speed-fast').attr('data-testid', 'speed-overlay-car');
+          }
+        },
+      };
+
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
+      result.push(speedOverlayLayer);
       return result;
     }, [
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      showSpeedOverlay,
+      showMinecraftOverlay,
       gradientColorByPoint,
       chartId,
       effectiveActiveHwTypes,
@@ -1513,11 +1746,14 @@ const ScatterGraph = React.memo(
       overlayData,
       processedOverlayData,
       overlayRooflines,
+      activeOverlayHwTypes,
+      unofficialRunInfos,
       runIndexByUrl,
       hardwareConfig,
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      chartDefinition,
       chartDefinition.chartType,
     ]);
 
@@ -1852,6 +2088,24 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setShowLineLabels(checked);
                   track('latency_line_labels_toggled', { enabled: checked });
+                },
+              },
+              {
+                id: 'scatter-speed-overlay',
+                label: 'Bus / Race Car',
+                checked: showSpeedOverlay,
+                onCheckedChange: (checked: boolean) => {
+                  setShowSpeedOverlay(checked);
+                  track('latency_speed_overlay_toggled', { enabled: checked });
+                },
+              },
+              {
+                id: 'scatter-minecraft-overlay',
+                label: 'Donkey / Elytra',
+                checked: showMinecraftOverlay,
+                onCheckedChange: (checked: boolean) => {
+                  setShowMinecraftOverlay(checked);
+                  track('latency_minecraft_overlay_toggled', { enabled: checked });
                 },
               },
             ]}

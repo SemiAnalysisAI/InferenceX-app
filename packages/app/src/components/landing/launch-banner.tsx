@@ -7,7 +7,7 @@ import { track } from '@/lib/analytics';
 
 const DISMISS_KEY = 'inferencex-dsv4-banner-dismissed';
 const BANNER_ID = 'dsv4-launch';
-const PRESET_ID = 'dsv4-launch-nvidia';
+const PRESET_ID = 'dsv4-launch';
 
 function isDismissed(): boolean {
   try {
@@ -73,7 +73,7 @@ export function LaunchBanner() {
               </span>
             </p>
             <p className="text-xs text-muted-foreground leading-snug truncate">
-              First inference numbers on NVIDIA, click to explore.
+              First inference numbers across NVIDIA and AMD GPUs, click to explore.
             </p>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">

@@ -28,6 +28,7 @@ const { mockState, mockDb } = vi.hoisted(() => {
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   JSON_MODE: false,
+  FIXTURES_MODE: false,
   postgresOptionsForUrl: () => ({ max: 5, ssl: false }),
 }));
 

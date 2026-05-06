@@ -11,6 +11,7 @@ import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
+import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -178,6 +179,7 @@ export default async function RootLayout({
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <CircuitBackground />
         <MinecraftBackgroundLazy />
+        <MinecraftDecorations />
         <PostHogProvider>
           <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
           <QueryProvider>

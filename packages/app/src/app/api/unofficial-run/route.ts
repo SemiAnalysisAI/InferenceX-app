@@ -116,6 +116,10 @@ export function normalizeEvalArtifactRows(
     }
 
     rows.push({
+      // Synthetic id — unofficial rows are never persisted to eval_results, so
+      // there's no real PK to surface. -1 signals "no DB-side row" to the
+      // samples drawer (it'll skip the DB lookup and fall back to live fetch).
+      id: -1,
       config_id: configIdOffset + localId,
       hardware: params.config.hardware,
       framework: params.config.framework,

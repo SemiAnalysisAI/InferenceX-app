@@ -447,6 +447,7 @@ export function getAllEvalResults(): EvalRow[] {
     if (!wr) continue;
 
     rows.push({
+      id: er.id,
       config_id: er.config_id,
       hardware: c.hardware,
       framework: c.framework,

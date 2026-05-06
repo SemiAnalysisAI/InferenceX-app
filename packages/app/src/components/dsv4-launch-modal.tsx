@@ -7,7 +7,7 @@ import { track } from '@/lib/analytics';
 import { isDsv4ModalDismissed, saveDsv4ModalDismissed } from '@/lib/dsv4-launch-storage';
 import { Button } from '@/components/ui/button';
 
-const PRESET_HREF = '/inference?preset=dsv4-launch-nvidia';
+const PRESET_HREF = '/inference?preset=dsv4-launch';
 
 let sessionDismissed = false;
 
@@ -73,8 +73,8 @@ export function Dsv4LaunchModal() {
             </span>
           </h2>
           <p id="dsv4-launch-description" className="text-sm text-muted-foreground">
-            Day-zero benchmarks for DeepSeek V4 Pro are now available across NVIDIA H200, B200, and
-            B300. Results are experimental — see how the new model performs on the latest GPUs.
+            Day-zero benchmarks for DeepSeek V4 Pro are now available across the latest NVIDIA and
+            AMD GPUs. Results are experimental — see how the new model performs across hardware.
           </p>
         </div>
         <div className="flex flex-row justify-end gap-2">

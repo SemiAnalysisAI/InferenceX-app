@@ -6,8 +6,53 @@ import {
   FAVORITE_PRESETS,
   findClosestDate,
   findConfigChangeDates,
+  matchesPresetHwFilter,
   subtractMonths,
 } from './favorite-presets';
+
+// ── matchesPresetHwFilter ────────────────────────────────────────────
+
+describe('matchesPresetHwFilter', () => {
+  const dsv4 = Model.DeepSeek_V4_Pro; // mtpEngineExclusion = true
+  const dsr1 = Model.DeepSeek_R1; // no MTP exclusion
+
+  it('matches a bare GPU prefix against any framework variant on that GPU', () => {
+    expect(matchesPresetHwFilter('b300_sglang', ['b300'], dsv4)).toBe(true);
+    expect(matchesPresetHwFilter('b300_vllm', ['b300'], dsv4)).toBe(true);
+    expect(matchesPresetHwFilter('b300_dynamo-vllm', ['b300'], dsv4)).toBe(true);
+  });
+
+  it('skips _mtp keys via a bare GPU prefix only for mtpEngineExclusion models', () => {
+    // dsv4 has mtpEngineExclusion → MTP keys filtered out under bare prefix
+    expect(matchesPresetHwFilter('b300_sglang_mtp', ['b300'], dsv4)).toBe(false);
+    expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], dsv4)).toBe(false);
+    // dsr1 (and other models) → bare prefix still pulls MTP variants through
+    expect(matchesPresetHwFilter('h100_dynamo-trt_mtp', ['h100'], dsr1)).toBe(true);
+    expect(matchesPresetHwFilter('gb300_dynamo-trt_mtp', ['gb300'], dsr1)).toBe(true);
+  });
+
+  it('matches _mtp keys via an exact filter entry regardless of model', () => {
+    expect(matchesPresetHwFilter('h100_dynamo-trt_mtp', ['h100_dynamo-trt_mtp'], dsv4)).toBe(true);
+    expect(matchesPresetHwFilter('gb300_dynamo-trt_mtp', ['gb300_dynamo-trt_mtp'], dsr1)).toBe(
+      true,
+    );
+  });
+
+  it('does not cross-match different GPUs', () => {
+    expect(matchesPresetHwFilter('b300_vllm', ['b200'], dsv4)).toBe(false);
+    expect(matchesPresetHwFilter('b200_vllm', ['b300'], dsr1)).toBe(false);
+  });
+
+  it('does not match a partial GPU prefix without the underscore boundary', () => {
+    expect(matchesPresetHwFilter('b3000_vllm', ['b300'], dsv4)).toBe(false);
+    expect(matchesPresetHwFilter('mi355x_sglang', ['mi35'], dsr1)).toBe(false);
+  });
+
+  it('treats null/undefined model the same as a non-exclusion model', () => {
+    expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], null)).toBe(true);
+    expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], undefined)).toBe(true);
+  });
+});
 
 // ── findClosestDate ──────────────────────────────────────────────────
 

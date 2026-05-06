@@ -1,6 +1,6 @@
 describe('TCO Calculator', () => {
   // ---------------------------------------------------------------------------
-  // Tab navigation (must start from / to test tab switching)
+  // Tab navigation (must start from /inference to test tab switching)
   // ---------------------------------------------------------------------------
 
   describe('tab navigation', () => {
@@ -31,10 +31,10 @@ describe('TCO Calculator', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // All remaining tests visit /calculator directly (once per describe)
+  // All remaining tests share a single /calculator page load
   // ---------------------------------------------------------------------------
 
-  describe('controls and chart rendering', () => {
+  describe('controls, interactions, and features', () => {
     before(() => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -42,6 +42,18 @@ describe('TCO Calculator', () => {
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
+
+    // Clear stale Radix scroll lock before each test to prevent pointer-events: none
+    beforeEach(() => {
+      cy.document().then((doc) => {
+        delete doc.body.dataset.scrollLocked;
+        doc.body.style.removeProperty('pointer-events');
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Controls and chart rendering
+    // -------------------------------------------------------------------------
 
     it('renders the calculator controls section with heading', () => {
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
@@ -157,20 +169,10 @@ describe('TCO Calculator', () => {
         .invoke('text')
         .should('match', /\d/);
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // Metric switching and badges
-  // ---------------------------------------------------------------------------
-
-  describe('metric switching', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
+    // -------------------------------------------------------------------------
+    // Metric switching and badges
+    // -------------------------------------------------------------------------
 
     it('clicking power metric button switches the chart metric', () => {
       cy.get('[data-testid="calculator-metric-power"]').click();
@@ -179,7 +181,6 @@ describe('TCO Calculator', () => {
     });
 
     it('shows power badges when tok/s/MW metric is selected', () => {
-      // Still on power metric from previous test
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'All in Power/GPU');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'kW');
       cy.get('[data-testid="calculator-chart-section"]').should(
@@ -195,44 +196,31 @@ describe('TCO Calculator', () => {
     });
 
     it('shows TCO badges when cost metric is selected', () => {
-      // Still on cost metric from previous test
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/GPU/hr');
       cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '$');
     });
 
     it('displays chart title that updates when metric changes', () => {
-      // Switch back to throughput
       cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'Total Token Throughput per GPU');
-      // Switch to power
       cy.get('[data-testid="calculator-metric-power"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'Tokens per Provisioned All-in Megawatt');
-      // Switch to cost
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'Cost per Million');
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // View toggle and table
-  // ---------------------------------------------------------------------------
-
-  describe('view toggle and table', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
+    // -------------------------------------------------------------------------
+    // View toggle and table (reset to throughput + chart view first)
+    // -------------------------------------------------------------------------
 
     it('switching to table view shows the results table', () => {
+      cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('[data-testid="calculator-table-view-btn"]').click();
       cy.get('[data-testid="calculator-results-table"]').should('be.visible');
       cy.get('[data-testid="calculator-results-table"] table').should('exist');
@@ -244,7 +232,6 @@ describe('TCO Calculator', () => {
     });
 
     it('results table contains expected column headers', () => {
-      // Still in table view from previous test
       cy.get('[data-testid="calculator-results-table"]').within(() => {
         cy.get('thead').should('contain.text', 'GPU');
         cy.get('thead').should('contain.text', 'tok/s/MW');
@@ -286,33 +273,15 @@ describe('TCO Calculator', () => {
           );
         });
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // Selector interactions
-  // ---------------------------------------------------------------------------
-
-  describe('selector interactions', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    // Clear stale Radix scroll lock before each test to prevent pointer-events: none
-    beforeEach(() => {
-      cy.document().then((doc) => {
-        delete doc.body.dataset.scrollLocked;
-        doc.body.style.removeProperty('pointer-events');
-      });
-    });
+    // -------------------------------------------------------------------------
+    // Selector interactions (reset to chart view + throughput)
+    // -------------------------------------------------------------------------
 
     it('model selector has selectable options', () => {
-      // Wait for availability data to load — model selector value updates when data arrives
+      cy.get('[data-testid="calculator-chart-view-btn"]').click();
+      cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('#calc-model').should('not.contain.text', 'Model');
-      cy.wait(100);
       cy.get('#calc-model').click();
       cy.get('[role="option"]').should('have.length.greaterThan', 0);
       cy.get('body').type('{esc}');
@@ -371,13 +340,11 @@ describe('TCO Calculator', () => {
     });
 
     it('switching token type updates table column headers', () => {
-      // Switch to table view
       cy.get('[data-testid="calculator-table-view-btn"]').click();
       cy.get('[data-testid="calculator-results-table"] thead').should(
         'contain.text',
         'Output Throughput',
       );
-      // Switch back to Total
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
@@ -386,7 +353,6 @@ describe('TCO Calculator', () => {
         'contain.text',
         'Total Throughput',
       );
-      // Switch back to chart view
       cy.get('[data-testid="calculator-chart-view-btn"]').click();
     });
 
@@ -403,22 +369,13 @@ describe('TCO Calculator', () => {
         .first()
         .should('contain.text', 'Owning - Neocloud');
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // Target interactivity slider
-  // ---------------------------------------------------------------------------
-
-  describe('target interactivity slider', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
+    // -------------------------------------------------------------------------
+    // Target interactivity slider (reset to throughput)
+    // -------------------------------------------------------------------------
 
     it('slider input value matches the number input value', () => {
+      cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('input[type="range"]')
           .invoke('val')
@@ -451,22 +408,14 @@ describe('TCO Calculator', () => {
           });
       });
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // Legend interactions
-  // ---------------------------------------------------------------------------
-
-  describe('legend interactions', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
+    // -------------------------------------------------------------------------
+    // Legend interactions (fresh visit to reset accumulated state changes)
+    // -------------------------------------------------------------------------
 
     it('legend items have colored dot indicators and text labels', () => {
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('.legend-container li').each(($li) => {
         cy.wrap($li).find('span').first().should('have.css', 'background-color');
         cy.wrap($li).find('label').invoke('text').should('have.length.greaterThan', 0);
@@ -478,31 +427,21 @@ describe('TCO Calculator', () => {
         .should('have.length.greaterThan', 1)
         .its('length')
         .then((initialCount) => {
-          // Click first legend label to toggle visibility
           cy.get('.sidebar-legend label').first().click();
-          // Bar count should change (fewer or zero if GPU has no data at this interactivity point)
           cy.get('[data-testid="calculator-bar-chart"] svg .bar').should(
             'have.length.lessThan',
             initialCount,
           );
         });
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // Click-to-compare bars
-  // ---------------------------------------------------------------------------
-
-  describe('click-to-compare bars', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 1);
-    });
+    // -------------------------------------------------------------------------
+    // Click-to-compare bars (fresh visit to ensure clean chart state)
+    // -------------------------------------------------------------------------
 
     it('clicking one bar shows a comparison banner with "selected" text', () => {
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 1);
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
       cy.get('[data-testid="calculator-comparison-banner"]').should('contain.text', 'selected');
@@ -513,7 +452,6 @@ describe('TCO Calculator', () => {
     });
 
     it('selected bars have higher opacity than unselected bars', () => {
-      // First bar still selected from previous test
       cy.get('[data-testid="calculator-bar-chart"] svg .bar')
         .first()
         .should('have.attr', 'opacity')
@@ -525,7 +463,6 @@ describe('TCO Calculator', () => {
     });
 
     it('clicking two bars shows a comparison ratio', () => {
-      // First bar already selected; click second
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').eq(1).click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
       cy.get('[data-testid="calculator-comparison-banner"]').should('contain.text', 'x more');
@@ -535,38 +472,14 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-comparison-banner"]').contains('Clear selection').click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('not.exist');
     });
-  });
 
-  // ---------------------------------------------------------------------------
-  // Direct URL navigation
-  // ---------------------------------------------------------------------------
-
-  describe('direct URL navigation', () => {
-    it('navigating to /calculator directly loads the calculator tab with data', () => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.url().should('include', '/calculator');
-      cy.get('[data-testid="calculator-controls"]').should('be.visible');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Metric-specific disclaimers
-  // ---------------------------------------------------------------------------
-
-  describe('metric-specific disclaimers', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
+    // -------------------------------------------------------------------------
+    // Metric-specific disclaimers (fresh visit to reset accumulated state)
+    // -------------------------------------------------------------------------
 
     it('shows disaggregated throughput disclaimer for throughput metric', () => {
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
         'Disaggregated inference configurations',
@@ -591,6 +504,22 @@ describe('TCO Calculator', () => {
         'contain.text',
         'throughput per decode GPU',
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Direct URL navigation (separate visit to verify fresh load)
+  // ---------------------------------------------------------------------------
+
+  describe('direct URL navigation', () => {
+    it('navigating to /calculator directly loads the calculator tab with data', () => {
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      });
+      cy.visit('/calculator');
+      cy.url().should('include', '/calculator');
+      cy.get('[data-testid="calculator-controls"]').should('be.visible');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
   });
 });

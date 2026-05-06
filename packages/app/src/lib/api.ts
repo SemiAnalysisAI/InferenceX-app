@@ -77,6 +77,7 @@ export interface ReliabilityRow {
 }
 
 export interface EvalRow {
+  id: number;
   config_id: number;
   hardware: string;
   framework: string;
@@ -160,6 +161,97 @@ export function fetchReliability(signal?: AbortSignal) {
 
 export function fetchEvaluations(signal?: AbortSignal) {
   return fetchJson<EvalRow[]>('/api/v1/evaluations', signal);
+}
+
+export interface EvalSampleRow {
+  docId: number;
+  prompt: string | null;
+  target: string | null;
+  /** Filtered answer that was actually scored against `target`. */
+  response: string | null;
+  /**
+   * Full unfiltered model output. Often identical to `response`, but for failed
+   * samples (degenerate output, control bytes, repetition loops) this is where
+   * the real signal lives — the filter may strip it down to nothing.
+   */
+  rawResponse: string | null;
+  /**
+   * Few-shot demonstrations parsed server-side from lm-eval `arguments.gen_args_0.arg_0`.
+   * Handles both the multi-turn chat-array shape and the pre-concatenated
+   * single-message shape. `null` when the task isn't 5-shot or the prompt format
+   * doesn't match either known shape — the bare `prompt` field is sufficient there.
+   */
+  demonstrations: { question: string; answer: string }[] | null;
+  passed: boolean | null;
+  score: number | null;
+  metrics: Record<string, number>;
+}
+
+export interface EvalSamplesResponse {
+  samples: EvalSampleRow[];
+  total: number;
+  passedTotal: number;
+  failedTotal: number;
+  source: 'db' | 'github_artifact';
+}
+
+export type EvalSamplesFilter = 'all' | 'passed' | 'failed';
+
+export function fetchEvalSamples(
+  evalResultId: number,
+  filter: EvalSamplesFilter,
+  offset: number,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    eval_result_id: String(evalResultId),
+    filter,
+    offset: String(offset),
+    limit: String(limit),
+  });
+  return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples?${params}`, signal);
+}
+
+/** Identifying fields used by the live route to locate the right eval artifact. */
+export interface EvalSamplesLiveContext {
+  runId: string;
+  task: string;
+  model: string;
+  framework: string;
+  hardware: string;
+  precision: string;
+  specMethod: string;
+  disagg: boolean;
+  conc: number | null;
+}
+
+/**
+ * Live-fetch variant for unofficial runs — same response shape as `fetchEvalSamples`,
+ * but the server reads samples from the workflow's GHA artifact rather than the DB.
+ */
+export function fetchEvalSamplesLive(
+  ctx: EvalSamplesLiveContext,
+  filter: EvalSamplesFilter,
+  offset: number,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    run_id: ctx.runId,
+    task: ctx.task,
+    model: ctx.model,
+    framework: ctx.framework,
+    hardware: ctx.hardware,
+    precision: ctx.precision,
+    spec_method: ctx.specMethod,
+    disagg: String(ctx.disagg),
+    filter,
+    offset: String(offset),
+    limit: String(limit),
+  });
+  if (ctx.conc !== null) params.set('conc', String(ctx.conc));
+  return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples-live?${params}`, signal);
 }
 
 export function fetchSubmissions(signal?: AbortSignal) {

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { track } from '@/lib/analytics';
 import { ChevronDownIcon } from 'lucide-react';
 
@@ -8,17 +10,20 @@ import { Button } from '@/components/ui/button';
 import { ModelSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
 import { DatePicker } from '@/components/ui/date-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export default function EvaluationChartControls() {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
+    if (isOpen) {
+      setOpenDropdown(dropdownKey);
+      return;
+    }
+    setOpenDropdown((current) => (current === dropdownKey ? null : current));
+  };
+
   const {
     selectedBenchmark,
     setSelectedBenchmark,
@@ -45,6 +50,8 @@ export default function EvaluationChartControls() {
             setSelectedModel(value);
             track('evaluation_model_selected', { model: value });
           }}
+          open={openDropdown === 'model'}
+          onOpenChange={handleDropdownOpenChange('model')}
           availableModels={availableModels}
         />
 
@@ -55,28 +62,32 @@ export default function EvaluationChartControls() {
             label="Benchmark"
             tooltip="The standardized test used to measure model performance. Common benchmarks include reasoning, coding, and knowledge-based evaluations."
           />
-          <Select
-            value={selectedBenchmark || ''}
-            onValueChange={(value) => {
-              setSelectedBenchmark(value);
-              track('evaluation_benchmark_selected', { benchmark: value });
-            }}
-          >
-            <SelectTrigger
-              id="eval-benchmark-select"
-              data-testid="evaluation-benchmark-selector"
-              className="w-full"
-            >
-              <SelectValue placeholder="Select benchmark" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableBenchmarks.map((benchmark) => (
-                <SelectItem key={benchmark} value={benchmark}>
-                  {benchmark.toUpperCase()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div>
+            <MultiSelect
+              options={availableBenchmarks.map((benchmark) => ({
+                value: benchmark,
+                label: benchmark.toUpperCase(),
+              }))}
+              value={selectedBenchmark ? [selectedBenchmark] : []}
+              onChange={(values) => {
+                const next = values[0];
+                if (!next) return;
+                setSelectedBenchmark(next);
+                track('evaluation_benchmark_selected', { benchmark: next });
+              }}
+              open={openDropdown === 'benchmark'}
+              onOpenChange={handleDropdownOpenChange('benchmark')}
+              triggerId="eval-benchmark-select"
+              triggerTestId="evaluation-benchmark-selector"
+              placeholder="Select benchmark"
+              minSelections={1}
+              maxSelections={1}
+              showClearAll={false}
+              searchable={false}
+              plainSelectedText
+              showSelectionSummary={false}
+            />
+          </div>
         </div>
 
         {/* Precision Multiselect */}
@@ -87,6 +98,8 @@ export default function EvaluationChartControls() {
             setSelectedPrecisions(value);
             track('evaluation_precision_selected', { precision: value.join(',') });
           }}
+          open={openDropdown === 'precision'}
+          onOpenChange={handleDropdownOpenChange('precision')}
           availablePrecisions={availablePrecisions}
           data-testid="evaluation-precision-selector"
         />

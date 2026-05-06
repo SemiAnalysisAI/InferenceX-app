@@ -79,6 +79,7 @@ async function migrate(): Promise<void> {
   }
 
   console.log('\n=== db:migrate complete ===');
+  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
 }
 
 migrate()

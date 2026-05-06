@@ -1,7 +1,7 @@
 /**
  * Tests that URL parameters correctly drive UI state and that user interactions
  * update the visible output (selector text, SVG axis labels).
- * Merged from url-params.cy.ts + chart-filter-effects.cy.ts.
+ * Merged from url-params.cy.ts + chart-filter-effects.cy.ts + high-contrast.cy.ts.
  */
 describe('URL Parameter Persistence', () => {
   before(() => {
@@ -120,6 +120,51 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="reliability-date-range"]').click({ force: true });
       cy.contains('[role="option"]', 'Last month').click({ force: true });
       cy.get('[data-testid="reliability-date-range"]').should('contain', 'Last month');
+    });
+  });
+
+  describe('High contrast mode', () => {
+    it('page loads without high contrast by default', () => {
+      cy.visit('/inference');
+      cy.get('[data-testid="scatter-graph"]').should('exist');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
+    });
+
+    it('i_hc=1 applies high contrast on load', () => {
+      cy.visit('/inference?i_hc=1');
+      cy.get('[data-testid="scatter-graph"]').should('exist');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
+    });
+
+    it('multiple high contrast params can coexist in URL', () => {
+      cy.visit('/inference?i_hc=1&r_hc=1&e_hc=1');
+      cy.get('[data-testid="scatter-graph"]').should('exist');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
+    });
+
+    it('r_hc=1 applies to reliability chart', () => {
+      cy.visit('/reliability?r_hc=1');
+      cy.get('[data-testid="reliability-chart-display"]').should('exist');
+      cy.get('#reliability-high-contrast').first().should('have.attr', 'data-state', 'checked');
+    });
+
+    it('e_hc=1 applies to evaluation chart', () => {
+      cy.visit('/evaluation?e_hc=1');
+      cy.get('[data-testid="evaluation-chart-display"]').should('exist');
+      cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
+      cy.get('#eval-high-contrast').first().should('have.attr', 'data-state', 'checked');
+    });
+
+    it('historical trends tab has high contrast switch off by default', () => {
+      cy.visit('/historical');
+      cy.get('[data-testid="historical-trends-display"]').should('exist');
+      cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
+    });
+
+    it('i_hc=1 enables historical trends high contrast', () => {
+      cy.visit('/historical?i_hc=1');
+      cy.get('[data-testid="historical-trends-display"]').should('exist');
+      cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
   });
 });

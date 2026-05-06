@@ -103,6 +103,20 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 Order: `inference` → `evaluation` → `historical` → `calculator` → `reliability` → `gpu-specs` (defined in `page-content.tsx` `VALID_TABS`). Tab value = URL hash.
 
+## Unofficial Run Support — Mandatory for Inference / Evaluation Features
+
+Any new feature that operates on inference or evaluation chart data **must** also work for unofficial run overlays — not just the official run rendering path. The overlay path is a separate code branch (`overlayData`, `processedOverlayData`, `overlayRooflines`, `activeOverlayHwTypes`, `overlayRunColor`/`overlayRunIndex` from `@/lib/overlay-run-style`, `useUnofficialRun()` from `@/components/unofficial-run-provider`) that is easy to forget — features that only handle the official path silently degrade for users who load an unofficial run via `?unofficialrun=…`.
+
+When adding a chart feature (toggle, label, overlay, filter, export, share-link param, tooltip enrichment, …):
+
+1. Implement it for both official and overlay data paths. Use `overlayRunColor(runIndex)` for overlay strokes / labels so they match the legend swatches; do **not** reuse the hw-derived color helper (`getCssColor(resolveColor(hw))`) for overlay items.
+2. Respect overlay visibility filters: `activeOverlayHwTypes` (hw toggles) and any per-run dismissal in `unofficialRunInfos`. Don't draw overlay items the user has hidden.
+3. Verify it manually with an unofficial run loaded — paste a `?unofficialrun=<github-actions-run-id>` URL and confirm the new feature renders for overlay rooflines / points / rows, animates with zoom, and survives a per-run dismiss.
+4. Add at least one E2E or unit test that exercises the overlay path. The mock helper `createMockUnofficialRunContext` (cypress/support/mock-data.ts) and the `cypress/e2e/inference-chart.cy.ts` overlay setup are good starting points.
+5. Note overlay support explicitly in the PR description so reviewers can verify it ("works for both official runs and `?unofficialrun=` overlays — verified at <preview-url>").
+
+If the feature genuinely cannot apply to overlays (e.g., it depends on data only ingested for official runs), say so explicitly in code comments and the PR description. Default to "must support overlays."
+
 ## Common Development Tasks
 
 ### Modify chart appearance/behavior
@@ -177,14 +191,10 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 
 ## Claude AI Agents
 
-### `@frontend-claude` (`.github/workflows/claude.yml`)
+### `@claude` (`.github/workflows/claude.yml`)
 
-Triggered by mentioning in issues/comments. Full code implementation + Playwright browser testing. Creates `claude/issue-{N}-*` branches. Must verify charts render real data (no "No data available").
+All Claude AI workflows are dispatched from a single trigger word `@claude`. The next word selects the mode:
 
-### `@chrome-claude` (`.github/workflows/claude-chrome.yml`)
-
-Same as `@frontend-claude` but uses Chrome DevTools MCP instead of Playwright for browser automation. Preferred when you need deeper debugging (network requests, console messages, JS evaluation).
-
-### `@pr-claude` (`.github/workflows/pr-claude.yml`)
-
-Auto-runs on PR open/sync. Code review only. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
+- `@claude` (or `@claude <anything>`) — implementation with Playwright MCP. Triggered by mentioning in issues/comments. Full code implementation + browser testing. Creates `claude/issue-{N}-*` branches. Must verify charts render real data (no "No data available").
+- `@claude chrome` — implementation with Chrome DevTools MCP instead of Playwright. Preferred when you need deeper debugging (network requests, console messages, JS evaluation).
+- `@claude review` — code review only. Also auto-runs on PR open/sync. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
