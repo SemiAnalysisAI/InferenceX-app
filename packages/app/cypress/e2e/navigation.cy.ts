@@ -48,12 +48,11 @@ describe('First-load navigation', () => {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.removeItem('inferencex-star-modal-dismissed');
         win.localStorage.removeItem('inferencex-dsv4-modal-dismissed');
+        win.localStorage.removeItem('inferencex-dsv4-banner-dismissed');
       },
     });
 
-    // dsv4 launch modal takes precedence over the GitHub star modal on first
-    // load — only one modal shows at a time. Either is fine for this test, we
-    // just need *a* first-load modal up to verify it doesn't block navigation.
+    // Banner (inline) and overlay modal coexist in independent slots.
     cy.get('[data-testid="dsv4-launch-modal"]').should('be.visible');
     cy.get('body').should('not.have.attr', 'data-scroll-locked');
   });
