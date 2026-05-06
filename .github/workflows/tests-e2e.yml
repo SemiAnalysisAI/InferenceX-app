@@ -41,20 +41,26 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Create CI env file
+        id: ci-env
         env:
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
         run: |
           if [ -z "$DATABASE_READONLY_URL" ]; then
-            echo "DATABASE_READONLY_URL secret is empty or unavailable in this PR context."
-            exit 1
+            echo "DATABASE_READONLY_URL secret unavailable; using fixture mode for this run."
+            echo "use_fixtures=1" >> "$GITHUB_OUTPUT"
+            cat > .env <<EOF
+            E2E_FIXTURES=1
+            EOF
+          else
+            echo "use_fixtures=" >> "$GITHUB_OUTPUT"
+            cat > .env <<EOF
+            DATABASE_READONLY_URL=$DATABASE_READONLY_URL
+            DATABASE_DRIVER=neon
+            DATABASE_SSL=true
+            GITHUB_TOKEN=$GITHUB_TOKEN
+            EOF
           fi
-          cat > .env <<EOF
-          DATABASE_READONLY_URL=$DATABASE_READONLY_URL
-          DATABASE_DRIVER=neon
-          DATABASE_SSL=true
-          GITHUB_TOKEN=$GITHUB_TOKEN
-          EOF
       - name: Cache Cypress binary
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -68,6 +74,7 @@ jobs:
       - name: Build app
         run: pnpm build
         env:
+          E2E_FIXTURES: ${{ steps.ci-env.outputs.use_fixtures }}
           BLOB_CACHE_PREFIX: ci-cache
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
@@ -87,6 +94,7 @@ jobs:
           browser: ${{ matrix.browser }}
         env:
           CI: true
+          E2E_FIXTURES: ${{ steps.ci-env.outputs.use_fixtures }}
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
       - name: Upload Cypress artifacts
