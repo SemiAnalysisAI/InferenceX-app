@@ -15,19 +15,8 @@ on:
       - 'tsconfig.json'
 
 jobs:
-  fork-pr-note:
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.fork }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Skip DB-backed E2E on fork PRs
-        run: |
-          echo "Skipping DB-backed Cypress workflow for fork PRs because repository secrets are unavailable."
-          echo "Run E2E in upstream repo context or use local env with DATABASE_READONLY_URL."
-
   cypress:
-    if: ${{ !github.event.pull_request.draft && !github.event.pull_request.head.repo.fork }}
+    if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
