@@ -25,6 +25,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
+import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -178,30 +179,26 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   // leaves the user staring at a chart with no overlay points — they'd have
   // to know to open the dropdown and pick the run's model themselves.
   //
-  // Skipped when `g_model` was set explicitly in the URL (respect the user's
-  // intent) and when the current model is already covered by the overlay.
-  //
-  // We key the "did we already switch?" check against the stringified set of
-  // (model, sequence) pairs from the unofficial run, so navigating from one
-  // run to another with a different model will re-trigger the switch — but
-  // a manual model change while the same run set is loaded will stick.
+  // Precedence on first load: the `if (urlModel)` early-bail in
+  // `computeAutoSwitchDecision` is the primary guard for explicit `g_model`
+  // intent. The dedupe ref is a secondary guard for the narrow window after
+  // an auto-switch fires but before the URL-sync effect (below) writes
+  // `g_model` back to the URL — once that runs, `urlModel` is set on every
+  // subsequent render and the ref check is effectively redundant. The ref
+  // still matters across navigations between unofficial runs because it is
+  // reset whenever the overlay set goes empty.
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
-    if (unofficialAvailable.length === 0) {
-      lastAutoSwitchKeyRef.current = '';
-      return;
+    const decision = computeAutoSwitchDecision(
+      unofficialAvailable,
+      getUrlParam('g_model'),
+      selectedModel,
+      lastAutoSwitchKeyRef.current,
+    );
+    lastAutoSwitchKeyRef.current = decision.nextKey;
+    if (decision.modelToSet !== null) {
+      setSelectedModel(decision.modelToSet);
     }
-    const urlModel = getUrlParam('g_model');
-    if (urlModel) return;
-    const key = unofficialAvailable
-      .map((a) => `${a.model}|${a.sequence}`)
-      .toSorted()
-      .join(',');
-    if (lastAutoSwitchKeyRef.current === key) return;
-    lastAutoSwitchKeyRef.current = key;
-    const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
-    if (unofficialModels.has(selectedModel)) return;
-    setSelectedModel(unofficialAvailable[0].model);
   }, [unofficialAvailable, selectedModel]);
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
