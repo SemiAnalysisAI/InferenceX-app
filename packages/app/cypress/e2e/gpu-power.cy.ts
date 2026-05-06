@@ -7,7 +7,7 @@ describe('PowerX', () => {
   beforeEach(() => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
   });
@@ -34,7 +34,7 @@ describe('PowerX', () => {
     beforeEach(() => {
       cy.visit('/inference', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
           win.localStorage.setItem('inferencex-feature-gate', '1');
         },
       });

@@ -4,7 +4,7 @@ describe('Model Architecture Diagram', () => {
     cy.viewport(1280, 800);
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     // Wait for the page to load

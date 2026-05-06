@@ -6,7 +6,7 @@ describe('TCO Calculator', () => {
   describe('tab navigation', () => {
     before(() => {
       cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       });
       cy.visit('/inference');
     });
@@ -37,7 +37,7 @@ describe('TCO Calculator', () => {
   describe('controls, interactions, and features', () => {
     before(() => {
       cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       });
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
@@ -514,7 +514,7 @@ describe('TCO Calculator', () => {
   describe('direct URL navigation', () => {
     it('navigating to /calculator directly loads the calculator tab with data', () => {
       cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       });
       cy.visit('/calculator');
       cy.url().should('include', '/calculator');

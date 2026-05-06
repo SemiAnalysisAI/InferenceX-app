@@ -2,7 +2,7 @@ describe('Line Labels Toggle', () => {
   before(() => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     // Wait for chart to load
@@ -69,7 +69,7 @@ describe('Line Labels Toggle', () => {
   it('URL param i_linelabel=1 enables line labels on load', () => {
     cy.visit('/inference?i_linelabel=1', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');

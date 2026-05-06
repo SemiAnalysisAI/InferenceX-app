@@ -15,7 +15,7 @@ const selectCustomPowerMetric = () => {
 describe('Custom User Values', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/inference');
     cy.get('[data-testid="model-selector"]').should('be.visible');

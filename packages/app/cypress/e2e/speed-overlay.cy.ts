@@ -2,7 +2,7 @@ describe('Bus / Race Car Speed Overlay', () => {
   before(() => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
@@ -55,7 +55,7 @@ describe('Bus / Race Car Speed Overlay', () => {
   it('URL param i_speed=1 enables the overlay on first load', () => {
     cy.visit('/inference?i_speed=1', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
@@ -69,7 +69,7 @@ describe('Donkey / Elytra Minecraft Overlay', () => {
   before(() => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
@@ -129,7 +129,7 @@ describe('Donkey / Elytra Minecraft Overlay', () => {
   it('URL param i_mc=1 enables the minecraft overlay on first load', () => {
     cy.visit('/inference?i_mc=1', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
@@ -146,7 +146,7 @@ describe('Y-Axis Metric Search', () => {
   before(() => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');

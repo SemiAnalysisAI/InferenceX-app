@@ -1,7 +1,7 @@
 describe('TTFT X-Axis Toggle (E2E chart)', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/inference');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 2);

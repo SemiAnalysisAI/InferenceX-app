@@ -1,7 +1,7 @@
 describe('Reliability Chart', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
@@ -49,7 +49,7 @@ describe('Reliability Chart', () => {
 describe('Reliability Chart — Content & Interactions', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('be.visible');

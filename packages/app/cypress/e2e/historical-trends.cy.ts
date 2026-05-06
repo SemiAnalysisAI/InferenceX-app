@@ -5,7 +5,7 @@
 describe('Historical Trends Tab', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/historical');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
@@ -37,7 +37,7 @@ describe('Historical Trends Tab', () => {
 describe('Historical Trends — Content & Interactions', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/historical');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');

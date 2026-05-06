@@ -1,7 +1,7 @@
 describe('Evaluation Chart', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('exist');
@@ -43,7 +43,7 @@ describe('Evaluation Chart', () => {
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');

@@ -6,7 +6,7 @@
 describe('Dropdown one-click switching', () => {
   beforeEach(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/inference');
     cy.get('[data-testid="inference-chart-display"]').should('exist');

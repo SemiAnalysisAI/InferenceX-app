@@ -1,7 +1,7 @@
 describe('GPU Specs Tab', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/gpu-specs');
     // Wait for GPU Specs tab content to be present in the DOM
@@ -210,7 +210,7 @@ describe('GPU Specs Tab', () => {
 describe('GPU Specs Bar Chart View', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('GPU Specifications').should('exist');
@@ -284,7 +284,7 @@ describe('GPU Specs Bar Chart View', () => {
 describe('GPU Specs Radar Chart View', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('GPU Specifications').should('exist');
@@ -381,7 +381,7 @@ describe('GPU Specs Radar Chart View', () => {
 describe('GPU Specs Navigation', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/inference');
     cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
@@ -397,7 +397,7 @@ describe('GPU Specs Navigation', () => {
 describe('Topology Dialog Navigation', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('GPU Specifications').should('exist');

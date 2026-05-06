@@ -1,7 +1,11 @@
+/**
+ * Persistent state for "user has starred the repo." Read by the header/footer
+ * GitHub-star buttons and by nudges that should disappear once the user has
+ * starred. The nudge framework owns its own *dismissal* storage — this module
+ * only tracks the user's actual starring action.
+ */
 export const STARRED_KEY = 'inferencex-starred';
 export const STARRED_EVENT = 'inferencex:starred';
-export const DISMISS_KEY = 'inferencex-star-modal-dismissed';
-export const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export function saveStarred(): void {
   try {
@@ -10,12 +14,4 @@ export function saveStarred(): void {
     // localStorage unavailable
   }
   window.dispatchEvent(new Event(STARRED_EVENT));
-}
-
-export function saveDismissTimestamp(): void {
-  try {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  } catch {
-    // localStorage unavailable
-  }
 }

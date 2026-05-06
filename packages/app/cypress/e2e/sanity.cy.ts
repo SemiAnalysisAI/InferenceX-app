@@ -38,7 +38,7 @@ describe('Page Load & Navigation', () => {
   it('navigates from the footer to the land acknowledgement page', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       },
     });
 
@@ -66,7 +66,7 @@ describe('Page Load & Navigation', () => {
 describe('Theme Toggle', () => {
   it('theme persists across page reload (localStorage)', () => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
       win.localStorage.setItem('theme', 'light');
     });
     cy.visit('/');

@@ -4,7 +4,7 @@
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/inference');
   });
@@ -46,15 +46,15 @@ describe('First-load navigation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
-        win.localStorage.removeItem('inferencex-star-modal-dismissed');
-        win.localStorage.removeItem('inferencex-dsv4-modal-dismissed');
+        win.localStorage.removeItem('inferencex-nudge:github-star-modal');
+        win.localStorage.removeItem('inferencex-nudge:dsv4-launch-modal');
       },
     });
 
     // dsv4 launch modal takes precedence over the GitHub star modal on first
     // load — only one modal shows at a time. Either is fine for this test, we
     // just need *a* first-load modal up to verify it doesn't block navigation.
-    cy.get('[data-testid="dsv4-launch-modal"]').should('be.visible');
+    cy.get('[data-testid="nudge-dsv4-launch-modal"]').should('be.visible');
     cy.get('body').should('not.have.attr', 'data-scroll-locked');
   });
 

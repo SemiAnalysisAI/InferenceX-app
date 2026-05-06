@@ -12,6 +12,7 @@ import { Header } from '@/components/header/header';
 import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
+import { NudgeProvider, NudgeRoot } from '@/components/nudges';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -191,9 +192,12 @@ export default async function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <Header starCount={starCount} />
-              <div className="grow flex flex-col">{children}</div>
-              <Footer starCount={starCount} />
+              <NudgeProvider>
+                <Header starCount={starCount} />
+                <div className="grow flex flex-col">{children}</div>
+                <Footer starCount={starCount} />
+                <NudgeRoot />
+              </NudgeProvider>
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}

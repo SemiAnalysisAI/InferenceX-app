@@ -6,7 +6,7 @@
 describe('Drill-Down Trend Chart Modal', () => {
   before(() => {
     cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      win.localStorage.setItem('inferencex-nudge:github-star-modal', String(Date.now()));
     });
     cy.visit('/inference');
     // Wait for scatter graph to render with data points

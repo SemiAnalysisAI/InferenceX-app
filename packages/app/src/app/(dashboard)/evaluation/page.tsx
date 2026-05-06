@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 
-import { EvalSamplesNudge } from '@/components/eval-samples-nudge';
 import { EvaluationProvider } from '@/components/evaluation/EvaluationContext';
 import EvaluationChartDisplay from '@/components/evaluation/ui/ChartDisplay';
 import { tabMetadata } from '@/lib/tab-meta';
@@ -11,7 +10,6 @@ export default function EvaluationPage() {
   return (
     <EvaluationProvider>
       <EvaluationChartDisplay />
-      <EvalSamplesNudge />
     </EvaluationProvider>
   );
 }
