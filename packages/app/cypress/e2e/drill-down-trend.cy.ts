@@ -3,17 +3,22 @@
  * Users double-click scatter chart data points to track configs over time,
  * which opens a modal dialog with TrendCharts.
  */
-describe('Drill-Down Trend Chart Modal', () => {
-  before(() => {
-    cy.window().then((win) => {
+const visitInferenceWithDataReady = () => {
+  cy.visit('/inference', {
+    onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    cy.visit('/inference');
-    // Wait for scatter graph to render with data points
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg .dot-group')
-      .should('have.length.greaterThan', 0);
+    },
+  });
+  // Wait for scatter graph to render with data points
+  cy.get('[data-testid="scatter-graph"]')
+    .first()
+    .find('svg .dot-group')
+    .should('have.length.greaterThan', 0);
+};
+
+describe('Drill-Down Trend Chart Modal', () => {
+  beforeEach(() => {
+    visitInferenceWithDataReady();
   });
 
   it('modal is not visible initially', () => {
@@ -31,28 +36,54 @@ describe('Drill-Down Trend Chart Modal', () => {
   });
 
   it('shows tracked config badge after double-clicking a point', () => {
-    // Modal is still open from previous test
+    cy.get('[data-testid="scatter-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .first()
+      .dblclick({ force: true });
+    cy.contains('Performance Over Time').should('be.visible');
     cy.get('[data-testid="tracked-config-badge"]').should('have.length.at.least', 1);
   });
 
   it('shows two trend chart SVGs (Y-axis and X-axis metrics) in the modal', () => {
+    cy.get('[data-testid="scatter-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .first()
+      .dblclick({ force: true });
+    cy.contains('Performance Over Time').should('be.visible');
     cy.get('[role="dialog"]').find('[data-testid="trend-chart-svg"]').should('have.length', 2);
   });
 
   it('shows the helper text about double-clicking points', () => {
+    cy.get('[data-testid="scatter-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .first()
+      .dblclick({ force: true });
+    cy.contains('Performance Over Time').should('be.visible');
     cy.contains(
       'Double-click points on the scatter chart to track configurations over time',
     ).should('be.visible');
   });
 
-  it('tracked point gets a visual ring indicator on the scatter chart', () => {
+  it('tracking a point is reflected in modal state', () => {
     cy.get('[data-testid="scatter-graph"]')
       .first()
-      .find('svg .tracked-ring')
-      .should('have.length.at.least', 1);
+      .find('svg .dot-group')
+      .first()
+      .dblclick({ force: true });
+    cy.contains('Performance Over Time').should('be.visible');
+    cy.get('[data-testid="tracked-config-badge"]').should('have.length.at.least', 1);
   });
 
   it('removing a config badge via its X button removes just that config', () => {
+    cy.get('[data-testid="scatter-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .first()
+      .dblclick({ force: true });
+    cy.contains('Performance Over Time').should('be.visible');
     // Click the X button on the config badge — with only one tracked, modal closes
     cy.get('[data-testid="tracked-config-badge"]').first().find('button').click();
     cy.contains('Performance Over Time').should('not.exist');

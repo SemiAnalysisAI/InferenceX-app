@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import { getAllEvalResults } from '@semianalysisai/inferencex-db/queries/evaluations';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ const getCachedEvaluations = cachedQuery(() => {
 }, 'evaluations');
 
 export async function GET() {
+  if (FIXTURES_MODE) return cachedJson(loadFixture('evaluations'));
   try {
     const rows = await getCachedEvaluations();
     return cachedJson(rows);

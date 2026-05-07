@@ -25,6 +25,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
+import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -171,6 +172,34 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
       return availabilityRows.some((r) => keys.includes(r.model));
     });
   }, [availabilityRows, unofficialAvailable]);
+
+  // Auto-switch the selected model when an unofficial run is loaded that
+  // doesn't include the currently selected model. Without this, navigating
+  // to `?unofficialrun=<id>` while the default `g_model=DeepSeek-R1` sticks
+  // leaves the user staring at a chart with no overlay points — they'd have
+  // to know to open the dropdown and pick the run's model themselves.
+  //
+  // Precedence on first load: the `if (urlModel)` early-bail in
+  // `computeAutoSwitchDecision` is the primary guard for explicit `g_model`
+  // intent. The dedupe ref is a secondary guard for the narrow window after
+  // an auto-switch fires but before the URL-sync effect (below) writes
+  // `g_model` back to the URL — once that runs, `urlModel` is set on every
+  // subsequent render and the ref check is effectively redundant. The ref
+  // still matters across navigations between unofficial runs because it is
+  // reset whenever the overlay set goes empty.
+  const lastAutoSwitchKeyRef = useRef<string>('');
+  useEffect(() => {
+    const decision = computeAutoSwitchDecision(
+      unofficialAvailable,
+      getUrlParam('g_model'),
+      selectedModel,
+      lastAutoSwitchKeyRef.current,
+    );
+    lastAutoSwitchKeyRef.current = decision.nextKey;
+    if (decision.modelToSet !== null) {
+      setSelectedModel(decision.modelToSet);
+    }
+  }, [unofficialAvailable, selectedModel]);
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
   const availableSequences = useMemo(() => {

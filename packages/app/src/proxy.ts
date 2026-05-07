@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const EMBED_PATH_PREFIX = '/embed/';
 const EMBED_CSP = 'frame-ancestors *';
-const DEFAULT_CSP = "frame-ancestors 'none'";
 
 export function proxy(request: NextRequest) {
   const isEmbedRoute = request.nextUrl.pathname.startsWith(EMBED_PATH_PREFIX);
@@ -15,6 +14,8 @@ export function proxy(request: NextRequest) {
     request: { headers: requestHeaders },
   });
 
-  response.headers.set('Content-Security-Policy', isEmbedRoute ? EMBED_CSP : DEFAULT_CSP);
+  if (isEmbedRoute) {
+    response.headers.set('Content-Security-Policy', EMBED_CSP);
+  }
   return response;
 }

@@ -43,7 +43,7 @@ type UnofficialChartData = Record<
 
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
 
-interface AvailableModelSequence {
+export interface AvailableModelSequence {
   model: Model;
   sequence: Sequence;
   precisions: string[];

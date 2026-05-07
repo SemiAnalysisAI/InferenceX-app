@@ -25,7 +25,8 @@
     "clean": "rimraf .next out",
     "clean:all": "rimraf .next out cypress/videos cypress/screenshots coverage",
     "cache:invalidate": "dotenv -e ../../.env -- tsx scripts/invalidate-cache.ts",
-    "cache:warmup": "dotenv -e ../../.env -- tsx scripts/warmup-cache.ts"
+    "cache:warmup": "dotenv -e ../../.env -- tsx scripts/warmup-cache.ts",
+    "capture:fixtures": "tsx scripts/capture-cypress-fixtures.ts"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.6",

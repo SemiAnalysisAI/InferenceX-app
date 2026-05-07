@@ -4,7 +4,7 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { GRADIENT_NUDGE_EVENT } from '@/components/gradient-label-nudge';
+import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';

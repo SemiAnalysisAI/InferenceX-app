@@ -6,11 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { Card } from '@/components/ui/card';
-import { Dsv4LaunchModal } from '@/components/dsv4-launch-modal';
-import { GitHubStarModal } from '@/components/github-star-modal';
 import { IntroSection } from '@/components/intro-section';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
-import { LaunchBanner } from '@/components/landing/launch-banner';
+import { NudgeEngine } from '@/components/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { track } from '@/lib/analytics';
 import { navigateInApp } from '@/lib/client-navigation';
@@ -25,10 +23,8 @@ export function LandingPage() {
 
   return (
     <main className="relative">
-      <Dsv4LaunchModal />
-      <GitHubStarModal />
+      <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
-        <LaunchBanner />
         <IntroSection />
 
         {/* Split: Dashboard vs Presets */}
