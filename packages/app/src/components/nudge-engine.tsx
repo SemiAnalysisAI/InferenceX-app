@@ -9,6 +9,7 @@ import {
   isPermanentlySuppressed,
   isWithinSchedule,
   markDismissed,
+  markShown,
 } from '@/lib/nudges/persistence';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
 import type { NudgeDefinition, NudgeTrigger } from '@/lib/nudges/types';
@@ -30,6 +31,19 @@ function isEligible(def: NudgeDefinition): boolean {
   if (isDismissed(def.storageKey, def.dismissal)) return false;
   if (def.conditions?.some((c) => !c.check())) return false;
   return true;
+}
+
+/**
+ * Should clicking the action button persist a dismissal and clear the nudge?
+ *
+ * Toast/modal default to `true` — engaging the CTA satisfies the nudge's
+ * goal, so it shouldn't keep nagging. Banner defaults to `false` — its action
+ * is a navigation, and the banner stays visible until the page transitions.
+ *
+ * Either default can be overridden per-nudge via `dismissOnAction`.
+ */
+function dismissesOnAction(def: NudgeDefinition): boolean {
+  return def.dismissOnAction ?? def.type !== 'banner';
 }
 
 // ---------------------------------------------------------------------------
@@ -70,20 +84,20 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (def.type === 'banner') {
       if (bannerShownRef.current) return;
       bannerShownRef.current = true;
-      markDismissed(def.storageKey, def.dismissal);
       setActiveBannerId(def.id);
     } else {
       if (overlayShownRef.current) return;
       overlayShownRef.current = true;
-      markDismissed(def.storageKey, def.dismissal);
       setActiveOverlayId(def.id);
     }
+    markShown(def.storageKey, def.dismissal);
     trackNudgeEvent(def, 'shown');
   }, []);
 
   const dismissBanner = useCallback(() => {
     if (!activeBanner) return;
     trackNudgeEvent(activeBanner, 'dismissed');
+    markDismissed(activeBanner.storageKey, activeBanner.dismissal);
     sessionDismissedRef.current.add(activeBanner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
@@ -92,6 +106,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   const dismissOverlay = useCallback(() => {
     if (!activeOverlay) return;
     trackNudgeEvent(activeOverlay, 'dismissed');
+    markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
     sessionDismissedRef.current.add(activeOverlay.id);
     setActiveOverlayId(null);
     overlayShownRef.current = false;
@@ -101,6 +116,8 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (!activeBanner) return;
     trackNudgeEvent(activeBanner, 'action');
     activeBanner.content.onLinkClick?.();
+    if (!dismissesOnAction(activeBanner)) return;
+    markDismissed(activeBanner.storageKey, activeBanner.dismissal);
     sessionDismissedRef.current.add(activeBanner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
@@ -117,6 +134,8 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       activeOverlay.content.primaryAction?.onClick(detail);
     }
 
+    if (!dismissesOnAction(activeOverlay)) return;
+    markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
     sessionDismissedRef.current.add(activeOverlay.id);
     setActiveOverlayId(null);
     overlayShownRef.current = false;
@@ -174,6 +193,10 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
             // Storage unavailable.
           }
         }
+        // For nudges without a separate permanentSuppressKey (e.g. eval-samples),
+        // also write the dismissal storage so the suppression survives reload.
+        // Harmless when permanentSuppressKey is set since both keys persist.
+        markDismissed(def.storageKey, def.dismissal);
       };
       window.addEventListener(def.permanentSuppressEvent, handler);
       handlers.push([def.permanentSuppressEvent, handler]);

@@ -7,6 +7,7 @@ import {
   isWithinSchedule,
   markDismissed,
   markPermanentlySuppressed,
+  markShown,
 } from './persistence';
 import type { NudgeDismissal } from './types';
 
@@ -136,6 +137,43 @@ describe('timed dismissal', () => {
   it('returns false for corrupted value', () => {
     mockLocal._store.set(key, 'not-a-number');
     expect(isDismissed(key, strategy)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markShown — show-time persistence (only fires for cooldown-on-show types)
+// ---------------------------------------------------------------------------
+
+describe('markShown', () => {
+  const oneWeek = 7 * 24 * 60 * 60 * 1000;
+
+  it('writes session storage for session dismissals', () => {
+    const key = 'session-show';
+    markShown(key, { type: 'session' });
+    expect(mockSession._store.has(key)).toBe(true);
+    expect(mockLocal._store.has(key)).toBe(false);
+  });
+
+  it('is a no-op for permanent dismissals', () => {
+    const key = 'permanent-show';
+    markShown(key, { type: 'permanent' });
+    expect(mockLocal._store.has(key)).toBe(false);
+    expect(mockSession._store.has(key)).toBe(false);
+  });
+
+  it('is a no-op for plain timed dismissals (snooze-on-dismiss pattern)', () => {
+    const key = 'timed-show';
+    markShown(key, { type: 'timed', durationMs: oneWeek });
+    expect(mockLocal._store.has(key)).toBe(false);
+    expect(mockSession._store.has(key)).toBe(false);
+  });
+
+  it('writes a timestamp for timed dismissals with cooldownStartsOnShow', () => {
+    const key = 'timed-cooldown-on-show';
+    markShown(key, { type: 'timed', durationMs: oneWeek, cooldownStartsOnShow: true });
+    const stored = mockLocal._store.get(key);
+    expect(stored).toBeTruthy();
+    expect(Number(stored)).toBeGreaterThan(0);
   });
 });
 

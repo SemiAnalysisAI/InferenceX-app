@@ -25,7 +25,17 @@ export type NudgeTrigger =
 export type NudgeDismissal =
   | { type: 'session' }
   | { type: 'permanent' }
-  | { type: 'timed'; durationMs: number };
+  | {
+      type: 'timed';
+      durationMs: number;
+      /**
+       * When true the cooldown timer starts at first show, giving a
+       * "remind every N" cadence (the nudge re-appears after `durationMs`
+       * regardless of whether the user dismissed it). When false (the default)
+       * the timer starts on user dismissal — the nudge is "snoozed for N".
+       */
+      cooldownStartsOnShow?: boolean;
+    };
 
 export interface NudgeCondition {
   check: () => boolean;
@@ -123,6 +133,14 @@ export interface NudgeDefinition {
   permanentSuppressEvent?: string;
 
   content: NudgeContent;
+
+  /**
+   * When the action button is clicked, should the nudge be persisted as
+   * dismissed and visually cleared? Defaults to `true` for `toast`/`modal`
+   * (action = engagement) and `false` for `banner` (banner action navigates;
+   * leaving it visible avoids a flash before the page transition completes).
+   */
+  dismissOnAction?: boolean;
 
   /** Override default `{id}_shown` / `{id}_dismissed` / `{id}_action` event names. */
   analytics?: NudgeAnalyticsOverrides;

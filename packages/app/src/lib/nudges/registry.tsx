@@ -154,7 +154,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     id: 'eval-samples',
     type: 'toast',
     trigger: { type: 'timer', delayMs: 1500 },
-    dismissal: { type: 'timed', durationMs: 7 * 24 * 60 * 60 * 1000 },
+    // Re-show every week so returning users see it again. Cadence runs from
+    // first show (or last suppress event), not from dismissal — matches the
+    // pre-refactor `EvalSamplesNudge` behavior.
+    dismissal: {
+      type: 'timed',
+      durationMs: 7 * 24 * 60 * 60 * 1000,
+      cooldownStartsOnShow: true,
+    },
     storageKey: 'inferencex-eval-samples-nudge-dismissed',
     permanentSuppressEvent: 'inferencex:eval-samples-opened',
     priority: 30,
