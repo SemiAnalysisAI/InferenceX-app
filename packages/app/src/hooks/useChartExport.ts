@@ -17,6 +17,37 @@ function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration
 
 const CSS_VAR_RE = /var\(--([^)]+)\)/;
 
+export function getExportFontFamily(): string {
+  const isMinecraftTheme =
+    typeof document !== 'undefined' &&
+    (document.documentElement.classList.contains('minecraft') ||
+      document.body.classList.contains('minecraft'));
+
+  if (isMinecraftTheme) {
+    return 'var(--font-minecraft), "Monocraft", monospace';
+  }
+
+  return 'var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+}
+
+function getResolvedExportFontFamily(): string {
+  if (typeof document === 'undefined') {
+    return getExportFontFamily();
+  }
+
+  const probe = document.createElement('span');
+  probe.textContent = 'A';
+  probe.style.position = 'fixed';
+  probe.style.left = '-9999px';
+  probe.style.top = '-9999px';
+  document.body.append(probe);
+
+  const resolved = getComputedStyle(probe).fontFamily;
+  probe.remove();
+
+  return resolved || getExportFontFamily();
+}
+
 /**
  * Resolve all CSS `var(--*)` references in SVG presentation attributes and
  * inline styles within a subtree. html-to-image cannot resolve CSS custom
@@ -92,6 +123,23 @@ function resolveCssVarsForExport(root: HTMLElement) {
         }
       }
     }
+  }
+}
+
+/**
+ * Bake computed font-family into inline styles so html-to-image retains
+ * Minecraft typography even when ancestor-based selectors (e.g. .minecraft *)
+ * are not preserved in its internal clone tree.
+ */
+function inlineComputedFontFamilyForExport(root: HTMLElement, resolvedFontFamily: string) {
+  const elements = [root, ...root.querySelectorAll<HTMLElement>('*')];
+  for (const el of elements) {
+    el.style.fontFamily = resolvedFontFamily;
+  }
+
+  // Ensure SVG text nodes also carry explicit font-family attributes.
+  for (const textNode of root.querySelectorAll<SVGTextElement>('svg text, svg tspan')) {
+    textNode.setAttribute('font-family', resolvedFontFamily);
   }
 }
 
@@ -346,8 +394,12 @@ export function useChartExport({
         }
       }
 
+      const resolvedExportFontFamily = getResolvedExportFontFamily();
+
       // Resolve all CSS var(--*) references in SVG elements (html-to-image can't resolve them)
       resolveCssVarsForExport(exportElement);
+      // Inline computed font family to preserve Minecraft pixel font in PNG exports.
+      inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
 
       // Normalize font sizes and SVG widths
       for (const label of clone.querySelectorAll('label')) {
@@ -370,20 +422,28 @@ export function useChartExport({
       }
 
       // Capture chart image
-      const { toPng } = await htmlToImagePromise;
+      const htmlToImage = await htmlToImagePromise;
+      const { toPng } = htmlToImage;
+      let fontEmbedCSS = getFontEmbedCSS();
+      if (typeof htmlToImage.getFontEmbedCSS === 'function') {
+        try {
+          fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
+        } catch {
+          // Fallback to @font-face extraction from loaded stylesheets.
+        }
+      }
       const chartDataUrl = await toPng(exportElement, {
         quality: 1,
         pixelRatio: 2,
         backgroundColor: bgColor,
         cacheBust: true,
         skipFonts: false,
-        fontEmbedCSS: getFontEmbedCSS(),
+        fontEmbedCSS,
         preferredFontFormat: 'woff2',
         filter: (node) => !node.classList?.contains('no-export'),
         style: {
           transform: 'scale(1)',
-          fontFamily:
-            'var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontFamily: resolvedExportFontFamily,
         },
       });
 
