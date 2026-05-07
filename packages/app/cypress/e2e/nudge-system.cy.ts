@@ -15,7 +15,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
     'inferencex-dsv4-modal-dismissed',
-    'inferencex-dsv4-banner-dismissed',
+    'inferencex-dsv4-banner-dismissed-v2',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -175,7 +175,7 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-dsv4-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-dsv4-banner-dismissed-v2')).to.eq(null);
     });
   });
 
@@ -190,7 +190,7 @@ describe('Landing nudges — banner', () => {
     // Body click must not write the dismissal key — the banner should still
     // render on a fresh visit to landing.
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-dsv4-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-dsv4-banner-dismissed-v2')).to.eq(null);
     });
 
     cy.visit('/');
@@ -308,7 +308,7 @@ describe('Nudge scope isolation', () => {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
         win.localStorage.setItem('inferencex-dsv4-modal-dismissed', '1');
-        win.localStorage.setItem('inferencex-dsv4-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-dsv4-banner-dismissed-v2', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

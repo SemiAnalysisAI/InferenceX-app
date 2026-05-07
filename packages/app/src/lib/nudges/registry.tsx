@@ -258,7 +258,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-dsv4-banner-dismissed',
+    storageKey: 'inferencex-dsv4-banner-dismissed-v2',
     priority: 60,
     scope: 'landing',
     content: {
