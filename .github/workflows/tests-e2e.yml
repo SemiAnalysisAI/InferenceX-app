@@ -61,7 +61,7 @@ jobs:
           retention-days: 1
 
   cypress:
-    if: ${{ !github.event.pull_request.draft && !github.event.pull_request.head.repo.fork }}
+    if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
@@ -91,15 +91,12 @@ jobs:
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
         run: |
-          if [ -z "$DATABASE_READONLY_URL" ]; then
-            echo "DATABASE_READONLY_URL secret is empty or unavailable in this PR context."
-            exit 1
-          fi
+          DB_URL="${DATABASE_READONLY_URL:-postgresql://postgres:postgres@localhost:5432/postgres}"
           cat > .env <<EOF
-          DATABASE_READONLY_URL=$DATABASE_READONLY_URL
+          DATABASE_READONLY_URL=$DB_URL
           DATABASE_DRIVER=neon
           DATABASE_SSL=true
-          GITHUB_TOKEN=$GITHUB_TOKEN
+          GITHUB_TOKEN=${GITHUB_TOKEN:-}
           EOF
       - name: Cache Cypress binary
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
