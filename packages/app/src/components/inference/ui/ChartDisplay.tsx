@@ -48,6 +48,7 @@ import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
+import ReplayLauncher from '../replay/ReplayLauncher';
 import TrendChart from './TrendChart';
 
 const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
@@ -538,6 +539,23 @@ export default function ChartDisplay() {
                     </div>
                   );
                 })()}
+                {getViewMode(graphIndex) === 'chart' &&
+                  !(
+                    selectedDateRange.startDate &&
+                    selectedDateRange.endDate &&
+                    selectedGPUs.length > 0
+                  ) && (
+                    <ReplayLauncher
+                      parentChartId={`chart-${graphIndex}`}
+                      chartDefinition={graph.chartDefinition}
+                      yLabel={`${
+                        graph.chartDefinition[
+                          `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
+                        ]
+                      }`}
+                      xLabel={graph.chartDefinition.x_label}
+                    />
+                  )}
               </Card>
             </figure>
           </section>

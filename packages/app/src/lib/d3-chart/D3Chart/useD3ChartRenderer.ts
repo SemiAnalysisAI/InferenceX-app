@@ -14,6 +14,8 @@ interface RendererDeps {
   svgRef: React.RefObject<SVGSVGElement | null>;
   tooltipRef: React.RefObject<HTMLDivElement | null>;
   dimensions: { width: number; height: number };
+  /** Owned by D3Chart so the imperative handle can read current scales. */
+  scalesRef: React.MutableRefObject<{ xScale: BuiltScale; yScale: BuiltScale } | null>;
   setupZoom: (
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
     width: number,
@@ -75,6 +77,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     svgRef,
     tooltipRef,
     dimensions,
+    scalesRef,
     setupZoom,
     zoomTransformRef,
     isPinned,
@@ -84,8 +87,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     attachHandlers,
   } = deps;
 
-  // Store scales in ref so zoom handler can read them without stale closures
-  const scalesRef = useRef<{ xScale: BuiltScale; yScale: BuiltScale } | null>(null);
+  // scalesRef is owned by D3Chart so the imperative handle can read it; the renderer
+  // writes the freshly-built scales into it on every render below.
   const layoutRef = useRef<ChartLayout | null>(null);
   const prevDataRef = useRef(data);
   const prevScalesRef = useRef({ xScaleConfig, yScaleConfig });
