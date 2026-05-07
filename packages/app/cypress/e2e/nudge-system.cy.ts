@@ -28,6 +28,15 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   }
 }
 
+// `cypress.config.ts` runs with `testIsolation: false` — the browser context
+// (incl. localStorage / sessionStorage) survives across tests in this spec.
+// Defensively clear before each test so a missed `onBeforeLoad` in any test
+// can't leak state into the next one.
+beforeEach(() => {
+  cy.clearAllLocalStorage();
+  cy.clearAllSessionStorage();
+});
+
 // ---------------------------------------------------------------------------
 // Landing — modal priority & dismissal
 // ---------------------------------------------------------------------------

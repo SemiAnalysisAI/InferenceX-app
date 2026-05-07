@@ -11,6 +11,7 @@ import {
   markDismissed,
   markShown,
 } from '@/lib/nudges/persistence';
+import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
 import type { NudgeDefinition, NudgeTrigger } from '@/lib/nudges/types';
 import { BottomToast } from '@/components/ui/bottom-toast';
@@ -31,19 +32,6 @@ function isEligible(def: NudgeDefinition): boolean {
   if (isDismissed(def.storageKey, def.dismissal)) return false;
   if (def.conditions?.some((c) => !c.check())) return false;
   return true;
-}
-
-/**
- * Should clicking the action button persist a dismissal and clear the nudge?
- *
- * Toast/modal default to `true` — engaging the CTA satisfies the nudge's
- * goal, so it shouldn't keep nagging. Banner defaults to `false` — its action
- * is a navigation, and the banner stays visible until the page transitions.
- *
- * Either default can be overridden per-nudge via `dismissOnAction`.
- */
-function dismissesOnAction(def: NudgeDefinition): boolean {
-  return def.dismissOnAction ?? def.type !== 'banner';
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +104,9 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (!activeBanner) return;
     trackNudgeEvent(activeBanner, 'action');
     activeBanner.content.onLinkClick?.();
+    // For navigation-style banners (default `dismissOnAction: false`), the
+    // banner stays visible until the page transitions. We deliberately leave
+    // `bannerShownRef`/`activeBannerId` set — the slot is still occupied.
     if (!dismissesOnAction(activeBanner)) return;
     markDismissed(activeBanner.storageKey, activeBanner.dismissal);
     sessionDismissedRef.current.add(activeBanner.id);
