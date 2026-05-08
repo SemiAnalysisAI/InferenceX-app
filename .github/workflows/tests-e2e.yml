@@ -32,9 +32,8 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      - name: Restore Cypress binary cache
-        id: cypress-cache
-        uses: useblacksmith/cache/restore@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
+      - name: Cache Cypress binary
+        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
         with:
           path: ~/.cache/Cypress
           key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -43,12 +42,6 @@ jobs:
       - name: Install Cypress binary if missing
         working-directory: packages/app
         run: pnpm exec cypress verify || pnpm exec cypress install
-      - name: Save Cypress binary cache
-        if: steps.cypress-cache.outputs.cache-hit != 'true'
-        uses: useblacksmith/cache/save@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Run component tests
         working-directory: packages/app
         run: pnpm exec cypress run --component --browser chrome
@@ -81,8 +74,8 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      - name: Restore Cypress binary cache
-        uses: useblacksmith/cache/restore@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
+      - name: Cache Cypress binary
+        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
         with:
           path: ~/.cache/Cypress
           key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
