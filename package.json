@@ -53,11 +53,5 @@
     "node": ">=18.0.0",
     "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@11.0.8",
-  "pnpm": {
-    "overrides": {
-      "@cypress/request>uuid": ">=14.0.0",
-      "postcss@<8.5.10": ">=8.5.14"
-    }
-  }
+  "packageManager": "pnpm@11.0.8"
 }
