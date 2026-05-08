@@ -58,7 +58,7 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chrome, firefox]
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
@@ -92,7 +92,7 @@ jobs:
         id: shard-specs
         env:
           SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_TOTAL: 2
+          SHARD_TOTAL: 3
         run: |
           node <<'EOF'
           const fs = require('node:fs');
