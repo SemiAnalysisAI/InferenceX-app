@@ -264,7 +264,7 @@ export function getScaleUpDomainMemory(spec: GpuSpec): string {
   const tb = total / 1000;
   if (tb % 1 === 0) return `${tb} TB`;
   // Use up to 2 decimal places, trimming trailing zeros
-  const formatted = tb.toFixed(2).replace(/\.?0+$/, '');
+  const formatted = tb.toFixed(2).replace(/\.?0+$/u, '');
   return `${formatted} TB`;
 }
 

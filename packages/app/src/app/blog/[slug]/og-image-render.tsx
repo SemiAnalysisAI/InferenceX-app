@@ -67,7 +67,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
 
   let subtitle = meta.subtitle;
   if (subtitle.length > maxSubtitleChars && maxSubtitleChars > 0) {
-    subtitle = `${subtitle.slice(0, maxSubtitleChars).replace(/\s\S*$/, '')}…`;
+    subtitle = `${subtitle.slice(0, maxSubtitleChars).replace(/\s\S*$/u, '')}…`;
   } else if (maxSubtitleChars <= 0) {
     subtitle = '';
   }

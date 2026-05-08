@@ -104,7 +104,7 @@ export function TabNav() {
     const sync = () => {
       const sp = new URLSearchParams(window.location.search);
       for (const [k, v] of sp) {
-        if (/^unofficialruns?$/i.test(k) && v) {
+        if (/^unofficialruns?$/iu.test(k) && v) {
           setUnofficialIds(v);
           return;
         }

@@ -70,7 +70,7 @@ interface UseAiChartReturn {
 
 function parseSpecsFromLlm(raw: string): AiChartSpec[] {
   const cleaned = raw
-    .replaceAll(/```json\s*/g, '')
+    .replaceAll(/```json\s*/gu, '')
     .replaceAll('```', '')
     .trim();
   const parsed = JSON.parse(cleaned);
@@ -453,7 +453,15 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
     }
 
     let topHwKeys: Set<string>;
-    if (spec.topNDistinctGpus !== false) {
+    if (spec.topNDistinctGpus === false) {
+      // Rank individual configs regardless of GPU family
+      topHwKeys = new Set(
+        [...peakByHw.entries()]
+          .toSorted(([, a], [, b]) => b - a)
+          .slice(0, spec.topN)
+          .map(([k]) => k),
+      );
+    } else {
       // Group by base GPU, pick the best config per GPU, then take top N GPUs
       const bestPerGpu = new Map<string, { hwKey: string; peak: number }>();
       for (const [hwKey, peak] of peakByHw) {
@@ -468,14 +476,6 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
         .slice(0, spec.topN);
       // Include only the single best config per winning GPU
       topHwKeys = new Set(topBases.map(([, v]) => v.hwKey));
-    } else {
-      // Rank individual configs regardless of GPU family
-      topHwKeys = new Set(
-        [...peakByHw.entries()]
-          .toSorted(([, a], [, b]) => b - a)
-          .slice(0, spec.topN)
-          .map(([k]) => k),
-      );
     }
     points = points.filter((p) => topHwKeys.has(p.hwKey ?? ''));
   }

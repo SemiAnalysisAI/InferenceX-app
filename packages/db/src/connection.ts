@@ -34,7 +34,7 @@ interface PostgresConnectionOptions {
 
 function getDbHostname(url: string): string | null {
   try {
-    return new URL(url).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
+    return new URL(url).hostname.toLowerCase().replace(/^\[(.*)\]$/u, '$1');
   } catch {
     return null;
   }

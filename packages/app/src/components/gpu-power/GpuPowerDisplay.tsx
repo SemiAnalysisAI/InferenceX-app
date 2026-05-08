@@ -486,15 +486,15 @@ export default function GpuMetricsDisplay() {
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
                     actions={
-                      !allGpusSelected
-                        ? [
+                      allGpusSelected
+                        ? []
+                        : [
                             {
                               id: 'gpu-metrics-reset-filter',
                               label: 'Reset filter',
                               onClick: selectAllGpus,
                             },
                           ]
-                        : []
                     }
                     switches={[
                       {
@@ -542,15 +542,15 @@ export default function GpuMetricsDisplay() {
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
                     actions={
-                      !allGpusSelected
-                        ? [
+                      allGpusSelected
+                        ? []
+                        : [
                             {
                               id: 'gpu-metrics-reset-filter-2',
                               label: 'Reset filter',
                               onClick: selectAllGpus,
                             },
                           ]
-                        : []
                     }
                     switches={[
                       {

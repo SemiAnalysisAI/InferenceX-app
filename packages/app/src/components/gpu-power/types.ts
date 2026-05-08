@@ -133,7 +133,7 @@ export interface Anomaly {
 function median(values: number[]): number {
   const sorted = [...values].toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
 function parseTimestampToMs(raw: string): number | null {
@@ -191,7 +191,7 @@ export function detectAnomalies(
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const ms = parseTimestampToMs(row.timestamp);
-      const seconds = ms !== null ? (ms - minTime) / 1000 : i;
+      const seconds = ms === null ? i : (ms - minTime) / 1000;
 
       // Statistical outlier (MAD)
       if (mad > 0) {
@@ -443,7 +443,7 @@ function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow
 export function parseCsvData(csvText: string): GpuMetricRow[] {
   const lines = csvText
     .split('\n')
-    .map((line) => line.replace(/\r$/, ''))
+    .map((line) => line.replace(/\r$/u, ''))
     .filter((line) => line.trim().length > 0);
   if (lines.length <= 1) return [];
 

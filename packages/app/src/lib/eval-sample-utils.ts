@@ -83,10 +83,10 @@ export function extractDemonstrations(argumentsData: unknown): Demonstration[] |
   // (the actual question) which ends with a bare `Answer:`.
   if (messages.length === 1 && messages[0].role === 'user') {
     const text = messages[0].content;
-    const chunks = text.split(/\n\nQuestion:\s?/);
+    const chunks = text.split(/\n\nQuestion:\s?/u);
     if (chunks.length >= 2) {
       // First chunk starts with `Question: ` rather than the split delimiter.
-      chunks[0] = chunks[0].replace(/^Question:\s?/, '');
+      chunks[0] = chunks[0].replace(/^Question:\s?/u, '');
       const out: Demonstration[] = [];
       for (let i = 0; i < chunks.length - 1; i++) {
         const c = chunks[i];

@@ -530,7 +530,9 @@ const ScatterGraph = React.memo(
           .selectAll<SVGGElement, InferenceData>('.dot-group')
           .transition('legend-hover')
           .duration(150)
-          .style('opacity', (d) => (!isPointVisible(d) ? 0 : String(d.hwKey) === hwKey ? 1 : 0.15));
+          .style('opacity', (d) =>
+            isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
+          );
         root
           .selectAll<SVGPathElement, unknown>('.roofline-path')
           .transition('legend-hover')
@@ -2007,8 +2009,9 @@ const ScatterGraph = React.memo(
               track('latency_legend_expanded', { expanded });
             }}
             switches={[
-              ...(selectedYAxisMetric !== 'y_inputTputPerGpu'
-                ? [
+              ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                ? []
+                : [
                     {
                       id: 'scatter-log-scale',
                       label: 'Log Scale',
@@ -2018,8 +2021,7 @@ const ScatterGraph = React.memo(
                         track('latency_log_scale_toggled', { enabled: checked });
                       },
                     },
-                  ]
-                : []),
+                  ]),
               {
                 id: 'scatter-hide-non-optimal',
                 label: 'Optimal Only',

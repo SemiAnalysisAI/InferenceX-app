@@ -367,7 +367,7 @@ function findChildBySelector(el: MockElement, selector: string): MockElement | u
   // Fall back to scanning children by class attribute
   for (const child of el.children) {
     if (child.removed) continue;
-    const classes = String(child.attrs['class'] || '').split(/\s+/);
+    const classes = String(child.attrs['class'] || '').split(/\s+/u);
     if (classes.includes(selectorClass)) {
       return child;
     }

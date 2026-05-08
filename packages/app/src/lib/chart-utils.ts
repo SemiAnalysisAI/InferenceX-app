@@ -191,7 +191,7 @@ export function normalizeEvalHardwareKey(
 
   // Strip additional qualifiers not relevant to GPU identification
   // e.g., "b200 nb" -> "b200", "h200 cw" -> "h200"
-  hwName = hwName.replace(/\s+(nb|cw|nv|dgxc|amds|cr|amd)$/i, '');
+  hwName = hwName.replace(/\s+(nb|cw|nv|dgxc|amds|cr|amd)$/iu, '');
 
   // Try to find a more specific hardware config that includes framework
   if (framework) {

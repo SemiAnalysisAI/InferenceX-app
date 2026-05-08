@@ -98,8 +98,8 @@ describe('Evaluation Chart — Content & Interactions', () => {
       .closest('figure')
       .find('figcaption')
       .invoke('text')
-      .should('match', /Source: SemiAnalysis InferenceX/)
-      .and('match', /•/);
+      .should('match', /Source: SemiAnalysis InferenceX/u)
+      .and('match', /•/u);
   });
 
   it('Show Labels switch exists in the legend and toggling it adds score labels to the chart', () => {

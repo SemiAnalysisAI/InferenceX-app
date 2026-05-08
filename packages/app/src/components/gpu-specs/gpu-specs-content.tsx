@@ -372,7 +372,7 @@ export function GpuSpecsContent() {
               <div
                 key={spec.name}
                 className="border border-border/50 rounded-lg p-4"
-                data-testid={`topology-${spec.name.toLowerCase().replaceAll(/\s+/g, '-')}`}
+                data-testid={`topology-${spec.name.toLowerCase().replaceAll(/\s+/gu, '-')}`}
               >
                 <TopologyDiagram
                   ref={(el) => {
@@ -398,7 +398,7 @@ export function GpuSpecsContent() {
               <div
                 key={spec.name}
                 className="border border-border/50 rounded-lg p-4"
-                data-testid={`scaleup-topology-${spec.name.toLowerCase().replaceAll(/\s+/g, '-')}`}
+                data-testid={`scaleup-topology-${spec.name.toLowerCase().replaceAll(/\s+/gu, '-')}`}
               >
                 <ScaleUpTopologyDiagram
                   ref={(el) => {

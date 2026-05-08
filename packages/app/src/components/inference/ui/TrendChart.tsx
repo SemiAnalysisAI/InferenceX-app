@@ -91,7 +91,7 @@ const TrendChart = React.memo(
       for (const config of lineConfigs) {
         const data = trendLines.get(config.id);
         if (!data || data.length === 0) continue;
-        const safeId = config.id.replaceAll(/[|]/g, '_');
+        const safeId = config.id.replaceAll(/[|]/gu, '_');
         const precision = config.precision ?? 'fp4';
         const prepared = data
           .map((d) => {
@@ -121,7 +121,7 @@ const TrendChart = React.memo(
     // Reverse lookup: safeId -> config
     const safeIdToConfig = useMemo(() => {
       const map = new Map<string, TrendLineConfig>();
-      for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/g, '_'), c);
+      for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/gu, '_'), c);
       return map;
     }, [lineConfigs]);
 

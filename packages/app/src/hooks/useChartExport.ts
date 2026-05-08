@@ -15,7 +15,7 @@ function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration
   }
 }
 
-const CSS_VAR_RE = /var\(--([^)]+)\)/;
+const CSS_VAR_RE = /var\(--([^)]+)\)/u;
 
 export function getExportFontFamily(): string {
   const isMinecraftTheme =

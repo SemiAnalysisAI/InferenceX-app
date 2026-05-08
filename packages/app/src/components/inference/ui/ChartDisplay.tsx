@@ -185,7 +185,7 @@ export default function ChartDisplay() {
         const info = unofficialRunInfos[runIndexByUrl[url]];
         return info ? { branch: info.branch, url: info.url } : undefined;
       }
-      const idMatch = url.match(/\/runs\/(\d+)/);
+      const idMatch = url.match(/\/runs\/(\d+)/u);
       if (idMatch && idMatch[1] in runIndexByUrl) {
         const info = unofficialRunInfos[runIndexByUrl[idMatch[1]]];
         return info ? { branch: info.branch, url: info.url } : undefined;

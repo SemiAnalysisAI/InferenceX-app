@@ -88,11 +88,11 @@ const runLinkHTML = (runUrl?: string) =>
 const tooltipLine = (label: string, value: string | number) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
-const shortenSha = (image: string) => image.replaceAll(/(sha256:[a-f0-9]{7})[a-f0-9]+/gi, '$1…');
+const shortenSha = (image: string) => image.replaceAll(/(sha256:[a-f0-9]{7})[a-f0-9]+/giu, '$1…');
 
 const imageTooltipLine = (image: string) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>Image:</strong> <span style="display: inline-block; vertical-align: top; overflow-wrap: anywhere;">${shortenSha(image.trim()).replace(/\s+/, '<br />')}</span>
+        <strong>Image:</strong> <span style="display: inline-block; vertical-align: top; overflow-wrap: anywhere;">${shortenSha(image.trim()).replace(/\s+/u, '<br />')}</span>
       </div>`;
 
 /**

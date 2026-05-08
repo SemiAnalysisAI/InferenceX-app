@@ -228,7 +228,7 @@ const GPUGraph = React.memo(
         const graphIndex = allGraphs.findIndex(
           ({ date, hwKey }) => d.date === date && d.hwKey === hwKey,
         );
-        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+        return graphIndex === -1 ? '#6b7280' : allGraphs[graphIndex].color;
       },
       [allGraphs],
     );
@@ -237,7 +237,7 @@ const GPUGraph = React.memo(
       () => (key: string) => {
         const graphId = key.split('_').slice(0, -1).join('_');
         const graphIndex = allGraphs.findIndex((d) => d.id === graphId);
-        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+        return graphIndex === -1 ? '#6b7280' : allGraphs[graphIndex].color;
       },
       [allGraphs],
     );

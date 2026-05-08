@@ -178,7 +178,7 @@ describe('Historical Trends — Content & Interactions', () => {
       .find('.relative.text-muted-foreground span')
       .should('have.length.greaterThan', 0)
       .each(($span) => {
-        expect($span.text()).to.match(/\d+/);
+        expect($span.text()).to.match(/\d+/u);
       });
   });
 });
