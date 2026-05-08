@@ -98,31 +98,75 @@ jobs:
           const fs = require('node:fs');
           const path = require('node:path');
 
-          const rootDir = path.resolve('packages/app/cypress/e2e');
           const appDir = path.resolve('packages/app');
+          const rootDir = path.resolve(appDir, 'cypress/e2e');
           const shardIndex = Number(process.env.SHARD_INDEX);
           const shardTotal = Number(process.env.SHARD_TOTAL);
           const outputFile = process.env.GITHUB_OUTPUT;
+
+          if (!Number.isInteger(shardIndex) || !Number.isInteger(shardTotal)) {
+            throw new Error('SHARD_INDEX and SHARD_TOTAL must be integers');
+          }
+          if (shardTotal < 1 || shardIndex < 1 || shardIndex > shardTotal) {
+            throw new Error(`invalid shard params: ${shardIndex}/${shardTotal}`);
+          }
+          if (!outputFile || !path.isAbsolute(outputFile)) {
+            throw new Error('GITHUB_OUTPUT must be set to an absolute path');
+          }
+
+          // Filename whitelist — only safe ASCII. Reject anything weird so the
+          // path can never escape the cypress/e2e tree, contain shell metas,
+          // or inject newlines into GITHUB_OUTPUT.
+          const SAFE_NAME = /^[A-Za-z0-9_.-]+$/;
+          // File-size cap. Spec files in this repo are <50 KB; anything larger
+          // is suspicious. Bounds the regex work too.
+          const MAX_BYTES = 1024 * 1024;
 
           function collectSpecs(dir) {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
             const files = [];
             for (const entry of entries) {
+              // Reject symlinks outright — no following anywhere.
+              if (entry.isSymbolicLink()) {
+                throw new Error(`symlink not allowed under cypress/e2e: ${entry.name}`);
+              }
+              if (!SAFE_NAME.test(entry.name)) {
+                throw new Error(`unsafe spec name: ${JSON.stringify(entry.name)}`);
+              }
               const fullPath = path.join(dir, entry.name);
+              // Defense-in-depth: verify the resolved path stays under rootDir.
+              if (!fullPath.startsWith(rootDir + path.sep) && fullPath !== rootDir) {
+                throw new Error(`path escape: ${fullPath}`);
+              }
               if (entry.isDirectory()) {
                 files.push(...collectSpecs(fullPath));
               } else if (entry.isFile() && entry.name.endsWith('.cy.ts')) {
-                files.push(path.relative(appDir, fullPath).replaceAll('\\', '/'));
+                // Stored relative to appDir, forward-slashed. All components
+                // already validated, so no path-separator surprises.
+                files.push(path.relative(appDir, fullPath).split(path.sep).join('/'));
               }
             }
             return files;
           }
 
           // Weight = cy.visit() + cy.reload() count. Each is a full app boot,
-          // which dominates per-spec runtime in Cypress E2E. Min 1 so specs
-          // without explicit visits still get a non-zero load.
+          // which dominates per-spec runtime. Read the file as bytes, regex
+          // for the literal call patterns. The content is never executed,
+          // eval'd, require'd, or template-interpolated — only matched.
           function weightOf(specRel) {
-            const src = fs.readFileSync(path.join(appDir, specRel), 'utf8');
+            const fullPath = path.join(appDir, specRel);
+            // One more containment check before reading.
+            if (!fullPath.startsWith(rootDir + path.sep)) {
+              throw new Error(`path escape on read: ${fullPath}`);
+            }
+            const stat = fs.lstatSync(fullPath);
+            if (!stat.isFile() || stat.isSymbolicLink()) {
+              throw new Error(`not a regular file: ${fullPath}`);
+            }
+            if (stat.size > MAX_BYTES) {
+              throw new Error(`spec file too large (${stat.size} bytes): ${fullPath}`);
+            }
+            const src = fs.readFileSync(fullPath, 'utf8');
             const visits = (src.match(/cy\.visit\s*\(/g) || []).length;
             const reloads = (src.match(/cy\.reload\s*\(/g) || []).length;
             return Math.max(1, visits + reloads);
@@ -147,7 +191,12 @@ jobs:
 
           const myBin = bins.find((b) => b.idx === shardIndex);
           const assignedSpecs = myBin.specs.sort();
+          // All spec paths are validated against SAFE_NAME components, so they
+          // cannot contain commas, newlines, or other GITHUB_OUTPUT-breaking chars.
           const specsCsv = assignedSpecs.join(',');
+          if (/[\n\r,]/.test(specsCsv.replaceAll(',', ''))) {
+            throw new Error('refused to emit specs containing newlines');
+          }
 
           fs.appendFileSync(outputFile, `specs=${specsCsv}\n`);
           fs.appendFileSync(outputFile, `spec_count=${assignedSpecs.length}\n`);
