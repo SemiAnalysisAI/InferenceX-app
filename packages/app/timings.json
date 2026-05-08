@@ -1,0 +1,27 @@
+{
+  "durations": [
+    { "spec": "cypress/e2e/blog.cy.ts", "duration": 3900 },
+    { "spec": "cypress/e2e/csv-export.cy.ts", "duration": 7000 },
+    { "spec": "cypress/e2e/custom-user-values.cy.ts", "duration": 16300 },
+    { "spec": "cypress/e2e/drill-down-trend.cy.ts", "duration": 10700 },
+    { "spec": "cypress/e2e/dropdown-switching.cy.ts", "duration": 2500 },
+    { "spec": "cypress/e2e/evaluation-chart.cy.ts", "duration": 3600 },
+    { "spec": "cypress/e2e/gpu-power.cy.ts", "duration": 6500 },
+    { "spec": "cypress/e2e/gpu-specs.cy.ts", "duration": 10700 },
+    { "spec": "cypress/e2e/gradient-labels.cy.ts", "duration": 7300 },
+    { "spec": "cypress/e2e/historical-trends.cy.ts", "duration": 11700 },
+    { "spec": "cypress/e2e/inference-chart.cy.ts", "duration": 1600 },
+    { "spec": "cypress/e2e/line-labels.cy.ts", "duration": 4100 },
+    { "spec": "cypress/e2e/model-architecture.cy.ts", "duration": 5900 },
+    { "spec": "cypress/e2e/navigation.cy.ts", "duration": 6200 },
+    { "spec": "cypress/e2e/nudge-system.cy.ts", "duration": 17000 },
+    { "spec": "cypress/e2e/performance.cy.ts", "duration": 3900 },
+    { "spec": "cypress/e2e/reliability-chart.cy.ts", "duration": 2600 },
+    { "spec": "cypress/e2e/sanity.cy.ts", "duration": 3200 },
+    { "spec": "cypress/e2e/speed-overlay.cy.ts", "duration": 4700 },
+    { "spec": "cypress/e2e/throughput-calculator.cy.ts", "duration": 11600 },
+    { "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts", "duration": 1800 },
+    { "spec": "cypress/e2e/url-params.cy.ts", "duration": 12300 },
+    { "spec": "cypress/e2e/yaxis-metrics-render.cy.ts", "duration": 4200 }
+  ]
+}

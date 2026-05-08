@@ -88,129 +88,7 @@ jobs:
         run: pnpm build
         env:
           E2E_FIXTURES: '1'
-      - name: Select shard specs
-        id: shard-specs
-        env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_TOTAL: 2
-        run: |
-          node <<'EOF'
-          const fs = require('node:fs');
-          const path = require('node:path');
-
-          const appDir = path.resolve('packages/app');
-          const rootDir = path.resolve(appDir, 'cypress/e2e');
-          const shardIndex = Number(process.env.SHARD_INDEX);
-          const shardTotal = Number(process.env.SHARD_TOTAL);
-          const outputFile = process.env.GITHUB_OUTPUT;
-
-          if (!Number.isInteger(shardIndex) || !Number.isInteger(shardTotal)) {
-            throw new Error('SHARD_INDEX and SHARD_TOTAL must be integers');
-          }
-          if (shardTotal < 1 || shardIndex < 1 || shardIndex > shardTotal) {
-            throw new Error(`invalid shard params: ${shardIndex}/${shardTotal}`);
-          }
-          if (!outputFile || !path.isAbsolute(outputFile)) {
-            throw new Error('GITHUB_OUTPUT must be set to an absolute path');
-          }
-
-          // Filename whitelist — only safe ASCII. Reject anything weird so the
-          // path can never escape the cypress/e2e tree, contain shell metas,
-          // or inject newlines into GITHUB_OUTPUT.
-          const SAFE_NAME = /^[A-Za-z0-9_.-]+$/;
-          // File-size cap. Spec files in this repo are <50 KB; anything larger
-          // is suspicious. Bounds the regex work too.
-          const MAX_BYTES = 1024 * 1024;
-
-          function collectSpecs(dir) {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
-            const files = [];
-            for (const entry of entries) {
-              // Reject symlinks outright — no following anywhere.
-              if (entry.isSymbolicLink()) {
-                throw new Error(`symlink not allowed under cypress/e2e: ${entry.name}`);
-              }
-              if (!SAFE_NAME.test(entry.name)) {
-                throw new Error(`unsafe spec name: ${JSON.stringify(entry.name)}`);
-              }
-              const fullPath = path.join(dir, entry.name);
-              // Defense-in-depth: verify the resolved path stays under rootDir.
-              if (!fullPath.startsWith(rootDir + path.sep) && fullPath !== rootDir) {
-                throw new Error(`path escape: ${fullPath}`);
-              }
-              if (entry.isDirectory()) {
-                files.push(...collectSpecs(fullPath));
-              } else if (entry.isFile() && entry.name.endsWith('.cy.ts')) {
-                // Stored relative to appDir, forward-slashed. All components
-                // already validated, so no path-separator surprises.
-                files.push(path.relative(appDir, fullPath).split(path.sep).join('/'));
-              }
-            }
-            return files;
-          }
-
-          // Weight = cy.visit() + cy.reload() count. Each is a full app boot,
-          // which dominates per-spec runtime. Read the file as bytes, regex
-          // for the literal call patterns. The content is never executed,
-          // eval'd, require'd, or template-interpolated — only matched.
-          function weightOf(specRel) {
-            const fullPath = path.join(appDir, specRel);
-            // One more containment check before reading.
-            if (!fullPath.startsWith(rootDir + path.sep)) {
-              throw new Error(`path escape on read: ${fullPath}`);
-            }
-            const stat = fs.lstatSync(fullPath);
-            if (!stat.isFile() || stat.isSymbolicLink()) {
-              throw new Error(`not a regular file: ${fullPath}`);
-            }
-            if (stat.size > MAX_BYTES) {
-              throw new Error(`spec file too large (${stat.size} bytes): ${fullPath}`);
-            }
-            const src = fs.readFileSync(fullPath, 'utf8');
-            const visits = (src.match(/cy\.visit\s*\(/g) || []).length;
-            const reloads = (src.match(/cy\.reload\s*\(/g) || []).length;
-            return Math.max(1, visits + reloads);
-          }
-
-          // LPT bin-packing: sort by weight desc (ties by name for determinism),
-          // assign each to the currently lightest bin (ties by lowest shard idx).
-          const allSpecs = collectSpecs(rootDir).sort();
-          const weighted = allSpecs.map((spec) => ({ spec, weight: weightOf(spec) }));
-          weighted.sort((a, b) => b.weight - a.weight || a.spec.localeCompare(b.spec));
-
-          const bins = Array.from({ length: shardTotal }, (_, i) => ({
-            idx: i + 1,
-            load: 0,
-            specs: [],
-          }));
-          for (const { spec, weight } of weighted) {
-            bins.sort((a, b) => a.load - b.load || a.idx - b.idx);
-            bins[0].load += weight;
-            bins[0].specs.push(spec);
-          }
-
-          const myBin = bins.find((b) => b.idx === shardIndex);
-          const assignedSpecs = myBin.specs.sort();
-          // All spec paths are validated against SAFE_NAME components, so they
-          // cannot contain commas, newlines, or other GITHUB_OUTPUT-breaking chars.
-          const specsCsv = assignedSpecs.join(',');
-          if (/[\n\r,]/.test(specsCsv.replaceAll(',', ''))) {
-            throw new Error('refused to emit specs containing newlines');
-          }
-
-          fs.appendFileSync(outputFile, `specs=${specsCsv}\n`);
-          fs.appendFileSync(outputFile, `spec_count=${assignedSpecs.length}\n`);
-          fs.appendFileSync(outputFile, `total_specs=${allSpecs.length}\n`);
-          console.log(`[Shard ${shardIndex}/${shardTotal}] LPT assignment (weight = cy.visit + cy.reload count):`);
-          for (const b of bins.sort((a, b) => a.idx - b.idx)) {
-            const marker = b.idx === shardIndex ? '>>' : '  ';
-            console.log(`${marker} shard ${b.idx}: load=${b.load}, ${b.specs.length} specs`);
-          }
-          console.log(`Assigned to shard ${shardIndex}:`);
-          for (const spec of assignedSpecs) console.log(` - ${spec}`);
-          EOF
       - name: Run integration tests
-        if: ${{ steps.shard-specs.outputs.spec_count != '0' }}
         uses: cypress-io/github-action@c495c3ddffba403ba11be95fffb67e25203b3799 # v7.1.10
         with:
           working-directory: packages/app
@@ -218,10 +96,17 @@ jobs:
           start: pnpm start
           wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
-          spec: ${{ steps.shard-specs.outputs.specs }}
+          publish-summary: false
         env:
           CI: true
           E2E_FIXTURES: '1'
-      - name: Skip empty shard
-        if: ${{ steps.shard-specs.outputs.spec_count == '0' }}
-        run: echo "No specs assigned for this shard; skipping Cypress run."
+          # cypress-split picks the subset of specs for this shard.
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1, 2].
+          # SPLIT_FILE seeds the balance from observed timings;
+          # SPLIT_OUTPUT_FILE redirects on-disk updates to a throwaway path
+          # so CI never tries to mutate the committed timings.json.
+          SPLIT: 2
+          SPLIT_INDEX1: ${{ matrix.shard }}
+          SPLIT_FILE: timings.json
+          SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
+          SPLIT_SUMMARY: 'false'
