@@ -99,6 +99,7 @@ jobs:
           const path = require('node:path');
 
           const rootDir = path.resolve('packages/app/cypress/e2e');
+          const appDir = path.resolve('packages/app');
           const shardIndex = Number(process.env.SHARD_INDEX);
           const shardTotal = Number(process.env.SHARD_TOTAL);
           const outputFile = process.env.GITHUB_OUTPUT;
@@ -111,20 +112,52 @@ jobs:
               if (entry.isDirectory()) {
                 files.push(...collectSpecs(fullPath));
               } else if (entry.isFile() && entry.name.endsWith('.cy.ts')) {
-                files.push(path.relative(path.resolve('packages/app'), fullPath).replaceAll('\\', '/'));
+                files.push(path.relative(appDir, fullPath).replaceAll('\\', '/'));
               }
             }
             return files;
           }
 
+          // Weight = cy.visit() + cy.reload() count. Each is a full app boot,
+          // which dominates per-spec runtime in Cypress E2E. Min 1 so specs
+          // without explicit visits still get a non-zero load.
+          function weightOf(specRel) {
+            const src = fs.readFileSync(path.join(appDir, specRel), 'utf8');
+            const visits = (src.match(/cy\.visit\s*\(/g) || []).length;
+            const reloads = (src.match(/cy\.reload\s*\(/g) || []).length;
+            return Math.max(1, visits + reloads);
+          }
+
+          // LPT bin-packing: sort by weight desc (ties by name for determinism),
+          // assign each to the currently lightest bin (ties by lowest shard idx).
           const allSpecs = collectSpecs(rootDir).sort();
-          const assignedSpecs = allSpecs.filter((_, index) => index % shardTotal === shardIndex - 1);
+          const weighted = allSpecs.map((spec) => ({ spec, weight: weightOf(spec) }));
+          weighted.sort((a, b) => b.weight - a.weight || a.spec.localeCompare(b.spec));
+
+          const bins = Array.from({ length: shardTotal }, (_, i) => ({
+            idx: i + 1,
+            load: 0,
+            specs: [],
+          }));
+          for (const { spec, weight } of weighted) {
+            bins.sort((a, b) => a.load - b.load || a.idx - b.idx);
+            bins[0].load += weight;
+            bins[0].specs.push(spec);
+          }
+
+          const myBin = bins.find((b) => b.idx === shardIndex);
+          const assignedSpecs = myBin.specs.sort();
           const specsCsv = assignedSpecs.join(',');
 
           fs.appendFileSync(outputFile, `specs=${specsCsv}\n`);
           fs.appendFileSync(outputFile, `spec_count=${assignedSpecs.length}\n`);
           fs.appendFileSync(outputFile, `total_specs=${allSpecs.length}\n`);
-          console.log(`[Shard ${shardIndex}/${shardTotal}] Assigned ${assignedSpecs.length}/${allSpecs.length} specs`);
+          console.log(`[Shard ${shardIndex}/${shardTotal}] LPT assignment (weight = cy.visit + cy.reload count):`);
+          for (const b of bins.sort((a, b) => a.idx - b.idx)) {
+            const marker = b.idx === shardIndex ? '>>' : '  ';
+            console.log(`${marker} shard ${b.idx}: load=${b.load}, ${b.specs.length} specs`);
+          }
+          console.log(`Assigned to shard ${shardIndex}:`);
           for (const spec of assignedSpecs) console.log(` - ${spec}`);
           EOF
       - name: Run integration tests
