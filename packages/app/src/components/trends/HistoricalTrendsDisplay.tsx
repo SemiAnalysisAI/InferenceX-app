@@ -335,7 +335,6 @@ export default function HistoricalTrendsDisplay() {
                 yLabel={currentYLabel}
                 logScale={logScale}
                 selectedPrecisions={selectedPrecisions}
-                selectedModel={selectedModel}
                 legendElement={
                   <ChartLegend
                     variant="sidebar"

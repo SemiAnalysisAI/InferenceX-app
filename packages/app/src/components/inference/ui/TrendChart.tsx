@@ -17,7 +17,7 @@ import {
   getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/chart-rendering';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
@@ -32,8 +32,6 @@ interface TrendChartProps {
   caption?: React.ReactNode;
   /** Selected precisions, in selection order; controls scatter-point shape assignment. */
   selectedPrecisions?: readonly string[];
-  /** Currently selected model — drives day-0 watermark for dsv4. */
-  selectedModel?: string;
 }
 
 const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
@@ -64,7 +62,6 @@ const TrendChart = React.memo(
     legendElement,
     caption,
     selectedPrecisions,
-    selectedModel,
   }: TrendChartProps) => {
     // All data points flattened for computing axis domains — only from VISIBLE configs
     const visibleConfigIds = useMemo(() => new Set(lineConfigs.map((c) => c.id)), [lineConfigs]);
@@ -302,7 +299,7 @@ const TrendChart = React.memo(
         data={flatPointData}
         height={600}
         margin={CHART_MARGIN}
-        watermark={getModelWatermark(selectedModel)}
+        watermark={getChartWatermark()}
         testId="trend-chart-svg"
         grabCursor
         instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset"

@@ -8,7 +8,7 @@ import { useTheme } from 'next-themes';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -43,7 +43,6 @@ const GPUGraph = React.memo(
   ({ chartId, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
     const {
       hardwareConfig,
-      selectedModel,
       selectedPrecisions,
       selectedYAxisMetric,
       selectedGPUs,
@@ -320,7 +319,7 @@ const GPUGraph = React.memo(
         chartId={chartId}
         data={filteredData}
         margin={CHART_MARGIN}
-        watermark={getModelWatermark(selectedModel)}
+        watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}

@@ -53,7 +53,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.DeepSeek_V4_Pro]: {
     label: 'DeepSeek V4 Pro',
     prefix: 'dsv4',
-    category: 'experimental',
+    category: 'default',
     mtpEngineExclusion: true,
   },
   [Model.Kimi_K2_5]: {
@@ -117,17 +117,11 @@ export function hasMtpEngineExclusion(model: Model | string | null | undefined):
 }
 
 /**
- * Pick the chart watermark for a given model + run state. Unofficial-run charts
- * always get the red "UNOFFICIAL" banner; otherwise dsv4 (day-0 support) gets
- * the blue "EXPERIMENTAL - DAY ZERO" banner; everything else gets the logo.
+ * Pick the chart watermark for a given run state. Unofficial-run charts get
+ * the red "UNOFFICIAL" banner; everything else gets the logo.
  */
-export function getModelWatermark(
-  model: Model | string | null | undefined,
-  isUnofficialRun = false,
-): 'logo' | 'unofficial' | 'day0' {
-  if (isUnofficialRun) return 'unofficial';
-  if (model === Model.DeepSeek_V4_Pro) return 'day0';
-  return 'logo';
+export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
+  return isUnofficialRun ? 'unofficial' : 'logo';
 }
 
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
