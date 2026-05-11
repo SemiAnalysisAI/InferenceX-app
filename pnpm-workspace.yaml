@@ -12,5 +12,3 @@ allowBuilds:
 
 overrides:
   postcss@<8.5.10: '>=8.5.10'
-  ip-address@<10.1.1: '>=10.1.1'
-  hono@<4.12.16: '>=4.12.16'
