@@ -3,6 +3,7 @@
 import type { PostHog } from 'posthog-js';
 import { Suspense, createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { installChunkLoadRecovery } from '@/lib/chunk-load-recovery';
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
@@ -13,6 +14,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
   const [client, setClient] = useState<PostHog | null>(null);
 
   useEffect(() => {
+    installChunkLoadRecovery();
     if (!POSTHOG_KEY || process.env.NODE_ENV !== 'production') return;
     import('posthog-js')
       .then(({ default: posthog }) => {
