@@ -327,21 +327,33 @@ export default function ReplayPanel({
 
   if (history.isLoading || !timeline) {
     return (
-      <div className="p-6">
-        <h3 className="text-base font-semibold">Replay</h3>
-        <p className="text-sm text-muted-foreground">Loading benchmark history…</p>
+      <div
+        className="p-4 sm:p-6 flex flex-col"
+        data-testid={`replay-panel-${parentChartId}`}
+        style={{ minHeight: REPLAY_HEIGHT + 140 }}
+      >
+        <h3 className="text-base font-semibold">Replay over time</h3>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">Loading benchmark history…</p>
+        </div>
       </div>
     );
   }
 
   if (timeline.dates.length < 2) {
     return (
-      <div className="p-6">
-        <h3 className="text-base font-semibold">Replay</h3>
-        <p className="text-sm text-muted-foreground">
-          Not enough history yet to replay this chart — at least two distinct benchmark dates are
-          required.
-        </p>
+      <div
+        className="p-4 sm:p-6 flex flex-col"
+        data-testid={`replay-panel-${parentChartId}`}
+        style={{ minHeight: REPLAY_HEIGHT + 140 }}
+      >
+        <h3 className="text-base font-semibold">Replay over time</h3>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Not enough history yet to replay this chart — at least two distinct benchmark dates are
+            required.
+          </p>
+        </div>
       </div>
     );
   }
@@ -442,9 +454,9 @@ export default function ReplayPanel({
         >
           <Video className="size-4" />
           {isExporting
-            ? exportProgress !== null
-              ? `Exporting ${Math.round(exportProgress * 100)}%`
-              : 'Exporting…'
+            ? exportProgress === null
+              ? 'Exporting…'
+              : `Exporting ${Math.round(exportProgress * 100)}%`
             : 'Export MP4'}
         </Button>
       </div>

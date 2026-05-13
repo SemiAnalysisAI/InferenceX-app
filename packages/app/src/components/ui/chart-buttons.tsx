@@ -1,7 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { Download, FileSpreadsheet, Image, RotateCcw } from 'lucide-react';
+import { Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { useChartExport } from '@/hooks/useChartExport';
@@ -24,6 +24,8 @@ interface ChartButtonsProps {
   hideImageExport?: boolean;
   /** Optional callback to export chart data as CSV */
   onExportCsv?: () => void;
+  /** Optional callback to open the MP4 export preview (e.g., replay modal) */
+  onExportMp4?: () => void;
   /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
   /**
@@ -51,6 +53,7 @@ export function ChartButtons({
   hideZoomReset,
   hideImageExport,
   onExportCsv,
+  onExportMp4,
   exportFileName,
   leadingControls,
   className,
@@ -77,6 +80,12 @@ export function ChartButtons({
     window.dispatchEvent(new CustomEvent('inferencex:action'));
   };
 
+  const handleExportMp4 = () => {
+    setPopoverOpen(false);
+    track(`${analyticsPrefix}_mp4_preview_opened`);
+    onExportMp4?.();
+  };
+
   return (
     <div
       className={cn(
@@ -85,7 +94,7 @@ export function ChartButtons({
       )}
     >
       {leadingControls}
-      {onExportCsv ? (
+      {onExportCsv || onExportMp4 ? (
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -111,16 +120,30 @@ export function ChartButtons({
               <Image size={14} />
               Download PNG
             </button>
-            <button
-              data-testid="export-csv-button"
-              data-ph-capture-attribute-export-type="csv"
-              data-ph-capture-attribute-chart={chartId}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-              onClick={handleExportCsv}
-            >
-              <FileSpreadsheet size={14} />
-              Download CSV
-            </button>
+            {onExportCsv && (
+              <button
+                data-testid="export-csv-button"
+                data-ph-capture-attribute-export-type="csv"
+                data-ph-capture-attribute-chart={chartId}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                onClick={handleExportCsv}
+              >
+                <FileSpreadsheet size={14} />
+                Download CSV
+              </button>
+            )}
+            {onExportMp4 && (
+              <button
+                data-testid="export-mp4-button"
+                data-ph-capture-attribute-export-type="mp4"
+                data-ph-capture-attribute-chart={chartId}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                onClick={handleExportMp4}
+              >
+                <Video size={14} />
+                Download MP4
+              </button>
+            )}
           </PopoverContent>
         </Popover>
       ) : (

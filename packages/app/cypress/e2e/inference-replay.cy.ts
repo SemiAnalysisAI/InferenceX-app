@@ -1,3 +1,12 @@
+const openReplayDialog = () => {
+  cy.get('[data-testid="chart-figure"]')
+    .first()
+    .within(() => {
+      cy.get('[data-testid="export-button"]').click();
+    });
+  cy.get('[data-testid="export-mp4-button"]').first().click();
+};
+
 describe('Inference Replay', () => {
   before(() => {
     cy.window().then((win) => {
@@ -7,19 +16,23 @@ describe('Inference Replay', () => {
     cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 
-  it('renders a Replay launcher under each scatter chart', () => {
-    cy.get('[data-testid^="replay-launcher-"]').should('have.length.at.least', 1);
-    cy.get('[data-testid^="replay-launcher-"]').first().should('contain', 'Replay');
+  it('exposes MP4 export in the chart export menu', () => {
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .within(() => {
+        cy.get('[data-testid="export-button"]').click();
+      });
+    cy.get('[data-testid="export-mp4-button"]').should('be.visible');
   });
 
-  it('opens the replay panel when the launcher is clicked', () => {
-    cy.get('[data-testid="replay-launcher-chart-0"]').click();
+  it('opens the replay preview modal from the MP4 menu item', () => {
+    openReplayDialog();
     cy.get('[data-testid="replay-panel-chart-0"]').should('exist');
     // Either the loading message, the "not enough history" message, or the controls.
     cy.get('[data-testid="replay-panel-chart-0"]').then(($panel) => {
       const text = $panel.text();
       const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;
-      const hasMessage = /Loading benchmark history|Not enough history/.test(text) || hasControls;
+      const hasMessage = /Loading benchmark history|Not enough history/u.test(text) || hasControls;
       expect(hasMessage).to.equal(true);
     });
   });
@@ -28,7 +41,7 @@ describe('Inference Replay', () => {
     // Wait for history to resolve into either the controls UI or the empty-state message.
     cy.get('[data-testid="replay-panel-chart-0"]', { timeout: 15_000 }).should(($panel) => {
       const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;
-      const hasEmpty = /Not enough history/.test($panel.text());
+      const hasEmpty = /Not enough history/u.test($panel.text());
       expect(hasControls || hasEmpty).to.equal(true);
     });
 
@@ -53,7 +66,6 @@ describe('Inference Replay', () => {
       // shadcn Dialog renders an X button inside the dialog content.
       cy.get('[data-testid^="replay-dialog-"]').find('button').first().click();
       cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
-      cy.get('[data-testid="replay-launcher-chart-0"]').should('be.visible');
     });
   });
 });
