@@ -62,3 +62,57 @@ describe('SubmissionsTable — Spec Method column', () => {
     cy.get('tbody tr').should('have.length', 1).first().should('contain.text', 'B300');
   });
 });
+
+describe('SubmissionsTable — Image diff in expanded row', () => {
+  const OLD = 'lmsysorg/sglang:v0.5.9-cu130';
+  const NEW = 'lmsysorg/sglang:v0.5.11-cu130';
+  const diffRows: SubmissionSummaryRow[] = [
+    {
+      ...baseRow,
+      hardware: 'h200',
+      spec_method: 'mtp',
+      date: '2026-05-12',
+      image: OLD,
+    },
+    {
+      ...baseRow,
+      hardware: 'h200',
+      spec_method: 'mtp',
+      date: '2026-05-13',
+      image: NEW,
+    },
+    // Different config — no diff should be computed against the h200 rows.
+    {
+      ...baseRow,
+      hardware: 'b300',
+      spec_method: 'eagle',
+      date: '2026-05-13',
+      image: 'rocm/sgl-dev:rocm720',
+    },
+  ];
+
+  it('shows previous → current image on the bump-day row', () => {
+    cy.mount(<SubmissionsTable data={diffRows} />);
+    // Sort defaults to date desc, so the newest h200 row (image=NEW) is first.
+    cy.get('tbody tr').first().click(); // expand
+    cy.get('[data-testid="submissions-image-diff"]')
+      .should('be.visible')
+      .within(() => {
+        cy.contains(OLD).should('be.visible');
+        cy.contains('→').should('be.visible');
+        cy.contains(NEW).should('be.visible');
+      });
+  });
+
+  it('renders just the current image when there is no preceding run', () => {
+    cy.mount(<SubmissionsTable data={diffRows} />);
+    // Expand the b300 row (single-row config, no diff).
+    cy.contains('tbody tr', 'B300').click();
+    cy.contains('tbody tr', 'B300')
+      .next()
+      .within(() => {
+        cy.get('[data-testid="submissions-image-diff"]').should('not.exist');
+        cy.contains('rocm/sgl-dev:rocm720').should('be.visible');
+      });
+  });
+});
