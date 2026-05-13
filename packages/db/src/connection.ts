@@ -79,7 +79,13 @@ function wrapPostgres(sql: postgres.Sql): DbClient {
 
 // Survive Next.js HMR — without globalThis the module re-evaluates on each
 // hot reload, leaking the previous postgres.js TCP connection pool.
-const g = globalThis as unknown as { __dbClient?: DbClient };
+const g = globalThis as unknown as { __dbClient?: DbClient; __dbWriteClient?: DbClient };
+
+function makeDbClient(url: string): DbClient {
+  return shouldUseNeon(url)
+    ? (neon(url) as DbClient)
+    : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
+}
 
 /**
  * Read-only SQL client for API routes.
@@ -90,10 +96,15 @@ export function getDb(): DbClient {
   if (g.__dbClient) return g.__dbClient;
   const url = process.env.DATABASE_READONLY_URL;
   if (!url) throw new Error('DATABASE_READONLY_URL is not set');
-
-  g.__dbClient = shouldUseNeon(url)
-    ? (neon(url) as DbClient)
-    : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
-
+  g.__dbClient = makeDbClient(url);
   return g.__dbClient;
+}
+
+/** Write-capable SQL client for API routes that need to insert (e.g. user feedback). */
+export function getWriteDb(): DbClient {
+  if (g.__dbWriteClient) return g.__dbWriteClient;
+  const url = process.env.DATABASE_WRITE_URL;
+  if (!url) throw new Error('DATABASE_WRITE_URL is not set');
+  g.__dbWriteClient = makeDbClient(url);
+  return g.__dbWriteClient;
 }

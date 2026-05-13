@@ -373,41 +373,45 @@ function ModalRenderer({
       >
         <X className="size-4" />
       </button>
-      <div className="flex flex-col gap-4">
-        <div className="space-y-1.5 pr-6">
-          <h2 id={`${idPrefix}-title`} className="flex items-center gap-2 text-lg font-semibold">
-            <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
-            {content.title}
-            {content.badge && (
-              <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
-                {content.badge}
-              </span>
-            )}
-          </h2>
-          <p id={`${idPrefix}-description`} className="text-sm text-muted-foreground">
-            {content.description}
-          </p>
-        </div>
-        <div className="flex flex-row justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={onDismiss}
-            data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
-          >
-            {content.dismissLabel ?? 'Maybe Later'}
-          </Button>
-          {content.primaryAction && (
+      {content.renderContent ? (
+        content.renderContent({ dismiss: onDismiss })
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="space-y-1.5 pr-6">
+            <h2 id={`${idPrefix}-title`} className="flex items-center gap-2 text-lg font-semibold">
+              <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
+              {content.title}
+              {content.badge && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                  {content.badge}
+                </span>
+              )}
+            </h2>
+            <p id={`${idPrefix}-description`} className="text-sm text-muted-foreground">
+              {content.description}
+            </p>
+          </div>
+          <div className="flex flex-row justify-end gap-2">
             <Button
-              onClick={onAction}
-              data-testid={content.testId ? `${content.testId}-action` : undefined}
-              className={content.actionClassName}
+              variant="outline"
+              onClick={onDismiss}
+              data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
             >
-              {content.primaryAction.icon}
-              {content.primaryAction.label}
+              {content.dismissLabel ?? 'Maybe Later'}
             </Button>
-          )}
+            {content.primaryAction && (
+              <Button
+                onClick={onAction}
+                data-testid={content.testId ? `${content.testId}-action` : undefined}
+                className={content.actionClassName}
+              >
+                {content.primaryAction.icon}
+                {content.primaryAction.label}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

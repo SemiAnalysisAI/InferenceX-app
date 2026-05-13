@@ -8,6 +8,7 @@
     "./connection": "./src/connection.ts",
     "./etl/*": "./src/etl/*.ts",
     "./json-provider": "./src/json-provider.ts",
+    "./lib/*": "./src/lib/*.ts",
     "./migrate": "./src/migrate.ts",
     "./queries/*": "./src/queries/*.ts"
   },
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@noble/ciphers": "^2.2.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "postgres": "^3.4.9"
   },
