@@ -129,6 +129,8 @@ export default function ReplayPanel({
     [],
   );
 
+  const panelRef = useRef<HTMLDivElement>(null);
+
   const [fraction, setFraction] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -222,8 +224,10 @@ export default function ReplayPanel({
       // 0.25× → 4×. Capped at 60 s so extreme settings don't produce 100+ MB
       // files.
       const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / speed / 1000));
+      const root = panelRef.current;
+      if (!root) throw new Error('Replay panel element is not mounted.');
       await exportReplayMp4({
-        captureRootId: `replay-panel-${parentChartId}`,
+        captureRoot: root,
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
         durationSec,
         renderFrame: async (t) => {
@@ -287,11 +291,7 @@ export default function ReplayPanel({
   }
 
   return (
-    <div
-      id={`replay-panel-${parentChartId}`}
-      className="p-4 sm:p-6"
-      data-testid={`replay-panel-${parentChartId}`}
-    >
+    <div ref={panelRef} className="p-4 sm:p-6" data-testid={`replay-panel-${parentChartId}`}>
       <div className="flex flex-wrap items-baseline gap-3 mb-3 pr-8">
         <h3 className="text-base font-semibold">Replay over time</h3>
         <p className="text-xs text-muted-foreground">

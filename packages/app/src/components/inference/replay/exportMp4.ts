@@ -1,6 +1,6 @@
 interface ExportOptions {
-  /** DOM id of the replay panel root to capture each frame. */
-  captureRootId: string;
+  /** Live replay panel element captured each frame. Must be in the DOM. */
+  captureRoot: HTMLElement;
   /**
    * Advance the replay to the given fraction [0, 1] and resolve once the new
    * frame has been painted. Called once per output frame. The caller is
@@ -161,7 +161,7 @@ interface MuxerLike {
  */
 export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   const {
-    captureRootId,
+    captureRoot: livePanel,
     renderFrame,
     fileName,
     fps = 30,
@@ -174,8 +174,9 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     throw new TypeError('WebCodecs is not available in this browser. Try Chrome.');
   }
 
-  const livePanel = document.querySelector<HTMLElement>(`#${captureRootId}`);
-  if (!livePanel) throw new Error(`Replay panel "${captureRootId}" not found in the DOM.`);
+  if (!livePanel.isConnected) {
+    throw new Error('Replay panel element is not in the DOM.');
+  }
 
   const [{ Muxer, ArrayBufferTarget }, { toCanvas }] = await Promise.all([
     import('mp4-muxer'),
