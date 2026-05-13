@@ -11,7 +11,7 @@ interface ExportOptions {
   onProgress?: (fraction: number) => void;
 }
 
-const CSS_VAR_RE = /var\(--([^)]+)\)/;
+const CSS_VAR_RE = /var\(--([^)]+)\)/u;
 const WATERMARK_HEIGHT = 48;
 const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
 
