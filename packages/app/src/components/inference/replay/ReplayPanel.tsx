@@ -165,7 +165,7 @@ export default function ReplayPanel({
       }, stepMs);
       return () => window.clearInterval(intervalId);
     }
-    let rafId: number;
+    let rafId = 0;
     let last = performance.now();
     const totalMs = spanMs(timeline.dates.length);
     const step = (now: number) => {
@@ -181,8 +181,28 @@ export default function ReplayPanel({
       });
       rafId = requestAnimationFrame(step);
     };
+    // When the tab is hidden the browser throttles rAF to ~1Hz, so resuming
+    // without rebasing produces a multi-second `dt` that jumps the playhead.
+    // Cancel on hide, rebase + resume on show.
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (rafId !== 0) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        return;
+      }
+      if (playingRef.current && rafId === 0) {
+        last = performance.now();
+        rafId = requestAnimationFrame(step);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     rafId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      if (rafId !== 0) cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [playing, timeline, prefersReducedMotion]);
 
   useEffect(() => {
