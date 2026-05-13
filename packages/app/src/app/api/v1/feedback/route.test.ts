@@ -47,7 +47,7 @@ function buildReq(body: unknown, headers: Record<string, string> = {}) {
 
 beforeEach(() => {
   sqlCalls.reset();
-  vi.stubEnv('FEEDBACK_ENCRYPTION_KEY', KEY_B64);
+  vi.stubEnv('FEEDBACK_SECRET', KEY_B64);
 });
 
 afterEach(() => {
@@ -112,7 +112,7 @@ describe('POST /api/v1/feedback', () => {
   });
 
   it('returns 500 with code E_CRYPTO when the encryption key is missing', async () => {
-    vi.stubEnv('FEEDBACK_ENCRYPTION_KEY', '');
+    vi.stubEnv('FEEDBACK_SECRET', '');
     const res = await POST(buildReq({ doingWell: 'x' }));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'storage error', code: 'E_CRYPTO' });

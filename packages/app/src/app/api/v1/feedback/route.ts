@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   let cipher: Cipher;
   let sql: ReturnType<typeof getWriteDb>;
   try {
-    cipher = createCipher(loadKey('FEEDBACK_ENCRYPTION_KEY'));
+    cipher = createCipher(loadKey('FEEDBACK_SECRET'));
     sql = getWriteDb();
   } catch (error) {
     console.error('feedback: misconfigured', error);

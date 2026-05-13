@@ -123,9 +123,7 @@ export default function FeedbackViewer() {
             <h2 className="text-lg font-semibold mb-2">User Feedback</h2>
             <p className="text-muted-foreground text-sm">
               All user-supplied columns are encrypted server-side. Paste the
-              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">
-                FEEDBACK_ENCRYPTION_KEY
-              </code>
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">FEEDBACK_SECRET</code>
               to decrypt in your browser. The key never leaves this page.
             </p>
           </div>
