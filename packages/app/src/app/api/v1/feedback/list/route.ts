@@ -15,7 +15,6 @@ interface FeedbackRow {
   want_to_see_ciphertext: string | null;
   user_agent_ciphertext: string | null;
   page_path_ciphertext: string | null;
-  visit_count_ciphertext: string | null;
 }
 
 export async function GET() {
@@ -28,8 +27,7 @@ export async function GET() {
         doing_poorly_ciphertext,
         want_to_see_ciphertext,
         user_agent_ciphertext,
-        page_path_ciphertext,
-        visit_count_ciphertext
+        page_path_ciphertext
       from user_feedback
       order by created_at desc
     `) as unknown as FeedbackRow[];

@@ -266,7 +266,6 @@ export interface FeedbackListRow {
   want_to_see_ciphertext: string | null;
   user_agent_ciphertext: string | null;
   page_path_ciphertext: string | null;
-  visit_count_ciphertext: string | null;
 }
 
 export function fetchFeedbackList(signal?: AbortSignal) {

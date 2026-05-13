@@ -3,7 +3,6 @@
  */
 
 const MAX_FIELD_LEN = 2000;
-const MAX_VISIT_COUNT = 10_000;
 const MAX_PAGE_PATH_LEN = 512;
 
 export interface ParsedFeedback {
@@ -12,7 +11,6 @@ export interface ParsedFeedback {
   wantToSee: string | null;
   honeypotTripped: boolean;
   pagePath: string | null;
-  visitCount: number | null;
 }
 
 export type ParseResult =
@@ -27,12 +25,6 @@ function trimOrNull(value: unknown): string | null {
 
 function exceedsCap(value: unknown, max: number): boolean {
   return typeof value === 'string' && value.length > max;
-}
-
-function pickVisitCount(value: unknown): number | null {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-  const n = Math.trunc(value);
-  return n < 0 || n > MAX_VISIT_COUNT ? null : n;
 }
 
 function hasControlChar(s: string): boolean {
@@ -84,9 +76,8 @@ export function parseFeedbackBody(raw: unknown): ParseResult {
       wantToSee,
       honeypotTripped: trimOrNull(body.honeypot) !== null,
       pagePath: pickPagePath(body.pagePath),
-      visitCount: pickVisitCount(body.visitCount),
     },
   };
 }
 
-export const FIELD_LIMITS = { MAX_FIELD_LEN, MAX_VISIT_COUNT, MAX_PAGE_PATH_LEN };
+export const FIELD_LIMITS = { MAX_FIELD_LEN, MAX_PAGE_PATH_LEN };

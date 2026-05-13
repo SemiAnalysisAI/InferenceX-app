@@ -49,7 +49,6 @@ describe('GET /api/v1/feedback/list', () => {
         want_to_see_ciphertext: 'BBBB',
         user_agent_ciphertext: 'CCCC',
         page_path_ciphertext: 'DDDD',
-        visit_count_ciphertext: 'EEEE',
       },
     ]);
     const res = await GET();
@@ -57,17 +56,13 @@ describe('GET /api/v1/feedback/list', () => {
     const body = await res.json();
     expect(body.rows).toHaveLength(1);
     const r = body.rows[0];
-    // Every user-supplied column is ciphertext (or null) — no cleartext leak.
     expect(r.id).toBe('42');
     expect(r.created_at).toBe('2026-05-12T10:00:00Z');
     expect(r.doing_well_ciphertext).toBe('AAAA');
     expect(r.user_agent_ciphertext).toBe('CCCC');
     expect(r.page_path_ciphertext).toBe('DDDD');
-    expect(r.visit_count_ciphertext).toBe('EEEE');
-    // No cleartext fields slipped through.
     expect(r.user_agent).toBeUndefined();
     expect(r.page_path).toBeUndefined();
-    expect(r.visit_count).toBeUndefined();
   });
 
   it('returns an empty array when the table is empty', async () => {

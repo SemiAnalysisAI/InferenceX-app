@@ -30,7 +30,6 @@ interface DecryptedRow {
   wantToSee: string | null;
   userAgent: string | null;
   pagePath: string | null;
-  visitCount: number | null;
   decryptError: string | null;
 }
 
@@ -55,8 +54,7 @@ function decryptRow(cipher: Cipher, row: FeedbackListRow): DecryptedRow {
   const wts = decryptOrNull(cipher, row.want_to_see_ciphertext, 'want_to_see');
   const ua = decryptOrNull(cipher, row.user_agent_ciphertext, 'user_agent');
   const pp = decryptOrNull(cipher, row.page_path_ciphertext, 'page_path');
-  const vc = decryptOrNull(cipher, row.visit_count_ciphertext, 'visit_count');
-  const firstError = dw.error ?? dp.error ?? wts.error ?? ua.error ?? pp.error ?? vc.error ?? null;
+  const firstError = dw.error ?? dp.error ?? wts.error ?? ua.error ?? pp.error ?? null;
   return {
     id: row.id,
     createdAt: row.created_at,
@@ -65,7 +63,6 @@ function decryptRow(cipher: Cipher, row: FeedbackListRow): DecryptedRow {
     wantToSee: wts.value,
     userAgent: ua.value,
     pagePath: pp.value,
-    visitCount: vc.value === null ? null : Number(vc.value),
     decryptError: firstError,
   };
 }
@@ -271,7 +268,6 @@ function FeedbackRow({ row }: { row: DecryptedRow }) {
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
           <span>#{row.id}</span>
           <span className="tabular-nums">{new Date(row.createdAt).toISOString()}</span>
-          <span>visit {row.visitCount ?? '?'}</span>
           <span className="font-mono">{row.pagePath ?? '?'}</span>
         </div>
         {row.doingWell && (

@@ -114,10 +114,6 @@ export async function POST(request: Request) {
   const userAgent = (request.headers.get('user-agent') ?? '').slice(0, 500) || null;
   const userAgentCt = encryptOrNull(userAgent, 'user_agent');
   const pagePathCt = encryptOrNull(body.pagePath, 'page_path');
-  const visitCountCt = encryptOrNull(
-    body.visitCount === null ? null : String(body.visitCount),
-    'visit_count',
-  );
 
   try {
     await sql`
@@ -126,15 +122,13 @@ export async function POST(request: Request) {
         doing_poorly_ciphertext,
         want_to_see_ciphertext,
         user_agent_ciphertext,
-        page_path_ciphertext,
-        visit_count_ciphertext
+        page_path_ciphertext
       ) values (
         ${doingWellCt},
         ${doingPoorlyCt},
         ${wantToSeeCt},
         ${userAgentCt},
-        ${pagePathCt},
-        ${visitCountCt}
+        ${pagePathCt}
       )
     `;
   } catch (error) {

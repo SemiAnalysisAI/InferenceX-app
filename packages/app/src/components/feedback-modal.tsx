@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useId, useState } from 'react';
 
 import { track } from '@/lib/analytics';
-import { getMonthlyVisitCount } from '@/lib/visit-tracking';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -59,7 +58,6 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
           wantToSee: wantToSee.trim() || undefined,
           honeypot,
           pagePath: pathname ?? undefined,
-          visitCount: getMonthlyVisitCount(),
         }),
       });
 

@@ -78,28 +78,22 @@ describe('POST /api/v1/feedback', () => {
   it('inserts a row with every user-supplied column encrypted and returns 204', async () => {
     const res = await POST(
       buildReq(
-        { doingWell: 'love it', pagePath: '/inference', visitCount: 4 },
+        { doingWell: 'love it', pagePath: '/inference' },
         { 'user-agent': 'Mozilla/5.0 (Test)' },
       ),
     );
     expect(res.status).toBe(204);
     const insertCall = sqlCalls.calls.find((c) => c.text.includes('insert into user_feedback'));
     expect(insertCall).toBeDefined();
-    const [doingWellCt, doingPoorlyCt, wantToSeeCt, userAgentCt, pagePathCt, visitCountCt] =
-      insertCall!.values;
-    expect(typeof doingWellCt).toBe('string'); // base64 ciphertext, not plaintext
+    const [doingWellCt, doingPoorlyCt, wantToSeeCt, userAgentCt, pagePathCt] = insertCall!.values;
+    expect(typeof doingWellCt).toBe('string');
     expect(doingWellCt).not.toContain('love it');
     expect(doingPoorlyCt).toBeNull();
     expect(wantToSeeCt).toBeNull();
-    // Metadata is encrypted too — no cleartext UA / path / count in the row.
     expect(typeof userAgentCt).toBe('string');
     expect(userAgentCt).not.toContain('Mozilla');
     expect(typeof pagePathCt).toBe('string');
     expect(pagePathCt).not.toContain('/inference');
-    expect(typeof visitCountCt).toBe('string');
-    // Ciphertext is base64 — strictly longer than the cleartext "4" and base64-shaped.
-    expect((visitCountCt as string).length).toBeGreaterThan(20);
-    expect(visitCountCt).toMatch(/^[A-Za-z0-9+/]+={0,2}$/u);
   });
 
   it('returns 204 silently for honeypot-tripped submissions and does not insert', async () => {

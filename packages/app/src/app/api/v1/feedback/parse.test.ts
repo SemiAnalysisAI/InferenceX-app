@@ -37,17 +37,6 @@ describe('parseFeedbackBody', () => {
     ).toBe(true);
   });
 
-  it('clamps visitCount: rejects negative, NaN, and out-of-range', () => {
-    const base = { doingWell: 'x' };
-    const ok = (n: unknown) => expectOk(parseFeedbackBody({ ...base, visitCount: n }));
-    expect(ok(4).visitCount).toBe(4);
-    expect(ok(-1).visitCount).toBeNull();
-    expect(ok(Number.NaN).visitCount).toBeNull();
-    expect(ok(10_001).visitCount).toBeNull();
-    expect(ok('4').visitCount).toBeNull();
-    expect(ok(4.7).visitCount).toBe(4);
-  });
-
   it('passes pagePath through when valid', () => {
     expect(expectOk(parseFeedbackBody({ doingWell: 'x', pagePath: '/inference' })).pagePath).toBe(
       '/inference',
