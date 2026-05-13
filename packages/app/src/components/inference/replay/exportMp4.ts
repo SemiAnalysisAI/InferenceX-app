@@ -210,8 +210,18 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   let encoder: VideoEncoder | null = null;
   const totalFrames = Math.max(2, Math.floor(durationSec * fps));
 
+  // Captured so a VideoEncoder error callback (which can fire at any
+  // point during encode/flush) surfaces as a checkable error instead of an
+  // un-awaitable throw from inside an async callback.
+  // oxlint-disable-next-line prefer-const
+  let encoderError: Error | null = null;
+
   try {
     for (let i = 0; i < totalFrames; i++) {
+      if (encoderError !== null) {
+        // oxlint-disable-next-line no-throw-literal
+        throw encoderError;
+      }
       const t = totalFrames === 1 ? 1 : i / (totalFrames - 1);
       await renderFrame(t);
 
@@ -246,10 +256,13 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
           video: { codec: 'avc', width: outWidth, height: outHeight },
           fastStart: 'in-memory',
         }) as unknown as MuxerLike;
+        // oxlint-disable-next-line no-loop-func
         const newEncoder = new VideoEncoder({
+          // oxlint-disable-next-line no-loop-func
           output: (chunk, meta) => newMuxer.addVideoChunk(chunk, meta),
-          error: (e) => {
-            throw e;
+          // oxlint-disable-next-line no-loop-func
+          error: (e: unknown) => {
+            encoderError = e instanceof Error ? e : new Error(String(e));
           },
         });
         newEncoder.configure({
@@ -290,7 +303,16 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     }
 
     if (!muxer || !encoder) throw new Error('Encoder was never initialized.');
-    await encoder.flush();
+    await Promise.race([
+      encoder.flush(),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(() => reject(new Error('Encoder flush timed out after 30s.')), 30_000);
+      }),
+    ]);
+    if (encoderError !== null) {
+      // oxlint-disable-next-line no-throw-literal
+      throw encoderError;
+    }
     encoder.close();
     muxer.finalize();
 
