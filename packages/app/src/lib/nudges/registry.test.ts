@@ -66,6 +66,7 @@ describe('NUDGE_REGISTRY integrity', () => {
       'dsv4-launch-modal',
       'eval-samples',
       'export',
+      'feedback-modal',
       'github-star-modal',
       'gradient-label',
       'reproducibility',

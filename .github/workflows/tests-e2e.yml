@@ -33,32 +33,20 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Cache Cypress binary
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
         with:
           path: ~/.cache/Cypress
-          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-component-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             cypress-binary-${{ runner.os }}-${{ runner.arch }}-
       - name: Install Cypress binary if missing
         working-directory: packages/app
         run: pnpm exec cypress verify || pnpm exec cypress install
-      - name: Build app
-        run: pnpm build
-        env:
-          E2E_FIXTURES: '1'
       - name: Run component tests
         working-directory: packages/app
         run: pnpm exec cypress run --component --browser chrome
         env:
           CI: true
-      - name: Upload Cypress artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
-        with:
-          name: cypress-component-report
-          path: |
-            packages/app/cypress/screenshots/
-          retention-days: 1
 
   cypress:
     if: ${{ !github.event.pull_request.draft }}
@@ -70,7 +58,7 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chrome, firefox]
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
@@ -87,10 +75,10 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Cache Cypress binary
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
         with:
           path: ~/.cache/Cypress
-          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ matrix.browser }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             cypress-binary-${{ runner.os }}-${{ runner.arch }}-
       - name: Install Cypress binary if missing
@@ -100,47 +88,7 @@ jobs:
         run: pnpm build
         env:
           E2E_FIXTURES: '1'
-      - name: Select shard specs
-        id: shard-specs
-        env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_TOTAL: 4
-        run: |
-          node <<'EOF'
-          const fs = require('node:fs');
-          const path = require('node:path');
-
-          const rootDir = path.resolve('packages/app/cypress/e2e');
-          const shardIndex = Number(process.env.SHARD_INDEX);
-          const shardTotal = Number(process.env.SHARD_TOTAL);
-          const outputFile = process.env.GITHUB_OUTPUT;
-
-          function collectSpecs(dir) {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
-            const files = [];
-            for (const entry of entries) {
-              const fullPath = path.join(dir, entry.name);
-              if (entry.isDirectory()) {
-                files.push(...collectSpecs(fullPath));
-              } else if (entry.isFile() && entry.name.endsWith('.cy.ts')) {
-                files.push(path.relative(path.resolve('packages/app'), fullPath).replaceAll('\\', '/'));
-              }
-            }
-            return files;
-          }
-
-          const allSpecs = collectSpecs(rootDir).sort();
-          const assignedSpecs = allSpecs.filter((_, index) => index % shardTotal === shardIndex - 1);
-          const specsCsv = assignedSpecs.join(',');
-
-          fs.appendFileSync(outputFile, `specs=${specsCsv}\n`);
-          fs.appendFileSync(outputFile, `spec_count=${assignedSpecs.length}\n`);
-          fs.appendFileSync(outputFile, `total_specs=${allSpecs.length}\n`);
-          console.log(`[Shard ${shardIndex}/${shardTotal}] Assigned ${assignedSpecs.length}/${allSpecs.length} specs`);
-          for (const spec of assignedSpecs) console.log(` - ${spec}`);
-          EOF
       - name: Run integration tests
-        if: ${{ steps.shard-specs.outputs.spec_count != '0' }}
         uses: cypress-io/github-action@c495c3ddffba403ba11be95fffb67e25203b3799 # v7.1.10
         with:
           working-directory: packages/app
@@ -148,18 +96,17 @@ jobs:
           start: pnpm start
           wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
-          spec: ${{ steps.shard-specs.outputs.specs }}
+          publish-summary: false
         env:
           CI: true
           E2E_FIXTURES: '1'
-      - name: Skip empty shard
-        if: ${{ steps.shard-specs.outputs.spec_count == '0' }}
-        run: echo "No specs assigned for this shard; skipping Cypress run."
-      - name: Upload Cypress artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
-        with:
-          name: cypress-${{ matrix.browser }}-shard-${{ matrix.shard }}-report
-          path: |
-            packages/app/cypress/screenshots/
-          retention-days: 1
+          # cypress-split picks the subset of specs for this shard.
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1, 2].
+          # SPLIT_FILE seeds the balance from observed timings;
+          # SPLIT_OUTPUT_FILE redirects on-disk updates to a throwaway path
+          # so CI never tries to mutate the committed timings.json.
+          SPLIT: 2
+          SPLIT_INDEX1: ${{ matrix.shard }}
+          SPLIT_FILE: timings.json
+          SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
+          SPLIT_SUMMARY: 'false'

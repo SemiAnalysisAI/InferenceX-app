@@ -18,6 +18,7 @@ export const VALID_TABS = [
   'ai-chart',
   'gpu-metrics',
   'submissions',
+  'feedback',
 ] as const;
 
 export type TabKey = (typeof VALID_TABS)[number];
@@ -67,6 +68,10 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
     title: 'Benchmark Submissions',
     description:
       'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes across GPU vendors.',
+  },
+  feedback: {
+    title: 'User Feedback',
+    description: 'Internal: decrypt and review user-submitted feedback.',
   },
 };
 

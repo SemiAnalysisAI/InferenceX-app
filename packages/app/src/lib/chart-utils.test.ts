@@ -60,12 +60,12 @@ function pt(
     costhi: { y: 2, roof: false },
     costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
-    ...(opts.outputTputY !== undefined
-      ? { outputTputPerGpu: { y: opts.outputTputY, roof: false } }
-      : {}),
-    ...(opts.inputTputY !== undefined
-      ? { inputTputPerGpu: { y: opts.inputTputY, roof: false } }
-      : {}),
+    ...(opts.outputTputY === undefined
+      ? {}
+      : { outputTputPerGpu: { y: opts.outputTputY, roof: false } }),
+    ...(opts.inputTputY === undefined
+      ? {}
+      : { inputTputPerGpu: { y: opts.inputTputY, roof: false } }),
   } as InferenceData;
 }
 
@@ -178,30 +178,30 @@ function fullPt(
     costhi: { y: 2, roof: false },
     costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
-    ...(vals.costhOutputY !== undefined
-      ? { costhOutput: { y: vals.costhOutputY, roof: false } }
-      : {}),
-    ...(vals.costnOutputY !== undefined
-      ? { costnOutput: { y: vals.costnOutputY, roof: false } }
-      : {}),
-    ...(vals.costrOutputY !== undefined
-      ? { costrOutput: { y: vals.costrOutputY, roof: false } }
-      : {}),
-    ...(vals.jTotalY !== undefined ? { jTotal: { y: vals.jTotalY, roof: false } } : {}),
-    ...(vals.jOutputY !== undefined ? { jOutput: { y: vals.jOutputY, roof: false } } : {}),
-    ...(vals.jInputY !== undefined ? { jInput: { y: vals.jInputY, roof: false } } : {}),
-    ...(vals.outputTputY !== undefined
-      ? { outputTputPerGpu: { y: vals.outputTputY, roof: false } }
-      : {}),
-    ...(vals.inputTputY !== undefined
-      ? { inputTputPerGpu: { y: vals.inputTputY, roof: false } }
-      : {}),
-    ...(vals.inputTputPerMwY !== undefined
-      ? { inputTputPerMw: { y: vals.inputTputPerMwY, roof: false } }
-      : {}),
-    ...(vals.outputTputPerMwY !== undefined
-      ? { outputTputPerMw: { y: vals.outputTputPerMwY, roof: false } }
-      : {}),
+    ...(vals.costhOutputY === undefined
+      ? {}
+      : { costhOutput: { y: vals.costhOutputY, roof: false } }),
+    ...(vals.costnOutputY === undefined
+      ? {}
+      : { costnOutput: { y: vals.costnOutputY, roof: false } }),
+    ...(vals.costrOutputY === undefined
+      ? {}
+      : { costrOutput: { y: vals.costrOutputY, roof: false } }),
+    ...(vals.jTotalY === undefined ? {} : { jTotal: { y: vals.jTotalY, roof: false } }),
+    ...(vals.jOutputY === undefined ? {} : { jOutput: { y: vals.jOutputY, roof: false } }),
+    ...(vals.jInputY === undefined ? {} : { jInput: { y: vals.jInputY, roof: false } }),
+    ...(vals.outputTputY === undefined
+      ? {}
+      : { outputTputPerGpu: { y: vals.outputTputY, roof: false } }),
+    ...(vals.inputTputY === undefined
+      ? {}
+      : { inputTputPerGpu: { y: vals.inputTputY, roof: false } }),
+    ...(vals.inputTputPerMwY === undefined
+      ? {}
+      : { inputTputPerMw: { y: vals.inputTputPerMwY, roof: false } }),
+    ...(vals.outputTputPerMwY === undefined
+      ? {}
+      : { outputTputPerMw: { y: vals.outputTputPerMwY, roof: false } }),
   } as InferenceData;
 }
 
@@ -272,9 +272,9 @@ describe('buildAvailabilityHwKey', () => {
 
 /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
 function parseRgb(color: string): [number, number, number] {
-  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu);
   if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
-  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/u);
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
   throw new Error(`Cannot parse color: ${color}`);
 }
@@ -318,7 +318,7 @@ describe('generateHighContrastColors', () => {
   it('returns a valid hex color for a single key', () => {
     const result = generateHighContrastColors(['gpu-a'], 'dark');
     expect(Object.keys(result)).toHaveLength(1);
-    expect(result['gpu-a']).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(result['gpu-a']).toMatch(/^#[0-9a-f]{6}$/iu);
   });
 
   it('returns one color per key', () => {

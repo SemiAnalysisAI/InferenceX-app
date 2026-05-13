@@ -54,9 +54,9 @@ export default async function BlogPage({
                 <Link
                   href="/blog"
                   className={`rounded-full px-3 py-0.5 text-xs transition-colors ${
-                    !activeTag
-                      ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    activeTag
+                      ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      : 'bg-primary/15 text-primary ring-1 ring-primary/30'
                   }`}
                 >
                   All

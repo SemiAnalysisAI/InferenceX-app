@@ -129,7 +129,7 @@ export default async function BlogPostPage({ params }: Props) {
     ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
     description: meta.subtitle,
     url: `${SITE_URL}/blog/${slug}`,
-    wordCount: raw.trim().split(/\s+/).length,
+    wordCount: raw.trim().split(/\s+/u).length,
     timeRequired: `PT${meta.readingTime}M`,
   };
 

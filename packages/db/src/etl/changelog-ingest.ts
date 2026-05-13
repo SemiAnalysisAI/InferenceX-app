@@ -36,7 +36,7 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
     // PR link: prefer explicit pr-link field, fall back to inline "PR: https://..."
     const prLink =
       (item['pr-link'] ? String(item['pr-link']) : null) ??
-      description.match(/\bPR:\s*(https?:\/\/\S+)/)?.[1] ??
+      description.match(/\bPR:\s*(https?:\/\/\S+)/u)?.[1] ??
       null;
     const evalsOnly = item['evals-only'] === true;
     out.push({ configKeys, description, prLink, evalsOnly });

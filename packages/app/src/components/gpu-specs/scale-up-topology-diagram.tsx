@@ -265,7 +265,7 @@ function renderSwitchedTopology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')
@@ -418,7 +418,7 @@ function renderMeshTopology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')
@@ -586,7 +586,7 @@ function renderSwitchedNvl72Topology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')

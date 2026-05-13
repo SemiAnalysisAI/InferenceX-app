@@ -42,6 +42,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   24954912912, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
   24959542295, // 2026-04-25 | Reason: MTP without chat template leads to supernatural AR
   24960716250, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
+  25603981395, // 2026-05-09 | Reason: not enough successful points on pareto
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([

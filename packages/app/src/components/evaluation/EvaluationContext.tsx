@@ -323,7 +323,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 
   useUrlStateSync(
     {
-      e_rundate: selectedRunDate !== globalRunDate ? selectedRunDate : '',
+      e_rundate: selectedRunDate === globalRunDate ? '' : selectedRunDate,
       e_bench: selectedBenchmark || '',
       e_hc: highContrast ? '1' : '',
       e_labels: showLabels ? '1' : '',

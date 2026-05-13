@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { getHardwareConfig } from '@/lib/constants';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
@@ -42,8 +42,6 @@ interface ThroughputBarChartProps {
   caption?: React.ReactNode;
   /** Optional color resolver — when provided, overrides static hardware config colors. */
   colorResolver?: (hwKey: string) => string;
-  /** Currently selected model — drives day-0 watermark for dsv4. */
-  selectedModel?: string;
 }
 
 /** Get the throughput value for the selected token type. */
@@ -356,7 +354,6 @@ export default function ThroughputBarChart({
   legendElement,
   caption,
   colorResolver,
-  selectedModel,
 }: ThroughputBarChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
 
@@ -576,7 +573,7 @@ export default function ThroughputBarChart({
       data={sortedResults}
       height={dynamicHeight}
       margin={dynamicMargin}
-      watermark={getModelWatermark(selectedModel)}
+      watermark={getChartWatermark()}
       testId="calculator-bar-chart"
       grabCursor
       clipContent={false}

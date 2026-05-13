@@ -262,13 +262,7 @@ export default function HistoricalTrendsDisplay() {
       </Card>
 
       {/* Chart card */}
-      {!hasInteractivityChart ? (
-        <Card>
-          <p className="text-muted-foreground text-sm">
-            No interactivity chart data available for the selected model and sequence.
-          </p>
-        </Card>
-      ) : (
+      {hasInteractivityChart ? (
         <section>
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
@@ -319,7 +313,6 @@ export default function HistoricalTrendsDisplay() {
                 yLabel={currentYLabel}
                 logScale={logScale}
                 selectedPrecisions={selectedPrecisions}
-                selectedModel={selectedModel}
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
@@ -389,6 +382,12 @@ export default function HistoricalTrendsDisplay() {
             </Card>
           </figure>
         </section>
+      ) : (
+        <Card>
+          <p className="text-muted-foreground text-sm">
+            No interactivity chart data available for the selected model and sequence.
+          </p>
+        </Card>
       )}
     </section>
   );

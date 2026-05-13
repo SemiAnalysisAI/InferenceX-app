@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   const requestedLimit = Math.trunc(Number(params.get('limit') ?? String(DEFAULT_LIMIT)));
   const limit = Math.min(MAX_LIMIT, Math.max(1, requestedLimit || DEFAULT_LIMIT));
 
-  if (!/^\d+$/.test(runId)) {
+  if (!/^\d+$/u.test(runId)) {
     return NextResponse.json({ error: 'run_id must be a positive integer' }, { status: 400 });
   }
   if (!task) {

@@ -35,7 +35,7 @@ export function hwToGpuKey(hw: string): string | null {
 const DB_MODEL_KEYS = new Set(Object.keys(DB_MODEL_TO_DISPLAY));
 
 /** Precision suffixes that can appear on `infmax_model_prefix` values. */
-const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/i;
+const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/iu;
 
 /** Explicit aliases for prefixes that don't match any DB key after suffix stripping. */
 const PREFIX_ALIASES: Record<string, string> = {
@@ -221,7 +221,7 @@ export function parseInt2(v: any): number | undefined {
  * @returns An object with `isl` and `osl` in tokens, or `null` if no match is found.
  */
 export function parseIslOsl(name: string): { isl: number; osl: number } | null {
-  const m = name.match(/[_-](\d+)k(\d+)k[_\-.]/i);
+  const m = name.match(/[_-](\d+)k(\d+)k[_\-.]/iu);
   if (!m) return null;
   return { isl: parseInt(m[1], 10) * 1024, osl: parseInt(m[2], 10) * 1024 };
 }

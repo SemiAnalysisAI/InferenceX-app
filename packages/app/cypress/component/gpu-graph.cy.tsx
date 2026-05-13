@@ -216,8 +216,8 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-line-labels svg .line-label')
       .invoke('text')
       .then((txt) => {
-        expect(txt.toLowerCase()).to.match(/h100|h 100/i);
-        expect(txt.toLowerCase()).to.match(/b200|b 200/i);
+        expect(txt.toLowerCase()).to.match(/h100|h 100/iu);
+        expect(txt.toLowerCase()).to.match(/b200|b 200/iu);
       });
     // Each label has the rounded background rect.
     cy.get('#test-gpu-line-labels svg .line-label .ll-bg').should('have.length', 2);

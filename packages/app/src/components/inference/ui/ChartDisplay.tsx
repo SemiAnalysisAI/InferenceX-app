@@ -186,7 +186,7 @@ export default function ChartDisplay() {
         const info = unofficialRunInfos[runIndexByUrl[url]];
         return info ? { branch: info.branch, url: info.url } : undefined;
       }
-      const idMatch = url.match(/\/runs\/(\d+)/);
+      const idMatch = url.match(/\/runs\/(\d+)/u);
       if (idMatch && idMatch[1] in runIndexByUrl) {
         const info = unofficialRunInfos[runIndexByUrl[idMatch[1]]];
         return info ? { branch: info.branch, url: info.url } : undefined;
@@ -681,7 +681,6 @@ export default function ChartDisplay() {
               yLabel={currentYLabel}
               logScale={logScale}
               selectedPrecisions={selectedPrecisions}
-              selectedModel={selectedModel}
             />
           </div>
           <div className="relative">
@@ -697,7 +696,6 @@ export default function ChartDisplay() {
               yLabel={currentXLabel}
               logScale={logScale}
               selectedPrecisions={selectedPrecisions}
-              selectedModel={selectedModel}
             />
           </div>
         </DialogContent>

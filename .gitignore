@@ -58,6 +58,9 @@
 **/cypress/screenshots/
 **/cypress/downloads/
 
+# playwright mcp artifacts (per-session snapshots/console logs)
+.playwright-mcp/
+
 # wsl shenanigans
 C:*
 .vercel

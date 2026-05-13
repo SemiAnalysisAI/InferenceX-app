@@ -22,17 +22,17 @@ export function buildScale(config: ScaleConfig, range: [number, number]): BuiltS
 
     case 'linear': {
       const s = d3.scaleLinear().domain(config.domain).range(range);
-      return config.nice !== false ? s.nice() : s;
+      return config.nice === false ? s : s.nice();
     }
 
     case 'log': {
       const l = d3.scaleLog().domain(config.domain).range(range);
-      return config.nice !== false ? l.nice() : l;
+      return config.nice === false ? l : l.nice();
     }
 
     case 'time': {
       const t = d3.scaleTime().domain(config.domain).range(range);
-      return config.nice !== false ? t.nice() : t;
+      return config.nice === false ? t : t.nice();
     }
   }
 }

@@ -151,7 +151,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
               <span style="font-size: 10px; color: ${vendorColor}; font-weight: 500;">${vendorLabel}</span>
             </div>
             <div style="color: var(--muted-foreground); font-size: 11px;">
-              <strong>${metric.label}:</strong> ${rawValue !== null ? rawValue.toLocaleString('en-US') : '—'} ${metric.unit}
+              <strong>${metric.label}:</strong> ${rawValue === null ? '—' : rawValue.toLocaleString('en-US')} ${metric.unit}
             </div>
           </div>`;
       },

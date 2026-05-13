@@ -56,20 +56,20 @@ describe('GPU_SPECS', () => {
 
   it('uses GB unit for memory', () => {
     for (const spec of GPU_SPECS) {
-      expect(spec.memory).toMatch(/GB$/);
+      expect(spec.memory).toMatch(/GB$/u);
     }
   });
 
   it('uses GB/s unit for scale-up bandwidth', () => {
     for (const spec of GPU_SPECS) {
-      expect(spec.scaleUpBandwidth).toMatch(/GB\/s$/);
+      expect(spec.scaleUpBandwidth).toMatch(/GB\/s$/u);
     }
   });
 
   it('uses Gbit/s unit for scale-out bandwidth', () => {
     for (const spec of GPU_SPECS) {
       if (spec.scaleOutBandwidth !== null) {
-        expect(spec.scaleOutBandwidth).toMatch(/Gbit\/s$/);
+        expect(spec.scaleOutBandwidth).toMatch(/Gbit\/s$/u);
       }
     }
   });
@@ -133,7 +133,7 @@ describe('GPU_SPECS', () => {
     const nvidiaGpus = GPU_SPECS.filter((s) => s.vendor === 'nvidia');
     expect(nvidiaGpus.length).toBe(6);
     for (const gpu of nvidiaGpus) {
-      expect(gpu.name).toMatch(/^(H|B|GB)/);
+      expect(gpu.name).toMatch(/^(H|B|GB)/u);
     }
   });
 
@@ -141,7 +141,7 @@ describe('GPU_SPECS', () => {
     const amdGpus = GPU_SPECS.filter((s) => s.vendor === 'amd');
     expect(amdGpus.length).toBe(3);
     for (const gpu of amdGpus) {
-      expect(gpu.name).toMatch(/^MI/);
+      expect(gpu.name).toMatch(/^MI/u);
     }
   });
 

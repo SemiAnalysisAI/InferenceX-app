@@ -305,7 +305,7 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toMatch(/i_active=h100(?:,|%2C)b200/);
+    expect(url).toMatch(/i_active=h100(?:,|%2C)b200/u);
     expect(url).not.toContain('e_active');
     expect(url).not.toContain('r_active');
   });
@@ -318,7 +318,7 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toMatch(/e_active=h100(?:,|%2C)b200/);
+    expect(url).toMatch(/e_active=h100(?:,|%2C)b200/u);
     expect(url).not.toContain('i_active');
     expect(url).not.toContain('r_active');
   });
@@ -331,7 +331,7 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toMatch(/r_active=dsr1(?:,|%2C)llama70b/);
+    expect(url).toMatch(/r_active=dsr1(?:,|%2C)llama70b/u);
     expect(url).not.toContain('i_active');
     expect(url).not.toContain('e_active');
   });
@@ -362,7 +362,7 @@ describe('buildShareUrl unofficialrun handling', () => {
 
     const url = buildShareUrl();
     // URLSearchParams encodes comma as %2C — accept either form.
-    expect(url).toMatch(/unofficialruns=111(?:,|%2C)222(?:,|%2C)333/);
+    expect(url).toMatch(/unofficialruns=111(?:,|%2C)222(?:,|%2C)333/u);
   });
 
   it('canonicalizes the singular alias "unofficialrun" to plural "unofficialruns"', async () => {
@@ -370,8 +370,8 @@ describe('buildShareUrl unofficialrun handling', () => {
     const { buildShareUrl } = await import('@/lib/url-state');
 
     const url = buildShareUrl();
-    expect(url).toMatch(/[?&]unofficialruns=/);
-    expect(url).not.toMatch(/[?&]unofficialrun=/);
+    expect(url).toMatch(/[?&]unofficialruns=/u);
+    expect(url).not.toMatch(/[?&]unofficialrun=/u);
   });
 
   it('preserves unofficialruns alongside other in-memory share params', async () => {

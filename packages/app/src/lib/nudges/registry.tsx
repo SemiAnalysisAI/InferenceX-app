@@ -10,8 +10,10 @@ import {
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
+import { FEEDBACK_SUBMITTED_EVENT, FeedbackForm } from '@/components/feedback-modal';
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
+import { FEEDBACK_ELIGIBLE_EVENT } from '@/lib/visit-tracking';
 import type { NudgeDefinition } from './types';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -154,7 +156,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     id: 'eval-samples',
     type: 'toast',
     trigger: { type: 'timer', delayMs: 1500 },
-    dismissal: { type: 'timed', durationMs: 7 * 24 * 60 * 60 * 1000 },
+    // Re-show every week so returning users see it again. Cadence runs from
+    // first show (or last suppress event), not from dismissal — matches the
+    // pre-refactor `EvalSamplesNudge` behavior.
+    dismissal: {
+      type: 'timed',
+      durationMs: 7 * 24 * 60 * 60 * 1000,
+      cooldownStartsOnShow: true,
+    },
     storageKey: 'inferencex-eval-samples-nudge-dismissed',
     permanentSuppressEvent: 'inferencex:eval-samples-opened',
     priority: 30,
@@ -170,6 +179,37 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     analytics: {
       shown: 'evaluation_samples_nudge_shown',
       dismissed: 'evaluation_samples_nudge_dismissed',
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Dashboard modals
+  // -------------------------------------------------------------------------
+  {
+    id: 'feedback-modal',
+    type: 'modal',
+    trigger: { type: 'event', event: FEEDBACK_ELIGIBLE_EVENT, delayMs: 2000 },
+    dismissal: {
+      type: 'timed',
+      durationMs: 90 * 24 * 60 * 60 * 1000,
+      cooldownStartsOnShow: true,
+    },
+    storageKey: 'inferencex-feedback-modal-snoozed',
+    permanentSuppressKey: 'inferencex-feedback-modal-submitted',
+    permanentSuppressEvent: FEEDBACK_SUBMITTED_EVENT,
+    priority: 5,
+    scope: 'dashboard',
+    content: {
+      icon: MessageSquareText,
+      iconClassName: 'text-brand',
+      title: 'Help us improve InferenceX',
+      description: "You're a regular! We'd love to hear what's working and what isn't.",
+      testId: 'feedback-modal',
+      renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
+    },
+    analytics: {
+      shown: 'feedback_modal_shown',
+      dismissed: 'feedback_modal_dismissed',
     },
   },
 
@@ -251,7 +291,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-dsv4-banner-dismissed',
+    storageKey: 'inferencex-dsv4-banner-dismissed-v2',
     priority: 60,
     scope: 'landing',
     content: {

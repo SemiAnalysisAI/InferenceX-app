@@ -178,7 +178,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         </table>
       </div>
       <p className="text-xs text-muted-foreground">
-        {filtered.length} config{filtered.length !== 1 ? 's' : ''} ·{' '}
+        {filtered.length} config{filtered.length === 1 ? '' : 's'} ·{' '}
         {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()} total datapoints
       </p>
     </div>

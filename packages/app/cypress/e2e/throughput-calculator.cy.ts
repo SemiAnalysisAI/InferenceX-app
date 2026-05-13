@@ -167,7 +167,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .value-label')
         .first()
         .invoke('text')
-        .should('match', /\d/);
+        .should('match', /\d/u);
     });
 
     // -------------------------------------------------------------------------
@@ -247,13 +247,13 @@ describe('TCO Calculator', () => {
           cy.get('td')
             .eq(1)
             .invoke('text')
-            .should('match', /\d+\.\d/);
+            .should('match', /\d+\.\d/u);
           cy.get('td')
             .eq(2)
             .invoke('text')
-            .should('match', /\$\d+\.\d/);
-          cy.get('td').eq(3).invoke('text').should('match', /\d+/);
-          cy.get('td').eq(4).invoke('text').should('match', /~\d+/);
+            .should('match', /\$\d+\.\d/u);
+          cy.get('td').eq(3).invoke('text').should('match', /\d+/u);
+          cy.get('td').eq(4).invoke('text').should('match', /~\d+/u);
         });
     });
 

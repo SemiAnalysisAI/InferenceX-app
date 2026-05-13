@@ -150,7 +150,7 @@ export function renderRadar<T>(
       const points: [number, number][] = [];
       for (let i = 0; i < numAxes; i++) {
         const val = getValue(d, i);
-        const r = val !== null ? val * radius : 0;
+        const r = val === null ? 0 : val * radius;
         points.push([cosAngles[i] * r, sinAngles[i] * r]);
       }
       points.push(points[0]); // close

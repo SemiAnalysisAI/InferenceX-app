@@ -38,7 +38,7 @@ export interface EvalArtifactConfig {
  * single zip; non-disagg artifacts encode a single conc value.
  */
 function artifactConcMatches(artifactName: string, targetConc: number): boolean {
-  const m = artifactName.match(/_conc(\d+(?:x\d+)*)_/);
+  const m = artifactName.match(/_conc(\d+(?:x\d+)*)_/u);
   if (!m) return false;
   return m[1].split('x').includes(String(targetConc));
 }
@@ -125,7 +125,7 @@ export async function fetchAndParseSamples(
   // lm-eval names samples files `samples_<task>_<timestamp>.jsonl`. There's
   // typically one per task; we filter by the requested task name only.
   extractZipEntries(buffer, '.jsonl', (entryName, contents) => {
-    const m = entryName.match(/(?:^|\/)samples_(.+?)_[^_]+\.jsonl$/);
+    const m = entryName.match(/(?:^|\/)samples_(.+?)_[^_]+\.jsonl$/u);
     if (!m) return [];
     if (m[1].toLowerCase() !== task.toLowerCase()) return [];
     collected.push(...mapEvalSamples(contents, tracker));

@@ -10,7 +10,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -119,7 +119,6 @@ const ScatterGraph = React.memo(
       toggleHwType,
       removeHwType,
       hwTypesWithData,
-      selectedModel,
       selectedPrecisions,
       selectedYAxisMetric,
       availableRuns,
@@ -530,7 +529,9 @@ const ScatterGraph = React.memo(
           .selectAll<SVGGElement, InferenceData>('.dot-group')
           .transition('legend-hover')
           .duration(150)
-          .style('opacity', (d) => (!isPointVisible(d) ? 0 : String(d.hwKey) === hwKey ? 1 : 0.15));
+          .style('opacity', (d) =>
+            isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
+          );
         root
           .selectAll<SVGPathElement, unknown>('.roofline-path')
           .transition('legend-hover')
@@ -1897,7 +1898,7 @@ const ScatterGraph = React.memo(
         chartId={chartId}
         data={chartScaleData}
         margin={CHART_MARGIN}
-        watermark={getModelWatermark(selectedModel, isUnofficialRun)}
+        watermark={getChartWatermark(isUnofficialRun)}
         testId="scatter-graph"
         grabCursor={true}
         caption={caption}
@@ -2007,8 +2008,9 @@ const ScatterGraph = React.memo(
               track('latency_legend_expanded', { expanded });
             }}
             switches={[
-              ...(selectedYAxisMetric !== 'y_inputTputPerGpu'
-                ? [
+              ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                ? []
+                : [
                     {
                       id: 'scatter-log-scale',
                       label: 'Log Scale',
@@ -2018,8 +2020,7 @@ const ScatterGraph = React.memo(
                         track('latency_log_scale_toggled', { enabled: checked });
                       },
                     },
-                  ]
-                : []),
+                  ]),
               {
                 id: 'scatter-hide-non-optimal',
                 label: 'Optimal Only',

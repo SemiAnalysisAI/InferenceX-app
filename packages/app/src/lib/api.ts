@@ -257,3 +257,17 @@ export function fetchEvalSamplesLive(
 export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
+
+export interface FeedbackListRow {
+  id: string;
+  created_at: string;
+  doing_well_ciphertext: string | null;
+  doing_poorly_ciphertext: string | null;
+  want_to_see_ciphertext: string | null;
+  user_agent_ciphertext: string | null;
+  page_path_ciphertext: string | null;
+}
+
+export function fetchFeedbackList(signal?: AbortSignal) {
+  return fetchJson<{ rows: FeedbackListRow[] }>('/api/v1/feedback/list', signal);
+}

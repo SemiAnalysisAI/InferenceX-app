@@ -33,7 +33,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
           h100: { power: 1.73, costh: 2.8, costn: 1.4, costr: 0.7 },
           b200: { power: 2.17, costh: 3.5, costn: 1.75, costr: 0.88 },
         };
-      const base = key.split(/[-_]/)[0];
+      const base = key.split(/[-_]/u)[0];
       return specs[base] ?? { power: 1.73, costh: 2.8, costn: 1.4, costr: 0.7 };
     }),
   };

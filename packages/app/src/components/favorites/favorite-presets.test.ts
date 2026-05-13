@@ -110,7 +110,7 @@ describe('subtractMonths', () => {
   it('handles month-end overflow (Mar 31 - 1 month)', () => {
     // March 31 minus 1 month: Feb has no 31st, JS Date rolls to Mar 3
     const result = subtractMonths('2025-03-31', 1);
-    expect(result).toMatch(/^2025-0[23]-/);
+    expect(result).toMatch(/^2025-0[23]-/u);
   });
 
   it('returns same date for 0 months', () => {
@@ -118,7 +118,7 @@ describe('subtractMonths', () => {
   });
 
   it('returns YYYY-MM-DD format', () => {
-    expect(subtractMonths('2025-06-15', 3)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(subtractMonths('2025-06-15', 3)).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
   });
 });
 

@@ -305,7 +305,7 @@ export function InferenceProvider({
   const presetGuardRef = useRef(false);
   const clearPresetOnChange = useCallback(() => {
     if (presetGuardRef.current) return;
-    setActivePresetId((prev) => (prev !== null ? null : prev));
+    setActivePresetId((prev) => (prev === null ? prev : null));
     presetHwFilterRef.current = null;
   }, []);
   const setSelectedModelAndClear = useCallback(
@@ -641,9 +641,9 @@ export function InferenceProvider({
   }, [allDateIds, setActiveDates]);
 
   useEffect(() => {
-    if (selectedYAxisMetric !== 'y_costUser') setUserCosts((prev) => (prev !== null ? null : prev));
+    if (selectedYAxisMetric !== 'y_costUser') setUserCosts((prev) => (prev === null ? prev : null));
     if (selectedYAxisMetric !== 'y_powerUser')
-      setUserPowers((prev) => (prev !== null ? null : prev));
+      setUserPowers((prev) => (prev === null ? prev : null));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
 
   const modelPrefixes = useMemo(

@@ -2,7 +2,7 @@
 import * as d3 from 'd3';
 import { describe, it, expect } from 'vitest';
 
-import { createDay0Watermark, createLogoWatermark, createUnofficialWatermark } from './watermark';
+import { createLogoWatermark, createUnofficialWatermark } from './watermark';
 
 function makeSvg() {
   const svg = d3.create('svg:svg') as unknown as d3.Selection<
@@ -209,46 +209,5 @@ describe('createUnofficialWatermark', () => {
     // The watermark rect should be inserted before defs (first child)
     const firstChild = svg.select(':first-child');
     expect(firstChild.attr('class')).toBe('watermark-rect');
-  });
-});
-
-describe('createDay0Watermark', () => {
-  const margin = { top: 20, right: 30, bottom: 40, left: 50 };
-  const innerWidth = 720;
-  const innerHeight = 540;
-
-  it('creates a diagonal pattern with id "day0-pattern-{chartId}"', () => {
-    const { svg, defs } = makeSvg();
-    createDay0Watermark(svg, defs, innerWidth, innerHeight, margin, 'test');
-
-    const pattern = defs.select('#day0-pattern-test');
-    expect(pattern.empty()).toBe(false);
-    expect(pattern.attr('patternUnits')).toBe('userSpaceOnUse');
-    expect(pattern.attr('patternTransform')).toBe('rotate(-45)');
-  });
-
-  it('renders the "EXPERIMENTAL - DAY ZERO" label in blue', () => {
-    const { svg, defs } = makeSvg();
-    createDay0Watermark(svg, defs, innerWidth, innerHeight, margin, 'test');
-
-    const text = defs.select('#day0-pattern-test text');
-    expect(text.empty()).toBe(false);
-    expect(text.text()).toBe('EXPERIMENTAL - DAY ZERO');
-    expect(text.attr('fill')).toBe('#2563eb');
-    expect(text.attr('font-weight')).toBe('bold');
-    expect(text.attr('opacity')).toBe('0.15');
-  });
-
-  it('inserts a watermark rect masked to the inner chart area', () => {
-    const { svg, defs } = makeSvg();
-    createDay0Watermark(svg, defs, innerWidth, innerHeight, margin, 'test');
-
-    const rect = svg.select('.watermark-rect');
-    expect(rect.empty()).toBe(false);
-    expect(rect.attr('fill')).toBe('url(#day0-pattern-test)');
-    expect(Number(rect.attr('x'))).toBe(margin.left);
-    expect(Number(rect.attr('y'))).toBe(margin.top);
-    expect(Number(rect.attr('width'))).toBe(innerWidth);
-    expect(Number(rect.attr('height'))).toBe(innerHeight);
   });
 });

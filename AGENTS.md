@@ -172,6 +172,28 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 3. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
 4. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
 
+### Bumping dependencies
+
+Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit each step separately so failures are easy to bisect.
+
+1. **Bump versions**: `pnpm taze -I -r latest` (interactive, all workspaces). Approve what you want, skip what you don't.
+2. **Resolve install errors**:
+   - `ERR_PNPM_IGNORED_BUILDS` after a pnpm major bump means new `allowBuilds` entries in `pnpm-workspace.yaml` were left as placeholder strings — set them to `true` (or `false` if you don't want the build script to run).
+   - pnpm 11 moved `pnpm.overrides` from `package.json` to `pnpm-workspace.yaml`. Overrides left in `package.json` are silently ignored. Migrate them.
+3. **Audit security**: `pnpm security` (runs `pnpm audit && audit-ci`). For each remaining vulnerability, add a targeted override in `pnpm-workspace.yaml`:
+
+   ```yaml
+   overrides:
+     <pkg>@<vulnerable-range>: '>=<min-patched-version>'
+   ```
+
+   - **Use the lowest patched version** (e.g. `>=8.5.10`, not `>=8.5.14`). pnpm resolves to the highest available that satisfies the constraint, so we automatically get the latest patch — and the override doesn't go stale when 8.5.15 ships.
+   - **Use the narrow `<vulnerable-range>` selector** (not bare `<pkg>:`) so the override only fires on vulnerable resolutions and doesn't disturb pins already on safe versions.
+   - **Verify minimum set**: drop any override that doesn't map to a current advisory. Test by removing it and re-running `pnpm security`.
+
+4. **Fix lint/format**: `pnpm lint:fix && pnpm fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `require-unicode-regexp`, `unicorn/no-negated-condition`) — fix manually. For mechanical bulk changes, delegate to a subagent and verify with `pnpm typecheck`.
+5. **Final check**: `pnpm lint && pnpm fmt && pnpm typecheck && pnpm security` all pass. Pre-commit hook reruns these.
+
 ## Subsystem Docs
 
 Detailed design rationale (the "why" and "how", not the "what") lives in [docs/](./docs/index.md):

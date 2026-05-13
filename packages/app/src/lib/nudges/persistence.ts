@@ -21,7 +21,15 @@ export function isDismissed(storageKey: string, strategy: NudgeDismissal): boole
   }
 }
 
-export function markDismissed(storageKey: string, strategy: NudgeDismissal): void {
+/**
+ * Low-level primitive: write the cooldown anchor for a strategy.
+ * Session → sessionStorage flag. Permanent → localStorage flag. Timed →
+ * localStorage timestamp.
+ *
+ * Both `markShown` and `markDismissed` go through this; their difference is
+ * *when* they call it, not *what* they write.
+ */
+function writeCooldownAnchor(storageKey: string, strategy: NudgeDismissal): void {
   try {
     if (strategy.type === 'session') {
       sessionStorage.setItem(storageKey, '1');
@@ -33,6 +41,32 @@ export function markDismissed(storageKey: string, strategy: NudgeDismissal): voi
   } catch {
     // Storage unavailable — fail silently.
   }
+}
+
+/**
+ * Persist that a nudge was shown. Writes only for strategies whose cooldown
+ * begins at show time:
+ *   - `session` — keeps the toast from re-appearing on subsequent page loads
+ *     in the same tab.
+ *   - `timed` with `cooldownStartsOnShow: true` — starts the every-N reminder
+ *     cycle.
+ *
+ * For `permanent` and plain `timed` strategies this is a no-op; those wait
+ * for an explicit user dismissal before persisting anything.
+ */
+export function markShown(storageKey: string, strategy: NudgeDismissal): void {
+  if (strategy.type === 'session' || (strategy.type === 'timed' && strategy.cooldownStartsOnShow)) {
+    writeCooldownAnchor(storageKey, strategy);
+  }
+}
+
+/**
+ * Persist that the user dismissed (or actioned) a nudge. Always writes,
+ * regardless of strategy — user-initiated dismissals always anchor the
+ * cooldown.
+ */
+export function markDismissed(storageKey: string, strategy: NudgeDismissal): void {
+  writeCooldownAnchor(storageKey, strategy);
 }
 
 export function clearDismissal(storageKey: string, strategy: NudgeDismissal): void {

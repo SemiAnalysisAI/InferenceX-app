@@ -48,7 +48,7 @@ describe('First-load navigation', () => {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.removeItem('inferencex-star-modal-dismissed');
         win.localStorage.removeItem('inferencex-dsv4-modal-dismissed');
-        win.localStorage.removeItem('inferencex-dsv4-banner-dismissed');
+        win.localStorage.removeItem('inferencex-dsv4-banner-dismissed-v2');
       },
     });
 

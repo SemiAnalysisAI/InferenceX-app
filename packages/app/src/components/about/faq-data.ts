@@ -34,7 +34,7 @@ const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((acc, key) =
 const modelNames = Object.values(DB_MODEL_TO_DISPLAY);
 
 const frameworkNames = [...new Set(Object.values(FRAMEWORK_LABELS))].map((n) =>
-  n.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/, ''),
+  n.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
 );
 
 const supporterOrgs = CAROUSEL_ORGS.map((org) => CAROUSEL_LABELS[org] ?? org);

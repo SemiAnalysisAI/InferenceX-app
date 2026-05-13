@@ -177,7 +177,7 @@ export const TopologyDiagram = forwardRef<
  */
 function abbreviateNic(nic: string): [string, string] {
   // Split on first space that separates model name from port spec
-  const parts = nic.replace('ConnectX-', 'CX-').split(/\s+/);
+  const parts = nic.replace('ConnectX-', 'CX-').split(/\s+/u);
   if (parts.length >= 2) {
     return [parts[0], parts.slice(1).join(' ')];
   }
@@ -186,13 +186,13 @@ function abbreviateNic(nic: string): [string, string] {
 
 /** Check if a NIC string indicates dual-port (2x prefix) */
 function isDualPortNic(nic: string): boolean {
-  return /\b2x\d+/.test(nic);
+  return /\b2x\d+/u.test(nic);
 }
 
 /** Abbreviate switch model names for compact display */
 function abbreviateSwitch(sw: string): string {
   return sw
-    .replace(/^\d+\.?\d*T\s*/, '') // Remove capacity prefix
+    .replace(/^\d+\.?\d*T\s*/u, '') // Remove capacity prefix
     .replace('Arista Tomahawk4 ', 'TH4 ')
     .replace('Arista Tomahawk5 ', 'TH5 ')
     .replace('NVIDIA Quantum-2 ', 'Q-2 ')
@@ -408,7 +408,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
       .attr('aria-label', `${spec.name} ${spec.scaleOutTopology} scale-out topology diagram`);
 
     // Add background logo watermark
-    const patternId = `logo-scaleout-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+    const patternId = `logo-scaleout-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
     svg
       .append('defs')
       .append('pattern')
@@ -737,7 +737,16 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
     }
 
     // Legend labels
-    if (!compact) {
+    if (compact) {
+      svg
+        .append('text')
+        .attr('x', totalW / 2)
+        .attr('y', viewBoxH - 4)
+        .attr('text-anchor', 'middle')
+        .attr('class', 'fill-muted-foreground')
+        .style('font-size', '7px')
+        .html(`${leafShort} (leaf) &middot; ${spineShort} (spine)`);
+    } else {
       svg
         .append('text')
         .attr('x', totalW / 2)
@@ -754,15 +763,6 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
         .attr('class', 'fill-muted-foreground')
         .style('font-size', smallFontSize)
         .html(`Leaf: ${leafShort} &middot; NIC: ${nicLine1} ${nicLine2}`);
-    } else {
-      svg
-        .append('text')
-        .attr('x', totalW / 2)
-        .attr('y', viewBoxH - 4)
-        .attr('text-anchor', 'middle')
-        .attr('class', 'fill-muted-foreground')
-        .style('font-size', '7px')
-        .html(`${leafShort} (leaf) &middot; ${spineShort} (spine)`);
     }
 
     return () => {
