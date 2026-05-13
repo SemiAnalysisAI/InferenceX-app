@@ -51,7 +51,9 @@ describe('Inference Replay', () => {
         return;
       }
       cy.get('[data-testid="replay-scrubber"]').should('exist');
-      cy.get('[data-testid="replay-speed-1x"]').should('exist');
+      // The speed trigger is always present; individual SelectItems are only
+      // mounted in the Radix portal while the dropdown is open.
+      cy.get('[data-testid="replay-speed-select"]').should('exist');
       cy.get('[data-testid="replay-export-mp4"]').should('exist');
 
       // Play, then pause, and confirm the button toggles label.
@@ -60,11 +62,12 @@ describe('Inference Replay', () => {
     });
   });
 
-  it('closes the modal via the dialog close button', () => {
+  it('closes the modal', () => {
     cy.get('body').then(($body) => {
       if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      // shadcn Dialog renders an X button inside the dialog content.
-      cy.get('[data-testid^="replay-dialog-"]').find('button').first().click();
+      // Radix Dialog closes on Escape — more robust than picking the X by DOM
+      // order now that the panel contains its own buttons (Play, Reset, …).
+      cy.get('body').type('{esc}');
       cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
     });
   });
