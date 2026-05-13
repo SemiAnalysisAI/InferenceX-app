@@ -74,6 +74,7 @@ const TAB_LINKS = [
   { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart', gated: true },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics', gated: true },
   { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions', gated: true },
+  { href: '/feedback', label: 'Feedback', testId: 'tab-trigger-feedback', gated: true },
 ] as const;
 
 const TAB_VALUES = new Set(TAB_LINKS.map((t) => t.href.slice(1)));
