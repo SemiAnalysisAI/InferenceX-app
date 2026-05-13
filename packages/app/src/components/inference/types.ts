@@ -347,6 +347,12 @@ export interface ScatterGraphProps {
    * on top of the official chart data with a distinct visual style (triangles).
    */
   overlayData?: OverlayData;
+  /**
+   * D3 transition duration in ms used when data or scales change. Defaults to
+   * the regular interactive value (750). The replay panel passes 0 so frames
+   * snap to interpolated positions instead of fighting a 750ms tween.
+   */
+  transitionDuration?: number;
 }
 /**
  * @file types.ts

@@ -112,6 +112,7 @@ const ScatterGraph = React.memo(
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
+    transitionDuration = 750,
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
@@ -1909,7 +1910,7 @@ const ScatterGraph = React.memo(
         layers={layers}
         zoom={zoomConfig}
         tooltip={tooltipConfig}
-        transitionDuration={750}
+        transitionDuration={transitionDuration}
         onRender={onRender}
         noDataOverlay={
           filteredData.length === 0 && processedOverlayData.length === 0 ? (

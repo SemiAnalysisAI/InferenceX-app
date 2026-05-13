@@ -1,9 +1,12 @@
-import type { ReplayController } from './ReplayController';
-
 interface ExportOptions {
   /** DOM id of the replay panel root to capture each frame. */
   captureRootId: string;
-  controller: ReplayController;
+  /**
+   * Advance the replay to the given fraction [0, 1] and resolve once the new
+   * frame has been painted. Called once per output frame. The caller is
+   * responsible for flushing React state and waiting for paint.
+   */
+  renderFrame: (fraction: number) => Promise<void>;
   fileName: string;
   fps?: number;
   durationSec?: number;
@@ -111,16 +114,6 @@ function expandLegendForExport(cloneRoot: HTMLElement) {
 const skipNoExport = (node: Node) =>
   !((node as Element).classList && (node as Element).classList.contains('no-export'));
 
-function waitTwoFrames(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        resolve();
-      });
-    });
-  });
-}
-
 /** Draw the panel canvas onto a slightly taller canvas with an InferenceX watermark bar. */
 function drawWithWatermark(
   source: HTMLCanvasElement,
@@ -169,7 +162,7 @@ interface MuxerLike {
 export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   const {
     captureRootId,
-    controller,
+    renderFrame,
     fileName,
     fps = 30,
     durationSec = 6,
@@ -188,8 +181,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     import('mp4-muxer'),
     import('@jpinsonneau/html-to-image'),
   ]);
-
-  controller.pause();
 
   // Off-screen host: kept positioned far off-canvas (not display:none, because
   // html-to-image needs computed styles to be available).
@@ -221,12 +212,10 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   try {
     for (let i = 0; i < totalFrames; i++) {
       const t = totalFrames === 1 ? 1 : i / (totalFrames - 1);
-      controller.renderFrame(t);
-      await waitTwoFrames();
+      await renderFrame(t);
 
-      // Per-frame clone: the controller mutates dot positions and the
-      // replay-roofline-layer paths in place on the live SVG, so a deep clone
-      // each frame captures the current state.
+      // Per-frame clone: React commits new dot positions on the live SVG, so a
+      // deep clone each frame captures the current state.
       host.replaceChildren();
       const clone = livePanel.cloneNode(true) as HTMLElement;
       clone.removeAttribute('id');
