@@ -190,8 +190,10 @@ export type YAxisMetricKey =
  * @property {string} y_label - The label for the y-axis.
  * @property {'up' | 'down'} roofline - Specifies the direction of the roofline calculation (e.g., "up" for higher is better, "down" for lower is better).
  */
+export type InferenceChartType = 'e2e' | 'interactivity';
+
 export interface ChartDefinition {
-  chartType: string;
+  chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
   x_label: string;
