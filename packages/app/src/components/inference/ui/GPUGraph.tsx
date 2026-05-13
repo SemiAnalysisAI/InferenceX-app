@@ -72,6 +72,7 @@ const GPUGraph = React.memo(
       selectAllActiveDates,
       showLineLabels,
       setShowLineLabels,
+      openReproduceDrawer,
     } = useInference();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
@@ -691,6 +692,18 @@ const GPUGraph = React.memo(
               sel.select('.visible-shape') as any,
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
+          onPointClick: (d: InferenceData) => {
+            const tooltipEl = chartRef.current?.getTooltipElement();
+            if (!tooltipEl) return;
+            const reproduceBtn = tooltipEl.querySelector('[data-action="reproduce"]');
+            if (!reproduceBtn) return;
+            reproduceBtn.addEventListener('click', (btnEvent) => {
+              btnEvent.stopPropagation();
+              openReproduceDrawer(d, 'gpu_graph_tooltip');
+              chartRef.current?.dismissTooltip();
+              chartRef.current?.hideTooltip();
+            });
+          },
           attachToLayer: 1,
         }}
         onRender={(ctx: RenderContext) => {

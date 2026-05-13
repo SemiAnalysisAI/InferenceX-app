@@ -48,7 +48,10 @@ import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
+import ReproduceDrawer from './ReproduceDrawer';
 import TrendChart from './TrendChart';
+
+import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
   ssr: false,
@@ -149,7 +152,14 @@ export default function ChartDisplay() {
     activeHwTypes,
     activeDates,
     setSelectedE2eXAxisMetric,
+    reproducePoint,
+    closeReproduceDrawer,
   } = useInference();
+
+  const reproduceSequence = useMemo(
+    () => (selectedSequence ? sequenceToIslOsl(selectedSequence) : null) ?? undefined,
+    [selectedSequence],
+  );
 
   const {
     changelogs,
@@ -682,6 +692,13 @@ export default function ChartDisplay() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ReproduceDrawer
+        point={reproducePoint}
+        sequence={reproduceSequence}
+        model={selectedModel}
+        onClose={closeReproduceDrawer}
+      />
     </div>
   );
 }
