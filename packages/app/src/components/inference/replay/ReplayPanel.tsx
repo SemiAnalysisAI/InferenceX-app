@@ -141,6 +141,19 @@ export default function ReplayPanel({
 
   const prefersReducedMotion = useReducedMotion();
 
+  // Pre-flight feature detection so the Export button is disabled with a clear
+  // reason on browsers that lack WebCodecs (Firefox today, older Safari).
+  const hasWebCodecs = useMemo(() => typeof VideoEncoder !== 'undefined', []);
+  const unavailableReportedRef = useRef(false);
+  useEffect(() => {
+    if (!hasWebCodecs && !unavailableReportedRef.current) {
+      unavailableReportedRef.current = true;
+      track('inference_replay_export_unavailable', {
+        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
+      });
+    }
+  }, [hasWebCodecs]);
+
   const speedRef = useRef(speed);
   speedRef.current = speed;
   const playingRef = useRef(playing);
@@ -291,7 +304,6 @@ export default function ReplayPanel({
     setExportProgress(0);
     setExportError(null);
     const startedAt = performance.now();
-    const hasWebCodecs = typeof VideoEncoder !== 'undefined';
     track('inference_replay_export_started', {
       model: selectedModel,
       chartType: chartDefinition.chartType,
@@ -354,7 +366,7 @@ export default function ReplayPanel({
       setIsExporting(false);
       setExportProgress(null);
     }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline]);
+  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
 
   if (history.isLoading || !timeline) {
     return (
@@ -481,9 +493,14 @@ export default function ReplayPanel({
           size="sm"
           variant="default"
           onClick={handleExportMp4}
-          disabled={isExporting}
+          disabled={isExporting || !hasWebCodecs}
           data-testid="replay-export-mp4"
           className="gap-1"
+          title={
+            hasWebCodecs
+              ? undefined
+              : 'MP4 export requires a Chromium-based browser (Chrome, Edge).'
+          }
         >
           <Video className="size-4" />
           {isExporting
