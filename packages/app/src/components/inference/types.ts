@@ -353,6 +353,13 @@ export interface ScatterGraphProps {
    * snap to interpolated positions instead of fighting a 750ms tween.
    */
   transitionDuration?: number;
+  /**
+   * Apply `.nice()` to x/y scale domains. Defaults to true. Replay disables
+   * this so the domain endpoints shift continuously between frames instead of
+   * snapping to rounded tick values (which produces visible "jumps" mid
+   * playback).
+   */
+  niceAxes?: boolean;
 }
 /**
  * @file types.ts

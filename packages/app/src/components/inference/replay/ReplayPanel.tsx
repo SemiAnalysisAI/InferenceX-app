@@ -309,6 +309,7 @@ export default function ReplayPanel({
           yLabel={yLabel}
           chartDefinition={chartDefinition}
           transitionDuration={0}
+          niceAxes={false}
         />
         <div
           className="absolute -translate-y-full pointer-events-none text-2xl font-bold tabular-nums opacity-85 leading-none pb-1"
