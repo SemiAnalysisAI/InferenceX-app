@@ -12,6 +12,8 @@ interface ExportOptions {
   durationSec?: number;
   bitrate?: number;
   onProgress?: (fraction: number) => void;
+  /** Aborting before completion throws an AbortError without writing the file. */
+  signal?: AbortSignal;
 }
 
 const CSS_VAR_RE = /var\(--([^)]+)\)/u;
@@ -142,7 +144,16 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     durationSec = 6,
     bitrate = 6_000_000,
     onProgress,
+    signal,
   } = opts;
+
+  const throwIfAborted = () => {
+    if (signal?.aborted) {
+      const err = new Error('Export cancelled');
+      err.name = 'AbortError';
+      throw err;
+    }
+  };
 
   if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
     throw new TypeError('WebCodecs is not available in this browser. Try Chrome.');
@@ -192,6 +203,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
 
   try {
     for (let i = 0; i < totalFrames; i++) {
+      throwIfAborted();
       if (encoderError !== null) {
         // oxlint-disable-next-line no-throw-literal
         throw encoderError;

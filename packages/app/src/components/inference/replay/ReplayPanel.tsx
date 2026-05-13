@@ -138,6 +138,7 @@ export default function ReplayPanel({
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
 
@@ -297,12 +298,18 @@ export default function ReplayPanel({
     setPlaying(false);
   }, []);
 
+  const handleCancelExport = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
   const handleExportMp4 = useCallback(async () => {
     if (!timeline) return;
     setPlaying(false);
     setIsExporting(true);
     setExportProgress(0);
     setExportError(null);
+    const ac = new AbortController();
+    abortRef.current = ac;
     const startedAt = performance.now();
     track('inference_replay_export_started', {
       model: selectedModel,
@@ -326,6 +333,7 @@ export default function ReplayPanel({
         captureRoot: root,
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
         durationSec,
+        signal: ac.signal,
         renderFrame: async (t) => {
           // flushSync forces React to commit synchronously; two RAFs let the
           // browser paint before the capture step reads back the DOM.
@@ -345,6 +353,16 @@ export default function ReplayPanel({
         durationMs: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
+      if (ac.signal.aborted) {
+        track('inference_replay_export_cancelled', {
+          model: selectedModel,
+          chartType: chartDefinition.chartType,
+          frameCount,
+          stage,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+        return;
+      }
       console.error('MP4 export failed', error);
       const message = error instanceof Error ? error.message : 'Export failed.';
       const errorName = error instanceof Error ? error.name : 'unknown';
@@ -365,6 +383,7 @@ export default function ReplayPanel({
     } finally {
       setIsExporting(false);
       setExportProgress(null);
+      abortRef.current = null;
     }
   }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
 
@@ -509,6 +528,17 @@ export default function ReplayPanel({
               : `Exporting ${Math.round(exportProgress * 100)}%`
             : 'Export MP4'}
         </Button>
+        {isExporting && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCancelExport}
+            data-testid="replay-export-cancel"
+            className="pointer-events-auto"
+          >
+            Cancel
+          </Button>
+        )}
       </div>
       {exportError && (
         <div
