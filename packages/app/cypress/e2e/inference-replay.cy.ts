@@ -62,6 +62,66 @@ describe('Inference Replay', () => {
     });
   });
 
+  it('advances the date overlay and scrubber when Play is pressed', () => {
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="replay-play-pause"]').length === 0) {
+        cy.log('Replay history fixture has < 2 dates; skipping animation check');
+        return;
+      }
+      cy.get('[data-testid="replay-scrubber"]')
+        .invoke('val')
+        .then((startVal) => {
+          cy.get('[data-testid="replay-date-overlay"]')
+            .invoke('text')
+            .then((startDate) => {
+              cy.get('[data-testid="replay-play-pause"]').click();
+              cy.wait(800);
+              cy.get('[data-testid="replay-play-pause"]').click();
+              cy.get('[data-testid="replay-scrubber"]')
+                .invoke('val')
+                .should((endVal) => {
+                  expect(Number(endVal)).to.be.greaterThan(Number(startVal));
+                });
+              cy.get('[data-testid="replay-date-overlay"]')
+                .invoke('text')
+                .should((endDate) => {
+                  expect(endDate).not.to.equal(startDate);
+                });
+            });
+        });
+    });
+  });
+
+  it('re-renders the replay frame when a parent-chart toggle changes', () => {
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
+      // Capture the SVG path data for the first roofline as a stable signature.
+      cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline')
+        .first()
+        .invoke('attr', 'd')
+        .then((beforeD) => {
+          // Toggle the log-scale setting in the underlying inference context —
+          // the replay panel shares state with the parent chart, so the chart
+          // re-renders without us touching the replay UI.
+          cy.window().then((win) => {
+            const url = new URL(win.location.href);
+            const cur = url.searchParams.get('i_log') === '1';
+            url.searchParams.set('i_log', cur ? '0' : '1');
+            win.history.replaceState(null, '', url.toString());
+            // Dispatch a popstate so InferenceContext picks up the change.
+            win.dispatchEvent(new win.PopStateEvent('popstate'));
+          });
+          cy.wait(400);
+          cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline')
+            .first()
+            .invoke('attr', 'd')
+            .should((afterD) => {
+              expect(afterD).not.to.equal(beforeD);
+            });
+        });
+    });
+  });
+
   it('closes the modal', () => {
     cy.get('body').then(($body) => {
       if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
