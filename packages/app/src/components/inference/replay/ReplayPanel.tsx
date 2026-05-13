@@ -220,10 +220,10 @@ export default function ReplayPanel({
     });
     try {
       const { exportReplayMp4 } = await import('./exportMp4');
-      // Output duration tracks current playback speed: 1× → ~spanMs, 2× → half,
-      // 0.25× → 4×. Capped at 60 s so extreme settings don't produce 100+ MB
-      // files.
-      const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / speed / 1000));
+      // Export duration is deterministic from timeline length, NOT playback speed
+      // — the MP4 is an artifact of the dataset, not a recording of the current
+      // UI session. Capped at 60s.
+      const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
       const root = panelRef.current;
       if (!root) throw new Error('Replay panel element is not mounted.');
       await exportReplayMp4({
@@ -255,7 +255,7 @@ export default function ReplayPanel({
       setIsExporting(false);
       setExportProgress(null);
     }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, speed, timeline]);
+  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline]);
 
   if (history.isLoading || !timeline) {
     return (
