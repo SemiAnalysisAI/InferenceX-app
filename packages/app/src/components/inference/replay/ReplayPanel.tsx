@@ -64,6 +64,7 @@ export default function ReplayPanel({
     hideNonOptimal,
     hidePointLabels,
     useAdvancedLabels,
+    showLineLabels,
   } = inference;
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
@@ -104,6 +105,7 @@ export default function ReplayPanel({
   const selectedPrecisionsRef = useRef(selectedPrecisions);
   const hidePointLabelsRef = useRef(hidePointLabels);
   const useAdvancedLabelsRef = useRef(useAdvancedLabels);
+  const showLineLabelsRef = useRef(showLineLabels);
   const getColorRef = useRef(getColor);
   activeHwTypesRef.current = activeHwTypes;
   hideNonOptimalRef.current = hideNonOptimal;
@@ -111,6 +113,7 @@ export default function ReplayPanel({
   selectedPrecisionsRef.current = selectedPrecisions;
   hidePointLabelsRef.current = hidePointLabels;
   useAdvancedLabelsRef.current = useAdvancedLabels;
+  showLineLabelsRef.current = showLineLabels;
   getColorRef.current = getColor;
 
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -191,6 +194,8 @@ export default function ReplayPanel({
       selectedPrecisions: () => selectedPrecisionsRef.current,
       hidePointLabels: () => hidePointLabelsRef.current,
       useAdvancedLabels: () => useAdvancedLabelsRef.current,
+      showLineLabels: () => showLineLabelsRef.current,
+      chartType: chartDefinition.chartType === 'e2e' ? 'e2e' : 'interactivity',
       onFrame: (date, frac) => {
         setCurrentDate(date);
         setFraction(frac);
@@ -225,6 +230,7 @@ export default function ReplayPanel({
     logScale,
     hidePointLabels,
     useAdvancedLabels,
+    showLineLabels,
     selectedPrecisions,
   ]);
 

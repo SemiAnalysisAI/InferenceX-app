@@ -7,7 +7,9 @@ import {
   paretoFrontUpperLeft,
   paretoFrontUpperRight,
 } from '@/lib/chart-utils';
+import { getHardwareConfig } from '@/lib/constants';
 import { createLogoWatermark } from '@/lib/d3-chart/watermark';
+import { getDisplayLabel } from '@/lib/utils';
 
 import type { InferenceData } from '@/components/inference/types';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
@@ -51,6 +53,10 @@ export interface ReplayControllerOptions {
   hidePointLabels: () => boolean;
   /** Use the longer TEP/EP/DPAEP label format vs. plain TP. */
   useAdvancedLabels: () => boolean;
+  /** Whether to render per-roofline hw labels along each line. Read every tick. */
+  showLineLabels: () => boolean;
+  /** Used by the line-label placement algorithm to pick interactivity-vs-endpoint style. */
+  chartType: 'e2e' | 'interactivity';
   /** Throttled ~10 Hz callback with the current observed-date label, fraction-of-playback, and step index. */
   onFrame?: (currentDate: string, fraction: number, stepIndex: number) => void;
   /** Fired once when playback reaches the end. */
@@ -106,6 +112,7 @@ export class ReplayController {
   private yAxisGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
   private rooflinesGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
   private dotsGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private lineLabelsGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
   private dateOverlay: d3.Selection<SVGTextElement, unknown, null, undefined>;
   private configs: MutableConfig[];
   private fraction = 0;
@@ -187,6 +194,7 @@ export class ReplayController {
     const zoomGroup = this.rootGroup.append('g').attr('clip-path', `url(#${clipId})`);
     this.rooflinesGroup = zoomGroup.append('g').attr('class', 'rooflines');
     this.dotsGroup = zoomGroup.append('g').attr('class', 'dots');
+    this.lineLabelsGroup = zoomGroup.append('g').attr('class', 'line-labels');
 
     // Big date overlay rendered into the SVG so it shows in MP4 frames too.
     this.dateOverlay = this.rootGroup
@@ -329,6 +337,8 @@ export class ReplayController {
       selectedPrecisions,
       hidePointLabels,
       useAdvancedLabels,
+      showLineLabels,
+      chartType,
     } = this.opts;
     const idxFloat = this.stepFloatAtFraction(this.fraction);
 
@@ -513,7 +523,135 @@ export class ReplayController {
         hide ? '' : advanced ? getPointLabel(d.template) : String(d.template.tp),
       );
 
-    // 8. Date overlay — rendered into the SVG so it shows in MP4 frames too.
+    // 8. Line labels — one label per hw roofline, placed along the line
+    // (interactivity charts use greedy collision avoidance, e2e/ttft uses
+    // endpoint labels with vertical de-overlap). Mirrors ScatterGraph.
+    interface LineLabel {
+      key: string;
+      label: string;
+      color: string;
+      x: number;
+      y: number;
+      visible: boolean;
+    }
+    const lineLabels: LineLabel[] = [];
+    if (showLineLabels() && rooflines.length > 0) {
+      const LABEL_H = 18;
+      const LABEL_W = 120;
+      if (chartType === 'interactivity') {
+        const placed: { x: number; y: number }[] = [];
+        const collides = (cx: number, cy: number) =>
+          placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+        const sorted = [...rooflines].toSorted(
+          (a, b) => (yScale(a.pts[0].y) ?? 0) - (yScale(b.pts[0].y) ?? 0),
+        );
+        for (const entry of sorted) {
+          const pts = entry.pts;
+          const label = getDisplayLabel(getHardwareConfig(entry.hw));
+          const candidates = [
+            pts[Math.min(1, pts.length - 1)],
+            pts[Math.floor(pts.length / 2)],
+            pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+            pts.at(-1)!,
+          ];
+          let foundPlacement = false;
+          for (const pt of candidates) {
+            const px = xScale(pt.x) ?? 0;
+            const py = yScale(pt.y) ?? 0;
+            if (!collides(px, py)) {
+              lineLabels.push({
+                key: entry.hw,
+                label,
+                color: getColor(entry.hw),
+                x: px,
+                y: py,
+                visible: true,
+              });
+              placed.push({ x: px, y: py });
+              foundPlacement = true;
+              break;
+            }
+          }
+          if (!foundPlacement) {
+            const pt = pts[0];
+            lineLabels.push({
+              key: entry.hw,
+              label,
+              color: getColor(entry.hw),
+              x: xScale(pt.x) ?? 0,
+              y: yScale(pt.y) ?? 0,
+              visible: false,
+            });
+          }
+        }
+      } else {
+        for (const entry of rooflines) {
+          const pt = entry.pts.at(-1)!;
+          lineLabels.push({
+            key: entry.hw,
+            label: getDisplayLabel(getHardwareConfig(entry.hw)),
+            color: getColor(entry.hw),
+            x: xScale(pt.x) ?? 0,
+            y: yScale(pt.y) ?? 0,
+            visible: true,
+          });
+        }
+        const yRange = yScale.range();
+        const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
+        const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
+        lineLabels.sort((a, b) => a.y - b.y);
+        for (let pass = 0; pass < 5; pass++) {
+          for (let i = 1; i < lineLabels.length; i++) {
+            const overlap = lineLabels[i - 1].y + LABEL_H - lineLabels[i].y;
+            if (overlap > 0) {
+              const half = overlap / 2;
+              lineLabels[i - 1].y -= half;
+              lineLabels[i].y += half;
+            }
+          }
+          for (const l of lineLabels) {
+            l.y = Math.max(top, Math.min(bottom, l.y));
+          }
+        }
+      }
+    }
+
+    const labelSel = this.lineLabelsGroup
+      .selectAll<SVGGElement, LineLabel>('.replay-line-label')
+      .data(lineLabels, (d) => d.key);
+    labelSel.exit().remove();
+    const labelEnter = labelSel
+      .enter()
+      .append('g')
+      .attr('class', 'replay-line-label')
+      .style('pointer-events', 'none');
+    labelEnter.append('rect').attr('rx', 4).attr('ry', 4).attr('opacity', 0.95);
+    labelEnter
+      .append('text')
+      .attr('text-anchor', 'start')
+      .attr('dominant-baseline', 'central')
+      .attr('fill', 'white')
+      .attr('font-size', '10px')
+      .attr('font-weight', '600');
+    const labelMerged = labelEnter.merge(labelSel as any);
+    labelMerged
+      .attr('transform', (d: LineLabel) => `translate(${d.x + 8},${d.y - 14})`)
+      .style('opacity', (d: LineLabel) => (d.visible ? 1 : 0));
+    labelMerged.each(function (d: LineLabel) {
+      const g = d3.select(this);
+      const text = g.select<SVGTextElement>('text').text(d.label);
+      const bbox = (text.node() as SVGTextElement).getBBox();
+      const px = 5;
+      const py = 3;
+      g.select('rect')
+        .attr('x', bbox.x - px)
+        .attr('y', bbox.y - py)
+        .attr('width', bbox.width + px * 2)
+        .attr('height', bbox.height + py * 2)
+        .attr('fill', d.color);
+    });
+
+    // 9. Date overlay — rendered into the SVG so it shows in MP4 frames too.
     const dates = timeline.dates;
     if (dates.length > 0) {
       const stepRound = Math.max(0, Math.min(dates.length - 1, Math.round(idxFloat)));
