@@ -3,15 +3,9 @@ import { NextResponse } from 'next/server';
 import { utf8ToBytes } from '@noble/ciphers/utils.js';
 
 import { getWriteDb } from '@semianalysisai/inferencex-db/connection';
-import {
-  type Cipher,
-  type CipherKey,
-  createCipher,
-  loadKey,
-} from '@semianalysisai/inferencex-db/lib/encryption';
+import { type Cipher, createCipher, loadKey } from '@semianalysisai/inferencex-db/lib/encryption';
 
 import { parseFeedbackBody } from './parse';
-import { hashIp, incrementHourlyAndGet, isRateLimited } from './rate-limit';
 
 const aadFor = (column: string) => utf8ToBytes(`user_feedback:${column}`);
 
@@ -20,26 +14,10 @@ export const runtime = 'nodejs';
 const MAX_BODY_BYTES = 5 * 1024;
 
 // Opaque 5xx code for operator triage without log grep.
-type ServerErrorCode = 'E_CRYPTO' | 'E_DB' | 'E_RATELIMIT' | 'E_INSERT';
+type ServerErrorCode = 'E_CRYPTO' | 'E_INSERT';
 
 function serverError(code: ServerErrorCode) {
   return NextResponse.json({ error: 'storage error', code }, { status: 500 });
-}
-
-// Vercel sets x-vercel-forwarded-for un-spoofably; fall back to rightmost XFF, then a dev bucket.
-function getTrustedIp(request: Request): string | null {
-  const vercel = request.headers.get('x-vercel-forwarded-for');
-  if (vercel) return vercel.trim();
-  const xff = request.headers.get('x-forwarded-for');
-  if (xff) {
-    const parts = xff
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return parts.at(-1) ?? null;
-  }
-  if (process.env.NODE_ENV !== 'production') return 'local-dev';
-  return null;
 }
 
 export async function POST(request: Request) {
@@ -77,31 +55,14 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 204 });
   }
 
-  const ip = getTrustedIp(request);
-  if (!ip) {
-    return NextResponse.json({ error: 'forwarded-for required' }, { status: 400 });
-  }
-
   let cipher: Cipher;
-  let key: CipherKey;
   let sql: ReturnType<typeof getWriteDb>;
   try {
-    key = loadKey('FEEDBACK_ENCRYPTION_KEY');
-    cipher = createCipher(key);
+    cipher = createCipher(loadKey('FEEDBACK_ENCRYPTION_KEY'));
     sql = getWriteDb();
   } catch (error) {
     console.error('feedback: misconfigured', error);
     return serverError('E_CRYPTO');
-  }
-
-  try {
-    const count = await incrementHourlyAndGet(sql, hashIp(ip, key));
-    if (isRateLimited(count)) {
-      return NextResponse.json({ error: 'rate limit' }, { status: 429 });
-    }
-  } catch (error) {
-    console.error('feedback: rate-limit check failed', error);
-    return serverError('E_RATELIMIT');
   }
 
   const encryptOrNull = (value: string | null, column: string) =>
