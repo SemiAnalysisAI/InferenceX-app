@@ -18,12 +18,8 @@ const CSS_VAR_RE = /var\(--([^)]+)\)/u;
 const WATERMARK_HEIGHT = 48;
 const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
 
-/**
- * Bake `var(--*)` references inside an SVG subtree into resolved colors.
- * Mutates the supplied root in place — must only be called on a clone, never
- * on the live panel (otherwise the live UI would be stuck on baked colors and
- * stop responding to theme switches after an export).
- */
+// Mutates the supplied root in place — call only on a clone; baking onto the
+// live panel would freeze it on current theme.
 function resolveCssVarsForExport(root: HTMLElement) {
   const rootStyles = getComputedStyle(document.documentElement);
 
@@ -70,12 +66,8 @@ function resolveCssVarsForExport(root: HTMLElement) {
   }
 }
 
-/**
- * Copy each live element's computed text color onto the matching clone element
- * as an inline style. html-to-image can't resolve `var(--muted-foreground)` and
- * similar tokens used by Tailwind text utilities, so we bake the resolved
- * colors directly. Mutates only the clone tree.
- */
+// html-to-image can't resolve var(--*) tokens used by Tailwind text utilities,
+// so bake live computed colors onto the clone.
 function bakeTextColorsFromLive(liveRoot: HTMLElement, cloneRoot: HTMLElement) {
   const liveEls = [
     liveRoot,
@@ -93,12 +85,8 @@ function bakeTextColorsFromLive(liveRoot: HTMLElement, cloneRoot: HTMLElement) {
   }
 }
 
-/**
- * Unconstrain the legend's outer scroll viewport so every item appears in the
- * rasterized frame. The mini legend itself is already compact — we just need
- * to drop the `max-h-[480px] overflow-y-auto` wrapper that engages scroll in
- * the live preview.
- */
+// Drop the live `max-h-[480px] overflow-y-auto` wrapper so every legend item
+// appears in the rasterized frame.
 function expandLegendForExport(cloneRoot: HTMLElement) {
   const legend = cloneRoot.querySelector<HTMLElement>('[data-testid="replay-legend"]');
   if (legend) {
@@ -144,21 +132,7 @@ interface MuxerLike {
   target: { buffer: ArrayBuffer };
 }
 
-/**
- * Render the replay timeline to MP4 (H.264) using WebCodecs + mp4-muxer.
- *
- * Per-frame "screenshot mode" capture: the live panel is cloned into an
- * off-screen container, no-export controls are filtered out, CSS variables
- * and computed text colors are baked onto the clone, the SVG is re-cloned
- * each frame from the live chart so position mutations land in the export,
- * and the final canvas is stamped with the InferenceX watermark bar.
- *
- * Crucially the LIVE panel is never modified — the user-visible UI keeps its
- * normal interactive look while the encode loop runs against the clone.
- *
- * Falls back with a clear error when WebCodecs is unavailable (mainly Firefox
- * without the experimental flag).
- */
+// Per-frame: caller advances replay → clone live panel → bake colors → toCanvas → encode.
 export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   const {
     captureRoot: livePanel,

@@ -141,8 +141,6 @@ export default function ReplayPanel({
 
   const prefersReducedMotion = useReducedMotion();
 
-  // rAF loop — keeps a ref to the current speed so changing speed doesn't
-  // restart the loop.
   const speedRef = useRef(speed);
   speedRef.current = speed;
   const playingRef = useRef(playing);
@@ -187,7 +185,6 @@ export default function ReplayPanel({
     return () => cancelAnimationFrame(rafId);
   }, [playing, timeline, prefersReducedMotion]);
 
-  // Reset fraction when timeline rebuilds (model/sequence/metric switch).
   useEffect(() => {
     setFraction(0);
     setPlaying(false);

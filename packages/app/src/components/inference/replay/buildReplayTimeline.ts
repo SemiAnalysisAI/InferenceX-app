@@ -16,10 +16,7 @@ export interface ReplayConfigSeries {
   hwKey: string;
   precision: string;
   template: InferenceData;
-  /**
-   * One entry per `dates[i]`. `visible=false` for steps before the config's
-   * first observation; sticky-last carries the final observation forward.
-   */
+  // One entry per `dates[i]`; sticky-last carries the last observation forward.
   stepValues: PerStepValue[];
 }
 
@@ -35,14 +32,7 @@ export interface StepDomain {
   y: [number, number];
 }
 
-/**
- * Compute a tight bounding box at a given step from the configs whose hwKey
- * passes `hwFilter`. The replay panel calls this with `activeHwTypes` so axes
- * shrink to fit the currently-selected GPU(s) rather than the full timeline
- * fleet.
- *
- * Pass `() => true` to disable filtering and get the full visible domain.
- */
+// Axes shrink to fit configs that pass `hwFilter` (usually `activeHwTypes`).
 export function computeStepDomain(
   timeline: ReplayTimeline,
   stepIndex: number,
@@ -82,11 +72,8 @@ const safeDomain = (lo: number, hi: number): [number, number] => {
   return lo < hi ? [lo, hi] : [hi, lo];
 };
 
-/**
- * Resolve which x-axis field a chart definition + selected metric should use.
- * Mirrors the logic in `useChartData` and `processOverlayChartData` so replay
- * frames sit on the same axes the static chart shows.
- */
+// Mirrors useChartData + processOverlayChartData so replay frames sit on the
+// same axes the static chart shows.
 function resolveXAxisField(
   chartDef: ChartDefinition,
   selectedYAxisMetric: string,
@@ -111,18 +98,6 @@ function resolveXAxisField(
   return chartDef.x;
 }
 
-/**
- * Build the per-config history timeline for a replay session.
- *
- * For every (config_id) seen in `rows`, produce a sorted observation list of
- * (dateMs, x, y) using the same metric resolution the live chart uses. Returns
- * the list of distinct dates (ascending) and a global x/y domain spanning the
- * whole history so axes can stay pinned during playback.
- *
- * Filtering matches the chart: rows whose precision is not in
- * `selectedPrecisions` are dropped, and rows missing the requested metric on
- * the `InferenceData` shape are dropped. Empty input → empty timeline.
- */
 export function buildReplayTimeline(
   rows: BenchmarkRow[],
   chartDef: ChartDefinition,
@@ -216,8 +191,6 @@ export function buildReplayTimeline(
 
     if (dedup.length === 0) continue;
 
-    // Build per-step values: at step i, the config's value is its latest
-    // observation with dateMs <= dates[i]. Sticky-last carries forward.
     const stepValues: PerStepValue[] = [];
     let obsIdx = 0;
     let latest: { x: number; y: number } | null = null;
