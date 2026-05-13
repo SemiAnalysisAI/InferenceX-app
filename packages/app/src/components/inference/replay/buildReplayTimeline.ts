@@ -175,7 +175,9 @@ export function buildReplayTimeline(
     if (yMetric === null) continue;
 
     const xVal =
-      xAxisField === chartDef.x ? point.x : ((point as any)[xAxisField] as number | undefined);
+      xAxisField === chartDef.x
+        ? point.x
+        : (point[xAxisField as keyof InferenceData] as number | undefined);
     if (typeof xVal !== 'number' || !Number.isFinite(xVal) || !Number.isFinite(yMetric)) continue;
     if (xVal <= 0 || yMetric <= 0) continue;
 
