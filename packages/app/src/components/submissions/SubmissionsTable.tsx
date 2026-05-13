@@ -41,7 +41,14 @@ function DetailItem({
   );
 }
 
-type SortKey = 'hardware' | 'model' | 'precision' | 'framework' | 'date' | 'total_datapoints';
+type SortKey =
+  | 'hardware'
+  | 'model'
+  | 'precision'
+  | 'spec_method'
+  | 'framework'
+  | 'date'
+  | 'total_datapoints';
 type SortDir = 'asc' | 'desc';
 
 interface SubmissionsTableProps {
@@ -86,6 +93,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         row.model.includes(q) ||
         row.framework.includes(q) ||
         row.precision.includes(q) ||
+        row.spec_method.includes(q) ||
         getVendor(row.hardware).toLowerCase().includes(q) ||
         getModelDisplayName(row.model).toLowerCase().includes(q),
     );
@@ -149,6 +157,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
               <SortHeader label="GPU" field="hardware" />
               <SortHeader label="Model" field="model" />
               <SortHeader label="Precision" field="precision" />
+              <SortHeader label="Spec Method" field="spec_method" />
               <SortHeader label="Framework" field="framework" />
               <SortHeader label="Date" field="date" />
               <SortHeader label="Datapoints" field="total_datapoints" />
@@ -169,7 +178,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   {search ? 'No matching submissions found.' : 'No submission data available.'}
                 </td>
               </tr>
@@ -212,6 +221,13 @@ function SubmissionRow({
         </td>
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
+        <td className="px-3 py-2 uppercase">
+          {row.spec_method && row.spec_method !== 'none' ? (
+            row.spec_method
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
         <td className="px-3 py-2 tabular-nums">{row.date}</td>
         <td className="px-3 py-2 tabular-nums">{row.total_datapoints.toLocaleString()}</td>
@@ -219,7 +235,7 @@ function SubmissionRow({
       {isExpanded && (
         <tr className="bg-muted/20">
           <td />
-          <td colSpan={6} className="px-3 py-3">
+          <td colSpan={7} className="px-3 py-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                 <DetailItem label="Vendor:" tip="GPU manufacturer">
