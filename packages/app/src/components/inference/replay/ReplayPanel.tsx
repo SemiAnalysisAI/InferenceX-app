@@ -237,6 +237,43 @@ export default function ReplayPanel({
     track('inference_replay_scrubbed', { fraction: value });
   }, []);
 
+  const handleScrubKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!timeline) return;
+      const n = timeline.dates.length;
+      if (n <= 1) return;
+      const cur = Math.round(fraction * (n - 1));
+      let nextStep: number;
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'ArrowDown': {
+          nextStep = Math.max(0, cur - 1);
+          break;
+        }
+        case 'ArrowRight':
+        case 'ArrowUp': {
+          nextStep = Math.min(n - 1, cur + 1);
+          break;
+        }
+        case 'Home': {
+          nextStep = 0;
+          break;
+        }
+        case 'End': {
+          nextStep = n - 1;
+          break;
+        }
+        default: {
+          return;
+        }
+      }
+      if (nextStep === cur) return;
+      e.preventDefault();
+      handleScrub(nextStep / (n - 1));
+    },
+    [timeline, fraction, handleScrub],
+  );
+
   const handleSpeedChange = useCallback((v: number) => {
     setSpeed(v);
     track('inference_replay_speed_changed', { speed: v });
@@ -415,8 +452,10 @@ export default function ReplayPanel({
           value={Math.round(fraction * 1000)}
           step={1}
           onChange={(e) => handleScrub(Number(e.target.value) / 1000)}
+          onKeyDown={handleScrubKeyDown}
           className="flex-1 min-w-[120px] h-2 cursor-pointer accent-foreground"
           aria-label="Replay timeline"
+          aria-valuetext={currentDate || undefined}
           data-testid="replay-scrubber"
         />
         <span className="text-xs tabular-nums text-muted-foreground min-w-[5.5rem] text-right">
