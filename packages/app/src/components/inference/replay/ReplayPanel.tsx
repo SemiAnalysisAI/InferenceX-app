@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 
 import { buildReplayTimeline } from './buildReplayTimeline';
 import { buildFrameData, dateAtFraction, spanMs } from './replayFrameData';
+import { useReducedMotion } from './useReducedMotion';
 
 interface ReplayPanelProps {
   parentChartId: string;
@@ -137,6 +138,8 @@ export default function ReplayPanel({
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
 
+  const prefersReducedMotion = useReducedMotion();
+
   // rAF loop — keeps a ref to the current speed so changing speed doesn't
   // restart the loop.
   const speedRef = useRef(speed);
@@ -146,6 +149,23 @@ export default function ReplayPanel({
 
   useEffect(() => {
     if (!playing || !timeline) return;
+    // Reduced motion: advance one observed step per ~1.2s without per-frame
+    // interpolation, so users get a slideshow rather than continuous motion.
+    if (prefersReducedMotion) {
+      const stepMs = 1200 / Math.max(0.1, speedRef.current);
+      const n = timeline.dates.length;
+      const intervalId = window.setInterval(() => {
+        if (!playingRef.current) return;
+        setFraction((prev) => {
+          const cur = Math.round(prev * (n - 1));
+          const nextStep = Math.min(n - 1, cur + 1);
+          const next = nextStep / (n - 1);
+          if (nextStep === n - 1) setPlaying(false);
+          return next;
+        });
+      }, stepMs);
+      return () => window.clearInterval(intervalId);
+    }
     let rafId: number;
     let last = performance.now();
     const totalMs = spanMs(timeline.dates.length);
@@ -164,7 +184,7 @@ export default function ReplayPanel({
     };
     rafId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(rafId);
-  }, [playing, timeline]);
+  }, [playing, timeline, prefersReducedMotion]);
 
   // Reset fraction when timeline rebuilds (model/sequence/metric switch).
   useEffect(() => {
