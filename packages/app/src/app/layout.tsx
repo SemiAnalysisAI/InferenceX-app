@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 
+import { ChromeGate } from '@/components/chrome-gate';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { CircuitBackground } from '@/components/circuit-background';
@@ -191,9 +192,13 @@ export default async function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <Header starCount={starCount} />
+              <ChromeGate>
+                <Header starCount={starCount} />
+              </ChromeGate>
               <div className="grow flex flex-col">{children}</div>
-              <Footer starCount={starCount} />
+              <ChromeGate>
+                <Footer starCount={starCount} />
+              </ChromeGate>
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}

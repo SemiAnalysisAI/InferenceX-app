@@ -135,6 +135,27 @@ export function readUrlParams(): UrlStateParams {
   return _initialParams;
 }
 
+/**
+ * Synchronously seed the URL-state cache before any provider's lazy
+ * `useState(() => getUrlParam(...))` initializer fires. Used by the embed
+ * routes to translate their stable, public-contract param shape (e.g.
+ * `?model=dsr1&y=tpPerGpu&gpus=...`) into the internal `g_*` / `i_*` keys.
+ *
+ * Must be called from a top-level module-scope statement in a client
+ * component (or its server-rendered parent) so the writes happen before
+ * `InferenceProvider` mounts. Calling it after a provider initializes its
+ * state has no effect on that provider — the lazy initializer has already
+ * run by then.
+ */
+export function seedUrlState(params: UrlStateParams): void {
+  for (const [key, value] of Object.entries(params)) {
+    const urlKey = key as UrlStateKey;
+    if (value === undefined) continue;
+    _initialParams[urlKey] = value;
+    currentState[urlKey] = value;
+  }
+}
+
 /** Check whether the current URL has any share-link params. */
 export function hasAnyUrlParams(): boolean {
   if (typeof window === 'undefined') return false;

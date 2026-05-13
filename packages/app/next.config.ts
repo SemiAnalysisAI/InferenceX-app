@@ -15,6 +15,27 @@ const nextConfig: NextConfig = {
       { hostname: 'substack-post-media.s3.amazonaws.com' },
     ],
   },
+  // /embed/* routes are explicitly framable from any origin so partner sites
+  // can iframe them. All other routes are non-framable (frame-ancestors
+  // 'self' + X-Frame-Options: SAMEORIGIN). Order matters: the more specific
+  // /embed/* match comes first.
+  headers() {
+    return Promise.resolve([
+      {
+        source: '/embed/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: 'frame-ancestors *' }],
+      },
+      {
+        // Negative lookahead excludes /embed/* so its CSP isn't overridden
+        // by the more general non-framable headers.
+        source: '/((?!embed/).*)',
+        headers: [
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        ],
+      },
+    ]);
+  },
 };
 
 const hasPostHogKeys = Boolean(
