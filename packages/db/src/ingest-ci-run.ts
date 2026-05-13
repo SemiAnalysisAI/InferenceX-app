@@ -17,6 +17,8 @@
  *   INGEST_RUN_ID          — (CI mode) Workflow run ID
  *   INGEST_ARTIFACTS_PATH  — (CI mode) Local path to pre-downloaded artifacts
  *   INGEST_REPO            — (CI mode) Source repo slug (owner/name)
+ *   reused-ingest-metadata/reuse_source_run.json overrides reused rows to the
+ *     original source sweep run, so public links point at the real benchmark run.
  */
 
 import { execSync } from 'child_process';
@@ -32,6 +34,10 @@ import { isRunAttemptPurged } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
+import {
+  flattenReusedIngestArtifactBundle,
+  readReusedIngestMetadata,
+} from './etl/reused-ingest-metadata';
 import { mapBenchmarkRow } from './etl/benchmark-mapper';
 import {
   bulkIngestBenchmarkRows,
@@ -157,6 +163,15 @@ if (!process.env.DATABASE_WRITE_URL || !process.env.GITHUB_TOKEN) {
   process.exit(1);
 }
 
+const flattenedReusedArtifacts = flattenReusedIngestArtifactBundle(artifactsDir);
+const requestedRunIdStr = runIdStr;
+const requestedRunAttemptNum = runAttemptNum;
+const reusedIngestMetadata = readReusedIngestMetadata(artifactsDir);
+if (reusedIngestMetadata) {
+  runIdStr = reusedIngestMetadata.sourceRunId;
+  runAttemptNum = reusedIngestMetadata.sourceRunAttempt;
+}
+
 const runIdNum = parseInt(runIdStr, 10);
 if (isRunAttemptPurged(runIdNum, runAttemptNum)) {
   console.log(`  Run ${runIdStr} attempt ${runAttemptNum} is purged via run-overrides — skipping.`);
@@ -206,17 +221,41 @@ async function main(): Promise<void> {
 
   const runId = parseInt(runIdStr, 10);
   const ghInfo = await fetchGithubRun(runId);
+  const triggerRunIdStr = reusedIngestMetadata?.triggerRunId ?? requestedRunIdStr;
+  const triggerRunId = parseInt(triggerRunIdStr, 10);
+  const triggerGhInfo = reusedIngestMetadata ? await fetchGithubRun(triggerRunId) : null;
+  const workflowGhInfo =
+    reusedIngestMetadata && ghInfo && triggerGhInfo
+      ? {
+          ...ghInfo,
+          createdAt: triggerGhInfo.createdAt || ghInfo.createdAt,
+          runStartedAt: triggerGhInfo.runStartedAt ?? ghInfo.runStartedAt,
+        }
+      : ghInfo;
 
   console.log('\n=== ingest-ci-run ===');
   console.log(`  Run ID:      ${runIdStr}`);
   console.log(`  Attempt:     ${runAttemptNum}`);
+  if (flattenedReusedArtifacts.length > 0) {
+    console.log(`  Flattened:   ${flattenedReusedArtifacts.toSorted().join(', ')}`);
+  }
+  if (reusedIngestMetadata) {
+    const triggerAttempt =
+      reusedIngestMetadata.triggerRunAttempt === undefined
+        ? requestedRunAttemptNum
+        : reusedIngestMetadata.triggerRunAttempt;
+    console.log(`  Reuse Meta:  ${reusedIngestMetadata.metadataPath}`);
+    console.log(`  Trigger Run: ${reusedIngestMetadata.triggerRunId ?? requestedRunIdStr}`);
+    console.log(`  Trigger Att: ${triggerAttempt}`);
+  }
   console.log(`  Artifacts:   ${artifactsDir}`);
   console.log(`  Repo:        ${REPO}`);
-  if (ghInfo?.htmlUrl) {
-    console.log(`  Run URL:     ${ghInfo.htmlUrl}/attempts/${runAttemptNum}`);
+  const runUrl = workflowGhInfo?.htmlUrl ?? reusedIngestMetadata?.sourceRunUrl;
+  if (runUrl) {
+    console.log(`  Run URL:     ${runUrl}/attempts/${runAttemptNum}`);
   }
-  if (ghInfo?.pullRequests && ghInfo.pullRequests.length > 0) {
-    for (const pr of ghInfo.pullRequests) {
+  if (workflowGhInfo?.pullRequests && workflowGhInfo.pullRequests.length > 0) {
+    for (const pr of workflowGhInfo.pullRequests) {
       console.log(`  PR #${pr.number}:      ${pr.htmlUrl}`);
     }
   }
@@ -228,19 +267,22 @@ async function main(): Promise<void> {
     throw new Error(`Artifacts directory does not exist: ${artifactsDir}`);
   }
 
-  const date = ghInfo?.createdAt
-    ? ghInfo.createdAt.split('T')[0]
+  const date = workflowGhInfo?.createdAt
+    ? workflowGhInfo.createdAt.split('T')[0]
     : new Date().toISOString().split('T')[0];
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
     runAttempt: runAttemptNum,
-    name: ghInfo?.name || `CI Run ${runIdStr}`,
+    name: workflowGhInfo?.name || `CI Run ${runIdStr}`,
     date,
-    headBranch: ghInfo?.headBranch,
-    headSha: ghInfo?.headSha,
-    createdAt: ghInfo?.createdAt || new Date().toISOString(),
-    ghInfo,
+    // Reused rows are attributed to the source PR sweep so public links open
+    // the real benchmark run; head branch/SHA therefore remain the PR values.
+    headBranch: workflowGhInfo?.headBranch,
+    headSha: workflowGhInfo?.headSha,
+    htmlUrl: reusedIngestMetadata?.sourceRunUrl,
+    createdAt: workflowGhInfo?.createdAt || triggerGhInfo?.createdAt || new Date().toISOString(),
+    ghInfo: workflowGhInfo,
   });
   if (workflowRunId === null) {
     console.log(
