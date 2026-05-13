@@ -137,6 +137,7 @@ export default function ReplayPanel({
   const [speed, setSpeed] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
 
@@ -234,10 +235,18 @@ export default function ReplayPanel({
     setPlaying(false);
     setIsExporting(true);
     setExportProgress(0);
+    setExportError(null);
+    const startedAt = performance.now();
+    const hasWebCodecs = typeof VideoEncoder !== 'undefined';
     track('inference_replay_export_started', {
       model: selectedModel,
       chartType: chartDefinition.chartType,
+      hasWebCodecs,
     });
+    // oxlint-disable-next-line prefer-const
+    let stage: 'init' | 'render' | 'encode' | 'flush' | 'mux' = 'init';
+    // oxlint-disable-next-line prefer-const
+    let frameCount = 0;
     try {
       const { exportReplayMp4 } = await import('./exportMp4');
       // Export duration is deterministic from timeline length, NOT playback speed
@@ -246,6 +255,7 @@ export default function ReplayPanel({
       const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
       const root = panelRef.current;
       if (!root) throw new Error('Replay panel element is not mounted.');
+      stage = 'render';
       await exportReplayMp4({
         captureRoot: root,
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
@@ -258,19 +268,34 @@ export default function ReplayPanel({
             requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
           });
         },
-        onProgress: (p) => setExportProgress(p),
+        onProgress: (p) => {
+          frameCount = Math.round(p * durationSec * 30);
+          setExportProgress(p);
+        },
       });
       track('inference_replay_export_completed', {
         model: selectedModel,
         chartType: chartDefinition.chartType,
+        durationMs: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
       console.error('MP4 export failed', error);
       const message = error instanceof Error ? error.message : 'Export failed.';
-      alert(
-        `MP4 export failed: ${message}\n\nIf you're not on Chrome, try Chrome. MP4 export uses WebCodecs, which may be unavailable in other browsers.`,
+      const errorName = error instanceof Error ? error.name : 'unknown';
+      setExportError(
+        hasWebCodecs
+          ? message
+          : 'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
       );
-      track('inference_replay_export_failed', { reason: message });
+      track('inference_replay_export_failed', {
+        reason: message,
+        errorName,
+        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
+        hasWebCodecs,
+        frameCount,
+        durationMs: Math.round(performance.now() - startedAt),
+        stage,
+      });
     } finally {
       setIsExporting(false);
       setExportProgress(null);
@@ -412,6 +437,22 @@ export default function ReplayPanel({
             : 'Export MP4'}
         </Button>
       </div>
+      {exportError && (
+        <div
+          role="alert"
+          data-testid="replay-export-error"
+          className="no-export mt-3 flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          <span className="flex-1">MP4 export failed: {exportError}</span>
+          <button
+            onClick={() => setExportError(null)}
+            className="text-destructive/70 hover:text-destructive cursor-pointer"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }
