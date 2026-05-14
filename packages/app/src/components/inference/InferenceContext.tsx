@@ -48,7 +48,7 @@ import {
   MtpEngineConflictToast,
   type MtpEngineConflictDetail,
 } from '@/components/mtp-engine-conflict-toast';
-import { clearAllMtpFamilies, resolveMtpToggle } from '@/lib/mtp-exclusion';
+import { clearAllMtpFamilies, effectiveLegendItems, resolveMtpToggle } from '@/lib/mtp-exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
@@ -448,8 +448,15 @@ export function InferenceProvider({
   const mtpExclusion = hasMtpEngineExclusion(selectedModel);
   const toggleHwType = useCallback(
     (hw: string) => {
+      // Under MTP exclusion, hide MTP keys from inactive families when
+      // computing the toggle "universe". This makes the default-deselected
+      // state (DSv4 on first load) count as "all selected", so clicking a
+      // legend entry solos it instead of just removing it.
+      const toggleUniverse = mtpExclusion
+        ? effectiveLegendItems(hwTypesWithData, activeHwTypes)
+        : hwTypesWithData;
       if (mtpExclusion) {
-        const decision = resolveMtpToggle(activeHwTypes, hw, hwTypesWithData);
+        const decision = resolveMtpToggle(activeHwTypes, hw, toggleUniverse);
         if (decision.kind === 'block') {
           setMtpConflict({
             kind: 'blocked',
@@ -465,7 +472,7 @@ export function InferenceProvider({
           return;
         }
       }
-      toggleHwRaw(hw, hwTypesWithData);
+      toggleHwRaw(hw, toggleUniverse);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },

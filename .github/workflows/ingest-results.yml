@@ -76,6 +76,33 @@ jobs:
             exit 1
           fi
 
+      - name: Flatten reused ingest artifact bundle
+        env:
+          ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+        run: |
+          bundle="$ARTIFACTS_PATH/reused-ingest-artifacts"
+          if [ ! -d "$bundle" ]; then
+            echo "No reused ingest artifact bundle found."
+            exit 0
+          fi
+
+          echo "Flattening reused ingest artifact bundle:"
+          for child in "$bundle"/*; do
+            [ -e "$child" ] || continue
+            name=$(basename "$child")
+            dest="$ARTIFACTS_PATH/$name"
+            if [ -e "$dest" ]; then
+              echo "::error::Cannot flatten reused artifact '$name'; destination already exists"
+              exit 1
+            fi
+            mv "$child" "$dest"
+            echo "  $name"
+          done
+          rmdir "$bundle"
+
+          echo "Artifacts after flattening:"
+          ls "$ARTIFACTS_PATH/"
+
       - name: Ingest results to DB
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
