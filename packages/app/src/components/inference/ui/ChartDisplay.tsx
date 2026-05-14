@@ -1,7 +1,7 @@
 'use client';
 import { track } from '@/lib/analytics';
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
@@ -48,7 +48,7 @@ import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
-import ReplayLauncher from '../replay/ReplayLauncher';
+import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 import TrendChart from './TrendChart';
 
 const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagram'), {
@@ -159,7 +159,7 @@ export default function ChartDisplay() {
   } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
 
   const [viewModes, setViewModes] = useState<Record<number, InferenceViewMode>>({});
-  const [replayOpen, setReplayOpen] = useState<Record<number, boolean>>({});
+  const replayHandlesRef = useRef<Record<number, ReplayLauncherHandle | null>>({});
   const getViewMode = (index: number): InferenceViewMode => viewModes[index] ?? 'chart';
   const handleViewModeChange = (index: number, value: InferenceViewMode) => {
     setViewModes((prev) => ({ ...prev, [index]: value }));
@@ -351,9 +351,7 @@ export default function ChartDisplay() {
                   setIsLegendExpanded={setIsLegendExpanded}
                   exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                   onExportMp4={
-                    replayAvailable
-                      ? () => setReplayOpen((prev) => ({ ...prev, [graphIndex]: true }))
-                      : undefined
+                    replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined
                   }
                   onExportCsv={() => {
                     const visibleData = graph.data.filter((d) =>
@@ -551,6 +549,9 @@ export default function ChartDisplay() {
                   })()}
                   {replayAvailable && (
                     <ReplayLauncher
+                      ref={(handle) => {
+                        replayHandlesRef.current[graphIndex] = handle;
+                      }}
                       parentChartId={`chart-${graphIndex}`}
                       chartDefinition={graph.chartDefinition}
                       yLabel={`${
@@ -559,8 +560,6 @@ export default function ChartDisplay() {
                         ]
                       }`}
                       xLabel={graph.chartDefinition.x_label}
-                      open={Boolean(replayOpen[graphIndex])}
-                      onOpenChange={(o) => setReplayOpen((prev) => ({ ...prev, [graphIndex]: o }))}
                     />
                   )}
                 </Card>
