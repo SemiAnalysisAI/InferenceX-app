@@ -361,7 +361,12 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
       const dstY = Math.floor((outHeight - drawH) / 2);
       fctx.drawImage(watermarked, srcX, srcY, drawW, drawH, dstX, dstY, drawW, drawH);
 
-      const frame = new VideoFrame(fit, { timestamp: Math.round((i / fps) * 1_000_000) });
+      // mp4-muxer rejects null durations on encoded chunks; WebCodecs leaves
+      // `duration` unset on VideoFrame unless we pass it through here.
+      const frame = new VideoFrame(fit, {
+        timestamp: Math.round((i / fps) * 1_000_000),
+        duration: Math.round(1_000_000 / fps),
+      });
       advanceStage('encode');
       encoder!.encode(frame, { keyFrame: i % fps === 0 });
       frame.close();
