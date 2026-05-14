@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 import type { InferenceData } from '@/components/inference/types';
 
 import type { ReplayTimeline } from '../buildReplayTimeline';
-import { buildFrameData, dateAtFraction, spanMs, stepFloatAtFraction } from '../replayFrameData';
+import {
+  FRACTION_COMMIT_QUANTUM,
+  buildFrameData,
+  dateAtFraction,
+  shouldCommitFraction,
+  spanMs,
+  stepFloatAtFraction,
+} from '../replayFrameData';
 
 const baseTemplate = {
   hwKey: 'b200',
@@ -113,7 +120,7 @@ describe('dateAtFraction', () => {
     expect(dateAtFraction(t, 1)).toBe('2025-09-03');
   });
 
-  it('returns the nearest observed date for intermediate fractions', () => {
+  it('returns the date the playhead is currently within for intermediate fractions', () => {
     const t = makeTimeline();
     expect(dateAtFraction(t, 0.5)).toBe('2025-09-02');
   });
@@ -121,6 +128,83 @@ describe('dateAtFraction', () => {
   it('returns empty string for an empty timeline', () => {
     const empty: ReplayTimeline = { dates: [], configs: [], domain: { x: [0, 1], y: [0, 1] } };
     expect(dateAtFraction(empty, 0.5)).toBe('');
+  });
+});
+
+describe('shouldCommitFraction', () => {
+  const quantumStep = 1 / FRACTION_COMMIT_QUANTUM;
+
+  it('skips when the quantized value is unchanged', () => {
+    expect(shouldCommitFraction(0.5, 0.5)).toBe(false);
+    expect(shouldCommitFraction(0.5, 0.5 + quantumStep / 10)).toBe(false);
+  });
+
+  it('commits when the quantized value changes by one full quantum', () => {
+    expect(shouldCommitFraction(0.5, 0.5 + quantumStep)).toBe(true);
+    expect(shouldCommitFraction(0.5, 0.5 - quantumStep)).toBe(true);
+  });
+
+  it('commits across the rounding boundary', () => {
+    // 0.5004 → round*1000 = 500, 0.5006 → round*1000 = 501
+    expect(shouldCommitFraction(0.5004, 0.5006)).toBe(true);
+  });
+});
+
+describe('commitFraction throttle (rAF-loop invariant)', () => {
+  // Mirrors ReplayPanel.commitFraction: snapshot fractionRef BEFORE mutating
+  // it, then ask the pure predicate whether to call setFraction. The throttle
+  // is load-bearing — if the predicate is given the React-committed value
+  // instead of the ref's previous value, a backward scrub that crosses a
+  // quantum boundary would silently no-op the commit.
+  function makeCommitter() {
+    const fractionRef = { current: 0 };
+    const commits: number[] = [];
+    const setFraction = (v: number) => commits.push(v);
+    const commit = (next: number, opts?: { force?: boolean }) => {
+      const clamped = next < 0 ? 0 : Math.min(1, next);
+      const prev = fractionRef.current;
+      fractionRef.current = clamped;
+      const force = opts?.force ?? false;
+      if (force || shouldCommitFraction(prev, clamped)) setFraction(clamped);
+    };
+    return { fractionRef, commits, commit };
+  }
+
+  it('advances fractionRef every tick but commits only when the quantum changes', () => {
+    const { fractionRef, commits, commit } = makeCommitter();
+    // Sub-quantum increments. 0.0001 * 4 = 0.0004 — all round to 0, no commits.
+    const subQuantum = 1 / (FRACTION_COMMIT_QUANTUM * 10);
+    for (let i = 1; i <= 4; i++) commit(i * subQuantum);
+    expect(fractionRef.current).toBeCloseTo(4 * subQuantum);
+    expect(commits).toHaveLength(0);
+    // Fifth tick lands on 0.0005 — round(0.5) === 1, crossing the first
+    // quantum boundary → one commit.
+    commit(5 * subQuantum);
+    expect(commits).toHaveLength(1);
+    expect(commits[0]).toBeCloseTo(5 * subQuantum);
+  });
+
+  it('force=true always commits even when the predicate would skip', () => {
+    const { commits, commit } = makeCommitter();
+    commit(0.5, { force: true });
+    commit(0.5, { force: true });
+    expect(commits).toEqual([0.5, 0.5]);
+  });
+
+  it('commits a backward scrub that crosses a quantum boundary', () => {
+    const { fractionRef, commits, commit } = makeCommitter();
+    commit(0.8); // forward, commits
+    fractionRef.current = 0.8; // simulate the ref already at the committed value
+    commit(0.6); // backward across many quanta — must commit
+    expect(commits.at(-1)).toBe(0.6);
+  });
+
+  it('clamps to [0, 1]', () => {
+    const { fractionRef, commit } = makeCommitter();
+    commit(-1);
+    expect(fractionRef.current).toBe(0);
+    commit(2);
+    expect(fractionRef.current).toBe(1);
   });
 });
 

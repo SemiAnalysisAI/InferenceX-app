@@ -30,9 +30,23 @@ export function spanMs(numDates: number): number {
   return Math.min(30_000, Math.max(4500, numDates * 800));
 }
 
+// Scrubber-resolution quantum (1/1000) used to throttle React commits while
+// the rAF loop advances continuously through the underlying ref.
+export const FRACTION_COMMIT_QUANTUM = 1000;
+
+// True when `next` differs from `prev` by at least one quantum tick. The
+// caller decides whether to bypass this entirely (force) — keeping the
+// predicate pure makes it match its name.
+export function shouldCommitFraction(prev: number, next: number): boolean {
+  return Math.round(prev * FRACTION_COMMIT_QUANTUM) !== Math.round(next * FRACTION_COMMIT_QUANTUM);
+}
+
+// Floor the eased step (same math as the renderer's interpolation) so the
+// label changes only when the visible interpolation crosses into the next
+// segment, not when the playhead is halfway through it.
 export function dateAtFraction(timeline: ReplayTimeline, fraction: number): string {
   const dates = timeline.dates;
   if (dates.length === 0) return '';
-  const step = Math.round(stepFloatAtFraction(fraction, dates.length));
+  const step = Math.floor(stepFloatAtFraction(fraction, dates.length));
   return dates[Math.max(0, Math.min(dates.length - 1, step))] ?? '';
 }
