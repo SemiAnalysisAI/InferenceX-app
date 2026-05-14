@@ -4,7 +4,7 @@ const FIRST_SEEN_KEY = 'inferencex-first-seen';
 const LAST_SEEN_KEY = 'inferencex-last-seen';
 const SESSION_KEY = 'inferencex-visit-counted';
 
-export const FEEDBACK_TARGET_VISIT = 4;
+export const FEEDBACK_TARGET_VISIT = 2;
 export const FEEDBACK_ELIGIBLE_EVENT = 'inferencex:feedback-eligible';
 
 function todayISO(): string {
