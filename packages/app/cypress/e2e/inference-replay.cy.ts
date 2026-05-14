@@ -27,8 +27,11 @@ describe('Inference Replay', () => {
 
   it('opens the replay preview modal from the MP4 menu item', () => {
     openReplayDialog();
+    // Assert the dialog itself is visible. ChartDisplay now opens the launcher
+    // via an imperative ref; the optional-chain `?.open()` would silently
+    // no-op if the ref ever failed to attach, so this guards against that.
+    cy.get('[data-testid="replay-dialog-chart-0"]').should('be.visible');
     cy.get('[data-testid="replay-panel-chart-0"]').should('exist');
-    // Either the loading message, the "not enough history" message, or the controls.
     cy.get('[data-testid="replay-panel-chart-0"]').then(($panel) => {
       const text = $panel.text();
       const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;

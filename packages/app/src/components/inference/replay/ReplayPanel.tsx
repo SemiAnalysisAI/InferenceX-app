@@ -22,8 +22,21 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 import { buildReplayTimeline } from './buildReplayTimeline';
-import { buildFrameData, dateAtFraction, spanMs } from './replayFrameData';
+import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
+import { buildFrameData, dateAtFraction, shouldCommitFraction, spanMs } from './replayFrameData';
 import { useReducedMotion } from './useReducedMotion';
+
+type Mp4ExportGuard = (value: unknown) => value is Mp4ExportError;
+
+// Lowercase pipeline tokens like "mux"/"flush" are jargon in a user-facing
+// banner. The raw stage still flows through telemetry — only the user copy
+// is humanized.
+const STAGE_LABELS: Partial<Record<Mp4ExportStage, string>> = {
+  render: 'while rendering frames',
+  encode: 'while encoding video',
+  flush: 'while finalizing video',
+  mux: 'while finalizing video',
+};
 
 interface ReplayPanelProps {
   parentChartId: string;
@@ -160,6 +173,20 @@ export default function ReplayPanel({
   const playingRef = useRef(playing);
   playingRef.current = playing;
 
+  // Accumulator decoupled from React state so the rAF loop doesn't trigger a
+  // commit on every tick. Snapshot the previous ref value *before* mutating
+  // so the predicate compares like-with-like — comparing against the
+  // React-committed value lags by a frame and would no-op a backward scrub
+  // that crosses a quantum boundary.
+  const fractionRef = useRef(0);
+  const commitFraction = useCallback((next: number, opts?: { force?: boolean }) => {
+    const clamped = next < 0 ? 0 : Math.min(1, next);
+    const prev = fractionRef.current;
+    fractionRef.current = clamped;
+    const force = opts?.force ?? false;
+    if (force || shouldCommitFraction(prev, clamped)) setFraction(clamped);
+  }, []);
+
   useEffect(() => {
     if (!playing || !timeline) return;
     // Reduced motion: advance one observed step per ~1.2s without per-frame
@@ -169,13 +196,11 @@ export default function ReplayPanel({
       const n = timeline.dates.length;
       const intervalId = window.setInterval(() => {
         if (!playingRef.current) return;
-        setFraction((prev) => {
-          const cur = Math.round(prev * (n - 1));
-          const nextStep = Math.min(n - 1, cur + 1);
-          const next = nextStep / (n - 1);
-          if (nextStep === n - 1) setPlaying(false);
-          return next;
-        });
+        const cur = Math.round(fractionRef.current * (n - 1));
+        const nextStep = Math.min(n - 1, cur + 1);
+        const next = nextStep / (n - 1);
+        commitFraction(next, { force: true });
+        if (nextStep === n - 1) setPlaying(false);
       }, stepMs);
       return () => window.clearInterval(intervalId);
     }
@@ -186,13 +211,9 @@ export default function ReplayPanel({
       if (!playingRef.current) return;
       const dt = now - last;
       last = now;
-      setFraction((prev) => {
-        const next = Math.min(1, prev + (dt / totalMs) * speedRef.current);
-        if (next >= 1) {
-          setPlaying(false);
-        }
-        return next;
-      });
+      const next = Math.min(1, fractionRef.current + (dt / totalMs) * speedRef.current);
+      commitFraction(next);
+      if (next >= 1) setPlaying(false);
       rafId = requestAnimationFrame(step);
     };
     // When the tab is hidden the browser throttles rAF to ~1Hz, so resuming
@@ -220,6 +241,7 @@ export default function ReplayPanel({
   }, [playing, timeline, prefersReducedMotion]);
 
   useEffect(() => {
+    fractionRef.current = 0;
     setFraction(0);
     setPlaying(false);
   }, [timeline]);
@@ -239,17 +261,20 @@ export default function ReplayPanel({
       setPlaying(false);
       track('inference_replay_paused', { fraction });
     } else {
-      setFraction((f) => (f >= 1 ? 0 : f));
+      if (fractionRef.current >= 1) commitFraction(0, { force: true });
       setPlaying(true);
       track('inference_replay_started', { speed });
     }
-  }, [playing, fraction, speed]);
+  }, [playing, fraction, speed, commitFraction]);
 
-  const handleScrub = useCallback((value: number) => {
-    setFraction(value);
-    setPlaying(false);
-    track('inference_replay_scrubbed', { fraction: value });
-  }, []);
+  const handleScrub = useCallback(
+    (value: number) => {
+      commitFraction(value, { force: true });
+      setPlaying(false);
+      track('inference_replay_scrubbed', { fraction: value });
+    },
+    [commitFraction],
+  );
 
   const handleScrubKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -294,9 +319,9 @@ export default function ReplayPanel({
   }, []);
 
   const handleReset = useCallback(() => {
-    setFraction(0);
+    commitFraction(0, { force: true });
     setPlaying(false);
-  }, []);
+  }, [commitFraction]);
 
   const handleCancelExport = useCallback(() => {
     abortRef.current?.abort();
@@ -316,19 +341,21 @@ export default function ReplayPanel({
       chartType: chartDefinition.chartType,
       hasWebCodecs,
     });
-    // oxlint-disable-next-line prefer-const
-    let stage: 'init' | 'render' | 'encode' | 'flush' | 'mux' = 'init';
-    // oxlint-disable-next-line prefer-const
+    let stage: Mp4ExportStage = 'init';
     let frameCount = 0;
+    let lastProgressAt = startedAt;
+    // Late-bound so the catch can narrow the error after the module loads.
+    let guard: Mp4ExportGuard | null = null;
     try {
-      const { exportReplayMp4 } = await import('./exportMp4');
+      const mod = await import('./exportMp4');
+      const { exportReplayMp4 } = mod;
+      guard = mod.isMp4ExportError;
       // Export duration is deterministic from timeline length, NOT playback speed
       // — the MP4 is an artifact of the dataset, not a recording of the current
       // UI session. Capped at 60s.
       const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
       const root = panelRef.current;
       if (!root) throw new Error('Replay panel element is not mounted.');
-      stage = 'render';
       await exportReplayMp4({
         captureRoot: root,
         fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
@@ -337,12 +364,16 @@ export default function ReplayPanel({
         renderFrame: async (t) => {
           // flushSync forces React to commit synchronously; two RAFs let the
           // browser paint before the capture step reads back the DOM.
-          flushSync(() => setFraction(t));
+          flushSync(() => commitFraction(t, { force: true }));
           await new Promise<void>((resolve) => {
             requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
           });
         },
+        onStage: (s) => {
+          stage = s;
+        },
         onProgress: (p) => {
+          lastProgressAt = performance.now();
           frameCount = Math.round(p * durationSec * 30);
           setExportProgress(p);
         },
@@ -366,19 +397,31 @@ export default function ReplayPanel({
       console.error('MP4 export failed', error);
       const message = error instanceof Error ? error.message : 'Export failed.';
       const errorName = error instanceof Error ? error.name : 'unknown';
+      let encoderState: VideoEncoder['state'] | 'unknown' = 'unknown';
+      let queuedFrames = 0;
+      if (guard?.(error)) {
+        stage = error.stage;
+        encoderState = error.encoderState;
+        queuedFrames = error.queuedFrames;
+      }
+      const elapsedSinceLastProgressMs = Math.round(performance.now() - lastProgressAt);
+      const stageLabel = STAGE_LABELS[stage];
       setExportError(
         hasWebCodecs
-          ? message
+          ? `${message}${stageLabel ? ` (${stageLabel})` : ''}`
           : 'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
       );
       track('inference_replay_export_failed', {
-        reason: message,
+        reason: message.slice(0, 500),
         errorName,
         userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
         hasWebCodecs,
         frameCount,
         durationMs: Math.round(performance.now() - startedAt),
         stage,
+        encoderState,
+        queuedFrames,
+        elapsedSinceLastProgressMs,
       });
     } finally {
       setIsExporting(false);
