@@ -99,7 +99,7 @@ describe('Inference Replay', () => {
     cy.get('body').then(($body) => {
       if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
       // Capture the SVG path data for the first roofline as a stable signature.
-      cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline')
+      cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
         .first()
         .invoke('attr', 'd')
         .then((beforeD) => {
@@ -115,7 +115,7 @@ describe('Inference Replay', () => {
             win.dispatchEvent(new win.PopStateEvent('popstate'));
           });
           cy.wait(400);
-          cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline')
+          cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
             .first()
             .invoke('attr', 'd')
             .should((afterD) => {
