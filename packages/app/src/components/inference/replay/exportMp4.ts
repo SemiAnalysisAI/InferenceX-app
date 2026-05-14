@@ -285,6 +285,14 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
       expandLegendForExport(clone);
       resolveCssVarsForExport(clone);
 
+      // Collapse .no-export boxes entirely. html-to-image's `filter` skips
+      // rendering, but the cloned nodes still take layout space — leaving
+      // dead space below the chart (controls bar) and inside the legend
+      // (search input, switches, action links). Matches the PNG export path.
+      for (const el of clone.querySelectorAll<HTMLElement>('.no-export')) {
+        el.style.display = 'none';
+      }
+
       const captured = await toCanvas(clone, {
         pixelRatio: 1,
         cacheBust: false,

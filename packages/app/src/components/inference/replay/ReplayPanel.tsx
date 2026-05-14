@@ -114,9 +114,22 @@ export default function ReplayPanel({
       if (!svg) return;
       const wRect = wrapper.getBoundingClientRect();
       const sRect = svg.getBoundingClientRect();
+      // When the legend sits to the right of the SVG, anchor the date's right
+      // edge to the legend's left edge (with a small gap) so wide dates like
+      // "2026-05-13" can't bleed into the legend column. Fall back to the
+      // SVG's right edge when no legend column is present (mobile/stacked).
+      // The legend container is positioned over the right edge of the SVG, so
+      // its bounding rect overlaps the SVG horizontally — anchor the date's
+      // right edge to the legend's left edge whenever it's present rather
+      // than checking for non-overlap.
+      const legend = wrapper.querySelector<HTMLElement>('[data-testid="chart-legend"]');
+      const legendRect = legend?.getBoundingClientRect();
+      const rightAnchor = legendRect
+        ? wRect.right - legendRect.left + 12
+        : wRect.right - sRect.right + 10;
       setSvgOffset((prev) => {
         const next = {
-          right: Math.max(0, wRect.right - sRect.right + 10),
+          right: Math.max(0, rightAnchor),
           top: sRect.top - wRect.top + 24,
         };
         if (prev && prev.right === next.right && prev.top === next.top) return prev;
