@@ -293,6 +293,26 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
         el.style.display = 'none';
       }
 
+      // Legend scroll container has a `border-b` divider that only makes sense
+      // when the bottom controls below it are visible; with .no-export gone
+      // the line dangles, so strip it once nothing visible remains below.
+      const legendContainer = clone.querySelector<HTMLElement>('[data-testid="chart-legend"]');
+      if (legendContainer) {
+        const scrollContainer =
+          legendContainer.querySelector<HTMLElement>('ul, [class*="overflow"]');
+        if (scrollContainer) {
+          const sibling = scrollContainer.nextElementSibling as HTMLElement | null;
+          const hasVisibleControls =
+            sibling &&
+            sibling.style.display !== 'none' &&
+            [...sibling.children].some((child) => (child as HTMLElement).style.display !== 'none');
+          if (!hasVisibleControls) {
+            scrollContainer.style.borderBottom = 'none';
+            scrollContainer.style.paddingBottom = '0';
+          }
+        }
+      }
+
       const captured = await toCanvas(clone, {
         pixelRatio: 1,
         cacheBust: false,
