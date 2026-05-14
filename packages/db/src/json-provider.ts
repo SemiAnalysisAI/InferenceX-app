@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import type { BenchmarkRow } from './queries/benchmarks.js';
+import type { BenchmarkEnvironment } from './queries/environments.js';
 import type { EvalRow } from './queries/evaluations.js';
 import type { ReliabilityRow } from './queries/reliability.js';
 import type {
@@ -273,6 +274,8 @@ function toBenchmarkRow(
   metrics?: Record<string, number>,
 ): BenchmarkRow {
   return {
+    workflow_run_id: br.workflow_run_id,
+    config_id: br.config_id,
     hardware: c.hardware,
     framework: c.framework,
     model: c.model,
@@ -582,4 +585,46 @@ export function getServerLog(benchmarkResultId: number): string | null {
   }
 
   return s.serverLogs.get(logId) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Environments — feeds /api/v1/run-environment
+// ---------------------------------------------------------------------------
+
+/**
+ * Older dumps that pre-date the `benchmark_environments` table won't have
+ * a `benchmark_environments.json` file. In that case `getEnvironmentForRunConfig`
+ * returns `null`, matching the "no row found" SQL behavior.
+ */
+export function getEnvironmentForRunConfig(
+  workflowRunId: number,
+  configId: number,
+): BenchmarkEnvironment | null {
+  const s = getStore();
+  const envPath = resolve(s.dumpDir, 'benchmark_environments.json');
+  if (!existsSync(envPath)) return null;
+
+  type RawEnv = BenchmarkEnvironment & {
+    workflow_run_id: number;
+    config_id: number;
+  };
+  const raw = JSON.parse(readFileSync(envPath, 'utf8')) as RawEnv[];
+  const match = raw.find(
+    (e) => Number(e.workflow_run_id) === workflowRunId && Number(e.config_id) === configId,
+  );
+  if (!match) return null;
+
+  return {
+    source: match.source,
+    image: match.image,
+    framework_version: match.framework_version,
+    framework_sha: match.framework_sha,
+    torch_version: match.torch_version,
+    python_version: match.python_version,
+    cuda_version: match.cuda_version,
+    rocm_version: match.rocm_version,
+    driver_version: match.driver_version,
+    gpu_sku: match.gpu_sku,
+    extra: match.extra ?? {},
+  };
 }

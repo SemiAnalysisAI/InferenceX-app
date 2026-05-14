@@ -146,6 +146,23 @@ export function InferenceProvider({
   // --- Tracked configs state ---
   const [trackedConfigs, setTrackedConfigs] = useState<TrackedConfig[]>([]);
 
+  // --- Reproduce drawer state ---
+  // Local-only — we do NOT sync this to the URL because closing the drawer
+  // should not perturb chart zoom or share-link state.
+  const [reproducePoint, setReproducePoint] = useState<InferenceData | null>(null);
+  const openReproduceDrawer = useCallback((point: InferenceData, source: string) => {
+    setReproducePoint(point);
+    track('reproduce_drawer_open_clicked', {
+      source,
+      framework: point.framework,
+      hwKey: point.hwKey,
+      precision: point.precision,
+      tp: point.tp,
+      conc: point.conc,
+    });
+  }, []);
+  const closeReproduceDrawer = useCallback(() => setReproducePoint(null), []);
+
   // --- Favorite presets state ---
   const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -984,6 +1001,9 @@ export function InferenceProvider({
       activePresetId,
       setActivePresetId,
       presetGuardRef,
+      reproducePoint,
+      openReproduceDrawer,
+      closeReproduceDrawer,
     }),
     [
       activeHwTypes,
@@ -1037,6 +1057,9 @@ export function InferenceProvider({
       removeTrackedConfig,
       clearTrackedConfigs,
       activePresetId,
+      reproducePoint,
+      openReproduceDrawer,
+      closeReproduceDrawer,
     ],
   );
 

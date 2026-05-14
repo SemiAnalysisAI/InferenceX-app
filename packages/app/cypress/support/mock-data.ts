@@ -250,6 +250,9 @@ export function createMockInferenceContext(
     activePresetId: null,
     setActivePresetId: namedStub('setActivePresetId'),
     presetGuardRef: { current: false } as React.RefObject<boolean>,
+    reproducePoint: null,
+    openReproduceDrawer: namedStub('openReproduceDrawer'),
+    closeReproduceDrawer: namedStub('closeReproduceDrawer'),
     ...overrides,
   };
 }

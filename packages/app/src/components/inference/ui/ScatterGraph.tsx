@@ -150,6 +150,7 @@ const ScatterGraph = React.memo(
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
+      openReproduceDrawer,
     } = useInference();
 
     const {
@@ -679,6 +680,15 @@ const ScatterGraph = React.memo(
                 });
               });
             }
+            const reproduceBtn = tooltipEl.querySelector('[data-action="reproduce"]');
+            if (reproduceBtn) {
+              reproduceBtn.addEventListener('click', (btnEvent) => {
+                btnEvent.stopPropagation();
+                openReproduceDrawer(d, 'scatter_tooltip');
+                chartRef.current?.dismissTooltip();
+                chartRef.current?.hideTooltip();
+              });
+            }
           }
         },
         attachToLayer: 1, // scatter layer is index 1 (after rooflines at 0)
@@ -693,6 +703,7 @@ const ScatterGraph = React.memo(
         removeTrackedConfig,
         chartDefinition.chartType,
         selectedPrecisions,
+        openReproduceDrawer,
       ],
     );
 

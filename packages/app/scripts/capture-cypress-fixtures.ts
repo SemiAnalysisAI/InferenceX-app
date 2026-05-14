@@ -3,7 +3,8 @@
  *
  * Hits the public production API by default and writes one JSON file per
  * endpoint into cypress/fixtures/api/. The cypress e2e suite uses these
- * fixtures via cy.intercept so tests run with no database.
+ * fixtures via server-side `FIXTURES_MODE` (E2E_FIXTURES=1) so tests run
+ * with no database.
  *
  * Usage:
  *   pnpm --filter app capture:fixtures                              (prod)
@@ -154,6 +155,11 @@ async function main() {
     precision: string;
     isl: number;
     osl: number;
+    // Optional: only present after the env-key PR ships. The capture script
+    // uses these to fetch a representative `/api/v1/run-environment` response;
+    // the route uses them as its sole identifier.
+    workflow_run_id?: number;
+    config_id?: number;
   }
   const benchmarks = await fetchJson<BenchmarkRow[]>(
     `/api/v1/benchmarks?model=${encodeURIComponent(BENCHMARK_MODEL)}`,
@@ -187,6 +193,51 @@ async function main() {
   const workflowInfo = await fetchJson<unknown>(
     `/api/v1/workflow-info?date=${encodeURIComponent(latestDate)}`,
   );
+
+  // run-environment: fired by `useRunEnvironment` every time the Reproduce
+  // drawer opens. We need a fixture so cypress' fixture mode doesn't 500.
+  // Try to pull a real one from prod, falling back to an all-nulls /
+  // log_parse placeholder. The placeholder is the worst-case end-state the
+  // drawer is designed to render (every env-only field shows "(not
+  // recorded)" with the "Some fields are approximated…" hint), so it's
+  // production-realistic even before the upstream env.json artifact lands.
+  const RUN_ENV_PLACEHOLDER = {
+    workflow_run_id: 1,
+    config_id: 1,
+    environment: {
+      source: 'log_parse',
+      image: null,
+      framework_version: null,
+      framework_sha: null,
+      torch_version: null,
+      python_version: null,
+      cuda_version: null,
+      rocm_version: null,
+      driver_version: null,
+      gpu_sku: null,
+      extra: {},
+    },
+  };
+  let runEnvironment: unknown = RUN_ENV_PLACEHOLDER;
+  const sampleRow = benchmarks.find((b) => b.workflow_run_id && b.config_id);
+  if (sampleRow) {
+    const envUrl =
+      `${baseUrl}/api/v1/run-environment` +
+      `?workflow_run_id=${sampleRow.workflow_run_id}` +
+      `&config_id=${sampleRow.config_id}`;
+    try {
+      const res = await fetch(envUrl);
+      if (res.ok) runEnvironment = await res.json();
+    } catch {
+      // Network or parse failure — keep the placeholder; logged below.
+    }
+  }
+  if (runEnvironment === RUN_ENV_PLACEHOLDER) {
+    console.log(
+      '  (note) run-environment: using placeholder — either prod predates the env PR, ' +
+        'the benchmark_environments table is empty, or the route is unavailable.',
+    );
+  }
 
   const N = TOP_DATES_PER_PARTITION;
   const sizes: [string, number][] = [
@@ -250,6 +301,7 @@ async function main() {
       }),
     ],
     ['workflow-info', await writeFixture('workflow-info', workflowInfo)],
+    ['run-environment', await writeFixture('run-environment', runEnvironment)],
   ];
 
   for (const [name, bytes] of sizes) {

@@ -88,6 +88,14 @@ export interface AggDataEntry {
   actualDate?: string;
   /** URL to the GitHub Actions workflow run that produced this data point. */
   run_url?: string;
+  /**
+   * Natural-key halves for the Reproduce Drawer's Environment tab — together
+   * they key `/api/v1/run-environment`. Both are optional because client-only
+   * synthetic points (e.g. overlay rooflines, unofficial-run rows) don't
+   * originate from a DB row.
+   */
+  workflowRunId?: number;
+  configId?: number;
 }
 
 /**
@@ -546,6 +554,12 @@ export interface InferenceChartContextType {
   activePresetId: string | null;
   setActivePresetId: (id: string | null) => void;
   presetGuardRef: React.RefObject<boolean>;
+  /** The point currently shown in the Reproduce drawer, or null when closed. */
+  reproducePoint: InferenceData | null;
+  /** Open the Reproduce drawer for a given chart point. */
+  openReproduceDrawer: (point: InferenceData, source: string) => void;
+  /** Close the Reproduce drawer. */
+  closeReproduceDrawer: () => void;
 }
 export interface CalculateUserCostsRequest {
   model: string;

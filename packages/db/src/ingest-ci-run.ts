@@ -45,6 +45,9 @@ import {
   bulkUpsertAvailability,
   insertServerLog,
 } from './etl/benchmark-ingest';
+import { parseServerLogEnv, type ParsedEnv } from './etl/env-parser';
+import { readEnvJson } from './etl/env-json-reader';
+import { upsertBenchmarkEnvironment } from './etl/env-ingest';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 import { mapEvalSamples } from './etl/eval-samples-mapper';
@@ -426,6 +429,41 @@ async function main(): Promise<void> {
               try {
                 const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
                 await insertServerLog(sql, insertedIds, serverLog);
+
+                // Populate benchmark_environments for every distinct config
+                // in this artifact. env.json (next to server.log in the same
+                // server_logs_<key>/ dir) is authoritative; the server-log
+                // parser is the fallback. Failures here MUST NOT abort the
+                // benchmark ingest — env data is supplementary.
+                const envJsonPath = path.join(path.dirname(logPath), 'env.json');
+                let envJsonParsed: ParsedEnv | null = null;
+                if (fs.existsSync(envJsonPath)) {
+                  try {
+                    envJsonParsed = readEnvJson(fs.readFileSync(envJsonPath, 'utf8'));
+                  } catch (error: any) {
+                    console.warn(
+                      `  [WARN] failed to parse env.json for ${configKey}: ${error.message}`,
+                    );
+                  }
+                }
+
+                const seenConfigIds = new Set<number>();
+                for (const r of toInsert) {
+                  if (seenConfigIds.has(r.configId)) continue;
+                  seenConfigIds.add(r.configId);
+                  const parsed = envJsonParsed ?? parseServerLogEnv(serverLog, r.config.framework);
+                  try {
+                    await upsertBenchmarkEnvironment(
+                      sql,
+                      workflowRunId,
+                      r.configId,
+                      r.image,
+                      parsed,
+                    );
+                  } catch (error: any) {
+                    tracker.recordDbError(`env for ${configKey}`, error);
+                  }
+                }
               } catch (error: any) {
                 tracker.recordDbError(`server_log for ${configKey}`, error);
               }

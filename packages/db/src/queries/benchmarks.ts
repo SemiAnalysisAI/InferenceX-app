@@ -1,6 +1,14 @@
 import type { DbClient } from '../connection.js';
 
 export interface BenchmarkRow {
+  /**
+   * Natural-key halves identifying the (run, config) this row was produced
+   * by. Together they key `benchmark_environments` and any future
+   * per-(run, config) endpoint. Optional because unofficial-run rows
+   * (synthesized client-side from GHA artifacts) have no DB row.
+   */
+  workflow_run_id?: number;
+  config_id?: number;
   hardware: string;
   framework: string;
   model: string;
@@ -51,6 +59,8 @@ export async function getLatestBenchmarks(
     const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
     const rows = await sql`
       SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
+        br.workflow_run_id,
+        br.config_id,
         c.hardware,
         c.framework,
         c.model,
@@ -89,6 +99,8 @@ export async function getLatestBenchmarks(
   // No date filter: use materialized view for instant lookups
   const rows = await sql`
     SELECT
+      lb.workflow_run_id,
+      lb.config_id,
       c.hardware,
       c.framework,
       c.model,
@@ -136,6 +148,8 @@ export async function getAllBenchmarksForHistory(
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   const rows = await sql`
     SELECT
+      br.workflow_run_id,
+      br.config_id,
       c.hardware,
       c.framework,
       c.model,

@@ -6,6 +6,14 @@
 import type { SubmissionsResponse } from './submissions-types';
 
 export interface BenchmarkRow {
+  /**
+   * Natural-key halves identifying the (run, config) this row was produced
+   * by. Together they key `benchmark_environments` and any future
+   * per-(run, config) endpoint. Optional because unofficial-run rows
+   * (synthesized client-side from GHA artifacts) have no DB row.
+   */
+  workflow_run_id?: number;
+  config_id?: number;
   hardware: string;
   framework: string;
   model: string;
@@ -270,4 +278,34 @@ export interface FeedbackListRow {
 
 export function fetchFeedbackList(signal?: AbortSignal) {
   return fetchJson<{ rows: FeedbackListRow[] }>('/api/v1/feedback/list', signal);
+}
+
+/** Environment metadata for a single benchmark row, served by /api/v1/run-environment. */
+export interface BenchmarkEnvironment {
+  /** Provenance: 'env_json' = authoritative, 'log_parse' = best-effort fallback. */
+  source: 'env_json' | 'log_parse';
+  image: string | null;
+  framework_version: string | null;
+  framework_sha: string | null;
+  torch_version: string | null;
+  python_version: string | null;
+  cuda_version: string | null;
+  rocm_version: string | null;
+  driver_version: string | null;
+  gpu_sku: string | null;
+  extra: Record<string, unknown>;
+}
+
+export interface RunEnvironmentResponse {
+  workflow_run_id: number;
+  config_id: number;
+  environment: BenchmarkEnvironment;
+}
+
+export function fetchRunEnvironment(workflowRunId: number, configId: number, signal?: AbortSignal) {
+  const params = new URLSearchParams({
+    workflow_run_id: String(workflowRunId),
+    config_id: String(configId),
+  });
+  return fetchJson<RunEnvironmentResponse>(`/api/v1/run-environment?${params}`, signal);
 }

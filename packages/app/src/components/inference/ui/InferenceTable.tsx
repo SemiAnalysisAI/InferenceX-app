@@ -2,8 +2,10 @@
 
 import { useMemo } from 'react';
 
+import { useInference } from '@/components/inference/InferenceContext';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { track } from '@/lib/analytics';
 import { getHardwareConfig } from '@/lib/constants';
 import { getNestedYValue } from '@/lib/chart-utils';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
@@ -29,6 +31,7 @@ export default function InferenceTable({
   chartDefinition,
   selectedYAxisMetric,
 }: InferenceTableProps) {
+  const { openReproduceDrawer } = useInference();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const yLabel = chartDefinition[`${selectedYAxisMetric}_label` as keyof ChartDefinition] as string;
   const xLabel = chartDefinition.x_label;
@@ -120,6 +123,16 @@ export default function InferenceTable({
       columns={columns}
       testId="inference-results-table"
       analyticsPrefix="inference_table"
+      onRowClick={(row) => {
+        track('inference_table_reproduce_clicked', {
+          framework: row.framework,
+          hwKey: row.hwKey,
+          precision: row.precision,
+          tp: row.tp,
+          conc: row.conc,
+        });
+        openReproduceDrawer(row, 'inference_table');
+      }}
     />
   );
 }

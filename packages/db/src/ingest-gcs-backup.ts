@@ -44,6 +44,9 @@ import {
   bulkUpsertAvailability,
   insertServerLog,
 } from './etl/benchmark-ingest';
+import { parseServerLogEnv, type ParsedEnv } from './etl/env-parser';
+import { readEnvJson } from './etl/env-json-reader';
+import { upsertBenchmarkEnvironment } from './etl/env-ingest';
 import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 import { mapEvalSamples } from './etl/eval-samples-mapper';
@@ -610,6 +613,33 @@ async function main(): Promise<void> {
               // Strip null bytes — some logs contain 0x00 which PostgreSQL text columns reject
               const clean = serverLog.replaceAll('\u0000', '');
               await insertServerLog(sql, insertedIds, clean);
+
+              // Populate benchmark_environments. env.json (next to
+              // server.log inside the same ZIP) is authoritative; the
+              // server-log parser is the fallback. Errors here MUST NOT
+              // abort the benchmark ingest.
+              const envJsonText = readZipText(serverLogPath, 'env.json');
+              let envJsonParsed: ParsedEnv | null = null;
+              if (envJsonText) {
+                try {
+                  envJsonParsed = readEnvJson(envJsonText);
+                } catch (error: any) {
+                  console.warn(
+                    `  [WARN] failed to parse env.json in ${path.basename(serverLogPath)}: ${error.message}`,
+                  );
+                }
+              }
+              const seenConfigIds = new Set<number>();
+              for (const r of toInsert) {
+                if (seenConfigIds.has(r.configId)) continue;
+                seenConfigIds.add(r.configId);
+                const parsed = envJsonParsed ?? parseServerLogEnv(clean, r.config.framework);
+                try {
+                  await upsertBenchmarkEnvironment(sql, workflowRunId, r.configId, r.image, parsed);
+                } catch (error: any) {
+                  tracker.recordDbError(`env for ${zipFile}`, error);
+                }
+              }
             }
           }
         } catch (error: any) {

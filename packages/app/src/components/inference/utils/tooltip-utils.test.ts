@@ -264,6 +264,17 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('Track Over Time');
     expect(html).not.toContain('Untrack Over Time');
   });
+
+  it('shows the Reproduce button when pinned', () => {
+    const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
+    expect(html).toContain('data-action="reproduce"');
+    expect(html).toContain('Reproduce');
+  });
+
+  it('does not show the Reproduce button when not pinned', () => {
+    const html = generateTooltipContent(tooltipConfig({ isPinned: false }));
+    expect(html).not.toContain('data-action="reproduce"');
+  });
 });
 
 // ===========================================================================
@@ -364,5 +375,15 @@ describe('generateGPUGraphTooltipContent', () => {
       tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
     );
     expect(html).toContain('vllm-v0.6.0<br />abc123');
+  });
+
+  it('shows the Reproduce button when pinned', () => {
+    const html = generateGPUGraphTooltipContent(tooltipConfig({ isPinned: true }));
+    expect(html).toContain('data-action="reproduce"');
+  });
+
+  it('does not show the Reproduce button when not pinned', () => {
+    const html = generateGPUGraphTooltipContent(tooltipConfig({ isPinned: false }));
+    expect(html).not.toContain('data-action="reproduce"');
   });
 });

@@ -192,7 +192,12 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
               margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
               border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
               background: var(--accent); color: var(--accent-foreground);
-            ">${config.isTracked ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Untrack Over Time' : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>Track Over Time'}</button>`
+            ">${config.isTracked ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>Untrack Over Time' : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>Track Over Time'}</button>
+            <button data-action="reproduce" data-testid="tooltip-reproduce-btn" style="
+              margin-top: 6px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
+              border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+              background: var(--background); color: var(--foreground);
+            "><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Reproduce…</button>`
           : ''
       }
     </div>
@@ -301,6 +306,15 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
       ${runLinkHTML(runUrl)}
+      ${
+        isPinned
+          ? `<button data-action="reproduce" data-testid="tooltip-reproduce-btn" style="
+              margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
+              border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+              background: var(--background); color: var(--foreground);
+            "><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-1px;margin-right:4px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Reproduce…</button>`
+          : ''
+      }
     </div>
   `;
 };

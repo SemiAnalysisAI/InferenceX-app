@@ -6,6 +6,8 @@ import { rowToAggDataEntry, transformBenchmarkRows } from './benchmark-transform
 
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
+    workflow_run_id: 1,
+    config_id: 1,
     hardware: 'h200',
     framework: 'trt',
     model: 'dsr1',

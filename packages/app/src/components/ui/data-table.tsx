@@ -51,6 +51,11 @@ interface DataTableProps<T> {
   analyticsPrefix?: string;
   /** Show watermark (default: true). */
   watermark?: boolean;
+  /**
+   * When set, the entire row is clickable and keyboard-activatable (Enter /
+   * Space), e.g. to open a detail drawer.
+   */
+  onRowClick?: (row: T, index: number) => void;
 }
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500] as const;
@@ -73,6 +78,7 @@ export function DataTable<T>({
   testId = 'data-table',
   analyticsPrefix = 'table',
   watermark = true,
+  onRowClick,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(25);
@@ -236,7 +242,28 @@ export function DataTable<T>({
               </tr>
             ) : (
               pageData.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
+                <tr
+                  key={rowIndex}
+                  className={`border-b border-border/50 hover:bg-muted/30${onRowClick ? ' cursor-pointer' : ''}`}
+                  data-testid={onRowClick ? 'data-table-row' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  role={onRowClick ? 'button' : undefined}
+                  aria-haspopup={onRowClick ? 'dialog' : undefined}
+                  aria-label={onRowClick ? 'Open details' : undefined}
+                  onClick={
+                    onRowClick ? () => onRowClick(row, safePage * pageSize + rowIndex) : undefined
+                  }
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onRowClick(row, safePage * pageSize + rowIndex);
+                          }
+                        }
+                      : undefined
+                  }
+                >
                   {columns.map((col, colIndex) => (
                     <td
                       key={colIndex}

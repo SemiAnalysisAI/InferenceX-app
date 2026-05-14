@@ -68,6 +68,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     date: row.date,
     actualDate: (row as any).actualDate ?? row.date,
     run_url: row.run_url ?? undefined,
+    workflowRunId: row.workflow_run_id,
+    configId: row.config_id,
   };
 }
 
