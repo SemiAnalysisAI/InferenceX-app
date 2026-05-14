@@ -1,12 +1,16 @@
 'use client';
 
 import { ChevronDown, ChevronUp, FileText, Lock, Minus, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import type { ComparisonChangelog as ComparisonChangelogType } from '@/hooks/api/use-comparison-changelogs';
+import {
+  buildDatesOnComparisonChart,
+  getAddableChangelogDates,
+} from '@/components/inference/utils/comparison-changelog-dates';
 import {
   configKeyMatchesHwKey,
   formatChangelogDescription,
@@ -27,6 +31,8 @@ interface ComparisonChangelogProps {
   onAddAllDates: (dates: string[]) => void;
   /** Earliest date the selected GPU config has benchmark data */
   firstAvailableDate?: string;
+  /** When this flips from false to true, expand the panel (e.g. comparison + range just became ready). */
+  expandWhenActive?: boolean;
 }
 
 export default function ComparisonChangelog({
@@ -41,8 +47,17 @@ export default function ComparisonChangelog({
   onRemoveDate,
   onAddAllDates,
   firstAvailableDate,
+  expandWhenActive = false,
 }: ComparisonChangelogProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(expandWhenActive);
+  const prevExpandActiveRef = useRef(expandWhenActive);
+
+  useEffect(() => {
+    if (expandWhenActive && !prevExpandActiveRef.current) {
+      setIsExpanded(true);
+    }
+    prevExpandActiveRef.current = expandWhenActive;
+  }, [expandWhenActive]);
 
   // Filter changelog entries to only show those matching selected GPUs and precisions.
   // Always keep range endpoints and first appearance date visible.
@@ -81,15 +96,13 @@ export default function ComparisonChangelog({
       .toSorted((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [changelogs, selectedGPUs, selectedPrecisions, pinnedDates]);
 
-  const datesOnChart = useMemo(() => {
-    const set = new Set(selectedDates);
-    if (selectedDateRange.startDate) set.add(selectedDateRange.startDate);
-    if (selectedDateRange.endDate) set.add(selectedDateRange.endDate);
-    return set;
-  }, [selectedDates, selectedDateRange]);
+  const datesOnChart = useMemo(
+    () => buildDatesOnComparisonChart(selectedDates, selectedDateRange),
+    [selectedDates, selectedDateRange],
+  );
 
   const addableDates = useMemo(
-    () => filteredChangelogs.map((c) => c.date).filter((d) => !datesOnChart.has(d)),
+    () => getAddableChangelogDates(filteredChangelogs, datesOnChart),
     [filteredChangelogs, datesOnChart],
   );
 
@@ -135,7 +148,7 @@ export default function ComparisonChangelog({
             className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-1"
           >
             <Plus className="size-3" />
-            Add all to chart
+            Pin all dates
           </button>
         )}
       </div>
@@ -194,12 +207,12 @@ export default function ComparisonChangelog({
                         className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
                       >
                         <Minus className="size-3" />
-                        Remove from chart
+                        Unpin
                       </button>
                     ) : (
                       <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                         <Lock className="size-3" />
-                        On chart
+                        Pinned
                       </span>
                     )
                   ) : (
@@ -212,7 +225,7 @@ export default function ComparisonChangelog({
                       className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                     >
                       <Plus className="size-3" />
-                      Add to chart
+                      Pin
                     </button>
                   )}
                 </div>

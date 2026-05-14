@@ -123,8 +123,8 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('#historical-log-scale').should('have.attr', 'data-state', 'unchecked');
   });
 
-  it('GPU Config multi-select is hidden (Historical Trends uses hideGpuComparison)', () => {
-    cy.get('[data-testid="gpu-multiselect"]').should('not.exist');
+  it('GPU Comparison card is not shown on Historical Trends (inference-only)', () => {
+    cy.get('[data-testid="gpu-comparison-card"]').should('not.exist');
   });
 
   it('Y-axis metric selector is present and can be changed', () => {

@@ -11,7 +11,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <NudgeEngine scope="dashboard" />
       <UnofficialRunProvider>
         <main className="relative">
-          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
+          <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-2 md:gap-3">
             <TabNav />
             <GlobalFilterProvider>{children}</GlobalFilterProvider>
           </div>

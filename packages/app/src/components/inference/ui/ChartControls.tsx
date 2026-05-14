@@ -10,9 +10,7 @@ import {
   SequenceSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
   SelectContent,
@@ -73,12 +71,7 @@ const GROUPED_Y_AXIS_OPTIONS = METRIC_GROUPS.map((group) => ({
     .map((m) => ({ value: m, label: METRIC_TITLE_MAP.get(m)! })),
 })).filter((g) => g.options.length > 0);
 
-interface ChartControlsProps {
-  /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
-  hideGpuComparison?: boolean;
-}
-
-export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+export default function ChartControls() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const handleDropdownOpenChange = (dropdownKey: string) => (open: boolean) => {
     if (open) {
@@ -97,13 +90,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     selectedYAxisMetric,
     setSelectedYAxisMetric,
     graphs,
-    selectedGPUs,
-    setSelectedGPUs,
-    availableGPUs,
-    selectedDateRange,
-    setSelectedDateRange,
-    dateRangeAvailableDates,
-    isCheckingAvailableDates,
     availablePrecisions,
     availableSequences,
     availableModels,
@@ -164,14 +150,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setTimeout(trackCombinedFilters, 0);
   };
 
-  const handleGPUChange = (value: string[]) => {
-    setSelectedGPUs(value);
-    track('inference_gpu_selected', {
-      gpus: value.join(','),
-    });
-    setTimeout(trackCombinedFilters, 0);
-  };
-
   const handleXAxisMetricChange = (value: string) => {
     setSelectedXAxisMetric(value);
     track('inference_x_axis_metric_selected', {
@@ -193,14 +171,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     const title = (chartDef[titleKey] as string) || '';
     return title.toLowerCase().includes('input');
   })();
-
-  const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
-    setSelectedDateRange(range);
-    track('inference_date_range_changed', {
-      startDate: range.startDate,
-      endDate: range.endDate,
-    });
-  };
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -301,50 +271,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                 </Select>
               </div>
             )}
-
-          {!hideGpuComparison && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
-              <LabelWithTooltip
-                htmlFor="gpu-config-select"
-                label="GPU Config"
-                tooltip="Select up to 4 GPU configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware."
-              />
-              <div data-testid="gpu-multiselect">
-                <MultiSelect
-                  options={availableGPUs}
-                  value={selectedGPUs}
-                  onChange={handleGPUChange}
-                  open={openDropdown === 'gpu'}
-                  onOpenChange={handleDropdownOpenChange('gpu')}
-                  placeholder="Select a GPU Config for comparison"
-                  maxSelections={4}
-                />
-              </div>
-            </div>
-          )}
-
-          {!hideGpuComparison && selectedGPUs.length > 0 && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
-              <LabelWithTooltip
-                htmlFor="date-picker"
-                label="Comparison Date Range"
-                tooltip="Select the start and end dates for the historical comparison. The chart will show performance data for the selected GPU configs across this time range."
-              />
-              <DateRangePicker
-                dateRange={selectedDateRange}
-                onChange={handleDateRangeChange}
-                placeholder="Select date range"
-                availableDates={dateRangeAvailableDates}
-                isCheckingAvailableDates={isCheckingAvailableDates}
-                className={
-                  selectedGPUs.length > 0 &&
-                  (!selectedDateRange.startDate || !selectedDateRange.endDate)
-                    ? 'border-red-500 ring-4 ring-red-500/40 animate-pulse'
-                    : ''
-                }
-              />
-            </div>
-          )}
         </div>
       </div>
     </TooltipProvider>

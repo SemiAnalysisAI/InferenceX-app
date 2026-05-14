@@ -364,11 +364,10 @@ function MultiSelect({
               </div>
             )}
             {showSelectionSummary &&
-              (maxSelections !== undefined || minSelections !== undefined) && (
+              (typeof maxSelections === 'number' || typeof minSelections === 'number') && (
                 <div className="text-muted-foreground px-2 py-1.5 text-xs border-b mb-1">
-                  {value.length}
-                  {maxSelections !== undefined && ` / ${maxSelections}`} selected
-                  {minSelections !== undefined && minSelections > 0 && (
+                  {`${value.length}${typeof maxSelections === 'number' ? ` / ${maxSelections}` : ''} selected`}
+                  {typeof minSelections === 'number' && minSelections > 0 && (
                     <span className="block text-xs mt-0.5">Minimum: {minSelections}</span>
                   )}
                 </div>

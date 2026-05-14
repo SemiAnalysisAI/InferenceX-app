@@ -5,9 +5,11 @@ import { type DateRange, DateRangePicker } from '@/components/ui/date-range-pick
 function DateRangePickerHarness({
   initialRange = { startDate: '', endDate: '' },
   availableDates,
+  disabled,
 }: {
   initialRange?: DateRange;
   availableDates?: string[];
+  disabled?: boolean;
 }) {
   const [range, setRange] = useState<DateRange>(initialRange);
   return (
@@ -17,6 +19,7 @@ function DateRangePickerHarness({
         onChange={setRange}
         availableDates={availableDates}
         placeholder="Select date range"
+        disabled={disabled}
       />
       <div data-testid="date-range-output">
         {range.startDate && range.endDate ? `${range.startDate} to ${range.endDate}` : 'no range'}
@@ -29,6 +32,13 @@ describe('DateRangePicker', () => {
   it('renders with placeholder text', () => {
     cy.mount(<DateRangePickerHarness />);
     cy.get('[data-testid="date-range-wrapper"]').should('contain', 'Select date range');
+  });
+
+  it('does not open dialog when disabled', () => {
+    cy.mount(<DateRangePickerHarness disabled />);
+    cy.contains('Select date range').should('be.disabled');
+    cy.contains('Select date range').click({ force: true });
+    cy.get('[role="dialog"]').should('not.exist');
   });
 
   it('opens dialog when clicked', () => {
@@ -64,7 +74,7 @@ describe('DateRangePicker', () => {
     const dates = ['2025-12-01', '2025-12-15', '2026-01-01', '2026-02-01', '2026-03-01'];
     cy.mount(<DateRangePickerHarness availableDates={dates} />);
     cy.contains('Select date range').click();
-    cy.contains('button', 'Max Range').should('be.visible');
+    cy.contains('button', 'All Time').should('be.visible');
   });
 
   it('shows overlay when no available dates', () => {

@@ -40,13 +40,12 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/data-mappings';
-import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 
 import ChartControls from './ChartControls';
-import ComparisonChangelog from './ComparisonChangelog';
 import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
+import GpuComparisonCard from './GpuComparisonCard';
 import GPUGraph from './GPUGraph';
 import TrendChart from './TrendChart';
 
@@ -134,10 +133,7 @@ export default function ChartDisplay() {
     selectedE2eXAxisMetric,
     selectedGPUs,
     selectedPrecisions,
-    selectedDates,
-    setSelectedDates,
     selectedDateRange,
-    dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
     selectedRunDate,
@@ -151,11 +147,7 @@ export default function ChartDisplay() {
     setSelectedE2eXAxisMetric,
   } = useInference();
 
-  const {
-    changelogs,
-    loading: changelogsLoading,
-    totalDatesQueried,
-  } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
+  const comparisonReady = useMemo(() => selectedGPUs.length > 0, [selectedGPUs]);
 
   const [viewModes, setViewModes] = useState<Record<number, InferenceViewMode>>({});
   const getViewMode = (index: number): InferenceViewMode => viewModes[index] ?? 'chart';
@@ -325,9 +317,7 @@ export default function ChartDisplay() {
               <ChartButtons
                 chartId={`chart-${graphIndex}`}
                 analyticsPrefix={
-                  selectedDateRange.startDate &&
-                  selectedDateRange.endDate &&
-                  selectedGPUs.length > 0
+                  selectedDateRange.startDate && selectedDateRange.endDate && comparisonReady
                     ? 'gpu_timeseries'
                     : graph.chartDefinition.chartType === 'e2e'
                       ? 'latency'
@@ -347,9 +337,7 @@ export default function ChartDisplay() {
                 exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                 onExportCsv={() => {
                   const isTimeline =
-                    selectedDateRange.startDate &&
-                    selectedDateRange.endDate &&
-                    selectedGPUs.length > 0;
+                    selectedDateRange.startDate && selectedDateRange.endDate && comparisonReady;
                   const visibleData = graph.data.filter((d) =>
                     isTimeline
                       ? activeDates.has(`${d.date}_${d.hwKey}`)
@@ -413,7 +401,7 @@ export default function ChartDisplay() {
                             const zoomPrefix =
                               selectedDateRange.startDate &&
                               selectedDateRange.endDate &&
-                              selectedGPUs.length > 0
+                              comparisonReady
                                 ? 'gpu_timeseries'
                                 : 'latency';
                             return (
@@ -493,7 +481,7 @@ export default function ChartDisplay() {
 
                   return selectedDateRange.startDate &&
                     selectedDateRange.endDate &&
-                    selectedGPUs.length > 0 ? (
+                    comparisonReady ? (
                     <GPUGraph
                       chartId={`chart-${graphIndex}`}
                       modelLabel={graph.model}
@@ -508,34 +496,24 @@ export default function ChartDisplay() {
                       caption={chartCaption}
                     />
                   ) : (
-                    <div className="relative">
-                      <ScatterGraph
-                        chartId={`chart-${graphIndex}`}
-                        modelLabel={graph.model}
-                        data={graph.data}
-                        xLabel={graph.chartDefinition.x_label}
-                        yLabel={`${
-                          graph.chartDefinition[
-                            `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                          ]
-                        }`}
-                        chartDefinition={graph.chartDefinition}
-                        caption={chartCaption}
-                        overlayData={
-                          graph.chartDefinition.chartType === 'e2e'
-                            ? (overlayDataByChartType.e2e ?? undefined)
-                            : (overlayDataByChartType.interactivity ?? undefined)
-                        }
-                      />
-                      {selectedGPUs.length > 0 &&
-                        (!selectedDateRange.startDate || !selectedDateRange.endDate) && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
-                            <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-                              Select a date range to view GPU comparison
-                            </p>
-                          </div>
-                        )}
-                    </div>
+                    <ScatterGraph
+                      chartId={`chart-${graphIndex}`}
+                      modelLabel={graph.model}
+                      data={graph.data}
+                      xLabel={graph.chartDefinition.x_label}
+                      yLabel={`${
+                        graph.chartDefinition[
+                          `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
+                        ]
+                      }`}
+                      chartDefinition={graph.chartDefinition}
+                      caption={chartCaption}
+                      overlayData={
+                        graph.chartDefinition.chartType === 'e2e'
+                          ? (overlayDataByChartType.e2e ?? undefined)
+                          : (overlayDataByChartType.interactivity ?? undefined)
+                      }
+                    />
                   );
                 })()}
               </Card>
@@ -544,14 +522,14 @@ export default function ChartDisplay() {
         ));
 
   return (
-    <div data-testid="inference-chart-display" className="flex flex-col gap-4">
+    <div data-testid="inference-chart-display" className="flex flex-col gap-3 md:gap-4">
       <section className="relative z-20">
-        <Card>
-          <div className="flex flex-col gap-4">
+        <Card className="p-4 md:p-6">
+          <div className="flex flex-col gap-3">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold mb-2">Inference Performance</h2>
-                <p className="text-muted-foreground text-sm mb-4">
+                <h2 className="text-lg font-semibold mb-1.5">Inference Performance</h2>
+                <p className="text-muted-foreground text-sm mb-3">
                   Inference performance metrics across different models, hardware configurations,
                   and serving parameters.
                 </p>
@@ -560,33 +538,13 @@ export default function ChartDisplay() {
             </div>
             <ChartControls />
             <ModelArchitectureDiagram model={selectedModel} />
-            {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
-            {selectedGPUs.length > 0 && (
-              <ComparisonChangelog
-                changelogs={changelogs}
-                selectedGPUs={selectedGPUs}
-                selectedPrecisions={selectedPrecisions}
-                loading={changelogsLoading}
-                totalDatesQueried={totalDatesQueried}
-                selectedDates={selectedDates}
-                selectedDateRange={selectedDateRange}
-                onAddDate={(date) => {
-                  if (!selectedDates.includes(date)) {
-                    setSelectedDates([...selectedDates, date]);
-                  }
-                }}
-                onRemoveDate={(date) => {
-                  setSelectedDates(selectedDates.filter((d) => d !== date));
-                }}
-                onAddAllDates={(dates) => {
-                  const merged = [...new Set([...selectedDates, ...dates])];
-                  setSelectedDates(merged);
-                }}
-                firstAvailableDate={dateRangeAvailableDates[0]}
-              />
-            )}
+            <WorkflowInfoDisplay workflowInfo={workflowInfo} controlsDisabled={comparisonReady} />
           </div>
         </Card>
+      </section>
+
+      <section className="relative z-10">
+        <GpuComparisonCard />
       </section>
 
       {selectedYAxisMetric === 'y_costUser' && (
@@ -605,7 +563,7 @@ export default function ChartDisplay() {
       <Dialog
         open={
           trackedConfigs.length > 0 &&
-          !(selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0)
+          !(selectedDateRange.startDate && selectedDateRange.endDate && comparisonReady)
         }
         onOpenChange={(open) => {
           if (!open) {

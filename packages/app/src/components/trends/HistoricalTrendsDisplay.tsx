@@ -167,7 +167,7 @@ export default function HistoricalTrendsDisplay() {
                 Interpolated performance metrics over time at a fixed interactivity operating point.
               </p>
             </div>
-            <ChartControls hideGpuComparison />
+            <ChartControls />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -197,7 +197,7 @@ export default function HistoricalTrendsDisplay() {
             </div>
             <ChartShareActions />
           </div>
-          <ChartControls hideGpuComparison />
+          <ChartControls />
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (

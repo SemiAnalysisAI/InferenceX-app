@@ -52,6 +52,7 @@ import { clearAllMtpFamilies, effectiveLegendItems, resolveMtpToggle } from '@/l
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
+import { normalizeComparisonGpuList } from './utils/normalize-comparison-gpus';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -108,7 +109,8 @@ export function InferenceProvider({
   // ── Inference-specific filter state ─────────────────────────────────────────
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>(() => {
     const urlGpus = getUrlParam('i_gpus');
-    return urlGpus ? urlGpus.split(',').filter(Boolean) : [];
+    const parts = urlGpus ? urlGpus.split(',').filter(Boolean) : [];
+    return normalizeComparisonGpuList(parts);
   });
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
     () => getUrlParam('i_metric') || 'y_tpPerGpu',
@@ -643,6 +645,27 @@ export function InferenceProvider({
     }
   }, [dateRangeAvailableDates]);
 
+  // Auto-default to max date range once when GPU comparison first becomes ready.
+  // Uses a ref to fire only on the transition from 0 GPUs to >=1, avoiding a loop
+  // when the user intentionally clears the date range.
+  const prevGpuCountRef = useRef(selectedGPUs.length);
+  useEffect(() => {
+    const wasBelow = prevGpuCountRef.current < 1;
+    prevGpuCountRef.current = selectedGPUs.length;
+    if (!wasBelow) return;
+    if (selectedGPUs.length === 0) return;
+    if (selectedDateRange.startDate && selectedDateRange.endDate) return;
+    if (dateRangeAvailableDates.length < 2) return;
+    const startDate = dateRangeAvailableDates[0];
+    const endDate = dateRangeAvailableDates.at(-1)!;
+    setSelectedDateRange({ startDate, endDate });
+    track('inference_date_range_auto_defaulted', {
+      startDate,
+      endDate,
+      gpuCount: selectedGPUs.length,
+    });
+  }, [selectedGPUs, selectedDateRange, dateRangeAvailableDates]);
+
   useEffect(() => {
     setActiveDates(allDateIds);
   }, [allDateIds, setActiveDates]);
@@ -821,7 +844,7 @@ export function InferenceProvider({
       setActivePresetId(preset.id);
       setHighContrast(true);
       if (config.gpus && config.gpus.length > 0) {
-        setSelectedGPUs(config.gpus);
+        setSelectedGPUs(normalizeComparisonGpuList(config.gpus));
         if (config.useDateRange) {
           setSelectedDateRange({ startDate: '', endDate: '' });
           setSelectedDates([]);

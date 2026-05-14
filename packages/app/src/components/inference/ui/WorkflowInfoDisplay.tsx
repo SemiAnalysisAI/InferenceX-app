@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { updateRepoUrl } from '@/lib/utils';
+import { cn, updateRepoUrl } from '@/lib/utils';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useInference } from '@/components/inference/InferenceContext';
@@ -50,8 +50,11 @@ function RunConclusionDot({ conclusion }: { conclusion: string | null }) {
 
 export default function WorkflowInfoDisplay({
   workflowInfo,
+  controlsDisabled = false,
 }: {
   workflowInfo: WorkflowInfo[] | null;
+  /** When true, run date / run / changelog stay visible but are non-interactive (GPU comparison). */
+  controlsDisabled?: boolean;
 }) {
   const {
     selectedRunDate,
@@ -90,15 +93,29 @@ export default function WorkflowInfoDisplay({
     }
   };
 
+  const shellClass = cn(
+    controlsDisabled && 'cursor-not-allowed select-none opacity-50 saturate-50',
+  );
+  const shellA11y = controlsDisabled
+    ? {
+        inert: true as unknown as boolean,
+        'aria-disabled': true as const,
+        title:
+          'Official run date and run list are fixed while GPU comparison is active. Clear a GPU slot in GPU Comparison to change them.',
+      }
+    : {};
+
   if (!workflowInfo || workflowInfo.length === 0 || !workflowInfo[0]) {
     return (
-      <div className="flex flex-col lg:flex-row gap-2 text-muted-foreground">
-        <DatePicker
-          date={selectedRunDate}
-          onChange={(date) => setSelectedRunDate(date)}
-          availableDates={availableDates}
-          isCheckingAvailableDates={isCheckingAvailableDates}
-        />
+      <div className={shellClass} {...shellA11y}>
+        <div className="flex flex-col lg:flex-row gap-2 text-muted-foreground">
+          <DatePicker
+            date={selectedRunDate}
+            onChange={(date) => setSelectedRunDate(date)}
+            availableDates={availableDates}
+            isCheckingAvailableDates={isCheckingAvailableDates}
+          />
+        </div>
       </div>
     );
   }
@@ -120,144 +137,146 @@ export default function WorkflowInfoDisplay({
   })();
 
   return (
-    <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
-      {/* <div className="flex items-center gap-2">
+    <div className={shellClass} {...shellA11y}>
+      <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
+        {/* <div className="flex items-center gap-2">
         <CalendarRange size={16} />
         <strong>Run Date:</strong> {workflowInfo[0].run_date} UTC
       </div> */}
-      <DatePicker
-        date={selectedRunDate}
-        onChange={(date) => setSelectedRunDate(date)}
-        availableDates={availableDates}
-        isCheckingAvailableDates={isCheckingAvailableDates}
-      />
-      {availableRuns ? (
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleGoPreviousRun}
-            disabled={!canGoPreviousRun()}
-            className="size-8"
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Select
-            value={selectedRunId}
-            onValueChange={(value) => {
-              track('inference_run_selected', { run: value });
-              setSelectedRunId(value);
-            }}
-          >
-            <SelectTrigger
-              id="run-select"
-              className="w-full border-0 shadow-none font-bold px-4 hover:bg-accent hover:text-accent-foreground dark:bg-input/90 dark:hover:bg-input/50 rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
-              onPointerDown={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-external-link]')) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const runUrl = availableRuns[selectedRunId]?.runUrl;
-                  if (runUrl) {
-                    window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
-                  }
-                }
+        <DatePicker
+          date={selectedRunDate}
+          onChange={(date) => setSelectedRunDate(date)}
+          availableDates={availableDates}
+          isCheckingAvailableDates={isCheckingAvailableDates}
+        />
+        {availableRuns ? (
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleGoPreviousRun}
+              disabled={!canGoPreviousRun()}
+              className="size-8"
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Select
+              value={selectedRunId}
+              onValueChange={(value) => {
+                track('inference_run_selected', { run: value });
+                setSelectedRunId(value);
               }}
             >
-              <SelectValue placeholder="Run" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(availableRuns).map((run, index) => {
-                const runUrl = updateRepoUrl(availableRuns[run].runUrl);
-                return (
-                  <SelectItem
-                    key={run}
-                    value={run}
-                    onPointerDown={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.closest('[data-external-link]')) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.open(runUrl, '_blank', 'noopener,noreferrer');
-                      }
-                    }}
-                  >
-                    <span className="flex items-center gap-1">
-                      <RunConclusionDot conclusion={availableRuns[run].conclusion} />
-                      Run {index + 1}/{runIds.length}
-                      <span
-                        data-external-link
-                        className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
-                      >
-                        <ExternalLinkIcon />
-                      </span>
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleGoNextRun}
-            disabled={!canGoNextRun()}
-            className="size-8"
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      ) : null}
-      <div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
-              <strong>Changelog</strong>
-              <ChevronDownIcon />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[400px]">
-            <div className="break-words">
-              {changelog && changelog.entries.length > 0 ? (
-                <>
-                  {changelog.entries.map((entry, index) => (
-                    <div key={index}>
-                      {index > 0 && <hr className="my-3" />}
-                      <div className="flex flex-col gap-2 text-xs line-break-words">
-                        <div className="text-xs font-bold">Description</div>
-                        {formatChangelogDescription(entry.description)}
-                        <div className="text-xs font-bold">Updated Configs</div>
-                        <ul className="list-disc pl-4">
-                          {entry.config_keys.map((key: string) => (
-                            <li key={key}>{formatConfigKeys(key)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ))}
-                  {changelog.entries[0]?.head_ref && (
-                    <a
-                      href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs hover:underline text-foreground underline"
+              <SelectTrigger
+                id="run-select"
+                className="w-full border-0 shadow-none font-bold px-4 hover:bg-accent hover:text-accent-foreground dark:bg-input/90 dark:hover:bg-input/50 rounded-md transition-colors [&_[data-external-link]_svg]:pointer-events-auto"
+                onPointerDown={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('[data-external-link]')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const runUrl = availableRuns[selectedRunId]?.runUrl;
+                    if (runUrl) {
+                      window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
+                    }
+                  }
+                }}
+              >
+                <SelectValue placeholder="Run" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.keys(availableRuns).map((run, index) => {
+                  const runUrl = updateRepoUrl(availableRuns[run].runUrl);
+                  return (
+                    <SelectItem
+                      key={run}
+                      value={run}
+                      onPointerDown={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[data-external-link]')) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.open(runUrl, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
                     >
-                      Git Commit
-                    </a>
-                  )}
-                </>
-              ) : (
-                <div className="flex flex-col gap-2 text-xs">
-                  <div className="text-xs font-bold">Description</div>
-                  <span className="text-muted-foreground">No changelog data available.</span>
-                  <span className="text-muted-foreground">
-                    This date predates changelog tracking.
-                  </span>
-                </div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+                      <span className="flex items-center gap-1">
+                        <RunConclusionDot conclusion={availableRuns[run].conclusion} />
+                        Run {index + 1}/{runIds.length}
+                        <span
+                          data-external-link
+                          className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
+                        >
+                          <ExternalLinkIcon />
+                        </span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleGoNextRun}
+              disabled={!canGoNextRun()}
+              className="size-8"
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        ) : null}
+        <div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" className="!px-4 dark:bg-input/90 dark:hover:bg-input/50">
+                <strong>Changelog</strong>
+                <ChevronDownIcon />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px]">
+              <div className="break-words">
+                {changelog && changelog.entries.length > 0 ? (
+                  <>
+                    {changelog.entries.map((entry, index) => (
+                      <div key={index}>
+                        {index > 0 && <hr className="my-3" />}
+                        <div className="flex flex-col gap-2 text-xs line-break-words">
+                          <div className="text-xs font-bold">Description</div>
+                          {formatChangelogDescription(entry.description)}
+                          <div className="text-xs font-bold">Updated Configs</div>
+                          <ul className="list-disc pl-4">
+                            {entry.config_keys.map((key: string) => (
+                              <li key={key}>{formatConfigKeys(key)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                    {changelog.entries[0]?.head_ref && (
+                      <a
+                        href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs hover:underline text-foreground underline"
+                      >
+                        Git Commit
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-2 text-xs">
+                    <div className="text-xs font-bold">Description</div>
+                    <span className="text-muted-foreground">No changelog data available.</span>
+                    <span className="text-muted-foreground">
+                      This date predates changelog tracking.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
     </div>
   );
