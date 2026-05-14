@@ -394,16 +394,16 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
 
     const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
-    try {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${fileName}-${Date.now()}.mp4`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${fileName}-${Date.now()}.mp4`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // Revoking synchronously races Chromium's async download dispatch — the
+    // blob URL is freed before the browser reads it, so the file lands as the
+    // bare blob UUID with no extension. Defer until the download has started.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     onProgress?.(1);
   } catch (error) {
     if (error instanceof Mp4ExportError) throw error;
