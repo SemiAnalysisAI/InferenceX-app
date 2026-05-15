@@ -1,13 +1,15 @@
+/**
+ * Compare OG image — same circuit tile sidebar layout as the blog OG.
+ */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { ImageResponse } from 'next/og';
 
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
-
 import {
   allCanonicalComparePairs,
   canonicalCompareSlug,
+  compareDisplayLabel,
   parseCompareSlug,
 } from '@/lib/compare-slug';
 
@@ -18,22 +20,65 @@ export const contentType = 'image/png';
 const BLUE = '#0B86D1';
 const BG = '#131416';
 const PANEL_BG = '#0F1214';
-const VENDOR_COLOR: Record<string, string> = {
-  NVIDIA: '#76B900',
-  AMD: '#ED1C24',
-  Intel: '#0071C5',
-};
+
+// Same tile grid as the blog OG so the two OG types read as a family.
+const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
+  { file: 'teal-chevron.png', rotate: 180 },
+  { file: 'gold-diagonal.png' },
+  { file: 'teal-circuit.png' },
+  null,
+  { file: 'gold-wavy.png' },
+  { file: 'teal-chip.png' },
+  { file: 'teal-chevron.png', rotate: 90 },
+  { file: 'teal-organic.png' },
+  null,
+  { file: 'gold-circuit.png' },
+  { file: 'teal-circuit.png', rotate: 180 },
+  { file: 'teal-organic.png', rotate: 180 },
+];
 
 export function generateStaticParams() {
   return allCanonicalComparePairs().map(({ a, b }) => ({ slug: canonicalCompareSlug(a, b) }));
 }
 
+// Read once at module load; a missing asset must not 500 every OG route.
+let logoSrcPromise: Promise<string | null> | undefined;
+function getLogoSrc(): Promise<string | null> {
+  if (!logoSrcPromise) {
+    logoSrcPromise = readFile(join(process.cwd(), 'public/brand/logo-color.png'))
+      .then((buf) => `data:image/png;base64,${buf.toString('base64')}`)
+      .catch(() => null);
+  }
+  return logoSrcPromise;
+}
+
+let tilesPromise: Promise<({ src: string; rotate?: number } | null)[]> | undefined;
+function getTiles(): Promise<({ src: string; rotate?: number } | null)[]> {
+  if (!tilesPromise) {
+    const uniqueFiles = [...new Set(TILE_GRID.filter(Boolean).map((t) => t!.file))];
+    tilesPromise = Promise.all(
+      uniqueFiles.map(async (f) => {
+        const src = await readFile(join(process.cwd(), 'public/brand/og-tiles', f))
+          .then((buf) => `data:image/png;base64,${buf.toString('base64')}`)
+          .catch(() => null);
+        return [f, src] as const;
+      }),
+    ).then((loaded) => {
+      const cache = Object.fromEntries(loaded);
+      return TILE_GRID.map((t) => {
+        if (!t) return null;
+        const src = cache[t.file];
+        return src ? { src, rotate: t.rotate } : null;
+      });
+    });
+  }
+  return tilesPromise;
+}
+
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const pair = parseCompareSlug(slug);
-  const logoSrc = await readFile(join(process.cwd(), 'public/brand/logo-color.png')).then(
-    (buf) => `data:image/png;base64,${buf.toString('base64')}`,
-  );
+  const [logoSrc, tiles] = await Promise.all([getLogoSrc(), getTiles()]);
 
   if (!pair) {
     return new ImageResponse(
@@ -56,183 +101,124 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
     );
   }
 
-  const aMeta = HW_REGISTRY[pair.a];
-  const bMeta = HW_REGISTRY[pair.b];
-  const aLabel = aMeta?.label ?? pair.a.toUpperCase();
-  const bLabel = bMeta?.label ?? pair.b.toUpperCase();
-  const aColor = aMeta ? (VENDOR_COLOR[aMeta.vendor] ?? BLUE) : BLUE;
-  const bColor = bMeta ? (VENDOR_COLOR[bMeta.vendor] ?? BLUE) : BLUE;
-
-  const fontSize = aLabel.length + bLabel.length > 22 ? 96 : 120;
+  const title = compareDisplayLabel(pair.a, pair.b);
+  // Content area is ~895px wide (1200 - 195 panel - 55*2 padding). Scale the
+  // title size down for longer labels so it fits without truncating.
+  const titleSize = title.length > 26 ? 80 : title.length > 18 ? 96 : 112;
 
   return new ImageResponse(
     <div
       style={{
         display: 'flex',
-        flexDirection: 'column',
         width: '100%',
         height: '100%',
         backgroundColor: BG,
         color: '#EAEBEC',
-        position: 'relative',
-        padding: '60px 70px',
+        overflow: 'hidden',
       }}
     >
+      {/* Left tile panel — identical pattern to blog OG */}
       <div
         style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          width: 6,
+          display: 'flex',
+          width: 195,
           height: '100%',
-          backgroundColor: BLUE,
-          display: 'flex',
-        }}
-      />
-      <div
-        style={{
-          fontSize: 28,
-          color: '#9BA0A6',
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          display: 'flex',
+          backgroundColor: PANEL_BG,
+          position: 'relative',
         }}
       >
-        Head-to-head GPU benchmark
+        {tiles.map((tile, i) => {
+          if (!tile) return null;
+          const row = Math.floor(i / 2);
+          const col = i % 2;
+          return (
+            <img
+              key={i}
+              src={tile.src}
+              style={{
+                position: 'absolute',
+                left: 12 + col * 90,
+                top: 12 + row * 104,
+                width: 78,
+                height: 86,
+                borderRadius: 4,
+                objectFit: 'cover',
+                ...(tile.rotate ? { transform: `rotate(${tile.rotate}deg)` } : {}),
+              }}
+            />
+          );
+        })}
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: 3,
+            height: '100%',
+            backgroundColor: BLUE,
+            display: 'flex',
+          }}
+        />
       </div>
 
+      {/* Content */}
       <div
         style={{
-          flex: 1,
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: 'column',
           justifyContent: 'space-between',
-          gap: 40,
-          marginTop: 30,
+          flex: 1,
+          padding: '48px 55px 20px 55px',
         }}
       >
-        <GpuPanel
-          label={aLabel}
-          vendor={aMeta?.vendor}
-          arch={aMeta?.arch}
-          color={aColor}
-          fontSize={fontSize}
-          align="flex-start"
-        />
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
+            gap: 24,
+            flex: 1,
             justifyContent: 'center',
-            gap: 8,
           }}
         >
           <div
             style={{
-              fontSize: 64,
-              fontWeight: 800,
-              color: '#FFFFFF',
-              backgroundColor: PANEL_BG,
-              padding: '14px 28px',
-              borderRadius: 999,
-              border: `2px solid ${BLUE}`,
+              fontSize: 26,
+              color: '#9BA0A6',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
               display: 'flex',
             }}
           >
-            VS
+            Head-to-head GPU benchmark
+          </div>
+
+          <div
+            style={{
+              fontSize: titleSize,
+              fontWeight: 800,
+              color: '#FFFFFF',
+              lineHeight: 1.1,
+              display: 'flex',
+            }}
+          >
+            {title}
           </div>
         </div>
-        <GpuPanel
-          label={bLabel}
-          vendor={bMeta?.vendor}
-          arch={bMeta?.arch}
-          color={bColor}
-          fontSize={fontSize}
-          align="flex-end"
-        />
-      </div>
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingTop: 20,
-          borderTop: '1px solid #2A2D31',
-        }}
-      >
-        <span style={{ fontSize: 28, color: '#9BA0A6', display: 'flex' }}>
-          AI inference benchmark · latency, throughput, cost
-        </span>
-        <img src={logoSrc} height={64} />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ fontSize: 26, color: '#9BA0A6', display: 'flex' }}>
+            AI inference benchmark · latency, throughput, cost
+          </span>
+          {logoSrc && <img src={logoSrc} height={72} />}
+        </div>
       </div>
     </div>,
     size,
-  );
-}
-
-function GpuPanel({
-  label,
-  vendor,
-  arch,
-  color,
-  fontSize,
-  align,
-}: {
-  label: string;
-  vendor?: string;
-  arch?: string;
-  color: string;
-  fontSize: number;
-  align: 'flex-start' | 'flex-end';
-}) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        alignItems: align,
-        textAlign: align === 'flex-start' ? 'left' : 'right',
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          fontSize,
-          fontWeight: 800,
-          color: '#FFFFFF',
-          lineHeight: 1.05,
-          display: 'flex',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
-        {vendor && (
-          <span
-            style={{
-              fontSize: 26,
-              fontWeight: 700,
-              color: '#FFFFFF',
-              backgroundColor: color,
-              padding: '4px 14px',
-              borderRadius: 6,
-              display: 'flex',
-            }}
-          >
-            {vendor}
-          </span>
-        )}
-        {arch && <span style={{ fontSize: 26, color: '#C9CACB', display: 'flex' }}>{arch}</span>}
-      </div>
-    </div>
   );
 }
