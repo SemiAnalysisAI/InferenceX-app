@@ -12,11 +12,15 @@ import {
   useState,
 } from 'react';
 
-// `useLayoutEffect` warns when used during SSR; `useEffect` is the safe no-op
-// on the server. URL overrides only matter on the client, so this aliasing is
-// safe: server uses useEffect (which doesn't run on the server anyway) and the
-// client uses useLayoutEffect to apply URL params synchronously before paint.
+// useLayoutEffect warns during SSR; alias to useEffect on the server (no-op there anyway).
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[keyof T] {
+  return (Object.values(e) as string[]).includes(v);
+}
+
+const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
+const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 
@@ -173,14 +177,25 @@ export function GlobalFilterProvider({
   // flicker, and SSR/client hydration agree because initial state came from
   // props/defaults on both sides.
   useIsomorphicLayoutEffect(() => {
-    const urlModel = getUrlParam('g_model');
-    if (urlModel && Object.values(Model).includes(urlModel as Model)) {
-      setSelectedModel(urlModel as Model);
-    }
-    const urlSeq = getUrlParam('i_seq');
-    if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) {
-      setSelectedSequence(urlSeq as Sequence);
-    }
+    const applyIfEnum = <T extends Record<string, string>>(
+      key: 'g_model' | 'i_seq',
+      enumType: T,
+      apply: (v: T[keyof T]) => void,
+    ) => {
+      const value = getUrlParam(key);
+      if (value !== undefined && isEnumValue(enumType, value)) apply(value);
+    };
+    const applyIfMatches = (
+      key: 'g_rundate' | 'g_runid',
+      pattern: RegExp,
+      apply: (v: string) => void,
+    ) => {
+      const value = getUrlParam(key);
+      if (value !== undefined && pattern.test(value)) apply(value);
+    };
+
+    applyIfEnum('g_model', Model, setSelectedModel);
+    applyIfEnum('i_seq', Sequence, setSelectedSequence);
     const urlPrec = getUrlParam('i_prec');
     if (urlPrec) {
       const precs = urlPrec
@@ -188,10 +203,8 @@ export function GlobalFilterProvider({
         .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
       if (precs.length > 0) setSelectedPrecisionsRaw(precs);
     }
-    const urlRunDate = getUrlParam('g_rundate');
-    if (urlRunDate) setSelectedRunDateBase(urlRunDate);
-    const urlRunId = getUrlParam('g_runid');
-    if (urlRunId) setSelectedRunId(urlRunId);
+    applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
+    applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
