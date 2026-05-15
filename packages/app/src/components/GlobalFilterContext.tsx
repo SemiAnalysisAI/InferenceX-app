@@ -6,10 +6,17 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+
+// `useLayoutEffect` warns when used during SSR; `useEffect` is the safe no-op
+// on the server. URL overrides only matter on the client, so this aliasing is
+// safe: server uses useEffect (which doesn't run on the server anyway) and the
+// client uses useLayoutEffect to apply URL params synchronously before paint.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 
@@ -129,28 +136,19 @@ export function GlobalFilterProvider({
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
-  const [selectedModel, setSelectedModel] = useState<Model>(() => {
-    const urlModel = getUrlParam('g_model');
-    if (urlModel && Object.values(Model).includes(urlModel as Model)) {
-      return urlModel as Model;
-    }
-    return initialModel ?? Model.DeepSeek_R1;
-  });
+  // Initial state seeds from props/defaults only (no URL reading). useUrlState's
+  // URL cache is client-only — populating SSR state from it would mismatch on
+  // hydration. URL overrides are applied below in a layout effect, before paint.
+  const [selectedModel, setSelectedModel] = useState<Model>(
+    () => initialModel ?? Model.DeepSeek_R1,
+  );
 
   const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
-    const urlSeq = getUrlParam('i_seq');
-    if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
-    return initialSequence ?? Sequence.EightK_OneK;
+    if (initialSequence) return initialSequence;
+    return Sequence.EightK_OneK;
   });
 
   const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() => {
-    const urlPrec = getUrlParam('i_prec');
-    if (urlPrec) {
-      const precs = urlPrec
-        .split(',')
-        .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
-      if (precs.length > 0) return precs;
-    }
     if (initialPrecisions && initialPrecisions.length > 0) {
       const valid = initialPrecisions.filter((p) =>
         (PRECISION_OPTIONS as readonly string[]).includes(p),
@@ -164,12 +162,38 @@ export function GlobalFilterProvider({
   }, []);
 
   // ── Run date / run ID ─────────────────────────────────────────────────────
-  const [selectedRunDate, setSelectedRunDateBase] = useState<string>(
-    () => getUrlParam('g_rundate') || '',
-  );
+  const [selectedRunDate, setSelectedRunDateBase] = useState<string>('');
   const [selectedRunDateRev, setSelectedRunDateRev] = useState(0);
 
-  const [selectedRunId, setSelectedRunId] = useState<string>(() => getUrlParam('g_runid') || '');
+  const [selectedRunId, setSelectedRunId] = useState<string>('');
+
+  // Apply URL param overrides synchronously after the first commit. Runs only
+  // on the client (useEffect on server is a no-op). Updates state before paint
+  // so users with shareable URLs (?i_seq=…&g_model=…) see their values without
+  // flicker, and SSR/client hydration agree because initial state came from
+  // props/defaults on both sides.
+  useIsomorphicLayoutEffect(() => {
+    const urlModel = getUrlParam('g_model');
+    if (urlModel && Object.values(Model).includes(urlModel as Model)) {
+      setSelectedModel(urlModel as Model);
+    }
+    const urlSeq = getUrlParam('i_seq');
+    if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) {
+      setSelectedSequence(urlSeq as Sequence);
+    }
+    const urlPrec = getUrlParam('i_prec');
+    if (urlPrec) {
+      const precs = urlPrec
+        .split(',')
+        .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
+      if (precs.length > 0) setSelectedPrecisionsRaw(precs);
+    }
+    const urlRunDate = getUrlParam('g_rundate');
+    if (urlRunDate) setSelectedRunDateBase(urlRunDate);
+    const urlRunId = getUrlParam('g_runid');
+    if (urlRunId) setSelectedRunId(urlRunId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
