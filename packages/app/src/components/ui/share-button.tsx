@@ -55,7 +55,7 @@ export function ShareButton() {
         <Button
           data-testid="share-button"
           size="sm"
-          className="h-8 gap-1.5 text-xs font-medium"
+          className="h-8 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium"
           title="Share this view"
         >
           <Share2 className="size-3.5" />
