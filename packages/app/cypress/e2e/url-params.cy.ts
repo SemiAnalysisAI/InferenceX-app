@@ -170,6 +170,63 @@ describe('URL Parameter Persistence', () => {
         .and('match', /[18]K . [18]K/u);
       assertNoHydrationMismatch();
     });
+
+    it('/inference?g_model=gpt-oss-120b seeds the model without a hydration error', () => {
+      visitWithErrorSpy('/inference?g_model=gpt-oss-120b');
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'gpt-oss 120B');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference with invalid ?g_model=junk falls back to the default', () => {
+      visitWithErrorSpy('/inference?g_model=junk');
+      cy.get('[data-testid="model-selector"]').invoke('text').should('not.contain', 'junk');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference?i_prec=fp8 seeds the precision without a hydration error', () => {
+      visitWithErrorSpy('/inference?i_prec=fp8');
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference with invalid ?i_prec=junk falls back to the default', () => {
+      visitWithErrorSpy('/inference?i_prec=junk');
+      cy.get('[data-testid="precision-multiselect"]').invoke('text').should('not.contain', 'junk');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference?g_rundate=2026-01-15 accepts the validated date without a hydration error', () => {
+      // The regex validator allows YYYY-MM-DD; we only assert no hydration error
+      // because the date picker UI doesn't expose a stable selector for assertion.
+      visitWithErrorSpy('/inference?g_rundate=2026-01-15');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference with invalid ?g_rundate=not-a-date is dropped by the regex (no hydration error)', () => {
+      visitWithErrorSpy('/inference?g_rundate=not-a-date');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference?g_runid=run-12345 accepts the validated run id without a hydration error', () => {
+      visitWithErrorSpy('/inference?g_runid=run-12345');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference with invalid ?g_runid=$%^$ is dropped by the regex (no hydration error)', () => {
+      visitWithErrorSpy('/inference?g_runid=$%^$');
+      assertNoHydrationMismatch();
+    });
+
+    it('/inference with multiple URL params seeds all of them without a hydration error', () => {
+      // Use a model + precision combination that the data supports, otherwise
+      // `effectivePrecisions` intersects the selection with available precisions
+      // and the UI may render the fallback. dsr1 + fp8 + 1k/1k is supported.
+      visitWithErrorSpy('/inference?i_seq=1k/1k&g_model=DeepSeek-R1-0528&i_prec=fp8');
+      cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek');
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
+      assertNoHydrationMismatch();
+    });
   });
 
   describe('High contrast mode', () => {
