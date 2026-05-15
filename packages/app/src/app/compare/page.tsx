@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
+import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { allCanonicalComparePairs, compareDisplayLabel, toCompareSlug } from '@/lib/compare-slug';
 
@@ -94,7 +95,7 @@ export default function CompareIndexPage() {
 
   return (
     <>
-      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      <JsonLd data={jsonLd} />
       <section>
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU Comparisons</h1>

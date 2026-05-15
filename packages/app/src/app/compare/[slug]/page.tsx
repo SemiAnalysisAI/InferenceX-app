@@ -29,6 +29,7 @@ import {
   toCompareSlug,
 } from '@/lib/compare-slug';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
+import { JsonLd } from '@/components/json-ld';
 
 import ComparePageClient from './page-client';
 
@@ -419,7 +420,7 @@ export default async function ComparePage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      <JsonLd data={jsonLd} />
       <ComparePageClient
         a={pair.a}
         b={pair.b}
