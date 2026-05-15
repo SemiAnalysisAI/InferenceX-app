@@ -140,9 +140,6 @@ export function GlobalFilterProvider({
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
-  // Initial state seeds from props/defaults only (no URL reading). useUrlState's
-  // URL cache is client-only — populating SSR state from it would mismatch on
-  // hydration. URL overrides are applied below in a layout effect, before paint.
   const [selectedModel, setSelectedModel] = useState<Model>(
     () => initialModel ?? Model.DeepSeek_R1,
   );
