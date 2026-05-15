@@ -4,6 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
 
 import {
@@ -78,28 +79,8 @@ function getTiles(): Promise<({ src: string; rotate?: number } | null)[]> {
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const pair = parseCompareSlug(slug);
+  if (!pair) notFound();
   const [logoSrc, tiles] = await Promise.all([getLogoSrc(), getTiles()]);
-
-  if (!pair) {
-    return new ImageResponse(
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '100%',
-          height: '100%',
-          backgroundColor: BG,
-          color: '#fafafa',
-          fontSize: 48,
-          fontWeight: 700,
-        }}
-      >
-        InferenceX GPU Comparison
-      </div>,
-      size,
-    );
-  }
 
   const title = compareDisplayLabel(pair.a, pair.b);
   // Content area is ~895px wide (1200 - 195 panel - 55*2 padding). Scale the
