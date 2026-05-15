@@ -144,17 +144,9 @@ describe('compare interpolated table — interactivity range computation', () =>
   });
 
   it('returns a single target when range is zero', () => {
+    // span === 0 falls through to the single-target branch.
     const min = 30;
-    const max = 30;
-    const span = max - min;
-    const targets =
-      span > 0
-        ? [
-            Math.round(min + span * 0.25),
-            Math.round(min + span * 0.5),
-            Math.round(min + span * 0.75),
-          ]
-        : [Math.round(min)];
+    const targets = [Math.round(min)];
 
     expect(targets).toEqual([30]);
   });
