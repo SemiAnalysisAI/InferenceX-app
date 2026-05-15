@@ -146,11 +146,15 @@ export function GlobalFilterProvider({
   const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() => {
     const urlPrec = getUrlParam('i_prec');
     if (urlPrec) {
-      const precs = urlPrec.split(',').filter((p) => PRECISION_OPTIONS.includes(p as any));
+      const precs = urlPrec
+        .split(',')
+        .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
       if (precs.length > 0) return precs;
     }
     if (initialPrecisions && initialPrecisions.length > 0) {
-      const valid = initialPrecisions.filter((p) => PRECISION_OPTIONS.includes(p as any));
+      const valid = initialPrecisions.filter((p) =>
+        (PRECISION_OPTIONS as readonly string[]).includes(p),
+      );
       if (valid.length > 0) return valid;
     }
     return [Precision.FP4];
