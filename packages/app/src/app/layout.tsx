@@ -9,6 +9,7 @@ import localFont from 'next/font/local';
 
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
+import { JsonLd } from '@/components/json-ld';
 import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
@@ -182,7 +183,7 @@ export default async function RootLayout({
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />
         <PostHogProvider>
-          <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+          <JsonLd data={jsonLd} />
           <QueryProvider>
             <ThemeProvider
               attribute="class"
