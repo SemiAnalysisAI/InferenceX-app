@@ -3,7 +3,6 @@ import { notFound, redirect } from 'next/navigation';
 
 import {
   HW_REGISTRY,
-  islOslToSequence,
   sequenceToIslOsl,
   SITE_NAME,
   SITE_URL,
@@ -21,6 +20,7 @@ import { cachedQuery } from '@/lib/api-cache';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { loadFixture } from '@/lib/test-fixtures';
 import { getHardwareKey } from '@/lib/chart-utils';
+import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   allCanonicalComparePairs,
   canonicalCompareSlug,
@@ -32,8 +32,6 @@ import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 
 import ComparePageClient from './page-client';
 
-// Dynamic SSR — page reflects latest data from cache, which is purged via
-// /api/v1/invalidate (no time-based revalidation needed).
 export const dynamic = 'force-dynamic';
 
 interface Props {
@@ -88,52 +86,6 @@ interface PairSummary {
   bestThroughputPerGpu: number | null;
   bestMedianTtft: number | null;
   bestMedianTpot: number | null;
-}
-
-/**
- * Pick the (sequence, precision) combo that maximises the number of distinct
- * (concurrency, framework, spec_method) configs covered by BOTH GPUs in the
- * pair. Falls back to whichever combo has any data for the pair if no overlap
- * exists. Returns nulls if neither GPU has any rows at all (the chart will
- * still render — InferenceProvider falls through to its hard-coded defaults).
- */
-function pickPairDefaults(
-  rows: Awaited<ReturnType<typeof getCachedBenchmarks>>,
-  a: string,
-  b: string,
-): { sequence: string | null; precision: string | null } {
-  const tally = new Map<string, { both: number; either: number }>();
-  const seenA = new Map<string, Set<string>>();
-  const seenB = new Map<string, Set<string>>();
-  for (const row of rows) {
-    if (row.hardware !== a && row.hardware !== b) continue;
-    const seq = islOslToSequence(row.isl, row.osl);
-    if (!seq) continue;
-    const key = `${seq}|${row.precision}`;
-    const variantId = `${row.framework}|${row.spec_method}|${row.conc}`;
-    if (row.hardware === a) {
-      if (!seenA.has(key)) seenA.set(key, new Set());
-      seenA.get(key)!.add(variantId);
-    } else {
-      if (!seenB.has(key)) seenB.set(key, new Set());
-      seenB.get(key)!.add(variantId);
-    }
-  }
-  for (const key of new Set([...seenA.keys(), ...seenB.keys()])) {
-    const aSet = seenA.get(key) ?? new Set();
-    const bSet = seenB.get(key) ?? new Set();
-    let both = 0;
-    for (const v of aSet) if (bSet.has(v)) both++;
-    tally.set(key, { both, either: aSet.size + bSet.size });
-  }
-  if (tally.size === 0) return { sequence: null, precision: null };
-  // Prefer combos where both GPUs have data; tiebreak on combined coverage.
-  const best = [...tally.entries()].toSorted((left, right) => {
-    if (left[1].both !== right[1].both) return right[1].both - left[1].both;
-    return right[1].either - left[1].either;
-  })[0];
-  const [seq, prec] = best[0].split('|');
-  return { sequence: seq, precision: prec };
 }
 
 function summarize(rows: Awaited<ReturnType<typeof getCachedBenchmarks>>, hw: string): PairSummary {
