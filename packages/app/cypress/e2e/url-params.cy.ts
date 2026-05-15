@@ -11,6 +11,26 @@ const visitWithDismissedModal = (path: string) => {
   });
 };
 
+const visitWithErrorSpy = (path: string) => {
+  cy.visit(path, {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      cy.stub(win.console, 'error').as('consoleError');
+    },
+  });
+};
+
+const assertNoHydrationMismatch = () => {
+  cy.get('[data-testid="sequence-selector"]').should('be.visible');
+  cy.get('@consoleError').then((spy) => {
+    const calls = (spy as unknown as { args: unknown[][] }).args;
+    const hydration = calls.filter((args) =>
+      args.some((a) => typeof a === 'string' && /hydrat(ion|ed) (mismatch|failed)/iu.test(a)),
+    );
+    expect(hydration, JSON.stringify(hydration)).to.have.length(0);
+  });
+};
+
 describe('URL Parameter Persistence', () => {
   it('page loads without error with unknown params', () => {
     visitWithDismissedModal('/inference?unknown_param=test');
@@ -122,6 +142,33 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="reliability-date-range"]').click({ force: true });
       cy.contains('[role="option"]', 'Last month').click({ force: true });
       cy.get('[data-testid="reliability-date-range"]').should('contain', 'Last month');
+    });
+  });
+
+  describe('Hydration on shared-link entry', () => {
+    // Regression coverage for GlobalFilterContext.tsx (layout-effect URL override)
+    // and compare/[slug]/page.tsx (server-side searchParams threading). Both
+    // were introduced to silence a SSR/CSR hydration mismatch.
+
+    it('/inference?i_seq=1k/1k seeds the sequence without a hydration error', () => {
+      visitWithErrorSpy('/inference?i_seq=1k/1k');
+      cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
+      assertNoHydrationMismatch();
+    });
+
+    it('/compare/[slug] with ?i_seq=1k/1k seeds the sequence without a hydration error', () => {
+      visitWithErrorSpy('/compare/h100-vs-h200?i_seq=1k/1k');
+      cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
+      assertNoHydrationMismatch();
+    });
+
+    it('/compare/[slug] with invalid ?i_seq=junk falls back to the seeded default', () => {
+      visitWithErrorSpy('/compare/h100-vs-h200?i_seq=junk');
+      cy.get('[data-testid="sequence-selector"]')
+        .invoke('text')
+        .should('not.contain', 'junk')
+        .and('match', /[18]K . [18]K/u);
+      assertNoHydrationMismatch();
     });
   });
 
