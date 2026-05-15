@@ -81,6 +81,27 @@ export function pickStickyMtpFamily(
 }
 
 /**
+ * Compute the effective legend universe for solo/restore-all toggle semantics
+ * under MTP engine-family exclusion. MTP keys whose family is not currently
+ * active are dropped, so the default-deselected MTP state (e.g. DSv4 on first
+ * load) counts as "all selected" — clicking an entry then solos it instead of
+ * just removing it.
+ */
+export function effectiveLegendItems(allItems: Set<string>, active: Set<string>): Set<string> {
+  const activeFamilies = new Set<string>();
+  for (const k of active) {
+    const fam = getMtpEngineFamily(k);
+    if (fam) activeFamilies.add(fam);
+  }
+  const result = new Set<string>();
+  for (const k of allItems) {
+    const fam = getMtpEngineFamily(k);
+    if (!fam || activeFamilies.has(fam)) result.add(k);
+  }
+  return result;
+}
+
+/**
  * Drop MTP keys for ALL families when `proposed` contains keys from more than
  * one family. Used for auto-reset / select-all paths so the user has to opt
  * into MTP explicitly (and only one engine at a time).

@@ -4,10 +4,12 @@ import type { SubmissionVolumeRow, SubmissionSummaryRow } from '@/lib/submission
 
 import {
   computeCumulative,
+  computePreviousImages,
   computeTotalStats,
   getVendor,
   groupVolumeByWeek,
   isNonNvidia,
+  submissionRowKey,
 } from './submissions-utils';
 
 describe('getVendor', () => {
@@ -130,5 +132,62 @@ describe('computeTotalStats', () => {
     expect(stats.totalConfigs).toBe(2);
     expect(stats.uniqueModels).toBe(1);
     expect(stats.uniqueGpus).toBe(2);
+  });
+});
+
+describe('computePreviousImages', () => {
+  const base: Omit<SubmissionSummaryRow, 'date' | 'image'> = {
+    model: 'dsr1',
+    hardware: 'h200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'mtp',
+    disagg: false,
+    is_multinode: false,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    total_datapoints: 10,
+    distinct_sequences: 2,
+    distinct_concurrencies: 5,
+    max_concurrency: 64,
+  };
+
+  it('flags the row where the image changed, not the steady-state rows', () => {
+    const oldImg = 'lmsysorg/sglang:v0.5.9-cu130';
+    const newImg = 'lmsysorg/sglang:v0.5.11-cu130';
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, date: '2026-05-10', image: oldImg },
+      { ...base, date: '2026-05-11', image: oldImg },
+      { ...base, date: '2026-05-12', image: newImg }, // bump day
+      { ...base, date: '2026-05-13', image: newImg },
+    ];
+    const map = computePreviousImages(rows);
+    expect(map.size).toBe(1);
+    expect(map.get(submissionRowKey(rows[2]))).toBe(oldImg);
+  });
+
+  it('does not cross config boundaries', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, hardware: 'h200', date: '2026-05-10', image: 'img-a' },
+      { ...base, hardware: 'b300', date: '2026-05-11', image: 'img-b' },
+    ];
+    expect(computePreviousImages(rows).size).toBe(0);
+  });
+
+  it('ignores rows missing image data', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, date: '2026-05-10', image: null },
+      { ...base, date: '2026-05-11', image: 'img-new' },
+    ];
+    expect(computePreviousImages(rows).size).toBe(0);
+  });
+
+  it('returns empty for a single-row config', () => {
+    const rows: SubmissionSummaryRow[] = [{ ...base, date: '2026-05-10', image: 'img-a' }];
+    expect(computePreviousImages(rows).size).toBe(0);
   });
 });

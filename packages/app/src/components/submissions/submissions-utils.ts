@@ -7,6 +7,42 @@ export function getVendor(hardware: string): string {
   return GPU_VENDORS[hardware] ?? 'Unknown';
 }
 
+/** Unique key for a (config, date) row. */
+export const submissionRowKey = (row: SubmissionSummaryRow): string =>
+  `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}_${row.date}`;
+
+/** Stable key for a benchmark config across dates (everything except date/image). */
+const submissionConfigKey = (row: SubmissionSummaryRow): string =>
+  `${row.model}|${row.hardware}|${row.framework}|${row.precision}|${row.spec_method}|${row.disagg}|${row.is_multinode}|${row.num_prefill_gpu}|${row.num_decode_gpu}|${row.prefill_tp}|${row.prefill_ep}|${row.decode_tp}|${row.decode_ep}`;
+
+/**
+ * For each row, returns the image used by the immediately preceding run of
+ * the same config IF that image differed (i.e. this row is a version bump).
+ * Rows with no earlier run, or whose preceding run used the same image, are
+ * absent from the map so the caller can fall back to a single-image label.
+ */
+export function computePreviousImages(data: SubmissionSummaryRow[]): Map<string, string> {
+  const byConfig = new Map<string, SubmissionSummaryRow[]>();
+  for (const row of data) {
+    const k = submissionConfigKey(row);
+    const list = byConfig.get(k);
+    if (list) list.push(row);
+    else byConfig.set(k, [row]);
+  }
+  const result = new Map<string, string>();
+  for (const rows of byConfig.values()) {
+    const sorted = [...rows].toSorted((a, b) => a.date.localeCompare(b.date));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const cur = sorted[i];
+      if (prev.image && cur.image && prev.image !== cur.image) {
+        result.set(submissionRowKey(cur), prev.image);
+      }
+    }
+  }
+  return result;
+}
+
 /** Check if hardware is non-NVIDIA. */
 export function isNonNvidia(hardware: string): boolean {
   return getVendor(hardware) !== 'NVIDIA';

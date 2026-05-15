@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
+import { computeToggle } from '@/hooks/useTogglableSet';
+
 import {
   clearAllMtpFamilies,
+  effectiveLegendItems,
   getMtpEngineFamily,
   pickStickyMtpFamily,
   resolveMtpToggle,
@@ -92,6 +95,58 @@ describe('clearAllMtpFamilies', () => {
     const out = clearAllMtpFamilies(proposed);
     expect([...out.result].toSorted()).toEqual(['gb300_sglang', 'h100_vllm']);
     expect(out.droppedFamilies.toSorted()).toEqual(['sglang', 'vllm']);
+  });
+});
+
+describe('effectiveLegendItems', () => {
+  it('returns the input set unchanged when no MTP keys present', () => {
+    const all = new Set(['h100_vllm', 'gb300_sglang']);
+    const active = new Set(['h100_vllm']);
+    const out = effectiveLegendItems(all, active);
+    expect([...out].toSorted()).toEqual(['gb300_sglang', 'h100_vllm']);
+  });
+
+  it('drops MTP keys whose family is not active (default DSv4 state)', () => {
+    const all = new Set(['h100_vllm', 'gb300_sglang', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const active = new Set(['h100_vllm', 'gb300_sglang']); // no MTP active
+    const out = effectiveLegendItems(all, active);
+    expect([...out].toSorted()).toEqual(['gb300_sglang', 'h100_vllm']);
+  });
+
+  it('keeps MTP keys for active families and drops the rest', () => {
+    const all = new Set([
+      'h100_vllm',
+      'gb300_sglang',
+      'h100_vllm_mtp',
+      'h200_vllm_mtp',
+      'gb300_sglang_mtp',
+    ]);
+    const active = new Set(['h100_vllm', 'gb300_sglang', 'h100_vllm_mtp']);
+    const out = effectiveLegendItems(all, active);
+    expect([...out].toSorted()).toEqual([
+      'gb300_sglang',
+      'h100_vllm',
+      'h100_vllm_mtp',
+      'h200_vllm_mtp',
+    ]);
+  });
+
+  it('treats dynamo-/mori- variants as the same family', () => {
+    const all = new Set(['h100_vllm', 'h100_dynamo-vllm_mtp', 'h100_vllm_mtp', 'h100_sglang_mtp']);
+    const active = new Set(['h100_vllm', 'h100_vllm_mtp']);
+    const out = effectiveLegendItems(all, active);
+    expect([...out].toSorted()).toEqual(['h100_dynamo-vllm_mtp', 'h100_vllm', 'h100_vllm_mtp']);
+  });
+
+  it('makes computeToggle solo on click in the default-deselected state', () => {
+    // Default DSv4 state: all non-MTP active, MTP keys exist in data but
+    // are deselected. The effective universe matches active → computeToggle
+    // soloes the clicked item.
+    const all = new Set(['h100_vllm', 'gb300_sglang', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const active = new Set(['h100_vllm', 'gb300_sglang']);
+    const effective = effectiveLegendItems(all, active);
+    const out = computeToggle(active, 'h100_vllm', effective);
+    expect(out).toEqual(new Set(['h100_vllm']));
   });
 });
 

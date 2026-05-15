@@ -26,6 +26,7 @@ import {
 import { fetchStarCount } from '@/lib/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
+import { VisitTracker } from '@/providers/visit-tracker';
 
 const dm_sans = DM_Sans({
   subsets: ['latin'],
@@ -191,6 +192,7 @@ export default async function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
+              <VisitTracker />
               <Header starCount={starCount} />
               <div className="grow flex flex-col">{children}</div>
               <Footer starCount={starCount} />

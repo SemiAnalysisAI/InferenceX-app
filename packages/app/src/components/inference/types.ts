@@ -190,8 +190,10 @@ export type YAxisMetricKey =
  * @property {string} y_label - The label for the y-axis.
  * @property {'up' | 'down'} roofline - Specifies the direction of the roofline calculation (e.g., "up" for higher is better, "down" for lower is better).
  */
+export type InferenceChartType = 'e2e' | 'interactivity';
+
 export interface ChartDefinition {
-  chartType: string;
+  chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
   x_label: string;
@@ -347,6 +349,19 @@ export interface ScatterGraphProps {
    * on top of the official chart data with a distinct visual style (triangles).
    */
   overlayData?: OverlayData;
+  /**
+   * D3 transition duration in ms used when data or scales change. Defaults to
+   * the regular interactive value (750). The replay panel passes 0 so frames
+   * snap to interpolated positions instead of fighting a 750ms tween.
+   */
+  transitionDuration?: number;
+  /**
+   * Apply `.nice()` to x/y scale domains. Defaults to true. Replay disables
+   * this so the domain endpoints shift continuously between frames instead of
+   * snapping to rounded tick values (which produces visible "jumps" mid
+   * playback).
+   */
+  niceAxes?: boolean;
 }
 /**
  * @file types.ts

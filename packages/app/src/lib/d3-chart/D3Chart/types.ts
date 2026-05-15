@@ -2,6 +2,7 @@ import type * as d3 from 'd3';
 
 import type { ChartLayout, ChartMargin, ContinuousScale } from '../types';
 import type { AnyScale } from '../chart-update';
+import type { BuiltScale } from './scale-builders';
 import type { BarConfig } from '../layers/bars';
 import type { HorizontalBarConfig } from '../layers/horizontal-bars';
 import type { PointConfig } from '../layers/points';
@@ -224,6 +225,15 @@ export interface D3ChartHandle {
   pinTooltip: (point: unknown, isOverlay?: boolean) => void;
   getSvgElement: () => SVGSVGElement | null;
   getTooltipElement: () => HTMLDivElement | null;
+  /** Current x/y scales (post-render). Null before the first render. */
+  getScales: () => { xScale: BuiltScale; yScale: BuiltScale } | null;
+  /**
+   * Re-apply `.dot-group` transforms from currently-bound datum `x`/`y` values using
+   * current scales (zoom-aware). Use to drive imperative position updates outside the
+   * normal React render path (e.g. replay animation frames). No-op when scales are
+   * unavailable or when neither scale is continuous.
+   */
+  refreshDataPositions: () => void;
 }
 
 // ---------------------------------------------------------------------------

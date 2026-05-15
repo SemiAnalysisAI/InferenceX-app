@@ -54,6 +54,10 @@ export interface NudgeAction {
   onClick: (eventDetail?: unknown) => void;
 }
 
+export interface NudgeRenderContext {
+  dismiss: () => void;
+}
+
 export interface NudgeContent {
   icon: ComponentType<{ className?: string }>;
   iconClassName?: string;
@@ -62,6 +66,9 @@ export interface NudgeContent {
   action?: NudgeAction;
   /** data-testid on the nudge container (preserves existing selectors). */
   testId?: string;
+
+  /** Escape hatch (modals): replaces the default body. Engine still renders chrome + X. */
+  renderContent?: (ctx: NudgeRenderContext) => ReactNode;
 
   // -- Modal-specific (ignored by toasts/banners) --
 

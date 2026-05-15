@@ -112,6 +112,8 @@ const ScatterGraph = React.memo(
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
+    transitionDuration = 750,
+    niceAxes = true,
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
@@ -447,10 +449,10 @@ const ScatterGraph = React.memo(
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
         domain,
-        nice: true,
+        nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType]);
+    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes]);
 
     const yScaleConfig = useMemo(() => {
       const ext =
@@ -472,9 +474,9 @@ const ScatterGraph = React.memo(
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
         domain: [yMin, ext[1] * 1.05] as [number, number],
-        nice: true,
+        nice: niceAxes,
       };
-    }, [visiblePoints, isInputTputMetric, logScale]);
+    }, [visiblePoints, isInputTputMetric, logScale, niceAxes]);
 
     // --- Axis configs ---
     const xAxisConfig = useMemo(
@@ -1909,7 +1911,7 @@ const ScatterGraph = React.memo(
         layers={layers}
         zoom={zoomConfig}
         tooltip={tooltipConfig}
-        transitionDuration={750}
+        transitionDuration={transitionDuration}
         onRender={onRender}
         noDataOverlay={
           filteredData.length === 0 && processedOverlayData.length === 0 ? (
