@@ -14,7 +14,11 @@ import type {
 } from '@/components/inference/types';
 import { filterDataByCostLimit } from '@/components/inference/utils';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
-import { GPU_ALIAS_TO_CANONICAL, getModelSortIndex } from '@/lib/constants';
+import {
+  GPU_ALIAS_TO_CANONICAL,
+  getModelSortIndex,
+  hardwareKeyMatchesAnyBase,
+} from '@/lib/constants';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
@@ -79,6 +83,8 @@ export function useChartData(
   selectedRunDate?: string,
   enabled = true,
   latestAvailableDate?: string,
+  /** When set, only series for these two registry GPU keys are shown (compare pages). */
+  compareGpuPair?: readonly [string, string] | null,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -283,6 +289,12 @@ export function useChartData(
         // Filter by selected GPUs if any
         filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
 
+        if (compareGpuPair) {
+          filteredData = filteredData.filter((d) =>
+            hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair),
+          );
+        }
+
         filteredData = filterDataByCostLimit(filteredData, chartDefinition, selectedYAxisMetric);
 
         // Filter to points that have the selected metric, then remap x/y
@@ -330,6 +342,7 @@ export function useChartData(
     userCosts,
     userPowers,
     stableChartDefinitions,
+    compareGpuPair,
   ]);
 
   return { graphs, loading, error, hardwareConfig };

@@ -26,7 +26,7 @@ export function splitLabel(label: string, mode: LabelSplitMode): [string, string
     return [label.slice(0, idx), label.slice(idx + 1).replaceAll('\n', ' ')];
   }
   if (mode === 'parens') {
-    const match = label.match(/^(.+?)(\s*\(.+\))$/);
+    const match = label.match(/^(.+?)(\s*\(.+\))$/u);
     if (!match) return [label, null];
     return [match[1], match[2].trim()];
   }

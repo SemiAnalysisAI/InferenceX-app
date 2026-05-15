@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import { getAllBenchmarksForHistory } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
   if (!model || !isl || !osl) {
     return NextResponse.json({ error: 'model, isl, and osl are required' }, { status: 400 });
   }
+  if (FIXTURES_MODE) return cachedJson(loadFixture('benchmarks-history'));
 
   try {
     const modelKeys = DISPLAY_MODEL_TO_DB[model];

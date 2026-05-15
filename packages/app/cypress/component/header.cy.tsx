@@ -49,6 +49,11 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
   });
 
+  it('shows Comparisons nav link', () => {
+    cy.get('[data-testid="nav-link-compare"]').should('be.visible');
+    cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
+  });
+
   it('shows Supporters nav link', () => {
     cy.get('[data-testid="nav-link-supporters"]').should('be.visible');
     cy.get('[data-testid="nav-link-supporters"]').should('have.attr', 'href', '/quotes');
@@ -70,6 +75,7 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu-toggle"]').should('be.visible');
     cy.get('[data-testid="mobile-menu-toggle"]').click();
     cy.contains('Dashboard').should('be.visible');
+    cy.contains('Comparisons').should('be.visible');
     cy.contains('Supporters').should('be.visible');
   });
 });

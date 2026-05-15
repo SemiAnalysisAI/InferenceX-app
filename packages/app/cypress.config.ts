@@ -1,5 +1,6 @@
 import createBundler from '@bahmutov/cypress-esbuild-preprocessor';
 import { defineConfig } from 'cypress';
+import cypressSplit from 'cypress-split';
 import path from 'path';
 
 export default defineConfig({
@@ -19,7 +20,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:3000',
     specPattern: 'cypress/e2e/**/*.cy.ts',
     supportFile: false,
-    setupNodeEvents(on) {
+    setupNodeEvents(on, config) {
       on(
         'file:preprocessor',
         createBundler({
@@ -27,6 +28,8 @@ export default defineConfig({
           alias: { '@': path.resolve(__dirname, 'src') },
         }),
       );
+      cypressSplit(on, config);
+      return config;
     },
   },
   component: {

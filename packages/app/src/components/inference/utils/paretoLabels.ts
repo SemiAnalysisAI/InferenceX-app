@@ -29,7 +29,7 @@ export interface ParetoPointLabel {
 export const getParetoLabel = (d: InferenceData): string => {
   const label = getPointLabel(d);
   // If the label is just a number (no parallelism info), prefix with "TP"
-  if (/^\d+$/.test(label)) {
+  if (/^\d+$/u.test(label)) {
     return `TP${label}`;
   }
   return label;
@@ -46,7 +46,7 @@ export const parseLabelComponents = (label: string): string[] => {
   const parts = label.split('+');
   return parts.map((p) => {
     // Strip the leading "NxNNN" multiplier (e.g., "1x" or "3x")
-    const match = p.match(/^\d+x(.+)$/);
+    const match = p.match(/^\d+x(.+)$/u);
     return match ? match[1] : p;
   });
 };

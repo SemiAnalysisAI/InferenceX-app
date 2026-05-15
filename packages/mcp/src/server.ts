@@ -21,7 +21,7 @@ const roundMetric = (v: unknown) => (typeof v === 'number' ? Math.round(v * 1000
  * but we also reject obviously bad queries before they hit the wire.
  */
 const BLOCKED_PATTERN =
-  /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXEC|SET|RESET|PREPARE|EXECUTE|DO)\b/i;
+  /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXEC|SET|RESET|PREPARE|EXECUTE|DO)\b/iu;
 
 /** Max execution time for query_sql calls (ms). */
 const QUERY_TIMEOUT_MS = 5_000;

@@ -34,6 +34,12 @@ const NAV_LINKS = [
     event: 'header_dashboard_clicked',
   },
   {
+    href: '/compare',
+    label: 'Comparisons',
+    testId: 'nav-link-compare',
+    event: 'header_compare_clicked',
+  },
+  {
     href: '/quotes',
     label: 'Supporters',
     testId: 'nav-link-supporters',

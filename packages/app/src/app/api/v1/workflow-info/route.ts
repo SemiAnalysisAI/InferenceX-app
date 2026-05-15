@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import {
   getChangelogByDate,
@@ -9,6 +9,7 @@ import {
 } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,12 +32,13 @@ const getCachedWorkflowInfo = cachedQuery(async (date: string) => {
 
 export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get('date') ?? '';
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if (date && !/^\d{4}-\d{2}-\d{2}$/u.test(date)) {
     return NextResponse.json(
       { error: 'Invalid date format (YYYY-MM-DD required)' },
       { status: 400 },
     );
   }
+  if (FIXTURES_MODE) return cachedJson(loadFixture('workflow-info'));
 
   try {
     const data = await getCachedWorkflowInfo(date);

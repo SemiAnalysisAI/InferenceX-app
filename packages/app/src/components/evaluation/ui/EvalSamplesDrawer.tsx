@@ -338,7 +338,7 @@ interface FilterChipProps {
  */
 function extractRunIdFromUrl(url: string | undefined): string | null {
   if (!url) return null;
-  const m = url.match(/\/actions\/runs\/(\d+)/);
+  const m = url.match(/\/actions\/runs\/(\d+)/u);
   return m ? m[1] : null;
 }
 

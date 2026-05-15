@@ -9,10 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import {
   Select,
@@ -486,15 +486,15 @@ export default function GpuMetricsDisplay() {
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
                     actions={
-                      !allGpusSelected
-                        ? [
+                      allGpusSelected
+                        ? []
+                        : [
                             {
                               id: 'gpu-metrics-reset-filter',
                               label: 'Reset filter',
                               onClick: selectAllGpus,
                             },
                           ]
-                        : []
                     }
                     switches={[
                       {
@@ -542,15 +542,15 @@ export default function GpuMetricsDisplay() {
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
                     actions={
-                      !allGpusSelected
-                        ? [
+                      allGpusSelected
+                        ? []
+                        : [
                             {
                               id: 'gpu-metrics-reset-filter-2',
                               label: 'Reset filter',
                               onClick: selectAllGpus,
                             },
                           ]
-                        : []
                     }
                     switches={[
                       {

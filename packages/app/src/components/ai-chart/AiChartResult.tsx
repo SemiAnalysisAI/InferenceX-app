@@ -369,9 +369,9 @@ function RadarChart({
         const metricRows = axes
           .map((axis, i) => {
             const raw = d.rawValues[i];
-            return raw !== null
-              ? `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`
-              : '';
+            return raw === null
+              ? ''
+              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`;
           })
           .filter(Boolean)
           .join('');

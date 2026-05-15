@@ -185,7 +185,7 @@ function parseRunIds(raw: string | null): { ids: string[]; error: string | null 
         .filter(Boolean),
     ),
   ];
-  if (ids.length === 0 || !ids.every((id) => /^\d+$/.test(id))) {
+  if (ids.length === 0 || !ids.every((id) => /^\d+$/u.test(id))) {
     return { ids: [], error: 'runId must be a comma-separated list of numeric values' };
   }
   return { ids, error: null };

@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 
 import type { ChartLayout, ChartSetupConfig } from './types';
-import { createDay0Watermark, createLogoWatermark, createUnofficialWatermark } from './watermark';
+import { createLogoWatermark, createUnofficialWatermark } from './watermark';
 
 /**
  * Creates or updates the structural SVG skeleton for a chart.
@@ -51,8 +51,6 @@ export function setupChartStructure(
       );
     } else if (watermark === 'unofficial') {
       createUnofficialWatermark(svg, defs, width, height, margin, chartId);
-    } else if (watermark === 'day0') {
-      createDay0Watermark(svg, defs, width, height, margin, chartId);
     }
 
     const g = svg
@@ -155,21 +153,17 @@ export function setupChartStructure(
   // Update watermark — detect type change and recreate if needed
   const logoPatternId = `logo-pattern-${chartId}`;
   const unofficialPatternId = `unofficial-pattern-${chartId}`;
-  const day0PatternId = `day0-pattern-${chartId}`;
   const hasLogo = !defs.select(`#${logoPatternId}`).empty();
   const hasUnofficial = !defs.select(`#${unofficialPatternId}`).empty();
-  const hasDay0 = !defs.select(`#${day0PatternId}`).empty();
   const needsSwitch =
     (watermark === 'unofficial' && !hasUnofficial) ||
     (watermark === 'logo' && !hasLogo) ||
-    (watermark === 'day0' && !hasDay0) ||
-    (watermark === 'none' && (hasLogo || hasUnofficial || hasDay0));
+    (watermark === 'none' && (hasLogo || hasUnofficial));
 
   if (needsSwitch) {
     svg.select('.watermark-rect').remove();
     defs.select(`#${logoPatternId}`).remove();
     defs.select(`#${unofficialPatternId}`).remove();
-    defs.select(`#${day0PatternId}`).remove();
     if (watermark === 'logo') {
       createLogoWatermark(
         svg,
@@ -183,8 +177,6 @@ export function setupChartStructure(
       );
     } else if (watermark === 'unofficial') {
       createUnofficialWatermark(svg, defs, width, height, margin, chartId);
-    } else if (watermark === 'day0') {
-      createDay0Watermark(svg, defs, width, height, margin, chartId);
     }
   } else {
     svg

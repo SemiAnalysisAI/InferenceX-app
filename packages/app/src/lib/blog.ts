@@ -24,13 +24,13 @@ export function slugify(raw: string): string {
   return (
     raw
       .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, '-')
-      .replaceAll(/^-+|-+$/g, '') || 'post'
+      .replaceAll(/[^a-z0-9]+/gu, '-')
+      .replaceAll(/^-+|-+$/gu, '') || 'post'
   );
 }
 
 export function getReadingTime(content: string): number {
-  const words = content.trim().split(/\s+/).length;
+  const words = content.trim().split(/\s+/u).length;
   return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
 }
 
@@ -40,7 +40,7 @@ export function getAllPosts(): BlogPostMeta[] {
   const files = fs.readdirSync(CONTENT_DIR).filter((f) => f.endsWith('.mdx'));
 
   const posts = files.map((filename) => {
-    const slug = slugify(filename.replace(/\.mdx$/, ''));
+    const slug = slugify(filename.replace(/\.mdx$/u, ''));
     const raw = fs.readFileSync(path.join(CONTENT_DIR, filename), 'utf8');
     const { data, content } = matter(raw);
 
@@ -82,8 +82,8 @@ export interface TocHeading {
 }
 
 export function extractHeadings(rawMdx: string): TocHeading[] {
-  const stripped = rawMdx.replaceAll(/```[\s\S]*?```/g, '');
-  const headingRegex = /^(#{1,3})\s+(.+)$/gm;
+  const stripped = rawMdx.replaceAll(/```[\s\S]*?```/gu, '');
+  const headingRegex = /^(#{1,3})\s+(.+)$/gmu;
   const headings: TocHeading[] = [];
   const seen = new Set<string>();
   const parents: string[] = []; // parents[level] = slug of most recent heading at that level

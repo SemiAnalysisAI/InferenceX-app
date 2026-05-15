@@ -28,7 +28,7 @@ const DEFAULT_SPECS: GpuSpecs = { power: 0, costh: 0, costn: 0, costr: 0 };
  * Splits on '_' or '-' to get the base (e.g. "h100_vllm" -> "h100").
  */
 export function getGpuSpecs(hwKey: string): GpuSpecs {
-  const base = hwKey.split(/[-_]/)[0];
+  const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
   return { power: entry.power, costh: entry.costh, costn: entry.costn, costr: entry.costr };
@@ -111,6 +111,19 @@ export function getModelSortIndex(hwKey: string): number {
 /** Returns true if the base GPU in a hardware key is recognized. */
 export function isKnownGpu(hwKey: string): boolean {
   return hwKey.split('_')[0] in HW_REGISTRY;
+}
+
+/**
+ * True when `hwKey` is exactly this registry GPU key or a framework / disagg /
+ * spec variant (`{base}_…`), matching the legend prefix rules used elsewhere.
+ */
+export function hardwareKeyMatchesBase(hwKey: string, baseGpuKey: string): boolean {
+  return hwKey === baseGpuKey || hwKey.startsWith(`${baseGpuKey}_`);
+}
+
+/** True when `hwKey` matches any of the given base registry keys (e.g. compare pages). */
+export function hardwareKeyMatchesAnyBase(hwKey: string, baseGpuKeys: readonly string[]): boolean {
+  return baseGpuKeys.some((b) => hardwareKeyMatchesBase(hwKey, b));
 }
 
 /** Cache for buildHardwareEntry results. */

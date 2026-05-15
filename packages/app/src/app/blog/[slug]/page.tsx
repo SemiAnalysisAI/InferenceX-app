@@ -14,6 +14,7 @@ import { createMdxComponents } from '@/components/blog/mdx-components';
 import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
+import { JsonLd } from '@/components/json-ld';
 import { getAllPosts, getAdjacentPosts, extractHeadings, getPostBySlug } from '@/lib/blog';
 import {
   AUTHOR_HANDLE,
@@ -129,7 +130,7 @@ export default async function BlogPostPage({ params }: Props) {
     ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
     description: meta.subtitle,
     url: `${SITE_URL}/blog/${slug}`,
-    wordCount: raw.trim().split(/\s+/).length,
+    wordCount: raw.trim().split(/\s+/u).length,
     timeRequired: `PT${meta.readingTime}M`,
   };
 
@@ -137,7 +138,7 @@ export default async function BlogPostPage({ params }: Props) {
     <main className="relative">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
-      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <section data-blog-section="true" className="flex flex-col gap-4">
           <Card>

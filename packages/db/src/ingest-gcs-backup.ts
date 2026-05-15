@@ -183,7 +183,7 @@ async function mapWorkflowDir(
     }
   }
   if (!githubRunId) {
-    const match = workflowDir.match(/_(\d{10,})$/);
+    const match = workflowDir.match(/_(\d{10,})$/u);
     if (match) githubRunId = parseInt(match[1], 10);
   }
   if (!githubRunId) {
@@ -223,7 +223,7 @@ async function mapWorkflowDir(
   const islOslFallback = parseIslOsl(workflowDir);
   const runName =
     workflowDir
-      .replace(/_\d{10,}$/, '')
+      .replace(/_\d{10,}$/u, '')
       .replaceAll('_', ' ')
       .trim() || `Run ${githubRunId}`;
 
@@ -238,7 +238,7 @@ async function mapWorkflowDir(
   // Map configKey → zip file path. Actual text is read lazily in phase 2.
   const serverLogPaths = new Map<string, string>();
   for (const zipFile of serverLogZips) {
-    const configKey = zipFile.replace(/^server_logs_/, '').replace(/_\d+_\d+\.zip$/, '');
+    const configKey = zipFile.replace(/^server_logs_/u, '').replace(/_\d+_\d+\.zip$/u, '');
     serverLogPaths.set(configKey, path.join(artifactsPath, zipFile));
   }
 
@@ -247,8 +247,8 @@ async function mapWorkflowDir(
   // artifacts map to the same DB conflict key, the newest is processed last
   // and wins the ON CONFLICT DO UPDATE (latest-attempt-wins).
   const sortedBmkZips = [...bmkZipFiles].toSorted((a, b) => {
-    const idA = a.match(/_(\d{10,})\.zip$/)?.[1];
-    const idB = b.match(/_(\d{10,})\.zip$/)?.[1];
+    const idA = a.match(/_(\d{10,})\.zip$/u)?.[1];
+    const idB = b.match(/_(\d{10,})\.zip$/u)?.[1];
     const tsA = idA ? (artifactCreatedAt.get(Number(idA)) ?? '') : '';
     const tsB = idB ? (artifactCreatedAt.get(Number(idB)) ?? '') : '';
     return tsA.localeCompare(tsB);
@@ -302,7 +302,7 @@ async function mapWorkflowDir(
       // Match server log by config key (bmk_ files only — results_ compiled zips have no matching logs)
       let serverLogPath: string | undefined;
       if (zipFile.startsWith('bmk_')) {
-        const bmkConfigKey = zipFile.replace(/^bmk_/, '').replace(/_\d+_\d+\.zip$/, '');
+        const bmkConfigKey = zipFile.replace(/^bmk_/u, '').replace(/_\d+_\d+\.zip$/u, '');
         serverLogPath = serverLogPaths.get(bmkConfigKey);
       }
       bmkZips.push({ zipFile, rows, serverLogPath });
@@ -374,7 +374,7 @@ async function mapWorkflowDir(
     );
     const samplesByTask = new Map<string, string>();
     for (const [name, text] of sampleTexts) {
-      const m = name.match(/^samples_(.+?)_[^_]+\.jsonl$/);
+      const m = name.match(/^samples_(.+?)_[^_]+\.jsonl$/u);
       if (m) samplesByTask.set(m[1].toLowerCase(), text);
     }
 
@@ -501,7 +501,7 @@ async function main(): Promise<void> {
 
   const dateDirs = fs
     .readdirSync(GCS_DIR)
-    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/u.test(d))
     .toSorted();
   console.log(`  ${dateDirs.length} date directories  (${dateDirs[0]} → ${dateDirs.at(-1)})`);
 

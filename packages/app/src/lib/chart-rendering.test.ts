@@ -38,8 +38,8 @@ describe('SHAPE_CONFIG', () => {
 
   it('triangle config has type "path" with an SVG path string', () => {
     expect(SHAPE_CONFIG.triangle.type).toBe('path');
-    expect(SHAPE_CONFIG.triangle.normal.d).toMatch(/^M /);
-    expect(SHAPE_CONFIG.triangle.hover.d).toMatch(/^M /);
+    expect(SHAPE_CONFIG.triangle.normal.d).toMatch(/^M /u);
+    expect(SHAPE_CONFIG.triangle.hover.d).toMatch(/^M /u);
   });
 
   it('diamond config has type "path" with a distinct path from triangle', () => {

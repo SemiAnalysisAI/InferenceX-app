@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getSubmissionSummary,
   getSubmissionVolume,
 } from '@semianalysisai/inferencex-db/queries/submissions';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ const getCachedVolume = cachedQuery(() => {
 }, 'submissions-volume');
 
 export async function GET() {
+  if (FIXTURES_MODE) return cachedJson(loadFixture('submissions'));
   try {
     const [summary, volume] = await Promise.all([getCachedSummary(), getCachedVolume()]);
     return cachedJson({ summary, volume });

@@ -4,13 +4,13 @@ import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { GRADIENT_NUDGE_EVENT } from '@/components/gradient-label-nudge';
+import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -112,6 +112,8 @@ const ScatterGraph = React.memo(
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
+    transitionDuration = 750,
+    niceAxes = true,
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
@@ -119,7 +121,6 @@ const ScatterGraph = React.memo(
       toggleHwType,
       removeHwType,
       hwTypesWithData,
-      selectedModel,
       selectedPrecisions,
       selectedYAxisMetric,
       availableRuns,
@@ -448,10 +449,10 @@ const ScatterGraph = React.memo(
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
         domain,
-        nice: true,
+        nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType]);
+    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes]);
 
     const yScaleConfig = useMemo(() => {
       const ext =
@@ -473,9 +474,9 @@ const ScatterGraph = React.memo(
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
         domain: [yMin, ext[1] * 1.05] as [number, number],
-        nice: true,
+        nice: niceAxes,
       };
-    }, [visiblePoints, isInputTputMetric, logScale]);
+    }, [visiblePoints, isInputTputMetric, logScale, niceAxes]);
 
     // --- Axis configs ---
     const xAxisConfig = useMemo(
@@ -530,7 +531,9 @@ const ScatterGraph = React.memo(
           .selectAll<SVGGElement, InferenceData>('.dot-group')
           .transition('legend-hover')
           .duration(150)
-          .style('opacity', (d) => (!isPointVisible(d) ? 0 : String(d.hwKey) === hwKey ? 1 : 0.15));
+          .style('opacity', (d) =>
+            isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
+          );
         root
           .selectAll<SVGPathElement, unknown>('.roofline-path')
           .transition('legend-hover')
@@ -1897,7 +1900,7 @@ const ScatterGraph = React.memo(
         chartId={chartId}
         data={chartScaleData}
         margin={CHART_MARGIN}
-        watermark={getModelWatermark(selectedModel, isUnofficialRun)}
+        watermark={getChartWatermark(isUnofficialRun)}
         testId="scatter-graph"
         grabCursor={true}
         caption={caption}
@@ -1908,7 +1911,7 @@ const ScatterGraph = React.memo(
         layers={layers}
         zoom={zoomConfig}
         tooltip={tooltipConfig}
-        transitionDuration={750}
+        transitionDuration={transitionDuration}
         onRender={onRender}
         noDataOverlay={
           filteredData.length === 0 && processedOverlayData.length === 0 ? (
@@ -2007,8 +2010,9 @@ const ScatterGraph = React.memo(
               track('latency_legend_expanded', { expanded });
             }}
             switches={[
-              ...(selectedYAxisMetric !== 'y_inputTputPerGpu'
-                ? [
+              ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                ? []
+                : [
                     {
                       id: 'scatter-log-scale',
                       label: 'Log Scale',
@@ -2018,8 +2022,7 @@ const ScatterGraph = React.memo(
                         track('latency_log_scale_toggled', { enabled: checked });
                       },
                     },
-                  ]
-                : []),
+                  ]),
               {
                 id: 'scatter-hide-non-optimal',
                 label: 'Optimal Only',

@@ -324,15 +324,17 @@ describe('interpolateForGPU', () => {
     expect(interpolateForGPU([], 30, 'interactivity_to_throughput', 'costh')).toBeNull();
   });
 
-  it('returns null when target is outside the data range', () => {
+  it('clamps target to the pareto-front input range instead of returning null', () => {
     const points = [
       makePoint({ interactivity: 20, throughput: 500 }),
       makePoint({ interactivity: 40, throughput: 300 }),
     ];
-    // Below range
-    expect(interpolateForGPU(points, 10, 'interactivity_to_throughput', 'costh')).toBeNull();
-    // Above range
-    expect(interpolateForGPU(points, 50, 'interactivity_to_throughput', 'costh')).toBeNull();
+    const below = interpolateForGPU(points, 10, 'interactivity_to_throughput', 'costh');
+    const above = interpolateForGPU(points, 50, 'interactivity_to_throughput', 'costh');
+    expect(below).not.toBeNull();
+    expect(above).not.toBeNull();
+    expect(below!.value).toBe(500);
+    expect(above!.value).toBe(300);
   });
 
   it('returns the single point value when target matches exactly', () => {
@@ -349,9 +351,12 @@ describe('interpolateForGPU', () => {
     expect(result!.nearestPoints).toHaveLength(1);
   });
 
-  it('returns null for single point when target does not match', () => {
+  it('single GPU clamps any target to the lone pareto-front point', () => {
     const points = [makePoint({ interactivity: 30, throughput: 500 })];
-    expect(interpolateForGPU(points, 25, 'interactivity_to_throughput', 'costh')).toBeNull();
+    const result = interpolateForGPU(points, 25, 'interactivity_to_throughput', 'costh');
+    expect(result).not.toBeNull();
+    expect(result!.value).toBe(500);
+    expect(result!.nearestPoints).toHaveLength(1);
   });
 
   it('interpolates throughput from interactivity with multiple points', () => {

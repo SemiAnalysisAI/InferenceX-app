@@ -1,11 +1,14 @@
 packages:
   - packages/*
 
-onlyBuiltDependencies:
-  - '@posthog/cli'
-  - core-js
-  - cypress
-  - esbuild
-  - lefthook
-  - protobufjs
-  - sharp
+allowBuilds:
+  '@posthog/cli': true
+  core-js: true
+  cypress: true
+  esbuild: true
+  lefthook: true
+  protobufjs: true
+  sharp: true
+
+overrides:
+  postcss@<8.5.10: '>=8.5.10'

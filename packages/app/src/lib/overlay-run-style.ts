@@ -65,7 +65,7 @@ export function overlayRunIndex(
 ): number {
   if (!runUrl) return 0;
   if (runUrl in map) return map[runUrl];
-  const idMatch = runUrl.match(/\/runs\/(\d+)/);
+  const idMatch = runUrl.match(/\/runs\/(\d+)/u);
   if (idMatch && idMatch[1] in map) return map[idMatch[1]];
   return 0;
 }

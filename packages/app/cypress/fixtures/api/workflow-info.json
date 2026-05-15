@@ -1,0 +1,46 @@
+{
+  "runs": [
+    {
+      "github_run_id": "25356359090",
+      "name": "Run Sweep - dsv4-fp8-h200-vllm-mtp: bump num_speculative_tokens 1 → 2 (#1279)\n\n* dsv4-fp8-h200-vllm-mtp: bump num_speculative_tokens 1 → 2\n\nTests whether H200 MTP kernels accept 2 draft tokens. Blackwell\nruns at 2 per @wzhao18's vLLM Blackwell MTP submission; checking\nif H200 has parity.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* perf-changelog: fill in PR #1279 link\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude ...",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/25356359090",
+      "created_at": "2026-05-05T03:31:54Z",
+      "date": "2026-05-05"
+    }
+  ],
+  "changelogs": [
+    {
+      "workflow_run_id": "25356359090",
+      "date": "2026-05-05",
+      "base_ref": "f7b1c444ea85b9e2157c5590e42905ea2a676fbc",
+      "head_ref": "9d5bbb82a1d648054e300003efb5692433f0fee8",
+      "config_keys": ["dsv4-fp8-h200-vllm-mtp"],
+      "description": "Bump --speculative-config num_speculative_tokens from 1 to 2 (`{\"method\":\"mtp\",\"num_speculative_tokens\":2}`)\nRe-test whether H200 MTP kernels accept 2 draft tokens — Blackwell MTP runs at 2 (per @wzhao18's vLLM Blackwell MTP submission); checking if H200 has parity now",
+      "pr_link": "https://github.com/SemiAnalysisAI/InferenceX/pull/1279"
+    }
+  ],
+  "configs": [
+    {
+      "model": "dsv4",
+      "isl": 1024,
+      "osl": 1024,
+      "precision": "fp8",
+      "hardware": "h200",
+      "framework": "vllm",
+      "spec_method": "mtp",
+      "disagg": false
+    },
+    {
+      "model": "dsv4",
+      "isl": 8192,
+      "osl": 1024,
+      "precision": "fp8",
+      "hardware": "h200",
+      "framework": "vllm",
+      "spec_method": "mtp",
+      "disagg": false
+    }
+  ]
+}

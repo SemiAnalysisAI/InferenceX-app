@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import {
   ModelSelector,
   SequenceSelector,
@@ -19,7 +20,6 @@ import {
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -758,7 +758,6 @@ export default function ThroughputCalculatorDisplay() {
                       selectedBars={selectedBars}
                       onBarSelect={handleBarSelect}
                       colorResolver={resolveColor}
-                      selectedModel={selectedModel}
                       legendElement={
                         availableHwKeys.length > 0 ? (
                           <ChartLegend

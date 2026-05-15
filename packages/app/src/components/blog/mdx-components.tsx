@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { slugify } from '@/lib/blog';
 import { HeadingLink } from '@/components/blog/heading-link';
+import { JsonLd } from '@/components/json-ld';
 
 function childrenToText(children: ReactNode): string {
   if (typeof children === 'string') return children;
@@ -175,12 +176,14 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
     JsonLd: (props: { children?: ReactNode }) => {
       const raw = childrenToText(props.children).trim();
       if (!raw) return null;
+      let parsed: unknown;
       try {
-        JSON.parse(raw);
+        parsed = JSON.parse(raw);
       } catch {
         return null;
       }
-      return <script type="application/ld+json">{raw}</script>;
+      if (!parsed || typeof parsed !== 'object') return null;
+      return <JsonLd data={parsed} />;
     },
   };
 }

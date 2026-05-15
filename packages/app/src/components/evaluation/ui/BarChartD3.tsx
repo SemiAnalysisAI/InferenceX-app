@@ -17,7 +17,7 @@ import {
   type EvalBenchmark,
   type Precision,
   getEvalBenchmarkLabel,
-  getModelWatermark,
+  getChartWatermark,
   getPrecisionLabel,
 } from '@/lib/data-mappings';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -180,7 +180,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       if (url) {
         const direct = runIndexByUrl[url];
         if (direct !== undefined) return unofficialRunInfos[direct]?.branch;
-        const idMatch = url.match(/\/runs\/(\d+)/);
+        const idMatch = url.match(/\/runs\/(\d+)/u);
         if (idMatch) {
           const viaId = runIndexByUrl[idMatch[1]];
           if (viaId !== undefined) return unofficialRunInfos[viaId]?.branch;
@@ -861,7 +861,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       data={chartData}
       height={chartHeight}
       margin={chartMargin}
-      watermark={getModelWatermark(selectedModel, isUnofficialRun)}
+      watermark={getChartWatermark(isUnofficialRun)}
       grabCursor={false}
       caption={caption}
       xScale={{ type: 'linear', domain: xDomain }}
@@ -881,7 +881,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         constrain: (transform) => {
           const k = transform.k;
           const innerWidth =
-            (typeof window !== 'undefined' ? window.innerWidth : 800) -
+            (typeof window === 'undefined' ? 800 : window.innerWidth) -
             chartMargin.left -
             chartMargin.right;
           const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);

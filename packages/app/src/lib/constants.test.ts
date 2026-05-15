@@ -8,6 +8,8 @@ import {
   getGpuSpecs,
   getHardwareConfig,
   getModelSortIndex,
+  hardwareKeyMatchesAnyBase,
+  hardwareKeyMatchesBase,
   isKnownGpu,
 } from '@/lib/constants';
 
@@ -53,6 +55,31 @@ describe('GPU_ALIAS_TO_CANONICAL', () => {
     for (const canonical of Object.keys(GPU_KEY_ALIASES)) {
       expect(GPU_ALIAS_TO_CANONICAL[canonical]).toBeUndefined();
     }
+  });
+});
+
+// ===========================================================================
+// hardwareKeyMatchesBase / hardwareKeyMatchesAnyBase
+// ===========================================================================
+describe('hardwareKeyMatchesBase', () => {
+  it('matches exact registry key and prefixed variants', () => {
+    expect(hardwareKeyMatchesBase('h100', 'h100')).toBe(true);
+    expect(hardwareKeyMatchesBase('h100_vllm', 'h100')).toBe(true);
+    expect(hardwareKeyMatchesBase('gb200_dynamo-trt_mtp', 'gb200')).toBe(true);
+  });
+
+  it('does not match a different GPU prefix', () => {
+    expect(hardwareKeyMatchesBase('h200_vllm', 'h100')).toBe(false);
+    expect(hardwareKeyMatchesBase('mi300x_trt', 'mi325x')).toBe(false);
+    expect(hardwareKeyMatchesBase('h1000_foo', 'h100')).toBe(false);
+  });
+});
+
+describe('hardwareKeyMatchesAnyBase', () => {
+  it('matches either base in a slug pair', () => {
+    expect(hardwareKeyMatchesAnyBase('h100_sglang', ['h100', 'h200'])).toBe(true);
+    expect(hardwareKeyMatchesAnyBase('h200', ['h100', 'h200'])).toBe(true);
+    expect(hardwareKeyMatchesAnyBase('b200_trt', ['h100', 'h200'])).toBe(false);
   });
 });
 

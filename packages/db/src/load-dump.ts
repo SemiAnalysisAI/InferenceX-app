@@ -197,7 +197,7 @@ async function load(): Promise<void> {
 
   console.log('=== db:load-dump ===\n');
   console.log(`  Source: ${dumpDir}`);
-  console.log(`  Target: ${process.env.DATABASE_WRITE_URL?.replace(/:[^@]+@/, ':***@')}`);
+  console.log(`  Target: ${process.env.DATABASE_WRITE_URL?.replace(/:[^@]+@/u, ':***@')}`);
   console.log(`  SSL:    ${hasNoSslFlag() ? 'disabled' : 'required'}`);
   console.log();
 

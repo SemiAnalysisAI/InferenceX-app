@@ -13,6 +13,18 @@ export type DbClient = (
 /** True when running off a JSON dump directory instead of a live database (local dev only). */
 export const JSON_MODE = !process.env.DATABASE_READONLY_URL && Boolean(process.env.DUMP_DIR);
 
+/**
+ * Server-side fixtures mode for cypress e2e: every API route returns a
+ * pre-captured fixture instead of querying. Set via E2E_FIXTURES=1 in the
+ * tests-e2e.yml workflow. Avoids relying on cy.intercept (which has a brief
+ * gap on test transitions when cypress resets routes) and works on fork PRs
+ * where DB secrets aren't available.
+ *
+ * Not gated on CI=true because Vercel also sets CI=true during production
+ * builds; using a dedicated var keeps prod safe.
+ */
+export const FIXTURES_MODE = process.env.E2E_FIXTURES === '1';
+
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 interface PostgresConnectionOptions {
@@ -22,7 +34,7 @@ interface PostgresConnectionOptions {
 
 function getDbHostname(url: string): string | null {
   try {
-    return new URL(url).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
+    return new URL(url).hostname.toLowerCase().replace(/^\[(.*)\]$/u, '$1');
   } catch {
     return null;
   }
@@ -67,7 +79,13 @@ function wrapPostgres(sql: postgres.Sql): DbClient {
 
 // Survive Next.js HMR — without globalThis the module re-evaluates on each
 // hot reload, leaking the previous postgres.js TCP connection pool.
-const g = globalThis as unknown as { __dbClient?: DbClient };
+const g = globalThis as unknown as { __dbClient?: DbClient; __dbWriteClient?: DbClient };
+
+function makeDbClient(url: string): DbClient {
+  return shouldUseNeon(url)
+    ? (neon(url) as DbClient)
+    : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
+}
 
 /**
  * Read-only SQL client for API routes.
@@ -78,10 +96,15 @@ export function getDb(): DbClient {
   if (g.__dbClient) return g.__dbClient;
   const url = process.env.DATABASE_READONLY_URL;
   if (!url) throw new Error('DATABASE_READONLY_URL is not set');
-
-  g.__dbClient = shouldUseNeon(url)
-    ? (neon(url) as DbClient)
-    : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
-
+  g.__dbClient = makeDbClient(url);
   return g.__dbClient;
+}
+
+/** Write-capable SQL client for API routes that need to insert (e.g. user feedback). */
+export function getWriteDb(): DbClient {
+  if (g.__dbWriteClient) return g.__dbWriteClient;
+  const url = process.env.DATABASE_WRITE_URL;
+  if (!url) throw new Error('DATABASE_WRITE_URL is not set');
+  g.__dbWriteClient = makeDbClient(url);
+  return g.__dbWriteClient;
 }

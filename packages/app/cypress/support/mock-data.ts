@@ -82,7 +82,7 @@ export function createMockHardwareConfig(): HardwareConfig {
 
 export function createMockChartDefinition(overrides?: Partial<ChartDefinition>): ChartDefinition {
   return {
-    chartType: 'scatter',
+    chartType: 'e2e',
     heading: 'End-to-End Latency vs Throughput',
     x: 'conc' as keyof AggDataEntry,
     x_label: 'Concurrency',
@@ -250,6 +250,7 @@ export function createMockInferenceContext(
     activePresetId: null,
     setActivePresetId: namedStub('setActivePresetId'),
     presetGuardRef: { current: false } as React.RefObject<boolean>,
+    compareGpuPair: null,
     ...overrides,
   };
 }

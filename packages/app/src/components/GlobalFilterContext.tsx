@@ -6,10 +6,21 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+
+// useLayoutEffect warns during SSR; alias to useEffect on the server (no-op there anyway).
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[keyof T] {
+  return (Object.values(e) as string[]).includes(v);
+}
+
+const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
+const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 
@@ -25,6 +36,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
+import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -108,29 +120,41 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
   return runs;
 }
 
-export function GlobalFilterProvider({ children }: { children: ReactNode }) {
+export function GlobalFilterProvider({
+  children,
+  initialModel,
+  initialSequence,
+  initialPrecisions,
+}: {
+  children: ReactNode;
+  /**
+   * Initial values used when no URL params are present. Lets per-route entry
+   * points (e.g. `/compare/[a]-vs-[b]`) seed sensible defaults derived from
+   * actual data — without these, every page falls back to FP4/8K-1K which
+   * has no data for older GPUs (Hopper, CDNA 3).
+   */
+  initialModel?: Model;
+  initialSequence?: Sequence;
+  initialPrecisions?: string[];
+}) {
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
-  const [selectedModel, setSelectedModel] = useState<Model>(() => {
-    const urlModel = getUrlParam('g_model');
-    if (urlModel && Object.values(Model).includes(urlModel as Model)) {
-      return urlModel as Model;
-    }
-    return Model.DeepSeek_R1;
-  });
+  const [selectedModel, setSelectedModel] = useState<Model>(
+    () => initialModel ?? Model.DeepSeek_R1,
+  );
 
   const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
-    const urlSeq = getUrlParam('i_seq');
-    if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
+    if (initialSequence) return initialSequence;
     return Sequence.EightK_OneK;
   });
 
   const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() => {
-    const urlPrec = getUrlParam('i_prec');
-    if (urlPrec) {
-      const precs = urlPrec.split(',').filter((p) => PRECISION_OPTIONS.includes(p as any));
-      if (precs.length > 0) return precs;
+    if (initialPrecisions && initialPrecisions.length > 0) {
+      const valid = initialPrecisions.filter((p) =>
+        (PRECISION_OPTIONS as readonly string[]).includes(p),
+      );
+      if (valid.length > 0) return valid;
     }
     return [Precision.FP4];
   });
@@ -139,12 +163,47 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Run date / run ID ─────────────────────────────────────────────────────
-  const [selectedRunDate, setSelectedRunDateBase] = useState<string>(
-    () => getUrlParam('g_rundate') || '',
-  );
+  const [selectedRunDate, setSelectedRunDateBase] = useState<string>('');
   const [selectedRunDateRev, setSelectedRunDateRev] = useState(0);
 
-  const [selectedRunId, setSelectedRunId] = useState<string>(() => getUrlParam('g_runid') || '');
+  const [selectedRunId, setSelectedRunId] = useState<string>('');
+
+  // Apply URL param overrides synchronously after the first commit. Runs only
+  // on the client (useEffect on server is a no-op). Updates state before paint
+  // so users with shareable URLs (?i_seq=…&g_model=…) see their values without
+  // flicker, and SSR/client hydration agree because initial state came from
+  // props/defaults on both sides.
+  useIsomorphicLayoutEffect(() => {
+    const applyIfEnum = <T extends Record<string, string>>(
+      key: 'g_model' | 'i_seq',
+      enumType: T,
+      apply: (v: T[keyof T]) => void,
+    ) => {
+      const value = getUrlParam(key);
+      if (value !== undefined && isEnumValue(enumType, value)) apply(value);
+    };
+    const applyIfMatches = (
+      key: 'g_rundate' | 'g_runid',
+      pattern: RegExp,
+      apply: (v: string) => void,
+    ) => {
+      const value = getUrlParam(key);
+      if (value !== undefined && pattern.test(value)) apply(value);
+    };
+
+    applyIfEnum('g_model', Model, setSelectedModel);
+    applyIfEnum('i_seq', Sequence, setSelectedSequence);
+    const urlPrec = getUrlParam('i_prec');
+    if (urlPrec) {
+      const precs = urlPrec
+        .split(',')
+        .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
+      if (precs.length > 0) setSelectedPrecisionsRaw(precs);
+    }
+    applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
+    applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
@@ -171,6 +230,34 @@ export function GlobalFilterProvider({ children }: { children: ReactNode }) {
       return availabilityRows.some((r) => keys.includes(r.model));
     });
   }, [availabilityRows, unofficialAvailable]);
+
+  // Auto-switch the selected model when an unofficial run is loaded that
+  // doesn't include the currently selected model. Without this, navigating
+  // to `?unofficialrun=<id>` while the default `g_model=DeepSeek-R1` sticks
+  // leaves the user staring at a chart with no overlay points — they'd have
+  // to know to open the dropdown and pick the run's model themselves.
+  //
+  // Precedence on first load: the `if (urlModel)` early-bail in
+  // `computeAutoSwitchDecision` is the primary guard for explicit `g_model`
+  // intent. The dedupe ref is a secondary guard for the narrow window after
+  // an auto-switch fires but before the URL-sync effect (below) writes
+  // `g_model` back to the URL — once that runs, `urlModel` is set on every
+  // subsequent render and the ref check is effectively redundant. The ref
+  // still matters across navigations between unofficial runs because it is
+  // reset whenever the overlay set goes empty.
+  const lastAutoSwitchKeyRef = useRef<string>('');
+  useEffect(() => {
+    const decision = computeAutoSwitchDecision(
+      unofficialAvailable,
+      getUrlParam('g_model'),
+      selectedModel,
+      lastAutoSwitchKeyRef.current,
+    );
+    lastAutoSwitchKeyRef.current = decision.nextKey;
+    if (decision.modelToSet !== null) {
+      setSelectedModel(decision.modelToSet);
+    }
+  }, [unofficialAvailable, selectedModel]);
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
   const availableSequences = useMemo(() => {

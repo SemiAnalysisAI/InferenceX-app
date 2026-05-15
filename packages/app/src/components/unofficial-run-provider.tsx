@@ -41,9 +41,9 @@ type UnofficialChartData = Record<
   }
 >;
 
-const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
+const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
-interface AvailableModelSequence {
+export interface AvailableModelSequence {
   model: Model;
   sequence: Sequence;
   precisions: string[];
@@ -281,7 +281,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       const belongsToDismissed = (rowUrl?: string | null) => {
         if (!rowUrl) return false;
         if (rowUrl === target.url) return true;
-        const m = rowUrl.match(/\/runs\/(\d+)/);
+        const m = rowUrl.match(/\/runs\/(\d+)/u);
         return m !== null && m[1] === runId;
       };
 

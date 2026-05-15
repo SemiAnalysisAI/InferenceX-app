@@ -78,7 +78,7 @@ function formatValue(value: number): string {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(2).replace(/\.?0+$/, '');
+  return value.toFixed(2).replace(/\.?0+$/u, '');
 }
 
 interface GpuSpecsBarChartProps {

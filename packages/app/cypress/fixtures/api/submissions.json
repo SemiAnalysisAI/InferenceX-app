@@ -1,0 +1,5646 @@
+{
+  "summary": [
+    {
+      "model": "dsv4",
+      "hardware": "h200",
+      "framework": "vllm",
+      "precision": "fp8",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-05",
+      "total_datapoints": 10,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.1@sha256:9eff9734a30b6713a8566217d36f8277630fd2d31cec7f0a0292835901a23aa4"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-04",
+      "total_datapoints": 19,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 9,
+      "max_concurrency": 256,
+      "image": "rocm/sgl-dev:rocm720-mi35x-a8410de-20260502-DSv4"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "h200",
+      "framework": "vllm",
+      "precision": "fp8",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-04",
+      "total_datapoints": 10,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.1@sha256:9eff9734a30b6713a8566217d36f8277630fd2d31cec7f0a0292835901a23aa4"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 32,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-04",
+      "total_datapoints": 3,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.1-ubuntu2404"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-04",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 128,
+      "image": "lmsysorg/sglang:nightly-dev-20260422-de962f32"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 0,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 0,
+      "decode_ep": 0,
+      "date": "2026-05-04",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "vllm/vllm-openai:v0.20.1-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-04",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 128,
+      "image": "vllm/vllm-openai:v0.20.1-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-04",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1024,
+      "image": "vllm/vllm-openai:v0.20.1-ubuntu2404"
+    },
+    {
+      "model": "kimik2.5",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "int4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 20,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "kimik2.5",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "int4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 20,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 16,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 9,
+      "max_concurrency": 256,
+      "image": "rocm/sgl-dev:rocm720-mi35x-a8410de-20260502-DSv4"
+    },
+    {
+      "model": "minimaxm2.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 14,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 256,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "minimaxm2.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 2,
+      "num_decode_gpu": 2,
+      "prefill_tp": 2,
+      "prefill_ep": 1,
+      "decode_tp": 2,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 14,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 256,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "trt",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 13,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 64,
+      "image": "ghcr.io/semianalysisai/trtllm-deepseek-v4:feat-deepseek_v4-4999884"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "h200",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 64,
+      "image": "lmsysorg/sglang:deepseek-v4-hopper@sha256:7f19c6dc092e47a10fac2e41f47eab78970280d06648b8e50d312a82f0ae722f"
+    },
+    {
+      "model": "dsr1",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 10,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 64,
+      "image": "lmsysorg/sglang:v0.5.9-rocm700-mi35x"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "trt",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-03",
+      "total_datapoints": 5,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 2048,
+      "image": "ghcr.io/semianalysisai/trtllm-deepseek-v4:feat-deepseek_v4-4999884"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "trt",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-05-03",
+      "total_datapoints": 4,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 256,
+      "image": "ghcr.io/semianalysisai/trtllm-deepseek-v4:feat-deepseek_v4-4999884"
+    },
+    {
+      "model": "dsr1",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-03",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 2,
+      "max_concurrency": 64,
+      "image": "lmsysorg/sglang:v0.5.9-rocm700-mi35x"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "h200",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-02",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 64,
+      "image": "lmsysorg/sglang:deepseek-v4-hopper@sha256:7f19c6dc092e47a10fac2e41f47eab78970280d06648b8e50d312a82f0ae722f"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-02",
+      "total_datapoints": 9,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 32,
+      "image": "rocm/sgl-dev:rocm720-mi35x-583b1b6-20260501-DSv4"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-02",
+      "total_datapoints": 7,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 256,
+      "image": "rocm/sgl-dev:rocm720-mi35x-583b1b6-20260501-DSv4"
+    },
+    {
+      "model": "glm5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 14,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 256,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 2,
+      "num_decode_gpu": 2,
+      "prefill_tp": 2,
+      "prefill_ep": 1,
+      "decode_tp": 2,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 14,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 256,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 2,
+      "num_decode_gpu": 2,
+      "prefill_tp": 2,
+      "prefill_ep": 1,
+      "decode_tp": 2,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 128,
+      "image": "lmsysorg/sglang:nightly-dev-20260422-de962f32"
+    },
+    {
+      "model": "glm5",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 128,
+      "image": "lmsysorg/sglang-rocm:v0.5.10rc0-rocm720-mi35x-20260415"
+    },
+    {
+      "model": "glm5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 256,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 6,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 16,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "glm5",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 4,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 2,
+      "max_concurrency": 8,
+      "image": "lmsysorg/sglang-rocm:v0.5.10rc0-rocm720-mi35x-20260415"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4,
+      "image": "lmsysorg/sglang:nightly-dev-20260422-de962f32"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 20,
+      "num_decode_gpu": 8,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-01",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 8,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-01",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 68,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 18,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 28,
+      "num_decode_gpu": 32,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 16,
+      "decode_ep": 16,
+      "date": "2026-05-01",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 3072,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 24,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-05-01",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 192,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 24,
+      "num_decode_gpu": 8,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-05-01",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "minimaxm2.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 1,
+      "num_decode_gpu": 1,
+      "prefill_tp": 1,
+      "prefill_ep": 1,
+      "decode_tp": 1,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 18,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 9,
+      "max_concurrency": 1024,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "minimaxm2.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 2,
+      "num_decode_gpu": 2,
+      "prefill_tp": 2,
+      "prefill_ep": 1,
+      "decode_tp": 2,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 18,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 9,
+      "max_concurrency": 1024,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 14,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 256,
+      "image": "lmsysorg/sglang:nightly-dev-20260422-de962f32"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "minimaxm2.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 128,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 9,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "minimaxm2.5",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 6,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 16,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 3,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 1024,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "qwen3.5",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4,
+      "image": "lmsysorg/sglang:nightly-dev-20260422-de962f32"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 32,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 2,
+      "max_concurrency": 512,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 8,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 2048,
+      "image": "lmsysorg/sglang:deepseek-v4-grace-blackwell"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 24,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "lmsysorg/sglang:deepseek-v4-grace-blackwell"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 8,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 512,
+      "image": "lmsysorg/sglang:deepseek-v4-grace-blackwell"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 16,
+      "decode_ep": 16,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 512,
+      "image": "lmsysorg/sglang:deepseek-v4-grace-blackwell"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1024,
+      "image": "lmsysorg/sglang:deepseek-v4-grace-blackwell"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb300",
+      "framework": "dynamo-sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 56,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 16,
+      "decode_ep": 16,
+      "date": "2026-04-30",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 16384,
+      "image": "lmsysorg/sglang:deepseek-v4-grace-blackwell"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-29",
+      "total_datapoints": 15,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 8,
+      "max_concurrency": 128,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-29",
+      "total_datapoints": 6,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 4,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-29",
+      "total_datapoints": 5,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 2048,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-29",
+      "total_datapoints": 3,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 8192,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-29",
+      "total_datapoints": 3,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 8192,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 32,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 32,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 2,
+      "max_concurrency": 512,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 24,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 512,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-29",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 256,
+      "image": "vllm/vllm-openai:v0.20.0-ubuntu2404"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 16,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 9,
+      "max_concurrency": 256,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 14,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 13,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-28",
+      "total_datapoints": 11,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-28",
+      "total_datapoints": 3,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 256,
+      "image": "vllm/vllm-openai:v0.20.0-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 32,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-28",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 512,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-28",
+      "total_datapoints": 2,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 2,
+      "max_concurrency": 4096,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:2fec8d7958bb0d53b50d7bf04d6ae6a7de8a35503775826e0550a45dd8c3ee15"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "vllm",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-28",
+      "total_datapoints": 1,
+      "distinct_sequences": 1,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-27",
+      "total_datapoints": 16,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 8,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:26e116bd211e300dbb76924d56c5cbe6cc3ee5ee2fe314859cb8774f5bc070f3"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-27",
+      "total_datapoints": 15,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 8,
+      "max_concurrency": 128,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-27",
+      "total_datapoints": 15,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 8,
+      "max_concurrency": 128,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-27",
+      "total_datapoints": 13,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-27",
+      "total_datapoints": 11,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 7,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "mtp",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-27",
+      "total_datapoints": 8,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 32,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:26e116bd211e300dbb76924d56c5cbe6cc3ee5ee2fe314859cb8774f5bc070f3"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-27",
+      "total_datapoints": 6,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 2048,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-27",
+      "total_datapoints": 3,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 8192,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-26",
+      "total_datapoints": 11,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 128,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-26",
+      "total_datapoints": 10,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 32,
+      "image": "lmsysorg/sglang:deepseek-v4-blackwell@sha256:df18bfc4aa9ecf59451002b49ba00cae58042de9e2a96378bbd21b404dd62c7b"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b200",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-26",
+      "total_datapoints": 9,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 5,
+      "max_concurrency": 1024,
+      "image": "lmsysorg/sglang:deepseek-v4-blackwell@sha256:df18bfc4aa9ecf59451002b49ba00cae58042de9e2a96378bbd21b404dd62c7b"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-26",
+      "total_datapoints": 9,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 4096,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 64,
+      "num_decode_gpu": 64,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 8,
+      "date": "2026-04-26",
+      "total_datapoints": 6,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 8192,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 16,
+      "num_decode_gpu": 16,
+      "prefill_tp": 4,
+      "prefill_ep": 4,
+      "decode_tp": 4,
+      "decode_ep": 4,
+      "date": "2026-04-26",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 512,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:26e116bd211e300dbb76924d56c5cbe6cc3ee5ee2fe314859cb8774f5bc070f3"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-26",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 32,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:26e116bd211e300dbb76924d56c5cbe6cc3ee5ee2fe314859cb8774f5bc070f3"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "atom",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-26",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "rocm/atom:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0_atom0.1.2.post"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-26",
+      "total_datapoints": 2,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 1,
+      "max_concurrency": 1,
+      "image": "lmsysorg/sglang:deepseek-v4-b300@sha256:26e116bd211e300dbb76924d56c5cbe6cc3ee5ee2fe314859cb8774f5bc070f3"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 4,
+      "num_decode_gpu": 4,
+      "prefill_tp": 4,
+      "prefill_ep": 1,
+      "decode_tp": 4,
+      "decode_ep": 1,
+      "date": "2026-04-25",
+      "total_datapoints": 16,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 8,
+      "max_concurrency": 512,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-25",
+      "total_datapoints": 12,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 6,
+      "max_concurrency": 64,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "b300",
+      "framework": "sglang",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-25",
+      "total_datapoints": 8,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 32,
+      "image": "lmsysorg/sglang:deepseek-v4-b300"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "mi355x",
+      "framework": "sglang",
+      "precision": "fp8",
+      "spec_method": "none",
+      "disagg": false,
+      "is_multinode": false,
+      "num_prefill_gpu": 8,
+      "num_decode_gpu": 8,
+      "prefill_tp": 8,
+      "prefill_ep": 1,
+      "decode_tp": 8,
+      "decode_ep": 1,
+      "date": "2026-04-25",
+      "total_datapoints": 7,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 3,
+      "max_concurrency": 64,
+      "image": "rocm/sgl-dev:deepseek-v4-mi35x"
+    },
+    {
+      "model": "dsv4",
+      "hardware": "gb200",
+      "framework": "dynamo-vllm",
+      "precision": "fp4",
+      "spec_method": "none",
+      "disagg": true,
+      "is_multinode": true,
+      "num_prefill_gpu": 24,
+      "num_decode_gpu": 16,
+      "prefill_tp": 8,
+      "prefill_ep": 8,
+      "decode_tp": 16,
+      "decode_ep": 16,
+      "date": "2026-04-25",
+      "total_datapoints": 4,
+      "distinct_sequences": 2,
+      "distinct_concurrencies": 4,
+      "max_concurrency": 8192,
+      "image": "vllm/vllm-openai:deepseekv4-cu130"
+    }
+  ],
+  "volume": [
+    {
+      "date": "2025-09-29",
+      "hardware": "mi355x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-09-29",
+      "hardware": "b200",
+      "datapoints": 106
+    },
+    {
+      "date": "2025-09-29",
+      "hardware": "mi300x",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-09-29",
+      "hardware": "mi325x",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-09-29",
+      "hardware": "gb200",
+      "datapoints": 29
+    },
+    {
+      "date": "2025-09-29",
+      "hardware": "h200",
+      "datapoints": 94
+    },
+    {
+      "date": "2025-09-29",
+      "hardware": "h100",
+      "datapoints": 30
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "mi300x",
+      "datapoints": 95
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "b200",
+      "datapoints": 23
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "mi355x",
+      "datapoints": 209
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "h200",
+      "datapoints": 196
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "mi325x",
+      "datapoints": 104
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "h100",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-09-30",
+      "hardware": "gb200",
+      "datapoints": 48
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "mi355x",
+      "datapoints": 224
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "b200",
+      "datapoints": 359
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "gb200",
+      "datapoints": 54
+    },
+    {
+      "date": "2025-10-01",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "mi355x",
+      "datapoints": 224
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-02",
+      "hardware": "b200",
+      "datapoints": 490
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "mi325x",
+      "datapoints": 91
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "mi300x",
+      "datapoints": 91
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "b200",
+      "datapoints": 336
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "h100",
+      "datapoints": 62
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "h200",
+      "datapoints": 195
+    },
+    {
+      "date": "2025-10-03",
+      "hardware": "mi355x",
+      "datapoints": 155
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "mi355x",
+      "datapoints": 225
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "b200",
+      "datapoints": 491
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "gb200",
+      "datapoints": 48
+    },
+    {
+      "date": "2025-10-04",
+      "hardware": "h200",
+      "datapoints": 129
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "b200",
+      "datapoints": 489
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "mi355x",
+      "datapoints": 225
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-05",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "b200",
+      "datapoints": 492
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-06",
+      "hardware": "mi355x",
+      "datapoints": 225
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-07",
+      "hardware": "b200",
+      "datapoints": 492
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "b200",
+      "datapoints": 492
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-08",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "b200",
+      "datapoints": 491
+    },
+    {
+      "date": "2025-10-09",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "mi300x",
+      "datapoints": 70
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "mi325x",
+      "datapoints": 70
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "gb200",
+      "datapoints": 26
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "mi355x",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "h100",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "b200",
+      "datapoints": 240
+    },
+    {
+      "date": "2025-10-10",
+      "hardware": "h200",
+      "datapoints": 144
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "b200",
+      "datapoints": 489
+    },
+    {
+      "date": "2025-10-11",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "mi355x",
+      "datapoints": 198
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "b200",
+      "datapoints": 489
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-12",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "mi355x",
+      "datapoints": 398
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "mi325x",
+      "datapoints": 270
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "b200",
+      "datapoints": 974
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "h100",
+      "datapoints": 180
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "h200",
+      "datapoints": 563
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "gb200",
+      "datapoints": 110
+    },
+    {
+      "date": "2025-10-13",
+      "hardware": "mi300x",
+      "datapoints": 270
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "h100",
+      "datapoints": 88
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "mi355x",
+      "datapoints": 152
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "b200",
+      "datapoints": 461
+    },
+    {
+      "date": "2025-10-14",
+      "hardware": "mi325x",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "b200",
+      "datapoints": 488
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-15",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "b200",
+      "datapoints": 438
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-16",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-17",
+      "hardware": "b200",
+      "datapoints": 49
+    },
+    {
+      "date": "2025-10-17",
+      "hardware": "h200",
+      "datapoints": 60
+    },
+    {
+      "date": "2025-10-17",
+      "hardware": "mi300x",
+      "datapoints": 63
+    },
+    {
+      "date": "2025-10-17",
+      "hardware": "mi355x",
+      "datapoints": 8
+    },
+    {
+      "date": "2025-10-17",
+      "hardware": "mi325x",
+      "datapoints": 49
+    },
+    {
+      "date": "2025-10-17",
+      "hardware": "h100",
+      "datapoints": 33
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "b200",
+      "datapoints": 281
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-18",
+      "hardware": "h200",
+      "datapoints": 18
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "mi300x",
+      "datapoints": 106
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "mi325x",
+      "datapoints": 97
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "h200",
+      "datapoints": 21
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "b200",
+      "datapoints": 116
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "h100",
+      "datapoints": 62
+    },
+    {
+      "date": "2025-10-19",
+      "hardware": "gb200",
+      "datapoints": 29
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "h200",
+      "datapoints": 157
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "h100",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "mi325x",
+      "datapoints": 87
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "gb200",
+      "datapoints": 22
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "b200",
+      "datapoints": 138
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "mi355x",
+      "datapoints": 26
+    },
+    {
+      "date": "2025-10-20",
+      "hardware": "mi300x",
+      "datapoints": 93
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "b200",
+      "datapoints": 492
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-21",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "mi325x",
+      "datapoints": 132
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "h200",
+      "datapoints": 281
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "b200",
+      "datapoints": 490
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-22",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "b200",
+      "datapoints": 492
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-23",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "mi325x",
+      "datapoints": 134
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "b200",
+      "datapoints": 446
+    },
+    {
+      "date": "2025-10-25",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "mi325x",
+      "datapoints": 133
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "b200",
+      "datapoints": 248
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "h200",
+      "datapoints": 264
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "mi300x",
+      "datapoints": 134
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "mi355x",
+      "datapoints": 173
+    },
+    {
+      "date": "2025-10-26",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "mi355x",
+      "datapoints": 196
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "b200",
+      "datapoints": 491
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "h200",
+      "datapoints": 280
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "mi325x",
+      "datapoints": 134
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-27",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "h200",
+      "datapoints": 281
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "b200",
+      "datapoints": 441
+    },
+    {
+      "date": "2025-10-28",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "mi325x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "b200",
+      "datapoints": 487
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "h100",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "mi355x",
+      "datapoints": 200
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "h200",
+      "datapoints": 282
+    },
+    {
+      "date": "2025-10-29",
+      "hardware": "mi300x",
+      "datapoints": 135
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "h200",
+      "datapoints": 150
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "b200",
+      "datapoints": 228
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "mi300x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "h100",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "mi325x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-10-30",
+      "hardware": "mi355x",
+      "datapoints": 80
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "mi300x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "mi355x",
+      "datapoints": 80
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "b200",
+      "datapoints": 226
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "mi325x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "h100",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-10-31",
+      "hardware": "h200",
+      "datapoints": 150
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "b200",
+      "datapoints": 223
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "h200",
+      "datapoints": 150
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "gb200",
+      "datapoints": 50
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "mi325x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "mi355x",
+      "datapoints": 80
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "h100",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-11-01",
+      "hardware": "mi300x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "h200",
+      "datapoints": 150
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "mi325x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "b200",
+      "datapoints": 228
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "mi300x",
+      "datapoints": 75
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "mi355x",
+      "datapoints": 80
+    },
+    {
+      "date": "2025-11-02",
+      "hardware": "h100",
+      "datapoints": 45
+    },
+    {
+      "date": "2025-11-04",
+      "hardware": "mi325x",
+      "datapoints": 12
+    },
+    {
+      "date": "2025-11-04",
+      "hardware": "h100",
+      "datapoints": 14
+    },
+    {
+      "date": "2025-11-04",
+      "hardware": "mi300x",
+      "datapoints": 17
+    },
+    {
+      "date": "2025-11-04",
+      "hardware": "h200",
+      "datapoints": 20
+    },
+    {
+      "date": "2025-11-04",
+      "hardware": "b200",
+      "datapoints": 12
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "b200",
+      "datapoints": 197
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "mi355x",
+      "datapoints": 63
+    },
+    {
+      "date": "2025-11-05",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "mi355x",
+      "datapoints": 63
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-06",
+      "hardware": "b200",
+      "datapoints": 197
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "b200",
+      "datapoints": 99
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "mi355x",
+      "datapoints": 63
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "mi325x",
+      "datapoints": 58
+    },
+    {
+      "date": "2025-11-07",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "b200",
+      "datapoints": 164
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "mi355x",
+      "datapoints": 62
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "h200",
+      "datapoints": 128
+    },
+    {
+      "date": "2025-11-08",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "b200",
+      "datapoints": 165
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "mi355x",
+      "datapoints": 63
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-09",
+      "hardware": "gb200",
+      "datapoints": 50
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "gb200",
+      "datapoints": 54
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "mi355x",
+      "datapoints": 63
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-10",
+      "hardware": "b200",
+      "datapoints": 197
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "b200",
+      "datapoints": 203
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-11",
+      "hardware": "gb200",
+      "datapoints": 50
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "b200",
+      "datapoints": 203
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "gb200",
+      "datapoints": 54
+    },
+    {
+      "date": "2025-11-12",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "b200",
+      "datapoints": 203
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-13",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "mi325x",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-14",
+      "hardware": "b200",
+      "datapoints": 203
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-15",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "mi355x",
+      "datapoints": 56
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "mi300x",
+      "datapoints": 10
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-16",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "gb200",
+      "datapoints": 51
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-17",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-18",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-19",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-19",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-19",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-19",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-19",
+      "hardware": "gb200",
+      "datapoints": 46
+    },
+    {
+      "date": "2025-11-19",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "mi355x",
+      "datapoints": 46
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "b200",
+      "datapoints": 207
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "mi300x",
+      "datapoints": 60
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "h200",
+      "datapoints": 130
+    },
+    {
+      "date": "2025-11-20",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "mi355x",
+      "datapoints": 50
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-21",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-22",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-22",
+      "hardware": "h100",
+      "datapoints": 32
+    },
+    {
+      "date": "2025-11-22",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-22",
+      "hardware": "h200",
+      "datapoints": 130
+    },
+    {
+      "date": "2025-11-22",
+      "hardware": "mi355x",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-11-22",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-23",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-23",
+      "hardware": "h100",
+      "datapoints": 30
+    },
+    {
+      "date": "2025-11-23",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-23",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-23",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-23",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-24",
+      "hardware": "mi355x",
+      "datapoints": 65
+    },
+    {
+      "date": "2025-11-24",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-24",
+      "hardware": "h100",
+      "datapoints": 32
+    },
+    {
+      "date": "2025-11-24",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-24",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-24",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "h100",
+      "datapoints": 31
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "gb200",
+      "datapoints": 39
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-25",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "h100",
+      "datapoints": 31
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-26",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "h100",
+      "datapoints": 33
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "b200",
+      "datapoints": 206
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "mi355x",
+      "datapoints": 65
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-27",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "h100",
+      "datapoints": 33
+    },
+    {
+      "date": "2025-11-28",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "h100",
+      "datapoints": 31
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-29",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "mi325x",
+      "datapoints": 58
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "h100",
+      "datapoints": 33
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "b200",
+      "datapoints": 148
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-11-30",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "b200",
+      "datapoints": 210
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "h100",
+      "datapoints": 32
+    },
+    {
+      "date": "2025-12-01",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "mi325x",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "b200",
+      "datapoints": 199
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "h100",
+      "datapoints": 30
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-02",
+      "hardware": "gb200",
+      "datapoints": 48
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "b200",
+      "datapoints": 212
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "h100",
+      "datapoints": 31
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-03",
+      "hardware": "gb200",
+      "datapoints": 53
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "h100",
+      "datapoints": 33
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-04",
+      "hardware": "gb200",
+      "datapoints": 54
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "b200",
+      "datapoints": 213
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "gb200",
+      "datapoints": 54
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "h100",
+      "datapoints": 31
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "mi355x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-05",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "mi325x",
+      "datapoints": 39
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "mi355x",
+      "datapoints": 1
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "mi300x",
+      "datapoints": 47
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "b200",
+      "datapoints": 177
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "h200",
+      "datapoints": 99
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "h100",
+      "datapoints": 21
+    },
+    {
+      "date": "2025-12-08",
+      "hardware": "gb200",
+      "datapoints": 55
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "gb200",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "h200",
+      "datapoints": 99
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "mi355x",
+      "datapoints": 30
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "mi325x",
+      "datapoints": 39
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "h100",
+      "datapoints": 28
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "mi300x",
+      "datapoints": 47
+    },
+    {
+      "date": "2025-12-09",
+      "hardware": "b200",
+      "datapoints": 176
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "gb200",
+      "datapoints": 62
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-12-10",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "gb200",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-11",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "gb200",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-12-12",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "gb200",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-13",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "gb200",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-12-14",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "gb200",
+      "datapoints": 64
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "mi325x",
+      "datapoints": 59
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "b200",
+      "datapoints": 214
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "h200",
+      "datapoints": 131
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "mi300x",
+      "datapoints": 61
+    },
+    {
+      "date": "2025-12-15",
+      "hardware": "mi355x",
+      "datapoints": 66
+    },
+    {
+      "date": "2025-12-17",
+      "hardware": "b200",
+      "datapoints": 53
+    },
+    {
+      "date": "2025-12-19",
+      "hardware": "gb200",
+      "datapoints": 90
+    },
+    {
+      "date": "2025-12-19",
+      "hardware": "mi355x",
+      "datapoints": 20
+    },
+    {
+      "date": "2025-12-21",
+      "hardware": "gb200",
+      "datapoints": 41
+    },
+    {
+      "date": "2025-12-30",
+      "hardware": "mi355x",
+      "datapoints": 20
+    },
+    {
+      "date": "2025-12-31",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2025-12-31",
+      "hardware": "b200",
+      "datapoints": 48
+    },
+    {
+      "date": "2026-01-02",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2026-01-02",
+      "hardware": "b200",
+      "datapoints": 56
+    },
+    {
+      "date": "2026-01-02",
+      "hardware": "h200",
+      "datapoints": 51
+    },
+    {
+      "date": "2026-01-05",
+      "hardware": "mi300x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-05",
+      "hardware": "mi325x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-05",
+      "hardware": "mi355x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-07",
+      "hardware": "gb200",
+      "datapoints": 34
+    },
+    {
+      "date": "2026-01-07",
+      "hardware": "b200",
+      "datapoints": 40
+    },
+    {
+      "date": "2026-01-08",
+      "hardware": "mi355x",
+      "datapoints": 42
+    },
+    {
+      "date": "2026-01-12",
+      "hardware": "mi355x",
+      "datapoints": 20
+    },
+    {
+      "date": "2026-01-13",
+      "hardware": "b200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-14",
+      "hardware": "mi355x",
+      "datapoints": 65
+    },
+    {
+      "date": "2026-01-14",
+      "hardware": "h200",
+      "datapoints": 21
+    },
+    {
+      "date": "2026-01-14",
+      "hardware": "b200",
+      "datapoints": 60
+    },
+    {
+      "date": "2026-01-21",
+      "hardware": "mi325x",
+      "datapoints": 44
+    },
+    {
+      "date": "2026-01-21",
+      "hardware": "mi300x",
+      "datapoints": 46
+    },
+    {
+      "date": "2026-01-23",
+      "hardware": "mi325x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-23",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-23",
+      "hardware": "mi300x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-26",
+      "hardware": "mi325x",
+      "datapoints": 44
+    },
+    {
+      "date": "2026-01-26",
+      "hardware": "mi300x",
+      "datapoints": 46
+    },
+    {
+      "date": "2026-01-27",
+      "hardware": "mi355x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-01-28",
+      "hardware": "b300",
+      "datapoints": 38
+    },
+    {
+      "date": "2026-01-29",
+      "hardware": "b200",
+      "datapoints": 64
+    },
+    {
+      "date": "2026-01-29",
+      "hardware": "h200",
+      "datapoints": 32
+    },
+    {
+      "date": "2026-01-29",
+      "hardware": "mi355x",
+      "datapoints": 20
+    },
+    {
+      "date": "2026-01-31",
+      "hardware": "gb200",
+      "datapoints": 51
+    },
+    {
+      "date": "2026-02-02",
+      "hardware": "mi355x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-03",
+      "hardware": "gb300",
+      "datapoints": 49
+    },
+    {
+      "date": "2026-02-03",
+      "hardware": "b200",
+      "datapoints": 25
+    },
+    {
+      "date": "2026-02-03",
+      "hardware": "gb200",
+      "datapoints": 39
+    },
+    {
+      "date": "2026-02-04",
+      "hardware": "mi355x",
+      "datapoints": 18
+    },
+    {
+      "date": "2026-02-05",
+      "hardware": "gb300",
+      "datapoints": 27
+    },
+    {
+      "date": "2026-02-05",
+      "hardware": "b200",
+      "datapoints": 63
+    },
+    {
+      "date": "2026-02-05",
+      "hardware": "gb200",
+      "datapoints": 39
+    },
+    {
+      "date": "2026-02-05",
+      "hardware": "h200",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-02-06",
+      "hardware": "mi355x",
+      "datapoints": 42
+    },
+    {
+      "date": "2026-02-06",
+      "hardware": "b200",
+      "datapoints": 52
+    },
+    {
+      "date": "2026-02-07",
+      "hardware": "h200",
+      "datapoints": 64
+    },
+    {
+      "date": "2026-02-07",
+      "hardware": "b200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-07",
+      "hardware": "b300",
+      "datapoints": 26
+    },
+    {
+      "date": "2026-02-07",
+      "hardware": "gb300",
+      "datapoints": 39
+    },
+    {
+      "date": "2026-02-08",
+      "hardware": "h100",
+      "datapoints": 28
+    },
+    {
+      "date": "2026-02-08",
+      "hardware": "gb200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-09",
+      "hardware": "gb300",
+      "datapoints": 19
+    },
+    {
+      "date": "2026-02-09",
+      "hardware": "gb200",
+      "datapoints": 20
+    },
+    {
+      "date": "2026-02-10",
+      "hardware": "b200",
+      "datapoints": 23
+    },
+    {
+      "date": "2026-02-11",
+      "hardware": "mi355x",
+      "datapoints": 92
+    },
+    {
+      "date": "2026-02-11",
+      "hardware": "b200",
+      "datapoints": 65
+    },
+    {
+      "date": "2026-02-12",
+      "hardware": "gb300",
+      "datapoints": 19
+    },
+    {
+      "date": "2026-02-12",
+      "hardware": "b200",
+      "datapoints": 53
+    },
+    {
+      "date": "2026-02-12",
+      "hardware": "mi325x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-12",
+      "hardware": "mi355x",
+      "datapoints": 52
+    },
+    {
+      "date": "2026-02-12",
+      "hardware": "b300",
+      "datapoints": 26
+    },
+    {
+      "date": "2026-02-12",
+      "hardware": "mi300x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-13",
+      "hardware": "b200",
+      "datapoints": 27
+    },
+    {
+      "date": "2026-02-13",
+      "hardware": "h100",
+      "datapoints": 44
+    },
+    {
+      "date": "2026-02-13",
+      "hardware": "mi355x",
+      "datapoints": 48
+    },
+    {
+      "date": "2026-02-14",
+      "hardware": "mi355x",
+      "datapoints": 52
+    },
+    {
+      "date": "2026-02-14",
+      "hardware": "h200",
+      "datapoints": 36
+    },
+    {
+      "date": "2026-02-16",
+      "hardware": "mi355x",
+      "datapoints": 52
+    },
+    {
+      "date": "2026-02-17",
+      "hardware": "mi355x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-17",
+      "hardware": "b200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-18",
+      "hardware": "mi355x",
+      "datapoints": 13
+    },
+    {
+      "date": "2026-02-19",
+      "hardware": "mi355x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-02-20",
+      "hardware": "mi355x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-20",
+      "hardware": "b200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-23",
+      "hardware": "mi355x",
+      "datapoints": 72
+    },
+    {
+      "date": "2026-02-24",
+      "hardware": "mi300x",
+      "datapoints": 46
+    },
+    {
+      "date": "2026-02-24",
+      "hardware": "mi325x",
+      "datapoints": 44
+    },
+    {
+      "date": "2026-02-24",
+      "hardware": "b200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-25",
+      "hardware": "b200",
+      "datapoints": 56
+    },
+    {
+      "date": "2026-02-25",
+      "hardware": "mi355x",
+      "datapoints": 52
+    },
+    {
+      "date": "2026-02-25",
+      "hardware": "h200",
+      "datapoints": 51
+    },
+    {
+      "date": "2026-02-25",
+      "hardware": "h100",
+      "datapoints": 43
+    },
+    {
+      "date": "2026-02-26",
+      "hardware": "mi300x",
+      "datapoints": 46
+    },
+    {
+      "date": "2026-02-26",
+      "hardware": "mi355x",
+      "datapoints": 31
+    },
+    {
+      "date": "2026-02-26",
+      "hardware": "mi325x",
+      "datapoints": 44
+    },
+    {
+      "date": "2026-02-27",
+      "hardware": "mi300x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-02-27",
+      "hardware": "mi355x",
+      "datapoints": 35
+    },
+    {
+      "date": "2026-02-27",
+      "hardware": "mi325x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-01",
+      "hardware": "mi325x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-01",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-01",
+      "hardware": "mi300x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-01",
+      "hardware": "mi355x",
+      "datapoints": 10
+    },
+    {
+      "date": "2026-03-02",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-02",
+      "hardware": "mi300x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-02",
+      "hardware": "mi325x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-03",
+      "hardware": "b200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-03",
+      "hardware": "mi355x",
+      "datapoints": 132
+    },
+    {
+      "date": "2026-03-03",
+      "hardware": "h100",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-04",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-05",
+      "hardware": "mi355x",
+      "datapoints": 17
+    },
+    {
+      "date": "2026-03-07",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-07",
+      "hardware": "mi355x",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-09",
+      "hardware": "mi355x",
+      "datapoints": 31
+    },
+    {
+      "date": "2026-03-09",
+      "hardware": "mi300x",
+      "datapoints": 46
+    },
+    {
+      "date": "2026-03-09",
+      "hardware": "mi325x",
+      "datapoints": 56
+    },
+    {
+      "date": "2026-03-10",
+      "hardware": "mi325x",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-03-11",
+      "hardware": "b200",
+      "datapoints": 47
+    },
+    {
+      "date": "2026-03-13",
+      "hardware": "mi355x",
+      "datapoints": 70
+    },
+    {
+      "date": "2026-03-13",
+      "hardware": "h200",
+      "datapoints": 18
+    },
+    {
+      "date": "2026-03-18",
+      "hardware": "b200",
+      "datapoints": 47
+    },
+    {
+      "date": "2026-03-19",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-20",
+      "hardware": "b200",
+      "datapoints": 39
+    },
+    {
+      "date": "2026-03-23",
+      "hardware": "mi355x",
+      "datapoints": 42
+    },
+    {
+      "date": "2026-03-23",
+      "hardware": "b200",
+      "datapoints": 29
+    },
+    {
+      "date": "2026-03-23",
+      "hardware": "h200",
+      "datapoints": 36
+    },
+    {
+      "date": "2026-03-23",
+      "hardware": "gb200",
+      "datapoints": 51
+    },
+    {
+      "date": "2026-03-24",
+      "hardware": "b200",
+      "datapoints": 36
+    },
+    {
+      "date": "2026-03-25",
+      "hardware": "h200",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-25",
+      "hardware": "b200",
+      "datapoints": 72
+    },
+    {
+      "date": "2026-03-26",
+      "hardware": "mi355x",
+      "datapoints": 35
+    },
+    {
+      "date": "2026-03-27",
+      "hardware": "mi325x",
+      "datapoints": 28
+    },
+    {
+      "date": "2026-03-27",
+      "hardware": "b200",
+      "datapoints": 17
+    },
+    {
+      "date": "2026-03-27",
+      "hardware": "h200",
+      "datapoints": 84
+    },
+    {
+      "date": "2026-03-27",
+      "hardware": "mi355x",
+      "datapoints": 65
+    },
+    {
+      "date": "2026-03-27",
+      "hardware": "h100",
+      "datapoints": 58
+    },
+    {
+      "date": "2026-03-28",
+      "hardware": "h100",
+      "datapoints": 15
+    },
+    {
+      "date": "2026-03-28",
+      "hardware": "mi325x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-28",
+      "hardware": "b200",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-28",
+      "hardware": "mi300x",
+      "datapoints": 30
+    },
+    {
+      "date": "2026-03-28",
+      "hardware": "mi355x",
+      "datapoints": 42
+    },
+    {
+      "date": "2026-03-28",
+      "hardware": "h200",
+      "datapoints": 18
+    },
+    {
+      "date": "2026-03-29",
+      "hardware": "mi325x",
+      "datapoints": 45
+    },
+    {
+      "date": "2026-03-29",
+      "hardware": "b200",
+      "datapoints": 10
+    },
+    {
+      "date": "2026-03-29",
+      "hardware": "mi300x",
+      "datapoints": 20
+    },
+    {
+      "date": "2026-03-30",
+      "hardware": "mi300x",
+      "datapoints": 10
+    },
+    {
+      "date": "2026-04-01",
+      "hardware": "mi355x",
+      "datapoints": 73
+    },
+    {
+      "date": "2026-04-03",
+      "hardware": "b200",
+      "datapoints": 40
+    },
+    {
+      "date": "2026-04-05",
+      "hardware": "mi355x",
+      "datapoints": 33
+    },
+    {
+      "date": "2026-04-06",
+      "hardware": "h200",
+      "datapoints": 12
+    },
+    {
+      "date": "2026-04-07",
+      "hardware": "gb200",
+      "datapoints": 22
+    },
+    {
+      "date": "2026-04-08",
+      "hardware": "b200",
+      "datapoints": 97
+    },
+    {
+      "date": "2026-04-08",
+      "hardware": "mi355x",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-04-09",
+      "hardware": "b200",
+      "datapoints": 16
+    },
+    {
+      "date": "2026-04-10",
+      "hardware": "mi355x",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-04-14",
+      "hardware": "h200",
+      "datapoints": 45
+    },
+    {
+      "date": "2026-04-14",
+      "hardware": "b200",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-04-14",
+      "hardware": "mi355x",
+      "datapoints": 19
+    },
+    {
+      "date": "2026-04-16",
+      "hardware": "mi355x",
+      "datapoints": 51
+    },
+    {
+      "date": "2026-04-16",
+      "hardware": "b200",
+      "datapoints": 16
+    },
+    {
+      "date": "2026-04-17",
+      "hardware": "b300",
+      "datapoints": 189
+    },
+    {
+      "date": "2026-04-17",
+      "hardware": "mi300x",
+      "datapoints": 54
+    },
+    {
+      "date": "2026-04-17",
+      "hardware": "mi355x",
+      "datapoints": 10
+    },
+    {
+      "date": "2026-04-17",
+      "hardware": "mi325x",
+      "datapoints": 20
+    },
+    {
+      "date": "2026-04-18",
+      "hardware": "b200",
+      "datapoints": 52
+    },
+    {
+      "date": "2026-04-18",
+      "hardware": "gb200",
+      "datapoints": 25
+    },
+    {
+      "date": "2026-04-18",
+      "hardware": "mi355x",
+      "datapoints": 41
+    },
+    {
+      "date": "2026-04-18",
+      "hardware": "b300",
+      "datapoints": 118
+    },
+    {
+      "date": "2026-04-20",
+      "hardware": "b200",
+      "datapoints": 12
+    },
+    {
+      "date": "2026-04-20",
+      "hardware": "b300",
+      "datapoints": 12
+    },
+    {
+      "date": "2026-04-21",
+      "hardware": "mi355x",
+      "datapoints": 48
+    },
+    {
+      "date": "2026-04-21",
+      "hardware": "mi300x",
+      "datapoints": 38
+    },
+    {
+      "date": "2026-04-21",
+      "hardware": "b300",
+      "datapoints": 42
+    },
+    {
+      "date": "2026-04-22",
+      "hardware": "b200",
+      "datapoints": 51
+    },
+    {
+      "date": "2026-04-24",
+      "hardware": "mi355x",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-04-24",
+      "hardware": "h200",
+      "datapoints": 10
+    },
+    {
+      "date": "2026-04-24",
+      "hardware": "b300",
+      "datapoints": 17
+    },
+    {
+      "date": "2026-04-24",
+      "hardware": "b200",
+      "datapoints": 17
+    },
+    {
+      "date": "2026-04-25",
+      "hardware": "gb200",
+      "datapoints": 19
+    },
+    {
+      "date": "2026-04-25",
+      "hardware": "b300",
+      "datapoints": 28
+    },
+    {
+      "date": "2026-04-25",
+      "hardware": "mi355x",
+      "datapoints": 7
+    },
+    {
+      "date": "2026-04-26",
+      "hardware": "b300",
+      "datapoints": 32
+    },
+    {
+      "date": "2026-04-26",
+      "hardware": "b200",
+      "datapoints": 19
+    },
+    {
+      "date": "2026-04-26",
+      "hardware": "mi355x",
+      "datapoints": 2
+    },
+    {
+      "date": "2026-04-27",
+      "hardware": "b200",
+      "datapoints": 24
+    },
+    {
+      "date": "2026-04-27",
+      "hardware": "b300",
+      "datapoints": 63
+    },
+    {
+      "date": "2026-04-28",
+      "hardware": "mi355x",
+      "datapoints": 2
+    },
+    {
+      "date": "2026-04-28",
+      "hardware": "b200",
+      "datapoints": 24
+    },
+    {
+      "date": "2026-04-28",
+      "hardware": "b300",
+      "datapoints": 41
+    },
+    {
+      "date": "2026-04-29",
+      "hardware": "gb200",
+      "datapoints": 8
+    },
+    {
+      "date": "2026-04-29",
+      "hardware": "b300",
+      "datapoints": 38
+    },
+    {
+      "date": "2026-04-30",
+      "hardware": "mi355x",
+      "datapoints": 54
+    },
+    {
+      "date": "2026-04-30",
+      "hardware": "gb200",
+      "datapoints": 8
+    },
+    {
+      "date": "2026-04-30",
+      "hardware": "gb300",
+      "datapoints": 6
+    },
+    {
+      "date": "2026-04-30",
+      "hardware": "b200",
+      "datapoints": 37
+    },
+    {
+      "date": "2026-05-01",
+      "hardware": "b200",
+      "datapoints": 14
+    },
+    {
+      "date": "2026-05-01",
+      "hardware": "mi355x",
+      "datapoints": 62
+    },
+    {
+      "date": "2026-05-01",
+      "hardware": "gb300",
+      "datapoints": 6
+    },
+    {
+      "date": "2026-05-02",
+      "hardware": "h200",
+      "datapoints": 12
+    },
+    {
+      "date": "2026-05-02",
+      "hardware": "mi355x",
+      "datapoints": 16
+    },
+    {
+      "date": "2026-05-03",
+      "hardware": "mi355x",
+      "datapoints": 56
+    },
+    {
+      "date": "2026-05-03",
+      "hardware": "h200",
+      "datapoints": 12
+    },
+    {
+      "date": "2026-05-03",
+      "hardware": "b300",
+      "datapoints": 62
+    },
+    {
+      "date": "2026-05-04",
+      "hardware": "mi355x",
+      "datapoints": 19
+    },
+    {
+      "date": "2026-05-04",
+      "hardware": "gb200",
+      "datapoints": 6
+    },
+    {
+      "date": "2026-05-04",
+      "hardware": "h200",
+      "datapoints": 10
+    },
+    {
+      "date": "2026-05-04",
+      "hardware": "b200",
+      "datapoints": 1
+    },
+    {
+      "date": "2026-05-05",
+      "hardware": "h200",
+      "datapoints": 10
+    }
+  ]
+}

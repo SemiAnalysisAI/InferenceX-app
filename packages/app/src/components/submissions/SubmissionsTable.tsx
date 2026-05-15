@@ -14,7 +14,7 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 
-import { getVendor } from './submissions-utils';
+import { computePreviousImages, getVendor, submissionRowKey } from './submissions-utils';
 
 function DetailItem({
   label,
@@ -41,7 +41,14 @@ function DetailItem({
   );
 }
 
-type SortKey = 'hardware' | 'model' | 'precision' | 'framework' | 'date' | 'total_datapoints';
+type SortKey =
+  | 'hardware'
+  | 'model'
+  | 'precision'
+  | 'spec_method'
+  | 'framework'
+  | 'date'
+  | 'total_datapoints';
 type SortDir = 'asc' | 'desc';
 
 interface SubmissionsTableProps {
@@ -55,14 +62,13 @@ function getModelDisplayName(dbModel: string): string {
   return dbModel;
 }
 
-const submissionRowKey = (row: SubmissionSummaryRow) =>
-  `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}_${row.date}`;
-
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const previousImages = useMemo(() => computePreviousImages(data), [data]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -86,6 +92,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         row.model.includes(q) ||
         row.framework.includes(q) ||
         row.precision.includes(q) ||
+        row.spec_method.includes(q) ||
         getVendor(row.hardware).toLowerCase().includes(q) ||
         getModelDisplayName(row.model).toLowerCase().includes(q),
     );
@@ -149,6 +156,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
               <SortHeader label="GPU" field="hardware" />
               <SortHeader label="Model" field="model" />
               <SortHeader label="Precision" field="precision" />
+              <SortHeader label="Spec Method" field="spec_method" />
               <SortHeader label="Framework" field="framework" />
               <SortHeader label="Date" field="date" />
               <SortHeader label="Datapoints" field="total_datapoints" />
@@ -163,13 +171,14 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                   key={key}
                   row={row}
                   isExpanded={isExpanded}
+                  previousImage={previousImages.get(key) ?? null}
                   onToggle={() => toggleRow(key)}
                 />
               );
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   {search ? 'No matching submissions found.' : 'No submission data available.'}
                 </td>
               </tr>
@@ -178,7 +187,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         </table>
       </div>
       <p className="text-xs text-muted-foreground">
-        {filtered.length} config{filtered.length !== 1 ? 's' : ''} ·{' '}
+        {filtered.length} config{filtered.length === 1 ? '' : 's'} ·{' '}
         {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()} total datapoints
       </p>
     </div>
@@ -188,10 +197,12 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 function SubmissionRow({
   row,
   isExpanded,
+  previousImage,
   onToggle,
 }: {
   row: SubmissionSummaryRow;
   isExpanded: boolean;
+  previousImage: string | null;
   onToggle: () => void;
 }) {
   const vendor = getVendor(row.hardware);
@@ -212,6 +223,13 @@ function SubmissionRow({
         </td>
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
+        <td className="px-3 py-2 uppercase">
+          {row.spec_method && row.spec_method !== 'none' ? (
+            row.spec_method
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
         <td className="px-3 py-2 tabular-nums">{row.date}</td>
         <td className="px-3 py-2 tabular-nums">{row.total_datapoints.toLocaleString()}</td>
@@ -219,7 +237,7 @@ function SubmissionRow({
       {isExpanded && (
         <tr className="bg-muted/20">
           <td />
-          <td colSpan={6} className="px-3 py-3">
+          <td colSpan={7} className="px-3 py-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                 <DetailItem label="Vendor:" tip="GPU manufacturer">
@@ -288,9 +306,26 @@ function SubmissionRow({
                 <div className="col-span-2 md:col-span-4">
                   <DetailItem
                     label="Image:"
-                    tip="Container image used for this benchmark configuration"
+                    tip={
+                      previousImage
+                        ? 'Container image used for this benchmark configuration. The previous run of this config used a different image — shown on the left.'
+                        : 'Container image used for this benchmark configuration'
+                    }
                   >
-                    <span className="font-mono text-xs break-all">{row.image ?? '—'}</span>
+                    {previousImage ? (
+                      <span
+                        data-testid="submissions-image-diff"
+                        className="font-mono text-xs break-all"
+                      >
+                        <span className="text-muted-foreground">{previousImage}</span>
+                        <span className="mx-2 text-muted-foreground" aria-label="changed to">
+                          →
+                        </span>
+                        <span>{row.image}</span>
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs break-all">{row.image ?? '—'}</span>
+                    )}
                   </DetailItem>
                 </div>
               </div>
