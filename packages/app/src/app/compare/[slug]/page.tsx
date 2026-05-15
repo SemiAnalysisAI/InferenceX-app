@@ -36,10 +36,31 @@ export const dynamic = 'force-dynamic';
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const DEFAULT_MODEL_DB_KEYS = ['dsr1'];
 const DEFAULT_MODEL_DISPLAY = 'DeepSeek-R1-0528';
+
+const KNOWN_MODELS = new Set([
+  'Llama-3.3-70B-Instruct-FP8',
+  'Llama-3.1-70B-Instruct-FP8-KV',
+  'DeepSeek-R1-0528',
+  'gpt-oss-120b',
+  'Qwen-3.5-397B-A17B',
+  'Kimi-K2.5',
+  'MiniMax-M2.5',
+  'GLM-5',
+  'DeepSeek-V4-Pro',
+]);
+const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k']);
+const KNOWN_PRECISIONS = new Set(['fp4', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
+
+function pickString(value: string | string[] | undefined): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+}
 
 const getCachedBenchmarks = cachedQuery(
   (dbModelKeys: string[]) => {
@@ -384,7 +405,7 @@ function buildJsonLd(
   };
 }
 
-export default async function ComparePage({ params }: Props) {
+export default async function ComparePage({ params, searchParams }: Props) {
   const { slug } = await params;
   const pair = parseCompareSlug(slug);
   if (!pair) notFound();
@@ -397,18 +418,28 @@ export default async function ComparePage({ params }: Props) {
   const rows = await getCachedBenchmarks(DEFAULT_MODEL_DB_KEYS);
   const summaryA = summarize(rows, pair.a);
   const summaryB = summarize(rows, pair.b);
-  const { sequence: defaultSequence, precision: defaultPrecision } = pickPairDefaults(
+  const { sequence: pickedSequence, precision: pickedPrecision } = pickPairDefaults(
     rows,
     pair.a,
     pair.b,
   );
 
+  // URL params win over pickPairDefaults; this baking-into-SSR avoids the
+  // hydration flash where the client upgrades seeded defaults to URL values.
+  const sp = await searchParams;
+  const urlModel = pickString(sp.g_model);
+  const urlSeq = pickString(sp.i_seq);
+  const urlPrec = pickString(sp.i_prec);
+  const effectiveModel = urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : DEFAULT_MODEL_DISPLAY;
+  const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
+  const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
+
   const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
     rows,
     pair.a,
     pair.b,
-    defaultSequence,
-    defaultPrecision,
+    effectiveSequence,
+    effectivePrecision,
   );
 
   const url = `${SITE_URL}/compare/${canonical}`;
@@ -424,9 +455,9 @@ export default async function ComparePage({ params }: Props) {
         a={pair.a}
         b={pair.b}
         label={label}
-        defaultModel={DEFAULT_MODEL_DISPLAY}
-        defaultSequence={defaultSequence}
-        defaultPrecision={defaultPrecision}
+        defaultModel={effectiveModel}
+        defaultSequence={effectiveSequence}
+        defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         aLabel={aMeta?.label ?? pair.a.toUpperCase()}
         bLabel={bMeta?.label ?? pair.b.toUpperCase()}
