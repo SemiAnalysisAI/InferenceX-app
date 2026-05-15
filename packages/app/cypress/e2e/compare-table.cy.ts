@@ -39,15 +39,56 @@ describe('Compare Interpolated Table', () => {
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'H100');
   });
 
-  it('commits target value when pressing Enter', () => {
-    cy.get('[data-testid="compare-table-target-0"]').clear().type('25{enter}');
-    cy.get('[data-testid="compare-table-target-0"]').should('have.value', '25');
-    cy.get('[data-testid="compare-interpolated-table"] tbody').should('contain.text', 'Throughput');
+  it('commits target value when pressing Enter and updates the throughput cell', () => {
+    cy.get('[data-testid="compare-table-target-1"]').then(($input) => {
+      const original = Number($input.val() as string);
+      const next = original + 3;
+      cy.contains('[data-testid="compare-interpolated-table"] tbody tr', 'Throughput (tok/s/gpu)')
+        .find('td')
+        .eq(2)
+        .invoke('text')
+        .then((initialCell) => {
+          cy.get('[data-testid="compare-table-target-1"]').clear().type(`${next}{enter}`);
+          cy.get('[data-testid="compare-table-target-1"]').should('have.value', String(next));
+          cy.contains(
+            '[data-testid="compare-interpolated-table"] tbody tr',
+            'Throughput (tok/s/gpu)',
+          )
+            .find('td')
+            .eq(2)
+            .should(($cell) => {
+              const text = $cell.text();
+              expect(text).to.match(/[0-9]/u);
+              expect(text).not.to.equal(initialCell);
+            });
+        });
+    });
   });
 
-  it('updates interpolated values when a target input is changed', () => {
-    cy.get('[data-testid="compare-table-target-0"]').clear().type('25').blur();
-    cy.get('[data-testid="compare-table-target-0"]').should('have.value', '25');
+  it('updates interpolated values when a target input is changed and blurred', () => {
+    cy.get('[data-testid="compare-table-target-2"]').then(($input) => {
+      const original = Number($input.val() as string);
+      const next = original - 3;
+      cy.contains('[data-testid="compare-interpolated-table"] tbody tr', 'Throughput (tok/s/gpu)')
+        .find('td')
+        .eq(3)
+        .invoke('text')
+        .then((initialCell) => {
+          cy.get('[data-testid="compare-table-target-2"]').clear().type(String(next)).blur();
+          cy.get('[data-testid="compare-table-target-2"]').should('have.value', String(next));
+          cy.contains(
+            '[data-testid="compare-interpolated-table"] tbody tr',
+            'Throughput (tok/s/gpu)',
+          )
+            .find('td')
+            .eq(3)
+            .should(($cell) => {
+              const text = $cell.text();
+              expect(text).to.match(/[0-9]/u);
+              expect(text).not.to.equal(initialCell);
+            });
+        });
+    });
   });
 
   it('flags out-of-range interactivity inputs and clears flag after blur commit', () => {
