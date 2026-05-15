@@ -5,7 +5,11 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
-import { allCanonicalComparePairs, compareDisplayLabel, toCompareSlug } from '@/lib/compare-slug';
+import {
+  allCanonicalComparePairs,
+  canonicalCompareSlug,
+  compareDisplayLabel,
+} from '@/lib/compare-slug';
 
 const DESCRIPTION =
   'Browse head-to-head GPU inference benchmark comparisons. Latency, throughput, and cost across LLM workloads for every hardware pair we test.';
@@ -44,7 +48,7 @@ function groupPairsByVendor(): VendorGroup[] {
     const entry = {
       a,
       b,
-      slug: toCompareSlug(a, b),
+      slug: canonicalCompareSlug(a, b),
       label: compareDisplayLabel(a, b),
     };
     const vA = HW_REGISTRY[a]?.vendor;

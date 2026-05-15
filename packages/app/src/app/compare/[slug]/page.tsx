@@ -26,7 +26,6 @@ import {
   canonicalCompareSlug,
   compareDisplayLabel,
   parseCompareSlug,
-  toCompareSlug,
 } from '@/lib/compare-slug';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { JsonLd } from '@/components/json-ld';
@@ -53,7 +52,7 @@ const getCachedBenchmarks = cachedQuery(
 );
 
 export function generateStaticParams() {
-  return allCanonicalComparePairs().map(({ a, b }) => ({ slug: toCompareSlug(a, b) }));
+  return allCanonicalComparePairs().map(({ a, b }) => ({ slug: canonicalCompareSlug(a, b) }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

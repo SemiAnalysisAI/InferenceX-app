@@ -20,18 +20,13 @@ export function parseCompareSlug(slug: string): ComparePair | null {
   return { a, b };
 }
 
-/** Build a slug from two GPU keys. Does NOT canonicalize order. */
-export function toCompareSlug(a: string, b: string): string {
-  return `${a}${SEPARATOR}${b}`;
-}
-
 /**
  * Canonical ordering = alphabetical by GPU key. Stable, easy to verify, matches
  * how external links to these pages will look once search engines crawl them.
  */
 export function canonicalCompareSlug(a: string, b: string): string {
   const [first, second] = [a, b].toSorted();
-  return toCompareSlug(first, second);
+  return `${first}${SEPARATOR}${second}`;
 }
 
 /** All canonical (alphabetical, distinct) GPU pairs from HW_REGISTRY. */

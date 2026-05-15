@@ -5,7 +5,11 @@ import { ImageResponse } from 'next/og';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { allCanonicalComparePairs, parseCompareSlug, toCompareSlug } from '@/lib/compare-slug';
+import {
+  allCanonicalComparePairs,
+  canonicalCompareSlug,
+  parseCompareSlug,
+} from '@/lib/compare-slug';
 
 export const alt = 'GPU inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
@@ -21,7 +25,7 @@ const VENDOR_COLOR: Record<string, string> = {
 };
 
 export function generateStaticParams() {
-  return allCanonicalComparePairs().map(({ a, b }) => ({ slug: toCompareSlug(a, b) }));
+  return allCanonicalComparePairs().map(({ a, b }) => ({ slug: canonicalCompareSlug(a, b) }));
 }
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {

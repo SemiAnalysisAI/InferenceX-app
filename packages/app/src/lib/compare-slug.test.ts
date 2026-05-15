@@ -5,7 +5,6 @@ import {
   canonicalCompareSlug,
   compareDisplayLabel,
   parseCompareSlug,
-  toCompareSlug,
 } from './compare-slug';
 
 describe('parseCompareSlug', () => {
@@ -39,16 +38,6 @@ describe('parseCompareSlug', () => {
 
   it('handles AMD GPU keys', () => {
     expect(parseCompareSlug('mi300x-vs-mi325x')).toEqual({ a: 'mi300x', b: 'mi325x' });
-  });
-});
-
-describe('toCompareSlug', () => {
-  it('joins with -vs-', () => {
-    expect(toCompareSlug('h100', 'h200')).toBe('h100-vs-h200');
-  });
-
-  it('does not canonicalize order', () => {
-    expect(toCompareSlug('h200', 'h100')).toBe('h200-vs-h100');
   });
 });
 
