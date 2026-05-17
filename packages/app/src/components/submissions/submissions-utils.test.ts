@@ -272,7 +272,8 @@ describe('buildInferenceCompareUrl', () => {
     expect(parsed.pathname).toBe('/inference');
     expect(parsed.searchParams.get('g_model')).toBe('DeepSeek-R1-0528');
     expect(parsed.searchParams.get('g_rundate')).toBe('2026-05-12');
-    expect(parsed.searchParams.get('i_dates')).toBe('2026-05-10');
+    expect(parsed.searchParams.get('i_dstart')).toBe('2026-05-10');
+    expect(parsed.searchParams.get('i_dend')).toBe('2026-05-12');
     expect(parsed.searchParams.get('i_prec')).toBe('fp8');
     // hwKey reflects framework + spec_method
     expect(parsed.searchParams.get('i_gpus')).toContain('h200');

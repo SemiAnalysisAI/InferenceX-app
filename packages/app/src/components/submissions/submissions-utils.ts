@@ -88,11 +88,16 @@ export function buildInferenceCompareUrl(
     currentRow.spec_method,
     currentRow.disagg,
   );
+  // Use i_dstart/i_dend (not i_dates) so the visible "Comparison Date Range"
+  // picker is populated. buildComparisonDates() pushes both endpoints into the
+  // comparison set, and the endpoint equal to g_rundate is deduped, leaving the
+  // chart with exactly two frontier lines: the new run and the previous run.
   const params = new URLSearchParams({
     g_model: displayModel,
     g_rundate: currentRow.date,
     i_gpus: hwKey,
-    i_dates: previousRow.date,
+    i_dstart: previousRow.date,
+    i_dend: currentRow.date,
     i_prec: currentRow.precision,
   });
   return `/inference?${params.toString()}`;
