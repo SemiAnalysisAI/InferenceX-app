@@ -186,6 +186,12 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
               <SortHeader label="Framework" field="framework" />
               <SortHeader label="Date" field="date" />
               <SortHeader label="Datapoints" field="total_datapoints" />
+              <th
+                className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
+                scope="col"
+              >
+                Compare
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -205,7 +211,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
                   {search ? 'No matching submissions found.' : 'No submission data available.'}
                 </td>
               </tr>
@@ -278,11 +284,55 @@ function SubmissionRow({
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
         <td className="px-3 py-2 tabular-nums">{row.date}</td>
         <td className="px-3 py-2 tabular-nums">{row.total_datapoints.toLocaleString()}</td>
+        <td className="px-3 py-2">
+          {compareUrl && previousRun ? (
+            <TooltipProvider>
+              <TooltipRoot>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Link
+                      href={compareUrl}
+                      data-testid="submissions-compare-runs-link-inline"
+                      onClick={() => {
+                        track('submissions_compare_runs_clicked', {
+                          source: 'inline',
+                          config: submissionRowKey(row),
+                          model: row.model,
+                          hardware: row.hardware,
+                          framework: row.framework,
+                          previous_date: previousRun.date,
+                          new_date: row.date,
+                          image_changed: previousImage !== null,
+                        });
+                      }}
+                    >
+                      <GitCompare className="size-3.5" />
+                      <span className="hidden lg:inline">vs prev</span>
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" collisionPadding={10}>
+                  <span className="text-xs">
+                    Compare {previousRun.date} → {row.date} on chart
+                  </span>
+                </TooltipContent>
+              </TooltipRoot>
+            </TooltipProvider>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          )}
+        </td>
       </tr>
       {isExpanded && (
         <tr className="bg-muted/20">
           <td />
-          <td colSpan={7} className="px-3 py-3">
+          <td colSpan={8} className="px-3 py-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                 <DetailItem label="Vendor:" tip="GPU manufacturer">
@@ -381,6 +431,7 @@ function SubmissionRow({
                         data-testid="submissions-compare-runs-link"
                         onClick={() => {
                           track('submissions_compare_runs_clicked', {
+                            source: 'expanded',
                             config: submissionRowKey(row),
                             model: row.model,
                             hardware: row.hardware,
