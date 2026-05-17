@@ -39,7 +39,7 @@ describe('ShareButton', () => {
     expect(trigger).not.toBeNull();
     expect(trigger?.textContent).toContain('Share');
     // Popover content lives in a portal and is not in the DOM until opened.
-    expect(document.querySelector('[data-testid="share-popover"]')).toBeNull();
+    expect(document.querySelector('[data-testid="share-button-popover"]')).toBeNull();
   });
 
   it('opens the popover with the share URL pre-filled when the trigger is clicked', () => {
@@ -50,12 +50,14 @@ describe('ShareButton', () => {
 
     act(() => trigger?.click());
 
-    const input = document.querySelector<HTMLInputElement>('[data-testid="share-url-input"]');
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-testid="share-button-url-input"]',
+    );
     expect(input).not.toBeNull();
     expect(input?.value).toBe('https://inferencex.semianalysis.com/?g_model=dsr1#inference');
 
     // Copy + social buttons live inside the popover content.
-    expect(document.querySelector('[data-testid="share-copy-button"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="share-button-copy-button"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="share-twitter"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="share-linkedin"]')).not.toBeNull();
   });

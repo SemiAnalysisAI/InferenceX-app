@@ -1,13 +1,16 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { ShareButton } from '@/components/ui/share-button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
+import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics';
 import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
+import { writeUrlParams } from '@/lib/url-state';
 
 const PAGE_SIZE = 50;
 
@@ -28,19 +31,46 @@ interface EvalSamplesDrawerProps {
  */
 export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerProps) {
   const open = row !== null;
+  const { getUrlParam } = useUrlState();
   const [filter, setFilter] = useState<EvalSamplesFilter>('all');
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
+  // Track whether we've already seeded from URL params (only happens once per page lifetime).
+  const urlParamsConsumedRef = useRef(false);
+
   // Reset transient state whenever a new row is opened.
+  // On the very first open this session, seed filter/search from URL params instead.
   useEffect(() => {
     if (!open) return;
-    setFilter('all');
+    // These always reset regardless of whether we're seeding from URL params.
     setPage(0);
-    setSearch('');
     setExpanded(new Set());
-  }, [row?.evalResultId, open]);
+    if (urlParamsConsumedRef.current) {
+      setFilter('all');
+      setSearch('');
+    } else {
+      urlParamsConsumedRef.current = true;
+      const rawFilter = getUrlParam('e_dfilter');
+      const rawSearch = getUrlParam('e_dq');
+      const validFilter: EvalSamplesFilter =
+        rawFilter === 'passed' || rawFilter === 'failed' ? rawFilter : 'all';
+      setFilter(validFilter);
+      setSearch(rawSearch ?? '');
+    }
+  }, [row?.evalResultId, open]); // eslint-disable-line react-hooks/exhaustive-deps -- getUrlParam is stable
+
+  // Mirror filter/search to the in-memory URL store so buildShareUrl() picks them up.
+  useEffect(() => {
+    if (!open) return;
+    writeUrlParams({ e_dfilter: filter === 'all' ? '' : filter });
+  }, [filter, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    writeUrlParams({ e_dq: search });
+  }, [search, open]);
 
   // Build a live-fetch context for unofficial runs from the row's identifying
   // fields. The hook ignores this when `evalResultId > 0` (DB-backed path).
@@ -140,8 +170,9 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
         aria-describedby={undefined}
       >
         {/* Header — `DialogContent` renders its own absolute-positioned close
-            button in the top-right, so we leave room with `pr-10`. */}
-        <div className="flex items-start gap-3 border-b border-border px-4 py-3 pr-10">
+            button at right-4. We render a Share button at right-10 and leave
+            pr-20 so neither overlaps the title text. */}
+        <div className="flex items-start gap-3 border-b border-border px-4 py-3 pr-20">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-sm font-semibold">
               {row ? (
@@ -159,6 +190,10 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                 <span>{row.date}</span>
               </div>
             )}
+          </div>
+          {/* Share button — positioned to the left of Radix's close X (right-4) */}
+          <div className="absolute right-10 top-3">
+            <ShareButton testId="eval-drawer-share-button" />
           </div>
         </div>
 
