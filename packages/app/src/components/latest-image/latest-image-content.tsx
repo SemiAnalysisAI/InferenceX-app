@@ -26,6 +26,16 @@ const FRAMEWORK_TO_BASE: Record<string, string> = {
   'mori-sglang': 'sglang',
 };
 
+/**
+ * Disaggregated frameworks pair a separate prefill/decode pool — identified by
+ * `dynamo-*` (NVIDIA Dynamo) or `mori-*` (AMD Mori) prefix on the framework key.
+ */
+function isDisaggFramework(framework: string): boolean {
+  return framework.startsWith('dynamo-') || framework.startsWith('mori-');
+}
+
+type NodeType = 'single' | 'disagg' | 'all';
+
 function deriveOptions(data: LatestImageRow[]) {
   const models = new Set<string>();
   const precisions = new Set<string>();
@@ -89,6 +99,7 @@ export function CurrentImageContent() {
   const [selectedSequence, setSelectedSequence] = useState<string>('1k/1k');
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
+  const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('single');
 
   const options = useMemo(() => (data ? deriveOptions(data) : null), [data]);
 
@@ -108,6 +119,11 @@ export function CurrentImageContent() {
       if (seq !== selectedSequence) return false;
       if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
       if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
+      if (selectedNodeType !== 'all') {
+        const disagg = isDisaggFramework(row.framework);
+        if (selectedNodeType === 'single' && disagg) return false;
+        if (selectedNodeType === 'disagg' && !disagg) return false;
+      }
       return true;
     });
     // Sort oldest-image first so the most stale entries surface at the top —
@@ -120,6 +136,7 @@ export function CurrentImageContent() {
     selectedSequence,
     selectedSpecMethod,
     selectedHardware,
+    selectedNodeType,
   ]);
 
   return (
@@ -139,7 +156,7 @@ export function CurrentImageContent() {
 
       {options && (
         <TooltipProvider delayDuration={0}>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-model-select"
@@ -270,6 +287,30 @@ export function CurrentImageContent() {
                       {h.toUpperCase()}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <LabelWithTooltip
+                htmlFor="image-node-type-select"
+                label="Node Type"
+                tooltip="Single node = vLLM/SGLang/TRT. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools."
+              />
+              <Select
+                value={selectedNodeType}
+                onValueChange={(v) => {
+                  track('current_image_node_type_changed', { node_type: v });
+                  setSelectedNodeType(v as NodeType);
+                }}
+              >
+                <SelectTrigger id="image-node-type-select" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Single Node</SelectItem>
+                  <SelectItem value="disagg">Disagg (Dynamo / Mori)</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                 </SelectContent>
               </Select>
             </div>
