@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
@@ -23,6 +23,8 @@ import {
   getVendor,
   submissionRowKey,
 } from './submissions-utils';
+
+const ROW_PAGE_SIZE = 100;
 
 function DetailItem({
   label,
@@ -75,6 +77,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
 
   const previousImages = useMemo(() => computePreviousImages(data), [data]);
   const previousRuns = useMemo(() => computePreviousRuns(data), [data]);
@@ -116,6 +119,20 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
       return String(av).localeCompare(String(bv)) * mult;
     });
   }, [filtered, sortKey, sortDir]);
+
+  // Reset visible count when the filtered/sorted view changes so the user
+  // always lands at the top of the new result set instead of mid-list.
+  useEffect(() => {
+    setVisibleCount(ROW_PAGE_SIZE);
+  }, [search, sortKey, sortDir]);
+
+  const visibleRows = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
+  const hiddenCount = Math.max(0, sorted.length - visibleRows.length);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + ROW_PAGE_SIZE);
+    track('submissions_table_load_more', { previous_count: visibleCount });
+  }, [visibleCount]);
 
   const toggleRow = useCallback((key: string) => {
     setExpandedRows((prev) => {
@@ -178,7 +195,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {sorted.map((row) => {
+            {visibleRows.map((row) => {
               const key = submissionRowKey(row);
               const isExpanded = expandedRows.has(key);
               return (
@@ -202,8 +219,23 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           </tbody>
         </table>
       </div>
+      {hiddenCount > 0 && (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            data-testid="submissions-load-more"
+          >
+            Show {Math.min(ROW_PAGE_SIZE, hiddenCount)} more
+            <span className="text-muted-foreground">({hiddenCount} hidden)</span>
+          </Button>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
-        {filtered.length} config{filtered.length === 1 ? '' : 's'} ·{' '}
+        Showing {visibleRows.length} of {filtered.length} config
+        {filtered.length === 1 ? '' : 's'} ·{' '}
         {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()} total datapoints
       </p>
     </div>
