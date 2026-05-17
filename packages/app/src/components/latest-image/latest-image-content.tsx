@@ -65,6 +65,13 @@ function getActualLatestTag(framework: string, releases: FrameworkReleases | und
 
 const UNSTABLE_PATTERNS = ['nightly', 'rocm/sgl-dev', 'sglang-rocm'];
 
+/** Whole-day delta between today (UTC) and an ISO date string (YYYY-MM-DD). */
+function daysSince(dateStr: string, today: Date): number {
+  const submitted = new Date(`${dateStr}T00:00:00Z`).getTime();
+  const ms = today.getTime() - submitted;
+  return Math.max(0, Math.floor(ms / 86_400_000));
+}
+
 /** Check if the image tag is outdated or uses an unstable/dev image. */
 function isOutdated(image: string, actualLatest: string | null): boolean {
   const lower = image.toLowerCase();
@@ -85,9 +92,13 @@ export function CurrentImageContent() {
 
   const options = useMemo(() => (data ? deriveOptions(data) : null), [data]);
 
+  // Stable "today" per render — recomputed on each mount, which is fine for the
+  // page's read-only display (no need to tick every minute).
+  const today = useMemo(() => new Date(), []);
+
   const filtered = useMemo(() => {
     if (!data) return [];
-    return data.filter((row) => {
+    const rows = data.filter((row) => {
       if (selectedModel !== 'all') {
         const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
         if (displayModel !== selectedModel) return false;
@@ -99,6 +110,9 @@ export function CurrentImageContent() {
       if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
       return true;
     });
+    // Sort oldest-image first so the most stale entries surface at the top —
+    // users primarily care about "what hasn't been refreshed in a while".
+    return rows.toSorted((a, b) => a.date.localeCompare(b.date));
   }, [
     data,
     selectedModel,
@@ -282,6 +296,12 @@ export function CurrentImageContent() {
                   Current InferenceX Image Tag
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Actual Latest Tag</th>
+                <th
+                  className="px-4 py-3 text-left text-sm font-semibold whitespace-nowrap"
+                  title="Whole days between today and the most recent benchmark submission for this config"
+                >
+                  Days Since Update
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -290,6 +310,8 @@ export function CurrentImageContent() {
                 const gpuLabel = row.hardware.toUpperCase();
                 const actualLatest = getActualLatestTag(row.framework, releases);
                 const outdated = isOutdated(row.image, actualLatest);
+                const ageDays = daysSince(row.date, today);
+                const ageStale = ageDays >= 7;
 
                 return (
                   <tr
@@ -325,6 +347,14 @@ export function CurrentImageContent() {
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-sm tabular-nums whitespace-nowrap ${
+                        ageStale ? 'text-red-400 font-medium' : 'text-muted-foreground'
+                      }`}
+                      title={`Last submission: ${row.date}`}
+                    >
+                      {ageDays}d
                     </td>
                   </tr>
                 );
