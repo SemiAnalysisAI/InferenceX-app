@@ -23,6 +23,7 @@ const DASHBOARD_TABS = [
   '/gpu-specs',
   '/gpu-metrics',
   '/submissions',
+  '/current-inferencex-image',
 ];
 
 const NAV_LINKS = [

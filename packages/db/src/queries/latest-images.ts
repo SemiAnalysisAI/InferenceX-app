@@ -1,4 +1,4 @@
-import type { NeonClient } from '../connection.js';
+import type { DbClient } from '../connection.js';
 
 export interface LatestImageRow {
   model: string;
@@ -16,7 +16,7 @@ export interface LatestImageRow {
  * Fetch the latest non-null image tag per unique (model, hardware, framework, precision, spec_method, isl, osl).
  * Uses the latest_benchmarks materialized view for fast lookups.
  */
-export async function getLatestImages(sql: NeonClient): Promise<LatestImageRow[]> {
+export async function getLatestImages(sql: DbClient): Promise<LatestImageRow[]> {
   const rows = await sql`
     SELECT DISTINCT ON (c.model, c.hardware, c.framework, c.precision, c.spec_method, lb.isl, lb.osl)
       c.model,

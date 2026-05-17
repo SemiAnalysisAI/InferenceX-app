@@ -82,6 +82,11 @@ const GATED_TABS = [
   { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart' },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics' },
   { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions' },
+  {
+    href: '/current-inferencex-image',
+    label: 'Images',
+    testId: 'tab-trigger-current-inferencex-image',
+  },
   { href: '/feedback', label: 'Feedback', testId: 'tab-trigger-feedback' },
 ] as const;
 

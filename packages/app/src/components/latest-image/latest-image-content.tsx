@@ -42,10 +42,10 @@ function deriveOptions(data: LatestImageRow[]) {
   }
 
   return {
-    models: [...models].sort(),
-    precisions: [...precisions].sort(),
-    sequences: [...sequences].filter((s) => s !== '1k/8k').sort(),
-    specMethods: [...specMethods].sort(),
+    models: [...models].toSorted(),
+    precisions: [...precisions].toSorted(),
+    sequences: [...sequences].filter((s) => s !== '1k/8k').toSorted(),
+    specMethods: [...specMethods].toSorted(),
   };
 }
 
@@ -88,9 +88,7 @@ export function CurrentImageContent() {
         const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
         if (displayModel !== selectedModel) return false;
       }
-      if (selectedPrecision !== 'all') {
-        if (row.precision !== selectedPrecision) return false;
-      }
+      if (selectedPrecision !== 'all' && row.precision !== selectedPrecision) return false;
       const seq = islOslToSequence(row.isl, row.osl) ?? `${row.isl}/${row.osl}`;
       if (seq !== selectedSequence) return false;
       if (row.spec_method !== selectedSpecMethod) return false;
