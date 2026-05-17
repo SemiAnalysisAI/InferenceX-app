@@ -31,6 +31,7 @@ function deriveOptions(data: LatestImageRow[]) {
   const precisions = new Set<string>();
   const sequences = new Set<string>();
   const specMethods = new Set<string>();
+  const hardwares = new Set<string>();
 
   for (const row of data) {
     const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
@@ -39,6 +40,7 @@ function deriveOptions(data: LatestImageRow[]) {
     const seq = islOslToSequence(row.isl, row.osl) ?? `${row.isl}/${row.osl}`;
     sequences.add(seq);
     specMethods.add(row.spec_method);
+    hardwares.add(row.hardware);
   }
 
   return {
@@ -46,6 +48,7 @@ function deriveOptions(data: LatestImageRow[]) {
     precisions: [...precisions].toSorted(),
     sequences: [...sequences].filter((s) => s !== '1k/8k').toSorted(),
     specMethods: [...specMethods].toSorted(),
+    hardwares: [...hardwares].toSorted(),
   };
 }
 
@@ -78,6 +81,7 @@ export function CurrentImageContent() {
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
   const [selectedSequence, setSelectedSequence] = useState<string>('1k/1k');
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
+  const [selectedHardware, setSelectedHardware] = useState<string>('all');
 
   const options = useMemo(() => (data ? deriveOptions(data) : null), [data]);
 
@@ -92,9 +96,17 @@ export function CurrentImageContent() {
       const seq = islOslToSequence(row.isl, row.osl) ?? `${row.isl}/${row.osl}`;
       if (seq !== selectedSequence) return false;
       if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
+      if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
       return true;
     });
-  }, [data, selectedModel, selectedPrecision, selectedSequence, selectedSpecMethod]);
+  }, [
+    data,
+    selectedModel,
+    selectedPrecision,
+    selectedSequence,
+    selectedSpecMethod,
+    selectedHardware,
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -113,7 +125,7 @@ export function CurrentImageContent() {
 
       {options && (
         <TooltipProvider delayDuration={0}>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-model-select"
@@ -215,6 +227,33 @@ export function CurrentImageContent() {
                   {options.specMethods.map((m) => (
                     <SelectItem key={m} value={m}>
                       {formatSpecMethod(m)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <LabelWithTooltip
+                htmlFor="image-hardware-select"
+                label="GPU SKU"
+                tooltip="Filter by GPU model (e.g. H200, MI300X, B200)."
+              />
+              <Select
+                value={selectedHardware}
+                onValueChange={(v) => {
+                  track('current_image_hardware_changed', { hardware: v });
+                  setSelectedHardware(v);
+                }}
+              >
+                <SelectTrigger id="image-hardware-select" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {options.hardwares.map((h) => (
+                    <SelectItem key={h} value={h}>
+                      {h.toUpperCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
