@@ -295,4 +295,32 @@ describe('buildInferenceCompareUrl', () => {
     };
     expect(buildInferenceCompareUrl(current, previous)).toBeNull();
   });
+
+  it('handles DB prefixes that include point-release suffix (gptoss120b, glm5.1, llama70b)', () => {
+    const cases: [string, string][] = [
+      ['gptoss120b', 'gpt-oss-120b'],
+      ['glm5.1', 'GLM-5'],
+      ['llama70b', 'Llama-3.3-70B-Instruct-FP8'],
+      ['kimik2.6', 'Kimi-K2.5'],
+      ['minimaxm2.7', 'MiniMax-M2.5'],
+    ];
+    for (const [dbModel, expectedDisplay] of cases) {
+      const previous: SubmissionSummaryRow = {
+        ...base,
+        model: dbModel,
+        date: '2026-05-10',
+        image: 'img-a',
+      };
+      const current: SubmissionSummaryRow = {
+        ...base,
+        model: dbModel,
+        date: '2026-05-12',
+        image: 'img-b',
+      };
+      const url = buildInferenceCompareUrl(current, previous);
+      expect(url, `expected URL for ${dbModel}`).not.toBeNull();
+      const parsed = new URL(`https://example.com${url}`);
+      expect(parsed.searchParams.get('g_model')).toBe(expectedDisplay);
+    }
+  });
 });
