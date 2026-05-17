@@ -77,7 +77,7 @@ export function CurrentImageContent() {
   const [selectedModel, setSelectedModel] = useState<string>('all');
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
   const [selectedSequence, setSelectedSequence] = useState<string>('1k/1k');
-  const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('none');
+  const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
 
   const options = useMemo(() => (data ? deriveOptions(data) : null), [data]);
 
@@ -91,7 +91,7 @@ export function CurrentImageContent() {
       if (selectedPrecision !== 'all' && row.precision !== selectedPrecision) return false;
       const seq = islOslToSequence(row.isl, row.osl) ?? `${row.isl}/${row.osl}`;
       if (seq !== selectedSequence) return false;
-      if (row.spec_method !== selectedSpecMethod) return false;
+      if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
       return true;
     });
   }, [data, selectedModel, selectedPrecision, selectedSequence, selectedSpecMethod]);
@@ -211,6 +211,7 @@ export function CurrentImageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
                   {options.specMethods.map((m) => (
                     <SelectItem key={m} value={m}>
                       {formatSpecMethod(m)}
@@ -237,6 +238,7 @@ export function CurrentImageContent() {
                 <th className="px-4 py-3 text-left text-sm font-semibold">Model</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Precision</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">GPU SKU</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Spec Decode</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">
                   Current InferenceX Image Tag
                 </th>
@@ -260,6 +262,13 @@ export function CurrentImageContent() {
                     <td className="px-4 py-3 text-sm font-medium">{displayModel}</td>
                     <td className="px-4 py-3 text-sm uppercase">{row.precision}</td>
                     <td className="px-4 py-3 text-sm">{gpuLabel}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {row.spec_method === 'none' ? (
+                        <span className="text-muted-foreground">Off</span>
+                      ) : (
+                        <span className="uppercase">{row.spec_method}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm">
                       <code
                         className={`rounded px-1.5 py-0.5 font-mono text-xs ${
