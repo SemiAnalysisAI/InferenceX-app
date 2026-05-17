@@ -170,7 +170,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
         aria-describedby={undefined}
       >
         {/* Header — `DialogContent` renders its own absolute-positioned close
-            button at right-4. We render a Share button at right-10 and leave
+            button at right-4. We render a Share button at right-11 and leave
             pr-20 so neither overlaps the title text. */}
         <div className="flex items-start gap-3 border-b border-border px-4 py-3 pr-20">
           <div className="min-w-0 flex-1">
@@ -192,7 +192,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
             )}
           </div>
           {/* Share button — positioned to the left of Radix's close X (right-4) */}
-          <div className="absolute right-10 top-3">
+          <div className="absolute right-11 top-2">
             <ShareButton testId="eval-drawer-share-button" />
           </div>
         </div>
