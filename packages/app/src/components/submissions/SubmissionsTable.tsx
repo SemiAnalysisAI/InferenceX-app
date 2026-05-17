@@ -1,12 +1,14 @@
 'use client';
 
-import { ChevronDown, ChevronRight, Info } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions-types';
 import { getFrameworkLabel } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import {
   TooltipProvider,
   TooltipRoot,
@@ -14,7 +16,15 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 
-import { computePreviousImages, getVendor, submissionRowKey } from './submissions-utils';
+import {
+  buildInferenceCompareUrl,
+  computePreviousImages,
+  computePreviousRuns,
+  getVendor,
+  submissionRowKey,
+} from './submissions-utils';
+
+const ROW_PAGE_SIZE = 100;
 
 function DetailItem({
   label,
@@ -67,8 +77,10 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
 
   const previousImages = useMemo(() => computePreviousImages(data), [data]);
+  const previousRuns = useMemo(() => computePreviousRuns(data), [data]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -107,6 +119,20 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
       return String(av).localeCompare(String(bv)) * mult;
     });
   }, [filtered, sortKey, sortDir]);
+
+  // Reset pagination when the filtered/sorted view changes so the user always
+  // sees the top of the new result set.
+  useEffect(() => {
+    setVisibleCount(ROW_PAGE_SIZE);
+  }, [search, sortKey, sortDir]);
+
+  const visibleRows = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
+  const hiddenCount = Math.max(0, sorted.length - visibleRows.length);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + ROW_PAGE_SIZE);
+    track('submissions_table_load_more', { previous_count: visibleCount });
+  }, [visibleCount]);
 
   const toggleRow = useCallback((key: string) => {
     setExpandedRows((prev) => {
@@ -163,7 +189,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {sorted.map((row) => {
+            {visibleRows.map((row) => {
               const key = submissionRowKey(row);
               const isExpanded = expandedRows.has(key);
               return (
@@ -172,6 +198,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                   row={row}
                   isExpanded={isExpanded}
                   previousImage={previousImages.get(key) ?? null}
+                  previousRun={previousRuns.get(key) ?? null}
                   onToggle={() => toggleRow(key)}
                 />
               );
@@ -186,8 +213,23 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           </tbody>
         </table>
       </div>
+      {hiddenCount > 0 && (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            data-testid="submissions-load-more"
+          >
+            Show {Math.min(ROW_PAGE_SIZE, hiddenCount)} more
+            <span className="text-muted-foreground">({hiddenCount} hidden)</span>
+          </Button>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
-        {filtered.length} config{filtered.length === 1 ? '' : 's'} ·{' '}
+        Showing {visibleRows.length} of {filtered.length} config
+        {filtered.length === 1 ? '' : 's'} ·{' '}
         {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()} total datapoints
       </p>
     </div>
@@ -198,14 +240,17 @@ function SubmissionRow({
   row,
   isExpanded,
   previousImage,
+  previousRun,
   onToggle,
 }: {
   row: SubmissionSummaryRow;
   isExpanded: boolean;
   previousImage: string | null;
+  previousRun: SubmissionSummaryRow | null;
   onToggle: () => void;
 }) {
   const vendor = getVendor(row.hardware);
+  const compareUrl = previousRun ? buildInferenceCompareUrl(row, previousRun) : null;
 
   return (
     <>
@@ -328,6 +373,30 @@ function SubmissionRow({
                     )}
                   </DetailItem>
                 </div>
+                {compareUrl && previousRun && (
+                  <div className="col-span-2 md:col-span-4 flex justify-end">
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={compareUrl}
+                        data-testid="submissions-compare-runs-link"
+                        onClick={() => {
+                          track('submissions_compare_runs_clicked', {
+                            config: submissionRowKey(row),
+                            model: row.model,
+                            hardware: row.hardware,
+                            framework: row.framework,
+                            previous_date: previousRun.date,
+                            new_date: row.date,
+                            image_changed: previousImage !== null,
+                          });
+                        }}
+                      >
+                        <GitCompare className="size-3.5" />
+                        Compare {previousRun.date} → {row.date} on chart
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             </TooltipProvider>
           </td>

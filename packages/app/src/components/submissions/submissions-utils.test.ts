@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { SubmissionVolumeRow, SubmissionSummaryRow } from '@/lib/submissions-types';
 
 import {
+  buildInferenceCompareUrl,
   computeCumulative,
   computePreviousImages,
+  computePreviousRuns,
   computeTotalStats,
   getVendor,
   groupVolumeByWeek,
@@ -189,5 +191,107 @@ describe('computePreviousImages', () => {
   it('returns empty for a single-row config', () => {
     const rows: SubmissionSummaryRow[] = [{ ...base, date: '2026-05-10', image: 'img-a' }];
     expect(computePreviousImages(rows).size).toBe(0);
+  });
+});
+
+describe('computePreviousRuns', () => {
+  const base: Omit<SubmissionSummaryRow, 'date' | 'image'> = {
+    model: 'dsr1',
+    hardware: 'h200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'mtp',
+    disagg: false,
+    is_multinode: false,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    total_datapoints: 10,
+    distinct_sequences: 2,
+    distinct_concurrencies: 5,
+    max_concurrency: 64,
+  };
+
+  it('returns the immediately preceding run for each row of the same config', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, date: '2026-05-10', image: 'img-a' },
+      { ...base, date: '2026-05-11', image: 'img-a' },
+      { ...base, date: '2026-05-12', image: 'img-b' },
+    ];
+    const map = computePreviousRuns(rows);
+    expect(map.size).toBe(2);
+    expect(map.get(submissionRowKey(rows[1]))?.date).toBe('2026-05-10');
+    expect(map.get(submissionRowKey(rows[2]))?.date).toBe('2026-05-11');
+    expect(map.has(submissionRowKey(rows[0]))).toBe(false);
+  });
+
+  it('does not cross config boundaries', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, hardware: 'h200', date: '2026-05-10', image: 'img-a' },
+      { ...base, hardware: 'b300', date: '2026-05-11', image: 'img-b' },
+    ];
+    expect(computePreviousRuns(rows).size).toBe(0);
+  });
+
+  it('returns empty for a single-row config', () => {
+    const rows: SubmissionSummaryRow[] = [{ ...base, date: '2026-05-10', image: 'img-a' }];
+    expect(computePreviousRuns(rows).size).toBe(0);
+  });
+});
+
+describe('buildInferenceCompareUrl', () => {
+  const base: Omit<SubmissionSummaryRow, 'date' | 'image'> = {
+    model: 'dsr1',
+    hardware: 'h200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'mtp',
+    disagg: false,
+    is_multinode: false,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    total_datapoints: 10,
+    distinct_sequences: 2,
+    distinct_concurrencies: 5,
+    max_concurrency: 64,
+  };
+
+  it('builds an /inference URL with the expected params', () => {
+    const previous: SubmissionSummaryRow = { ...base, date: '2026-05-10', image: 'img-a' };
+    const current: SubmissionSummaryRow = { ...base, date: '2026-05-12', image: 'img-b' };
+    const url = buildInferenceCompareUrl(current, previous);
+    expect(url).not.toBeNull();
+    const parsed = new URL(`https://example.com${url}`);
+    expect(parsed.pathname).toBe('/inference');
+    expect(parsed.searchParams.get('g_model')).toBe('DeepSeek-R1-0528');
+    expect(parsed.searchParams.get('g_rundate')).toBe('2026-05-12');
+    expect(parsed.searchParams.get('i_dates')).toBe('2026-05-10');
+    expect(parsed.searchParams.get('i_prec')).toBe('fp8');
+    // hwKey reflects framework + spec_method
+    expect(parsed.searchParams.get('i_gpus')).toContain('h200');
+    expect(parsed.searchParams.get('i_gpus')).toContain('mtp');
+  });
+
+  it('returns null when the model prefix has no display mapping', () => {
+    const previous: SubmissionSummaryRow = {
+      ...base,
+      model: 'unknown-model',
+      date: '2026-05-10',
+      image: 'img-a',
+    };
+    const current: SubmissionSummaryRow = {
+      ...base,
+      model: 'unknown-model',
+      date: '2026-05-12',
+      image: 'img-b',
+    };
+    expect(buildInferenceCompareUrl(current, previous)).toBeNull();
   });
 });
