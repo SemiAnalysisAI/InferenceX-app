@@ -118,6 +118,21 @@ function ageColorStyle(days: number): React.CSSProperties | undefined {
   return { color: `oklch(${L.toFixed(3)} ${C.toFixed(3)} 25)` };
 }
 
+/**
+ * Companion to `ageColorStyle` for the whole row's background tint — same
+ * 1d → 60d ramp but expressed as a low-alpha fill so the row content stays
+ * readable. 0-day rows return `undefined` so the row falls back to its
+ * hover-only class background.
+ */
+function ageRowStyle(days: number): React.CSSProperties | undefined {
+  if (days < 1) return undefined;
+  const t = Math.min(AGE_MAX_RED_DAYS, days) / AGE_MAX_RED_DAYS;
+  // Alpha tops out around 0.28 — enough that 60d+ rows are unmistakably
+  // tinted without drowning out the text or competing with hover affordance.
+  const alpha = (0.04 + 0.24 * t).toFixed(3);
+  return { backgroundColor: `oklch(0.60 0.22 25 / ${alpha})` };
+}
+
 /** Check if the image tag is outdated or uses an unstable/dev image. */
 function isOutdated(image: string, actualLatest: string | null): boolean {
   const lower = image.toLowerCase();
@@ -422,13 +437,15 @@ export function CurrentImageContent() {
                 const outdated = isOutdated(row.image, actualLatest);
                 const ageDays = daysSince(row.date, today);
                 const ageStyle = ageColorStyle(ageDays);
+                const rowStyle = ageRowStyle(ageDays);
 
                 return (
                   <tr
                     key={`${row.model}-${row.hardware}-${row.isl}-${row.osl}-${row.spec_method}-${i}`}
                     className={`border-b border-border last:border-b-0 transition-colors ${
-                      outdated ? 'bg-red-500/10 hover:bg-red-500/15' : 'hover:bg-muted/30'
+                      rowStyle ? 'hover:brightness-110' : 'hover:bg-muted/30'
                     }`}
+                    style={rowStyle}
                   >
                     <td className="px-4 py-3 text-sm font-medium">{displayModel}</td>
                     <td className="px-4 py-3 text-sm uppercase">{row.precision}</td>
