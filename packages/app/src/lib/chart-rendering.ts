@@ -152,7 +152,8 @@ export const formatLargeNumber = (value: number): string => {
   if (Math.abs(value) >= 1_000) {
     return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1)}k`;
   }
-  return formatNumber(value);
+  if (Number.isInteger(value)) return formatNumber(value);
+  return Number(value.toFixed(Math.abs(value) >= 10 ? 1 : 2)).toString();
 };
 
 /**
