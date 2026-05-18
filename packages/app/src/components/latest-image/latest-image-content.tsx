@@ -99,6 +99,25 @@ function daysSince(dateStr: string, today: Date): number {
   return Math.max(0, Math.floor(ms / 86_400_000));
 }
 
+/** Age past which the cell is rendered at max red — anything older looks identical. */
+const AGE_MAX_RED_DAYS = 60;
+
+/**
+ * Returns inline style for the Days-Since-Update cell so older rows scream
+ * louder visually. Ramps from a subtle red at 1 day to deep red at 60 days
+ * (then clamps); 0-day rows return `undefined` so the cell falls back to the
+ * muted-foreground class.
+ */
+function ageColorStyle(days: number): React.CSSProperties | undefined {
+  if (days < 1) return undefined;
+  const t = Math.min(AGE_MAX_RED_DAYS, days) / AGE_MAX_RED_DAYS; // 0.017 … 1
+  // Perceptually-uniform OKLCH ramp at hue 25 (red): lightness drops as
+  // chroma rises, so the cell goes from light pink to saturated dark red.
+  const L = 0.78 - 0.28 * t;
+  const C = 0.12 + 0.12 * t;
+  return { color: `oklch(${L.toFixed(3)} ${C.toFixed(3)} 25)` };
+}
+
 /** Check if the image tag is outdated or uses an unstable/dev image. */
 function isOutdated(image: string, actualLatest: string | null): boolean {
   const lower = image.toLowerCase();
@@ -402,7 +421,7 @@ export function CurrentImageContent() {
                 const actualLatest = getActualLatestTag(row.framework, releases);
                 const outdated = isOutdated(row.image, actualLatest);
                 const ageDays = daysSince(row.date, today);
-                const ageStale = ageDays >= 7;
+                const ageStyle = ageColorStyle(ageDays);
 
                 return (
                   <tr
@@ -441,9 +460,10 @@ export function CurrentImageContent() {
                     </td>
                     <td
                       className={`px-4 py-3 text-sm tabular-nums whitespace-nowrap ${
-                        ageStale ? 'text-red-400 font-medium' : 'text-muted-foreground'
+                        ageStyle ? 'font-medium' : 'text-muted-foreground'
                       }`}
-                      title={`Last submission: ${row.date}`}
+                      style={ageStyle}
+                      title={`Last submission: ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? ` (≥${AGE_MAX_RED_DAYS}d clamps to max red)` : ''}`}
                     >
                       {ageDays}d
                     </td>
