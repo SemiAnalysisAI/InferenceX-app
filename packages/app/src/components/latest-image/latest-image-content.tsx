@@ -436,8 +436,11 @@ export function CurrentImageContent() {
                 const actualLatest = getActualLatestTag(row.framework, releases);
                 const outdated = isOutdated(row.image, actualLatest);
                 const ageDays = daysSince(row.date, today);
-                const ageStyle = ageColorStyle(ageDays);
-                const rowStyle = ageRowStyle(ageDays);
+                // Only tint by age when the row is actually outdated (image lags
+                // upstream latest, or uses an unstable tag). Up-to-date configs
+                // shouldn't look alarming just because a day passed.
+                const ageStyle = outdated ? ageColorStyle(ageDays) : undefined;
+                const rowStyle = outdated ? ageRowStyle(ageDays) : undefined;
 
                 return (
                   <tr
