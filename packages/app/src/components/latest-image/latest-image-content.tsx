@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
 import type { FrameworkReleases, LatestImageRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { getFrameworkLabel } from '@/lib/utils';
 
 /** Map framework variants to their base framework for release lookup. */
 const FRAMEWORK_TO_BASE: Record<string, string> = {
@@ -34,6 +36,18 @@ function isDisaggFramework(framework: string): boolean {
   return framework.startsWith('dynamo-') || framework.startsWith('mori-');
 }
 
+/**
+ * Strip the disagg prefix to get the base engine ID. `dynamo-trt` → `trt`,
+ * `mori-sglang` → `sglang`, plain `vllm` stays `vllm`. Used by the framework
+ * multi-select so users pick engines (sglang / vllm / trt / atom) without
+ * having to think about whether they're disagg variants.
+ */
+function baseFramework(framework: string): string {
+  if (framework.startsWith('dynamo-')) return framework.slice('dynamo-'.length);
+  if (framework.startsWith('mori-')) return framework.slice('mori-'.length);
+  return framework;
+}
+
 type NodeType = 'single' | 'disagg' | 'all';
 
 function deriveOptions(data: LatestImageRow[]) {
@@ -42,6 +56,7 @@ function deriveOptions(data: LatestImageRow[]) {
   const sequences = new Set<string>();
   const specMethods = new Set<string>();
   const hardwares = new Set<string>();
+  const frameworks = new Set<string>();
 
   for (const row of data) {
     const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
@@ -51,6 +66,7 @@ function deriveOptions(data: LatestImageRow[]) {
     sequences.add(seq);
     specMethods.add(row.spec_method);
     hardwares.add(row.hardware);
+    frameworks.add(baseFramework(row.framework));
   }
 
   return {
@@ -59,6 +75,7 @@ function deriveOptions(data: LatestImageRow[]) {
     sequences: [...sequences].filter((s) => s !== '1k/8k').toSorted(),
     specMethods: [...specMethods].toSorted(),
     hardwares: [...hardwares].toSorted(),
+    frameworks: [...frameworks].toSorted(),
   };
 }
 
@@ -100,6 +117,9 @@ export function CurrentImageContent() {
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('single');
+  // Empty array = no framework filter (matches every row); any non-empty array
+  // limits the table to rows whose base framework is in the set.
+  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
 
   const options = useMemo(() => (data ? deriveOptions(data) : null), [data]);
 
@@ -124,6 +144,11 @@ export function CurrentImageContent() {
         if (selectedNodeType === 'single' && disagg) return false;
         if (selectedNodeType === 'disagg' && !disagg) return false;
       }
+      if (
+        selectedFrameworks.length > 0 &&
+        !selectedFrameworks.includes(baseFramework(row.framework))
+      )
+        return false;
       return true;
     });
     // Sort oldest-image first so the most stale entries surface at the top —
@@ -137,6 +162,7 @@ export function CurrentImageContent() {
     selectedSpecMethod,
     selectedHardware,
     selectedNodeType,
+    selectedFrameworks,
   ]);
 
   return (
@@ -156,7 +182,7 @@ export function CurrentImageContent() {
 
       {options && (
         <TooltipProvider delayDuration={0}>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-model-select"
@@ -313,6 +339,30 @@ export function CurrentImageContent() {
                   <SelectItem value="all">All</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <LabelWithTooltip
+                htmlFor="image-framework-multiselect"
+                label="Framework"
+                tooltip="Filter by inference engine (sglang, vllm, TensorRT, atom). Disagg variants (dynamo-*, mori-*) collapse into their base engine. Empty = all frameworks."
+              />
+              <MultiSelect
+                triggerId="image-framework-multiselect"
+                triggerTestId="image-framework-multiselect"
+                options={options.frameworks.map((fw) => ({
+                  value: fw,
+                  label: getFrameworkLabel(fw),
+                }))}
+                value={selectedFrameworks}
+                onChange={(v) => {
+                  track('current_image_framework_changed', {
+                    frameworks: v.join(',') || 'all',
+                  });
+                  setSelectedFrameworks(v);
+                }}
+                placeholder="All frameworks"
+              />
             </div>
           </div>
         </TooltipProvider>
