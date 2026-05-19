@@ -16,6 +16,8 @@ import {
   type GpuSpec,
 } from '@/lib/gpu-specs';
 
+const findGpu = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
+
 describe('GPU_SPECS', () => {
   it('contains all expected GPUs', () => {
     const names = GPU_SPECS.map((s) => s.name);
@@ -75,58 +77,52 @@ describe('GPU_SPECS', () => {
   });
 
   it('B200 SXM and GB200 NVL72 have different memory capacities', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('B200 SXM').memory).toBe('180 GB');
-    expect(find('GB200 NVL72').memory).toBe('192 GB');
+    expect(findGpu('B200 SXM').memory).toBe('180 GB');
+    expect(findGpu('GB200 NVL72').memory).toBe('192 GB');
   });
 
   it('B300 SXM and GB300 NVL72 have different memory capacities', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('B300 SXM').memory).toBe('268 GB');
-    expect(find('GB300 NVL72').memory).toBe('288 GB');
+    expect(findGpu('B300 SXM').memory).toBe('268 GB');
+    expect(findGpu('GB300 NVL72').memory).toBe('288 GB');
   });
 
   it('NIC values have name first then port spec', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-
-    expect(find('H100 SXM').nic).toBe('ConnectX-7 2x200GbE');
-    expect(find('H200 SXM').nic).toBe('ConnectX-7 400G');
-    expect(find('B200 SXM').nic).toBe('ConnectX-7 400GbE');
-    expect(find('B300 SXM').nic).toBe('ConnectX-8 2x400GbE');
+    expect(findGpu('H100 SXM').nic).toBe('ConnectX-7 2x200GbE');
+    expect(findGpu('H200 SXM').nic).toBe('ConnectX-7 400G');
+    expect(findGpu('B200 SXM').nic).toBe('ConnectX-7 400GbE');
+    expect(findGpu('B300 SXM').nic).toBe('ConnectX-8 2x400GbE');
 
     // NVL72 systems don't have scale-out NICs
-    expect(find('GB200 NVL72').nic).toBeNull();
-    expect(find('GB300 NVL72').nic).toBeNull();
+    expect(findGpu('GB200 NVL72').nic).toBeNull();
+    expect(findGpu('GB300 NVL72').nic).toBeNull();
 
     // AMD GPUs use Pollara
-    expect(find('MI300X').nic).toBe('Pollara 400GbE');
-    expect(find('MI325X').nic).toBe('Pollara 400GbE');
-    expect(find('MI355X').nic).toBe('Pollara 400GbE');
+    expect(findGpu('MI300X').nic).toBe('Pollara 400GbE');
+    expect(findGpu('MI325X').nic).toBe('Pollara 400GbE');
+    expect(findGpu('MI355X').nic).toBe('Pollara 400GbE');
   });
 
   it('scale out technology matches issue requirements', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-
     // H100 is RoCEv2 Ethernet (no vendor prefix)
-    expect(find('H100 SXM').scaleOutTech).toBe('RoCEv2 Ethernet');
+    expect(findGpu('H100 SXM').scaleOutTech).toBe('RoCEv2 Ethernet');
 
     // MI300X/MI325X/MI355X is RoCEv2 Ethernet
-    expect(find('MI300X').scaleOutTech).toBe('RoCEv2 Ethernet');
-    expect(find('MI325X').scaleOutTech).toBe('RoCEv2 Ethernet');
-    expect(find('MI355X').scaleOutTech).toBe('RoCEv2 Ethernet');
+    expect(findGpu('MI300X').scaleOutTech).toBe('RoCEv2 Ethernet');
+    expect(findGpu('MI325X').scaleOutTech).toBe('RoCEv2 Ethernet');
+    expect(findGpu('MI355X').scaleOutTech).toBe('RoCEv2 Ethernet');
 
     // GB200/GB300 is N/A
-    expect(find('GB200 NVL72').scaleOutTech).toBeNull();
-    expect(find('GB300 NVL72').scaleOutTech).toBeNull();
+    expect(findGpu('GB200 NVL72').scaleOutTech).toBeNull();
+    expect(findGpu('GB300 NVL72').scaleOutTech).toBeNull();
 
     // B300 is RoCEv2 Ethernet
-    expect(find('B300 SXM').scaleOutTech).toBe('RoCEv2 Ethernet');
+    expect(findGpu('B300 SXM').scaleOutTech).toBe('RoCEv2 Ethernet');
 
     // H200 is InfiniBand NDR
-    expect(find('H200 SXM').scaleOutTech).toBe('InfiniBand NDR');
+    expect(findGpu('H200 SXM').scaleOutTech).toBe('InfiniBand NDR');
 
     // B200 uses gIB RoCEv2 Ethernet
-    expect(find('B200 SXM').scaleOutTech).toBe('gIB RoCEv2 Ethernet');
+    expect(findGpu('B200 SXM').scaleOutTech).toBe('gIB RoCEv2 Ethernet');
   });
 
   it('NVIDIA GPUs have nvidia vendor', () => {
@@ -172,9 +168,8 @@ describe('GPU_SPECS', () => {
   });
 
   it('B300/GB300 have higher FP4 than B200/GB200', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('B300 SXM').fp4).toBeGreaterThan(find('B200 SXM').fp4!);
-    expect(find('GB300 NVL72').fp4).toBeGreaterThan(find('GB200 NVL72').fp4!);
+    expect(findGpu('B300 SXM').fp4).toBeGreaterThan(findGpu('B200 SXM').fp4!);
+    expect(findGpu('GB300 NVL72').fp4).toBeGreaterThan(findGpu('GB200 NVL72').fp4!);
   });
 
   it('NVL72 GPUs have world size of 72', () => {
@@ -186,29 +181,26 @@ describe('GPU_SPECS', () => {
   });
 
   it('scale-up bandwidth values are unidirectional', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-
     // NVLink 4.0 (Hopper): 450 GB/s unidirectional
-    expect(find('H100 SXM').scaleUpBandwidth).toBe('450 GB/s');
-    expect(find('H200 SXM').scaleUpBandwidth).toBe('450 GB/s');
+    expect(findGpu('H100 SXM').scaleUpBandwidth).toBe('450 GB/s');
+    expect(findGpu('H200 SXM').scaleUpBandwidth).toBe('450 GB/s');
 
     // NVLink 5.0 (Blackwell): 900 GB/s unidirectional
-    expect(find('B200 SXM').scaleUpBandwidth).toBe('900 GB/s');
-    expect(find('B300 SXM').scaleUpBandwidth).toBe('900 GB/s');
-    expect(find('GB200 NVL72').scaleUpBandwidth).toBe('900 GB/s');
-    expect(find('GB300 NVL72').scaleUpBandwidth).toBe('900 GB/s');
+    expect(findGpu('B200 SXM').scaleUpBandwidth).toBe('900 GB/s');
+    expect(findGpu('B300 SXM').scaleUpBandwidth).toBe('900 GB/s');
+    expect(findGpu('GB200 NVL72').scaleUpBandwidth).toBe('900 GB/s');
+    expect(findGpu('GB300 NVL72').scaleUpBandwidth).toBe('900 GB/s');
 
     // AMD Infinity Fabric: MI300X/MI325X = 448 GB/s, MI355X = 576 GB/s (5th Gen IF)
-    expect(find('MI300X').scaleUpBandwidth).toBe('448 GB/s');
-    expect(find('MI325X').scaleUpBandwidth).toBe('448 GB/s');
-    expect(find('MI355X').scaleUpBandwidth).toBe('576 GB/s');
+    expect(findGpu('MI300X').scaleUpBandwidth).toBe('448 GB/s');
+    expect(findGpu('MI325X').scaleUpBandwidth).toBe('448 GB/s');
+    expect(findGpu('MI355X').scaleUpBandwidth).toBe('576 GB/s');
   });
 
   it('MI355X has higher scale-up bandwidth than MI300X/MI325X (5th Gen IF)', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    const mi300xBw = parseFloat(find('MI300X').scaleUpBandwidth);
-    const mi325xBw = parseFloat(find('MI325X').scaleUpBandwidth);
-    const mi355xBw = parseFloat(find('MI355X').scaleUpBandwidth);
+    const mi300xBw = parseFloat(findGpu('MI300X').scaleUpBandwidth);
+    const mi325xBw = parseFloat(findGpu('MI325X').scaleUpBandwidth);
+    const mi355xBw = parseFloat(findGpu('MI355X').scaleUpBandwidth);
 
     // MI300X and MI325X share same CDNA 3 interconnect
     expect(mi300xBw).toBe(mi325xBw);
@@ -222,16 +214,14 @@ describe('GPU_SPECS', () => {
   });
 
   it('Blackwell Ultra (B300) has higher FP4 than Blackwell (B200)', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    const b200 = find('B200 SXM');
-    const b300 = find('B300 SXM');
+    const b200 = findGpu('B200 SXM');
+    const b300 = findGpu('B300 SXM');
     expect(b300.fp4).toBeGreaterThan(b200.fp4!);
   });
 
   it('NVL72 variants have higher FLOPs than SXM variants', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    const b200 = find('B200 SXM');
-    const gb200 = find('GB200 NVL72');
+    const b200 = findGpu('B200 SXM');
+    const gb200 = findGpu('GB200 NVL72');
     // NVL72 liquid-cooled variants run at higher TDP
     expect(gb200.fp4).toBeGreaterThan(b200.fp4!);
     expect(gb200.fp8).toBeGreaterThan(b200.fp8);
@@ -253,56 +243,50 @@ describe('GPU_SPECS', () => {
   });
 
   it('scale out switch values match requirements', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-
-    expect(find('H100 SXM').scaleOutSwitch).toBe('25.6T Arista Tomahawk4 7060DX5-64S');
-    expect(find('H200 SXM').scaleOutSwitch).toBe('25.6T NVIDIA Quantum-2 QM9790');
-    expect(find('B200 SXM').scaleOutSwitch).toBe(
+    expect(findGpu('H100 SXM').scaleOutSwitch).toBe('25.6T Arista Tomahawk4 7060DX5-64S');
+    expect(findGpu('H200 SXM').scaleOutSwitch).toBe('25.6T NVIDIA Quantum-2 QM9790');
+    expect(findGpu('B200 SXM').scaleOutSwitch).toBe(
       '12.8T Whitebox Leaf Tomahawk3 & 25.6T Whitebox Tomahawk4',
     );
-    expect(find('B300 SXM').scaleOutSwitch).toBe('51.2T NVIDIA Spectrum-X SN5600');
-    expect(find('MI300X').scaleOutSwitch).toBe('51.2T Tomahawk5');
-    expect(find('MI325X').scaleOutSwitch).toBe('51.2T Tomahawk5');
-    expect(find('MI355X').scaleOutSwitch).toBe('51.2T Arista Tomahawk5 DCS-7060X6-64PE');
+    expect(findGpu('B300 SXM').scaleOutSwitch).toBe('51.2T NVIDIA Spectrum-X SN5600');
+    expect(findGpu('MI300X').scaleOutSwitch).toBe('51.2T Tomahawk5');
+    expect(findGpu('MI325X').scaleOutSwitch).toBe('51.2T Tomahawk5');
+    expect(findGpu('MI355X').scaleOutSwitch).toBe('51.2T Arista Tomahawk5 DCS-7060X6-64PE');
 
     // NVL72 systems don't use scale out
-    expect(find('GB200 NVL72').scaleOutSwitch).toBeNull();
-    expect(find('GB300 NVL72').scaleOutSwitch).toBeNull();
+    expect(findGpu('GB200 NVL72').scaleOutSwitch).toBeNull();
+    expect(findGpu('GB300 NVL72').scaleOutSwitch).toBeNull();
   });
 
   it('scale out topology values match requirements', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-
-    expect(find('H100 SXM').scaleOutTopology).toBe('8-rail optimized');
-    expect(find('H200 SXM').scaleOutTopology).toBe('8-rail optimized');
-    expect(find('B200 SXM').scaleOutTopology).toBe('4-rail optimized');
-    expect(find('B300 SXM').scaleOutTopology).toBe('8-rail optimized');
-    expect(find('MI300X').scaleOutTopology).toBe('8-rail optimized');
-    expect(find('MI325X').scaleOutTopology).toBe('8-rail optimized');
-    expect(find('MI355X').scaleOutTopology).toBe('8-rail optimized');
+    expect(findGpu('H100 SXM').scaleOutTopology).toBe('8-rail optimized');
+    expect(findGpu('H200 SXM').scaleOutTopology).toBe('8-rail optimized');
+    expect(findGpu('B200 SXM').scaleOutTopology).toBe('4-rail optimized');
+    expect(findGpu('B300 SXM').scaleOutTopology).toBe('8-rail optimized');
+    expect(findGpu('MI300X').scaleOutTopology).toBe('8-rail optimized');
+    expect(findGpu('MI325X').scaleOutTopology).toBe('8-rail optimized');
+    expect(findGpu('MI355X').scaleOutTopology).toBe('8-rail optimized');
 
     // NVL72 systems don't use scale out
-    expect(find('GB200 NVL72').scaleOutTopology).toBeNull();
-    expect(find('GB300 NVL72').scaleOutTopology).toBeNull();
+    expect(findGpu('GB200 NVL72').scaleOutTopology).toBeNull();
+    expect(findGpu('GB300 NVL72').scaleOutTopology).toBeNull();
   });
 
   it('scale up switch values match requirements', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-
     // Hopper: NVSwitch Gen 3.0
-    expect(find('H100 SXM').scaleUpSwitch).toBe('7.2Tbit/s NVSwitch Gen 3.0');
-    expect(find('H200 SXM').scaleUpSwitch).toBe('7.2Tbit/s NVSwitch Gen 3.0');
+    expect(findGpu('H100 SXM').scaleUpSwitch).toBe('7.2Tbit/s NVSwitch Gen 3.0');
+    expect(findGpu('H200 SXM').scaleUpSwitch).toBe('7.2Tbit/s NVSwitch Gen 3.0');
 
     // Blackwell / NVL72: NVSwitch Gen 4.0
-    expect(find('B200 SXM').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
-    expect(find('B300 SXM').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
-    expect(find('GB200 NVL72').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
-    expect(find('GB300 NVL72').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
+    expect(findGpu('B200 SXM').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
+    expect(findGpu('B300 SXM').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
+    expect(findGpu('GB200 NVL72').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
+    expect(findGpu('GB300 NVL72').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
 
     // AMD: no scale-up switches (mesh topology)
-    expect(find('MI300X').scaleUpSwitch).toBeNull();
-    expect(find('MI325X').scaleUpSwitch).toBeNull();
-    expect(find('MI355X').scaleUpSwitch).toBeNull();
+    expect(findGpu('MI300X').scaleUpSwitch).toBeNull();
+    expect(findGpu('MI325X').scaleUpSwitch).toBeNull();
+    expect(findGpu('MI355X').scaleUpSwitch).toBeNull();
   });
 
   it('B300 has correct dense TFLOPS values', () => {
@@ -554,28 +538,24 @@ describe('getScaleUpDomainMemoryBw', () => {
 
 describe('scale-up topology values', () => {
   it('H100/H200 have Switched 4-rail Optimized', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('H100 SXM').scaleUpTopology).toBe('Switched 4-rail Optimized');
-    expect(find('H200 SXM').scaleUpTopology).toBe('Switched 4-rail Optimized');
+    expect(findGpu('H100 SXM').scaleUpTopology).toBe('Switched 4-rail Optimized');
+    expect(findGpu('H200 SXM').scaleUpTopology).toBe('Switched 4-rail Optimized');
   });
 
   it('B200/B300 have Switched 2-rail Optimized', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('B200 SXM').scaleUpTopology).toBe('Switched 2-rail Optimized');
-    expect(find('B300 SXM').scaleUpTopology).toBe('Switched 2-rail Optimized');
+    expect(findGpu('B200 SXM').scaleUpTopology).toBe('Switched 2-rail Optimized');
+    expect(findGpu('B300 SXM').scaleUpTopology).toBe('Switched 2-rail Optimized');
   });
 
   it('MI300X/MI325X/MI355X have Full Mesh', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('MI300X').scaleUpTopology).toBe('Full Mesh');
-    expect(find('MI325X').scaleUpTopology).toBe('Full Mesh');
-    expect(find('MI355X').scaleUpTopology).toBe('Full Mesh');
+    expect(findGpu('MI300X').scaleUpTopology).toBe('Full Mesh');
+    expect(findGpu('MI325X').scaleUpTopology).toBe('Full Mesh');
+    expect(findGpu('MI355X').scaleUpTopology).toBe('Full Mesh');
   });
 
   it('GB200/GB300 NVL72 have Switched 18-rail Optimized', () => {
-    const find = (name: string) => GPU_SPECS.find((s) => s.name === name)!;
-    expect(find('GB200 NVL72').scaleUpTopology).toBe('Switched 18-rail Optimized');
-    expect(find('GB300 NVL72').scaleUpTopology).toBe('Switched 18-rail Optimized');
+    expect(findGpu('GB200 NVL72').scaleUpTopology).toBe('Switched 18-rail Optimized');
+    expect(findGpu('GB300 NVL72').scaleUpTopology).toBe('Switched 18-rail Optimized');
   });
 });
 

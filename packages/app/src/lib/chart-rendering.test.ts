@@ -19,6 +19,10 @@ function mockScale(min: number, max: number) {
   return { domain: () => [min, max] } as any;
 }
 
+function mockSelection() {
+  return { attr: vi.fn().mockReturnThis() } as any;
+}
+
 // ===========================================================================
 // SHAPE_CONFIG (keyed by shape name)
 // ===========================================================================
@@ -112,10 +116,6 @@ describe('getShapeConfig', () => {
 // applyNormalState
 // ===========================================================================
 describe('applyNormalState', () => {
-  function mockSelection() {
-    return { attr: vi.fn().mockReturnThis() } as any;
-  }
-
   it('sets path attributes for triangle', () => {
     const sel = mockSelection();
     applyNormalState(sel, 'triangle');
@@ -153,10 +153,6 @@ describe('applyNormalState', () => {
 // applyHoverState
 // ===========================================================================
 describe('applyHoverState', () => {
-  function mockSelection() {
-    return { attr: vi.fn().mockReturnThis() } as any;
-  }
-
   it('sets hover path attributes for triangle', () => {
     const sel = mockSelection();
     applyHoverState(sel, 'triangle');

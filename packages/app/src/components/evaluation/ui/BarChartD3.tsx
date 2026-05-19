@@ -762,7 +762,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 .style('pointer-events', 'none')
                 .html(generateEvaluationTooltipContent(d, false, branchForRow(d)));
             })
-            .on('mousemove', function (event) {
+            .on('mousemove', (event) => {
               if (chartRef.current?.isPinned()) return;
               const [mx, my] = d3.pointer(event, container);
               const pos = computeTooltipPosition(mx, my, tooltip, container);
@@ -776,7 +776,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 .attr('stroke-width', 2.5);
               tooltip.style('opacity', 0).style('display', 'none');
             })
-            .on('click', function (event, d) {
+            .on('click', (event, d) => {
               event.stopPropagation();
               const [mx, my] = d3.pointer(event, container);
               tooltip

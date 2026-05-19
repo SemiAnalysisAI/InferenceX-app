@@ -17,6 +17,10 @@ vi.mock('adm-zip', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+function makeRequest(params: string) {
+  return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
+}
+
 /** Minimal raw artifact row matching the shape produced by CI benchmarks. */
 function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -277,10 +281,6 @@ describe('GET /api/unofficial-run', () => {
     const mod = await import('./route');
     GET = mod.GET as any;
   });
-
-  function makeRequest(params: string) {
-    return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
-  }
 
   it('returns 400 for missing runId', async () => {
     const res = await GET(makeRequest(''));

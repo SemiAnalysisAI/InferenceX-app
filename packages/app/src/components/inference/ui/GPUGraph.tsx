@@ -45,6 +45,18 @@ import {
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
+// Label text combines the hw config (display label) and the date so
+// both dimensions of the GPU comparison view are legible on the chart,
+// not only the legend. Falls back to the raw hwKey if the config
+// lookup misses (legacy data).
+function labelTextFor(pts: InferenceData[]): string {
+  const hwKey = String(pts[0].hwKey);
+  const date = String(pts[0].date);
+  const cfg = getHardwareConfig(hwKey);
+  const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
+  return `${hwLabel} • ${date}`;
+}
+
 const GPUGraph = React.memo(
   ({ chartId, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
     const {
@@ -292,18 +304,6 @@ const GPUGraph = React.memo(
           }
 
           const lineLabels: LineLabel[] = [];
-
-          // Label text combines the hw config (display label) and the date so
-          // both dimensions of the GPU comparison view are legible on the chart,
-          // not only the legend. Falls back to the raw hwKey if the config
-          // lookup misses (legacy data).
-          const labelTextFor = (pts: InferenceData[]): string => {
-            const hwKey = String(pts[0].hwKey);
-            const date = String(pts[0].date);
-            const cfg = getHardwareConfig(hwKey);
-            const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
-            return `${hwLabel} • ${date}`;
-          };
 
           if (isInteractivity) {
             // Greedy placement: try start → midpoint → 2/3-along → endpoint.

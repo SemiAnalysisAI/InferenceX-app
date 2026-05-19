@@ -274,7 +274,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
             horizontalRuler.attr('y1', y).attr('y2', y);
           }
         })
-        .on('mousemove', function (event) {
+        .on('mousemove', (event) => {
           if (isPinned()) return;
 
           const rect = containerElement.getBoundingClientRect();
@@ -297,7 +297,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           tooltipElement.style('opacity', 0).style('display', 'none');
           rulerGroup.style('display', 'none');
         })
-        .on('click', function (event, d) {
+        .on('click', (event, d) => {
           event.stopPropagation();
 
           // Set content first so dimensions are available for position calc

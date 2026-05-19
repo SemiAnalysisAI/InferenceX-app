@@ -112,6 +112,11 @@ function activeTab(pathname: string): string {
   return seg;
 }
 
+function handleDesktopClick(tab: string) {
+  window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
+  track('tab_changed', { tab });
+}
+
 export function TabNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -151,11 +156,6 @@ export function TabNav() {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
     track('tab_changed', { tab: value });
     router.push(tabHref(`/${value}`));
-  };
-
-  const handleDesktopClick = (tab: string) => {
-    window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
-    track('tab_changed', { tab });
   };
 
   return (

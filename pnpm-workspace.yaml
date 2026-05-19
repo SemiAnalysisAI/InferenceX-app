@@ -10,5 +10,8 @@ allowBuilds:
   protobufjs: true
   sharp: true
 
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+
 overrides:
   postcss@<8.5.10: '>=8.5.10'

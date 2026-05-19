@@ -171,22 +171,22 @@ describe('getAllPosts', () => {
   });
 });
 
+function mockPostFiles(files: Record<string, string>) {
+  vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+  vi.spyOn(fs, 'readdirSync').mockReturnValue(Object.keys(files).map((name) => name) as any);
+  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+    const p = String(filePath);
+    for (const [name, content] of Object.entries(files)) {
+      if (p.includes(name.replace('.mdx', ''))) return content;
+    }
+    return '';
+  });
+}
+
 describe('getAllPosts — publishDate filtering', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
-
-  function mockPostFiles(files: Record<string, string>) {
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    vi.spyOn(fs, 'readdirSync').mockReturnValue(Object.keys(files).map((name) => name) as any);
-    vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
-      const p = String(filePath);
-      for (const [name, content] of Object.entries(files)) {
-        if (p.includes(name.replace('.mdx', ''))) return content;
-      }
-      return '';
-    });
-  }
 
   it('filters out future-publishDate and missing-publishDate posts in production', () => {
     vi.stubEnv('NODE_ENV', 'production');

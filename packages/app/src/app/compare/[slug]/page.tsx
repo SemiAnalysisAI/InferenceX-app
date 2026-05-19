@@ -287,6 +287,53 @@ function computeCompareTableData(
   return { defaultTargets, ssrRows, interactivityRange };
 }
 
+function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
+  const meta = HW_REGISTRY[key];
+  const label = meta?.label ?? key.toUpperCase();
+  const props: { name: string; value: string | number }[] = [];
+  if (meta) {
+    props.push({ name: 'Vendor', value: meta.vendor });
+    props.push({ name: 'Architecture', value: meta.arch });
+    props.push({ name: 'TDP (W)', value: meta.tdp });
+  }
+  if (summary.bestThroughputPerGpu !== null) {
+    props.push({
+      name: 'Best Throughput per GPU (tok/s)',
+      value: Number(summary.bestThroughputPerGpu.toFixed(2)),
+    });
+  }
+  if (summary.bestMedianTtft !== null) {
+    props.push({
+      name: 'Best Median TTFT (s)',
+      value: Number(summary.bestMedianTtft.toFixed(3)),
+    });
+  }
+  if (summary.bestMedianTpot !== null) {
+    props.push({
+      name: 'Best Median TPOT (s)',
+      value: Number(summary.bestMedianTpot.toFixed(4)),
+    });
+  }
+  props.push({ name: 'Benchmark Configurations', value: summary.configCount });
+  return {
+    '@type': 'ListItem',
+    position,
+    item: {
+      '@type': 'Product',
+      name: label,
+      brand: { '@type': 'Brand', name: meta?.vendor ?? 'Unknown' },
+      category: 'GPU',
+      ...(props.length > 0 && {
+        additionalProperty: props.map((p) => ({
+          '@type': 'PropertyValue',
+          name: p.name,
+          value: p.value,
+        })),
+      }),
+    },
+  };
+}
+
 function buildJsonLd(
   a: string,
   b: string,
@@ -295,53 +342,6 @@ function buildJsonLd(
   summaryB: PairSummary,
   ssrRows: SsrInterpolatedRow[],
 ) {
-  const entryFor = (key: string, summary: PairSummary, position: number) => {
-    const meta = HW_REGISTRY[key];
-    const label = meta?.label ?? key.toUpperCase();
-    const props: { name: string; value: string | number }[] = [];
-    if (meta) {
-      props.push({ name: 'Vendor', value: meta.vendor });
-      props.push({ name: 'Architecture', value: meta.arch });
-      props.push({ name: 'TDP (W)', value: meta.tdp });
-    }
-    if (summary.bestThroughputPerGpu !== null) {
-      props.push({
-        name: 'Best Throughput per GPU (tok/s)',
-        value: Number(summary.bestThroughputPerGpu.toFixed(2)),
-      });
-    }
-    if (summary.bestMedianTtft !== null) {
-      props.push({
-        name: 'Best Median TTFT (s)',
-        value: Number(summary.bestMedianTtft.toFixed(3)),
-      });
-    }
-    if (summary.bestMedianTpot !== null) {
-      props.push({
-        name: 'Best Median TPOT (s)',
-        value: Number(summary.bestMedianTpot.toFixed(4)),
-      });
-    }
-    props.push({ name: 'Benchmark Configurations', value: summary.configCount });
-    return {
-      '@type': 'ListItem',
-      position,
-      item: {
-        '@type': 'Product',
-        name: label,
-        brand: { '@type': 'Brand', name: meta?.vendor ?? 'Unknown' },
-        category: 'GPU',
-        ...(props.length > 0 && {
-          additionalProperty: props.map((p) => ({
-            '@type': 'PropertyValue',
-            name: p.name,
-            value: p.value,
-          })),
-        }),
-      },
-    };
-  };
-
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
 
@@ -388,7 +388,7 @@ function buildJsonLd(
         url,
         itemListOrder: 'https://schema.org/ItemListOrderAscending',
         numberOfItems: 2,
-        itemListElement: [entryFor(a, summaryA, 1), entryFor(b, summaryB, 2)],
+        itemListElement: [jsonLdEntryFor(a, summaryA, 1), jsonLdEntryFor(b, summaryB, 2)],
       },
       ...(comparisonRows.length > 0
         ? [
