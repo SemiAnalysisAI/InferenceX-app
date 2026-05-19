@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
@@ -296,7 +295,7 @@ function SubmissionRow({
                     className="h-7 px-2 gap-1"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Link
+                    <a
                       href={compareUrl}
                       data-testid="submissions-compare-runs-link-inline"
                       onClick={() => {
@@ -314,7 +313,7 @@ function SubmissionRow({
                     >
                       <GitCompare className="size-3.5" />
                       <span className="hidden lg:inline">vs prev</span>
-                    </Link>
+                    </a>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" collisionPadding={10}>
@@ -426,7 +425,7 @@ function SubmissionRow({
                 {compareUrl && previousRun && (
                   <div className="col-span-2 md:col-span-4 flex justify-end">
                     <Button asChild variant="outline" size="sm">
-                      <Link
+                      <a
                         href={compareUrl}
                         data-testid="submissions-compare-runs-link"
                         onClick={() => {
@@ -444,7 +443,7 @@ function SubmissionRow({
                       >
                         <GitCompare className="size-3.5" />
                         Compare {previousRun.date} → {row.date} on chart
-                      </Link>
+                      </a>
                     </Button>
                   </div>
                 )}
