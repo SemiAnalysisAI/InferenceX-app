@@ -69,6 +69,8 @@ export interface ChartLegendProps {
   onItemHover?: (id: string) => void;
   onItemHoverEnd?: () => void;
   onItemRemove?: (name: string) => void;
+  /** When true, hides the Expand/Collapse button entirely (e.g. embed mode). */
+  hideExpandButton?: boolean;
 }
 
 export default function ChartLegend({
@@ -88,6 +90,7 @@ export default function ChartLegend({
   onItemHover,
   onItemHoverEnd,
   onItemRemove,
+  hideExpandButton = false,
 }: ChartLegendProps) {
   const isSidebar = variant === 'sidebar';
   const [hasLongText, setHasLongText] = useState(false);
@@ -315,18 +318,19 @@ export default function ChartLegend({
     </div>
   ) : null;
 
-  const expandButton = hasLongText ? (
-    <div className="hidden lg:block mt-2 no-export">
-      <button
-        onClick={handleLegendExpand}
-        className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
-        aria-label={isLegendExpanded ? 'Collapse legend' : 'Expand legend'}
-      >
-        {isLegendExpanded ? <ArrowRightToLine size={16} /> : <ArrowLeftToLine size={16} />}
-        {isLegendExpanded ? 'Collapse' : 'Expand'}
-      </button>
-    </div>
-  ) : null;
+  const expandButton =
+    hasLongText && !hideExpandButton ? (
+      <div className="hidden lg:block mt-2 no-export">
+        <button
+          onClick={handleLegendExpand}
+          className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
+          aria-label={isLegendExpanded ? 'Collapse legend' : 'Expand legend'}
+        >
+          {isLegendExpanded ? <ArrowRightToLine size={16} /> : <ArrowLeftToLine size={16} />}
+          {isLegendExpanded ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+    ) : null;
 
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
   const itemClassName = (item: CommonLegendItemProps, isHidden: boolean) =>

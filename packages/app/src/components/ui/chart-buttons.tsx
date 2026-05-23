@@ -1,12 +1,13 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { Check, CodeXml, Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
+import { type ReactNode, useCallback, useState } from 'react';
 
 import { useChartExport } from '@/hooks/useChartExport';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { buildEmbedIframeSnippet } from '@/lib/embed-params';
 import { cn } from '@/lib/utils';
 
 interface ChartButtonsProps {
@@ -26,6 +27,8 @@ interface ChartButtonsProps {
   onExportCsv?: () => void;
   /** Optional callback to open the MP4 export preview (e.g., replay modal) */
   onExportMp4?: () => void;
+  /** When set, export menu includes "Copy embed" (iframe HTML built from `/embed/scatter?...`). */
+  getEmbedUrl?: () => string;
   /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
   /**
@@ -39,7 +42,7 @@ interface ChartButtonsProps {
 
 /**
  * Reusable chart action buttons component that provides:
- * - Export to image button with analytics tracking (or dropdown with PNG/CSV when onExportCsv is provided)
+ * - Export to image with analytics tracking, or a popover with PNG plus optional CSV / MP4 / copy embed (iframe)
  * - Reset zoom button with custom event dispatch
  *
  * Event pattern: `${analyticsPrefix}_zoom_reset_${chartId}`
@@ -54,6 +57,7 @@ export function ChartButtons({
   hideImageExport,
   onExportCsv,
   onExportMp4,
+  getEmbedUrl,
   exportFileName,
   leadingControls,
   className,
@@ -64,8 +68,34 @@ export function ChartButtons({
     exportFileName,
   });
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [copiedEmbed, setCopiedEmbed] = useState(false);
   // always include chartId in event name for consistency
   const resetEventName = zoomResetEvent || `${analyticsPrefix}_zoom_reset_${chartId}`;
+
+  const handleCopyEmbed = useCallback(async () => {
+    const url = getEmbedUrl?.();
+    if (!url) return;
+    track(`${analyticsPrefix}_embed_iframe_copied`);
+    const snippet = buildEmbedIframeSnippet(url);
+
+    try {
+      await navigator.clipboard.writeText(snippet);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = snippet;
+      document.body.append(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      textArea.remove();
+    }
+
+    window.dispatchEvent(new CustomEvent('inferencex:action'));
+    setCopiedEmbed(true);
+    setTimeout(() => {
+      setCopiedEmbed(false);
+      setPopoverOpen(false);
+    }, 2000);
+  }, [analyticsPrefix, getEmbedUrl]);
 
   const handleExportPng = () => {
     setPopoverOpen(false);
@@ -94,8 +124,14 @@ export function ChartButtons({
       )}
     >
       {leadingControls}
-      {onExportCsv || onExportMp4 ? (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+      {onExportCsv || onExportMp4 || getEmbedUrl ? (
+        <Popover
+          open={popoverOpen}
+          onOpenChange={(open) => {
+            setPopoverOpen(open);
+            if (open) setCopiedEmbed(false);
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               data-testid="export-button"
@@ -142,6 +178,21 @@ export function ChartButtons({
               >
                 <Video size={14} />
                 Download MP4
+              </button>
+            )}
+            {getEmbedUrl && (
+              <button
+                type="button"
+                data-testid="export-embed-button"
+                data-ph-capture-attribute-export-type="embed"
+                data-ph-capture-attribute-chart={chartId}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                onClick={() => {
+                  void handleCopyEmbed();
+                }}
+              >
+                {copiedEmbed ? <Check size={14} /> : <CodeXml size={14} />}
+                {copiedEmbed ? 'Copied!' : 'Copy embed'}
               </button>
             )}
           </PopoverContent>

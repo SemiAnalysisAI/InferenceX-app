@@ -19,11 +19,14 @@ function D3ChartInner<T>(
     chartId,
     data,
     height = 600,
+    fillHeight = false,
     margin,
     watermark,
     testId,
     grabCursor = true,
     instructions,
+    legendWrapper,
+    compactLegend,
     clipContent,
     xScale: xScaleConfig,
     yScale: yScaleConfig,
@@ -44,7 +47,11 @@ function D3ChartInner<T>(
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const scalesRef = useRef<{ xScale: BuiltScale; yScale: BuiltScale } | null>(null);
 
-  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height });
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({
+    height,
+    observeHeight: fillHeight,
+    minHeight: fillHeight ? 240 : undefined,
+  });
 
   const { zoomTransformRef, setupZoom } = useChartZoom({
     resetEventName: zoomConfig?.resetEventName ?? `d3chart_zoom_reset_${chartId}`,
@@ -148,6 +155,9 @@ function D3ChartInner<T>(
       testId={testId}
       grabCursor={grabCursor}
       legendElement={legendElement}
+      legendWrapper={legendWrapper}
+      compactLegend={compactLegend}
+      fillHeight={fillHeight}
       noDataOverlay={noDataOverlay}
       caption={caption}
     />

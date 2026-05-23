@@ -244,6 +244,11 @@ export interface D3ChartProps<T = any> {
   chartId: string;
   data: T[];
   height?: number;
+  /**
+   * When true, the chart fills the parent flex height (embed iframes). Width
+   * stays responsive; height is observed and floored at 240px.
+   */
+  fillHeight?: boolean;
   margin?: ChartMargin;
   watermark?: 'logo' | 'unofficial' | 'none';
   testId?: string;
@@ -264,6 +269,8 @@ export interface D3ChartProps<T = any> {
 
   transitionDuration?: number;
   legendElement?: React.ReactNode;
+  legendWrapper?: (legend: React.ReactNode) => React.ReactNode;
+  compactLegend?: boolean;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
 

@@ -112,6 +112,12 @@ const ScatterGraph = React.memo(
     showAllHardwareTypes = false,
     hardwareConfigOverride,
     overlayData,
+    legendWrapper,
+    instructions,
+    disableLegendExpand = false,
+    compactLegend = false,
+    fillHeight = false,
+    hideLegendControls = false,
     transitionDuration = 750,
     niceAxes = true,
   }: ScatterGraphProps) => {
@@ -1899,11 +1905,15 @@ const ScatterGraph = React.memo(
         ref={chartRef}
         chartId={chartId}
         data={chartScaleData}
+        fillHeight={fillHeight}
         margin={CHART_MARGIN}
         watermark={getChartWatermark(isUnofficialRun)}
         testId="scatter-graph"
         grabCursor={true}
         caption={caption}
+        instructions={instructions}
+        legendWrapper={legendWrapper}
+        compactLegend={compactLegend}
         xScale={xScaleConfig}
         yScale={yScaleConfig}
         xAxis={xAxisConfig}
@@ -2004,130 +2014,138 @@ const ScatterGraph = React.memo(
                 })),
             ]}
             disableActiveSort={false}
-            isLegendExpanded={isLegendExpanded}
+            hideExpandButton={disableLegendExpand}
+            isLegendExpanded={disableLegendExpand ? false : isLegendExpanded}
             onExpandedChange={(expanded) => {
+              if (disableLegendExpand) return;
               setIsLegendExpanded(expanded);
               track('latency_legend_expanded', { expanded });
             }}
-            switches={[
-              ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+            switches={
+              hideLegendControls
                 ? []
                 : [
+                    ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                      ? []
+                      : [
+                          {
+                            id: 'scatter-log-scale',
+                            label: 'Log Scale',
+                            checked: logScale,
+                            onCheckedChange: (checked: boolean) => {
+                              setLogScale(checked);
+                              track('latency_log_scale_toggled', { enabled: checked });
+                            },
+                          },
+                        ]),
                     {
-                      id: 'scatter-log-scale',
-                      label: 'Log Scale',
-                      checked: logScale,
+                      id: 'scatter-hide-non-optimal',
+                      label: 'Optimal Only',
+                      checked: hideNonOptimal,
                       onCheckedChange: (checked: boolean) => {
-                        setLogScale(checked);
-                        track('latency_log_scale_toggled', { enabled: checked });
+                        setHideNonOptimal(checked);
+                        track('latency_hide_non_optimal_toggled', { enabled: checked });
                       },
                     },
-                  ]),
-              {
-                id: 'scatter-hide-non-optimal',
-                label: 'Optimal Only',
-                checked: hideNonOptimal,
-                onCheckedChange: (checked: boolean) => {
-                  setHideNonOptimal(checked);
-                  track('latency_hide_non_optimal_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-hide-point-labels',
-                label: 'Hide Labels',
-                checked: hidePointLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setHidePointLabels(checked);
-                  track('latency_hide_point_labels_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-high-contrast',
-                label: 'High Contrast',
-                checked: highContrast,
-                onCheckedChange: (checked: boolean) => {
-                  setHighContrast(checked);
-                  track('latency_high_contrast_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-parallelism-labels',
-                label: 'Parallelism Labels',
-                checked: useAdvancedLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setUseAdvancedLabels(checked);
-                  track('latency_advanced_labels_toggled', { enabled: checked });
-                  if (checked && !showGradientLabels) {
-                    window.dispatchEvent(
-                      new CustomEvent(GRADIENT_NUDGE_EVENT, {
-                        detail: {
-                          enableGradient: () => {
-                            setShowGradientLabels(true);
-                            setUseAdvancedLabels(false);
-                            track('latency_gradient_labels_toggled', {
-                              enabled: true,
-                              source: 'nudge',
-                            });
-                          },
-                        },
-                      }),
-                    );
-                  }
-                },
-              },
-              {
-                id: 'scatter-gradient-labels',
-                label: 'Gradient Labels',
-                checked: showGradientLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setShowGradientLabels(checked);
-                  track('latency_gradient_labels_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-line-labels',
-                label: 'Line Labels',
-                checked: showLineLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setShowLineLabels(checked);
-                  track('latency_line_labels_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-speed-overlay',
-                label: 'Bus / Race Car',
-                checked: showSpeedOverlay,
-                onCheckedChange: (checked: boolean) => {
-                  setShowSpeedOverlay(checked);
-                  track('latency_speed_overlay_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-minecraft-overlay',
-                label: 'Donkey / Elytra',
-                checked: showMinecraftOverlay,
-                onCheckedChange: (checked: boolean) => {
-                  setShowMinecraftOverlay(checked);
-                  track('latency_minecraft_overlay_toggled', { enabled: checked });
-                },
-              },
-            ]}
-            actions={
-              effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-              activeOverlayHwTypes.size < allOverlayHwTypes.size
-                ? [
                     {
-                      id: 'scatter-reset-filter',
-                      label: 'Reset filter',
-                      onClick: () => {
-                        selectAllHwTypes();
-                        setLocalOfficialOverride(null);
-                        resetOverlayHwTypes();
-                        track('latency_legend_filter_reset');
+                      id: 'scatter-hide-point-labels',
+                      label: 'Hide Labels',
+                      checked: hidePointLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setHidePointLabels(checked);
+                        track('latency_hide_point_labels_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-high-contrast',
+                      label: 'High Contrast',
+                      checked: highContrast,
+                      onCheckedChange: (checked: boolean) => {
+                        setHighContrast(checked);
+                        track('latency_high_contrast_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-parallelism-labels',
+                      label: 'Parallelism Labels',
+                      checked: useAdvancedLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setUseAdvancedLabels(checked);
+                        track('latency_advanced_labels_toggled', { enabled: checked });
+                        if (checked && !showGradientLabels) {
+                          window.dispatchEvent(
+                            new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                              detail: {
+                                enableGradient: () => {
+                                  setShowGradientLabels(true);
+                                  setUseAdvancedLabels(false);
+                                  track('latency_gradient_labels_toggled', {
+                                    enabled: true,
+                                    source: 'nudge',
+                                  });
+                                },
+                              },
+                            }),
+                          );
+                        }
+                      },
+                    },
+                    {
+                      id: 'scatter-gradient-labels',
+                      label: 'Gradient Labels',
+                      checked: showGradientLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowGradientLabels(checked);
+                        track('latency_gradient_labels_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-line-labels',
+                      label: 'Line Labels',
+                      checked: showLineLabels,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowLineLabels(checked);
+                        track('latency_line_labels_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-speed-overlay',
+                      label: 'Bus / Race Car',
+                      checked: showSpeedOverlay,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowSpeedOverlay(checked);
+                        track('latency_speed_overlay_toggled', { enabled: checked });
+                      },
+                    },
+                    {
+                      id: 'scatter-minecraft-overlay',
+                      label: 'Donkey / Elytra',
+                      checked: showMinecraftOverlay,
+                      onCheckedChange: (checked: boolean) => {
+                        setShowMinecraftOverlay(checked);
+                        track('latency_minecraft_overlay_toggled', { enabled: checked });
                       },
                     },
                   ]
-                : []
+            }
+            actions={
+              hideLegendControls
+                ? []
+                : effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+                    activeOverlayHwTypes.size < allOverlayHwTypes.size
+                  ? [
+                      {
+                        id: 'scatter-reset-filter',
+                        label: 'Reset filter',
+                        onClick: () => {
+                          selectAllHwTypes();
+                          setLocalOfficialOverride(null);
+                          resetOverlayHwTypes();
+                          track('latency_legend_filter_reset');
+                        },
+                      },
+                    ]
+                  : []
             }
             precisionIndicators={selectedPrecisions}
             enableTooltips={true}

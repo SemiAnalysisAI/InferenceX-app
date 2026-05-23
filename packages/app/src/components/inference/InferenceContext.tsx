@@ -61,6 +61,7 @@ export function InferenceProvider({
   activeTab,
   initialActiveHwTypes,
   compareGpuPair,
+  embedAllowedHwTypes = null,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -75,6 +76,12 @@ export function InferenceProvider({
    * registry GPU base keys so other hardware never appears on the legend or plots.
    */
   compareGpuPair?: readonly [string, string];
+  /**
+   * When set (embed mode), restricts the legend/chart universe to only these
+   * hwKeys. The viewer can toggle any subset on/off but cannot add GPUs outside
+   * this set. `null` (default) means no restriction — all available GPUs shown.
+   */
+  embedAllowedHwTypes?: ReadonlySet<string> | null;
 }) {
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
@@ -241,7 +248,8 @@ export function InferenceProvider({
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
-  // GPU dropdown: only show configs that have data for current model + sequence + precision
+  // GPU dropdown: only show configs that have data for current model + sequence + precision.
+  // In embed mode, further restrict to the creator's allow-list.
   const availableGPUs = useMemo(() => {
     if (!availabilityRows) return [];
     const hwKeys = new Set<string>();
@@ -251,7 +259,9 @@ export function InferenceProvider({
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
-      if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
+      if (!isKnownGpu(hwKey)) continue;
+      if (embedAllowedHwTypes && !embedAllowedHwTypes.has(hwKey)) continue;
+      hwKeys.add(hwKey);
     }
     return [...hwKeys]
       .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
@@ -259,7 +269,7 @@ export function InferenceProvider({
         value: hw,
         label: getDisplayLabel(getHardwareConfig(hw)),
       }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions]);
+  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, embedAllowedHwTypes]);
 
   // --- Tracked config functions ---
   const buildTrackedConfigId = useCallback((point: InferenceData): string => {
@@ -446,11 +456,22 @@ export function InferenceProvider({
     [setActiveHwTypes, setActiveHwTypesDispatch],
   );
 
-  const hwTypesWithData = useChartDataFilter(
+  const rawHwTypesWithData = useChartDataFilter(
     hwFilteredPoints,
     setActiveHwTypesWithFilter,
     extractHwKey,
   );
+
+  // In embed mode, restrict the legend/chart universe to the creator's allowed
+  // GPU set. All downstream effects and toggle calls use this filtered set so
+  // the viewer can only toggle within the allowed GPUs.
+  const hwTypesWithData = useMemo(() => {
+    if (!embedAllowedHwTypes) return rawHwTypesWithData;
+    const filtered = new Set([...rawHwTypesWithData].filter((k) => embedAllowedHwTypes.has(k)));
+    // If none of the allowed GPUs have data yet, fall back to the full set
+    // (keeps the chart functional during initial load before data arrives).
+    return filtered.size > 0 ? filtered : rawHwTypesWithData;
+  }, [rawHwTypesWithData, embedAllowedHwTypes]);
 
   // Direct fallback: apply pendingHwFilter when hwTypesWithData is already populated
   // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).

@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 
+import { ChromeGate } from '@/components/chrome-gate';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { JsonLd } from '@/components/json-ld';
@@ -179,9 +180,11 @@ export default async function RootLayout({
         <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
-        <CircuitBackground />
-        <MinecraftBackgroundLazy />
-        <MinecraftDecorations />
+        <ChromeGate>
+          <CircuitBackground />
+          <MinecraftBackgroundLazy />
+          <MinecraftDecorations />
+        </ChromeGate>
         <PostHogProvider>
           <JsonLd data={jsonLd} />
           <QueryProvider>
@@ -193,14 +196,22 @@ export default async function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <VisitTracker />
-              <Header starCount={starCount} />
+              <ChromeGate>
+                <VisitTracker />
+              </ChromeGate>
+              <ChromeGate>
+                <Header starCount={starCount} />
+              </ChromeGate>
               <div className="grow flex flex-col">{children}</div>
-              <Footer starCount={starCount} />
+              <ChromeGate>
+                <Footer starCount={starCount} />
+              </ChromeGate>
             </ThemeProvider>
           </QueryProvider>
-          {process.env.VERCEL && <Analytics />}
-          {process.env.VERCEL && <SpeedInsights />}
+          <ChromeGate>
+            {process.env.VERCEL && <Analytics />}
+            {process.env.VERCEL && <SpeedInsights />}
+          </ChromeGate>
         </PostHogProvider>
       </body>
     </html>

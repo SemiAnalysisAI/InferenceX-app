@@ -23,6 +23,7 @@ import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
+import { buildEmbedScatterUrl } from '@/lib/embed-params';
 import {
   Dialog,
   DialogContent,
@@ -368,6 +369,17 @@ export default function ChartDisplay() {
                   exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                   onExportMp4={
                     replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined
+                  }
+                  getEmbedUrl={() =>
+                    buildEmbedScatterUrl({
+                      origin: window.location.origin,
+                      model: graph.model,
+                      sequence: graph.sequence,
+                      precisions: selectedPrecisions.join(','),
+                      yMetric: selectedYAxisMetric,
+                      activeGpus: [...activeHwTypes].join(','),
+                      chartType: graph.chartDefinition.chartType,
+                    })
                   }
                   onExportCsv={() => {
                     const visibleData = graph.data.filter((d) =>
