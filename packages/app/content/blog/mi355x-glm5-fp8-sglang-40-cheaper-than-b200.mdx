@@ -134,8 +134,6 @@ This result is single-node, aggregated, FP8 only. Two gaps still need closing:
 - **FP4 composability.** B200 in this comparison is FP8 on a CUDA nightly. B200 NVFP4 SGLang for GLM-5 is now shipping and will further compress B200's cost curve. MI355X MXFP4 GLM-5.1 SGLang shipped via [InferenceX PR #1098](https://github.com/SemiAnalysisAI/InferenceX/pull/1098) on 2026-04-21, but the FP4 + MTP composition on MI355X is not yet at parity with the FP8 + MTP recipe shown here.
 - **Disaggregation and wide expert parallelism.** A single-node MI355X GLM-5 disagg config exists (TP=4 prefill / TP=4 decode) but does not yet shift the Pareto. NVIDIA's GB200 NVL72 Dynamo TRT-LLM and Dynamo vLLM recipes on Kimi K2.5 already demonstrated a [~3x throughput-per-GPU advantage from rack-scale wide EP](https://inferencex.semianalysis.com/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200). AMD has already shipped production disagg for DeepSeek R1 via `mori-sglang`, so the playbook exists; GLM-5 hasn't been wired through it yet.
 
-For long-context chat and RAG-style serving in the 12–25 tok/s/user band where most production traffic sits, the data is already definitive on the 8k/1k workload: MI355X SGLang FP8 with MTP is the cheaper per-million-tokens choice today on GLM-5.
-
 ## Acknowledgments
 
 This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangovan), [HaiShaw](https://github.com/HaiShaw), and the broader AMD AI team landed both the upstream SGLang TileLang fused MLA + FP8 KV kernel in a 14-week window after GLM-5 dropped. The SGLang maintainers reviewed and shipped the kernel within days of submission. Speed of the upstream-to-benchmark loop is the moat.
