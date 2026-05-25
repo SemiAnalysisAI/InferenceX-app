@@ -16,7 +16,7 @@ tags:
   - rocm
 ---
 
-14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across the entire single-node Pareto frontier on the 8k/1k workload. The peak gap is **1.41x at 18 tok/s/user with MTP** ($0.30/M on B200 vs $0.22/M on MI355X — a 40% reduction) and **1.36x at 10 tok/s/user without MTP** ($0.31/M vs $0.23/M). The MI355X cost advantage holds across the whole MTP curve from ~12 to ~77 tok/s/user, on a SGLang stack that is now feature-matched with the CUDA stack on B200: both MTP and non-MTP recipes, both with FP8 KV cache, both on SGLang's latest TileLang-backed MLA path.
+14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across the entire single-node Pareto frontier on the 8k/1k workload. The peak gap is **1.41x at 18 tok/s/user with MTP** ($0.30/M on B200 vs $0.22/M on MI355X — a 40% reduction) and **1.36x at 10 tok/s/user without MTP** ($0.31/M vs $0.23/M). Both runs are on **SGLang v0.12**, where the MI355X ROCm stack is now feature-matched with the CUDA stack on B200: both MTP and non-MTP recipes, both with FP8 KV cache, both on SGLang's latest TileLang-backed MLA path.
 
 This is the cadence that matters. GLM-5 dropped, and within a quarter AMD shipped an upstream SGLang kernel ([sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)) along with other optimizations plus the matching InferenceX recipes ([InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)) that flipped the FP8 single-node cost curve on the model. Speed is the moat.
 
@@ -38,7 +38,7 @@ The TileLang dependency was bumped to enable FP8 GEMM on AMD, and a new `sparse_
 
 ## The Numbers
 
-All rows are GLM-5 FP8 at **ISL 8192 / OSL 1024** on a single non-disaggregated node, measured on InferenceX on 2026-05-20. Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)`, with B200 at $1.95/GPU/hr and MI355X at $1.48/GPU/hr.
+All rows are GLM-5 FP8 at **ISL 8192 / OSL 1024** on a single non-disaggregated node, measured on InferenceX on 2026-05-20 on **SGLang v0.12** for both CUDA (B200) and ROCm (MI355X). Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)`, with B200 at $1.95/GPU/hr and MI355X at $1.48/GPU/hr.
 
 **B200 SGLang FP8 MTP, TP=8 on 8 GPUs:**
 
