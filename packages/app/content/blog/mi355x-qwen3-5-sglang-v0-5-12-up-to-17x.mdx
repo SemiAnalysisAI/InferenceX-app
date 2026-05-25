@@ -1,0 +1,177 @@
+---
+title: 'AMD MI355X Qwen3.5 Inference: Up to 17.7x Throughput per GPU in 3 Months on SGLang FP8'
+subtitle: 'From v0.5.8 (Feb) → v0.5.10rc0 (Apr) → v0.5.12 (May), three AITER kernel landings on MI355X plus a TP=8 → TP=2/TP=4 retune push Qwen3.5 8k/1k peak from 1.3k to 6.4k tok/s/GPU and extend the curve out to 75 tok/s/user'
+date: '2026-05-25'
+publishDate: '2026-05-25'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - qwen
+  - amd
+  - mi355x
+  - sglang
+  - rocm
+---
+
+13 weeks after Alibaba's Qwen3.5-397B-A17B release, AMD MI355X SGLang FP8 throughput per GPU on the 8k/1k workload has moved up to **17.7x at iso-interactivity at 40 tok/s/user** (210 → 3,709 tok/s/GPU between the 2026-02-20 v0.5.8.post1 baseline and the 2026-05-19 v0.5.12 run), and peak per-GPU throughput has gone from **1.3k → 6.4k tok/s/GPU** (5.0x). The gains compound across three SGLang releases and a config retune: a TP=8 → TP=2/TP=4 switch on 2026-04-16 plus three AITER MoE kernel landings drove most of the move, with another **~1.5x** from the May v0.5.10rc0 → v0.5.12 image bump on top.
+
+The story is software-only — same MI355X CDNA4 silicon at $1.48/GPU/hr the whole time. The receipts: [sgl-project/sglang#20736](https://github.com/sgl-project/sglang/pull/20736), [#21188](https://github.com/sgl-project/sglang/pull/21188), and [#21421](https://github.com/sgl-project/sglang/pull/21421), all merged Mar–Apr and all gated on `SGLANG_USE_AITER=1`. Speed of the upstream-to-benchmark loop is the moat.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+Qwen3.5-397B-A17B is Alibaba's MoE flagship, released 2026-02-16 under Apache 2.0 — 397B total parameters with 17B activated per token across **512 experts** (top-K routing), with a hybrid attention stack interleaving Gated DeltaNet and Gated Attention layers in the formal pattern `15 × (3 × (Gated DeltaNet → MoE) → 1 × (Gated Attention → MoE))`. Native context is 256K. The expert pool is 4x wider than the Qwen3 generation (128 experts → 512), which makes the per-step MoE dispatch the dominant decode cost and turns every kernel that touches the routed expert path into a leverage point. The first InferenceX benchmark ran on MI355X four days after the release. It took three months for the AMD stack to catch up to where the silicon could actually serve the model.
+
+## What Shipped to Make This Happen
+
+Three AMD-authored upstream SGLang PRs landed in the v0.5.10rc0 image used by the 2026-04-16 InferenceX run, all gated on `_use_aiter` so they only apply to MI300/MI355X CDNA4:
+
+- **[sgl-project/sglang PR #20736](https://github.com/sgl-project/sglang/pull/20736)** by [zhentaocc](https://github.com/zhentaocc) (with co-author [yichiche](https://github.com/yichiche)), merged 2026-04-15 — **fuses the shared expert with routed experts in Qwen2 MoE and Qwen3.5 MoE**. When `shared_expert_intermediate_size == moe_intermediate_size`, the shared expert is treated as an additional expert (top-K + 1) inside a single AITER MoE dispatch. One fewer kernel launch per MoE layer, fewer HBM round-trips for the shared-expert weights. Reported +4.6% total throughput, −4% TPOT on Qwen3.5 at concurrency 16; FP8 accuracy initially required an AITER split-K fix before being enabled.
+- **[sgl-project/sglang PR #21188](https://github.com/sgl-project/sglang/pull/21188)** by [yichiche](https://github.com/yichiche), merged 2026-03-23 — **adds a `forward_hip` path to `GemmaRMSNorm` so AMD GPUs use fused RMSNorm kernels (AITER `fused_add_rms_norm` / `rms_norm`) instead of the native fallback**. The native path was scalar-bound on MI355X; the fused path absorbs the Gemma-style `weight + 1.0` offset into the kernel. Reported on 8x MI355X at conc 1, 8k/1k: **−23.1% median E2E latency, +30.0% total throughput, −17.0% median TTFT**, with GSM8K accuracy rising from 0.943 to 0.955.
+- **[sgl-project/sglang PR #21421](https://github.com/sgl-project/sglang/pull/21421)** by [zhentaocc](https://github.com/zhentaocc), merged 2026-03-26 — **integrates AITER's `fused_topk` kernel into SGLang's `fused_topk` for softmax-scored MoE top-K selection**. Auto-dispatches to `aiter.fused_moe.fused_topk` when AITER is enabled. Kernel microbenchmarks: ~1.31x to **6.29x** faster than the sgl-kernel baseline on Qwen3.5 shapes (E=512, top-K=10), with the largest gains at high token counts. End-to-end bs=64 1k/1k: +1.9% total throughput, GSM8K within ±0.001 of baseline.
+
+On top of the upstream PRs, the 2026-04-16 InferenceX recipe also switched MI355X Qwen3.5 from **TP=8 to TP=2 and TP=4** (per the InferenceX changelog: "Update cli args of Qwen3.5 FP8 and BF16 SGLang benchmarks for MI355X to achieve better performance"). The TP=8 recipe on the Feb 20 image was leaving most of the silicon idle on this MoE — TP=2/TP=4 spreads decode batches across fewer ranks and keeps the AITER fused-MoE dispatch hot. The May 2026 v0.5.10rc0 → v0.5.12 image bump adds another ~1.5x on top of that without further config changes.
+
+## The Numbers
+
+All rows are Qwen3.5-397B-A17B FP8 at **ISL 8192 / OSL 1024** on a single non-disaggregated MI355X node, measured on InferenceX. Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)` with MI355X TCO at $1.48/GPU/hr.
+
+Container images per date:
+
+- **2026-02-20:** `rocm/sgl-dev:v0.5.8.post1-rocm720-mi35x-20260218`
+- **2026-04-16:** `lmsysorg/sglang-rocm:v0.5.10rc0-rocm720-mi35x-20260414`
+- **2026-05-19:** `lmsysorg/sglang-rocm:v0.5.12-rocm720-mi35x-20260517`
+
+**2026-02-20, MI355X SGLang FP8, TP=8 on 8 GPUs** (baseline):
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 171.9     | 40.86      | 24.47     | $2.39      |
+| 8    | 312.1     | 37.66      | 26.55     | $1.32      |
+| 16   | 568.0     | 35.47      | 28.19     | $0.72      |
+| 32   | 917.8     | 28.48      | 35.11     | $0.45      |
+| 64   | 1,288.0   | 19.22      | 52.03     | $0.32      |
+
+**2026-04-16, MI355X SGLang FP8, TP=2 on 2 GPUs** (post-retune + AITER PRs):
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 1,074.3   | 63.89      | 15.65     | $0.38      |
+| 8    | 1,704.6   | 50.98      | 19.61     | $0.24      |
+| 16   | 2,571.9   | 38.50      | 26.51     | $0.16      |
+| 32   | 3,567.8   | 26.22      | 38.15     | $0.12      |
+
+**2026-04-16, MI355X SGLang FP8, TP=4 on 4 GPUs** (high-throughput arm):
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 32   | 2,584.9   | 38.56      | 25.94     | $0.16      |
+| 64   | 3,426.6   | 24.84      | 40.25     | $0.12      |
+| 128  | 4,263.2   | 15.38      | 65.01     | $0.10      |
+| 256  | 5,099.3   | 9.20       | 108.64    | $0.08      |
+
+**2026-05-19, MI355X SGLang FP8, TP=2 on 2 GPUs** (v0.5.12 bump):
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 1,267.5   | 75.22      | 13.29     | $0.32      |
+| 8    | 2,008.1   | 59.67      | 16.76     | $0.20      |
+| 16   | 3,175.6   | 46.73      | 21.40     | $0.13      |
+| 32   | 4,346.8   | 31.91      | 31.34     | $0.09      |
+
+**2026-05-19, MI355X SGLang FP8, TP=4 on 4 GPUs** (v0.5.12 bump):
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 32   | 3,171.8   | 46.82      | 21.36     | $0.13      |
+| 64   | 4,113.4   | 29.83      | 33.53     | $0.10      |
+| 128  | 5,019.6   | 18.09      | 55.27     | $0.08      |
+| 256  | 6,409.1   | 11.56      | 86.53     | $0.06      |
+
+## Iso-Interactivity Throughput Comparison
+
+Each date is interpolated on its Pareto frontier (the lower of TP=2 and TP=4 throughput at each interactivity for the April and May runs; TP=8 only for the Feb baseline). Ratios are throughput-per-GPU at matched tok/s/user:
+
+| Interactivity (tok/s/user) | Feb v0.5.8 tok/s/GPU | Apr v0.5.10rc0 tok/s/GPU | May v0.5.12 tok/s/GPU | May / Feb  | May / Apr |
+| -------------------------- | -------------------- | ------------------------ | --------------------- | ---------- | --------- |
+| 20                         | 1,257                | 3,967                    | 4,927                 | 3.92x      | 1.24x     |
+| 30                         | 842                  | 3,267                    | 4,440                 | 5.27x      | 1.36x     |
+| 35                         | 592                  | 2,869                    | 4,104                 | 6.93x      | 1.43x     |
+| **40**                     | **210**              | **2,483**                | **3,709**             | **17.66x** | **1.49x** |
+| 50                         | _no recipe_          | 1,774                    | 2,884                 | _n/a_      | 1.63x     |
+| 60                         | _no recipe_          | 1,264                    | 1,992                 | _n/a_      | 1.58x     |
+| 75                         | _no recipe_          | _no recipe_              | 1,267                 | _n/a_      | _n/a_     |
+
+The 17.7x peak at 40 tok/s/user is partly a regime extension — the Feb TP=8 recipe had a 24.5 ms TPOT floor at conc 4 (40.86 tok/s/user) and couldn't run cheaper than that on this workload, so the comparison band tops out where the old recipe was already in collapse. By 50 tok/s/user the v0.5.8 curve doesn't exist at all; by 75 tok/s/user only the v0.5.12 curve still has a point. The May v0.5.12 image alone adds 1.43x to 1.63x on top of the April baseline across the entire shared band — a clean version-bump win.
+
+<Figure
+  srcLight="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-light.png"
+  srcDark="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-dark.png"
+  alt="Qwen3.5 FP8 8k/1k tok/s/GPU vs interactivity on MI355X SGLang across three dates: 2026-02-20 (v0.5.8.post1), 2026-04-16 (v0.5.10rc0), 2026-05-19 (v0.5.12). Each curve labeled with its date and the TP value at each point."
+  caption="Qwen3.5-397B-A17B FP8 8k/1k on MI355X SGLang. Three runs over 3 months: v0.5.8.post1 (Feb 20, TP=8), v0.5.10rc0 (Apr 16, TP=2/4), v0.5.12 (May 19, TP=2/4). Point labels denote the TP value used for that config."
+/>
+
+[Live chart](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8), pre-filtered to MI355X SGLang Qwen3.5 FP8 across all three runs.
+
+## What's Next for MI355X on Qwen3.5
+
+- **NVIDIA comparison.** This post is MI355X-only across time. The same dashboard view holds B200 and B300 SGLang Qwen3.5 numbers for the same workload — a follow-up cross-vendor cost-per-token comparison is the next post in the series.
+- **FP4.** Qwen3.5 MXFP4 on MI355X SGLang exists in the dataset (Pareto peaks at ~8.5k tok/s/GPU on TP=2 at conc 256, per the same May 19 run) but the FP4 vs FP8 accuracy gap on a 512-expert MoE needs to be characterized before recommending FP4 as the production default.
+- **Disagg + wide EP.** Qwen3.5's 512-expert pool is exactly the regime where wide EP across a NVLink/Infinity Fabric scale-up domain should shine. There is no MI355X Qwen3.5 disagg or wide-EP recipe yet, and AMD has still not shipped disagg for Qwen3.5.
+
+## Acknowledgments
+
+This 3-month curve move is the work of [zhentaocc](https://github.com/zhentaocc) (Todd Chen) and [yichiche](https://github.com/yichiche) (Jacky Cheng) at AMD, who authored all three upstream SGLang PRs, with [HaiShaw](https://github.com/HaiShaw) reviewing and merging. The Qwen3.5 InferenceX recipe maintenance on MI355X kept catching the gains within weeks of each upstream landing. Speed of the upstream-to-benchmark loop is the moat.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much faster is MI355X SGLang on Qwen3.5 FP8 compared to 3 months ago?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On Qwen3.5-397B-A17B FP8 at 8k/1k on MI355X SGLang, throughput per GPU at iso-interactivity has improved by up to 17.7x between the 2026-02-20 v0.5.8.post1 baseline and the 2026-05-19 v0.5.12 run, peaking at 40 tok/s/user (210 to 3,709 tok/s/GPU). Peak per-GPU throughput rose from 1,288 to 6,409 tok/s/GPU (5.0x). The Feb baseline was on TP=8; the April and May runs use TP=2 and TP=4. Single MI355X node throughout, no hardware change."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which SGLang PRs drove the MI355X Qwen3.5 speedup?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Three AMD-authored upstream PRs gated on SGLANG_USE_AITER=1 landed in the v0.5.10rc0 image. PR #20736 (zhentaocc, merged 2026-04-15) fuses the shared expert with routed experts in Qwen2/Qwen3.5 MoE as topk+1 in a single AITER dispatch. PR #21188 (yichiche, merged 2026-03-23) adds a forward_hip path to GemmaRMSNorm so AMD GPUs use fused RMSNorm kernels (AITER fused_add_rms_norm / rms_norm) instead of the native fallback, reported as -23.1% E2E latency and +30.0% throughput at concurrency 1 on 8k/1k. PR #21421 (zhentaocc, merged 2026-03-26) integrates AITER's fused_topk kernel into SGLang's fused_topk for softmax MoE top-K selection, with kernel microbenchmarks 1.31x to 6.29x faster than the sgl-kernel baseline on Qwen3.5 shapes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much of the gain came from switching TP=8 to TP=2/TP=4?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The April 2026 InferenceX recipe update bundled the TP retune with the v0.5.10rc0 image bump and the AITER PRs in a single change, so they cannot be cleanly separated from the public InferenceX dataset. What is clear: TP=8 was leaving most MI355X tensor-core capacity idle on Qwen3.5's 512-expert MoE dispatch path, and TP=2 / TP=4 spreads decode batches across fewer ranks to keep the AITER fused-MoE dispatch hot. The TP retune is a necessary condition for the AITER kernel gains to materialize end-to-end."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much speedup came from just the May v0.5.12 image bump?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Holding the TP=2/TP=4 recipes constant, the 2026-05-19 SGLang v0.5.12 image delivers 1.43x to 1.63x throughput per GPU over the 2026-04-16 v0.5.10rc0 image at iso-interactivity in the 30 to 60 tok/s/user band, and pushes the Pareto frontier out to 75 tok/s/user where the April recipe topped out at 64. Peak throughput at concurrency 256 rises from 5,099 to 6,409 tok/s/GPU on TP=4."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What's not covered by this MI355X-only Qwen3.5 result?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Three gaps. First, this post is MI355X-only across time and does not compare against B200 or B300 NVIDIA SKUs on the same workload. Second, Qwen3.5 MXFP4 on MI355X SGLang exists in the dataset (peak around 8,500 tok/s/GPU on TP=2 at conc 256 on the same May 19 run) but FP4 vs FP8 accuracy on a 512-expert MoE is not characterized here. Third, no MI355X Qwen3.5 disagg or wide-EP recipe exists yet, and AMD has still not shipped disagg for Qwen3.5."
+      }
+    }
+  ]
+}`}</JsonLd>
