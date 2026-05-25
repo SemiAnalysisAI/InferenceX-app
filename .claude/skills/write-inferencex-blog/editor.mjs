@@ -17,7 +17,7 @@ if (!FILE) {
 const ABS = path.resolve(FILE);
 const PORT = parseInt(process.env.MDX_EDITOR_PORT || '4747', 10);
 const HOME = os.homedir();
-const DISPLAY_PATH = ABS.startsWith(HOME) ? `~${  ABS.slice(HOME.length)}` : ABS;
+const DISPLAY_PATH = ABS.startsWith(HOME) ? `~${ABS.slice(HOME.length)}` : ABS;
 const FILE_NAME = path.basename(ABS);
 
 const HTML = `<!DOCTYPE html>
@@ -202,6 +202,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`MDX editor: http://127.0.0.1:${  PORT}`);
-  console.log(`Editing:    ${  DISPLAY_PATH}`);
+  console.log(`MDX editor: http://127.0.0.1:${PORT}`);
+  console.log(`Editing:    ${DISPLAY_PATH}`);
 });
