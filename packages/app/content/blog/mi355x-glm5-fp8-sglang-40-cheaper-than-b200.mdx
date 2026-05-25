@@ -137,7 +137,7 @@ Interpolating both Pareto frontiers at matched interactivity. For MI355X MTP the
 This result is single-node, aggregated, FP8 only. Two gaps still need closing:
 
 - **FP4 composability.** B200 in this comparison is FP8 on a CUDA nightly. B200 NVFP4 SGLang for GLM-5 is now shipping and will further compress B200's cost curve. MI355X MXFP4 GLM-5.1 SGLang shipped via [InferenceX PR #1098](https://github.com/SemiAnalysisAI/InferenceX/pull/1098) on 2026-04-21, but the FP4 + MTP composition on MI355X is not yet at parity with the FP8 + MTP recipe shown here.
-- **Disaggregation and wide expert parallelism.** A single-node MI355X GLM-5 disagg config exists (TP=4 prefill / TP=4 decode) but does not yet shift the Pareto. NVIDIA's GB200 NVL72 Dynamo TRT-LLM and Dynamo vLLM recipes on Kimi K2.5 already demonstrated a [~3x throughput-per-GPU advantage from rack-scale wide EP](https://inferencex.semianalysis.com/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200). AMD has already shipped production disagg for DeepSeek R1 via `mori-sglang`, so the playbook exists; GLM-5 hasn't been wired through it yet.
+- **Disaggregation and wide expert parallelism.** MI355X GLM-5 has no disagg or wide-EP recipe yet. NVIDIA's GB200 NVL72 Dynamo TRT-LLM and Dynamo vLLM recipes on Kimi K2.5 already demonstrated a [~3x throughput-per-GPU advantage from rack-scale wide EP](https://inferencex.semianalysis.com/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200). AMD has already shipped production disagg for DeepSeek R1 via `mori-sglang`, so the playbook exists; GLM-5 hasn't been wired through it yet.
 
 ## Acknowledgments
 
@@ -188,7 +188,7 @@ This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangov
       "name": "What are the remaining gaps for AMD MI355X on GLM-5?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Two main gaps remain. FP4 composability: B200 NVFP4 SGLang for GLM-5 is shipping and is materially faster than MI355X MXFP4. MI355X MXFP4 GLM-5.1 SGLang exists via InferenceX PR #1098 but FP4 + MTP composition on MI355X is not yet at parity with the FP8 + MTP recipe in this comparison. Disaggregation and wide expert parallelism: a single-node MI355X GLM-5 disagg recipe (TP=4 prefill / TP=4 decode) exists but does not yet shift the Pareto. NVIDIA GB200 NVL72 Dynamo recipes on Kimi K2.5 already demonstrate around 3x throughput per GPU advantage from rack-scale wide EP. AMD has shipped production disagg for DeepSeek R1 via mori-sglang, so the playbook exists; GLM-5 hasn't been wired through it yet."
+        "text": "Two main gaps remain. FP4 composability: B200 NVFP4 SGLang for GLM-5 is shipping and is materially faster than MI355X MXFP4. MI355X MXFP4 GLM-5.1 SGLang exists via InferenceX PR #1098 but FP4 + MTP composition on MI355X is not yet at parity with the FP8 + MTP recipe in this comparison. Disaggregation and wide expert parallelism: MI355X GLM-5 has no disagg or wide-EP recipe yet. NVIDIA GB200 NVL72 Dynamo recipes on Kimi K2.5 already demonstrate around 3x throughput per GPU advantage from rack-scale wide EP. AMD has shipped production disagg for DeepSeek R1 via mori-sglang, so the playbook exists; GLM-5 hasn't been wired through it yet."
       }
     }
   ]
