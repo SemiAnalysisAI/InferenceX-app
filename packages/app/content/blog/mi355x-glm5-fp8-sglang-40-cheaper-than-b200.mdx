@@ -1,6 +1,6 @@
 ---
 title: 'AMD MI355X GLM-5 Inference: Up to 40% Cheaper per Million Tokens than B200 on SGLang FP8'
-subtitle: '14 weeks after GLM-5 launched, AMD landed both MTP and non-MTP SGLang FP8 recipes on MI355X — fused MLA + FP8 KV cache via TileLang flips the single-node FP8 cost curve in AMD favor across the entire performance Pareto'
+subtitle: '14 weeks after GLM-5 launched, AMD landed both MTP and non-MTP SGLang FP8 recipes on MI355X — fused MLA + FP8 KV cache via TileLang flips the single-node FP8 cost curve in AMD favor across most of the performance Pareto'
 date: '2026-05-25'
 publishDate: '2026-05-25'
 tags:
@@ -16,7 +16,7 @@ tags:
   - rocm
 ---
 
-14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across the entire single-node Pareto frontier on the 8k/1k workload. The peak gap is **1.41x at 18 tok/s/user with MTP** ($0.30/M on B200 vs $0.22/M on MI355X — a 40% reduction) and **1.36x at 10 tok/s/user without MTP** ($0.31/M vs $0.23/M). Both runs are on **SGLang v0.12**, where the MI355X ROCm stack is now feature-matched with the CUDA stack on B200: both MTP and non-MTP recipes, both with FP8 KV cache, both on SGLang's latest TileLang-backed MLA path.
+14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across most of the single-node Pareto frontier on the 8k/1k workload (from ~10 to ~77 tok/s/user; B200 noses back ahead above ~90 tok/s/user). The peak gap is **1.41x at 18 tok/s/user with MTP** ($0.30/M on B200 vs $0.22/M on MI355X — a 40% reduction) and **1.36x at 10 tok/s/user without MTP** ($0.31/M vs $0.23/M). Both runs are on **SGLang v0.12**, where the MI355X ROCm stack is now feature-matched with the CUDA stack on B200: both MTP and non-MTP recipes, both with FP8 KV cache, both on SGLang's latest TileLang-backed MLA path.
 
 This is the cadence that matters. GLM-5 dropped, and within a quarter AMD shipped an upstream SGLang kernel ([sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)) along with other optimizations plus the matching InferenceX recipes ([InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)) that flipped the FP8 single-node cost curve on the model. Speed is the moat.
 
@@ -101,7 +101,7 @@ Container images used:
 
 ## Iso-Interactivity Cost Comparison
 
-Interpolating both Pareto frontiers at matched interactivity. For MI355X MTP the Pareto frontier is the lower of TP=4 and TP=8 at each interactivity — TP=4 dominates across the whole range.
+Interpolating both Pareto frontiers at matched interactivity. For MI355X MTP the Pareto frontier is the lower of TP=4 and TP=8 at each interactivity — TP=4 dominates up to ~77 tok/s/user, with TP=8 conc 4 taking over at the high-interactivity end (~90 tok/s/user) where TP=4 can't reach.
 
 **MTP:**
 
@@ -180,7 +180,7 @@ This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangov
       "name": "Is MI355X also cheaper than B200 on GLM-5 FP8 without MTP?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, but the gap narrows at higher interactivity. Without MTP, MI355X SGLang FP8 (TP=4) is 1.36x cheaper than B200 SGLang FP8 (TP=8) at 10 tok/s/user ($0.23 vs $0.31 per million tokens), 1.27x cheaper at 20 tok/s/user ($0.35 vs $0.45), and 1.05x cheaper at 40 tok/s/user ($1.03 vs $1.07). MTP widens the cheap-end gap because the speculative decoding pass roughly doubles the effective per-step throughput on MI355X TP=4: at concurrency 32, TPOT drops from 53.9 ms (non-MTP) to 40.3 ms (MTP) and tok/s/GPU rises from 1,274 to 1,707."
+        "text": "Yes, but the gap narrows at higher interactivity. Without MTP, MI355X SGLang FP8 (TP=4) is 1.36x cheaper than B200 SGLang FP8 (TP=8) at 10 tok/s/user ($0.23 vs $0.31 per million tokens), 1.27x cheaper at 20 tok/s/user ($0.35 vs $0.45), and 1.05x cheaper at 40 tok/s/user ($1.03 vs $1.07). MTP widens the cheap-end gap because the speculative decoding pass lifts effective per-step throughput on MI355X TP=4 by ~1.34x: at concurrency 32, TPOT drops from 53.9 ms (non-MTP) to 40.3 ms (MTP) and tok/s/GPU rises from 1,274 to 1,707."
       }
     },
     {
