@@ -266,14 +266,22 @@ After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose
 - Link the upstream PRs and InferenceX recipe PRs every time. Reader wants the receipts.
 - Don't apologize for non-coverage in the lede — save it for "What's Next".
 
-## Reference posts
+## Reference posts — REQUIRED reading before drafting
 
-Open these in order to match tone and structure when in doubt:
+**Before writing a single word, read every existing post in `packages/app/content/blog/*.mdx`.** This is not optional and not "open when in doubt." The InferenceX voice — the cadence framing, the "speed is the moat" close, the way technical PRs get cited with author handles, the table → iso-interactivity → "What's Next" arc, the willingness to call out where the headline gap inverts — is set by the existing posts. A draft that hasn't absorbed them will read like a generic vendor comparison and get flagged. Use `ls packages/app/content/blog/` to enumerate, then `Read` each MDX in full.
+
+**Two of the existing posts are foundational and must be read heavily** — multiple passes, paying attention to structure and tone, not just skimming for facts:
+
+- **`packages/app/content/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper.mdx`** — the launch piece for InferenceXv2 (formerly InferenceMAX). Sets the editorial voice for the whole series: the "composability" framing for AMD's gaps, the rack-scale vs single-node distinction, the way TCO and per-GPU economics get woven into the technical discussion, the Acknowledgments style that names individual NVIDIA and AMD engineers by first name, and the "key observations and results" overview that anchors everything in the actual benchmark dataset. Every later post implicitly assumes the reader has seen this one. Match its tone.
+- **`packages/app/content/blog/inferencemax-open-source-inference-benchmarking.mdx`** — the origin story for the open-source benchmark. Establishes why InferenceX exists (continuous benchmarking vs point-in-time studies), what "the loop" is (upstream PR → InferenceX recipe → next benchmark run within days), and why "speed is the moat" is the recurring close — software cadence on the same hardware moves the curve more than silicon upgrades on any given quarter. Borrow its framing about why benchmark cadence matters.
+
+After the two foundational posts, the closest structural templates per post type:
 
 - `packages/app/content/blog/mi355x-glm5-fp8-sglang-40-cheaper-than-b200.mdx` — AMD wins on TCO, single-node, MTP + non-MTP, with iso-interactivity tables and honest gap-inversion call-out. Closest template for AMD-vs-NVIDIA single-node cost posts.
 - `packages/app/content/blog/mi355x-kimi-k2-5-vllm-aiter-7x-speedup.mdx` — Single-PR speedup story, 25-day cadence, iso-throughput interpolation. Closest template for "one PR moved the curve" posts.
 - `packages/app/content/blog/sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x.mdx` — Same-hardware version-bump story. Closest template for "framework release X is N% faster than X-1" posts.
 - `packages/app/content/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200.mdx` — Rack-scale wide EP story. Closest template for "scale-up fabric unlocks a new operating regime" posts.
+- `packages/app/content/blog/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x.mdx` — Three-date version-bump time series with the spline iso-interactivity comparison and the `_unreachable_` cell convention for out-of-frontier interactivities.
 
 ## When the user has only a chart image
 
