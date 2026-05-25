@@ -128,6 +128,21 @@ Bold the peak ratio in the lede. Second paragraph: name the upstream PRs that ma
 
 Use the preset URL the user provided so clicking lands on the exact comparison view, not the bare dashboard. Format: `https://inferencex.semianalysis.com/inference?g_model=...&i_prec=...&g_rundate=...&g_runid=...&i_active={hw1}_{fw1}%2C{hw2}_{fw2}&i_metric=y_costh&i_linelabel=1`.
 
+### `<Figure>` hero image immediately after the top DashboardCTA
+
+The chart image is the **hero** of the post — it goes right after the top `<DashboardCTA>`, **before** the model / architecture paragraph, so readers see the curves before they read the prose. Do not bury the figure halfway down the post next to the iso-interactivity table.
+
+```mdx
+<Figure
+  srcLight="/images/{slug}/benchmark-light.png"
+  srcDark="/images/{slug}/benchmark-dark.png"
+  alt="Plain-English description of the chart including model, precision, ISL/OSL, both compared SKUs/frameworks, and any toggles (MTP/non-MTP)"
+  caption="Short caption. Note any non-obvious labeling convention used on the chart (e.g. 'Labels denote GPU count per config.')."
+/>
+```
+
+Use the chart asset only once in the body — show it at the top and don't repeat it lower down. Below the iso-interactivity table, place a small `[Live chart](...)` link that points at the same preset URL and tells the reader the figure at the top is interactive when clicked through. That's where readers will go to drill into specific points.
+
 ### Model / architecture paragraph
 
 One paragraph naming the model, vendor, release date (use it to compute "N weeks after release" if it sharpens the cadence framing), total/active parameters, expert count + top-K routing, attention mechanism (MLA, NSA/DSA, GQA, etc.), and context window. **Always WebSearch to verify these numbers** — don't carry over from a prior generation. Cite a source URL inline if the number is non-obvious.
@@ -169,18 +184,15 @@ Columns: `Interactivity (tok/s/user) | {NVIDIA} $/M tok | {AMD} $/M tok | {NVIDI
 
 Follow with one paragraph explaining _why_ the gap peaks where it does (e.g. "the MI355X 4-GPU TP=4 recipe plateaus at $0.22 while B200 is still climbing"), and one sentence noting where the gap inverts (e.g. "Above 90 tok/s/user the comparison flips marginally back to B200 because there is no MI355X recipe matching B200's TP=8 conc 4 at 100+ tok/s/user."). **Don't paper over the inversion** — call it out.
 
-### `<Figure>` with the chart image
+### `[Live chart]` link after the iso-interactivity tables
+
+The hero `<Figure>` already shipped at the top of the post. Down here, just a one-line link that points at the same preset URL so readers can drill into the interactive version of what they saw at the top:
 
 ```mdx
-<Figure
-  srcLight="/images/{slug}/benchmark-light.png"
-  srcDark="/images/{slug}/benchmark-dark.png"
-  alt="Plain-English description of the chart including model, precision, ISL/OSL, both compared SKUs/frameworks, and any toggles (MTP/non-MTP)"
-  caption="Short caption. Note any non-obvious labeling convention used on the chart (e.g. 'Labels denote GPU count per config.')."
-/>
+[Live chart](https://inferencex.semianalysis.com/inference?...) — same view as the figure at the top, pre-filtered to {hardware/framework/model/precision} and interactive.
 ```
 
-Immediately followed by a `[Live chart]({preset URL})` link with the same preset as the `DashboardCTA` so readers can drill into a single point.
+Do not embed a second `<Figure>` here. One chart asset, shown once at the top.
 
 ### `## What's Next for {SKU/framework} on {Model}` (or similar)
 
