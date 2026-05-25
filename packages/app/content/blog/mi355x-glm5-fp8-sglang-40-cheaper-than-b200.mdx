@@ -40,6 +40,11 @@ The TileLang dependency was bumped to enable FP8 GEMM on AMD, and a new `sparse_
 
 All rows are GLM-5 FP8 at **ISL 8192 / OSL 1024** on a single non-disaggregated node, measured on InferenceX on 2026-05-20 on **SGLang v0.12** for both CUDA (B200) and ROCm (MI355X). Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)`, with B200 at $1.95/GPU/hr and MI355X at $1.48/GPU/hr.
 
+Container images used:
+
+- **B200:** `lmsysorg/sglang:v0.5.12-cu130`
+- **MI355X:** `lmsysorg/sglang-rocm:v0.5.12-rocm720-mi35x-20260517`
+
 **B200 SGLang FP8 MTP, TP=8 on 8 GPUs:**
 
 | Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
