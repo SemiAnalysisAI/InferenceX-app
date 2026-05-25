@@ -1,0 +1,5 @@
+# Vercel deploys from packages/app/ (per packages/app/vercel.json), so the
+# .claude/ tooling directory is already outside the project root. This file is
+# belt-and-suspenders: skip uploading editor scripts, agent definitions, and
+# worktrees to the build machine entirely.
+.claude/

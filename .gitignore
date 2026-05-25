@@ -67,3 +67,7 @@ C:*
 
 # one-off local scripts (ad-hoc DB migrations, scratch SQL, etc.)
 **/scratch/
+
+# python bytecode (e.g. .claude/skills/*/iso-interactivity.py imports)
+**/__pycache__/
+**/*.pyc

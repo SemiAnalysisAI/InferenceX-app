@@ -40,7 +40,39 @@ Common gotchas:
   - MI300X $1.12, MI325X $1.28, MI355X $1.48
 - **Cost per million tokens formula**: `$/M tok = TCO_$/GPU/hr * 1e6 / (3600 * tput_per_gpu)`. Equivalently in Python: `cost = tco / (3600 * tput / 1e6)`. Throughput is per-GPU, so GPU count cancels out for aggregated configs.
 
-For iso-interactivity comparison: linear-interpolate each (interactivity, cost) curve, then take the Pareto-cheapest cost at each interactivity. When a model has multiple recipes (TP=4 and TP=8 for the same hardware), the Pareto frontier is the lower of the two at each interactivity — usually one recipe dominates a band and the other dominates the rest.
+### Iso-interactivity interpolation — match the chart, not your shell script
+
+The dashboard chart uses a **monotone cubic Hermite spline (Steffen 1990, identical to `d3.curveMonotoneX`)** on the **upper-left Pareto frontier** of (interactivity, throughput). Linear interpolation in a one-off Python REPL will not match what readers see in the chart and will get flagged in review.
+
+**Always use the bundled helper:**
+
+```bash
+python3 .claude/skills/write-inferencex-blog/iso-interactivity.py
+# stdin:  {"points": [{"interactivity": .., "throughput": .., "cost_per_M": ..}, ...],
+#          "target_iv": 18.0, "metric_key": "cost_per_M"}
+# stdout: {"value": 0.22}  // or null when target is outside frontier range
+```
+
+Or import it as a module from a small wrapper script if you're computing many rows at once.
+
+Rules to follow because the helper enforces them — but you need to interpret them correctly when writing the table:
+
+- **No extrapolation.** When the target interactivity falls outside the frontier's `[min x, max x]`, the helper returns `null`. Render those cells as `_unreachable_` (and the ratio column as `_∞_` if comparing two dates/configs). Do not invent a value. This is the whole reason the chart code returns `null` — the recipe physically can't reach that operating point.
+- **Frontier is always built on (interactivity, throughput).** Even when interpolating cost or TPOT or energy, the frontier itself is the upper-left envelope on throughput-vs-interactivity. Other metrics are derived values at frontier knots. This matches `interpolateForGPU` in the chart code: one frontier, many metrics interpolated against it.
+- **Multiple recipes (TP=4, TP=8, etc.) for the same hardware go into one points list together.** The Pareto operation collapses them into a single combined frontier, exactly as the chart does when both recipes are toggled on.
+- **The Y values are clamped to the frontier's min/max** to prevent cubic-spline overshoot above/below the data. Don't be surprised when the interpolated value sits at a knot value rather than between two knots — that's the spline saying "any value here would overshoot the data."
+
+The canonical source of truth is `packages/app/src/components/calculator/interpolation.ts` (functions `paretoFrontUpperLeft`, `monotoneSlopes`, `hermiteInterpolate`) and `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` (function `interpolateMetricAtInteractivity`). If you ever need to change the algorithm, change all three files — the TS pair plus the Python helper — in the same PR. The repository's `AGENTS.md` codifies this as a hard rule.
+
+#### How the Pareto frontier behaves between the knots
+
+The frontier is the set of measured `(interactivity, throughput)` points that are **not dominated** by any other point — a point is dominated if some other point in the dataset has both higher interactivity AND higher throughput. Geometrically, you sort the points by interactivity ascending, walk from left to right, and keep popping the previous point off the stack as long as the new point's throughput is greater or equal. What survives is the upper-left envelope: a staircase of points where as interactivity decreases (moving left), throughput increases (moving up), monotonically. Everything "inside" that envelope was a worse operating point on both axes simultaneously and is discarded — it could never be chosen in production.
+
+The chart then draws a smooth curve **through these surviving knots only**. The curve is a piecewise cubic — between each adjacent pair of frontier knots `(xᵢ, yᵢ)` and `(xᵢ₊₁, yᵢ₊₁)`, the chart draws a Hermite cubic specified by the two endpoint values and two tangent slopes `mᵢ`, `mᵢ₊₁` at each end. The tangents are computed by Steffen's 1990 monotone construction (identical to d3's `curveMonotoneX`), which has one critical property: the cubic between two knots **never overshoots** the throughput values at those knots. If two adjacent knots have throughputs 3,000 and 4,000, the curve between them stays inside `[3,000, 4,000]` — no spurious bumps above 4,000 or dips below 3,000, even if the slopes from neighboring segments would push it that way. This is why simple cubic splines aren't used: they wiggle, and the chart would imply throughput values that the silicon never actually produced.
+
+So when you interpolate at `target_iv = 18`, the helper does this: (1) finds the bracket `[xᵢ, xᵢ₊₁]` containing 18, (2) evaluates the Hermite cubic `h₀₀·yᵢ + h₁₀·hh·mᵢ + h₀₁·yᵢ₊₁ + h₁₁·hh·mᵢ₊₁` at `t = (18 − xᵢ) / (xᵢ₊₁ − xᵢ)`, and (3) clamps the result to the metric's `[min, max]` across the entire frontier as a final safety net against any residual overshoot. If 18 is to the left of the smallest frontier x or to the right of the largest, the helper returns `null` — there is no extrapolation, because the chart code itself draws no curve outside the data range.
+
+What this means for the blog tables: the interpolated values you publish track the **shape of the rendered curve** between knots, not a straight line. At iso-interactivity points that happen to sit very close to a knot, the published number will land very close to that knot's measured value. In the middle of a wide segment, the spline can sit noticeably above or below the linear-interpolation guess — sometimes by 10% or more on steep parts of the curve. That difference is what readers see in the chart, so it's what the table must show.
 
 ## Step 2: Slug and image directory
 
@@ -183,10 +215,32 @@ Five questions covering: (1) the headline cost / throughput ratio, (2) what the 
 }`}</JsonLd>
 ```
 
-## Step 5: Verify, commit, push, PR
+## Step 5: Draft → browser editor → human review → commit → push → PR
+
+**Do not commit, push, or open a PR on your own.** When the MDX file is written, stop and hand it to the user for review. Wait for explicit approval (e.g. "ship", "looks good, push", "create the PR") before touching git. Reasons:
+
+- Numbers in the post are claims the user will be publicly attached to. They need a chance to spot-check ratios, names, and PR descriptions before the PR notification fires.
+- The frontmatter date, slug, image filenames, and dashboard URL are all hard to change once a PR is open and a Vercel preview is generated.
+- A blog post is not a code change — it benefits from an editorial pass, not a CI pass.
+
+**Always launch the bundled browser editor for the review pass.** Do not ask the user to read MDX in their IDE — the auto-save split-pane editor in this skill gives them a rendered preview, an editable source pane, and writes changes back to disk automatically. Launch it as soon as the draft is written:
 
 ```bash
-pnpm lint && pnpm typecheck       # pre-commit hooks rerun these
+node .claude/skills/write-inferencex-blog/editor.mjs \
+  packages/app/content/blog/{slug}.mdx &
+sleep 1 && open http://127.0.0.1:4747/
+```
+
+The editor runs as a background Node process on `127.0.0.1:4747`, reads from and writes to the absolute path of the file you pass on argv (no hard-coded paths — `~/`-normalized display only), and auto-saves ~800 ms after the last keystroke. `Cmd+S` forces an immediate save. Tell the user the URL, that edits are auto-saved, and that `git status` will reflect their changes when they're done.
+
+While the user reviews in the browser, you can:
+
+- Run `pnpm lint && pnpm typecheck` against the working tree to catch any MDX errors that would block the pre-commit hook later.
+- Save the chart image into `packages/app/public/images/{slug}/benchmark-light.png` (and `benchmark-dark.png` if the user provided both) so the `<Figure>` placeholder in the preview shows a real path.
+
+When the user gives the green light, stop the editor process (`TaskStop` if you started it via Bash background, otherwise `kill` the PID listening on 4747), then run the git sequence in one shot:
+
+```bash
 git checkout -b blog/{slug} origin/master
 git add packages/app/content/blog/{slug}.mdx packages/app/public/images/{slug}/
 git commit -m "feat(blog): {title-ish}"
@@ -195,6 +249,8 @@ gh pr create --title "feat(blog): ..." --body "..."
 ```
 
 The pre-commit hook runs `oxlint`, `oxfmt`, and `tsc --noEmit`. All three must pass. If lint/format fails, run `pnpm lint:fix && pnpm fmt:fix` and re-commit (don't `--no-verify`).
+
+After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose (numeric overstatement, claims contradicted by tables, wrong attribution). Treat its findings as real review comments — fix them in a follow-up commit, then resolve the threads. Branch protection on master requires resolved review threads before auto-merge fires.
 
 ## House style
 
