@@ -18,9 +18,9 @@ tags:
   - disagg
 ---
 
-On DeepSeek R1 0528 FP4 1k/1k with Dynamo TRT-LLM + MTP and disaggregated prefill/decode on both SKUs, [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) delivers **up to 4.39x throughput per GPU vs B200 at iso-interactivity** — peaking at 125 tok/s/user (4,130 tok/s/GPU on GB200 NVL72 vs 941 tok/s/GPU on [B200](https://inferencex.semianalysis.com/gpu-specs)).
+On DeepSeek R1 0528 FP4 1k/1k with Dynamo TRT-LLM + MTP and disaggregated prefill/decode on both SKUs, GB200 NVL72 delivers **up to 4.39x throughput per GPU vs B200 at iso-interactivity** — peaking at 125 tok/s/user (4,130 tok/s/GPU on GB200 NVL72 vs 941 tok/s/GPU on B200).
 
-NVIDIA GB200 NVL72 connects all 72 GPUs over NVLink 5 at **900 GB/s per GPU uni-directional** (1.8 TB/s jensen math bidi rx + tx). A B200 server connects only 8 GPUs over NVLink; once decode EP needs more than 8 ranks, the all-to-all has to leave the NVLink island and cross **ConnectX-7 RoCEv2 Ethernet at 400 Gbit/s per GPU**. So per-GPU bandwidth available to any wider-than-8 EP collective drops from 900 GB/s to 50 GB/s, 18x. DeepSeek R1's 256 routed experts amortize beautifully when the all-to-all stays on NVLink end-to-end across 16 or 32 ranks.
+NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) connects all 72 GPUs over NVLink 5 at **900 GB/s per GPU uni-directional** (1.8 TB/s jensen math bidi rx + tx). A [B200](https://inferencex.semianalysis.com/gpu-specs) server connects only 8 GPUs over NVLink; once decode EP needs more than 8 ranks, the all-to-all has to leave the NVLink island and cross **ConnectX-7 RoCEv2 Ethernet at 400 Gbit/s per GPU**. So per-GPU bandwidth available to any wider-than-8 EP collective drops from 900 GB/s to 50 GB/s, 18x. DeepSeek R1's 256 routed experts amortize beautifully when the all-to-all stays on NVLink end-to-end across 16 or 32 ranks.
 
 <Figure
   srcLight="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-light.png"
