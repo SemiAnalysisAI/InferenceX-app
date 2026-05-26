@@ -124,7 +124,7 @@ export default function ComparePerDollarPageClient({
         initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
       >
         <div className="flex flex-col gap-4">
-          <Card className="flex w-full min-w-0 max-w-3xl flex-col gap-3">
+          <Card className="flex w-full min-w-0 flex-col gap-3">
             <header>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · Performance per Dollar
@@ -132,7 +132,7 @@ export default function ComparePerDollarPageClient({
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
                 {label} Performance per Dollar
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                 <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
                 Owning-hyperscaler TCO normalized by output tokens — performance per dollar across
@@ -146,7 +146,7 @@ export default function ComparePerDollarPageClient({
               </p>
               {narrative.length > 0 && (
                 <div
-                  className="mt-3 flex flex-col gap-2 max-w-3xl"
+                  className="mt-3 flex flex-col gap-2"
                   data-testid="compare-per-dollar-narrative"
                 >
                   {narrative.map((para, i) => (
@@ -169,7 +169,7 @@ export default function ComparePerDollarPageClient({
               )}
               {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
                 <p
-                  className="mt-2 text-xs text-muted-foreground max-w-3xl"
+                  className="mt-2 text-xs text-muted-foreground"
                   data-testid="compare-per-dollar-pricing"
                 >
                   GPU pricing (owning hyperscaler): <strong>{aLabel}</strong>{' '}
