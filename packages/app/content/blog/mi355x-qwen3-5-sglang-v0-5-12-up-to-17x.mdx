@@ -110,7 +110,14 @@ Each date is interpolated on its Pareto frontier (the lower of TP=2 and TP=4 thr
 
 The 19x peak at 40 tok/s/user is partly a regime extension — the Feb TP=8 recipe had a 24.5 ms TPOT floor at conc 4 (40.86 tok/s/user) and couldn't run cheaper than that on this workload, so the comparison band tops out where the old recipe was already in collapse. By 50 tok/s/user the v0.5.8 curve doesn't exist at all; by 75 tok/s/user only the v0.5.12 curve still has a point. The May v0.5.12 image alone adds 1.44x to 1.68x on top of the April baseline across the entire shared band — a clean version-bump win.
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8) — same view as the figure at the top, pre-filtered to MI355X SGLang Qwen3.5 FP8 across all three runs and interactive.
+<Figure
+  srcLight="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-light.png"
+  srcDark="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-dark.png"
+  alt="Qwen3.5 FP8 8k/1k tok/s/GPU vs interactivity on MI355X SGLang across three dates: 2026-02-20 (v0.5.8.post1), 2026-04-16 (v0.5.10rc0), 2026-05-19 (v0.5.12). Each curve labeled with its date and the TP value at each point."
+  caption="Qwen3.5-397B-A17B FP8 8k/1k on MI355X SGLang. Three runs over 3 months: v0.5.8.post1 (Feb 20, TP=8), v0.5.10rc0 (Apr 16, TP=2/4), v0.5.12 (May 19, TP=2/4). Point labels denote the TP value used for that config."
+/>
+
+[Live chart](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8), pre-filtered to MI355X SGLang Qwen3.5 FP8 across all three runs.
 
 ## What's Next for MI355X on Qwen3.5
 

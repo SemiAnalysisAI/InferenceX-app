@@ -130,7 +130,7 @@ Use the preset URL the user provided so clicking lands on the exact comparison v
 
 ### `<Figure>` hero image immediately after the top DashboardCTA
 
-The chart image is the **hero** of the post — it goes right after the top `<DashboardCTA>`, **before** the model / architecture paragraph, so readers see the curves before they read the prose. Do not bury the figure halfway down the post next to the iso-interactivity table.
+The chart image is the **hero** of the post — it goes right after the top `<DashboardCTA>`, **before** the model / architecture paragraph, so readers see the curves before they read the prose. Do not bury the figure halfway down without one at the top.
 
 ```mdx
 <Figure
@@ -141,7 +141,7 @@ The chart image is the **hero** of the post — it goes right after the top `<Da
 />
 ```
 
-Use the chart asset only once in the body — show it at the top and don't repeat it lower down. Below the iso-interactivity table, place a small `[Live chart](...)` link that points at the same preset URL and tells the reader the figure at the top is interactive when clicked through. That's where readers will go to drill into specific points.
+Use the **same `<Figure>` block twice**: once here as the hero (so the chart anchors the post visually before the reader hits the technical prose), and once more directly below the iso-interactivity table further down (so the chart is right next to the data that derives from it, instead of forcing readers to scroll back up). Both `<Figure>` blocks are identical — same `srcLight`/`srcDark`/`alt`/`caption`. The repetition is intentional and matches how readers consume the post.
 
 ### Model / architecture paragraph
 
@@ -184,15 +184,22 @@ Columns: `Interactivity (tok/s/user) | {NVIDIA} $/M tok | {AMD} $/M tok | {NVIDI
 
 Follow with one paragraph explaining _why_ the gap peaks where it does (e.g. "the MI355X 4-GPU TP=4 recipe plateaus at $0.22 while B200 is still climbing"), and one sentence noting where the gap inverts (e.g. "Above 90 tok/s/user the comparison flips marginally back to B200 because there is no MI355X recipe matching B200's TP=8 conc 4 at 100+ tok/s/user."). **Don't paper over the inversion** — call it out.
 
-### `[Live chart]` link after the iso-interactivity tables
+### Second `<Figure>` + `[Live chart]` link after the iso-interactivity tables
 
-The hero `<Figure>` already shipped at the top of the post. Down here, just a one-line link that points at the same preset URL so readers can drill into the interactive version of what they saw at the top:
+Place the **same** `<Figure>` block from Step 4 here again, immediately followed by a `[Live chart]({preset URL})` link. The repeat is intentional: readers who scrolled past the hero figure at the top need to see the chart next to the data table that derives from it, not scroll back up.
 
 ```mdx
-[Live chart](https://inferencex.semianalysis.com/inference?...) — same view as the figure at the top, pre-filtered to {hardware/framework/model/precision} and interactive.
+<Figure
+  srcLight="/images/{slug}/benchmark-light.png"
+  srcDark="/images/{slug}/benchmark-dark.png"
+  alt="..."
+  caption="..."
+/>
+
+[Live chart](https://inferencex.semianalysis.com/inference?...), pre-filtered to {hardware/framework/model/precision}.
 ```
 
-Do not embed a second `<Figure>` here. One chart asset, shown once at the top.
+Same `srcLight`/`srcDark`/`alt`/`caption` as the top placement — copy-paste, do not vary.
 
 ### `## What's Next for {SKU/framework} on {Model}` (or similar)
 
