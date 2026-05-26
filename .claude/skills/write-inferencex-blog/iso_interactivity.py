@@ -26,7 +26,7 @@ Usage as a module:
 
 Usage as a script (JSON input on stdin, JSON output on stdout):
     echo '{"points":[...], "target_iv":18.0, "metric_key":"throughput"}' \\
-      | python3 iso-interactivity.py
+      | python3 iso_interactivity.py
 
 If extending: keep this file 1:1 with the TS reference. If the chart's
 interpolation changes, update both at once.
@@ -185,12 +185,20 @@ def interpolate_metric(
             return sorted_front[0].get(metric_key)
         return None
 
-    ys = [p[metric_key] for p in sorted_front]
+    # Matches TS `extractMetric(...) ?? 0`: missing metric on a frontier
+    # point falls back to 0 instead of raising KeyError. Use `.get` so the
+    # CLI returns null cleanly instead of dying with a traceback.
+    ys = [(p.get(metric_key) if p.get(metric_key) is not None else 0) for p in sorted_front]
     slopes = monotone_slopes(xs, ys)
     raw = hermite_interpolate(xs, ys, slopes, target_iv)
 
-    # Clamp to data range to prevent cubic-spline overshoot beyond
-    # the min/max observed metric values on the frontier.
+    # Clamp to data range to prevent cubic-spline overshoot beyond the min/max
+    # observed metric values on the frontier. This matches `interpolateForGPU`
+    # in the calculator (which is the closest analog to blog iso-interactivity
+    # tables) rather than `interpolateMetricAtInteractivity` in the trend chart
+    # hook (which only does max(0, raw) and lets the spline overshoot upward).
+    # The tighter clamp is more honest — readers should not see a published
+    # value above the highest measured throughput on that date's frontier.
     return max(min(ys), min(max(ys), raw))
 
 

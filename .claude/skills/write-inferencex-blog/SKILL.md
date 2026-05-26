@@ -47,7 +47,7 @@ The dashboard chart uses a **monotone cubic Hermite spline (Steffen 1990, identi
 **Always use the bundled helper:**
 
 ```bash
-python3 .claude/skills/write-inferencex-blog/iso-interactivity.py
+python3 .claude/skills/write-inferencex-blog/iso_interactivity.py
 # stdin:  {"points": [{"interactivity": .., "throughput": .., "cost_per_M": ..}, ...],
 #          "target_iv": 18.0, "metric_key": "cost_per_M"}
 # stdout: {"value": 0.22}  // or null when target is outside frontier range

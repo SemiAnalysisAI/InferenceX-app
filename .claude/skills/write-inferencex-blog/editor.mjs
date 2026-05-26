@@ -107,7 +107,14 @@ const HTML = `<!DOCTYPE html>
     }
   }
   async function doSave() {
-    if (saving) return;
+    // If a save is already in flight, schedule another one so the latest
+    // buffer doesn't get stranded. The in-flight save's finally{} block also
+    // reschedules, but a Cmd+S during the network round-trip would otherwise
+    // be silently dropped.
+    if (saving) {
+      scheduleSave();
+      return;
+    }
     const value = editor.getValue();
     if (value === lastSaved) {
       setStatus('Up to date · ' + new Date().toLocaleTimeString(), 'saved');

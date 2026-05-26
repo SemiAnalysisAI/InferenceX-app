@@ -119,7 +119,7 @@ If the feature genuinely cannot apply to overlays (e.g., it depends on data only
 
 ## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
 
-The blog-writing workflow (`.claude/skills/write-inferencex-blog/`) ships a Python port of the chart's interpolation algorithm at `.claude/skills/write-inferencex-blog/iso-interactivity.py`. It exists so iso-interactivity tables in blog posts produce **exactly the same numbers** readers see when they hover the rendered chart. Linear-interpolation shell scripts will produce visibly different values — Cursor Bugbot has flagged this on prior posts.
+The blog-writing workflow (`.claude/skills/write-inferencex-blog/`) ships a Python port of the chart's interpolation algorithm at `.claude/skills/write-inferencex-blog/iso_interactivity.py`. It exists so iso-interactivity tables in blog posts produce **exactly the same numbers** readers see when they hover the rendered chart. Linear-interpolation shell scripts will produce visibly different values — Cursor Bugbot has flagged this on prior posts.
 
 The Python helper is a 1:1 port of these three TypeScript functions:
 
@@ -129,7 +129,7 @@ The Python helper is a 1:1 port of these three TypeScript functions:
 
 Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` which composes them with the "no extrapolation → return null" rule.
 
-**Rule: any PR that changes any of those four TypeScript functions MUST also update `.claude/skills/write-inferencex-blog/iso-interactivity.py` in the same commit.** Drift between the TS and Python implementations means the blog tables will silently diverge from the live chart on the very next post — readers will see one number in the table and a different one in the chart they click through to. This includes:
+**Rule: any PR that changes any of those four TypeScript functions MUST also update `.claude/skills/write-inferencex-blog/iso_interactivity.py` in the same commit.** Drift between the TS and Python implementations means the blog tables will silently diverge from the live chart on the very next post — readers will see one number in the table and a different one in the chart they click through to. This includes:
 
 - Changing the Pareto frontier definition (upper-left → lower-left, or adding tie-breaking rules)
 - Switching from Steffen's monotone slopes to a different spline construction (Fritsch-Carlson, natural cubic, etc.)
