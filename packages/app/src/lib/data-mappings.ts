@@ -53,7 +53,7 @@ interface ModelConfig {
 // already part of the canonical name (Llama 3.3 70B, gpt-oss 120B) so no
 // duplication needed.
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
-  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 670B', prefix: 'dsr1', category: 'default' },
+  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 671B', prefix: 'dsr1', category: 'default' },
   [Model.DeepSeek_V4_Pro]: {
     label: 'DeepSeek V4 Pro 1.6T',
     prefix: 'dsv4',
