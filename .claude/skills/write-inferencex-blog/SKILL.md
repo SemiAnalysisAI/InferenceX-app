@@ -16,9 +16,10 @@ Before writing anything, ask the user for whichever of these they have:
 1. **A chart image** from the InferenceX dashboard (this is the visual that will ship in the post)
 2. **A CSV export** from the dashboard with the underlying rows (this is the authoritative numeric source)
 3. **An "instant link" / preset URL** to the chart on `inferencex.semianalysis.com/inference?...` (this becomes both the `DashboardCTA` href and the live-chart link)
-4. **The upstream PR** that caused the change (SGLang / vLLM / TRT-LLM)
-5. **The InferenceX recipe PR** that wired it into the benchmark loop
-6. **Tweet / X post text** if there's a marketing framing they want the lede to echo
+4. **A `/gpu-specs` radar image** for the SKUs in the comparison (the user clicks "Radar" on the dashboard's GPU specs page, toggles only the SKUs in the post, and screenshots). Used in the "On-Paper Specs" section as the second figure. If the post is a cross-vendor or cross-generation comparison, this is high-value and you should ask for it; if it's a same-SKU version-bump comparison (e.g. SGLang v0.5.5 → v0.5.6 on the same B200 pool), skip the radar.
+5. **The upstream PR** that caused the change (SGLang / vLLM / TRT-LLM)
+6. **The InferenceX recipe PR** that wired it into the benchmark loop
+7. **Tweet / X post text** if there's a marketing framing they want the lede to echo
 
 If the user gives you only the chart, ask for the CSV — the chart is for the figure, the CSV is for the tables. If they give only the CSV, that becomes source of truth even if a chart later appears.
 
@@ -168,6 +169,35 @@ One paragraph naming the model, vendor, release date (use it to compute "N weeks
 
 Then a follow-on paragraph that ties the architecture details to _why this PR matters on this hardware_ — e.g. "MI355X's FP8 KV path landed in mid-April, and the resulting decode throughput moved enough that MI355X's lower per-GPU TCO ($1.48/GPU/hr vs B200 at $1.95/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](...)) now compounds into a real cost-per-token advantage instead of being swamped by software gaps."
 
+### `## On-Paper Specs` (cross-SKU comparisons only)
+
+Skip this section for same-SKU version-bump posts (e.g. SGLang v0.5.5 → v0.5.6 on the same B200 pool) — the hardware hasn't changed and the reader doesn't need it. For any cross-vendor, cross-generation, or scale-up-domain comparison (B200 vs H200, MI355X vs B200, GB200 NVL72 vs B200 HGX, etc.), include this section _between the model/architecture paragraph and `## What Shipped to Make This Happen`_. It anchors the reader on raw silicon ratios before they hit the recipe details and the measured perf/$ numbers, so the body's "the measured lift is HBM-bound, here's why" framing has somewhere to land.
+
+Structure (~3 elements, in order):
+
+1. **One short intro paragraph** — name the two SKUs and their generation, then explain that the radar normalizes each axis to the cross-vendor maximum in [`/gpu-specs`](/gpu-specs), so the visible polygons compress against axes where a different SKU (typically GB200/GB300 NVL72 for scale-up-domain axes, GB300 NVL72 for FP4) sets the ceiling.
+2. **`<Figure>` for the radar.** Save the user's radar screenshot to `packages/app/public/images/{slug}/specs-radar-light.png` (and `-dark.png` — copy the same file in if they only have one). The caption should call out (a) which SKU sets the ceiling on the most-visually-compressed axes and the absolute max value (e.g. "FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%"), (b) that the older-gen SKU reads 0% on the FP4 axis when it has no FP4 tensor cores.
+3. **Absolute specs table.** Pull values directly from `packages/app/src/lib/gpu-specs.ts` — never paraphrase from memory or a vendor datasheet, because the spec file is the source of truth the dashboard renders. Include both per-GPU and scale-up-domain rows so the reader can audit the implications paragraph.
+
+Standard row set (10 rows, in this order; drop rows that are identical and uninteresting for a same-vendor same-generation comparison):
+
+| Spec                               | SKU A                                | SKU B             | B / A          |
+| ---------------------------------- | ------------------------------------ | ----------------- | -------------- |
+| HBM capacity                       | `memory` value                       | `memory` value    | ratio          |
+| HBM bandwidth                      | `memoryBandwidth`                    | `memoryBandwidth` | ratio          |
+| Dense FP4 (TFLOP/s)                | `fp4` (or `—` if null)               | `fp4`             | ratio (or `—`) |
+| Dense FP8 (TFLOP/s)                | `fp8`                                | `fp8`             | ratio          |
+| Dense BF16 (TFLOP/s)               | `bf16`                               | `bf16`            | ratio          |
+| Scale-up BW per GPU (uni-di)       | `scaleUpBandwidth` (`scaleUpTech`)   | same              | ratio          |
+| Scale-up world size                | `scaleUpWorldSize`                   | same              | ratio          |
+| Scale-up domain HBM capacity       | `memory × scaleUpWorldSize`          | same              | ratio          |
+| Scale-up domain HBM BW (aggregate) | `memoryBandwidth × scaleUpWorldSize` | same              | ratio          |
+| TCO (SemiAnalysis AI Cloud Model)  | `$X/GPU/hr`                          | `$Y/GPU/hr`       | ratio          |
+
+Render the FP4 row as `—` (em-dash, not "N/A") in both the value and ratio columns when the older SKU lacks FP4 tensor cores — this matches the chart's "0% on FP4" rendering and avoids the misleading appearance of an infinite ratio.
+
+4. **One "implications" paragraph** that turns the raw ratios into a perf/$ bracket. Standard form: "with the same precision and the same recipe, SKU B's perf/$ ceiling vs SKU A is bounded by `(FP8 ratio) / (TCO ratio)` on a fully compute-bound workload and by `(HBM BW ratio) / (TCO ratio)` on a fully memory-bandwidth-bound workload (with NVLink BW giving a middle bound at `(NVLink BW ratio) / (TCO ratio)`)." Then state which bracket the post's measured lift lands in and why — this is the bridge to the next section. If the precision step is the headline (FP8 → FP4 on the new SKU), close with "X is the lever that breaks the GEMM ceiling: A has zero FP4 tensor cores, B has Y PFLOP/s, and the resulting precision step compounds N×–M× on top."
+
 ### `## What Shipped to Make This Happen`
 
 The technical breakdown. For each PR:
@@ -199,7 +229,21 @@ Table columns: `Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens`. Right-a
 
 This is where the headline ratio gets made explicit. One short intro sentence ("Throughput per GPU at matched interactivity, interpolated along each SKU's Pareto frontier."), one sentence on the `_unreachable_` convention if it appears in the table, then the table(s) — MTP and non-MTP if both are in scope, otherwise one.
 
-**Do not put the interpolation algorithm in the body.** No "monotone cubic Hermite", no source-file paths, no Steffen 1990 references. Readers do not need to audit the spline math to trust the table — the table reads cleanly because the helper is already matching the chart they can click through to. The algorithm details belong in this SKILL, in `AGENTS.md`, and in the helper's docstring, not in the published post. Mentioning them in the prose is slop.
+> 🚫 **BANNED PHRASES — do not put the interpolation algorithm in the published prose.** The SKILL's earlier sections describe the algorithm at length because the agent writing the post needs to understand it; the **reader** does not. Mentioning the algorithm in the post is slop and gets cut in review every time.
+>
+> Specifically banned anywhere in the MDX body, table captions, figure captions, intro sentences, FAQ answers, or anywhere else readers will see:
+>
+> - "monotone cubic Hermite", "monotone cubic", "Hermite spline", "Hermite cubic", "Hermite interpolation"
+> - "Steffen 1990", "Steffen monotone", "Steffen's construction"
+> - "`d3.curveMonotoneX`", "the chart's spline algorithm", "cubic spline", "piecewise cubic"
+> - source-file paths like `interpolation.ts`, `useInterpolatedTrendData.ts`, or function names like `paretoFrontUpperLeft` / `monotoneSlopes` / `hermiteInterpolate`
+>
+> ✅ **Approved phrasings** for the iso-interactivity intro sentence:
+>
+> - "interpolated along each SKU's Pareto frontier" (terse — preferred default)
+> - "interpolated along each SKU's Pareto frontier using the same algorithm as the dashboard chart" (acceptable if you must signal congruence with the chart)
+>
+> Before saving the MDX, grep your draft for `monotone|Hermite|Steffen|spline|curveMonotoneX` and delete any hit. If you find yourself wanting to explain _why_ the table values match the chart values, the answer goes in the iso-interactivity table's `_unreachable_` legend or in a footnote — never by naming the algorithm.
 
 Columns: `Interactivity (tok/s/user) | {NVIDIA} $/M tok | {AMD} $/M tok | {NVIDIA} / {AMD}`. Bold the peak-gap row. Show 5-8 rows covering the interesting band — include at least one row where the gap narrows or reverses, so the post stays honest.
 
