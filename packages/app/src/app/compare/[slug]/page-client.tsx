@@ -120,7 +120,12 @@ export default function ComparePageClient({
                   className="mt-3 text-sm text-foreground/80 max-w-3xl"
                   data-testid="compare-narrative"
                 >
-                  {narrative}
+                  {narrative}{' '}
+                  <span className="text-muted-foreground italic">
+                    (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
+                    {defaultPrecision ?? 'precision'} selection for this URL — table and chart below
+                    update if you change sequence, precision, or model in the controls.)
+                  </span>
                 </p>
               )}
               <p className="mt-2 text-sm">

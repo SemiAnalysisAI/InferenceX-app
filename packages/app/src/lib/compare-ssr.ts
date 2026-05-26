@@ -338,7 +338,16 @@ function fmtPctDelta(ratio: number): string {
  *  the points readers care about), or falls back to a single-GPU description
  *  at the mid row if there's no overlap. Template differs by variant —
  *  `'full'` mentions both cost and throughput; `'per-dollar'` focuses on cost
- *  and references the table for the rest. */
+ *  and references the table for the rest.
+ *
+ *  The returned prose anchors to the SSR'd default model / sequence /
+ *  precision — i.e. the slug's canonical operating point. The chart and
+ *  interpolated table beneath the narrative re-render on client-side filter
+ *  changes; the narrative does not. This is intentional: the URL slug *is*
+ *  the canonical view, and the narrative is the canonical view's prose
+ *  summary. The caller adds a small "(default configuration)" caveat after
+ *  the narrative so a reader who fiddles with the chart controls sees that
+ *  the narrative is fixed to the slug's defaults. */
 export function compareTableNarrative(
   variant: CompareJsonLdVariant,
   modelLabel: string,
