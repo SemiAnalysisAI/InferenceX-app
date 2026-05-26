@@ -362,6 +362,13 @@ After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose
 - **Write tight first, expand only on request.** Default to 1-3 short paragraphs per explanation; trust the reader to ask for more detail in review. Long preemptive expansions get trimmed back by the reviewer (and overwritten by the browser editor's auto-save while you wait). The compute-comm-overlap framing template in the "Reusable technical framings" section is the upper bound — don't go longer than that even for the most central technical argument.
 - **Don't restate the table contents in prose.** If the reader can see "4,130 vs 941 tok/s/GPU = 4.39x at 125 tok/s/user" in the iso-interactivity row, don't also write it in the closing paragraph after the table. Use the prose around tables to explain the WHY, not to summarize the WHAT. A closing paragraph that just restates the headline number gets removed in editorial review.
 - Don't apologize for non-coverage in the lede — save it for "What's Next".
+- **Don't use the "X, not Y" antithesis construction for emphasis.** AI writing tics this hard — phrases like "the gap is silicon × precision, **not** framework", "every gain came from the kernels, **not** the silicon", "it's a software story, **not** a hardware one", "this is a real lever, **not** a paper one". Reads as performatively contrarian flexing and is one of the loudest AI-prose tells. State the thing on its own; if the "Y" the reader might have guessed is actually plausible-but-wrong, address it on its merits in a separate sentence (or skip it — usually the table that follows kills the wrong guess on its own).
+  - Avoid: "The gap is silicon × precision, not framework."
+  - Use instead: "The gap is silicon × precision." (or, if you really need to neutralize the framework guess: "Both run the same vLLM build; the spread comes from the silicon and the precision.")
+  - Avoid: "This is a real lever, not a paper one."
+  - Use instead: just delete the sentence — the data already shows it is real.
+  - Avoid: "The lift came from the kernels, not the silicon."
+  - Use instead: "Same hardware on both dates — every gain came from the kernels."
 
 ## Reusable technical framings
 
