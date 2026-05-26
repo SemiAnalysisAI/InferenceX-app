@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { getAllPosts } from '@/lib/blog';
-import { allCanonicalComparePairs, canonicalCompareSlug } from '@/lib/compare-slug';
+import { allCanonicalCompareSlugs, canonicalCompareSlug } from '@/lib/compare-slug';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 const TABS = [
@@ -59,8 +59,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     })),
-    ...allCanonicalComparePairs().map(({ a, b }) => ({
-      url: `${BASE_URL}/compare/${canonicalCompareSlug(a, b)}`,
+    ...allCanonicalCompareSlugs().map(({ modelSlug, a, b }) => ({
+      url: `${BASE_URL}/compare/${canonicalCompareSlug(modelSlug, a, b)}`,
       lastModified: now,
       changeFrequency: 'daily' as const,
       priority: 0.7,

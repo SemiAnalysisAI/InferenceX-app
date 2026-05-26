@@ -8,7 +8,7 @@ import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
 
 import {
-  allCanonicalComparePairs,
+  allCanonicalCompareSlugs,
   canonicalCompareSlug,
   compareDisplayLabel,
   parseCompareSlug,
@@ -39,7 +39,9 @@ const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
 ];
 
 export function generateStaticParams() {
-  return allCanonicalComparePairs().map(({ a, b }) => ({ slug: canonicalCompareSlug(a, b) }));
+  return allCanonicalCompareSlugs().map(({ modelSlug, a, b }) => ({
+    slug: canonicalCompareSlug(modelSlug, a, b),
+  }));
 }
 
 // Read once at module load; a missing asset must not 500 every OG route.
@@ -78,11 +80,12 @@ function getTiles(): Promise<({ src: string; rotate?: number } | null)[]> {
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const pair = parseCompareSlug(slug);
-  if (!pair) notFound();
+  const parsed = parseCompareSlug(slug);
+  if (!parsed) notFound();
   const [logoSrc, tiles] = await Promise.all([getLogoSrc(), getTiles()]);
 
-  const title = compareDisplayLabel(pair.a, pair.b);
+  const title = compareDisplayLabel(parsed.a, parsed.b);
+  const eyebrow = `${parsed.model.label} · Head-to-head GPU benchmark`;
   // Content area is ~895px wide (1200 - 195 panel - 55*2 padding). Scale the
   // title size down for longer labels so it fits without truncating.
   const titleSize = title.length > 26 ? 80 : title.length > 18 ? 96 : 112;
@@ -163,14 +166,14 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
         >
           <div
             style={{
-              fontSize: 26,
+              fontSize: 24,
               color: '#9BA0A6',
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
               display: 'flex',
             }}
           >
-            Head-to-head GPU benchmark
+            {eyebrow}
           </div>
 
           <div

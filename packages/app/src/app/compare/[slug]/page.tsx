@@ -22,9 +22,11 @@ import { loadFixture } from '@/lib/test-fixtures';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
-  allCanonicalComparePairs,
+  allCanonicalCompareSlugs,
   canonicalCompareSlug,
   compareDisplayLabel,
+  compareModelDisplayLabel,
+  type CompareModelSlug,
   parseCompareSlug,
 } from '@/lib/compare-slug';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
@@ -38,9 +40,6 @@ interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
-
-const DEFAULT_MODEL_DB_KEYS = ['dsr1'];
-const DEFAULT_MODEL_DISPLAY = 'DeepSeek-R1-0528';
 
 const KNOWN_MODELS = new Set([
   'Llama-3.3-70B-Instruct-FP8',
@@ -73,29 +72,32 @@ const getCachedBenchmarks = cachedQuery(
 );
 
 export function generateStaticParams() {
-  return allCanonicalComparePairs().map(({ a, b }) => ({ slug: canonicalCompareSlug(a, b) }));
+  return allCanonicalCompareSlugs().map(({ modelSlug, a, b }) => ({
+    slug: canonicalCompareSlug(modelSlug, a, b),
+  }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const pair = parseCompareSlug(slug);
-  if (!pair) return {};
-  const label = compareDisplayLabel(pair.a, pair.b);
-  const url = `${SITE_URL}/compare/${canonicalCompareSlug(pair.a, pair.b)}`;
-  const description = `Head-to-head GPU inference benchmark comparison: ${label}. Latency, throughput, and cost across LLM workloads.`;
+  const parsed = parseCompareSlug(slug);
+  if (!parsed) return {};
+  const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
+  const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
+  const url = `${SITE_URL}/compare/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
+  const description = `Head-to-head GPU inference benchmark comparison for ${parsed.model.label}: ${gpuLabel}. Latency, throughput, and cost across LLM workloads.`;
   return {
-    title: `${label} Inference Benchmark`,
+    title: `${fullLabel} Inference Benchmark`,
     description,
     alternates: { canonical: url },
     openGraph: {
-      title: `${label} | ${SITE_NAME}`,
+      title: `${fullLabel} | ${SITE_NAME}`,
       description,
       url,
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${label} Inference Benchmark`,
+      title: `${fullLabel} Inference Benchmark`,
       description,
     },
   };
@@ -109,7 +111,7 @@ interface PairSummary {
   bestMedianTpot: number | null;
 }
 
-function summarize(rows: Awaited<ReturnType<typeof getCachedBenchmarks>>, hw: string): PairSummary {
+function summarize(rows: BenchmarkRow[], hw: string): PairSummary {
   const hwRows = rows.filter((r) => r.hardware === hw);
   let bestThroughput: number | null = null;
   let bestTtft: number | null = null;
@@ -147,7 +149,7 @@ export interface SsrInterpolatedRow {
  * same transform logic as useThroughputData (but callable on the server).
  */
 function buildGpuDataPoints(
-  rows: Awaited<ReturnType<typeof getCachedBenchmarks>>,
+  rows: BenchmarkRow[],
   hw: string,
   isl: number,
   osl: number,
@@ -216,7 +218,7 @@ function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number }
  * interactivity range of both GPUs.
  */
 function computeCompareTableData(
-  rows: Awaited<ReturnType<typeof getCachedBenchmarks>>,
+  rows: BenchmarkRow[],
   a: string,
   b: string,
   sequence: string | null,
@@ -335,6 +337,7 @@ function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
 }
 
 function buildJsonLd(
+  model: CompareModelSlug,
   a: string,
   b: string,
   url: string,
@@ -344,11 +347,13 @@ function buildJsonLd(
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
+  const fullLabel = compareModelDisplayLabel(model, a, b);
 
   const comparisonRows = ssrRows
     .filter((row) => row.a || row.b)
     .map((row) => {
       const metrics: { name: string; value: string }[] = [
+        { name: 'Model', value: model.displayName },
         { name: 'Target Interactivity (tok/s/user)', value: String(row.target) },
       ];
       if (row.a) {
@@ -369,7 +374,7 @@ function buildJsonLd(
       }
       return {
         '@type': 'Observation',
-        name: `Comparison at ${row.target} tok/s/user interactivity`,
+        name: `${model.label} comparison at ${row.target} tok/s/user interactivity`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
@@ -383,8 +388,8 @@ function buildJsonLd(
     '@graph': [
       {
         '@type': 'ItemList',
-        name: `${compareDisplayLabel(a, b)} Inference Benchmark`,
-        description: `Head-to-head AI inference benchmark comparison of ${aLabel} and ${bLabel} across LLM workloads.`,
+        name: `${fullLabel} Inference Benchmark`,
+        description: `Head-to-head AI inference benchmark comparison of ${aLabel} and ${bLabel} on ${model.label} across LLM workloads.`,
         url,
         itemListOrder: 'https://schema.org/ItemListOrderAscending',
         numberOfItems: 2,
@@ -394,8 +399,8 @@ function buildJsonLd(
         ? [
             {
               '@type': 'Dataset',
-              name: `${aLabel} vs ${bLabel} Interpolated Benchmark Comparison`,
-              description: `Interpolated throughput, cost, power efficiency, and concurrency for ${aLabel} and ${bLabel} at matched interactivity levels.`,
+              name: `${aLabel} vs ${bLabel} (${model.label}) Interpolated Benchmark Comparison`,
+              description: `Interpolated throughput, cost, power efficiency, and concurrency for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels.`,
               url,
               hasPart: comparisonRows,
             },
@@ -407,60 +412,86 @@ function buildJsonLd(
 
 export default async function ComparePage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const pair = parseCompareSlug(slug);
-  if (!pair) notFound();
+  const parsed = parseCompareSlug(slug);
+  if (!parsed) notFound();
 
-  const canonical = canonicalCompareSlug(pair.a, pair.b);
+  // Await searchParams once so we can both preserve them on redirect and read
+  // them for URL-param overrides further down.
+  const sp = await searchParams;
+
+  // One-hop redirect to the fully canonical URL. Handles all three normalization
+  // cases in a single 308:
+  //   - legacy bare slug:   `h100-vs-h200`              → `deepseek-r1-h100-vs-h200`
+  //   - alias model:        `kimi-h100-vs-h200`         → `kimi-k26-h100-vs-h200`
+  //   - non-canonical GPUs: `kimi-k26-h200-vs-h100`     → `kimi-k26-h100-vs-h200`
+  //   - any combination of the above
+  // Preserves the query string so `?i_seq=1k/1k&i_prec=fp8` etc. survive the
+  // redirect — the original PR #351 redirect dropped these, but with bare slugs
+  // now redirecting unconditionally we need to keep them.
+  const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   if (canonical !== slug) {
-    redirect(`/compare/${canonical}`);
+    const qs = Object.entries(sp)
+      .flatMap(([k, v]) => {
+        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
+        if (v === undefined) return [];
+        return [[k, v] as const];
+      })
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
+    redirect(`/compare/${canonical}${qs ? `?${qs}` : ''}`);
   }
 
-  const rows = await getCachedBenchmarks(DEFAULT_MODEL_DB_KEYS);
-  const summaryA = summarize(rows, pair.a);
-  const summaryB = summarize(rows, pair.b);
+  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
+  const summaryA = summarize(rows, parsed.a);
+  const summaryB = summarize(rows, parsed.b);
   const { sequence: pickedSequence, precision: pickedPrecision } = pickPairDefaults(
     rows,
-    pair.a,
-    pair.b,
+    parsed.a,
+    parsed.b,
   );
 
-  // URL params win over pickPairDefaults; this baking-into-SSR avoids the
+  // URL params win over slug-derived defaults; this baking-into-SSR avoids the
   // hydration flash where the client upgrades seeded defaults to URL values.
-  const sp = await searchParams;
-  const urlModel = pickString(sp.g_model);
+  // `sp` was already awaited above for the redirect-query-preservation path.
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
-  const effectiveModel = urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : DEFAULT_MODEL_DISPLAY;
+  const urlModel = pickString(sp.g_model);
   const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
   const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
+  // `?g_model=` is honored only if it matches a known model — but the slug's
+  // model is the canonical default. Disregard URL param if user wants to
+  // explicitly override (rare).
+  const effectiveModel =
+    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
 
   const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
     rows,
-    pair.a,
-    pair.b,
+    parsed.a,
+    parsed.b,
     effectiveSequence,
     effectivePrecision,
   );
 
   const url = `${SITE_URL}/compare/${canonical}`;
-  const jsonLd = buildJsonLd(pair.a, pair.b, url, summaryA, summaryB, ssrRows);
-  const label = compareDisplayLabel(pair.a, pair.b);
-  const aMeta = HW_REGISTRY[pair.a];
-  const bMeta = HW_REGISTRY[pair.b];
+  const jsonLd = buildJsonLd(parsed.model, parsed.a, parsed.b, url, summaryA, summaryB, ssrRows);
+  const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
+  const aMeta = HW_REGISTRY[parsed.a];
+  const bMeta = HW_REGISTRY[parsed.b];
 
   return (
     <>
       <JsonLd data={jsonLd} />
       <ComparePageClient
-        a={pair.a}
-        b={pair.b}
+        a={parsed.a}
+        b={parsed.b}
         label={label}
+        modelLabel={parsed.model.label}
         defaultModel={effectiveModel}
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
-        aLabel={aMeta?.label ?? pair.a.toUpperCase()}
-        bLabel={bMeta?.label ?? pair.b.toUpperCase()}
+        aLabel={aMeta?.label ?? parsed.a.toUpperCase()}
+        bLabel={bMeta?.label ?? parsed.b.toUpperCase()}
         aVendor={aMeta?.vendor ?? ''}
         bVendor={bMeta?.vendor ?? ''}
         aArch={aMeta?.arch ?? ''}

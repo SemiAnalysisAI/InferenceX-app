@@ -23,6 +23,10 @@ interface ComparePageClientProps {
   a: string;
   b: string;
   label: string;
+  /** Human-readable model name from the slug — drives the eyebrow above the
+   *  H1 so the URL-grouping ("Kimi K2.6", "GLM 5.1", etc.) is legible without
+   *  scanning the URL bar. */
+  modelLabel: string;
   defaultModel: string;
   defaultSequence: string | null;
   defaultPrecision: string | null;
@@ -53,6 +57,7 @@ export default function ComparePageClient({
   a,
   b,
   label,
+  modelLabel,
   defaultModel,
   defaultSequence,
   defaultPrecision,
@@ -88,14 +93,15 @@ export default function ComparePageClient({
           <Card className="flex flex-col gap-3">
             <header>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                GPU comparison
+                {modelLabel} · GPU comparison
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">{label}</h1>
               <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
                 Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
-                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}). Latency,
-                throughput, and cost across LLM workloads. Use the chart controls below to switch
-                models, sequences, precisions, and metrics — same interactions as{' '}
+                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
+                <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
+                Use the chart controls below to switch sequences, precisions, and metrics — same
+                interactions as{' '}
                 <Link href="/" className="underline hover:text-primary">
                   the main inference chart
                 </Link>

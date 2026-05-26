@@ -3,7 +3,10 @@ describe('Compare Interpolated Table', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/compare/gb200-vs-h100');
+    // Visit the canonical model-prefixed URL directly to avoid the bare-slug
+    // 308 redirect changing the URL after page load (which would invalidate
+    // the URL-based assertions further down).
+    cy.visit('/compare/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"]').should('exist');
   });
 
