@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -98,6 +99,16 @@ export default async function CompareIndexPage() {
             {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
             throughput, and cost metrics, plus an interpolated comparison table.
           </p>
+          <div className="mt-4">
+            <Link
+              data-testid="compare-index-per-dollar-link"
+              href="/compare-per-dollar"
+              className="inline-flex items-center gap-2 rounded-md bg-brand/10 px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand/15 transition-colors"
+            >
+              Compare GPU performance per dollar
+              <span aria-hidden="true">→</span>
+            </Link>
+          </div>
         </Card>
       </section>
 

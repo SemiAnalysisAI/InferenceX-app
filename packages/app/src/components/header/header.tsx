@@ -41,12 +41,6 @@ const NAV_LINKS = [
     event: 'header_compare_clicked',
   },
   {
-    href: '/compare-per-dollar',
-    label: 'Per Dollar',
-    testId: 'nav-link-compare-per-dollar',
-    event: 'header_compare_per_dollar_clicked',
-  },
-  {
     href: '/quotes',
     label: 'Supporters',
     testId: 'nav-link-supporters',
