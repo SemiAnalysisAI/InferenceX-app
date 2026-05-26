@@ -36,6 +36,17 @@ export const metadata: Metadata = {
   },
 };
 
+/** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Enumerated
+ *  in the lede instead of a bare count so search engines see every model name
+ *  in the indexable description. */
+function formatModelList(models: CompareModelSlug[]): string {
+  const labels = models.map((m) => m.label);
+  if (labels.length === 0) return 'no models';
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
+}
+
 interface VendorGroup {
   heading: string;
   description: string;
@@ -121,9 +132,9 @@ export default async function ComparePerDollarIndexPage() {
           </h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head cost-per-million-tokens comparisons across{' '}
-            {modelsWithPairs.length} models. Performance normalized by owning-hyperscaler TCO — each
-            page renders the cost-per-token chart and an interpolated dollars-per-million comparison
-            table so you can pick the cheaper SKU at any target interactivity level.
+            {formatModelList(modelsWithPairs)}. Performance normalized by owning-hyperscaler TCO —
+            each page renders the cost-per-token chart and an interpolated dollars-per-million
+            comparison table so you can pick the cheaper SKU at any target interactivity level.
           </p>
         </Card>
       </section>

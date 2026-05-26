@@ -36,6 +36,17 @@ export const metadata: Metadata = {
   },
 };
 
+/** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Enumerated
+ *  in the lede instead of a bare count so search engines see every model name
+ *  in the indexable description. */
+function formatModelList(models: CompareModelSlug[]): string {
+  const labels = models.map((m) => m.label);
+  if (labels.length === 0) return 'no models';
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
+}
+
 interface VendorGroup {
   heading: string;
   description: string;
@@ -119,7 +130,7 @@ export default async function CompareIndexPage() {
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU Comparisons</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}
-            {modelsWithPairs.length} models. Each page includes interactive charts for latency,
+            {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
             throughput, and cost metrics, plus an interpolated comparison table.
           </p>
         </Card>
