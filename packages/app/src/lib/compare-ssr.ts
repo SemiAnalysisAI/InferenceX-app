@@ -329,25 +329,209 @@ function fmtPctDelta(ratio: number): string {
   return `${Math.round((ratio - 1) * 100)}%`;
 }
 
-/** Per-route prose summary of the interpolated table. Server-rendered into
- *  the page HTML so crawlers and screen-readers get a plain-English read of
- *  the headline number alongside the table data. Returns null when there's
- *  no comparable data to describe (caller falls back to the empty-state UI).
+/** Deterministic 32-bit-ish string hash. Used to pick a template variant
+ *  per (page, row) without `Math.random()` so SSR + hydration agree and the
+ *  same URL renders the same prose every request. */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.trunc(Math.imul(31, h) + (s.codePointAt(i) ?? 0));
+  }
+  return Math.abs(h);
+}
+
+/** Bucket the target into low / middle / high segment of the benchmarked
+ *  range. Used by templates that say things like "Near the low end" or
+ *  "At the upper edge" so the same prose array doesn't all read identically. */
+function bandFor(target: number, range: { min: number; max: number }): 'low' | 'middle' | 'high' {
+  const span = range.max - range.min;
+  if (span <= 0) return 'middle';
+  const t = (target - range.min) / span;
+  if (t < 1 / 3) return 'low';
+  if (t > 2 / 3) return 'high';
+  return 'middle';
+}
+
+interface PerDollarBoth {
+  modelLabel: string;
+  aLabel: string;
+  bLabel: string;
+  cheaper: string;
+  pricier: string;
+  cheaperCost: number;
+  pricierCost: number;
+  ratio: number;
+  target: number;
+  aCost: number;
+  bCost: number;
+  range: string;
+  band: 'low' | 'middle' | 'high';
+}
+
+interface FullBoth {
+  modelLabel: string;
+  aLabel: string;
+  bLabel: string;
+  cheaper: string;
+  faster: string;
+  costRatio: number | null; // null when tied or zero-guarded
+  tputRatio: number | null;
+  costTied: boolean;
+  tputTied: boolean;
+  target: number;
+  aCost: number;
+  bCost: number;
+  aValue: number;
+  bValue: number;
+  range: string;
+  band: 'low' | 'middle' | 'high';
+}
+
+const BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
+  low: 'near the low end',
+  middle: 'around the middle',
+  high: 'toward the upper edge',
+};
+
+// ---------------------------------------------------------------------------
+// /compare-per-dollar variant — both GPUs, no tie, non-zero costs
+// ---------------------------------------------------------------------------
+
+const PER_DOLLAR_BOTH_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
+  (i) =>
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} costs ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} costs ${fmtCost(i.bCost)}. ${i.cheaper} is ${fmtPctDelta(i.ratio)} more cost-efficient at this operating point.`,
+  (i) =>
+    `${i.cheaper} edges ${i.pricier} at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.cheaperCost)} per million tokens versus ${fmtCost(i.pricierCost)}, a ${fmtPctDelta(i.ratio)} cost-per-token gap.`,
+  (i) =>
+    `Push ${i.modelLabel} to ${i.target} tok/s/user and ${i.aLabel} lands at ${fmtCost(i.aCost)} per million tokens against ${i.bLabel}'s ${fmtCost(i.bCost)} — ${i.cheaper} pulls ahead by ${fmtPctDelta(i.ratio)}.`,
+  (i) =>
+    `${i.aLabel}: ${fmtCost(i.aCost)} per million tokens. ${i.bLabel}: ${fmtCost(i.bCost)}. Both at ${i.target} tok/s/user on ${i.modelLabel}, with ${i.cheaper} ${fmtPctDelta(i.ratio)} cheaper.`,
+  (i) =>
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band — at ${i.target} tok/s/user — ${i.aLabel} runs ${fmtCost(i.aCost)} per million tokens on ${i.modelLabel} while ${i.bLabel} runs ${fmtCost(i.bCost)}. ${i.cheaper} is the cheaper choice by ${fmtPctDelta(i.ratio)}.`,
+  (i) =>
+    `On ${i.modelLabel} at ${i.target} tok/s/user, the per-million math comes out to ${fmtCost(i.aCost)} for ${i.aLabel} and ${fmtCost(i.bCost)} for ${i.bLabel}; ${i.cheaper} delivers ${fmtPctDelta(i.ratio)} more output per dollar.`,
+];
+
+const PER_DOLLAR_TIED_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
+  (i) =>
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} and ${i.bLabel} land within ~1% on cost per million tokens (${fmtCost(i.aCost)} vs ${fmtCost(i.bCost)}) — call it a tie at this operating point.`,
+  (i) =>
+    `${i.aLabel} ${fmtCost(i.aCost)} and ${i.bLabel} ${fmtCost(i.bCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}: effectively the same cost.`,
+  (i) =>
+    `Cost-per-million is essentially even between ${i.aLabel} (${fmtCost(i.aCost)}) and ${i.bLabel} (${fmtCost(i.bCost)}) at ${i.target} tok/s/user on ${i.modelLabel}.`,
+];
+
+const PER_DOLLAR_ZERO_TEMPLATES: ((args: {
+  modelLabel: string;
+  aLabel: string;
+  bLabel: string;
+  target: number;
+  aCost: number;
+  bCost: number;
+}) => string)[] = [
+  (i) =>
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.aLabel} and ${i.bLabel} register ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} per million tokens — one side has missing pricing or throughput, so a like-for-like ratio isn't meaningful here.`,
+  (i) =>
+    `${i.aLabel} (${fmtCost(i.aCost)}) and ${i.bLabel} (${fmtCost(i.bCost)}) per million tokens at ${i.target} tok/s/user on ${i.modelLabel}: at least one input is zero, so the gap can't be expressed as a ratio.`,
+];
+
+const PER_DOLLAR_SINGLE_TEMPLATES: ((args: {
+  modelLabel: string;
+  presentLabel: string;
+  missingLabel: string;
+  target: number;
+  presentCost: number;
+}) => string)[] = [
+  (i) =>
+    `${i.presentLabel} costs ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; we have no ${i.missingLabel} benchmark data at this exact target.`,
+  (i) =>
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} comes in at ${fmtCost(i.presentCost)} per million tokens. ${i.missingLabel} hasn't been benchmarked at this operating point.`,
+  (i) =>
+    `Only ${i.presentLabel} has cost data at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.presentCost)} per million tokens. ${i.missingLabel} is unmeasured at this target.`,
+];
+
+// ---------------------------------------------------------------------------
+// /compare 'full' variant — both GPUs, mentions cost AND throughput
+// ---------------------------------------------------------------------------
+
+function fullSummary(i: FullBoth): string {
+  const costPart = i.costTied
+    ? 'cost per token is essentially tied'
+    : i.costRatio === null
+      ? null
+      : `${i.cheaper} is ${fmtPctDelta(i.costRatio)} cheaper per token`;
+  const tputPart = i.tputTied
+    ? 'throughput per GPU is essentially tied'
+    : i.tputRatio === null
+      ? null
+      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/GPU`;
+  const both = [costPart, tputPart].filter(Boolean).join('; ');
+  return both.length > 0
+    ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
+    : 'numbers are too close to call';
+}
+
+const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [
+  (i) =>
+    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
+  (i) =>
+    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
+  (i) =>
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/GPU, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
+  (i) =>
+    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/GPU, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
+  (i) =>
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
+  (i) =>
+    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${i.aValue.toFixed(0)} tok/s/GPU (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${i.bValue.toFixed(0)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
+];
+
+const FULL_SINGLE_TEMPLATES: ((args: {
+  modelLabel: string;
+  presentLabel: string;
+  missingLabel: string;
+  target: number;
+  presentValue: number;
+  presentCost: number;
+}) => string)[] = [
+  (i) =>
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/GPU at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
+  (i) =>
+    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/GPU for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
+  (i) =>
+    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/GPU, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
+];
+
+/** Pick template `rowIndex` in the rotation starting from a per-page hash
+ *  offset. Within a single page, paragraphs 0/1/2 always pick three
+ *  *consecutive* templates from the pool (never repeating each other), while
+ *  the page-level seed picks where in the rotation to start — so different
+ *  pages get different starting templates. Avoids the birthday-problem
+ *  collisions that pickTemplate alone produces when sampling N times from a
+ *  pool of size M near N. */
+function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {
+  const start = hashStr(pageSeed) % arr.length;
+  return arr[(start + rowIndex) % arr.length];
+}
+
+/** Per-route prose summary of the interpolated table — one paragraph per
+ *  default interactivity target. Server-rendered into the page HTML so
+ *  crawlers and screen-readers get a plain-English read of every operating
+ *  point. Returns an empty array when there's no data (caller falls back to
+ *  the empty-state UI).
  *
- *  Picks the first interactivity target where both GPUs have data (those are
- *  the points readers care about), or falls back to a single-GPU description
- *  at the mid row if there's no overlap. Template differs by variant —
- *  `'full'` mentions both cost and throughput; `'per-dollar'` focuses on cost
- *  and references the table for the rest.
+ *  Template selection is deterministic: the same (model, GPU pair, row index,
+ *  variant) seed always picks the same template, so SSR and any subsequent
+ *  render agree on prose. Different pages pick different templates from the
+ *  pool, so the catalog reads with variety instead of repeating the same
+ *  sentence shape on every URL.
  *
  *  The returned prose anchors to the SSR'd default model / sequence /
  *  precision — i.e. the slug's canonical operating point. The chart and
  *  interpolated table beneath the narrative re-render on client-side filter
- *  changes; the narrative does not. This is intentional: the URL slug *is*
- *  the canonical view, and the narrative is the canonical view's prose
- *  summary. The caller adds a small "(default configuration)" caveat after
- *  the narrative so a reader who fiddles with the chart controls sees that
- *  the narrative is fixed to the slug's defaults. */
+ *  changes; the narrative does not. The caller adds a "(default selection)"
+ *  caveat after the last paragraph so a reader who fiddles with the chart
+ *  controls sees that the narrative is fixed to the slug's defaults. */
 export function compareTableNarrative(
   variant: CompareJsonLdVariant,
   modelLabel: string,
@@ -355,72 +539,128 @@ export function compareTableNarrative(
   bLabel: string,
   ssrRows: SsrInterpolatedRow[],
   interactivityRange: { min: number; max: number },
-): string | null {
-  if (ssrRows.length === 0) return null;
-
-  const both = ssrRows.find((r) => r.a && r.b);
-  const row = both ?? ssrRows[Math.floor(ssrRows.length / 2)];
-  const { target, a, b } = row;
-  if (!a && !b) return null;
+): string[] {
+  if (ssrRows.length === 0) return [];
 
   const range = `${interactivityRange.min}–${interactivityRange.max} tok/s/user`;
+  // Page-level seed: stable across renders, varies by (route variant, model,
+  // GPU pair). Template selection rotates by rowIndex from this seed so the
+  // 3 paragraphs on a single page never duplicate templates with each other,
+  // and different pages pick different starting points in the rotation.
+  const pageSeed = `${variant}|${modelLabel}|${aLabel}|${bLabel}`;
+  const paragraphs: string[] = [];
 
-  if (variant === 'per-dollar') {
+  for (const [rowIndex, row] of ssrRows.entries()) {
+    const { target, a, b } = row;
+    if (!a && !b) continue;
+    const band = bandFor(target, interactivityRange);
+
+    if (variant === 'per-dollar') {
+      if (a && b) {
+        if (!(a.cost > 0 && b.cost > 0)) {
+          paragraphs.push(
+            pickRotated(
+              PER_DOLLAR_ZERO_TEMPLATES,
+              pageSeed,
+              rowIndex,
+            )({
+              modelLabel,
+              aLabel,
+              bLabel,
+              target,
+              aCost: a.cost,
+              bCost: b.cost,
+            }),
+          );
+          continue;
+        }
+        const aCheaper = a.cost < b.cost;
+        const cheaper = aCheaper ? aLabel : bLabel;
+        const pricier = aCheaper ? bLabel : aLabel;
+        const ratio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
+        const inputs: PerDollarBoth = {
+          modelLabel,
+          aLabel,
+          bLabel,
+          cheaper,
+          pricier,
+          cheaperCost: aCheaper ? a.cost : b.cost,
+          pricierCost: aCheaper ? b.cost : a.cost,
+          ratio,
+          target,
+          aCost: a.cost,
+          bCost: b.cost,
+          range,
+          band,
+        };
+        const pool = ratio < 1.01 ? PER_DOLLAR_TIED_TEMPLATES : PER_DOLLAR_BOTH_TEMPLATES;
+        paragraphs.push(pickRotated(pool, pageSeed, rowIndex)(inputs));
+        continue;
+      }
+      const present = (a ?? b)!;
+      paragraphs.push(
+        pickRotated(
+          PER_DOLLAR_SINGLE_TEMPLATES,
+          pageSeed,
+          rowIndex,
+        )({
+          modelLabel,
+          presentLabel: a ? aLabel : bLabel,
+          missingLabel: a ? bLabel : aLabel,
+          target,
+          presentCost: present.cost,
+        }),
+      );
+      continue;
+    }
+
+    // 'full' variant
     if (a && b) {
-      // Guard against zero costs (HW_REGISTRY.costh == 0 or zero throughput
-      // upstream): the ratio math would emit Infinity / NaN. Fall through to
-      // a values-only summary instead of dividing.
-      if (!(a.cost > 0 && b.cost > 0)) {
-        return `On ${modelLabel}, ${aLabel} and ${bLabel} register cost-per-token values of ${fmtCost(a.cost)} and ${fmtCost(b.cost)} respectively at ${target} tok/s/user interactivity. At least one side has missing pricing or throughput data, so a like-for-like ratio isn't meaningful at this point — see the interpolated table below for targets with both inputs populated.`;
-      }
+      const costOk = a.cost > 0 && b.cost > 0;
+      const tputOk = a.value > 0 && b.value > 0;
       const aCheaper = a.cost < b.cost;
-      const cheaper = aCheaper ? aLabel : bLabel;
-      const pricier = aCheaper ? bLabel : aLabel;
-      const ratio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
-      // Within ~1% the cost is effectively tied — say so rather than rounding
-      // to "0% more cost-efficient" which reads wrong.
-      if (ratio < 1.01) {
-        return `On ${modelLabel}, ${aLabel} and ${bLabel} land within ~1% of each other on cost per million tokens at ${target} tok/s/user interactivity (${fmtCost(a.cost)} vs. ${fmtCost(b.cost)}). Across the ${range} interactivity range we benchmarked, see the interpolated table below for the points where one pulls ahead.`;
-      }
-      return `On ${modelLabel}, ${aLabel} costs ${fmtCost(a.cost)} per million tokens at ${target} tok/s/user interactivity; ${bLabel} costs ${fmtCost(b.cost)} per million tokens at the same target. ${cheaper} is ${fmtPctDelta(ratio)} more cost-efficient than ${pricier} at this operating point — across the ${range} interactivity range we benchmarked, see the interpolated table below for how the gap moves across the full Pareto frontier.`;
+      const aFaster = a.value > b.value;
+      const costRatio = costOk ? (aCheaper ? b.cost / a.cost : a.cost / b.cost) : null;
+      const tputRatio = tputOk ? (aFaster ? a.value / b.value : b.value / a.value) : null;
+      const inputs: FullBoth = {
+        modelLabel,
+        aLabel,
+        bLabel,
+        cheaper: aCheaper ? aLabel : bLabel,
+        faster: aFaster ? aLabel : bLabel,
+        costRatio,
+        tputRatio,
+        costTied: costOk && costRatio !== null && costRatio < 1.01,
+        tputTied: tputOk && tputRatio !== null && tputRatio < 1.01,
+        target,
+        aCost: a.cost,
+        bCost: b.cost,
+        aValue: a.value,
+        bValue: b.value,
+        range,
+        band,
+      };
+      paragraphs.push(pickRotated(FULL_BOTH_TEMPLATES, pageSeed, rowIndex)(inputs));
+      continue;
     }
     const present = (a ?? b)!;
-    const presentLabel = a ? aLabel : bLabel;
-    const missingLabel = a ? bLabel : aLabel;
-    return `On ${modelLabel}, ${presentLabel} costs ${fmtCost(present.cost)} per million tokens at ${target} tok/s/user interactivity. We don't have ${missingLabel} benchmark data at this exact operating point — see the interpolated table below for the targets where both GPUs are measurable.`;
+    paragraphs.push(
+      pickRotated(
+        FULL_SINGLE_TEMPLATES,
+        pageSeed,
+        rowIndex,
+      )({
+        modelLabel,
+        presentLabel: a ? aLabel : bLabel,
+        missingLabel: a ? bLabel : aLabel,
+        target,
+        presentValue: present.value,
+        presentCost: present.cost,
+      }),
+    );
   }
 
-  // 'full' variant — mention cost AND throughput
-  if (a && b) {
-    // Two independent comparisons (cost, throughput): tie-handling and
-    // zero-guard applied separately so a tie on one dimension doesn't
-    // suppress the other side of the sentence.
-    const costPart = (() => {
-      if (!(a.cost > 0 && b.cost > 0)) return null;
-      const aCheaper = a.cost < b.cost;
-      const cheaper = aCheaper ? aLabel : bLabel;
-      const ratio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
-      if (ratio < 1.01) return 'cost per token is essentially tied';
-      return `${cheaper} is ${fmtPctDelta(ratio)} cheaper per token`;
-    })();
-    const tputPart = (() => {
-      if (!(a.value > 0 && b.value > 0)) return null;
-      const aFaster = a.value > b.value;
-      const faster = aFaster ? aLabel : bLabel;
-      const ratio = aFaster ? a.value / b.value : b.value / a.value;
-      if (ratio < 1.01) return 'throughput per GPU is essentially tied';
-      return `${faster} delivers ${fmtPctDelta(ratio)} more tok/s/GPU`;
-    })();
-    const summary = [costPart, tputPart].filter(Boolean).join('; ');
-    const summarySentence = summary
-      ? ` ${summary.charAt(0).toUpperCase() + summary.slice(1)} at this operating point — `
-      : ' ';
-    return `On ${modelLabel}, at ${target} tok/s/user interactivity (within the ${range} range benchmarked), ${aLabel} delivers ${a.value.toFixed(0)} tok/s/GPU at ${fmtCost(a.cost)} per million tokens, while ${bLabel} delivers ${b.value.toFixed(0)} tok/s/GPU at ${fmtCost(b.cost)} per million tokens.${summarySentence}use the interpolated table below to see how the comparison shifts at higher and lower interactivity.`;
-  }
-  const present = (a ?? b)!;
-  const presentLabel = a ? aLabel : bLabel;
-  const missingLabel = a ? bLabel : aLabel;
-  return `On ${modelLabel}, ${presentLabel} delivers ${present.value.toFixed(0)} tok/s/GPU at ${fmtCost(present.cost)} per million tokens at ${target} tok/s/user interactivity. We don't have ${missingLabel} benchmark data at this exact operating point — see the interpolated table below for the targets where both GPUs are measurable.`;
+  return paragraphs;
 }
 
 // ---------------------------------------------------------------------------

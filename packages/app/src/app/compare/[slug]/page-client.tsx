@@ -34,9 +34,12 @@ interface ComparePageClientProps {
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: SsrTableData;
-  /** SSR-rendered plain-English summary of the interpolated table (mid-target
-   *  operating point + headline ratio). Null when there's no comparable data. */
-  narrative: string | null;
+  /** One SSR-rendered prose paragraph per interpolated-table row (default
+   *  interactivity target). Each paragraph picks a template variant
+   *  deterministically from the slug so prose stays stable across renders
+   *  but varies across pages in the catalog. Empty array when there's no
+   *  comparable data. */
+  narrative: string[];
   aLabel: string;
   bLabel: string;
   aVendor: string;
@@ -115,18 +118,25 @@ export default function ComparePageClient({
                 </Link>
                 .
               </p>
-              {narrative && (
-                <p
-                  className="mt-3 text-sm text-foreground/80 max-w-3xl"
-                  data-testid="compare-narrative"
-                >
-                  {narrative}{' '}
-                  <span className="text-muted-foreground italic">
-                    (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
-                    {defaultPrecision ?? 'precision'} selection for this URL — table and chart below
-                    update if you change sequence, precision, or model in the controls.)
-                  </span>
-                </p>
+              {narrative.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
+                  {narrative.map((para, i) => (
+                    <p key={i} className="text-sm text-foreground/80">
+                      {para}
+                      {i === narrative.length - 1 && (
+                        <>
+                          {' '}
+                          <span className="text-muted-foreground italic">
+                            (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
+                            {defaultPrecision ?? 'precision'} selection for this URL — table and
+                            chart below update if you change sequence, precision, or model in the
+                            controls.)
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  ))}
+                </div>
               )}
               <p className="mt-2 text-sm">
                 <Link
