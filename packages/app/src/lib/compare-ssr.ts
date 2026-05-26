@@ -308,6 +308,85 @@ function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
  *  `'per-dollar'` is the /compare-per-dollar page's cost-efficiency framing. */
 export type CompareJsonLdVariant = 'full' | 'per-dollar';
 
+// ---------------------------------------------------------------------------
+// Plain-English table narrative
+// ---------------------------------------------------------------------------
+
+/** Format cost as $X.XX or $X.X depending on magnitude. */
+function fmtCost(v: number): string {
+  if (v >= 10) return `$${v.toFixed(1)}`;
+  return `$${v.toFixed(2)}`;
+}
+
+/** Round a ratio (always ≥ 1) into a percentage delta, e.g. 1.3 → "30%". */
+function fmtPctDelta(ratio: number): string {
+  return `${Math.round((ratio - 1) * 100)}%`;
+}
+
+/** Per-route prose summary of the interpolated table. Server-rendered into
+ *  the page HTML so crawlers and screen-readers get a plain-English read of
+ *  the headline number alongside the table data. Returns null when there's
+ *  no comparable data to describe (caller falls back to the empty-state UI).
+ *
+ *  Picks the middle target where both GPUs have data (preferred), or the
+ *  middle target with data on either side, and describes that operating
+ *  point. Template differs by variant — `'full'` mentions both cost and
+ *  throughput; `'per-dollar'` focuses on cost and references the table for
+ *  the rest. */
+export function compareTableNarrative(
+  variant: CompareJsonLdVariant,
+  modelLabel: string,
+  aLabel: string,
+  bLabel: string,
+  ssrRows: SsrInterpolatedRow[],
+  interactivityRange: { min: number; max: number },
+): string | null {
+  if (ssrRows.length === 0) return null;
+
+  // Prefer the first row with data on BOTH sides — those are the comparison
+  // points readers care about. Fall back to the mid row if there's no overlap.
+  const both = ssrRows.find((r) => r.a && r.b);
+  const row = both ?? ssrRows[Math.floor(ssrRows.length / 2)];
+  const { target, a, b } = row;
+  if (!a && !b) return null;
+
+  const range = `${interactivityRange.min}–${interactivityRange.max} tok/s/user`;
+
+  if (variant === 'per-dollar') {
+    if (a && b) {
+      const aCheaper = a.cost < b.cost;
+      const cheaper = aCheaper ? aLabel : bLabel;
+      const pricier = aCheaper ? bLabel : aLabel;
+      const ratio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
+      // Within ~1% the cost is effectively tied — say so rather than rounding
+      // to "0% more cost-efficient" which reads wrong.
+      if (ratio < 1.01) {
+        return `On ${modelLabel}, ${aLabel} and ${bLabel} land within ~1% of each other on cost per million tokens at ${target} tok/s/user interactivity (${fmtCost(a.cost)} vs. ${fmtCost(b.cost)}). Across the ${range} interactivity range we benchmarked, see the interpolated table below for the points where one pulls ahead.`;
+      }
+      return `On ${modelLabel}, ${aLabel} costs ${fmtCost(a.cost)} per million tokens at ${target} tok/s/user interactivity; ${bLabel} costs ${fmtCost(b.cost)} per million tokens at the same target. ${cheaper} is ${fmtPctDelta(ratio)} more cost-efficient than ${pricier} at this operating point — across the ${range} interactivity range we benchmarked, see the interpolated table below for how the gap moves across the full Pareto frontier.`;
+    }
+    const present = (a ?? b)!;
+    const presentLabel = a ? aLabel : bLabel;
+    const missingLabel = a ? bLabel : aLabel;
+    return `On ${modelLabel}, ${presentLabel} costs ${fmtCost(present.cost)} per million tokens at ${target} tok/s/user interactivity. We don't have ${missingLabel} benchmark data at this exact operating point — see the interpolated table below for the targets where both GPUs are measurable.`;
+  }
+
+  // 'full' variant — mention cost AND throughput
+  if (a && b) {
+    const aCheaper = a.cost < b.cost;
+    const cheaper = aCheaper ? aLabel : bLabel;
+    const costRatio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
+    const aFaster = a.value > b.value;
+    const faster = aFaster ? aLabel : bLabel;
+    const tputRatio = aFaster ? a.value / b.value : b.value / a.value;
+    return `On ${modelLabel}, at ${target} tok/s/user interactivity (the middle of the ${range} range benchmarked), ${aLabel} delivers ${a.value.toFixed(0)} tok/s/GPU at ${fmtCost(a.cost)} per million tokens, while ${bLabel} delivers ${b.value.toFixed(0)} tok/s/GPU at ${fmtCost(b.cost)} per million tokens. ${cheaper} is ${fmtPctDelta(costRatio)} cheaper per token at this operating point; ${faster} delivers ${fmtPctDelta(tputRatio)} more tok/s/GPU — use the interpolated table below to see how the comparison shifts at higher and lower interactivity.`;
+  }
+  const present = (a ?? b)!;
+  const presentLabel = a ? aLabel : bLabel;
+  const missingLabel = a ? bLabel : aLabel;
+  return `On ${modelLabel}, ${presentLabel} delivers ${present.value.toFixed(0)} tok/s/GPU at ${fmtCost(present.cost)} per million tokens at ${target} tok/s/user interactivity. We don't have ${missingLabel} benchmark data at this exact operating point — see the interpolated table below for the targets where both GPUs are measurable.`;
+}
+
 export function buildJsonLd(
   variant: CompareJsonLdVariant,
   model: CompareModelSlug,

@@ -31,6 +31,9 @@ interface ComparePerDollarPageClientProps {
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: SsrTableData;
+  /** SSR-rendered plain-English summary of the dollar-per-million-tokens table
+   *  at the mid target. Null when there's no comparable data. */
+  narrative: string | null;
   aLabel: string;
   bLabel: string;
   aVendor: string;
@@ -78,6 +81,7 @@ export default function ComparePerDollarPageClient({
   defaultSequence,
   defaultPrecision,
   ssrTableData,
+  narrative,
   aLabel,
   bLabel,
   aVendor,
@@ -112,7 +116,9 @@ export default function ComparePerDollarPageClient({
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · Performance per Dollar
               </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">{label}</h1>
+              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+                {label} Performance per Dollar
+              </h1>
               <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
                 Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                 <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
@@ -125,6 +131,14 @@ export default function ComparePerDollarPageClient({
                 </Link>
                 .
               </p>
+              {narrative && (
+                <p
+                  className="mt-3 text-sm text-foreground/80 max-w-3xl"
+                  data-testid="compare-per-dollar-narrative"
+                >
+                  {narrative}
+                </p>
+              )}
               <p className="mt-2 text-sm">
                 <Link
                   href={`/compare/${slug}`}

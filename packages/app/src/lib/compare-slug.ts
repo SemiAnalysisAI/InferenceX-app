@@ -30,18 +30,23 @@ export interface CompareModelSlug {
   label: string;
 }
 
+// Order matches the master /compare and /compare-per-dollar index display:
+// DeepSeek V4 Pro → R1 → Kimi → GLM → MiniMax → Qwen → gpt-oss → Llama 70B.
+// Per product spec — flagship Chinese-developed models first, smaller open
+// US-developed models at the bottom. Qwen sits between MiniMax and gpt-oss to
+// keep the Chinese-lab cluster contiguous before the US transition.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
-  {
-    slug: 'deepseek-r1',
-    displayName: 'DeepSeek-R1-0528',
-    dbKeys: ['dsr1'],
-    label: 'DeepSeek R1',
-  },
   {
     slug: 'deepseek-v4',
     displayName: 'DeepSeek-V4-Pro',
     dbKeys: ['dsv4'],
     label: 'DeepSeek V4 Pro',
+  },
+  {
+    slug: 'deepseek-r1',
+    displayName: 'DeepSeek-R1-0528',
+    dbKeys: ['dsr1'],
+    label: 'DeepSeek R1',
   },
   {
     slug: 'kimi-k26',
@@ -54,12 +59,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // Slug groups two point releases sharing one architecture — the header
     // surfaces both versions so the URL doesn't read as "only K2.6".
     label: 'Kimi K2.5/K2.6',
-  },
-  {
-    slug: 'qwen-3-5',
-    displayName: 'Qwen-3.5-397B-A17B',
-    dbKeys: ['qwen3.5'],
-    label: 'Qwen 3.5',
   },
   {
     slug: 'glm-5-1',
@@ -77,16 +76,22 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     label: 'MiniMax M2.5/M2.7',
   },
   {
-    slug: 'llama-3-3-70b',
-    displayName: 'Llama-3.3-70B-Instruct-FP8',
-    dbKeys: ['llama70b'],
-    label: 'Llama 3.3 70B',
+    slug: 'qwen-3-5',
+    displayName: 'Qwen-3.5-397B-A17B',
+    dbKeys: ['qwen3.5'],
+    label: 'Qwen 3.5',
   },
   {
     slug: 'gptoss-120b',
     displayName: 'gpt-oss-120b',
     dbKeys: ['gptoss120b'],
     label: 'gpt-oss 120B',
+  },
+  {
+    slug: 'llama-3-3-70b',
+    displayName: 'Llama-3.3-70B-Instruct-FP8',
+    dbKeys: ['llama70b'],
+    label: 'Llama 3.3 70B',
   },
 ];
 

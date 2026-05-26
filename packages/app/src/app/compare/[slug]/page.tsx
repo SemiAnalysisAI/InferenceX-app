@@ -14,6 +14,7 @@ import {
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import {
   buildJsonLd,
+  compareTableNarrative,
   computeCompareTableData,
   getCachedBenchmarks,
   KNOWN_MODELS,
@@ -146,6 +147,16 @@ export default async function ComparePage({ params, searchParams }: Props) {
   const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const aMeta = HW_REGISTRY[parsed.a];
   const bMeta = HW_REGISTRY[parsed.b];
+  const aLabel = aMeta?.label ?? parsed.a.toUpperCase();
+  const bLabel = bMeta?.label ?? parsed.b.toUpperCase();
+  const narrative = compareTableNarrative(
+    'full',
+    parsed.model.label,
+    aLabel,
+    bLabel,
+    ssrRows,
+    interactivityRange,
+  );
 
   return (
     <>
@@ -160,8 +171,9 @@ export default async function ComparePage({ params, searchParams }: Props) {
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
-        aLabel={aMeta?.label ?? parsed.a.toUpperCase()}
-        bLabel={bMeta?.label ?? parsed.b.toUpperCase()}
+        narrative={narrative}
+        aLabel={aLabel}
+        bLabel={bLabel}
         aVendor={aMeta?.vendor ?? ''}
         bVendor={bMeta?.vendor ?? ''}
         aArch={aMeta?.arch ?? ''}

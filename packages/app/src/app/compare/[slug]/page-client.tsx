@@ -34,6 +34,9 @@ interface ComparePageClientProps {
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: SsrTableData;
+  /** SSR-rendered plain-English summary of the interpolated table (mid-target
+   *  operating point + headline ratio). Null when there's no comparable data. */
+  narrative: string | null;
   aLabel: string;
   bLabel: string;
   aVendor: string;
@@ -66,6 +69,7 @@ export default function ComparePageClient({
   defaultSequence,
   defaultPrecision,
   ssrTableData,
+  narrative,
   aLabel,
   bLabel,
   aVendor,
@@ -111,6 +115,14 @@ export default function ComparePageClient({
                 </Link>
                 .
               </p>
+              {narrative && (
+                <p
+                  className="mt-3 text-sm text-foreground/80 max-w-3xl"
+                  data-testid="compare-narrative"
+                >
+                  {narrative}
+                </p>
+              )}
               <p className="mt-2 text-sm">
                 <Link
                   href={`/compare-per-dollar/${slug}`}
