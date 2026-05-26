@@ -36,7 +36,7 @@ Common gotchas:
 - **Workload mismatch**: chart headers can mislead. Verify ISL/OSL from the data itself — 1k/1k and 8k/1k give wildly different `tok/s/GPU` and `$/M tokens` numbers. The blog title, lede, tables, and chart caption must all use the same ISL/OSL.
 - **Latest run only**: filter to the highest `run_attempt` per `github_run_id`, then take the latest `date` per `(config_id, conc, isl, osl)`. See the `inferencex-data` skill for the exact filter.
 - **Model spec verification**: never invent parameter counts. Always `WebSearch` the model's released specs (total params, active params, expert count, attention type) before writing the architecture paragraph. Cite sources. GLM-5 is _not_ GLM-4.5 — the numbers changed.
-- **TCO values**: pull from the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics). Current values (verify if older than a quarter):
+- **TCO values**: pull from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/). Current values (verify if older than a quarter):
   - H100 $1.30, H200 $1.41, B200 $1.95, B300 $2.34, GB200 $2.21, GB300 $2.652
   - MI300X $1.12, MI325X $1.28, MI355X $1.48
 - **Cost per million tokens formula**: `$/M tok = TCO_$/GPU/hr * 1e6 / (3600 * tput_per_gpu)`. Equivalently in Python: `cost = tco / (3600 * tput / 1e6)`. Throughput is per-GPU, so GPU count cancels out for aggregated configs.

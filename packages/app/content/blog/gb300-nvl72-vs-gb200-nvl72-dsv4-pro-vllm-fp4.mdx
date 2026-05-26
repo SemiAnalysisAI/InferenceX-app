@@ -20,7 +20,7 @@ tags:
 
 On DeepSeek-V4-Pro FP4 at 8K/1K with Dynamo vLLM and disaggregated prefill/decode on both racks, GB300 NVL72 delivers **up to 2.83x throughput per GPU vs GB200 NVL72 at iso-interactivity**, peaking at 27 tok/s/user (6,182 tok/s/GPU on GB300 vs 2,189 tok/s/GPU on GB200). On paper the silicon delta looks modest — same memory bandwidth, same NVLink fabric, same scale-up world size, only 1.5x more HBM capacity and 1.5x more FP4 — but the middle-of-curve gap blows past every static ratio because GB300's extra HBM removes a software constraint GB200 has to pay for.
 
-The mechanism is **HBM headroom**. At 1.6T params, DSv4-Pro's FP4 weights alone are about 800 GB, and on GB200 the available HBM at narrow prefill shapes is tight enough that the recipe has to compromise on batch size to fit. GB300's 1.5x HBM capacity (288 vs 192 GB/GPU) holds the same model on the same shape with hundreds of GB of headroom to spare, so prefill can run a wider batch that keeps the wider decode pool saturated. After a 20% per-GPU TCO premium ($2.65 vs $2.21/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics)), GB300 still lands **2.31x cheaper per million tokens at 27 tok/s/user**. More HBM, more save.
+The mechanism is **HBM headroom**. At 1.6T params, DSv4-Pro's FP4 weights alone are about 800 GB, and on GB200 the available HBM at narrow prefill shapes is tight enough that the recipe has to compromise on batch size to fit. GB300's 1.5x HBM capacity (288 vs 192 GB/GPU) holds the same model on the same shape with hundreds of GB of headroom to spare, so prefill can run a wider batch that keeps the wider decode pool saturated. After a 20% per-GPU TCO premium ($2.65 vs $2.21/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/)), GB300 still lands **2.31x cheaper per million tokens at 27 tok/s/user**. More HBM, more save.
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
   Click to see the full InferenceX dashboard →
@@ -75,7 +75,7 @@ The catch is that wide EP fires a routed **all-to-all dispatch** before each MoE
 
 ## The Numbers
 
-All rows are DeepSeek-V4-Pro FP4 at **ISL 8192 / OSL 1024** on NVL72, Dynamo vLLM, disaggregated prefill/decode, no speculative decoding, measured on InferenceX on 2026-05-22 ([GHA run 26306422380](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26306422380)). Cost per million total tokens is `TCO_$/GPU/hr × 1e6 / (3600 × tput_per_gpu)`, with GB200 NVL72 at $2.21/GPU/hr and GB300 NVL72 at $2.65/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics).
+All rows are DeepSeek-V4-Pro FP4 at **ISL 8192 / OSL 1024** on NVL72, Dynamo vLLM, disaggregated prefill/decode, no speculative decoding, measured on InferenceX on 2026-05-22 ([GHA run 26306422380](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26306422380)). Cost per million total tokens is `TCO_$/GPU/hr × 1e6 / (3600 × tput_per_gpu)`, with GB200 NVL72 at $2.21/GPU/hr and GB300 NVL72 at $2.65/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/).
 
 **GB200 NVL72 (Dynamo vLLM), DSv4-Pro FP4 8K/1K disagg:**
 
