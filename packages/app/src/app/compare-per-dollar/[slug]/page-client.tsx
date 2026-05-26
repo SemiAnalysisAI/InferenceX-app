@@ -48,6 +48,8 @@ interface ComparePerDollarPageClientProps {
    *  header so readers can audit the pricing assumptions. */
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
+  /** Crawlable data graphic generated for the canonical default comparison. */
+  heroImageSrc: string;
 }
 
 /** Only show Cost + Concurrency in the interpolated table — the rest of the
@@ -98,6 +100,7 @@ export default function ComparePerDollarPageClient({
   bArch,
   aCostPerGpuHr,
   bCostPerGpuHr,
+  heroImageSrc,
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
     track('compare_per_dollar_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
@@ -121,7 +124,7 @@ export default function ComparePerDollarPageClient({
         initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
       >
         <div className="flex flex-col gap-4">
-          <Card className="flex flex-col gap-3">
+          <Card className="flex w-full min-w-0 flex-col gap-3">
             <header>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · Performance per Dollar
@@ -129,7 +132,7 @@ export default function ComparePerDollarPageClient({
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
                 {label} Performance per Dollar
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                 <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
                 Owning-hyperscaler TCO normalized by output tokens — performance per dollar across
@@ -143,7 +146,7 @@ export default function ComparePerDollarPageClient({
               </p>
               {narrative.length > 0 && (
                 <div
-                  className="mt-3 flex flex-col gap-2 max-w-3xl"
+                  className="mt-3 flex flex-col gap-2"
                   data-testid="compare-per-dollar-narrative"
                 >
                   {narrative.map((para, i) => (
@@ -166,7 +169,7 @@ export default function ComparePerDollarPageClient({
               )}
               {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
                 <p
-                  className="mt-2 text-xs text-muted-foreground max-w-3xl"
+                  className="mt-2 text-xs text-muted-foreground"
                   data-testid="compare-per-dollar-pricing"
                 >
                   GPU pricing (owning hyperscaler): <strong>{aLabel}</strong>{' '}
@@ -195,6 +198,24 @@ export default function ComparePerDollarPageClient({
                 </Link>
               </p>
             </header>
+            <figure
+              className="mt-2 flex flex-col gap-2"
+              data-testid="compare-per-dollar-indexed-image"
+            >
+              <img
+                src={heroImageSrc}
+                alt={`${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`}
+                width={1200}
+                height={675}
+                loading="eager"
+                fetchPriority="high"
+                className="w-full rounded-lg border border-border/50"
+              />
+              <figcaption className="text-xs text-muted-foreground">
+                {aLabel} versus {bLabel} cost per million tokens for this comparison's canonical
+                default workload. Lower cost indicates better performance per dollar.
+              </figcaption>
+            </figure>
             <CompareTableSection
               a={a}
               b={b}

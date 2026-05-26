@@ -258,6 +258,44 @@ export function computeCompareTableData(
   return { defaultTargets, ssrRows, interactivityRange };
 }
 
+/** Sample the same interpolated cost curve used for the comparison table for
+ * server-rendered image assets. More samples make the static PNG read like the
+ * interactive roofline without requiring browser-based chart capture. */
+export function computeCompareImageRows(
+  rows: BenchmarkRow[],
+  a: string,
+  b: string,
+  sequence: string | null,
+  precision: string | null,
+  interactivityRange: { min: number; max: number },
+): SsrInterpolatedRow[] {
+  if (!sequence || !precision || interactivityRange.max <= interactivityRange.min) return [];
+
+  const islOsl = sequenceToIslOsl(sequence);
+  if (!islOsl) return [];
+
+  const pointsA = buildGpuDataPoints(rows, a, islOsl.isl, islOsl.osl, precision);
+  const pointsB = buildGpuDataPoints(rows, b, islOsl.isl, islOsl.osl, precision);
+  if (pointsA.length === 0 && pointsB.length === 0) return [];
+
+  const sampleCount = 17;
+  const span = interactivityRange.max - interactivityRange.min;
+  return Array.from({ length: sampleCount }, (_, index) => {
+    const target = interactivityRange.min + (span * index) / (sampleCount - 1);
+    return {
+      target,
+      a:
+        pointsA.length > 0
+          ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
+          : null,
+      b:
+        pointsB.length > 0
+          ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
+          : null,
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // JSON-LD graph
 // ---------------------------------------------------------------------------
@@ -729,6 +767,7 @@ export function buildJsonLd(
   summaryA: PairSummary,
   summaryB: PairSummary,
   ssrRows: SsrInterpolatedRow[],
+  imageUrl?: string,
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
@@ -793,6 +832,7 @@ export function buildJsonLd(
         name: itemListName,
         description: itemListDescription,
         url,
+        ...(imageUrl && { image: imageUrl }),
         itemListOrder: 'https://schema.org/ItemListOrderAscending',
         numberOfItems: 2,
         itemListElement: [jsonLdEntryFor(a, summaryA, 1), jsonLdEntryFor(b, summaryB, 2)],
@@ -804,6 +844,13 @@ export function buildJsonLd(
               name: datasetName,
               description: datasetDescription,
               url,
+              ...(imageUrl && {
+                image: {
+                  '@type': 'ImageObject',
+                  contentUrl: imageUrl,
+                  caption: datasetName,
+                },
+              }),
               hasPart: comparisonRows,
             },
           ]
