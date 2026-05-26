@@ -99,14 +99,16 @@ export default async function CompareIndexPage() {
             {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
             throughput, and cost metrics, plus an interpolated comparison table.
           </p>
-          <div className="mt-4">
+          <div className="mt-6">
             <Link
               data-testid="compare-index-per-dollar-link"
               href="/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md bg-brand/10 px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand/15 transition-colors"
+              className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
             >
               Compare GPU performance per dollar
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
             </Link>
           </div>
         </Card>
