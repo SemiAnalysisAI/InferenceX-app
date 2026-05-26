@@ -43,6 +43,13 @@ interface ComparePerDollarPageClientProps {
  *  metric rows (Throughput, tok/s/MW) live on the sibling /compare page. */
 const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
+/** Rename "Cost ($/M tok)" to the full-English "Dollar per Million Tokens"
+ *  in the per-dollar table so the cell reads in line with the page's
+ *  "Performance per Dollar" framing and surfaces the SEO term verbatim. */
+const PER_DOLLAR_LABEL_OVERRIDES = {
+  'Cost ($/M tok)': 'Dollar per Million Tokens',
+};
+
 /** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
  *  packages/app/src/components/inference/inference-chart-config.json. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
@@ -198,6 +205,7 @@ function CompareTableSection({
       gpuDataPointsA={pointsA}
       gpuDataPointsB={pointsB}
       visibleMetricLabels={PER_DOLLAR_TABLE_METRICS}
+      metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES}
     />
   );
 }

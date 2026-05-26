@@ -37,6 +37,12 @@ export interface CompareInterpolatedTableProps {
    *  variant passes ['Cost ($/M tok)', 'Concurrency'] to slim the table down
    *  to the cost-efficiency view; /compare omits the prop. */
   visibleMetricLabels?: string[];
+  /** Per-route display-label overrides keyed by the metric's internal `label`.
+   *  Lets routes render a longer / more descriptive name in the cell without
+   *  forking the METRICS table. Example: /compare-per-dollar overrides
+   *  'Cost ($/M tok)' → 'Dollar per Million Tokens' so the page reads in full
+   *  English to match its "Performance per Dollar" framing. */
+  metricLabelOverrides?: Record<string, string>;
 }
 
 interface ColumnData {
@@ -90,10 +96,15 @@ export function CompareInterpolatedTable({
   gpuDataPointsA,
   gpuDataPointsB,
   visibleMetricLabels,
+  metricLabelOverrides,
 }: CompareInterpolatedTableProps) {
-  const metricsToRender = visibleMetricLabels
-    ? METRICS.filter((m) => visibleMetricLabels.includes(m.label))
-    : METRICS;
+  const metricsToRender = (
+    visibleMetricLabels ? METRICS.filter((m) => visibleMetricLabels.includes(m.label)) : METRICS
+  ).map((m) =>
+    metricLabelOverrides && metricLabelOverrides[m.label]
+      ? { ...m, label: metricLabelOverrides[m.label] }
+      : m,
+  );
   const [columns, setColumns] = useState<ColumnData[]>(() =>
     defaultTargets.map((target, i) => ({
       target,
