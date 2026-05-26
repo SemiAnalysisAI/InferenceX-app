@@ -12,7 +12,7 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'GPU performance per dollar — head-to-head cost per million tokens across every model and hardware pair we benchmark. Performance normalized by owning-hyperscaler TCO for DeepSeek R1, Kimi K2.5/K2.6, GLM 5/5.1, Qwen 3.5, and more. Pick the cheapest SKU for your workload.';
+  'GPU performance per dollar — head-to-head cost per million tokens across every model and hardware pair we benchmark. Performance normalized by owning-hyperscaler TCO for DeepSeek V4 Pro 1.6T, DeepSeek R1, Kimi K2.5/K2.6 1T, GLM 5/5.1, Qwen 3.5 397B-A17B, and more. Pick the cheapest SKU for your workload.';
 
 export const metadata: Metadata = {
   title: 'GPU Performance per Dollar',

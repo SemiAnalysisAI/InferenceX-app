@@ -40,7 +40,7 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'deepseek-v4',
     displayName: 'DeepSeek-V4-Pro',
     dbKeys: ['dsv4'],
-    label: 'DeepSeek V4 Pro',
+    label: 'DeepSeek V4 Pro 1.6T',
   },
   {
     slug: 'deepseek-r1',
@@ -57,8 +57,9 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // so the slug is populated today and stays populated when K2.6 data lands.
     dbKeys: ['kimik2.6', 'kimik2.5'],
     // Slug groups two point releases sharing one architecture — the header
-    // surfaces both versions so the URL doesn't read as "only K2.6".
-    label: 'Kimi K2.5/K2.6',
+    // surfaces both versions so the URL doesn't read as "only K2.6". Param
+    // count appended so the label conveys model scale alongside the version.
+    label: 'Kimi K2.5/K2.6 1T',
   },
   {
     slug: 'glm-5-1',
@@ -79,7 +80,8 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'qwen-3-5',
     displayName: 'Qwen-3.5-397B-A17B',
     dbKeys: ['qwen3.5'],
-    label: 'Qwen 3.5',
+    // 397B total parameters, 17B active per forward pass (MoE).
+    label: 'Qwen 3.5 397B-A17B',
   },
   {
     slug: 'gptoss-120b',

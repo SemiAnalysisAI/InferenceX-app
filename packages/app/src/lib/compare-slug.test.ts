@@ -241,7 +241,7 @@ describe('compareModelDisplayLabel', () => {
       'DeepSeek R1 — H100 vs H200',
     );
     expect(compareModelDisplayLabel(KIMI_K26, 'gb200', 'mi355x')).toBe(
-      'Kimi K2.5/K2.6 — GB200 NVL72 vs MI355X',
+      'Kimi K2.5/K2.6 1T — GB200 NVL72 vs MI355X',
     );
   });
 });
