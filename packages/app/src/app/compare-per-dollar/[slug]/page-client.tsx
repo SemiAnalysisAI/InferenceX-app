@@ -124,7 +124,7 @@ export default function ComparePerDollarPageClient({
         initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
       >
         <div className="flex flex-col gap-4">
-          <Card className="flex flex-col gap-3">
+          <Card className="flex w-full min-w-0 max-w-3xl flex-col gap-3">
             <header>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · Performance per Dollar
@@ -199,7 +199,7 @@ export default function ComparePerDollarPageClient({
               </p>
             </header>
             <figure
-              className="mt-2 flex max-w-3xl flex-col gap-2"
+              className="mt-2 flex flex-col gap-2"
               data-testid="compare-per-dollar-indexed-image"
             >
               <img
