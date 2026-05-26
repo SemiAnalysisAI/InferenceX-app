@@ -187,9 +187,9 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.DeepSeek_R1)).toBe('DeepSeek R1 0528');
     expect(getModelLabel(Model.GptOss)).toBe('gpt-oss 120B');
     expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5');
-    expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5');
+    expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6');
     expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1');
-    expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5');
+    expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5/2.7');
   });
 
   it('falls back to the model value for unknown model', () => {

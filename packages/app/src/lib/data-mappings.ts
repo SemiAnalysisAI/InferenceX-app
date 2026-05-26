@@ -57,14 +57,19 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     mtpEngineExclusion: true,
   },
   [Model.Kimi_K2_5]: {
-    label: 'Kimi K2.5',
+    // K2.5 and K2.6 share an architecture, so the dropdown surfaces both
+    // versions joined with a slash — matches the GLM5/5.1 pattern. The
+    // hyphenated `Model.Kimi_K2_5` enum value stays as-is for internal
+    // routing / DB key mapping.
+    label: 'Kimi K2.5/2.6',
     prefix: 'kimik2.5',
     category: 'default',
   },
   [Model.Qwen3_5]: { label: 'Qwen3.5', prefix: 'qwen3.5', category: 'default' },
   [Model.GLM_5]: { label: 'GLM5/5.1', prefix: 'glm5', category: 'default' },
   [Model.MiniMax_M2_5]: {
-    label: 'MiniMax M2.5',
+    // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
+    label: 'MiniMax M2.5/2.7',
     prefix: 'minimaxm2.5',
     category: 'default',
   },
