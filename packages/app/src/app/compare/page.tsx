@@ -6,13 +6,8 @@ import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import {
-  canonicalCompareSlug,
-  compareDisplayLabel,
-  type ComparePair,
-  COMPARE_MODEL_SLUGS,
-  type CompareModelSlug,
-} from '@/lib/compare-slug';
+import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
+import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,17 +31,6 @@ export const metadata: Metadata = {
   },
 };
 
-/** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Enumerated
- *  in the lede instead of a bare count so search engines see every model name
- *  in the indexable description. */
-function formatModelList(models: CompareModelSlug[]): string {
-  const labels = models.map((m) => m.label);
-  if (labels.length === 0) return 'no models';
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
-}
-
 interface VendorGroup {
   heading: string;
   description: string;
@@ -57,26 +41,8 @@ function groupPairsByVendorForModel(
   model: CompareModelSlug,
   comparablePairs: ComparePair[],
 ): VendorGroup[] {
-  const nvidia: VendorGroup['pairs'] = [];
-  const amd: VendorGroup['pairs'] = [];
-  const cross: VendorGroup['pairs'] = [];
-
-  for (const { a, b } of comparablePairs) {
-    const entry = {
-      a,
-      b,
-      slug: canonicalCompareSlug(model.slug, a, b),
-      label: compareDisplayLabel(a, b),
-    };
-    const vA = HW_REGISTRY[a]?.vendor;
-    const vB = HW_REGISTRY[b]?.vendor;
-    if (vA === 'NVIDIA' && vB === 'NVIDIA') nvidia.push(entry);
-    else if (vA === 'AMD' && vB === 'AMD') amd.push(entry);
-    else cross.push(entry);
-  }
-
+  const { cross, nvidia, amd } = bucketComparePairsByVendor(model.slug, comparablePairs);
   const groups: VendorGroup[] = [];
-
   if (cross.length > 0) {
     groups.push({
       heading: 'NVIDIA vs AMD',
@@ -98,7 +64,6 @@ function groupPairsByVendorForModel(
       pairs: amd,
     });
   }
-
   return groups;
 }
 

@@ -23,7 +23,13 @@ import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/t
 import { cachedQuery } from '@/lib/api-cache';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { getHardwareKey } from '@/lib/chart-utils';
-import { type CompareModelSlug, compareModelDisplayLabel } from '@/lib/compare-slug';
+import {
+  canonicalCompareSlug,
+  compareDisplayLabel,
+  type ComparePair,
+  type CompareModelSlug,
+  compareModelDisplayLabel,
+} from '@/lib/compare-slug';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { loadFixture } from '@/lib/test-fixtures';
 
@@ -328,11 +334,11 @@ function fmtPctDelta(ratio: number): string {
  *  the headline number alongside the table data. Returns null when there's
  *  no comparable data to describe (caller falls back to the empty-state UI).
  *
- *  Picks the middle target where both GPUs have data (preferred), or the
- *  middle target with data on either side, and describes that operating
- *  point. Template differs by variant — `'full'` mentions both cost and
- *  throughput; `'per-dollar'` focuses on cost and references the table for
- *  the rest. */
+ *  Picks the first interactivity target where both GPUs have data (those are
+ *  the points readers care about), or falls back to a single-GPU description
+ *  at the mid row if there's no overlap. Template differs by variant —
+ *  `'full'` mentions both cost and throughput; `'per-dollar'` focuses on cost
+ *  and references the table for the rest. */
 export function compareTableNarrative(
   variant: CompareJsonLdVariant,
   modelLabel: string,
@@ -343,8 +349,6 @@ export function compareTableNarrative(
 ): string | null {
   if (ssrRows.length === 0) return null;
 
-  // Prefer the first row with data on BOTH sides — those are the comparison
-  // points readers care about. Fall back to the mid row if there's no overlap.
   const both = ssrRows.find((r) => r.a && r.b);
   const row = both ?? ssrRows[Math.floor(ssrRows.length / 2)];
   const { target, a, b } = row;
@@ -354,6 +358,12 @@ export function compareTableNarrative(
 
   if (variant === 'per-dollar') {
     if (a && b) {
+      // Guard against zero costs (HW_REGISTRY.costh == 0 or zero throughput
+      // upstream): the ratio math would emit Infinity / NaN. Fall through to
+      // a values-only summary instead of dividing.
+      if (!(a.cost > 0 && b.cost > 0)) {
+        return `On ${modelLabel}, ${aLabel} and ${bLabel} register cost-per-token values of ${fmtCost(a.cost)} and ${fmtCost(b.cost)} respectively at ${target} tok/s/user interactivity. At least one side has missing pricing or throughput data, so a like-for-like ratio isn't meaningful at this point — see the interpolated table below for targets with both inputs populated.`;
+      }
       const aCheaper = a.cost < b.cost;
       const cheaper = aCheaper ? aLabel : bLabel;
       const pricier = aCheaper ? bLabel : aLabel;
@@ -373,18 +383,92 @@ export function compareTableNarrative(
 
   // 'full' variant — mention cost AND throughput
   if (a && b) {
-    const aCheaper = a.cost < b.cost;
-    const cheaper = aCheaper ? aLabel : bLabel;
-    const costRatio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
-    const aFaster = a.value > b.value;
-    const faster = aFaster ? aLabel : bLabel;
-    const tputRatio = aFaster ? a.value / b.value : b.value / a.value;
-    return `On ${modelLabel}, at ${target} tok/s/user interactivity (the middle of the ${range} range benchmarked), ${aLabel} delivers ${a.value.toFixed(0)} tok/s/GPU at ${fmtCost(a.cost)} per million tokens, while ${bLabel} delivers ${b.value.toFixed(0)} tok/s/GPU at ${fmtCost(b.cost)} per million tokens. ${cheaper} is ${fmtPctDelta(costRatio)} cheaper per token at this operating point; ${faster} delivers ${fmtPctDelta(tputRatio)} more tok/s/GPU — use the interpolated table below to see how the comparison shifts at higher and lower interactivity.`;
+    // Two independent comparisons (cost, throughput): tie-handling and
+    // zero-guard applied separately so a tie on one dimension doesn't
+    // suppress the other side of the sentence.
+    const costPart = (() => {
+      if (!(a.cost > 0 && b.cost > 0)) return null;
+      const aCheaper = a.cost < b.cost;
+      const cheaper = aCheaper ? aLabel : bLabel;
+      const ratio = aCheaper ? b.cost / a.cost : a.cost / b.cost;
+      if (ratio < 1.01) return 'cost per token is essentially tied';
+      return `${cheaper} is ${fmtPctDelta(ratio)} cheaper per token`;
+    })();
+    const tputPart = (() => {
+      if (!(a.value > 0 && b.value > 0)) return null;
+      const aFaster = a.value > b.value;
+      const faster = aFaster ? aLabel : bLabel;
+      const ratio = aFaster ? a.value / b.value : b.value / a.value;
+      if (ratio < 1.01) return 'throughput per GPU is essentially tied';
+      return `${faster} delivers ${fmtPctDelta(ratio)} more tok/s/GPU`;
+    })();
+    const summary = [costPart, tputPart].filter(Boolean).join('; ');
+    const summarySentence = summary
+      ? ` ${summary.charAt(0).toUpperCase() + summary.slice(1)} at this operating point — `
+      : ' ';
+    return `On ${modelLabel}, at ${target} tok/s/user interactivity (within the ${range} range benchmarked), ${aLabel} delivers ${a.value.toFixed(0)} tok/s/GPU at ${fmtCost(a.cost)} per million tokens, while ${bLabel} delivers ${b.value.toFixed(0)} tok/s/GPU at ${fmtCost(b.cost)} per million tokens.${summarySentence}use the interpolated table below to see how the comparison shifts at higher and lower interactivity.`;
   }
   const present = (a ?? b)!;
   const presentLabel = a ? aLabel : bLabel;
   const missingLabel = a ? bLabel : aLabel;
   return `On ${modelLabel}, ${presentLabel} delivers ${present.value.toFixed(0)} tok/s/GPU at ${fmtCost(present.cost)} per million tokens at ${target} tok/s/user interactivity. We don't have ${missingLabel} benchmark data at this exact operating point — see the interpolated table below for the targets where both GPUs are measurable.`;
+}
+
+// ---------------------------------------------------------------------------
+// Master-index helpers (shared by /compare and /compare-per-dollar)
+// ---------------------------------------------------------------------------
+
+/** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Used by the
+ *  master index ledes on both /compare and /compare-per-dollar so the
+ *  enumeration stays consistent if a model is added or removed. */
+export function formatModelList(models: CompareModelSlug[]): string {
+  const labels = models.map((m) => m.label);
+  if (labels.length === 0) return 'no models';
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
+}
+
+export interface VendorBucketEntry {
+  a: string;
+  b: string;
+  slug: string;
+  label: string;
+}
+
+export interface VendorBuckets {
+  /** Cross-vendor pairs (NVIDIA × AMD). */
+  cross: VendorBucketEntry[];
+  /** Both sides NVIDIA. */
+  nvidia: VendorBucketEntry[];
+  /** Both sides AMD. */
+  amd: VendorBucketEntry[];
+}
+
+/** Split (a, b) GPU pairs into vendor buckets for the index grid. The caller
+ *  wraps these entries with its own group headings / descriptions / route
+ *  prefix — keeps the sorting + bucketing + slug-building in one place so the
+ *  two index pages can't drift on those mechanics. */
+export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair[]): VendorBuckets {
+  const nvidia: VendorBucketEntry[] = [];
+  const amd: VendorBucketEntry[] = [];
+  const cross: VendorBucketEntry[] = [];
+
+  for (const { a, b } of pairs) {
+    const entry: VendorBucketEntry = {
+      a,
+      b,
+      slug: canonicalCompareSlug(modelSlug, a, b),
+      label: compareDisplayLabel(a, b),
+    };
+    const vA = HW_REGISTRY[a]?.vendor;
+    const vB = HW_REGISTRY[b]?.vendor;
+    if (vA === 'NVIDIA' && vB === 'NVIDIA') nvidia.push(entry);
+    else if (vA === 'AMD' && vB === 'AMD') amd.push(entry);
+    else cross.push(entry);
+  }
+
+  return { cross, nvidia, amd };
 }
 
 export function buildJsonLd(

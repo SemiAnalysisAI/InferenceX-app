@@ -156,7 +156,7 @@ export default function ComparePerDollarPageClient({
                   <strong>{bLabel}</strong>{' '}
                   {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/GPU/hr` : '—'}. Source:{' '}
                   <a
-                    href="https://newsletter.semianalysis.com/p/ai-cloud-economics"
+                    href="https://semianalysis.com/ai-cloud-tco-model/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-primary"
