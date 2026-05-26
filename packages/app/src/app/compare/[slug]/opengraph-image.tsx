@@ -7,12 +7,8 @@ import { join } from 'node:path';
 import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
 
-import {
-  allCanonicalCompareSlugs,
-  canonicalCompareSlug,
-  compareDisplayLabel,
-  parseCompareSlug,
-} from '@/lib/compare-slug';
+import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
+import { canonicalCompareSlug, compareDisplayLabel, parseCompareSlug } from '@/lib/compare-slug';
 
 export const alt = 'GPU inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
@@ -38,10 +34,12 @@ const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
   { file: 'teal-organic.png', rotate: 180 },
 ];
 
-export function generateStaticParams() {
-  return allCanonicalCompareSlugs().map(({ modelSlug, a, b }) => ({
-    slug: canonicalCompareSlug(modelSlug, a, b),
-  }));
+export async function generateStaticParams() {
+  // Mirror the SSR page's static params — only emit (model, pair) combos
+  // with benchmark data on both sides so we don't generate OG images for
+  // empty pages.
+  const slugs = await getAllComparableCompareSlugs();
+  return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
 }
 
 // Read once at module load; a missing asset must not 500 every OG route.

@@ -20,9 +20,9 @@ import { cachedQuery } from '@/lib/api-cache';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { loadFixture } from '@/lib/test-fixtures';
 import { getHardwareKey } from '@/lib/chart-utils';
+import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
-  allCanonicalCompareSlugs,
   canonicalCompareSlug,
   compareDisplayLabel,
   compareModelDisplayLabel,
@@ -71,10 +71,12 @@ const getCachedBenchmarks = cachedQuery(
   { blobOnly: true },
 );
 
-export function generateStaticParams() {
-  return allCanonicalCompareSlugs().map(({ modelSlug, a, b }) => ({
-    slug: canonicalCompareSlug(modelSlug, a, b),
-  }));
+export async function generateStaticParams() {
+  // Only enumerate (model, pair) combos with benchmark data on both sides.
+  // Direct URL hits to non-enumerated combos still render via the dynamic
+  // SSR path (with the empty-state fallback).
+  const slugs = await getAllComparableCompareSlugs();
+  return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

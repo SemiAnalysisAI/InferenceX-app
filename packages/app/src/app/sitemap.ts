@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
 
 import { getAllPosts } from '@/lib/blog';
-import { allCanonicalCompareSlugs, canonicalCompareSlug } from '@/lib/compare-slug';
+import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
+import { canonicalCompareSlug } from '@/lib/compare-slug';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 const TABS = [
@@ -13,8 +14,11 @@ const TABS = [
   'gpu-metrics',
 ] as const;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
+  // Only emit (model, pair) URLs that have benchmark data on both sides —
+  // avoids polluting the sitemap with empty pages that hurt crawl budget.
+  const compareSlugs = await getAllComparableCompareSlugs();
 
   return [
     {
@@ -59,7 +63,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     })),
-    ...allCanonicalCompareSlugs().map(({ modelSlug, a, b }) => ({
+    ...compareSlugs.map(({ modelSlug, a, b }) => ({
       url: `${BASE_URL}/compare/${canonicalCompareSlug(modelSlug, a, b)}`,
       lastModified: now,
       changeFrequency: 'daily' as const,

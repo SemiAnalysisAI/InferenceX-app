@@ -46,7 +46,11 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'kimi-k26',
     displayName: 'Kimi-K2.5',
-    dbKeys: ['kimik2.6'],
+    // Both K2.5 and K2.6 point releases share an architecture (mirroring
+    // DISPLAY_MODEL_TO_DB in packages/constants/src/models.ts). The slug uses
+    // the newer version name; the dbKey list pulls data from both DB buckets
+    // so the slug is populated today and stays populated when K2.6 data lands.
+    dbKeys: ['kimik2.6', 'kimik2.5'],
     label: 'Kimi K2.6',
   },
   {
@@ -58,13 +62,16 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'glm-5-1',
     displayName: 'GLM-5',
-    dbKeys: ['glm5.1'],
+    // GLM-5.0 and GLM-5.1 share an architecture per the model card; the slug
+    // uses the newer version name but the data pull covers both DB buckets.
+    dbKeys: ['glm5.1', 'glm5'],
     label: 'GLM 5.1',
   },
   {
     slug: 'minimax-m27',
     displayName: 'MiniMax-M2.5',
-    dbKeys: ['minimaxm2.7'],
+    // Same point-release grouping pattern as Kimi and GLM.
+    dbKeys: ['minimaxm2.7', 'minimaxm2.5'],
     label: 'MiniMax M2.7',
   },
   {

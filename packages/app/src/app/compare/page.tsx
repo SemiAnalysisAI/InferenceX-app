@@ -5,13 +5,16 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
+import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
 import {
-  allCanonicalComparePairs,
   canonicalCompareSlug,
   compareDisplayLabel,
+  type ComparePair,
   COMPARE_MODEL_SLUGS,
   type CompareModelSlug,
 } from '@/lib/compare-slug';
+
+export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
   'Browse head-to-head GPU inference benchmark comparisons across every model and hardware pair we test. Latency, throughput, and cost for DeepSeek R1, Kimi K2.6, GLM 5.1, Qwen 3.5, and more.';
@@ -39,14 +42,15 @@ interface VendorGroup {
   pairs: { a: string; b: string; slug: string; label: string }[];
 }
 
-function groupPairsByVendorForModel(model: CompareModelSlug): VendorGroup[] {
-  const all = allCanonicalComparePairs();
-
+function groupPairsByVendorForModel(
+  model: CompareModelSlug,
+  comparablePairs: ComparePair[],
+): VendorGroup[] {
   const nvidia: VendorGroup['pairs'] = [];
   const amd: VendorGroup['pairs'] = [];
   const cross: VendorGroup['pairs'] = [];
 
-  for (const { a, b } of all) {
+  for (const { a, b } of comparablePairs) {
     const entry = {
       a,
       b,
@@ -95,9 +99,17 @@ const jsonLd = {
   url: `${SITE_URL}/compare`,
 };
 
-export default function CompareIndexPage() {
-  const pairsPerModel = allCanonicalComparePairs().length;
-  const totalUrls = COMPARE_MODEL_SLUGS.length * pairsPerModel;
+export default async function CompareIndexPage() {
+  // Server-side filter: only show (model, pair) combinations where both GPUs
+  // have benchmark data for that model. Avoids cards that would link to an
+  // empty-state page. The page-level handler at /compare/[slug] still renders
+  // the empty-state for direct URL hits, so this is purely a navigation
+  // hygiene concern.
+  const comparablePairsByModel = await getComparablePairsByModelSlug();
+  const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
+  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+    (m) => (comparablePairsByModel.get(m.slug)?.length ?? 0) > 0,
+  );
 
   return (
     <>
@@ -106,23 +118,24 @@ export default function CompareIndexPage() {
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">GPU Comparisons</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
-            {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons —{' '}
-            {pairsPerModel} GPU pairs × {COMPARE_MODEL_SLUGS.length} models. Each page includes
-            interactive charts for latency, throughput, and cost metrics, plus an interpolated
-            comparison table.
+            {totalUrls.toLocaleString()} head-to-head inference benchmark comparisons across{' '}
+            {modelsWithPairs.length} models. Each page includes interactive charts for latency,
+            throughput, and cost metrics, plus an interpolated comparison table.
           </p>
         </Card>
       </section>
 
-      {COMPARE_MODEL_SLUGS.map((model) => {
-        const groups = groupPairsByVendorForModel(model);
+      {modelsWithPairs.map((model) => {
+        const pairs = comparablePairsByModel.get(model.slug) ?? [];
+        const groups = groupPairsByVendorForModel(model, pairs);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Compare any GPU pair on {model.label}.
+                  {pairs.length} GPU pair{pairs.length === 1 ? '' : 's'} with benchmark data on{' '}
+                  {model.label}.
                 </p>
               </div>
               {groups.map((group) => (
