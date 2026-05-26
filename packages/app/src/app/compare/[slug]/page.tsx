@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import {
   HW_REGISTRY,
@@ -440,7 +440,11 @@ export default async function ComparePage({ params, searchParams }: Props) {
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    redirect(`/compare/${canonical}${qs ? `?${qs}` : ''}`);
+    // 308 (not 307): bare-slug, alias model, and non-canonical GPU order are
+    // all permanent decisions — using a permanent redirect lets search engines
+    // consolidate link equity onto the canonical URL instead of keeping the
+    // alias URL in the index alongside the canonical one.
+    permanentRedirect(`/compare/${canonical}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
