@@ -199,7 +199,7 @@ export default function ComparePerDollarPageClient({
               </p>
             </header>
             <figure
-              className="mt-2 flex flex-col gap-2"
+              className="mt-2 flex max-w-3xl flex-col gap-2"
               data-testid="compare-per-dollar-indexed-image"
             >
               <img
