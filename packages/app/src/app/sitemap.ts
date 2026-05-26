@@ -75,14 +75,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily' as const,
       priority: 0.7,
     })),
-    // Per-dollar variant URLs — same (model, pair) availability filter as the
-    // /compare set, so the count matches exactly. Each is a distinct canonical
-    // URL with its own SSR metadata, JSON-LD, and OG image.
-    ...compareSlugs.map(({ modelSlug, a, b }) => ({
-      url: `${BASE_URL}/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`,
-      lastModified: now,
-      changeFrequency: 'daily' as const,
-      priority: 0.7,
-    })),
+    // Every indexed per-dollar landing page has a stable data graphic so image
+    // crawlers discover the PNG alongside the canonical comparison URL.
+    ...compareSlugs.map(({ modelSlug, a, b }) => {
+      const url = `${BASE_URL}/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
+      return {
+        url,
+        images: [`${url}/performance-per-dollar.png`],
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      };
+    }),
   ];
 }

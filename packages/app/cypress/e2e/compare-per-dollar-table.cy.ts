@@ -58,6 +58,19 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
   it('uses "Performance per Dollar" framing in the page header', () => {
     cy.contains('Performance per Dollar').should('be.visible');
   });
+
+  it('renders an indexable comparison PNG with descriptive alt text', () => {
+    cy.get('[data-testid="compare-per-dollar-indexed-image"] img')
+      .should('be.visible')
+      .and('have.attr', 'src')
+      .and(
+        'match',
+        /\/compare-per-dollar\/deepseek-r1-gb200-vs-h100\/performance-per-dollar\.png$/u,
+      );
+    cy.get('[data-testid="compare-per-dollar-indexed-image"] img')
+      .should('have.attr', 'alt')
+      .and('contain', 'cost per million tokens at matched interactivity levels');
+  });
 });
 
 describe('Compare slug page — cross-link to per-dollar view', () => {

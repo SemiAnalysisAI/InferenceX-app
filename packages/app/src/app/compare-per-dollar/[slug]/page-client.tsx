@@ -48,6 +48,8 @@ interface ComparePerDollarPageClientProps {
    *  header so readers can audit the pricing assumptions. */
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
+  /** Crawlable data graphic generated for the canonical default comparison. */
+  heroImageSrc: string;
 }
 
 /** Only show Cost + Concurrency in the interpolated table — the rest of the
@@ -98,6 +100,7 @@ export default function ComparePerDollarPageClient({
   bArch,
   aCostPerGpuHr,
   bCostPerGpuHr,
+  heroImageSrc,
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
     track('compare_per_dollar_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
@@ -195,6 +198,24 @@ export default function ComparePerDollarPageClient({
                 </Link>
               </p>
             </header>
+            <figure
+              className="mt-2 flex flex-col gap-2"
+              data-testid="compare-per-dollar-indexed-image"
+            >
+              <img
+                src={heroImageSrc}
+                alt={`${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`}
+                width={1200}
+                height={675}
+                loading="eager"
+                fetchPriority="high"
+                className="w-full rounded-lg border border-border/50"
+              />
+              <figcaption className="text-xs text-muted-foreground">
+                {aLabel} versus {bLabel} cost per million tokens for this comparison's canonical
+                default workload. Lower cost indicates better performance per dollar.
+              </figcaption>
+            </figure>
             <CompareTableSection
               a={a}
               b={b}

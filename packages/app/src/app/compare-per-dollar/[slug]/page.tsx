@@ -120,6 +120,7 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
   );
 
   const url = `${SITE_URL}/compare-per-dollar/${canonical}`;
+  const imageUrl = `${url}/performance-per-dollar.png`;
   const jsonLd = buildJsonLd(
     'per-dollar',
     parsed.model,
@@ -129,6 +130,7 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
     summaryA,
     summaryB,
     ssrRows,
+    imageUrl,
   );
   const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const aMeta = HW_REGISTRY[parsed.a];
@@ -172,6 +174,7 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
         bArch={bMeta?.arch ?? ''}
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
+        heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png`}
       />
     </>
   );
