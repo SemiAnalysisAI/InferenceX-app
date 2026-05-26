@@ -85,6 +85,15 @@ Slug naming follows the pattern of existing posts (see `packages/app/content/blo
 
 Then `mkdir -p packages/app/public/images/{slug}/` and ask the user to drop `benchmark-light.png` and `benchmark-dark.png` there (or do it yourself if they shared the files).
 
+**Image filename convention.** Every image needs both `-light.png` and `-dark.png` variants (drop the same file in for both if the user only has one — placeholder is fine). Filenames should describe what's in the image, not its position in the post:
+
+- `benchmark-{light,dark}.png` — the headline Pareto / throughput / cost chart
+- `{architecture}-rack-{light,dark}.png` — rack diagrams (e.g. `gb200-nvl72-rack-light.png`)
+- `{topology}-topology-{light,dark}.png` — NVLink / scale-up topology diagrams
+- `{kernel-or-feature}-timeline-{light,dark}.png` — profiler timelines
+
+Never use numeric names (`figure1`, `figure2`) — they break when figures get reordered and they tell the next reader nothing.
+
 ## Step 3: Frontmatter
 
 ```yaml
@@ -106,6 +115,13 @@ tags:
 ```
 
 Use `date` == `publishDate` == ISO YYYY-MM-DD. The same date appears in the lede ("measured on InferenceX on 2026-MM-DD").
+
+**Title and subtitle prefer model name + headline ratio + the interactivity point at which it peaks.** Not a laundry list of framework + precision + workload + parallelism — those belong in the body. Compare:
+
+- Good: `'GB200 NVL72 vs B200 on DeepSeek R1 670B: Up to 4.4x Throughput per GPU at 125 tok/s/user'`
+- Avoid: `'GB200 NVL72 vs B200 on DeepSeek R1 FP4 Dynamo TRT Disagg: Up to 4.4x Throughput per GPU in the Middle of the Curve'`
+
+Title gives the SKUs, the model, the headline number, and the interactivity anchor. Subtitle gives the one-sentence mechanism (e.g. "NVLink scale-up vs RoCEv2 EP cap") plus the workload (precision + ISL/OSL). Frameworks, MTP, and recipe details get a line in the body, not the title.
 
 ## Step 4: Body structure
 
@@ -143,6 +159,8 @@ The chart image is the **hero** of the post — it goes right after the top `<Da
 ```
 
 Use the **same `<Figure>` block twice**: once here as the hero (so the chart anchors the post visually before the reader hits the technical prose), and once more directly below the iso-interactivity table further down (so the chart is right next to the data that derives from it, instead of forcing readers to scroll back up). Both `<Figure>` blocks are identical — same `srcLight`/`srcDark`/`alt`/`caption`. The repetition is intentional and matches how readers consume the post.
+
+**Architectural diagrams (rack layouts, topology diagrams) go between the architectural prose and the DashboardCTA, not buried lower down.** If the post discusses a rack-scale system, scale-up domain, NVLink island, prefill/decode pool topology, or anything where a picture is worth a paragraph, drop it in immediately after the prose that motivates it. Example from `gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt.mdx`: the lede mentions "all 72 GPUs over NVLink 5" → next paragraph explains the 8-GPU NVLink island vs 72-GPU rack → next thing the reader sees is the GB200 NVL72 rack diagram showing the 18 compute trays / 9 NVSwitch5 trays. The visual grounds the technical claim before the data tables appear. Use the same `<Figure>` block format as the hero chart, with `srcLight`/`srcDark` even if dark is a placeholder copy of light.
 
 ### Model / architecture paragraph
 
@@ -184,6 +202,8 @@ This is where the headline ratio gets made explicit. One short intro sentence ("
 **Do not put the interpolation algorithm in the body.** No "monotone cubic Hermite", no source-file paths, no Steffen 1990 references. Readers do not need to audit the spline math to trust the table — the table reads cleanly because the helper is already matching the chart they can click through to. The algorithm details belong in this SKILL, in `AGENTS.md`, and in the helper's docstring, not in the published post. Mentioning them in the prose is slop.
 
 Columns: `Interactivity (tok/s/user) | {NVIDIA} $/M tok | {AMD} $/M tok | {NVIDIA} / {AMD}`. Bold the peak-gap row. Show 5-8 rows covering the interesting band — include at least one row where the gap narrows or reverses, so the post stays honest.
+
+**Row-pruning heuristic for `_unreachable_` cells.** The first row of the table must have two real numbers — never start with an `_unreachable_` row, even if that interactivity is technically in your range. Start where both SKUs are measurable so the reader anchors on a real comparison. `_unreachable_` rows are great in the middle or at the end of the table where they tell a regime-extension story ("B200 wins at 300 tok/s/user where GB200 NVL72 has no recipe at all"), but a table that opens with `_∞_` reads like the data is missing rather than that one curve genuinely doesn't reach there.
 
 Follow with one paragraph explaining _why_ the gap peaks where it does (e.g. "the MI355X 4-GPU TP=4 recipe plateaus at $0.22 while B200 is still climbing"), and one sentence noting where the gap inverts (e.g. "Above 90 tok/s/user the comparison flips marginally back to B200 because there is no MI355X recipe matching B200's TP=8 conc 4 at 100+ tok/s/user."). **Don't paper over the inversion** — call it out.
 
@@ -294,6 +314,9 @@ After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose
 - For frameworks: SGLang, vLLM, TRT-LLM (or TensorRT-LLM in formal contexts), Dynamo TRT-LLM, Dynamo vLLM, Dynamo SGLang. AMD's disagg fork is `mori-sglang`.
 - Use em-dashes `—` not double-hyphens.
 - Link the upstream PRs and InferenceX recipe PRs every time. Reader wants the receipts.
+- **Cross-links go where the prose motivates them, not in the lede.** Link `/gpu-specs`, prior InferenceX posts, kernel-recipe docs, and SemiAnalysis models _next to the sentence that earns the click_ — when the post discusses NVLink fanout, the `/gpu-specs` link goes in that paragraph, not in the headline number sentence. The lede is for the headline ratio and the workload; navigation belongs in the body. Link each cross-target once at the first place it's contextually motivated, not at every mention of the SKU/model/topic.
+- **Write tight first, expand only on request.** Default to 1-3 short paragraphs per explanation; trust the reader to ask for more detail in review. Long preemptive expansions get trimmed back by the reviewer (and overwritten by the browser editor's auto-save while you wait). The compute-comm-overlap framing template in the "Reusable technical framings" section is the upper bound — don't go longer than that even for the most central technical argument.
+- **Don't restate the table contents in prose.** If the reader can see "4,130 vs 941 tok/s/GPU = 4.39x at 125 tok/s/user" in the iso-interactivity row, don't also write it in the closing paragraph after the table. Use the prose around tables to explain the WHY, not to summarize the WHAT. A closing paragraph that just restates the headline number gets removed in editorial review.
 - Don't apologize for non-coverage in the lede — save it for "What's Next".
 
 ## Reusable technical framings
