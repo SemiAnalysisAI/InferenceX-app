@@ -46,8 +46,23 @@ DeepSeek published the V4-Pro-Max evaluation at preview against Claude Opus 4.6,
   srcLight="/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/quality-benchmarks-light.png"
   srcDark="/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/quality-benchmarks-dark.png"
   alt="Bar chart comparing DeepSeek-V4-Pro-Max (blue hatched) against Claude Opus 4.6-Max, GPT-5.4-xHigh, and Gemini 3.1-Pro-High across SimpleQA Verified, HLE, Apex Shortlist, Codeforces, SWE Verified, Terminal Bench 2.0, and Toolathlon. DSv4 leads on SimpleQA Verified (57.9), Apex Shortlist (90.2), Codeforces (3206), and SWE Verified (80.6, tied)."
-  caption="DeepSeek-V4-Pro-Max vs Claude Opus 4.6 / GPT-5.4 / Gemini 3.1 on knowledge+reasoning and agentic benchmarks (source: [DeepSeek V4 preview release](https://api-docs.deepseek.com/news/news260424)). DSv4-Pro leads on SimpleQA (57.9 vs Opus 46.2 / GPT 45.3), Apex Shortlist (90.2 vs Opus 85.9), Codeforces (3206 vs Opus 3168), and ties on SWE Verified (80.6 vs Opus 80.8 / GPT 80.6). Trails on Terminal Bench 2.0 (67.9 vs GPT 75.1) and Toolathlon (51.8 vs GPT 54.6).
-"
+  caption={
+    <>
+      DeepSeek-V4-Pro-Max vs Claude Opus 4.6 / GPT-5.4 / Gemini 3.1 on knowledge+reasoning and
+      agentic benchmarks (source:{' '}
+      <a
+        href="https://api-docs.deepseek.com/news/news260424"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline"
+      >
+        DeepSeek V4 preview release
+      </a>
+      ). DSv4-Pro leads on SimpleQA (57.9 vs Opus 46.2 / GPT 45.3), Apex Shortlist (90.2 vs Opus
+      85.9), Codeforces (3206 vs Opus 3168), and ties on SWE Verified (80.6 vs Opus 80.8 / GPT
+      80.6). Trails on Terminal Bench 2.0 (67.9 vs GPT 75.1) and Toolathlon (51.8 vs GPT 54.6).
+    </>
+  }
 />
 
 That quality bar is the reason the AMD SGLang team under the leadership of HaiShaw treated MI355X serving as a 14-day sprint: a frontier open-weights coding model is worth the engineering investment, and once a usable curve exists on AMD silicon every percentage point of perf/$ on the serving stack moves real workloads.

@@ -102,7 +102,7 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
       srcLight?: string;
       srcDark?: string;
       alt?: string;
-      caption?: string;
+      caption?: ReactNode;
     }) => {
       const isFirst = figureCount === 0;
       figureCount++;
