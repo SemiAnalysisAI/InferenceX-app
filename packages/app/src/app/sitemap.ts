@@ -52,6 +52,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
+      url: `${BASE_URL}/compare-per-dollar`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
       url: `${BASE_URL}/blog`,
       lastModified: now,
       changeFrequency: 'weekly',
@@ -65,6 +71,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     ...compareSlugs.map(({ modelSlug, a, b }) => ({
       url: `${BASE_URL}/compare/${canonicalCompareSlug(modelSlug, a, b)}`,
+      lastModified: now,
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    })),
+    // Per-dollar variant URLs — same (model, pair) availability filter as the
+    // /compare set, so the count matches exactly. Each is a distinct canonical
+    // URL with its own SSR metadata, JSON-LD, and OG image.
+    ...compareSlugs.map(({ modelSlug, a, b }) => ({
+      url: `${BASE_URL}/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`,
       lastModified: now,
       changeFrequency: 'daily' as const,
       priority: 0.7,

@@ -23,7 +23,7 @@ import {
   summarize,
 } from '@/lib/compare-ssr';
 
-import ComparePageClient from './page-client';
+import ComparePerDollarPageClient from './page-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,9 +33,9 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  // Only enumerate (model, pair) combos with benchmark data on both sides.
-  // Direct URL hits to non-enumerated combos still render via the dynamic
-  // SSR path (with the empty-state fallback).
+  // Mirror the /compare route's static params — only (model, pair) combos with
+  // benchmark data on both sides. Direct URL hits to non-enumerated combos
+  // still render via the dynamic SSR path (with the empty-state fallback).
   const slugs = await getAllComparableCompareSlugs();
   return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
 }
@@ -46,44 +46,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!parsed) return {};
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
-  const url = `${SITE_URL}/compare/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
-  const description = `Head-to-head GPU inference benchmark comparison for ${parsed.model.label}: ${gpuLabel}. Latency, throughput, and cost across LLM workloads.`;
+  const url = `${SITE_URL}/compare-per-dollar/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
+  // Description weaves the user-named SEO terms — "performance per dollar",
+  // "performance normalized by cost", "dollars per million tokens" — without
+  // keyword-stuffing.
+  const description = `${parsed.model.label} cost per million tokens on ${gpuLabel}. Performance normalized by owning-hyperscaler TCO — see which GPU delivers more inference dollars-per-token at every interactivity level.`;
   return {
-    title: `${fullLabel} Inference Benchmark`,
+    title: `${fullLabel} — Performance per Dollar`,
     description,
     alternates: { canonical: url },
     openGraph: {
-      title: `${fullLabel} | ${SITE_NAME}`,
+      title: `${fullLabel} — Performance per Dollar | ${SITE_NAME}`,
       description,
       url,
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${fullLabel} Inference Benchmark`,
+      title: `${fullLabel} — Performance per Dollar`,
       description,
     },
   };
 }
 
-export default async function ComparePage({ params, searchParams }: Props) {
+export default async function ComparePerDollarPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
 
-  // Await searchParams once so we can both preserve them on redirect and read
-  // them for URL-param overrides further down.
   const sp = await searchParams;
 
-  // One-hop redirect to the fully canonical URL. Handles all three normalization
-  // cases in a single 308:
-  //   - legacy bare slug:   `h100-vs-h200`              → `deepseek-r1-h100-vs-h200`
-  //   - alias model:        `kimi-h100-vs-h200`         → `kimi-k26-h100-vs-h200`
-  //   - non-canonical GPUs: `kimi-k26-h200-vs-h100`     → `kimi-k26-h100-vs-h200`
-  //   - any combination of the above
-  // Preserves the query string so `?i_seq=1k/1k&i_prec=fp8` etc. survive the
-  // redirect — the original PR #351 redirect dropped these, but with bare slugs
-  // now redirecting unconditionally we need to keep them.
+  // Same one-hop 308 normalization as /compare/[slug] — bare-slug fallback,
+  // alias model resolution, GPU alphabetical order — but redirect target lives
+  // under /compare-per-dollar/. Query string is preserved across the hop.
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   if (canonical !== slug) {
     const qs = Object.entries(sp)
@@ -94,11 +89,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // 308 (not 307): bare-slug, alias model, and non-canonical GPU order are
-    // all permanent decisions — using a permanent redirect lets search engines
-    // consolidate link equity onto the canonical URL instead of keeping the
-    // alias URL in the index alongside the canonical one.
-    permanentRedirect(`/compare/${canonical}${qs ? `?${qs}` : ''}`);
+    permanentRedirect(`/compare-per-dollar/${canonical}${qs ? `?${qs}` : ''}`);
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -110,17 +101,11 @@ export default async function ComparePage({ params, searchParams }: Props) {
     parsed.b,
   );
 
-  // URL params win over slug-derived defaults; this baking-into-SSR avoids the
-  // hydration flash where the client upgrades seeded defaults to URL values.
-  // `sp` was already awaited above for the redirect-query-preservation path.
   const urlSeq = pickString(sp.i_seq);
   const urlPrec = pickString(sp.i_prec);
   const urlModel = pickString(sp.g_model);
   const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence;
   const effectivePrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : pickedPrecision;
-  // `?g_model=` is honored only if it matches a known model — but the slug's
-  // model is the canonical default. Disregard URL param if user wants to
-  // explicitly override (rare).
   const effectiveModel =
     urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
 
@@ -132,9 +117,9 @@ export default async function ComparePage({ params, searchParams }: Props) {
     effectivePrecision,
   );
 
-  const url = `${SITE_URL}/compare/${canonical}`;
+  const url = `${SITE_URL}/compare-per-dollar/${canonical}`;
   const jsonLd = buildJsonLd(
-    'full',
+    'per-dollar',
     parsed.model,
     parsed.a,
     parsed.b,
@@ -150,7 +135,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
   return (
     <>
       <JsonLd data={jsonLd} />
-      <ComparePageClient
+      <ComparePerDollarPageClient
         a={parsed.a}
         b={parsed.b}
         slug={canonical}

@@ -61,6 +61,7 @@ export function InferenceProvider({
   activeTab,
   initialActiveHwTypes,
   compareGpuPair,
+  initialYAxisMetric,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -75,6 +76,14 @@ export function InferenceProvider({
    * registry GPU base keys so other hardware never appears on the legend or plots.
    */
   compareGpuPair?: readonly [string, string];
+  /**
+   * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
+   * `/compare-per-dollar/[slug]` to default the chart to
+   * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
+   * the dashboard's default `y_tpPerGpu`. URL param still wins so existing
+   * shared links are unaffected.
+   */
+  initialYAxisMetric?: string;
 }) {
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
@@ -125,7 +134,7 @@ export function InferenceProvider({
     return urlGpus ? urlGpus.split(',').filter(Boolean) : [];
   });
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
-    () => getUrlParam('i_metric') || 'y_tpPerGpu',
+    () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_xmetric') || 'p99_ttft',

@@ -32,6 +32,11 @@ export interface CompareInterpolatedTableProps {
   interactivityRange: { min: number; max: number };
   gpuDataPointsA: GPUDataPoint[];
   gpuDataPointsB: GPUDataPoint[];
+  /** When set, only metric rows whose `label` is in this list are rendered.
+   *  Undefined (the default) shows all four metrics. The /compare-per-dollar
+   *  variant passes ['Cost ($/M tok)', 'Concurrency'] to slim the table down
+   *  to the cost-efficiency view; /compare omits the prop. */
+  visibleMetricLabels?: string[];
 }
 
 interface ColumnData {
@@ -84,7 +89,11 @@ export function CompareInterpolatedTable({
   interactivityRange,
   gpuDataPointsA,
   gpuDataPointsB,
+  visibleMetricLabels,
 }: CompareInterpolatedTableProps) {
+  const metricsToRender = visibleMetricLabels
+    ? METRICS.filter((m) => visibleMetricLabels.includes(m.label))
+    : METRICS;
   const [columns, setColumns] = useState<ColumnData[]>(() =>
     defaultTargets.map((target, i) => ({
       target,
@@ -277,7 +286,7 @@ export function CompareInterpolatedTable({
             </tr>
           </thead>
           <tbody>
-            {METRICS.map((metric) => (
+            {metricsToRender.map((metric) => (
               <MetricTableRow
                 key={metric.label}
                 metric={metric}
