@@ -12,6 +12,7 @@ import {
   parseCompareSlug,
 } from '@/lib/compare-slug';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
+import { getGpuSpecs } from '@/lib/constants';
 import {
   buildJsonLd,
   compareTableNarrative,
@@ -142,6 +143,12 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
     ssrRows,
     interactivityRange,
   );
+  // Owning-hyperscaler $/GPU/hr — the same `costh` value the per-dollar math
+  // upstream uses to derive cost per million tokens. Rendered in the header
+  // so the reader can audit the underlying pricing inputs without leaving
+  // the page.
+  const aCostPerGpuHr = getGpuSpecs(parsed.a).costh;
+  const bCostPerGpuHr = getGpuSpecs(parsed.b).costh;
 
   return (
     <>
@@ -163,6 +170,8 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
         bVendor={bMeta?.vendor ?? ''}
         aArch={aMeta?.arch ?? ''}
         bArch={bMeta?.arch ?? ''}
+        aCostPerGpuHr={aCostPerGpuHr}
+        bCostPerGpuHr={bCostPerGpuHr}
       />
     </>
   );

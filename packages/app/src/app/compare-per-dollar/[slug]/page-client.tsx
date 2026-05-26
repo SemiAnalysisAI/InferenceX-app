@@ -40,6 +40,11 @@ interface ComparePerDollarPageClientProps {
   bVendor: string;
   aArch: string;
   bArch: string;
+  /** Owning-hyperscaler $/GPU/hr for each GPU — sourced from HW_REGISTRY.costh
+   *  (the same input the per-dollar cost-per-token math uses). Rendered in the
+   *  header so readers can audit the pricing assumptions. */
+  aCostPerGpuHr: number;
+  bCostPerGpuHr: number;
 }
 
 /** Only show Cost + Concurrency in the interpolated table — the rest of the
@@ -88,6 +93,8 @@ export default function ComparePerDollarPageClient({
   bVendor,
   aArch,
   bArch,
+  aCostPerGpuHr,
+  bCostPerGpuHr,
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
     track('compare_per_dollar_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
@@ -137,6 +144,27 @@ export default function ComparePerDollarPageClient({
                   data-testid="compare-per-dollar-narrative"
                 >
                   {narrative}
+                </p>
+              )}
+              {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
+                <p
+                  className="mt-2 text-xs text-muted-foreground max-w-3xl"
+                  data-testid="compare-per-dollar-pricing"
+                >
+                  GPU pricing (owning hyperscaler): <strong>{aLabel}</strong>{' '}
+                  {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/GPU/hr` : '—'} ·{' '}
+                  <strong>{bLabel}</strong>{' '}
+                  {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/GPU/hr` : '—'}. Source:{' '}
+                  <a
+                    href="https://newsletter.semianalysis.com/p/ai-cloud-economics"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-primary"
+                    onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
+                  >
+                    SemiAnalysis Market August 2025 Pricing Surveys &amp; AI Cloud TCO Model
+                  </a>
+                  .
                 </p>
               )}
               <p className="mt-2 text-sm">
