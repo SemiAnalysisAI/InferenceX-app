@@ -41,6 +41,12 @@ const NAV_LINKS = [
     event: 'header_compare_clicked',
   },
   {
+    href: '/compare-per-dollar',
+    label: 'Per Dollar',
+    testId: 'nav-link-compare-per-dollar',
+    event: 'header_compare_per_dollar_clicked',
+  },
+  {
     href: '/quotes',
     label: 'Supporters',
     testId: 'nav-link-supporters',
@@ -53,7 +59,10 @@ const NAV_LINKS = [
 function isActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
-  return pathname.startsWith(href);
+  // Exact match or a child path under `<href>/...`. The bare `startsWith` would
+  // light up `/compare` when the user is on `/compare-per-dollar/...` since the
+  // latter starts with the literal string `/compare`.
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export const Header = ({ starCount }: { starCount?: number | null }) => {
