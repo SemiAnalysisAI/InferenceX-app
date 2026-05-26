@@ -13,8 +13,14 @@ import {
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const SIZE = { width: 1200, height: 675 };
-const CHART = { left: 76, top: 42, width: 654, height: 272 };
+const DISPLAY_SIZE = { width: 1200, height: 675 };
+const IMAGE_SCALE = 2;
+const SIZE = {
+  width: DISPLAY_SIZE.width * IMAGE_SCALE,
+  height: DISPLAY_SIZE.height * IMAGE_SCALE,
+};
+const CHART_FRAME = { left: 0, top: 18, width: 746, height: 382 };
+const CHART = { left: 96, top: 42, width: 630, height: 272 };
 const COLORS = {
   background: '#0d1117',
   panel: '#121a23',
@@ -111,12 +117,14 @@ export async function GET(
       style={{
         display: 'flex',
         flexDirection: 'column',
-        width: '100%',
-        height: '100%',
+        width: DISPLAY_SIZE.width,
+        height: DISPLAY_SIZE.height,
         padding: '38px 46px 26px',
         background: COLORS.background,
         color: COLORS.text,
         fontFamily: 'Arial, sans-serif',
+        transform: `scale(${IMAGE_SCALE})`,
+        transformOrigin: 'top left',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -169,10 +177,10 @@ export async function GET(
             style={{ position: 'absolute', left: 0, top: 0 }}
           >
             <rect
-              x="42"
-              y="18"
-              width="704"
-              height="382"
+              x={CHART_FRAME.left}
+              y={CHART_FRAME.top}
+              width={CHART_FRAME.width}
+              height={CHART_FRAME.height}
               rx="13"
               fill={COLORS.panel}
               stroke={COLORS.border}
@@ -240,9 +248,9 @@ export async function GET(
               style={{
                 display: 'flex',
                 position: 'absolute',
-                left: 0,
+                left: CHART_FRAME.left + 14,
                 top: scaleY(tick) - 9,
-                width: CHART.left - 12,
+                width: CHART.left - CHART_FRAME.left - 28,
                 justifyContent: 'flex-end',
                 color: COLORS.muted,
                 fontSize: 15,
@@ -325,36 +333,32 @@ export async function GET(
             </span>
           </div>
           {plottedRows.length > 0 ? (
-            plottedRows.map((row) => {
-              const aCheaper = row.a && row.b && row.a.cost < row.b.cost;
-              const bCheaper = row.a && row.b && row.b.cost < row.a.cost;
-              return (
-                <div
-                  key={`row-${row.target}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                    border: `1px solid ${COLORS.border}`,
-                    borderRadius: 10,
-                    padding: '11px 13px',
-                    background: COLORS.panel,
-                  }}
-                >
-                  <div style={{ display: 'flex', color: COLORS.muted, fontSize: 13 }}>
-                    {row.target} tok/s/user
-                  </div>
-                  <div style={{ display: 'flex', gap: 15, fontSize: 19, fontWeight: 700 }}>
-                    <span style={{ display: 'flex', color: aCheaper ? COLORS.a : COLORS.text }}>
-                      {row.a ? money(row.a.cost) : 'N/A'}
-                    </span>
-                    <span style={{ display: 'flex', color: bCheaper ? COLORS.b : COLORS.text }}>
-                      {row.b ? money(row.b.cost) : 'N/A'}
-                    </span>
-                  </div>
+            plottedRows.map((row) => (
+              <div
+                key={`row-${row.target}`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 10,
+                  padding: '11px 13px',
+                  background: COLORS.panel,
+                }}
+              >
+                <div style={{ display: 'flex', color: COLORS.muted, fontSize: 13 }}>
+                  {row.target} tok/s/user
                 </div>
-              );
-            })
+                <div style={{ display: 'flex', gap: 15, fontSize: 19, fontWeight: 700 }}>
+                  <span style={{ display: 'flex', color: COLORS.a }}>
+                    {row.a ? money(row.a.cost) : 'N/A'}
+                  </span>
+                  <span style={{ display: 'flex', color: COLORS.b }}>
+                    {row.b ? money(row.b.cost) : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            ))
           ) : (
             <div style={{ display: 'flex', fontSize: 18, color: COLORS.muted }}>
               No matched cost data available.
