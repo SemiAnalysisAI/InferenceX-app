@@ -1,6 +1,6 @@
 ---
 title: 'B200 NVFP4 vs H200 INT4 on Kimi K2.5/K2.6: Up to 2.95x Better Performance per Dollar'
-subtitle: "On vLLM 8K/1K the NVFP4 path on B200 is 2.71x–2.95x cheaper per million tokens than H200 INT4 across the entire 30–90 tok/s/user serving band, and 2.50x–2.74x cheaper than B200 INT4 on the same silicon. Both factors decompose cleanly into B200's HBM bandwidth, HBM capacity, and NVFP4 tensor cores"
+subtitle: "On vLLM 8K/1K the NVFP4 path on B200 is 2.71x–2.95x cheaper per million tokens than H200 INT4 across the entire 30–90 tok/s/user serving band, and 2.45x–2.74x cheaper than B200 INT4 on the same silicon. Both factors decompose cleanly into B200's HBM bandwidth, HBM capacity, and NVFP4 tensor cores"
 date: '2026-05-26'
 publishDate: '2026-05-26'
 tags:
@@ -15,7 +15,7 @@ tags:
   - nvfp4
 ---
 
-Kimi K2.5 and K2.6 are the open-weights models behind [xAI's Cursor Composer 2 and Composer 2.5](https://tomtunguz.com/cursor-kimi-open-source-ai-imperative/) — 1M+ daily active users from the Cursor IDE, and the current leader on SWE-Bench Pro at 58.6%. On the 8K/1K workload, vLLM on NVIDIA B200 in NVFP4 serves K2.5/K2.6 cheaper than H200 in INT4 across the entire single-node Pareto frontier. **B200 NVFP4 is 2.71x–2.95x cheaper per million tokens than H200 INT4 in the 30–90 tok/s/user serving band**, peaking at **2.95x at 32 tok/s/user** ($0.140/M on B200 NVFP4 vs $0.413/M on H200 INT4 — a 66% reduction). On the same B200 silicon, swapping INT4 for NVFP4 is worth another **2.50x–2.74x at iso-interactivity** ($0.397/M → $0.154/M at 40 tok/s/user). Measured on SemiAnalysis InferenceX, 2026-05-19, [GHA run 26118912054](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26118912054).
+Kimi K2.5 and K2.6 are the open-weights models behind [xAI's Cursor Composer 2 and Composer 2.5](https://tomtunguz.com/cursor-kimi-open-source-ai-imperative/) — 1M+ daily active users from the Cursor IDE, and the current leader on SWE-Bench Pro at 58.6%. On the 8K/1K workload, vLLM on NVIDIA B200 in NVFP4 serves K2.5/K2.6 cheaper than H200 in INT4 across the entire single-node Pareto frontier. **B200 NVFP4 is 2.71x–2.95x cheaper per million tokens than H200 INT4 in the 30–90 tok/s/user serving band**, peaking at **2.95x at 32 tok/s/user** ($0.140/M on B200 NVFP4 vs $0.413/M on H200 INT4 — a 66% reduction). On the same B200 silicon, swapping INT4 for NVFP4 is worth another **2.45x–2.74x at iso-interactivity** ($0.397/M → $0.154/M at 40 tok/s/user). Measured on SemiAnalysis InferenceX, 2026-05-19, [GHA run 26118912054](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26118912054).
 
 Both SKUs run the same `vllm/vllm-openai:v0.21.0` container. The spread comes from the silicon and the precision. B200 has 2.27x H200's FP8 dense throughput (4,500 vs 1,979 TFLOP/s), 1.67x its HBM bandwidth (8 vs 4.8 TB/s), and 2.00x its NVLink scale-up bandwidth (900 vs 450 GB/s uni-di). On the FP4 axis H200 has nothing — Hopper SM90 has no FP4 tensor cores, and the [official datasheet](https://resources.nvidia.com/en-us-data-center-overview/gtc24-h200-datasheet) stops at FP8. B200's NVFP4 cores deliver 9,000 TFLOP/s. The measured 3x cost-per-token gap is what those silicon ratios look like once you fold in B200's 1.38x TCO penalty ($1.95 vs $1.41 per GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics)).
 
@@ -178,7 +178,7 @@ Kimi K2.5 and K2.6 are the work of [Moonshot AI](https://www.moonshot.ai/), with
       "name": "Is the NVFP4 vs INT4 gap on the same B200 silicon worth the swap?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. On the same B200 hardware, switching the vLLM precision from native INT4 to NVFP4 is worth 2.50x to 2.74x at iso-interactivity in the 30 to 90 tok/s/user serving band, peaking at 2.74x at 60 tok/s/user ($0.566 INT4 vs $0.206 NVFP4 per million tokens). Mechanism: NVFP4 lights up B200's 9,000 TFLOP/s FP4 tensor cores, which the INT4 path does not use. NVFP4 also extends the reachable interactivity range — B200 INT4 caps at 104 tok/s/user, B200 NVFP4 serves out to 125 tok/s/user. No silicon change, no TCO change, just precision."
+        "text": "Yes. On the same B200 hardware, switching the vLLM precision from native INT4 to NVFP4 is worth 2.45x to 2.74x at iso-interactivity in the 30 to 90 tok/s/user serving band, peaking at 2.74x at 60 tok/s/user ($0.566 INT4 vs $0.206 NVFP4 per million tokens). Mechanism: NVFP4 lights up B200's 9,000 TFLOP/s FP4 tensor cores, which the INT4 path does not use. NVFP4 also extends the reachable interactivity range — B200 INT4 caps at 104 tok/s/user, B200 NVFP4 serves out to 125 tok/s/user. No silicon change, no TCO change, just precision."
       }
     },
     {
