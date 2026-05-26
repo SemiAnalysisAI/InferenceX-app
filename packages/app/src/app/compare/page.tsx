@@ -17,7 +17,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Browse head-to-head GPU inference benchmark comparisons across every model and hardware pair we test. Latency, throughput, and cost for DeepSeek R1, Kimi K2.6, GLM 5.1, Qwen 3.5, and more.';
+  'Browse head-to-head GPU inference benchmark comparisons across every model and hardware pair we test. Latency, throughput, and cost for DeepSeek R1, Kimi K2.5/K2.6, GLM 5/5.1, Qwen 3.5, and more.';
 
 export const metadata: Metadata = {
   title: 'GPU Comparisons',
