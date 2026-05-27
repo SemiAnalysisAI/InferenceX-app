@@ -54,6 +54,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
     avg_power_w: m.avg_power_w,
     joules_per_output_token: m.joules_per_output_token,
+    joules_per_total_token: m.joules_per_total_token,
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,

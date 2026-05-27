@@ -68,9 +68,10 @@ export interface AggDataEntry {
   std_e2el: number;
   p99_e2el: number;
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
-  // Optional because historical runs predate the field.
+  // Optional because historical runs predate the fields.
   avg_power_w?: number;
   joules_per_output_token?: number;
+  joules_per_total_token?: number;
   disagg: boolean;
   num_prefill_gpu: number;
   num_decode_gpu: number;
@@ -162,6 +163,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // emit these fields.
   measuredAvgPower?: { y: number; roof: boolean };
   measuredJPerOutputToken?: { y: number; roof: boolean };
+  measuredJPerTotalToken?: { y: number; roof: boolean };
 }
 
 /**
@@ -189,7 +191,8 @@ export type YAxisMetricKey =
   | 'jOutput'
   | 'jInput'
   | 'measuredAvgPower'
-  | 'measuredJPerOutputToken';
+  | 'measuredJPerOutputToken'
+  | 'measuredJPerTotalToken';
 
 /**
  * Defines the configuration and labels for a specific chart.
@@ -302,6 +305,10 @@ export interface ChartDefinition {
   y_measuredJPerOutputToken_label?: string;
   y_measuredJPerOutputToken_title?: string;
   y_measuredJPerOutputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_measuredJPerTotalToken?: string;
+  y_measuredJPerTotalToken_label?: string;
+  y_measuredJPerTotalToken_title?: string;
+  y_measuredJPerTotalToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_cost_limit?: number;
   y_latency_limit?: number;
 }

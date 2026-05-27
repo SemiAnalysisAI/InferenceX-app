@@ -56,7 +56,7 @@ const METRIC_GROUPS: { label: string; metrics: string[]; gated?: boolean }[] = [
   { label: 'All-in Provisioned Energy per Token', metrics: ['y_jTotal', 'y_jOutput', 'y_jInput'] },
   {
     label: 'Measured Energy',
-    metrics: ['y_measuredAvgPower', 'y_measuredJPerOutputToken'],
+    metrics: ['y_measuredAvgPower', 'y_measuredJPerOutputToken', 'y_measuredJPerTotalToken'],
     gated: true,
   },
   { label: 'Custom User Values', metrics: ['y_costUser', 'y_powerUser'] },
