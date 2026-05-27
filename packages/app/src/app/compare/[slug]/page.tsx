@@ -13,9 +13,11 @@ import {
 } from '@/lib/compare-slug';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import {
+  buildBreadcrumbJsonLd,
   buildJsonLd,
   compareTableNarrative,
   computeCompareTableData,
+  dateRangeForPair,
   getCachedBenchmarks,
   KNOWN_MODELS,
   KNOWN_PRECISIONS,
@@ -134,6 +136,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
   );
 
   const url = `${SITE_URL}/compare/${canonical}`;
+  const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLd(
     'full',
     parsed.model,
@@ -143,6 +146,15 @@ export default async function ComparePage({ params, searchParams }: Props) {
     summaryA,
     summaryB,
     ssrRows,
+    undefined,
+    oldest,
+    newest,
+    parsed.model.displayName,
+  );
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    'full',
+    compareModelDisplayLabel(parsed.model, parsed.a, parsed.b),
+    url,
   );
   const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const aMeta = HW_REGISTRY[parsed.a];
@@ -161,6 +173,7 @@ export default async function ComparePage({ params, searchParams }: Props) {
   return (
     <>
       <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <ComparePageClient
         a={parsed.a}
         b={parsed.b}

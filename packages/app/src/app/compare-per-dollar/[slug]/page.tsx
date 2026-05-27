@@ -14,9 +14,11 @@ import {
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { getGpuSpecs } from '@/lib/constants';
 import {
+  buildBreadcrumbJsonLd,
   buildJsonLd,
   compareTableNarrative,
   computeCompareTableData,
+  dateRangeForPair,
   getCachedBenchmarks,
   KNOWN_MODELS,
   KNOWN_PRECISIONS,
@@ -121,6 +123,7 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
 
   const url = `${SITE_URL}/compare-per-dollar/${canonical}`;
   const imageUrl = `${url}/performance-per-dollar.png`;
+  const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLd(
     'per-dollar',
     parsed.model,
@@ -131,6 +134,14 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
     summaryB,
     ssrRows,
     imageUrl,
+    oldest,
+    newest,
+    parsed.model.displayName,
+  );
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    'per-dollar',
+    compareModelDisplayLabel(parsed.model, parsed.a, parsed.b),
+    url,
   );
   const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const aMeta = HW_REGISTRY[parsed.a];
@@ -155,6 +166,7 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
   return (
     <>
       <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <ComparePerDollarPageClient
         a={parsed.a}
         b={parsed.b}

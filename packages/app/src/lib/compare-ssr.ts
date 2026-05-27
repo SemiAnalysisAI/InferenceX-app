@@ -14,6 +14,7 @@ import {
   AUTHOR_NAME,
   AUTHOR_URL,
   HW_REGISTRY,
+  SITE_URL,
   sequenceToIslOsl,
 } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
@@ -773,6 +774,46 @@ export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair
   return { cross, nvidia, amd };
 }
 
+/** Breadcrumb trail for a compare slug page. Emitted alongside the main
+ *  Dataset/ItemList JSON-LD so Google can render the Home → Compare → A vs B
+ *  trail in search results. Variant chooses /compare vs /compare-per-dollar. */
+export function buildBreadcrumbJsonLd(
+  variant: CompareJsonLdVariant,
+  pairLabel: string,
+  url: string,
+) {
+  const indexUrl =
+    variant === 'per-dollar' ? `${SITE_URL}/compare-per-dollar` : `${SITE_URL}/compare`;
+  const indexName = variant === 'per-dollar' ? 'GPU Performance per Dollar' : 'GPU Comparisons';
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: indexName, item: indexUrl },
+      { '@type': 'ListItem', position: 3, name: pairLabel, item: url },
+    ],
+  };
+}
+
+/** Pick the oldest and newest benchmark dates among rows whose hardware matches
+ *  the compared pair — used to populate Dataset.datePublished / dateModified. */
+export function dateRangeForPair(
+  rows: BenchmarkRow[],
+  a: string,
+  b: string,
+): { oldest?: string; newest?: string } {
+  let oldest: string | undefined;
+  let newest: string | undefined;
+  for (const row of rows) {
+    if (row.hardware !== a && row.hardware !== b) continue;
+    if (!row.date) continue;
+    if (oldest === undefined || row.date < oldest) oldest = row.date;
+    if (newest === undefined || row.date > newest) newest = row.date;
+  }
+  return { oldest, newest };
+}
+
 export function buildJsonLd(
   variant: CompareJsonLdVariant,
   model: CompareModelSlug,
@@ -783,6 +824,13 @@ export function buildJsonLd(
   summaryB: PairSummary,
   ssrRows: SsrInterpolatedRow[],
   imageUrl?: string,
+  /** ISO date of oldest benchmark row contributing to this dataset. */
+  datePublished?: string,
+  /** ISO date of newest benchmark row — drives Google Dataset Search freshness. */
+  dateModified?: string,
+  /** Display model name accepted by /api/v1/benchmarks?model=…, used to wire the
+   *  Dataset's `distribution: DataDownload` to a real machine-readable export. */
+  modelApiKey?: string,
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
@@ -860,11 +908,37 @@ export function buildJsonLd(
               description: datasetDescription,
               url,
               license: 'https://www.apache.org/licenses/LICENSE-2.0',
+              isAccessibleForFree: true,
+              measurementTechnique:
+                'Open-source automated GPU CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
+              keywords: [
+                'AI inference benchmark',
+                'GPU comparison',
+                variant === 'per-dollar' ? 'cost per million tokens' : 'inference latency',
+                variant === 'per-dollar' ? 'performance per dollar' : 'tokens per second',
+                model.label,
+                aLabel,
+                bLabel,
+                HW_REGISTRY[a]?.vendor,
+                HW_REGISTRY[b]?.vendor,
+              ]
+                .filter(Boolean)
+                .join(', '),
+              ...(datePublished && { datePublished }),
+              ...(dateModified && { dateModified }),
               creator: {
                 '@type': 'Organization',
                 name: AUTHOR_NAME,
                 url: AUTHOR_URL,
               },
+              ...(modelApiKey && {
+                distribution: {
+                  '@type': 'DataDownload',
+                  encodingFormat: 'application/json',
+                  contentUrl: `${SITE_URL}/api/v1/benchmarks?model=${encodeURIComponent(modelApiKey)}`,
+                  name: `${model.label} latest benchmark rows (JSON)`,
+                },
+              }),
               ...(imageUrl && {
                 image: {
                   '@type': 'ImageObject',
