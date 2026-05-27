@@ -97,7 +97,7 @@
     "y_measuredJPerOutputToken_roofline": "lower_right",
     "y_measuredJPerTotalToken": "measuredJPerTotalToken.y",
     "y_measuredJPerTotalToken_label": "Measured J per Token (J/tok)",
-    "y_measuredJPerTotalToken_title": "Measured Joules per Token (input + output)",
+    "y_measuredJPerTotalToken_title": "Measured Joules per Token (incl. prompt)",
     "y_measuredJPerTotalToken_roofline": "lower_right",
     "y_cost_limit": 5,
     "y_latency_limit": 60
@@ -199,7 +199,7 @@
     "y_measuredJPerOutputToken_roofline": "lower_left",
     "y_measuredJPerTotalToken": "measuredJPerTotalToken.y",
     "y_measuredJPerTotalToken_label": "Measured J per Token (J/tok)",
-    "y_measuredJPerTotalToken_title": "Measured Joules per Token (input + output)",
+    "y_measuredJPerTotalToken_title": "Measured Joules per Token (incl. prompt)",
     "y_measuredJPerTotalToken_roofline": "lower_left",
     "y_cost_limit": 5,
     "y_latency_limit": 60
