@@ -306,7 +306,12 @@ export function useChartData(
               .map((d: InferenceData) => {
                 const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
                 const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
-                const xValue = (d as any)[xAxisField] ?? d.x;
+                // xAxisField is `keyof AggDataEntry`; InferenceData embeds those
+                // fields via `Partial<Omit<AggDataEntry, ...>>`, so a typed
+                // accessor catches a future field rename (silent fallthrough to
+                // d.x would otherwise mask the regression).
+                const xCandidate = (d as Partial<AggDataEntry>)[xAxisField];
+                const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
                 return {
                   ...d,
                   x: xValue,
