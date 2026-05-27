@@ -912,18 +912,20 @@ export function buildJsonLd(
               measurementTechnique:
                 'Open-source automated GPU CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
               keywords: [
-                'AI inference benchmark',
-                'GPU comparison',
-                variant === 'per-dollar' ? 'cost per million tokens' : 'inference latency',
-                variant === 'per-dollar' ? 'performance per dollar' : 'tokens per second',
-                model.label,
-                aLabel,
-                bLabel,
-                HW_REGISTRY[a]?.vendor,
-                HW_REGISTRY[b]?.vendor,
-              ]
-                .filter(Boolean)
-                .join(', '),
+                ...new Set(
+                  [
+                    'AI inference benchmark',
+                    'GPU comparison',
+                    variant === 'per-dollar' ? 'cost per million tokens' : 'inference latency',
+                    variant === 'per-dollar' ? 'performance per dollar' : 'tokens per second',
+                    model.label,
+                    aLabel,
+                    bLabel,
+                    HW_REGISTRY[a]?.vendor,
+                    HW_REGISTRY[b]?.vendor,
+                  ].filter(Boolean),
+                ),
+              ].join(', '),
               ...(datePublished && { datePublished }),
               ...(dateModified && { dateModified }),
               creator: {
