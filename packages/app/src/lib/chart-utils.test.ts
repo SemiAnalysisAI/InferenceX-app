@@ -1265,6 +1265,33 @@ describe('createChartDataPoint measured power fields', () => {
     expect(point.measuredAvgPower).toBeDefined();
     expect(point.measuredAvgPower!.y).toBe(0);
   });
+
+  it('emits measuredJPerTotalToken when joules_per_total_token is present', () => {
+    const e = entry({ joules_per_total_token: 0.93 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerTotalToken).toBeDefined();
+    expect(point.measuredJPerTotalToken!.y).toBe(0.93);
+    expect(point.measuredJPerTotalToken!.roof).toBe(false);
+  });
+
+  it('emits J/output and J/total independently — different denominators', () => {
+    // 8k1k workload: J/output ≈ 9 × J/total (input is ~8x output, so output/total ≈ 1/9).
+    const e = entry({ joules_per_output_token: 2.04, joules_per_total_token: 0.23 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerOutputToken!.y).toBe(2.04);
+    expect(point.measuredJPerTotalToken!.y).toBe(0.23);
+  });
+
+  it('omits measuredJPerTotalToken on rows that predate the field', () => {
+    // Rows ingested before joules_per_total_token was added still have avg_power_w
+    // and joules_per_output_token. The new field must be absent (not 0) so the
+    // chart correctly drops them from the J/total view rather than plotting fake data.
+    const e = entry({ avg_power_w: 458, joules_per_output_token: 2.04 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredJPerOutputToken).toBeDefined();
+    expect(point.measuredJPerTotalToken).toBeUndefined();
+  });
 });
 
 // ===========================================================================

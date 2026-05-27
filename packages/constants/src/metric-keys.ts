@@ -44,8 +44,11 @@ export const METRIC_KEYS = new Set([
   'p99.9_intvty',
   'std_intvty',
   // measured power / energy (emitted by runner's aggregate_power.py)
-  // avg_power_w: mean per-GPU draw (W) during the load window
+  // avg_power_w:             mean per-GPU draw (W) during the load window
   // joules_per_output_token: avg_power_w * num_gpus * duration / total_output_tokens
+  // joules_per_total_token:  avg_power_w * num_gpus * duration / (total_input + total_output)
+  //                          — workload-shape-fair view that doesn't treat prompt as free
   'avg_power_w',
   'joules_per_output_token',
+  'joules_per_total_token',
 ]);

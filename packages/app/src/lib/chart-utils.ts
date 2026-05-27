@@ -152,6 +152,7 @@ export const Y_AXIS_METRICS = [
   // distinct from the spec-sheet TDP-derived jTotal/jOutput/jInput above).
   'y_measuredAvgPower',
   'y_measuredJPerOutputToken',
+  'y_measuredJPerTotalToken',
 ] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
@@ -403,6 +404,9 @@ export function createChartDataPoint(
     ...(typeof entry.joules_per_output_token === 'number'
       ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
       : {}),
+    ...(typeof entry.joules_per_total_token === 'number'
+      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      : {}),
   };
 }
 
@@ -565,7 +569,8 @@ export const calculateRoofline = (
     | `jOutput.y`
     | `jInput.y`
     | `measuredAvgPower.y`
-    | `measuredJPerOutputToken.y`,
+    | `measuredJPerOutputToken.y`
+    | `measuredJPerTotalToken.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
   const pointsForRoofline = points.map((p) => {
@@ -637,7 +642,8 @@ export function computeAllRooflines(
             | `jOutput.y`
             | `jInput.y`
             | `measuredAvgPower.y`
-            | `measuredJPerOutputToken.y`,
+            | `measuredJPerOutputToken.y`
+            | `measuredJPerTotalToken.y`,
           rooflineDirection,
         );
       }
@@ -683,6 +689,7 @@ export function markRooflinePoints(
       if (newPoint.jInput) newPoint.jInput.roof = false;
       if (newPoint.measuredAvgPower) newPoint.measuredAvgPower.roof = false;
       if (newPoint.measuredJPerOutputToken) newPoint.measuredJPerOutputToken.roof = false;
+      if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
@@ -749,6 +756,8 @@ export function markRooflinePoints(
           newPoint.measuredJPerOutputToken
         ) {
           newPoint.measuredJPerOutputToken.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredJPerTotalToken' && newPoint.measuredJPerTotalToken) {
+          newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);
