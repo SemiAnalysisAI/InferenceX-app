@@ -11,7 +11,6 @@ import {
   compareModelDisplayLabel,
   parseCompareSlug,
 } from '@/lib/compare-slug';
-import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import {
   buildBreadcrumbJsonLd,
   buildJsonLd,
@@ -33,14 +32,6 @@ export const dynamic = 'force-dynamic';
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-export async function generateStaticParams() {
-  // Only enumerate (model, pair) combos with benchmark data on both sides.
-  // Direct URL hits to non-enumerated combos still render via the dynamic
-  // SSR path (with the empty-state fallback).
-  const slugs = await getAllComparableCompareSlugs();
-  return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
