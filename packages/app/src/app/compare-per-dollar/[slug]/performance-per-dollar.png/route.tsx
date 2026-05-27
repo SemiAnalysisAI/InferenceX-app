@@ -8,6 +8,7 @@ import {
   computeCompareImageRows,
   computeCompareTableData,
   getCachedBenchmarks,
+  type SsrInterpolatedRow,
 } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
@@ -20,12 +21,13 @@ const SIZE = {
   height: DISPLAY_SIZE.height * IMAGE_SCALE,
 };
 const CHART_FRAME = { left: 0, top: 18, width: 746, height: 382 };
-const CHART = { left: 96, top: 42, width: 630, height: 272 };
+const CHART = { left: 96, top: 42, width: 630, height: 260 };
 const COLORS = {
   background: '#0d1117',
   panel: '#121a23',
   border: '#23303d',
   muted: '#9aa7b5',
+  faint: '#5f6e7d',
   text: '#f3f7fb',
   a: '#38d9a9',
   b: '#f7b041',
@@ -38,10 +40,52 @@ interface Point {
   y: number;
 }
 
+interface TargetedPoint extends Point {
+  target: number;
+}
+
 function money(value: number): string {
   if (value >= 10) return `$${value.toFixed(1)}`;
   if (value >= 1) return `$${value.toFixed(2)}`;
   return `$${value.toFixed(3)}`;
+}
+
+/** Decimals chosen from the tick step so every label in the axis prints with
+ * the same precision (no $0.000/$9.01/$18.0 mix). */
+function decimalsForStep(step: number): number {
+  if (step >= 1) return 0;
+  return Math.max(0, Math.ceil(-Math.log10(step)));
+}
+
+function moneyForStep(value: number, step: number): string {
+  return `$${value.toFixed(decimalsForStep(step))}`;
+}
+
+/** "Nice" step in the 1/2/5 × 10ⁿ family, the same convention d3 uses. */
+function niceStep(span: number, targetCount: number): number {
+  const rawStep = span / Math.max(1, targetCount - 1);
+  const mag = 10 ** Math.floor(Math.log10(rawStep));
+  const normalized = rawStep / mag;
+  if (normalized < 1.5) return mag;
+  if (normalized < 3) return 2 * mag;
+  if (normalized < 7) return 5 * mag;
+  return 10 * mag;
+}
+
+function niceAxis(
+  min: number,
+  max: number,
+  targetCount = 5,
+): { min: number; max: number; step: number; ticks: number[] } {
+  if (max <= min) return { min, max: min + 1, step: 1, ticks: [min] };
+  const step = niceStep(max - min, targetCount);
+  const niceMin = Math.floor(min / step) * step;
+  const niceMax = Math.ceil(max / step) * step;
+  const ticks: number[] = [];
+  for (let t = niceMin; t <= niceMax + step * 1e-6; t += step) {
+    ticks.push(Number(t.toFixed(10)));
+  }
+  return { min: niceMin, max: niceMax, step, ticks };
 }
 
 function pointsPath(points: Point[]): string {
@@ -75,6 +119,7 @@ export async function GET(
     sequence,
     precision,
     interactivityRange,
+    plottedRows.map((r) => r.target),
   ).filter((row) => row.a || row.b);
   const curveRows = imageRows.length > 0 ? imageRows : plottedRows;
 
@@ -85,11 +130,16 @@ export async function GET(
     .filter((cost): cost is number => typeof cost === 'number' && Number.isFinite(cost));
   const costMin = costs.length > 0 ? Math.min(...costs) : 0;
   const costMax = costs.length > 0 ? Math.max(...costs) : 1;
-  const costPadding = Math.max((costMax - costMin) * 0.18, costMax * 0.08, 0.02);
-  const yMin = Math.max(0, costMin - costPadding);
-  const yMax = costMax + costPadding;
+  const yAxis = niceAxis(Math.min(0, costMin), costMax);
+  const yMin = yAxis.min;
+  const yMax = yAxis.max;
+  const yStep = yAxis.step;
   const xMin = curveRows.at(0)?.target ?? 0;
   const xMax = curveRows.at(-1)?.target ?? 100;
+  const matchedMin = plottedRows.at(0)?.target ?? xMin;
+  const matchedMax = plottedRows.at(-1)?.target ?? xMax;
+  const hasLeftExtension = matchedMin - xMin >= 0.5;
+  const hasRightExtension = xMax - matchedMax >= 0.5;
   const scaleX = (value: number) =>
     CHART.left + (xMax === xMin ? CHART.width / 2 : ((value - xMin) / (xMax - xMin)) * CHART.width);
   const scaleY = (value: number) =>
@@ -97,20 +147,47 @@ export async function GET(
     CHART.height -
     (yMax === yMin ? CHART.height / 2 : ((value - yMin) / (yMax - yMin)) * CHART.height);
 
-  const aPoints = curveRows
-    .filter((row) => row.a)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.a!.cost) }));
-  const bPoints = curveRows
-    .filter((row) => row.b)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.b!.cost) }));
+  function buildSeriesPoints(getCost: (row: SsrInterpolatedRow) => number | null): TargetedPoint[] {
+    return curveRows
+      .map((row) => ({ target: row.target, cost: getCost(row) }))
+      .filter((p): p is { target: number; cost: number } => p.cost !== null)
+      .map((p) => ({ x: scaleX(p.target), y: scaleY(p.cost), target: p.target }));
+  }
+
+  function splitByMatchRange(points: TargetedPoint[]) {
+    return {
+      matched: points.filter((p) => p.target >= matchedMin && p.target <= matchedMax),
+      leftExt: points.filter((p) => p.target <= matchedMin),
+      rightExt: points.filter((p) => p.target >= matchedMax),
+    };
+  }
+
+  const aSeries = splitByMatchRange(buildSeriesPoints((r) => r.a?.cost ?? null));
+  const bSeries = splitByMatchRange(buildSeriesPoints((r) => r.b?.cost ?? null));
   const aHighlightPoints = plottedRows
     .filter((row) => row.a)
     .map((row) => ({ x: scaleX(row.target), y: scaleY(row.a!.cost) }));
   const bHighlightPoints = plottedRows
     .filter((row) => row.b)
     .map((row) => ({ x: scaleX(row.target), y: scaleY(row.b!.cost) }));
-  const yTicks = Array.from({ length: 4 }, (_, index) => yMin + ((yMax - yMin) * index) / 3);
   const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
+  const showRangeEndpoints = hasLeftExtension || hasRightExtension;
+
+  function renderSeriesPath(points: Point[], stroke: string, dashed: boolean) {
+    if (points.length < 2) return null;
+    return (
+      <path
+        d={pointsPath(points)}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="9"
+        strokeOpacity={dashed ? 0.55 : 1}
+        strokeDasharray={dashed ? '14 10' : undefined}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    );
+  }
 
   return new ImageResponse(
     <div
@@ -185,7 +262,7 @@ export async function GET(
               fill={COLORS.panel}
               stroke={COLORS.border}
             />
-            {yTicks.map((tick) => {
+            {yAxis.ticks.map((tick) => {
               const y = scaleY(tick);
               return (
                 <line
@@ -199,26 +276,26 @@ export async function GET(
                 />
               );
             })}
-            {aPoints.length > 1 && (
-              <path
-                d={pointsPath(aPoints)}
-                fill="none"
-                stroke={COLORS.a}
-                strokeWidth="9"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            )}
-            {bPoints.length > 1 && (
-              <path
-                d={pointsPath(bPoints)}
-                fill="none"
-                stroke={COLORS.b}
-                strokeWidth="9"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            )}
+            {plottedRows.map((row) => {
+              const x = scaleX(row.target);
+              return (
+                <line
+                  key={`mark-${row.target}`}
+                  x1={x}
+                  x2={x}
+                  y1={CHART.top + CHART.height}
+                  y2={CHART.top + CHART.height + 6}
+                  stroke={COLORS.muted}
+                  strokeWidth="2"
+                />
+              );
+            })}
+            {renderSeriesPath(aSeries.leftExt, COLORS.a, true)}
+            {renderSeriesPath(aSeries.rightExt, COLORS.a, true)}
+            {renderSeriesPath(aSeries.matched, COLORS.a, false)}
+            {renderSeriesPath(bSeries.leftExt, COLORS.b, true)}
+            {renderSeriesPath(bSeries.rightExt, COLORS.b, true)}
+            {renderSeriesPath(bSeries.matched, COLORS.b, false)}
             {aHighlightPoints.map((point, index) => (
               <circle
                 key={`a-${index}`}
@@ -242,7 +319,7 @@ export async function GET(
               />
             ))}
           </svg>
-          {yTicks.map((tick) => (
+          {yAxis.ticks.map((tick) => (
             <div
               key={`y-label-${tick}`}
               style={{
@@ -256,7 +333,7 @@ export async function GET(
                 fontSize: 15,
               }}
             >
-              {money(tick)}
+              {moneyForStep(tick, yStep)}
             </div>
           ))}
           {plottedRows.map((row) => (
@@ -277,12 +354,46 @@ export async function GET(
               {row.target}
             </div>
           ))}
+          {showRangeEndpoints && hasLeftExtension && (
+            <div
+              style={{
+                display: 'flex',
+                position: 'absolute',
+                left: scaleX(xMin) - 4,
+                top: CHART.top + CHART.height + 16,
+                width: 56,
+                justifyContent: 'flex-start',
+                color: COLORS.faint,
+                fontSize: 13,
+                fontStyle: 'italic',
+              }}
+            >
+              {Math.round(xMin)}
+            </div>
+          )}
+          {showRangeEndpoints && hasRightExtension && (
+            <div
+              style={{
+                display: 'flex',
+                position: 'absolute',
+                left: scaleX(xMax) - 52,
+                top: CHART.top + CHART.height + 16,
+                width: 56,
+                justifyContent: 'flex-end',
+                color: COLORS.faint,
+                fontSize: 13,
+                fontStyle: 'italic',
+              }}
+            >
+              {Math.round(xMax)}
+            </div>
+          )}
           <div
             style={{
               display: 'flex',
               position: 'absolute',
               left: CHART.left,
-              top: CHART.top + CHART.height + 43,
+              top: CHART.top + CHART.height + 38,
               width: CHART.width,
               justifyContent: 'center',
               color: COLORS.muted,
@@ -292,6 +403,23 @@ export async function GET(
           >
             Interactivity (tok/s/user)
           </div>
+          {showRangeEndpoints && (
+            <div
+              style={{
+                display: 'flex',
+                position: 'absolute',
+                left: CHART.left,
+                top: CHART.top + CHART.height + 62,
+                width: CHART.width,
+                justifyContent: 'center',
+                color: COLORS.faint,
+                fontSize: 13,
+                fontStyle: 'italic',
+              }}
+            >
+              Dashed segments extend to each SKU's operating envelope, where cost rises steeply
+            </div>
+          )}
         </div>
 
         <div

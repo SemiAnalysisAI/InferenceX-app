@@ -260,7 +260,12 @@ export function computeCompareTableData(
 
 /** Sample the same interpolated cost curve used for the comparison table for
  * server-rendered image assets. More samples make the static PNG read like the
- * interactive roofline without requiring browser-based chart capture. */
+ * interactive roofline without requiring browser-based chart capture.
+ *
+ * `includeTargets` are merged into the even sampling grid so callers can
+ * guarantee the curve has exact samples at specific targets (e.g. the plotted
+ * comparison dots), making it safe to partition the curve into solid /
+ * dashed segments without interpolation gaps at the boundary. */
 export function computeCompareImageRows(
   rows: BenchmarkRow[],
   a: string,
@@ -268,6 +273,7 @@ export function computeCompareImageRows(
   sequence: string | null,
   precision: string | null,
   interactivityRange: { min: number; max: number },
+  includeTargets: number[] = [],
 ): SsrInterpolatedRow[] {
   if (!sequence || !precision || interactivityRange.max <= interactivityRange.min) return [];
 
@@ -280,20 +286,26 @@ export function computeCompareImageRows(
 
   const sampleCount = 17;
   const span = interactivityRange.max - interactivityRange.min;
-  return Array.from({ length: sampleCount }, (_, index) => {
-    const target = interactivityRange.min + (span * index) / (sampleCount - 1);
-    return {
-      target,
-      a:
-        pointsA.length > 0
-          ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
-          : null,
-      b:
-        pointsB.length > 0
-          ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
-          : null,
-    };
-  });
+  const evenTargets = Array.from(
+    { length: sampleCount },
+    (_, index) => interactivityRange.min + (span * index) / (sampleCount - 1),
+  );
+  const clamped = includeTargets.filter(
+    (t) => t >= interactivityRange.min && t <= interactivityRange.max,
+  );
+  const targets = [...new Set([...evenTargets, ...clamped])].toSorted((x, y) => x - y);
+
+  return targets.map((target) => ({
+    target,
+    a:
+      pointsA.length > 0
+        ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
+        : null,
+    b:
+      pointsB.length > 0
+        ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
+        : null,
+  }));
 }
 
 // ---------------------------------------------------------------------------
