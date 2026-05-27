@@ -75,7 +75,7 @@ export function pickString(value: string | string[] | undefined): string | undef
 }
 
 // ---------------------------------------------------------------------------
-// Pair summary (JSON-LD Product additionalProperty)
+// Pair summary (JSON-LD additionalProperty)
 // ---------------------------------------------------------------------------
 
 export interface PairSummary {
@@ -315,7 +315,7 @@ export function computeCompareImageRows(
 function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
   const meta = HW_REGISTRY[key];
   const label = meta?.label ?? key.toUpperCase();
-  const props: { name: string; value: string | number }[] = [];
+  const props: { name: string; value: string | number }[] = [{ name: 'Category', value: 'GPU' }];
   if (meta) {
     props.push({ name: 'Vendor', value: meta.vendor });
     props.push({ name: 'Architecture', value: meta.arch });
@@ -344,10 +344,8 @@ function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
     '@type': 'ListItem',
     position,
     item: {
-      '@type': 'Product',
+      '@type': 'Thing',
       name: label,
-      brand: { '@type': 'Brand', name: meta?.vendor ?? 'Unknown' },
-      category: 'GPU',
       ...(props.length > 0 && {
         additionalProperty: props.map((p) => ({
           '@type': 'PropertyValue',
