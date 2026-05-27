@@ -14,14 +14,13 @@ import {
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const DISPLAY_SIZE = { width: 1200, height: 675 };
-const IMAGE_SCALE = 2;
-const SIZE = {
-  width: DISPLAY_SIZE.width * IMAGE_SCALE,
-  height: DISPLAY_SIZE.height * IMAGE_SCALE,
-};
-const CHART_FRAME = { left: 0, top: 18, width: 746, height: 382 };
-const CHART = { left: 96, top: 42, width: 630, height: 260 };
+// Render natively at high-DPI. CSS `transform: scale()` causes Satori to rasterize
+// SVG/text at the source size and bitmap-upsample, which produces a blurry chart.
+// Multiplying every pixel value by R keeps glyphs and strokes as vectors at full res.
+const R = 2;
+const SIZE = { width: 1200 * R, height: 675 * R };
+const CHART_FRAME = { left: 0, top: 18 * R, width: 746 * R, height: 382 * R };
+const CHART = { left: 96 * R, top: 42 * R, width: 630 * R, height: 260 * R };
 const COLORS = {
   background: '#0d1117',
   panel: '#121a23',
@@ -172,6 +171,8 @@ export async function GET(
     .map((row) => ({ x: scaleX(row.target), y: scaleY(row.b!.cost) }));
   const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
   const showRangeEndpoints = hasLeftExtension || hasRightExtension;
+  const svgWidth = 760 * R;
+  const svgHeight = 406 * R;
 
   function renderSeriesPath(points: Point[], stroke: string, dashed: boolean) {
     if (points.length < 2) return null;
@@ -180,9 +181,9 @@ export async function GET(
         d={pointsPath(points)}
         fill="none"
         stroke={stroke}
-        strokeWidth="9"
+        strokeWidth={9 * R}
         strokeOpacity={dashed ? 0.55 : 1}
-        strokeDasharray={dashed ? '14 10' : undefined}
+        strokeDasharray={dashed ? `${14 * R} ${10 * R}` : undefined}
         strokeLinejoin="round"
         strokeLinecap="round"
       />
@@ -194,22 +195,20 @@ export async function GET(
       style={{
         display: 'flex',
         flexDirection: 'column',
-        width: DISPLAY_SIZE.width,
-        height: DISPLAY_SIZE.height,
-        padding: '38px 46px 26px',
+        width: SIZE.width,
+        height: SIZE.height,
+        padding: `${38 * R}px ${46 * R}px ${26 * R}px`,
         background: COLORS.background,
         color: COLORS.text,
         fontFamily: 'Arial, sans-serif',
-        transform: `scale(${IMAGE_SCALE})`,
-        transformOrigin: 'top left',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 * R }}>
           <div
             style={{
               display: 'flex',
-              fontSize: 19,
+              fontSize: 19 * R,
               fontWeight: 700,
               letterSpacing: '0.13em',
               textTransform: 'uppercase',
@@ -218,8 +217,10 @@ export async function GET(
           >
             InferenceX Performance per Dollar
           </div>
-          <div style={{ display: 'flex', fontSize: 41, fontWeight: 800 }}>{parsed.model.label}</div>
-          <div style={{ display: 'flex', fontSize: 25, color: COLORS.muted }}>
+          <div style={{ display: 'flex', fontSize: 41 * R, fontWeight: 800 }}>
+            {parsed.model.label}
+          </div>
+          <div style={{ display: 'flex', fontSize: 25 * R, color: COLORS.muted }}>
             {aLabel} vs {bLabel} | Cost per Million Tokens
           </div>
         </div>
@@ -228,29 +229,31 @@ export async function GET(
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-end',
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 12,
-            padding: '13px 17px',
+            border: `${R}px solid ${COLORS.border}`,
+            borderRadius: 12 * R,
+            padding: `${13 * R}px ${17 * R}px`,
             background: COLORS.panel,
-            gap: 5,
+            gap: 5 * R,
           }}
         >
-          <div style={{ display: 'flex', fontSize: 14, color: COLORS.muted }}>DEFAULT WORKLOAD</div>
-          <div style={{ display: 'flex', fontSize: 21, fontWeight: 700 }}>
+          <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
+            DEFAULT WORKLOAD
+          </div>
+          <div style={{ display: 'flex', fontSize: 21 * R, fontWeight: 700 }}>
             {workload || 'Default comparison'}
           </div>
-          <div style={{ display: 'flex', fontSize: 14, color: COLORS.muted }}>
+          <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
             Lower cost is better
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, gap: 34, marginTop: 22 }}>
-        <div style={{ display: 'flex', position: 'relative', width: 760, height: 406 }}>
+      <div style={{ display: 'flex', flex: 1, gap: 34 * R, marginTop: 22 * R }}>
+        <div style={{ display: 'flex', position: 'relative', width: svgWidth, height: svgHeight }}>
           <svg
-            width="760"
-            height="406"
-            viewBox="0 0 760 406"
+            width={svgWidth}
+            height={svgHeight}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
             style={{ position: 'absolute', left: 0, top: 0 }}
           >
             <rect
@@ -258,7 +261,7 @@ export async function GET(
               y={CHART_FRAME.top}
               width={CHART_FRAME.width}
               height={CHART_FRAME.height}
-              rx="13"
+              rx={13 * R}
               fill={COLORS.panel}
               stroke={COLORS.border}
             />
@@ -272,7 +275,7 @@ export async function GET(
                   y1={y}
                   y2={y}
                   stroke={COLORS.grid}
-                  strokeWidth="2"
+                  strokeWidth={2 * R}
                 />
               );
             })}
@@ -284,9 +287,9 @@ export async function GET(
                   x1={x}
                   x2={x}
                   y1={CHART.top + CHART.height}
-                  y2={CHART.top + CHART.height + 6}
+                  y2={CHART.top + CHART.height + 6 * R}
                   stroke={COLORS.muted}
-                  strokeWidth="2"
+                  strokeWidth={2 * R}
                 />
               );
             })}
@@ -301,10 +304,10 @@ export async function GET(
                 key={`a-${index}`}
                 cx={point.x}
                 cy={point.y}
-                r="10"
+                r={10 * R}
                 fill={COLORS.a}
                 stroke={COLORS.background}
-                strokeWidth="4"
+                strokeWidth={4 * R}
               />
             ))}
             {bHighlightPoints.map((point, index) => (
@@ -312,10 +315,10 @@ export async function GET(
                 key={`b-${index}`}
                 cx={point.x}
                 cy={point.y}
-                r="10"
+                r={10 * R}
                 fill={COLORS.b}
                 stroke={COLORS.background}
-                strokeWidth="4"
+                strokeWidth={4 * R}
               />
             ))}
           </svg>
@@ -325,12 +328,12 @@ export async function GET(
               style={{
                 display: 'flex',
                 position: 'absolute',
-                left: CHART_FRAME.left + 14,
-                top: scaleY(tick) - 9,
-                width: CHART.left - CHART_FRAME.left - 28,
+                left: CHART_FRAME.left + 14 * R,
+                top: scaleY(tick) - 9 * R,
+                width: CHART.left - CHART_FRAME.left - 28 * R,
                 justifyContent: 'flex-end',
                 color: COLORS.muted,
-                fontSize: 15,
+                fontSize: 15 * R,
               }}
             >
               {moneyForStep(tick, yStep)}
@@ -342,12 +345,12 @@ export async function GET(
               style={{
                 display: 'flex',
                 position: 'absolute',
-                left: scaleX(row.target) - 32,
-                top: CHART.top + CHART.height + 15,
-                width: 64,
+                left: scaleX(row.target) - 32 * R,
+                top: CHART.top + CHART.height + 15 * R,
+                width: 64 * R,
                 justifyContent: 'center',
                 color: COLORS.muted,
-                fontSize: 16,
+                fontSize: 16 * R,
                 fontWeight: 600,
               }}
             >
@@ -359,12 +362,12 @@ export async function GET(
               style={{
                 display: 'flex',
                 position: 'absolute',
-                left: scaleX(xMin) - 4,
-                top: CHART.top + CHART.height + 16,
-                width: 56,
+                left: scaleX(xMin) - 4 * R,
+                top: CHART.top + CHART.height + 16 * R,
+                width: 56 * R,
                 justifyContent: 'flex-start',
                 color: COLORS.faint,
-                fontSize: 13,
+                fontSize: 13 * R,
                 fontStyle: 'italic',
               }}
             >
@@ -376,12 +379,12 @@ export async function GET(
               style={{
                 display: 'flex',
                 position: 'absolute',
-                left: scaleX(xMax) - 52,
-                top: CHART.top + CHART.height + 16,
-                width: 56,
+                left: scaleX(xMax) - 52 * R,
+                top: CHART.top + CHART.height + 16 * R,
+                width: 56 * R,
                 justifyContent: 'flex-end',
                 color: COLORS.faint,
-                fontSize: 13,
+                fontSize: 13 * R,
                 fontStyle: 'italic',
               }}
             >
@@ -393,11 +396,11 @@ export async function GET(
               display: 'flex',
               position: 'absolute',
               left: CHART.left,
-              top: CHART.top + CHART.height + 38,
+              top: CHART.top + CHART.height + 38 * R,
               width: CHART.width,
               justifyContent: 'center',
               color: COLORS.muted,
-              fontSize: 15,
+              fontSize: 15 * R,
               fontWeight: 600,
             }}
           >
@@ -409,11 +412,11 @@ export async function GET(
                 display: 'flex',
                 position: 'absolute',
                 left: CHART.left,
-                top: CHART.top + CHART.height + 62,
+                top: CHART.top + CHART.height + 62 * R,
                 width: CHART.width,
                 justifyContent: 'center',
                 color: COLORS.faint,
-                fontSize: 13,
+                fontSize: 13 * R,
                 fontStyle: 'italic',
               }}
             >
@@ -427,33 +430,33 @@ export async function GET(
             display: 'flex',
             flex: 1,
             flexDirection: 'column',
-            gap: 17,
-            paddingTop: 18,
+            gap: 17 * R,
+            paddingTop: 18 * R,
           }}
         >
-          <div style={{ display: 'flex', fontSize: 18, fontWeight: 700 }}>
+          <div style={{ display: 'flex', fontSize: 18 * R, fontWeight: 700 }}>
             Matched Interactivity
           </div>
-          <div style={{ display: 'flex', gap: 20, fontSize: 15, color: COLORS.muted }}>
-            <span style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 20 * R, fontSize: 15 * R, color: COLORS.muted }}>
+            <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
               <span
                 style={{
                   display: 'flex',
-                  width: 19,
-                  height: 6,
-                  borderRadius: 3,
+                  width: 19 * R,
+                  height: 6 * R,
+                  borderRadius: 3 * R,
                   background: COLORS.a,
                 }}
               />
               {aLabel}
             </span>
-            <span style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+            <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
               <span
                 style={{
                   display: 'flex',
-                  width: 19,
-                  height: 6,
-                  borderRadius: 3,
+                  width: 19 * R,
+                  height: 6 * R,
+                  borderRadius: 3 * R,
                   background: COLORS.b,
                 }}
               />
@@ -467,17 +470,17 @@ export async function GET(
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 6,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 10,
-                  padding: '11px 13px',
+                  gap: 6 * R,
+                  border: `${R}px solid ${COLORS.border}`,
+                  borderRadius: 10 * R,
+                  padding: `${11 * R}px ${13 * R}px`,
                   background: COLORS.panel,
                 }}
               >
-                <div style={{ display: 'flex', color: COLORS.muted, fontSize: 13 }}>
+                <div style={{ display: 'flex', color: COLORS.muted, fontSize: 13 * R }}>
                   {row.target} tok/s/user
                 </div>
-                <div style={{ display: 'flex', gap: 15, fontSize: 19, fontWeight: 700 }}>
+                <div style={{ display: 'flex', gap: 15 * R, fontSize: 19 * R, fontWeight: 700 }}>
                   <span style={{ display: 'flex', color: COLORS.a }}>
                     {row.a ? money(row.a.cost) : 'N/A'}
                   </span>
@@ -488,7 +491,7 @@ export async function GET(
               </div>
             ))
           ) : (
-            <div style={{ display: 'flex', fontSize: 18, color: COLORS.muted }}>
+            <div style={{ display: 'flex', fontSize: 18 * R, color: COLORS.muted }}>
               No matched cost data available.
             </div>
           )}
@@ -499,8 +502,8 @@ export async function GET(
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          paddingTop: 9,
-          fontSize: 15,
+          paddingTop: 9 * R,
+          fontSize: 15 * R,
           color: COLORS.muted,
         }}
       >
