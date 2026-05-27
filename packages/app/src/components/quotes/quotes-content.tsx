@@ -34,7 +34,7 @@ function QuoteCard({
 }) {
   const content = (
     <blockquote className="space-y-4">
-      <p className="text-base lg:text-lg leading-relaxed text-muted-foreground italic">
+      <p className="text-base lg:text-lg leading-relaxed text-muted-foreground">
         &ldquo;{highlightBrand(text)}&rdquo;
       </p>
       <footer className="flex items-center gap-3">

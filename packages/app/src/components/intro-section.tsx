@@ -1,5 +1,3 @@
-import { Quote } from 'lucide-react';
-
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { QuoteCarousel } from '@/components/quote-carousel';
@@ -17,7 +15,6 @@ export function IntroSection() {
     <section>
       <Card data-testid="intro-section">
         <div className="relative flex items-start gap-2 mb-4">
-          <Quote className="size-5 shrink-0 mt-1 text-brand" />
           <h2 className="text-lg font-semibold">
             Open Source Continuous Inference Benchmark Trusted by GigaWatt Token Factories
           </h2>

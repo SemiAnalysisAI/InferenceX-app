@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Quote } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -66,33 +67,39 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   return shuffleArray(entries);
 }
 
-function QuoteBlock({ quote }: { quote: CarouselQuote }) {
+function QuoteText({ quote }: { quote: CarouselQuote }) {
   return (
-    <blockquote className="w-full">
-      <p className="text-sm lg:text-base leading-relaxed text-muted-foreground italic">
-        &ldquo;{highlightBrand(quote.text)}&rdquo;
+    <blockquote className="m-0 p-0 border-0">
+      <p className="text-sm lg:text-base leading-relaxed text-muted-foreground">
+        <Quote className="inline-block mr-2 -mt-1 size-4 text-brand align-middle" aria-hidden="true" />
+        {highlightBrand(quote.text)}
       </p>
-      <footer className="mt-3 flex items-center gap-3">
-        <CompanyLogo org={quote.org} logo={quote.logo} />
-        <div className="h-12 w-0.5 bg-brand" />
-        <div className="text-sm">
-          {quote.link ? (
-            <a
-              href={quote.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-foreground hover:text-brand transition-colors group"
-            >
-              <span className="group-hover:underline">{quote.name}</span>
-              <ExternalLinkIcon />
-            </a>
-          ) : (
-            <span className="font-semibold text-foreground">{quote.name}</span>
-          )}
-          <span className="block text-muted-foreground text-xs">{quote.title}</span>
-        </div>
-      </footer>
     </blockquote>
+  );
+}
+
+function QuoteAuthor({ quote }: { quote: CarouselQuote }) {
+  return (
+    <div className="flex items-center gap-3">
+      <CompanyLogo org={quote.org} logo={quote.logo} />
+      <div className="h-12 w-0.5 bg-brand" />
+      <div className="text-sm">
+        {quote.link ? (
+          <a
+            href={quote.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-foreground hover:text-brand transition-colors group"
+          >
+            <span className="group-hover:underline">{quote.name}</span>
+            <ExternalLinkIcon />
+          </a>
+        ) : (
+          <span className="font-semibold text-foreground">{quote.name}</span>
+        )}
+        <span className="block text-muted-foreground text-xs">{quote.title}</span>
+      </div>
+    </div>
   );
 }
 
@@ -160,7 +167,7 @@ export function QuoteCarousel({
 
   return (
     <div
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-5"
       onMouseEnter={() => {
         hovering.current = true;
       }}
@@ -168,24 +175,61 @@ export function QuoteCarousel({
         hovering.current = false;
       }}
     >
-      {/* Org name strip */}
-      <div className="flex flex-wrap justify-center gap-x-6 md:gap-x-8 gap-y-2 mx-4">
-        {entries.map((e, i) => (
-          <button
-            key={e.org}
-            type="button"
-            onClick={() => goTo(i)}
-            className={`text-xs font-semibold tracking-wide uppercase transition-colors duration-200 ${
-              i === activeIndex ? 'text-foreground' : 'text-[#808488] hover:text-muted-foreground'
-            }`}
-          >
-            {labels[e.org] ?? e.org}
-          </button>
-        ))}
+      {/* Org logo strip — infinite marquee carousel; clickable, active is highlighted.
+          Each set carries `pr-5` so the trailing gap is baked into the 50%
+          translate, keeping the loop seamless. */}
+      <div className="overflow-hidden">
+        <div className="flex w-max animate-marquee">
+          {[0, 1].map((copy) => (
+            <div
+              key={copy}
+              className="flex items-center gap-x-5 pr-5 shrink-0"
+              aria-hidden={copy === 1 ? true : undefined}
+            >
+              {entries.map((e, i) => {
+                const isActive = i === activeIndex;
+                return (
+                  <button
+                    key={e.org}
+                    type="button"
+                    onClick={() => goTo(i)}
+                    title={labels[e.org] ?? e.org}
+                    aria-label={`Show quote from ${labels[e.org] ?? e.org}`}
+                    tabIndex={copy === 1 ? -1 : undefined}
+                    className={`group flex h-10 shrink-0 items-center justify-center px-2 rounded-md transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+                      isActive
+                        ? 'bg-accent/60'
+                        : 'opacity-50 hover:opacity-100'
+                    }`}
+                  >
+                    {e.quote.logo ? (
+                      <img
+                        src={`/logos/${e.quote.logo}`}
+                        alt={labels[e.org] ?? e.org}
+                        className={`h-6 sm:h-7 max-w-[110px] object-contain transition-all duration-200 ${
+                          isActive ? 'grayscale-0 dark:invert' : 'grayscale dark:invert'
+                        }`}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span
+                        className={`text-xs font-semibold tracking-wide uppercase ${
+                          isActive ? 'text-foreground' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {labels[e.org] ?? e.org}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* All quotes stacked in same grid cell — tallest sets height */}
-      <div className="grid items-center">
+      {/* Stacked quote texts — tallest sets the cell height. */}
+      <div className="grid items-start">
         {entries.map((e, i) => {
           const isActive = i === activeIndex;
           return (
@@ -193,28 +237,52 @@ export function QuoteCarousel({
               key={e.org}
               className={`col-start-1 row-start-1 ${
                 isActive
-                  ? `transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`
+                  ? `transition-opacity duration-300 ease-in-out ${
+                      fading ? 'opacity-0' : 'opacity-100'
+                    }`
                   : 'opacity-0 invisible pointer-events-none'
               }`}
               aria-hidden={!isActive}
             >
-              <QuoteBlock quote={e.quote} />
+              <QuoteText quote={e.quote} />
             </div>
           );
         })}
       </div>
 
-      {moreHref && (
-        <div className="flex justify-end">
+      {/* Bottom row: active quote's author (left) and "See more" link (right),
+          aligned to the same bottom baseline via items-end. */}
+      <div className="flex items-end justify-between gap-4">
+        <div className="grid items-end flex-1 min-w-0">
+          {entries.map((e, i) => {
+            const isActive = i === activeIndex;
+            return (
+              <div
+                key={e.org}
+                className={`col-start-1 row-start-1 ${
+                  isActive
+                    ? `transition-opacity duration-300 ease-in-out ${
+                        fading ? 'opacity-0' : 'opacity-100'
+                      }`
+                    : 'opacity-0 invisible pointer-events-none'
+                }`}
+                aria-hidden={!isActive}
+              >
+                <QuoteAuthor quote={e.quote} />
+              </div>
+            );
+          })}
+        </div>
+        {moreHref && (
           <Link
             href={moreHref}
-            className="text-xs font-bold text-brand hover:underline"
+            className="text-xs font-bold text-brand hover:underline shrink-0"
             onClick={() => track('quote_carousel_see_more_clicked')}
           >
             See more supporters &rarr;
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
