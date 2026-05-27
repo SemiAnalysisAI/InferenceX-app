@@ -75,7 +75,9 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
   // alias model resolution, GPU alphabetical order — but redirect target lives
   // under /compare-per-dollar/. Query string is preserved across the hop.
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  if (canonical !== slug) {
+  // canonical is always lowercase; compare against lowercased input so mixed-case
+  // URLs don't emit a fresh 308 + CDN cache entry every hit.
+  if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
         if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);

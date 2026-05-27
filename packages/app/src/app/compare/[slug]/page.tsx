@@ -79,7 +79,10 @@ export default async function ComparePage({ params, searchParams }: Props) {
   // redirect — the original PR #351 redirect dropped these, but with bare slugs
   // now redirecting unconditionally we need to keep them.
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  if (canonical !== slug) {
+  // canonical is always lowercase; compare against lowercased input so mixed-case
+  // URLs (e.g. /compare/H100-vs-H200) don't emit a fresh 308 + CDN cache entry
+  // every hit when they actually match the canonical content.
+  if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
         if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
