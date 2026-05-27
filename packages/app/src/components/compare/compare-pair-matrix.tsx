@@ -56,6 +56,18 @@ function pairKey(a: string, b: string): string {
   return [a, b].toSorted().join('|');
 }
 
+/** Drop trailing "NVL72" so labels fit inside narrow cells without wrapping. */
+function shortHwLabel(gpu: string): string {
+  const label = HW_REGISTRY[gpu]?.label ?? gpu.toUpperCase();
+  return label.replace(/\s+NVL72$/u, '');
+}
+
+function vendorTextColor(vendor: VendorKey): string {
+  if (vendor === 'nvidia') return NVIDIA_COLOR;
+  if (vendor === 'amd') return AMD_COLOR;
+  return 'currentColor';
+}
+
 export function ComparePairMatrix({ pairs, hrefPrefix }: ComparePairMatrixProps) {
   const gpus = [...new Set(pairs.flatMap((p) => [p.a, p.b]))].toSorted(compareGpus);
   const pairByKey = new Map(pairs.map((p) => [pairKey(p.a, p.b), p]));
@@ -65,7 +77,7 @@ export function ComparePairMatrix({ pairs, hrefPrefix }: ComparePairMatrixProps)
       <div
         className="grid w-fit gap-1.5"
         style={{
-          gridTemplateColumns: `minmax(0, max-content) repeat(${gpus.length}, minmax(56px, 1fr))`,
+          gridTemplateColumns: `minmax(0, max-content) repeat(${gpus.length}, minmax(72px, 1fr))`,
         }}
       >
         <div aria-hidden />
@@ -113,8 +125,8 @@ function HeaderChip({ gpu, axis }: { gpu: string; axis: 'row' | 'col' }) {
     <div
       className={
         axis === 'col'
-          ? 'flex min-h-[44px] items-center justify-center rounded-md border px-2 py-1 text-center text-xs font-semibold leading-tight whitespace-nowrap'
-          : 'flex min-h-[44px] items-center justify-end rounded-md border px-3 py-1 text-right text-xs font-semibold leading-tight whitespace-nowrap'
+          ? 'flex min-h-[48px] items-center justify-center rounded-md border px-2 py-1 text-center text-xs font-semibold leading-tight whitespace-nowrap'
+          : 'flex min-h-[48px] items-center justify-end rounded-md border px-3 py-1 text-right text-xs font-semibold leading-tight whitespace-nowrap'
       }
       style={style}
       title={arch ? `${label} · ${arch}` : label}
@@ -127,7 +139,7 @@ function HeaderChip({ gpu, axis }: { gpu: string; axis: 'row' | 'col' }) {
 function DiagonalCell({ gpu }: { gpu: string }) {
   return (
     <div
-      className="flex min-h-[44px] items-center justify-center rounded-md border border-dashed border-border/40 bg-muted/20 text-[10px] text-muted-foreground/60"
+      className="flex min-h-[48px] items-center justify-center rounded-md border border-dashed border-border/40 bg-muted/20 text-[10px] text-muted-foreground/60"
       aria-hidden
       title={`${HW_REGISTRY[gpu]?.label ?? gpu.toUpperCase()} (same SKU)`}
     >
@@ -137,7 +149,7 @@ function DiagonalCell({ gpu }: { gpu: string }) {
 }
 
 function EmptyCell() {
-  return <div className="min-h-[44px] rounded-md border border-border/20 bg-background/5" />;
+  return <div className="min-h-[48px] rounded-md border border-border/20 bg-background/5" />;
 }
 
 function PairCell({
@@ -183,10 +195,23 @@ function PairCell({
         track('compare_index_matrix_clicked', { slug, label });
         window.location.href = href;
       }}
-      className="group flex min-h-[44px] items-center justify-center rounded-md border transition-all hover:scale-[1.04] hover:shadow-md hover:shadow-brand/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+      className="group relative flex min-h-[48px] flex-col items-center justify-center gap-0 rounded-md border px-1.5 py-1 text-center leading-tight transition-all hover:scale-[1.04] hover:shadow-md hover:shadow-brand/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
       style={cellStyle}
     >
-      <span className="text-[11px] text-foreground/40 opacity-0 transition-opacity group-hover:opacity-90">
+      <span
+        className="text-[11px] font-semibold whitespace-nowrap"
+        style={{ color: vendorTextColor(vRow) }}
+      >
+        {shortHwLabel(rowGpu)}
+      </span>
+      <span className="text-[8px] font-medium uppercase tracking-wider text-foreground/45">vs</span>
+      <span
+        className="text-[11px] font-semibold whitespace-nowrap"
+        style={{ color: vendorTextColor(vCol) }}
+      >
+        {shortHwLabel(colGpu)}
+      </span>
+      <span className="absolute right-1 top-1 text-[10px] text-foreground/40 opacity-0 transition-opacity group-hover:opacity-80">
         ↗
       </span>
     </a>
