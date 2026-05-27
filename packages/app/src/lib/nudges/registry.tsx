@@ -7,10 +7,18 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { FEEDBACK_SUBMITTED_EVENT, FeedbackForm } from '@/components/feedback-modal';
+import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+
+// Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS;
+// it only renders after the eligibility event fires (see feedback-modal nudge below).
+const FeedbackForm = dynamic(
+  () => import('@/components/feedback-modal').then((m) => m.FeedbackForm),
+  { ssr: false },
+);
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
 import { FEEDBACK_ELIGIBLE_EVENT } from '@/lib/visit-tracking';
