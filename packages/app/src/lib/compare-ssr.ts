@@ -10,7 +10,12 @@
  *     and JSON-LD shape — with a `variant` knob that swaps the headline
  *     framing between the latency+throughput view and the per-dollar view.
  */
-import { HW_REGISTRY, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import {
+  AUTHOR_NAME,
+  AUTHOR_URL,
+  HW_REGISTRY,
+  sequenceToIslOsl,
+} from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import {
@@ -854,6 +859,12 @@ export function buildJsonLd(
               name: datasetName,
               description: datasetDescription,
               url,
+              license: 'https://www.apache.org/licenses/LICENSE-2.0',
+              creator: {
+                '@type': 'Organization',
+                name: AUTHOR_NAME,
+                url: AUTHOR_URL,
+              },
               ...(imageUrl && {
                 image: {
                   '@type': 'ImageObject',
