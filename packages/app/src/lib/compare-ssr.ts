@@ -824,7 +824,7 @@ export function buildJsonLd(
         );
       }
       return {
-        '@type': 'Observation',
+        '@type': 'Dataset',
         name: `${model.label} comparison at ${row.target} tok/s/user interactivity`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
