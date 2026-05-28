@@ -1,21 +1,14 @@
 import type { DbClient } from '../connection.js';
+import type { WorkerPower } from '../etl/benchmark-mapper.js';
 
 /**
  * One entry in `BenchmarkRow.workers` — mirrors the runner's aggregate_power.py
- * per-worker payload. Telemetry scalars after `avg_power_w` are optional
- * because they depend on which sample columns the perfmon CSVs include.
+ * per-worker payload. Structurally identical to the ingest-side {@link WorkerPower},
+ * so it is aliased to that single definition rather than redeclared, keeping the
+ * shape from drifting within this package. The read side keeps the
+ * `BenchmarkWorkerRow` name it's referenced by (json-provider, BenchmarkRow.workers).
  */
-export interface BenchmarkWorkerRow {
-  role: string;
-  worker_idx: number;
-  hosts?: string[];
-  num_gpus: number;
-  avg_power_w: number;
-  avg_temp_c?: number;
-  peak_temp_c?: number;
-  avg_util_pct?: number;
-  avg_mem_used_mb?: number;
-}
+export type BenchmarkWorkerRow = WorkerPower;
 
 export interface BenchmarkRow {
   hardware: string;
