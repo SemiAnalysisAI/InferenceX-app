@@ -8,6 +8,12 @@ import type { Model, Sequence } from '@/lib/data-mappings';
  * - `prefill` / `decode`: the two halves of a disaggregated serving setup
  * - `agg`: an aggregated (non-disagg) worker that handles both phases
  * - `frontend`: a router / load-balancer process (typically zero GPUs)
+ *
+ * Carried on `WorkerPower.role` as `string` (not the literal union) because
+ * the runner emits the role at the JSONB boundary — we can't statically
+ * guarantee the value at the type system level. Consumers that switch on the
+ * role should narrow via `if (role === 'prefill') ...` or a `WorkerRole`
+ * cast at the point of use.
  */
 export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
 
@@ -15,12 +21,30 @@ export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
  * Per-worker measured power entry emitted by the runner's aggregate_power.py
  * for multinode and disaggregated runs. The chart layer can use these to
  * surface a stacked breakdown of where energy is spent across worker types.
+ *
+ * `hosts` lists the node hostnames whose perfmon CSVs were rolled up into
+ * this worker entry (a single-node worker has one host; a multinode decode
+ * worker spanning 4 nodes has four). Optional because pre-multinode versions
+ * of aggregate_power.py didn't emit it.
+ *
+ * `avg_temp_c`, `peak_temp_c`, `avg_util_pct`, `avg_mem_used_mb` mirror the
+ * cluster-wide telemetry scalars and are only present when the perfmon CSVs
+ * include the corresponding sample columns. Each is optional so callers can
+ * distinguish "field absent from this run" from "field present and equal to 0".
  */
 export interface WorkerPower {
-  role: WorkerRole;
+  // `string` rather than `WorkerRole` so the type lines up with what we get
+  // from the JSONB column without an unsafe cast at every boundary. Chart
+  // code can still narrow on the literal values it understands.
+  role: string;
   worker_idx: number;
+  hosts?: string[];
   num_gpus: number;
   avg_power_w: number;
+  avg_temp_c?: number;
+  peak_temp_c?: number;
+  avg_util_pct?: number;
+  avg_mem_used_mb?: number;
 }
 
 /**
@@ -97,12 +121,22 @@ export interface AggDataEntry {
   // and decode workers (single-node disagg or multinode disagg). Single-node
   // aggregated configs leave these undefined.
   // - prefill_avg_power_w / decode_avg_power_w: mean per-GPU draw (W) within each role
-  // - joules_per_input_token: prefill_energy / total_input_tokens
-  // - joules_per_output_token_decode: decode_energy / total_output_tokens
+  // - joules_per_input_token: prefill_energy / total_input_tokens (prefill GPUs only)
+  // The disagg decode-only J/output is carried by joules_per_output_token above
+  // (the runner overrides it to decode_energy / total_output_tokens on disagg) —
+  // there is no separate _decode field.
   prefill_avg_power_w?: number;
   decode_avg_power_w?: number;
   joules_per_input_token?: number;
-  joules_per_output_token_decode?: number;
+  // Cluster-wide GPU telemetry beyond power (temperature, utilization, memory).
+  // Emitted by aggregate_power.py when the perfmon CSVs include the matching
+  // sample columns. Optional because older runs (and runs without the relevant
+  // perfmon samples) leave them unset — the chart layer must distinguish "no
+  // measurement" from "0".
+  avg_temp_c?: number;
+  peak_temp_c?: number;
+  avg_util_pct?: number;
+  avg_mem_used_mb?: number;
   // Per-worker measured power breakdown. Each entry is one worker process
   // (a prefill, decode, agg, or frontend role). Optional because pre-multinode
   // and pre-aggregate_power.py runs don't emit it.

@@ -56,10 +56,18 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     joules_per_output_token: m.joules_per_output_token,
     joules_per_total_token: m.joules_per_total_token,
     // Multinode / disagg-only role splits — same undefined-for-legacy pattern.
+    // (disagg's decode-only J/output is carried by joules_per_output_token above,
+    // which the runner overrides to the per-stage value — no separate _decode key.)
     prefill_avg_power_w: m.prefill_avg_power_w,
     decode_avg_power_w: m.decode_avg_power_w,
     joules_per_input_token: m.joules_per_input_token,
-    joules_per_output_token_decode: m.joules_per_output_token_decode,
+    // Cluster-wide GPU telemetry beyond power. Emitted when the perfmon CSVs
+    // include the corresponding sample columns; left undefined otherwise so
+    // the chart layer can distinguish "no measurement" from a real zero.
+    avg_temp_c: m.avg_temp_c,
+    peak_temp_c: m.peak_temp_c,
+    avg_util_pct: m.avg_util_pct,
+    avg_mem_used_mb: m.avg_mem_used_mb,
     // Per-worker measured power. Surfaced on BenchmarkRow as a sibling of the
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.

@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { BenchmarkRow } from './queries/benchmarks.js';
+import type { BenchmarkRow, BenchmarkWorkerRow } from './queries/benchmarks.js';
 import type { EvalRow } from './queries/evaluations.js';
 import type { ReliabilityRow } from './queries/reliability.js';
 import type {
@@ -73,6 +73,8 @@ interface RawBenchmarkResult {
   conc: number;
   image: string | null;
   metrics: Record<string, number>;
+  /** Added in migration 006; older dumps omit this field — surfaced as undefined. */
+  workers?: BenchmarkWorkerRow[] | null;
   error: string | null;
   server_log_id: number | null;
 }
@@ -300,6 +302,10 @@ function toBenchmarkRow(
     conc: br.conc,
     image: br.image,
     metrics: metrics ?? br.metrics,
+    // workers: optional sibling JSONB column. Older dumps (pre-migration 006)
+    // simply lack the field — defensively narrow to an array or undefined so
+    // downstream consumers can rely on the property being well-typed.
+    workers: Array.isArray(br.workers) ? br.workers : undefined,
     date: toDateString(br.date),
     run_url: buildRunUrl(wr),
   };
