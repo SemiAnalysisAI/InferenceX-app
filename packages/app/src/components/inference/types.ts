@@ -4,6 +4,26 @@ import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
 /**
+ * Role of a single worker process in a multinode / disaggregated deployment.
+ * - `prefill` / `decode`: the two halves of a disaggregated serving setup
+ * - `agg`: an aggregated (non-disagg) worker that handles both phases
+ * - `frontend`: a router / load-balancer process (typically zero GPUs)
+ */
+export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
+
+/**
+ * Per-worker measured power entry emitted by the runner's aggregate_power.py
+ * for multinode and disaggregated runs. The chart layer can use these to
+ * surface a stacked breakdown of where energy is spent across worker types.
+ */
+export interface WorkerPower {
+  role: WorkerRole;
+  worker_idx: number;
+  num_gpus: number;
+  avg_power_w: number;
+}
+
+/**
  * Represents an aggregated data entry, typically from a raw data source.
  * This interface contains various performance metrics.
  * @interface AggDataEntry
@@ -72,6 +92,21 @@ export interface AggDataEntry {
   avg_power_w?: number;
   joules_per_output_token?: number;
   joules_per_total_token?: number;
+  // Multinode / disagg-only measured power. The aggregate_power.py runner
+  // emits per-role energy splits when the deployment has separate prefill
+  // and decode workers (single-node disagg or multinode disagg). Single-node
+  // aggregated configs leave these undefined.
+  // - prefill_avg_power_w / decode_avg_power_w: mean per-GPU draw (W) within each role
+  // - joules_per_input_token: prefill_energy / total_input_tokens
+  // - joules_per_output_token_decode: decode_energy / total_output_tokens
+  prefill_avg_power_w?: number;
+  decode_avg_power_w?: number;
+  joules_per_input_token?: number;
+  joules_per_output_token_decode?: number;
+  // Per-worker measured power breakdown. Each entry is one worker process
+  // (a prefill, decode, agg, or frontend role). Optional because pre-multinode
+  // and pre-aggregate_power.py runs don't emit it.
+  workers?: WorkerPower[];
   disagg: boolean;
   num_prefill_gpu: number;
   num_decode_gpu: number;

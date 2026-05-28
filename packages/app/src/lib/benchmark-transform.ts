@@ -55,6 +55,15 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     avg_power_w: m.avg_power_w,
     joules_per_output_token: m.joules_per_output_token,
     joules_per_total_token: m.joules_per_total_token,
+    // Multinode / disagg-only role splits — same undefined-for-legacy pattern.
+    prefill_avg_power_w: m.prefill_avg_power_w,
+    decode_avg_power_w: m.decode_avg_power_w,
+    joules_per_input_token: m.joules_per_input_token,
+    joules_per_output_token_decode: m.joules_per_output_token_decode,
+    // Per-worker measured power. Surfaced on BenchmarkRow as a sibling of the
+    // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
+    // payload can't poison downstream consumers.
+    workers: Array.isArray(row.workers) ? row.workers : undefined,
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,

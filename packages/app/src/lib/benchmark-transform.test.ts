@@ -133,6 +133,57 @@ describe('rowToAggDataEntry', () => {
     expect(entry.avg_power_w).toBeUndefined();
     expect(entry.joules_per_output_token).toBeUndefined();
   });
+
+  it('passes through multinode / disagg role-split power scalars when present', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          tput_per_gpu: 100,
+          prefill_avg_power_w: 612.3,
+          decode_avg_power_w: 701.5,
+          joules_per_input_token: 1.2,
+          joules_per_output_token_decode: 9.7,
+        },
+      }),
+    );
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.decode_avg_power_w).toBe(701.5);
+    expect(entry.joules_per_input_token).toBe(1.2);
+    expect(entry.joules_per_output_token_decode).toBe(9.7);
+  });
+
+  it('passes through per-worker measured power array intact', () => {
+    const workers = [
+      { role: 'prefill' as const, worker_idx: 0, num_gpus: 4, avg_power_w: 588.4 },
+      { role: 'prefill' as const, worker_idx: 1, num_gpus: 4, avg_power_w: 601.2 },
+      { role: 'decode' as const, worker_idx: 0, num_gpus: 8, avg_power_w: 712.1 },
+      { role: 'frontend' as const, worker_idx: 0, num_gpus: 0, avg_power_w: 0 },
+    ];
+    const entry = rowToAggDataEntry(makeRow({ workers }));
+    expect(entry.workers).toEqual(workers);
+  });
+
+  it('defensively drops a non-array workers payload', () => {
+    // The DB JSONB column is untyped at the wire boundary, so guard against a
+    // malformed row reaching downstream consumers.
+    const entry = rowToAggDataEntry(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      makeRow({ workers: 'oops' as any }),
+    );
+    expect(entry.workers).toBeUndefined();
+  });
+
+  it('leaves multinode role-split scalars and workers undefined for legacy rows', () => {
+    // Single-node configs predating the multinode runner don't emit any of
+    // the role-split fields; transform must yield undefined (not 0) so the
+    // chart layer can distinguish "no measurement" from a real zero.
+    const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
+    expect(entry.prefill_avg_power_w).toBeUndefined();
+    expect(entry.decode_avg_power_w).toBeUndefined();
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.joules_per_output_token_decode).toBeUndefined();
+    expect(entry.workers).toBeUndefined();
+  });
 });
 
 describe('transformBenchmarkRows', () => {

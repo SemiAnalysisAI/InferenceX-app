@@ -51,4 +51,17 @@ export const METRIC_KEYS = new Set([
   'avg_power_w',
   'joules_per_output_token',
   'joules_per_total_token',
+  // multinode / disagg role splits (emitted only when the deployment has
+  // distinct prefill / decode workers)
+  // prefill_avg_power_w / decode_avg_power_w:  mean per-GPU draw within each role
+  // joules_per_input_token:           prefill_energy / total_input_tokens
+  // joules_per_output_token_decode:   decode_energy  / total_output_tokens
+  //                                   — _decode suffix is load-bearing: the
+  //                                   single-node joules_per_output_token above
+  //                                   sums across both phases, this one isolates
+  //                                   decode-only energy.
+  'prefill_avg_power_w',
+  'decode_avg_power_w',
+  'joules_per_input_token',
+  'joules_per_output_token_decode',
 ]);
