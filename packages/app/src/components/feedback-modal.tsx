@@ -105,7 +105,7 @@ export function FeedbackForm({ onDismiss }: FeedbackFormProps) {
           Help us improve InferenceX
         </h2>
         <p id={descId} className="text-sm text-muted-foreground">
-          You're a regular! We'd love to hear what's working and what isn't.
+          We'd love to hear what's working and what isn't.
         </p>
       </div>
 
