@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
@@ -91,6 +94,16 @@ function pointsPath(points: Point[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
+let logoSrcPromise: Promise<string | null> | undefined;
+function getLogoSrc(): Promise<string | null> {
+  if (!logoSrcPromise) {
+    logoSrcPromise = readFile(join(process.cwd(), 'public/brand/logo-color.png'))
+      .then((buf) => `data:image/png;base64,${buf.toString('base64')}`)
+      .catch(() => null);
+  }
+  return logoSrcPromise;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
@@ -101,7 +114,10 @@ export async function GET(
     return new Response('Not found', { status: 404 });
   }
 
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
+  const [rows, logoSrc] = await Promise.all([
+    getCachedBenchmarks(parsed.model.dbKeys),
+    getLogoSrc(),
+  ]);
   const { sequence, precision } = pickPairDefaults(rows, parsed.a, parsed.b);
   const { ssrRows, interactivityRange } = computeCompareTableData(
     rows,
@@ -502,6 +518,7 @@ export async function GET(
         style={{
           display: 'flex',
           justifyContent: 'space-between',
+          alignItems: 'flex-end',
           paddingTop: 9 * R,
           fontSize: 15 * R,
           color: COLORS.muted,
@@ -510,9 +527,19 @@ export async function GET(
         <span style={{ display: 'flex' }}>
           Owning-hyperscaler TCO | interpolated from benchmark results
         </span>
-        <span style={{ display: 'flex', color: COLORS.text, fontWeight: 700 }}>
-          inferencex.semianalysis.com
-        </span>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: 6 * R,
+          }}
+        >
+          {logoSrc && <img src={logoSrc} height={28 * R} alt="" />}
+          <span style={{ display: 'flex', color: COLORS.text, fontWeight: 700 }}>
+            inferencex.semianalysis.com
+          </span>
+        </div>
       </div>
     </div>,
     {
