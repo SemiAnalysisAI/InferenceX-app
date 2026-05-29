@@ -90,7 +90,11 @@ export async function getLatestBenchmarks(
         br.conc,
         br.image,
         br.metrics,
-        br.workers,
+        -- Read workers via to_jsonb(row)->'workers' rather than a bare column ref so the
+        -- query still plans (and returns null) if migration 006 has not been applied yet.
+        -- A bare column reference throws "column does not exist" at parse time and 500s the
+        -- whole endpoint. See migration 006_benchmark_results_workers.sql.
+        to_jsonb(br) -> 'workers' AS workers,
         br.date::text,
         CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
       FROM benchmark_results br
@@ -129,7 +133,8 @@ export async function getLatestBenchmarks(
       lb.conc,
       lb.image,
       lb.metrics,
-      lb.workers,
+      -- to_jsonb(row)->'workers' guard: tolerate a pre-migration-006 view (see date branch above).
+      to_jsonb(lb) -> 'workers' AS workers,
       lb.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM latest_benchmarks lb
@@ -176,7 +181,8 @@ export async function getAllBenchmarksForHistory(
       br.osl,
       br.conc,
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
-      br.workers,
+      -- to_jsonb(row)->'workers' guard: tolerate a pre-migration-006 base table (see getLatestBenchmarks).
+      to_jsonb(br) -> 'workers' AS workers,
       br.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM configs c
