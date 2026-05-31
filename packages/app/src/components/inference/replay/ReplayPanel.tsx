@@ -170,7 +170,7 @@ export default function ReplayPanel({
 
   // Pre-flight feature detection so the Export button is disabled with a clear
   // reason on browsers that lack WebCodecs (Firefox today, older Safari).
-  const hasWebCodecs = useMemo(() => typeof VideoEncoder !== 'undefined', []);
+  const hasWebCodecs = typeof VideoEncoder !== 'undefined';
   const unavailableReportedRef = useRef(false);
   useEffect(() => {
     if (!hasWebCodecs && !unavailableReportedRef.current) {
@@ -251,7 +251,7 @@ export default function ReplayPanel({
       if (rafId !== 0) cancelAnimationFrame(rafId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [playing, timeline, prefersReducedMotion]);
+  }, [playing, timeline, prefersReducedMotion, commitFraction]);
 
   useEffect(() => {
     fractionRef.current = 0;
@@ -441,7 +441,7 @@ export default function ReplayPanel({
       setExportProgress(null);
       abortRef.current = null;
     }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
+  }, [chartDefinition.chartType, commitFraction, selectedModel, timeline, hasWebCodecs]);
 
   if (history.isLoading || !timeline) {
     return (

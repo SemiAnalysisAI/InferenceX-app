@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -225,12 +225,16 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
       chartData,
       availableModels,
       dateRange,
+      setDateRange,
       showPercentagesOnBars,
+      setShowPercentagesOnBars,
       highContrast,
+      setHighContrast,
       enabledModels,
       toggleModel,
       removeModel,
       isLegendExpanded,
+      setIsLegendExpanded,
       modelsWithData,
       selectAllModels,
     ],
@@ -240,7 +244,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
 }
 
 export function useReliabilityContext() {
-  const context = useContext(ReliabilityContext);
+  const context = use(ReliabilityContext);
   if (context === undefined) {
     throw new Error('useReliabilityContext must be used within a ReliabilityProvider');
   }

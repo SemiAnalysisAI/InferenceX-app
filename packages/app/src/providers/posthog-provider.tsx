@@ -1,7 +1,7 @@
 'use client';
 
 import type { PostHog } from 'posthog-js';
-import { Suspense, createContext, useContext, useEffect, useState } from 'react';
+import { Suspense, createContext, use, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { installChunkLoadRecovery } from '@/lib/chunk-load-recovery';
 
@@ -38,7 +38,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 function PageViewTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const ph = useContext(PostHogCtx);
+  const ph = use(PostHogCtx);
 
   useEffect(() => {
     if (pathname && ph) {

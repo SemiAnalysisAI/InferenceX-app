@@ -103,84 +103,84 @@ export function buildEvaluationChartRows(
   if (!dbModelKeys || dbModelKeys.length === 0) return [];
 
   const showPrecision = selectedPrecisions.length > 1;
-  const allData = rawData
-    .filter(
-      (item) =>
-        item.task === selectedBenchmark &&
-        dbModelKeys.includes(item.model) &&
-        (!selectedRunDate || item.date <= selectedRunDate) &&
-        selectedPrecisions.includes(item.precision),
+  const allData: EvaluationChartData[] = [];
+  for (const item of rawData) {
+    if (
+      item.task !== selectedBenchmark ||
+      !dbModelKeys.includes(item.model) ||
+      (selectedRunDate && item.date > selectedRunDate) ||
+      !selectedPrecisions.includes(item.precision)
     )
-    .map((item): EvaluationChartData | null => {
-      const score = item.metrics.em_strict ?? item.metrics.score;
-      if (score === undefined) {
-        console.warn(
-          `[evaluation] dropped row with missing metrics: config_id=${item.config_id} ${item.hardware} ${item.framework} ${item.task}`,
-        );
-        return null;
-      }
+      continue;
 
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      if (hwKey === 'unknown') {
-        console.warn(
-          `[evaluation] dropped row with unknown hardware mapping: hardware=${item.hardware} framework=${item.framework} spec=${item.spec_method}`,
-        );
-        return null;
-      }
+    const score = item.metrics.em_strict ?? item.metrics.score;
+    if (score === undefined) {
+      console.warn(
+        `[evaluation] dropped row with missing metrics: config_id=${item.config_id} ${item.hardware} ${item.framework} ${item.task}`,
+      );
+      continue;
+    }
 
-      const hwConfig = getHardwareConfig(hwKey);
-      const hwLabel = hwConfig.label;
+    const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
+    if (hwKey === 'unknown') {
+      console.warn(
+        `[evaluation] dropped row with unknown hardware mapping: hardware=${item.hardware} framework=${item.framework} spec=${item.spec_method}`,
+      );
+      continue;
+    }
 
-      return {
-        evalResultId: item.id,
-        configId: item.config_id,
-        hwKey,
-        hardware: item.hardware,
-        configLabel: buildConfigLabel(
-          hwLabel,
-          item.framework,
-          item.spec_method,
-          item.precision,
-          item.conc,
-          {
-            disagg: item.disagg,
-            decodeTp: item.decode_tp,
-            decodeEp: item.decode_ep,
-            decodeDpa: item.decode_dp_attention,
-            decodeNw: item.decode_num_workers,
-            prefillTp: item.prefill_tp,
-            prefillEp: item.prefill_ep,
-            prefillDpa: item.prefill_dp_attention,
-            prefillNw: item.prefill_num_workers,
-          },
-          showPrecision,
-        ),
-        score,
-        scoreError: item.metrics.em_strict_se ?? item.metrics.score_se ?? 0,
-        model: item.model,
-        benchmark: item.task,
-        specDecode: item.spec_method,
-        date: item.date,
-        datetime: item.timestamp ?? '',
-        precision: item.precision,
-        framework: item.framework,
-        tp: item.decode_tp,
-        ep: item.decode_ep,
-        dp_attention: item.decode_dp_attention,
-        conc: item.conc ?? 0,
-        disagg: item.disagg,
-        isMultinode: item.is_multinode,
-        prefillTp: item.prefill_tp,
-        prefillEp: item.prefill_ep,
-        prefillDpAttention: item.prefill_dp_attention,
-        prefillNumWorkers: item.prefill_num_workers,
-        decodeNumWorkers: item.decode_num_workers,
-        numPrefillGpu: item.num_prefill_gpu,
-        numDecodeGpu: item.num_decode_gpu,
-        runUrl: item.run_url ?? undefined,
-      };
-    })
-    .filter((item): item is EvaluationChartData => item !== null);
+    const hwConfig = getHardwareConfig(hwKey);
+    const hwLabel = hwConfig.label;
+
+    allData.push({
+      evalResultId: item.id,
+      configId: item.config_id,
+      hwKey,
+      hardware: item.hardware,
+      configLabel: buildConfigLabel(
+        hwLabel,
+        item.framework,
+        item.spec_method,
+        item.precision,
+        item.conc,
+        {
+          disagg: item.disagg,
+          decodeTp: item.decode_tp,
+          decodeEp: item.decode_ep,
+          decodeDpa: item.decode_dp_attention,
+          decodeNw: item.decode_num_workers,
+          prefillTp: item.prefill_tp,
+          prefillEp: item.prefill_ep,
+          prefillDpa: item.prefill_dp_attention,
+          prefillNw: item.prefill_num_workers,
+        },
+        showPrecision,
+      ),
+      score,
+      scoreError: item.metrics.em_strict_se ?? item.metrics.score_se ?? 0,
+      model: item.model,
+      benchmark: item.task,
+      specDecode: item.spec_method,
+      date: item.date,
+      datetime: item.timestamp ?? '',
+      precision: item.precision,
+      framework: item.framework,
+      tp: item.decode_tp,
+      ep: item.decode_ep,
+      dp_attention: item.decode_dp_attention,
+      conc: item.conc ?? 0,
+      disagg: item.disagg,
+      isMultinode: item.is_multinode,
+      prefillTp: item.prefill_tp,
+      prefillEp: item.prefill_ep,
+      prefillDpAttention: item.prefill_dp_attention,
+      prefillNumWorkers: item.prefill_num_workers,
+      decodeNumWorkers: item.decode_num_workers,
+      numPrefillGpu: item.num_prefill_gpu,
+      numDecodeGpu: item.num_decode_gpu,
+      runUrl: item.run_url ?? undefined,
+    });
+  }
 
   // Dedup by (configId, conc) so each distinct config (unique prefill/decode
   // geometry, spec method, precision, etc.) gets its own "latest date" slot
@@ -278,39 +278,39 @@ export function buildEvalChangelogEntries(
   if (!dbModelKeys || dbModelKeys.length === 0) return [];
 
   const showPrecision = selectedPrecisions.length > 1;
-  const rows = rawData
-    .filter((item) => {
-      const rawScore = item.metrics.em_strict ?? item.metrics.score;
-      return (
-        item.date === selectedRunDate &&
-        dbModelKeys.includes(item.model) &&
-        selectedPrecisions.includes(item.precision) &&
-        rawScore !== undefined
-      );
-    })
-    .map((item) => {
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      const hwConfig = getHardwareConfig(hwKey);
-      const hwLabel = hwConfig.label;
-      // Changelog labels historically omit TP/EP; keep that behavior while
-      // still surfacing the disagg marker.
-      return {
-        benchmark: item.task,
-        configLabel: buildConfigLabel(
-          hwLabel,
-          item.framework,
-          item.spec_method,
-          item.precision,
-          item.conc,
-          {
-            disagg: item.disagg,
-            prefillDpa: item.prefill_dp_attention,
-            decodeDpa: item.decode_dp_attention,
-          },
-          showPrecision,
-        ),
-      };
+  const rows: { benchmark: string; configLabel: string }[] = [];
+  for (const item of rawData) {
+    const rawScore = item.metrics.em_strict ?? item.metrics.score;
+    if (
+      item.date !== selectedRunDate ||
+      !dbModelKeys.includes(item.model) ||
+      !selectedPrecisions.includes(item.precision) ||
+      rawScore === undefined
+    )
+      continue;
+
+    const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
+    const hwConfig = getHardwareConfig(hwKey);
+    const hwLabel = hwConfig.label;
+    // Changelog labels historically omit TP/EP; keep that behavior while
+    // still surfacing the disagg marker.
+    rows.push({
+      benchmark: item.task,
+      configLabel: buildConfigLabel(
+        hwLabel,
+        item.framework,
+        item.spec_method,
+        item.precision,
+        item.conc,
+        {
+          disagg: item.disagg,
+          prefillDpa: item.prefill_dp_attention,
+          decodeDpa: item.decode_dp_attention,
+        },
+        showPrecision,
+      ),
     });
+  }
 
   const byBenchmark = new Map<string, Set<string>>();
   for (const item of rows) {

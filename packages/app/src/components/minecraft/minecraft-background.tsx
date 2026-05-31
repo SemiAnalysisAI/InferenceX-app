@@ -42,7 +42,7 @@ const SONGS = [
 
 function getInitialMusicStart(): number {
   try {
-    const raw = sessionStorage.getItem('minecraft-music-pos');
+    const raw = sessionStorage.getItem('minecraft-music-pos:v1');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Date.now() - parsed.ts < 30_000 && typeof parsed.time === 'number' && parsed.time > 0) {
@@ -169,7 +169,10 @@ export function MinecraftBackground() {
       try {
         const time = player.getCurrentTime();
         if (time > 0) {
-          sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
+          sessionStorage.setItem(
+            'minecraft-music-pos:v1',
+            JSON.stringify({ time, ts: Date.now() }),
+          );
         }
       } catch {
         /* player may not be ready */
@@ -187,7 +190,10 @@ export function MinecraftBackground() {
       try {
         const time = player.getCurrentTime();
         if (time > 0) {
-          sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
+          sessionStorage.setItem(
+            'minecraft-music-pos:v1',
+            JSON.stringify({ time, ts: Date.now() }),
+          );
         }
       } catch {
         /* player may not be ready */
@@ -310,7 +316,10 @@ export function MinecraftBackground() {
         try {
           const time = player.getCurrentTime();
           if (time > 0) {
-            sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
+            sessionStorage.setItem(
+              'minecraft-music-pos:v1',
+              JSON.stringify({ time, ts: Date.now() }),
+            );
           }
         } catch {
           /* ignore */

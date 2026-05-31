@@ -367,13 +367,14 @@ function RadarChart({
       rulerType: 'none',
       content: (d) => {
         const metricRows = axes
-          .map((axis, i) => {
+          .flatMap((axis, i) => {
             const raw = d.rawValues[i];
             return raw === null
-              ? ''
-              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`;
+              ? []
+              : [
+                  `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`,
+                ];
           })
-          .filter(Boolean)
           .join('');
         return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">

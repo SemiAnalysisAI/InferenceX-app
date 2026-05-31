@@ -85,6 +85,7 @@ export function ShareButton() {
               ref={inputRef}
               data-testid="share-url-input"
               readOnly
+              aria-label="Share URL"
               value={url}
               onFocus={(event) => event.currentTarget.select()}
               className="border-input bg-background h-8 flex-1 min-w-0 rounded-md border px-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"

@@ -255,7 +255,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                   </span>
                 </button>
                 {expanded.has(s.docId) && (
-                  <div className="space-y-2 border-t border-border/50 px-3 py-3 text-xs">
+                  <div className="space-y-2 border-t border-border/50 p-3 text-xs">
                     <FewShotBlock demonstrations={s.demonstrations} />
                     <Block label="Prompt" value={s.prompt} />
                     {s.rawResponse !== null && s.rawResponse !== s.response ? (
@@ -371,7 +371,7 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
 function PassFailBadge({ passed }: { passed: boolean | null }) {
   if (passed === null) {
     return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
+      <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
         ?
       </span>
     );

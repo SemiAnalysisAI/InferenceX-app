@@ -130,9 +130,10 @@ export function buildReplayTimeline(
   let yMin = Infinity;
   let yMax = -Infinity;
   const dateSet = new Set<string>();
+  const precisionSet = new Set(selectedPrecisions);
 
   for (const row of rows) {
-    if (!selectedPrecisions.includes(row.precision)) continue;
+    if (!precisionSet.has(row.precision)) continue;
 
     const entry = rowToAggDataEntry(row);
     entry.hwKey = getHardwareKey(entry);

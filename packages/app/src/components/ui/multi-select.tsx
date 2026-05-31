@@ -19,6 +19,8 @@ export interface MultiSelectSection {
   options: MultiSelectOption[];
 }
 
+const EMPTY_VALUE: readonly string[] = [];
+
 interface MultiSelectProps {
   options?: MultiSelectOption[];
   sections?: MultiSelectSection[];
@@ -43,7 +45,7 @@ interface MultiSelectProps {
 function MultiSelect({
   options,
   sections,
-  value = [],
+  value = EMPTY_VALUE as string[],
   onChange,
   triggerId,
   triggerTestId,
@@ -270,16 +272,10 @@ function MultiSelect({
                   className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
                   {label}
-                  <span
-                    role="button"
+                  <button
+                    type="button"
                     tabIndex={0}
                     onClick={(e) => handleRemove(value[index], e)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleRemove(value[index], e);
-                      }
-                    }}
                     className={cn(
                       'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
                       (disabled || isMinReached) && 'hidden',
@@ -288,7 +284,7 @@ function MultiSelect({
                     aria-disabled={disabled || isMinReached}
                   >
                     <XIcon className="size-4 text-foreground" />
-                  </span>
+                  </button>
                 </span>
               ))
             )
@@ -297,16 +293,10 @@ function MultiSelect({
           )}
         </div>
         {value.length > 0 && showClearAll && (
-          <span
-            role="button"
+          <button
+            type="button"
             tabIndex={0}
             onClick={handleClearAll}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleClearAll(e);
-              }
-            }}
             className={cn(
               'hover:bg-destructive/10 hover:text-destructive text-muted-foreground shrink-0 rounded-sm p-1 transition-colors',
               (disabled || (minSelections !== undefined && minSelections > 0)) &&
@@ -316,7 +306,7 @@ function MultiSelect({
             aria-disabled={disabled || (minSelections !== undefined && minSelections > 0)}
           >
             <XIcon className="size-4" />
-          </span>
+          </button>
         )}
         <ChevronDownIcon
           className={cn(
@@ -343,6 +333,7 @@ function MultiSelect({
                 <input
                   ref={searchRef}
                   type="text"
+                  aria-label="Search options"
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -399,9 +390,16 @@ function MultiSelect({
                           <div
                             key={option.value}
                             role="option"
+                            tabIndex={0}
                             aria-selected={isSelected}
                             data-slot="select-item"
                             onClick={() => !isDisabledOption && handleToggle(option.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (!isDisabledOption) handleToggle(option.value);
+                              }
+                            }}
                             className={cn(
                               "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                               'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
@@ -428,9 +426,16 @@ function MultiSelect({
                     <div
                       key={option.value}
                       role="option"
+                      tabIndex={0}
                       aria-selected={isSelected}
                       data-slot="select-item"
                       onClick={() => !isDisabledOption && handleToggle(option.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (!isDisabledOption) handleToggle(option.value);
+                        }
+                      }}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                         'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',

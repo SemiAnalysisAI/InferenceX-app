@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { track } from '@/lib/analytics';
@@ -31,10 +31,15 @@ export interface ScaleUpTopologyDiagramHandle {
  * - Switched NVL72 (GB200/GB300): Nodes + NVSwitches
  * Expanded dialog supports left/right arrow navigation between GPU SKUs.
  */
-export const ScaleUpTopologyDiagram = forwardRef<
-  ScaleUpTopologyDiagramHandle,
-  { spec: GpuSpec; allSpecs: GpuSpec[] }
->(({ spec, allSpecs }, ref) => {
+export function ScaleUpTopologyDiagram({
+  spec,
+  allSpecs,
+  ref,
+}: {
+  spec: GpuSpec;
+  allSpecs: GpuSpec[];
+  ref?: Ref<ScaleUpTopologyDiagramHandle>;
+}) {
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);
@@ -177,7 +182,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
       </Dialog>
     </div>
   );
-});
+}
 
 interface ScaleUpD3Props {
   spec: GpuSpec;

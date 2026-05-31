@@ -128,13 +128,12 @@ export default function ChartLegend({
     const query = searchQuery.trim().toLowerCase();
     if (!query) return new Set<string>();
     return new Set(
-      legendItems
-        .filter(
-          (item) =>
-            !item.label.toLowerCase().includes(query) &&
-            !(item.title && item.title.toLowerCase().includes(query)),
-        )
-        .map((item) => item.name),
+      legendItems.flatMap((item) =>
+        !item.label.toLowerCase().includes(query) &&
+        !(item.title && item.title.toLowerCase().includes(query))
+          ? [item.name]
+          : [],
+      ),
     );
   }, [legendItems, searchQuery, isSidebar]);
 
@@ -155,7 +154,7 @@ export default function ChartLegend({
       });
     }
     return result.filter((row) => row.length > 0);
-  }, [grouped, legendItems, sortedItems, isSidebar]);
+  }, [grouped, legendItems, sortedItems, isSidebar, disableActiveSort]);
 
   const handleLegendExpand = () => {
     onExpandedChange(!isLegendExpanded);
@@ -233,6 +232,7 @@ export default function ChartLegend({
             onChange={(e) => setSearchQuery(e.target.value)}
             onBlur={trackSearchOnBlur}
             placeholder="Search..."
+            aria-label="Search legend items"
             className="w-full px-2 py-1 pr-6 rounded-md border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/50"
           />
           {searchQuery && (
@@ -420,11 +420,12 @@ export default function ChartLegend({
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {rows.map((row, i) => {
+          const groupKey = row[0].name.split(' ')[0];
           const allHidden =
             isSidebar && row.every((item: CommonLegendItemProps) => hiddenNames.has(item.name));
           return (
             <div
-              key={i}
+              key={groupKey}
               className={cn(
                 'p-1 rounded-sm shrink-0',
                 i > 0 && 'mt-2',

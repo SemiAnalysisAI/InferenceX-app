@@ -121,7 +121,7 @@ export default function ComparePageClient({
               {narrative.length > 0 && (
                 <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
                   {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
+                    <p key={para.slice(0, 80)} className="text-sm text-foreground/80">
                       {para}
                       {i === narrative.length - 1 && (
                         <>

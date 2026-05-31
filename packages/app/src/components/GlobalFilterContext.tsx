@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -257,13 +257,13 @@ export function GlobalFilterProvider({
     if (decision.modelToSet !== null) {
       setSelectedModel(decision.modelToSet);
     }
-  }, [unofficialAvailable, selectedModel]);
+  }, [unofficialAvailable, selectedModel, getUrlParam]);
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
   const availableSequences = useMemo(() => {
-    const unofficialSeqs = unofficialAvailable
-      .filter((a) => a.model === selectedModel)
-      .map((a) => a.sequence as Sequence);
+    const unofficialSeqs = unofficialAvailable.flatMap((a) =>
+      a.model === selectedModel ? [a.sequence as Sequence] : [],
+    );
     if (!availabilityRows) {
       return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : SEQUENCE_OPTIONS;
     }
@@ -282,9 +282,9 @@ export function GlobalFilterProvider({
 
   // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {
-    const unofficialPrecs = unofficialAvailable
-      .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
-      .flatMap((a) => a.precisions);
+    const unofficialPrecs = unofficialAvailable.flatMap((a) =>
+      a.model === selectedModel && a.sequence === effectiveSequence ? a.precisions : [],
+    );
     if (!availabilityRows) {
       return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
     }
@@ -383,7 +383,7 @@ export function GlobalFilterProvider({
     } else if (selectedRunId !== '') {
       setSelectedRunId('');
     }
-  }, [availableRuns, selectedRunId]);
+  }, [availableRuns, selectedRunId, hasUrlParam, getUrlParam]);
 
   // ── URL sync ──────────────────────────────────────────────────────────────
   const isMountedRef = useRef(false);
@@ -436,14 +436,18 @@ export function GlobalFilterProvider({
     }),
     [
       selectedModel,
+      setSelectedModel,
       selectedSequence,
+      setSelectedSequence,
       selectedPrecisions,
+      setSelectedPrecisions,
       effectiveSequence,
       effectivePrecisions,
       effectiveRunDate,
       setSelectedRunDateManual,
       selectedRunDateRev,
       selectedRunId,
+      setSelectedRunId,
       availableModels,
       availableSequences,
       availablePrecisions,
@@ -462,7 +466,7 @@ export function GlobalFilterProvider({
 }
 
 export function useGlobalFilters() {
-  const context = useContext(GlobalFilterContext);
+  const context = use(GlobalFilterContext);
   if (context === undefined) {
     throw new Error('useGlobalFilters must be used within a GlobalFilterProvider');
   }

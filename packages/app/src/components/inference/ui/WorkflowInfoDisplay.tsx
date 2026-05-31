@@ -107,15 +107,13 @@ export default function WorkflowInfoDisplay({
     const raw = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
     if (!raw) return null;
     // Filter config_keys by selected precisions, drop entries with no matching keys
-    const filtered = raw.entries
-      .map((entry) => ({
-        ...entry,
-        config_keys: entry.config_keys.filter((key) => {
-          const precision = key.split('-')[1];
-          return effectivePrecisions.includes(precision);
-        }),
-      }))
-      .filter((entry) => entry.config_keys.length > 0);
+    const filtered = raw.entries.flatMap((entry) => {
+      const config_keys = entry.config_keys.filter((key) => {
+        const precision = key.split('-')[1];
+        return effectivePrecisions.includes(precision);
+      });
+      return config_keys.length > 0 ? [{ ...entry, config_keys }] : [];
+    });
     return filtered.length > 0 ? { entries: filtered } : null;
   })();
 

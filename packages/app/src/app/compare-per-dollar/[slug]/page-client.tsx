@@ -150,7 +150,7 @@ export default function ComparePerDollarPageClient({
                   data-testid="compare-per-dollar-narrative"
                 >
                   {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
+                    <p key={para} className="text-sm text-foreground/80">
                       {para}
                       {i === narrative.length - 1 && (
                         <>

@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -253,11 +253,13 @@ export function InferenceProvider({
   // GPU dropdown: only show configs that have data for current model + sequence + precision
   const availableGPUs = useMemo(() => {
     if (!availabilityRows) return [];
+    const dbModelKeySet = new Set(dbModelKeys);
+    const precisionSet = new Set(effectivePrecisions);
     const hwKeys = new Set<string>();
     for (const r of availabilityRows) {
-      if (!dbModelKeys.includes(r.model)) continue;
+      if (!dbModelKeySet.has(r.model)) continue;
       if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) continue;
-      if (!effectivePrecisions.includes(r.precision)) continue;
+      if (!precisionSet.has(r.precision)) continue;
       if (!r.hardware) continue;
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
       if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
@@ -693,9 +695,9 @@ export function InferenceProvider({
 
   const modelPrefixes = useMemo(
     () =>
-      Object.entries(MODEL_PREFIX_MAPPING)
-        .filter(([, model]) => model === selectedModel)
-        .map(([prefix]) => prefix),
+      Object.entries(MODEL_PREFIX_MAPPING).flatMap(([prefix, model]) =>
+        model === selectedModel ? [prefix] : [],
+      ),
     [selectedModel],
   );
 
@@ -1103,7 +1105,7 @@ export function InferenceProvider({
 }
 
 export function useInference() {
-  const context = useContext(InferenceContext);
+  const context = use(InferenceContext);
   if (context === undefined) {
     throw new Error('useInference must be used within an InferenceProvider');
   }

@@ -69,12 +69,13 @@ export function useThroughputData(
       };
 
     const multiPrecision = selectedPrecisions.length > 1;
+    const precisionSet = new Set(selectedPrecisions);
     const grouped: Record<string, GPUDataPoint[]> = {};
     const hwConfigMap: HardwareConfig = {};
 
     for (const row of allRows) {
       if (row.isl !== seqIslOsl.isl || row.osl !== seqIslOsl.osl) continue;
-      if (!selectedPrecisions.includes(row.precision)) continue;
+      if (!precisionSet.has(row.precision)) continue;
 
       const entry = rowToAggDataEntry(row);
       const hwKey = getHardwareKey(entry);

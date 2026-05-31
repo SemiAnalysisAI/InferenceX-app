@@ -196,7 +196,7 @@ export function DataTable<T>({
                       : null;
                 return (
                   <th
-                    key={i}
+                    key={col.header}
                     className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
                     tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
@@ -238,9 +238,9 @@ export function DataTable<T>({
             ) : (
               pageData.map((row, rowIndex) => (
                 <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
-                  {columns.map((col, colIndex) => (
+                  {columns.map((col) => (
                     <td
-                      key={colIndex}
+                      key={col.header}
                       className={`py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''}`}
                     >
                       {col.cell(row, safePage * pageSize + rowIndex)}

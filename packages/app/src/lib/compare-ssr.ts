@@ -790,39 +790,40 @@ export function buildJsonLd(
       ? `Owning-hyperscaler cost per million tokens for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels — dollar-normalized inference benchmark.`
       : `Interpolated throughput, cost, power efficiency, and concurrency for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels.`;
 
-  const comparisonRows = ssrRows
-    .filter((row) => row.a || row.b)
-    .map((row) => {
-      const metrics: { name: string; value: string }[] = [
-        { name: 'Model', value: model.displayName },
-        { name: 'Target Interactivity (tok/s/user)', value: String(row.target) },
-      ];
-      if (row.a) {
-        metrics.push(
-          { name: `${aLabel} Throughput (tok/s/gpu)`, value: row.a.value.toFixed(1) },
-          { name: `${aLabel} Cost ($/M tok)`, value: row.a.cost.toFixed(3) },
-          { name: `${aLabel} tok/s/MW`, value: row.a.tpPerMw.toFixed(0) },
-          { name: `${aLabel} Concurrency`, value: String(Math.round(row.a.concurrency)) },
-        );
-      }
-      if (row.b) {
-        metrics.push(
-          { name: `${bLabel} Throughput (tok/s/gpu)`, value: row.b.value.toFixed(1) },
-          { name: `${bLabel} Cost ($/M tok)`, value: row.b.cost.toFixed(3) },
-          { name: `${bLabel} tok/s/MW`, value: row.b.tpPerMw.toFixed(0) },
-          { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
-        );
-      }
-      return {
-        '@type': 'Observation',
+  const comparisonRows = ssrRows.flatMap((row) => {
+    if (!row.a && !row.b) return [];
+    const metrics: { name: string; value: string }[] = [
+      { name: 'Model', value: model.displayName },
+      { name: 'Target Interactivity (tok/s/user)', value: String(row.target) },
+    ];
+    if (row.a) {
+      metrics.push(
+        { name: `${aLabel} Throughput (tok/s/gpu)`, value: row.a.value.toFixed(1) },
+        { name: `${aLabel} Cost ($/M tok)`, value: row.a.cost.toFixed(3) },
+        { name: `${aLabel} tok/s/MW`, value: row.a.tpPerMw.toFixed(0) },
+        { name: `${aLabel} Concurrency`, value: String(Math.round(row.a.concurrency)) },
+      );
+    }
+    if (row.b) {
+      metrics.push(
+        { name: `${bLabel} Throughput (tok/s/gpu)`, value: row.b.value.toFixed(1) },
+        { name: `${bLabel} Cost ($/M tok)`, value: row.b.cost.toFixed(3) },
+        { name: `${bLabel} tok/s/MW`, value: row.b.tpPerMw.toFixed(0) },
+        { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
+      );
+    }
+    return [
+      {
+        '@type': 'Observation' as const,
         name: `${model.label} comparison at ${row.target} tok/s/user interactivity`,
         variableMeasured: metrics.map((m) => ({
-          '@type': 'PropertyValue',
+          '@type': 'PropertyValue' as const,
           name: m.name,
           value: m.value,
         })),
-      };
-    });
+      },
+    ];
+  });
 
   return {
     '@context': 'https://schema.org',

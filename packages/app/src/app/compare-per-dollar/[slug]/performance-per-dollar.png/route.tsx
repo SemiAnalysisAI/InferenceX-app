@@ -80,9 +80,12 @@ export async function GET(
 
   const aLabel = HW_REGISTRY[parsed.a]?.label ?? parsed.a.toUpperCase();
   const bLabel = HW_REGISTRY[parsed.b]?.label ?? parsed.b.toUpperCase();
-  const costs = curveRows
-    .flatMap((row) => [row.a?.cost, row.b?.cost])
-    .filter((cost): cost is number => typeof cost === 'number' && Number.isFinite(cost));
+  const costs = curveRows.flatMap((row) => {
+    const out: number[] = [];
+    if (typeof row.a?.cost === 'number' && Number.isFinite(row.a.cost)) out.push(row.a.cost);
+    if (typeof row.b?.cost === 'number' && Number.isFinite(row.b.cost)) out.push(row.b.cost);
+    return out;
+  });
   const costMin = costs.length > 0 ? Math.min(...costs) : 0;
   const costMax = costs.length > 0 ? Math.max(...costs) : 1;
   const costPadding = Math.max((costMax - costMin) * 0.18, costMax * 0.08, 0.02);
@@ -97,18 +100,18 @@ export async function GET(
     CHART.height -
     (yMax === yMin ? CHART.height / 2 : ((value - yMin) / (yMax - yMin)) * CHART.height);
 
-  const aPoints = curveRows
-    .filter((row) => row.a)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.a!.cost) }));
-  const bPoints = curveRows
-    .filter((row) => row.b)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.b!.cost) }));
-  const aHighlightPoints = plottedRows
-    .filter((row) => row.a)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.a!.cost) }));
-  const bHighlightPoints = plottedRows
-    .filter((row) => row.b)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.b!.cost) }));
+  const aPoints = curveRows.flatMap((row) =>
+    row.a ? [{ x: scaleX(row.target), y: scaleY(row.a.cost) }] : [],
+  );
+  const bPoints = curveRows.flatMap((row) =>
+    row.b ? [{ x: scaleX(row.target), y: scaleY(row.b.cost) }] : [],
+  );
+  const aHighlightPoints = plottedRows.flatMap((row) =>
+    row.a ? [{ x: scaleX(row.target), y: scaleY(row.a.cost) }] : [],
+  );
+  const bHighlightPoints = plottedRows.flatMap((row) =>
+    row.b ? [{ x: scaleX(row.target), y: scaleY(row.b.cost) }] : [],
+  );
   const yTicks = Array.from({ length: 4 }, (_, index) => yMin + ((yMax - yMin) * index) / 3);
   const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
 

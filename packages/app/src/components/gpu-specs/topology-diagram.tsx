@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { track } from '@/lib/analytics';
@@ -27,10 +27,15 @@ export interface TopologyDiagramHandle {
  * Clicking the diagram opens an expanded modal view with left/right arrow
  * navigation to cycle between GPU SKUs.
  */
-export const TopologyDiagram = forwardRef<
-  TopologyDiagramHandle,
-  { spec: GpuSpec; allSpecs: GpuSpec[] }
->(({ spec, allSpecs }, ref) => {
+export function TopologyDiagram({
+  spec,
+  allSpecs,
+  ref,
+}: {
+  spec: GpuSpec;
+  allSpecs: GpuSpec[];
+  ref?: Ref<TopologyDiagramHandle>;
+}) {
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);
@@ -166,7 +171,7 @@ export const TopologyDiagram = forwardRef<
       </Dialog>
     </div>
   );
-});
+}
 
 /** Abbreviate NIC model names for compact display.
  * Returns [line1, line2] where line1 is the model name, line2 is the port spec.

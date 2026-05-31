@@ -307,8 +307,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
             sibling.style.display !== 'none' &&
             [...sibling.children].some((child) => (child as HTMLElement).style.display !== 'none');
           if (!hasVisibleControls) {
-            scrollContainer.style.borderBottom = 'none';
-            scrollContainer.style.paddingBottom = '0';
+            Object.assign(scrollContainer.style, { borderBottom: 'none', paddingBottom: '0' });
           }
         }
       }

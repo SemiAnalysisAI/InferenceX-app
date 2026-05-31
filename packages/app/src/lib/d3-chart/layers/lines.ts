@@ -35,9 +35,9 @@ export function renderLines(
     lineGenerator.defined(config.isDefined);
   }
 
-  const entries: LineEntry[] = Object.entries(lines)
-    .filter(([, points]) => points.length > 0)
-    .map(([key, points]) => ({ key, points }));
+  const entries: LineEntry[] = Object.entries(lines).flatMap(([key, points]) =>
+    points.length > 0 ? [{ key, points }] : [],
+  );
 
   const selection = group
     .selectAll<SVGPathElement, LineEntry>('.line-path')

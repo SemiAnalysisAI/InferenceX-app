@@ -89,7 +89,7 @@ export function ModelSelector({
   ];
 
   return (
-    <div className="flex flex-col space-y-1.5 lg:col-span-2">
+    <div className="flex flex-col gap-y-1.5 lg:col-span-2">
       <LabelWithTooltip
         htmlFor={id}
         label="Model"
@@ -167,7 +167,7 @@ export function SequenceSelector({
   ];
 
   return (
-    <div className="flex flex-col space-y-1.5 lg:col-span-1">
+    <div className="flex flex-col gap-y-1.5 lg:col-span-1">
       <LabelWithTooltip
         htmlFor={id}
         label="ISL / OSL"
@@ -220,7 +220,7 @@ export function PrecisionSelector({
   'data-testid': testId,
 }: PrecisionSelectorProps) {
   return (
-    <div className="flex flex-col space-y-1.5 lg:col-span-1">
+    <div className="flex flex-col gap-y-1.5 lg:col-span-1">
       <LabelWithTooltip
         htmlFor={id}
         label="Precision"

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { type Ref, useImperativeHandle, useState } from 'react';
 
 import type { ChartDefinition } from '@/components/inference/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -32,29 +32,33 @@ export interface ReplayLauncherHandle {
  * a controlled boolean per chart instance. The dialog mounts the panel lazily,
  * keeping mp4-muxer and html-to-image out of the main inference bundle.
  */
-const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
-  ({ parentChartId, chartDefinition, yLabel, xLabel }, ref) => {
-    const [open, setOpen] = useState(false);
-    useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
-    return (
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          className="max-w-[min(1280px,95vw)] w-[min(1280px,95vw)] max-h-[92vh] overflow-y-auto p-0 sm:rounded-lg"
-          data-testid={`replay-dialog-${parentChartId}`}
-        >
-          <DialogTitle className="sr-only">Replay over time</DialogTitle>
-          {open && (
-            <ReplayPanel
-              parentChartId={parentChartId}
-              chartDefinition={chartDefinition}
-              yLabel={yLabel}
-              xLabel={xLabel}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    );
-  },
-);
+function ReplayLauncher({
+  parentChartId,
+  chartDefinition,
+  yLabel,
+  xLabel,
+  ref,
+}: ReplayLauncherProps & { ref?: Ref<ReplayLauncherHandle> }) {
+  const [open, setOpen] = useState(false);
+  useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent
+        className="max-w-[min(1280px,95vw)] w-[min(1280px,95vw)] max-h-[92vh] overflow-y-auto p-0 sm:rounded-lg"
+        data-testid={`replay-dialog-${parentChartId}`}
+      >
+        <DialogTitle className="sr-only">Replay over time</DialogTitle>
+        {open && (
+          <ReplayPanel
+            parentChartId={parentChartId}
+            chartDefinition={chartDefinition}
+            yLabel={yLabel}
+            xLabel={xLabel}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default ReplayLauncher;

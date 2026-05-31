@@ -151,9 +151,9 @@ export function useChartData(
     );
     if (comparisonDates.length === 0) return mainRows;
     const extraRows = comparisonQueries.flatMap((q, i) =>
-      (q.data ?? [])
-        .filter(seqFilter)
-        .map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
+      (q.data ?? []).flatMap((r) =>
+        seqFilter(r) ? [{ ...r, date: comparisonDates[i], actualDate: r.date }] : [],
+      ),
     );
     return [...mainRows, ...extraRows];
   }, [allRows, sequenceIslOsl, comparisonDates, comparisonDataKey, selectedRunDate]);
@@ -301,27 +301,22 @@ export function useChartData(
         const hasMetric = filteredData.some((d) => metricKey in d);
         const isTtftX = xAxisField === 'p99_ttft' || xAxisField === 'median_ttft';
         const processedData = hasMetric
-          ? filteredData
-              .filter((d) => metricKey in d)
-              .map((d: InferenceData) => {
-                const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
-                const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
-                const xValue = (d as any)[xAxisField] ?? d.x;
-                return {
-                  ...d,
-                  x: xValue,
-                  y: yValue,
-                  roof,
-                };
-              })
+          ? filteredData.flatMap((d: InferenceData) => {
+              if (!(metricKey in d)) return [];
+              const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
+              const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
+              const xValue = (d as any)[xAxisField] ?? d.x;
               // When TTFT is on the x-axis, apply the latency limit to filter overload outliers
               // (e.g. conc=2048 rows with TTFT > 60s that compress all real data to the far left)
-              .filter(
-                (d) =>
-                  !isTtftX ||
-                  !chartDefinition.y_latency_limit ||
-                  d.x <= chartDefinition.y_latency_limit,
-              )
+              if (
+                isTtftX &&
+                chartDefinition.y_latency_limit &&
+                xValue > chartDefinition.y_latency_limit
+              ) {
+                return [];
+              }
+              return [{ ...d, x: xValue, y: yValue, roof }];
+            })
           : [];
 
         return {

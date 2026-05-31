@@ -69,18 +69,18 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
             style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
           />
           {canRemove && (
-            <span
-              role="button"
+            <button
+              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 onRemove!(hw || name);
               }}
-              className="absolute inset-0 inline-flex items-center justify-center opacity-0 group-hover/item:opacity-100"
+              className="absolute inset-0 inline-flex items-center justify-center opacity-0 group-hover/item:opacity-100 bg-transparent border-none p-0 cursor-pointer"
               aria-label={`Hide ${label}`}
             >
               <X size={14} strokeWidth={4} className="text-foreground" />
-            </span>
+            </button>
           )}
         </span>
         <span

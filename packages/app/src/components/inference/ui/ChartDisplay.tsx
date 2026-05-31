@@ -345,7 +345,7 @@ export default function ChartDisplay() {
           );
           const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
           return (
-            <section key={graphIndex} className="pt-8 md:pt-0">
+            <section key={graph.chartDefinition.chartType} className="pt-8 md:pt-0">
               <figure data-testid="chart-figure" className="relative rounded-lg">
                 <ChartButtons
                   chartId={`chart-${graphIndex}`}

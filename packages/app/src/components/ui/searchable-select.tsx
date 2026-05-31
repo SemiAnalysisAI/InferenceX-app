@@ -91,20 +91,24 @@ export function SearchableSelect({
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
     const lower = search.toLowerCase();
-    return groups
-      .map((g) => ({
-        label: g.label,
-        options: g.options.filter(
-          (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
-        ),
-      }))
-      .filter((g) => g.options.length > 0);
+    const result: SearchableSelectGroup[] = [];
+    for (const g of groups) {
+      const groupLabelMatches = g.label.toLowerCase().includes(lower);
+      const filtered = groupLabelMatches
+        ? g.options
+        : g.options.filter((opt) => opt.label.toLowerCase().includes(lower));
+      if (filtered.length > 0) {
+        result.push({ label: g.label, options: filtered });
+      }
+    }
+    return result;
   }, [groups, search]);
 
   const selectedLabel = React.useMemo(() => {
     for (const group of groups) {
-      const match = group.options.find((opt) => opt.value === value);
-      if (match) return match.label;
+      for (const opt of group.options) {
+        if (opt.value === value) return opt.label;
+      }
     }
     return undefined;
   }, [groups, value]);
@@ -173,6 +177,7 @@ export function SearchableSelect({
                   if (e.target.value) searchUsedRef.current = true;
                 }}
                 placeholder="Search..."
+                aria-label="Search options"
                 className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
               />
               {search && (
@@ -212,9 +217,16 @@ export function SearchableSelect({
                       key={option.value}
                       role="option"
                       aria-selected={isSelected}
+                      tabIndex={0}
                       data-slot="select-item"
                       data-value={option.value}
                       onClick={() => handleSelect(option.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelect(option.value);
+                        }
+                      }}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                         'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',

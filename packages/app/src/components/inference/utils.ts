@@ -100,17 +100,19 @@ export function processOverlayChartData(
     xAxisField = selectedXAxisMetric!;
   }
 
-  const processedData = data
-    .filter((d) => metricKey in d)
-    .map((d: InferenceData) => {
-      const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
-      const xValue = (d as any)[xAxisField] ?? d.x;
-      return { ...d, x: xValue, y: yValue };
-    })
-    .filter(
-      (d) =>
-        xAxisField === chartDef.x || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,
-    );
+  const processedData = data.flatMap((d: InferenceData) => {
+    if (!(metricKey in d)) return [];
+    const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
+    const xValue = (d as any)[xAxisField] ?? d.x;
+    if (
+      xAxisField !== chartDef.x &&
+      chartDef.y_latency_limit &&
+      xValue > chartDef.y_latency_limit
+    ) {
+      return [];
+    }
+    return [{ ...d, x: xValue, y: yValue }];
+  });
 
   return filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
 }

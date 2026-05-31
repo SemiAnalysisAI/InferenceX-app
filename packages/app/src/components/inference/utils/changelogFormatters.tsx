@@ -18,8 +18,8 @@ export function formatChangelogDescription(desc: string | string[]) {
   }
   return (
     <ul className="list-disc pl-4">
-      {desc.map((item, index) => (
-        <li key={index}>{item}</li>
+      {desc.map((item) => (
+        <li key={item}>{item}</li>
       ))}
     </ul>
   );

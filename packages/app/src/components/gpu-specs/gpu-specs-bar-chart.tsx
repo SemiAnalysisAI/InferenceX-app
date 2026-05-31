@@ -243,7 +243,10 @@ export function GpuSpecsBarChart({
     return (
       <div data-testid="gpu-specs-bar-chart">
         <div className="flex items-center gap-3 mb-4 px-4 md:px-8">
-          <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+          <label
+            htmlFor="gpu-specs-metric-select"
+            className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+          >
             Metric:
           </label>
           <Select
@@ -253,7 +256,11 @@ export function GpuSpecsBarChart({
               track('gpu_specs_chart_metric_changed', { metric: value });
             }}
           >
-            <SelectTrigger className="w-[240px]" data-testid="gpu-specs-metric-select">
+            <SelectTrigger
+              id="gpu-specs-metric-select"
+              className="w-[240px]"
+              data-testid="gpu-specs-metric-select"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -275,7 +282,10 @@ export function GpuSpecsBarChart({
   return (
     <div data-testid="gpu-specs-bar-chart">
       <div className="flex items-center gap-3 mb-4 px-4 md:px-8">
-        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+        <label
+          htmlFor="gpu-specs-metric-select-main"
+          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+        >
           Metric:
         </label>
         <Select
@@ -285,7 +295,11 @@ export function GpuSpecsBarChart({
             track('gpu_specs_chart_metric_changed', { metric: value });
           }}
         >
-          <SelectTrigger className="w-[240px]" data-testid="gpu-specs-metric-select">
+          <SelectTrigger
+            id="gpu-specs-metric-select-main"
+            className="w-[240px]"
+            data-testid="gpu-specs-metric-select"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

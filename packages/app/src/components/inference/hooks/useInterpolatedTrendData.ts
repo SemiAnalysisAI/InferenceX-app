@@ -170,9 +170,10 @@ export function useInterpolatedTrendData({
     if (!allRows || allRows.length === 0) return new Map<string, Map<string, InferenceData[]>>();
 
     const result = new Map<string, Map<string, InferenceData[]>>();
+    const precisionSet = new Set(selectedPrecisions);
 
     for (const row of allRows) {
-      if (!selectedPrecisions.includes(row.precision)) continue;
+      if (!precisionSet.has(row.precision)) continue;
 
       const point = rowToLightweightPoint(row);
       if (!point) continue;
@@ -223,7 +224,7 @@ export function useInterpolatedTrendData({
     // Build sorted trend lines, extending each to today with last known value
     const today = new Date().toISOString().split('T')[0];
     const lines = new Map<string, TrendDataPoint[]>();
-    const keysWithData: string[] = [];
+    const keysWithDataSet = new Set<string>();
 
     for (const [groupKey, dateMap] of resultMap) {
       const points = [...dateMap.values()].toSorted(
@@ -238,13 +239,11 @@ export function useInterpolatedTrendData({
         lines.set(groupKey, points);
         // Return base hwKey for legend filtering
         const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
-        if (!keysWithData.includes(baseHwKey)) {
-          keysWithData.push(baseHwKey);
-        }
+        keysWithDataSet.add(baseHwKey);
       }
     }
 
-    return { trendLines: lines, hwKeysWithData: keysWithData };
+    return { trendLines: lines, hwKeysWithData: [...keysWithDataSet] };
   }, [dateGroupedData, targetInteractivity, selectedYAxisMetric]);
 
   // Artificial progress that ramps up while the API call is in flight

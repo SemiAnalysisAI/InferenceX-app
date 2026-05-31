@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -179,12 +179,9 @@ export function DatePicker({
     if (isOpen) {
       setTempDate(date);
     }
+    setError('');
     setOpen(isOpen);
   };
-
-  useEffect(() => {
-    setError('');
-  }, [open]);
 
   return (
     <div className="space-y-2">

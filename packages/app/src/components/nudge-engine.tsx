@@ -428,13 +428,13 @@ function BannerRenderer({
   const { content } = def;
   const Icon = content.icon;
 
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleBannerLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
     onAction();
   };
 
-  const handleDismiss = (e: React.MouseEvent) => {
+  const handleBannerDismissClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onDismiss();
@@ -444,7 +444,7 @@ function BannerRenderer({
     <section className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4">
       <a
         href={content.href ?? '#'}
-        onClick={handleClick}
+        onClick={handleBannerLinkClick}
         className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-brand/40 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-4 py-3 transition-all duration-200 hover:border-brand/70 hover:shadow-lg hover:shadow-brand/10"
         data-testid={content.testId}
       >
@@ -473,7 +473,7 @@ function BannerRenderer({
         </div>
         <button
           type="button"
-          onClick={handleDismiss}
+          onClick={handleBannerDismissClick}
           className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
           aria-label="Dismiss launch banner"
           data-testid={content.testId ? `${content.testId}-dismiss` : undefined}

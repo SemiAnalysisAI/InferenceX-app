@@ -65,7 +65,7 @@ export default function EvaluationChartDisplay() {
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = evaluationChartToCsv(chartData);
     exportToCsv(`InferenceX_evaluation_${selectedModel}_${selectedBenchmark}`, headers, rows);
-  }, [chartData]);
+  }, [chartData, selectedModel, selectedBenchmark]);
 
   const caption = (
     <>

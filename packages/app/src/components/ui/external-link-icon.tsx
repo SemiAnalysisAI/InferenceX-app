@@ -3,10 +3,12 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-type ExternalLinkIconProps = React.ComponentPropsWithoutRef<typeof ExternalLink>;
+type ExternalLinkIconProps = React.ComponentPropsWithoutRef<typeof ExternalLink> & {
+  ref?: React.Ref<SVGSVGElement>;
+};
 
-const ExternalLinkIcon = React.forwardRef<SVGSVGElement, ExternalLinkIconProps>(
-  ({ className, style, ...props }, ref) => (
+function ExternalLinkIcon({ className, style, ref, ...props }: ExternalLinkIconProps) {
+  return (
     <ExternalLink
       ref={ref}
       className={cn(
@@ -16,8 +18,7 @@ const ExternalLinkIcon = React.forwardRef<SVGSVGElement, ExternalLinkIconProps>(
       style={{ verticalAlign: '-0.125em', ...style }}
       {...props}
     />
-  ),
-);
-ExternalLinkIcon.displayName = 'ExternalLinkIcon';
+  );
+}
 
 export { ExternalLinkIcon };

@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -111,10 +111,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const availableDates = useMemo(() => {
     const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [];
     const dates = new Set(
-      rawData
-        .filter((item) => dbModelKeys.includes(item.model))
-        .map((item) => item.date)
-        .filter(Boolean),
+      rawData.flatMap((item) => (dbModelKeys.includes(item.model) && item.date ? [item.date] : [])),
     );
     return [...dates].toSorted();
   }, [rawData, selectedModel]);
@@ -128,7 +125,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     if (availableModels.length > 0 && !selectedModel) {
       setSelectedModel(availableModels[0]);
     }
-  }, [availableBenchmarks, availableModels, selectedBenchmark, setSelectedModel]);
+  }, [availableBenchmarks, availableModels, selectedBenchmark, selectedModel, setSelectedModel]);
 
   useEffect(() => {
     if (availableDates.length === 0) return;
@@ -184,9 +181,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     if (!dbModelKeys || dbModelKeys.length === 0) return globalAvailablePrecisions;
     const precs = [
       ...new Set(
-        [...rawData, ...unofficialRawData]
-          .filter((r) => dbModelKeys.includes(r.model))
-          .map((r) => r.precision),
+        [...rawData, ...unofficialRawData].flatMap((r) =>
+          dbModelKeys.includes(r.model) ? [r.precision] : [],
+        ),
       ),
     ].toSorted();
     return precs.length > 0 ? precs : globalAvailablePrecisions;
@@ -379,6 +376,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       selectedBenchmark,
+      setSelectedBenchmark,
       selectedModel,
       handleSetSelectedModel,
       selectedRunDate,
@@ -393,8 +391,11 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
       toggleHardware,
       removeHardware,
       highContrast,
+      setHighContrast,
       showLabels,
+      setShowLabels,
       isLegendExpanded,
+      setIsLegendExpanded,
       hwTypesWithData,
       selectAllHwTypes,
       highlightedConfigs,
@@ -410,7 +411,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 }
 
 export function useEvaluation(): EvaluationChartContextType {
-  const context = useContext(EvaluationContext);
+  const context = use(EvaluationContext);
   if (context === undefined) {
     throw new Error('useEvaluation must be used within an EvaluationProvider');
   }

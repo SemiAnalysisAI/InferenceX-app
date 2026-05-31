@@ -358,8 +358,7 @@ export function useChartExport({
       // Strip red changelog highlighting from legend items in the export clone
       if (legendContainer) {
         for (const el of legendContainer.querySelectorAll('.text-red-900')) {
-          (el as HTMLElement).style.color = 'inherit';
-          (el as HTMLElement).style.fontWeight = 'normal';
+          applyStyles(el as HTMLElement, { color: 'inherit', fontWeight: 'normal' });
         }
       }
 

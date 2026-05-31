@@ -151,9 +151,9 @@ const CustomGpuValuePanel = memo(
 
     const stableGpus = React.useMemo(
       () =>
-        Object.entries(HW_REGISTRY)
-          .filter(([, specs]) => config.getDefaultValue(specs) > 0)
-          .map(([base, specs]) => ({ base, label: base.toUpperCase(), specs })),
+        Object.entries(HW_REGISTRY).flatMap(([base, specs]) =>
+          config.getDefaultValue(specs) > 0 ? [{ base, label: base.toUpperCase(), specs }] : [],
+        ),
       [config],
     );
 

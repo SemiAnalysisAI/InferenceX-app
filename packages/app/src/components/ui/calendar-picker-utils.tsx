@@ -282,6 +282,7 @@ export function CalendarMonthPanel({
             <button
               type="button"
               key={formatCalendarDate(day)}
+              suppressHydrationWarning
               onClick={() => !disabled && !isDisabled && onDateClick(day)}
               onMouseEnter={() => !isDisabled && onDateHover?.(day)}
               onMouseLeave={() => !isDisabled && onDateHover?.(null)}

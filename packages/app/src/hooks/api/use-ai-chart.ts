@@ -480,7 +480,14 @@ async function resolveSpec(spec: AiChartSpec): Promise<AiSingleChartResult> {
     points = points.filter((p) => topHwKeys.has(p.hwKey ?? ''));
   }
 
-  const hwKeys = [...new Set(points.map((p) => p.hwKey ?? '').filter(Boolean))];
+  const hwKeys = [
+    ...new Set(
+      points.flatMap((p) => {
+        const key = p.hwKey ?? '';
+        return key ? [key] : [];
+      }),
+    ),
+  ];
   const colorMap = generateHighContrastColors(hwKeys, 'dark');
 
   const lineData = spec.chartType === 'line' ? buildLineData(points, spec, colorMap) : {};

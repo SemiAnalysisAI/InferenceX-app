@@ -232,9 +232,11 @@ const ScatterGraph = React.memo(
         const cl = availableRuns[selectedRunId]?.changelog;
         if (cl) {
           const suffixes = cl.entries.flatMap((entry: any) =>
-            (entry.config_keys ?? entry['config-keys'] ?? [])
-              .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map((key: string) => key.split('-').slice(2).join('-')),
+            (entry.config_keys ?? entry['config-keys'] ?? []).flatMap((key: string) =>
+              selectedPrecisions.includes(key.split('-')[1])
+                ? [key.split('-').slice(2).join('-')]
+                : [],
+            ),
           );
           return new Set(suffixes);
         }
@@ -1247,11 +1249,12 @@ const ScatterGraph = React.memo(
 
               // Deduplicate by hw key — pick roofline with most points per hw
               const bestByHw = new Map<string, [string, InferenceData[]]>();
+              const precisionSet = new Set(selectedPrecisions);
               for (const [key, pts] of Object.entries(rooflines)) {
                 if (pts.length < 2) continue;
                 const hw = key.split('_').slice(0, -1).join('_');
                 const prec = key.split('_').pop()!;
-                if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisions.includes(prec)) continue;
+                if (!effectiveActiveHwTypes.has(hw) || !precisionSet.has(prec)) continue;
                 const prev = bestByHw.get(hw);
                 if (!prev || pts.length > prev[1].length) bestByHw.set(hw, [key, pts]);
               }

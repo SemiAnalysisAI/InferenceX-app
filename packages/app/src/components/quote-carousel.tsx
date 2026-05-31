@@ -30,6 +30,9 @@ export interface QuoteCarouselProps {
   intervalMs?: number;
 }
 
+const EMPTY_OVERRIDES: NonNullable<QuoteCarouselProps['overrides']> = {};
+const EMPTY_LABELS: Record<string, string> = {};
+
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -57,9 +60,10 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   }));
   if (order?.length) {
     const orderSet = new Set(order);
-    const pinned = order
-      .map((c) => entries.find((e) => e.org === c))
-      .filter(Boolean) as CompanyEntry[];
+    const pinned = order.flatMap((c) => {
+      const found = entries.find((e) => e.org === c);
+      return found ? [found] : [];
+    });
     const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.org)));
     return [...pinned, ...rest];
   }
@@ -98,11 +102,11 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
 
 export function QuoteCarousel({
   quotes,
-  overrides = {},
+  overrides = EMPTY_OVERRIDES,
   moreHref,
   intervalMs = 8_000,
 }: QuoteCarouselProps) {
-  const { order, labels = {} } = overrides;
+  const { order, labels = EMPTY_LABELS } = overrides;
 
   const [entries, setEntries] = useState<CompanyEntry[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);

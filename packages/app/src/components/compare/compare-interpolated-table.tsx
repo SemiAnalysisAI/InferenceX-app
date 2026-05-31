@@ -212,14 +212,7 @@ export function CompareInterpolatedTable({
         return next;
       });
     },
-    [
-      hasClientData,
-      hasClientDataA,
-      hasClientDataB,
-      interactivityRange,
-      reinterpolate,
-      gpuDataPointsA,
-    ],
+    [interactivityRange, reinterpolate],
   );
 
   const handleInputBlur = useCallback(

@@ -83,11 +83,11 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
 };
 
 function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
-  return new Set(
-    (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
-      .filter(([, c]) => c.category === cat)
-      .map(([m]) => m),
-  );
+  const result: Model[] = [];
+  for (const [m, c] of Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][]) {
+    if (c.category === cat) result.push(m);
+  }
+  return new Set(result);
 }
 
 export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
@@ -133,11 +133,13 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 
-export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
-  (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
-    .filter(([, c]) => c.prefix)
-    .map(([m, c]) => [c.prefix, m]),
-);
+export const MODEL_PREFIX_MAPPING: Record<string, Model> = (() => {
+  const result: Record<string, Model> = {};
+  for (const [m, c] of Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][]) {
+    if (c.prefix) result[c.prefix] = m;
+  }
+  return result;
+})();
 
 // ---------------------------------------------------------------------------
 // Sequences
@@ -158,11 +160,16 @@ const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string; catego
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
 
-export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
-  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][])
-    .filter(([, c]) => c.category === 'deprecated')
-    .map(([s]) => s),
-);
+export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = (() => {
+  const result: Sequence[] = [];
+  for (const [s, c] of Object.entries(SEQUENCE_CONFIG) as [
+    Sequence,
+    (typeof SEQUENCE_CONFIG)[Sequence],
+  ][]) {
+    if (c.category === 'deprecated') result.push(s);
+  }
+  return new Set(result);
+})();
 
 export function isSequenceDeprecated(sequence: Sequence): boolean {
   return DEPRECATED_SEQUENCES.has(sequence);

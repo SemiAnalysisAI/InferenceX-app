@@ -217,7 +217,7 @@ export function CurrentImageContent() {
       {options && (
         <TooltipProvider delayDuration={0}>
           <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-model-select"
                 label="Model"
@@ -244,7 +244,7 @@ export function CurrentImageContent() {
               </Select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-precision-select"
                 label="Precision"
@@ -271,7 +271,7 @@ export function CurrentImageContent() {
               </Select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-sequence-select"
                 label="ISL / OSL"
@@ -297,7 +297,7 @@ export function CurrentImageContent() {
               </Select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-spec-decode-select"
                 label="Spec Decode"
@@ -324,7 +324,7 @@ export function CurrentImageContent() {
               </Select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-hardware-select"
                 label="GPU SKU"
@@ -351,7 +351,7 @@ export function CurrentImageContent() {
               </Select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-node-type-select"
                 label="Node Type"
@@ -375,7 +375,7 @@ export function CurrentImageContent() {
               </Select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col gap-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-framework-multiselect"
                 label="Framework"

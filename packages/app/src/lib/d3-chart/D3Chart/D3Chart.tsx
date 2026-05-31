@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useImperativeHandle, useRef } from 'react';
+import React, { type Ref, useImperativeHandle, useRef } from 'react';
 import * as d3 from 'd3';
 
 import { D3ChartWrapper } from '@/components/ui/d3-chart-wrapper';
@@ -14,32 +14,30 @@ import { isBandScale, type BuiltScale } from './scale-builders';
 import type { D3ChartHandle, D3ChartProps } from './types';
 import { useD3ChartRenderer } from './useD3ChartRenderer';
 
-function D3ChartInner<T>(
-  {
-    chartId,
-    data,
-    height = 600,
-    margin,
-    watermark,
-    testId,
-    grabCursor = true,
-    instructions,
-    clipContent,
-    xScale: xScaleConfig,
-    yScale: yScaleConfig,
-    xAxis,
-    yAxis,
-    layers,
-    zoom: zoomConfig,
-    tooltip: tooltipConfig,
-    transitionDuration,
-    legendElement,
-    noDataOverlay,
-    caption,
-    onRender,
-  }: D3ChartProps<T>,
-  ref: React.ForwardedRef<D3ChartHandle>,
-) {
+function D3ChartInner<T>({
+  chartId,
+  data,
+  height = 600,
+  margin,
+  watermark,
+  testId,
+  grabCursor = true,
+  instructions,
+  clipContent,
+  xScale: xScaleConfig,
+  yScale: yScaleConfig,
+  xAxis,
+  yAxis,
+  layers,
+  zoom: zoomConfig,
+  tooltip: tooltipConfig,
+  transitionDuration,
+  legendElement,
+  noDataOverlay,
+  caption,
+  onRender,
+  ref,
+}: D3ChartProps<T> & { ref?: Ref<D3ChartHandle> }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const scalesRef = useRef<{ xScale: BuiltScale; yScale: BuiltScale } | null>(null);
@@ -154,6 +152,6 @@ function D3ChartInner<T>(
   );
 }
 
-export const D3Chart = React.memo(React.forwardRef(D3ChartInner)) as <T>(
-  props: D3ChartProps<T> & { ref?: React.Ref<D3ChartHandle> },
+export const D3Chart = React.memo(D3ChartInner) as <T>(
+  props: D3ChartProps<T> & { ref?: Ref<D3ChartHandle> },
 ) => React.ReactElement | null;

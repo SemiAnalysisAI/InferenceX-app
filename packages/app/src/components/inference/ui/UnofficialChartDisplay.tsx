@@ -56,10 +56,7 @@ export function UnofficialChartDisplay() {
   ]);
 
   // Generate the key to look up unofficial data
-  const dataKey = useMemo(
-    () => `${selectedModel}_${selectedSequence}`,
-    [selectedModel, selectedSequence],
-  );
+  const dataKey = `${selectedModel}_${selectedSequence}`;
 
   // Create graphs with hardware config for unofficial data
   interface UnofficialGraph extends RenderableGraph {
@@ -162,7 +159,7 @@ export function UnofficialChartDisplay() {
   return (
     <>
       {graphs.map((graph, graphIndex) => (
-        <section key={graphIndex}>
+        <section key={graph.chartDefinition.chartType}>
           <figure>
             <Card>
               <ScatterGraph

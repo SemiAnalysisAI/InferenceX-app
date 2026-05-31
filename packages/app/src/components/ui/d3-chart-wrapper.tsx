@@ -48,6 +48,8 @@ export function D3ChartWrapper({
           <div className="relative">
             <svg
               ref={svgRef}
+              role="application"
+              tabIndex={0}
               width="100%"
               height={dimensions.height}
               style={{ cursor: grabCursor ? 'grab' : undefined }}
@@ -65,6 +67,12 @@ export function D3ChartWrapper({
                     }
                   : undefined
               }
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && isPinned()) {
+                  dismissTooltip();
+                  hideTooltipElements(tooltipRef, svgRef);
+                }
+              }}
               onClick={() => {
                 if (isPinned()) {
                   dismissTooltip();

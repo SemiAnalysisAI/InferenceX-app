@@ -62,9 +62,10 @@ export function BlogToc({ headings }: BlogTocProps) {
   }, [updateLayout]);
 
   useEffect(() => {
-    const elements = headings
-      .map((h) => document.querySelector(`#${CSS.escape(h.id)}`))
-      .filter(Boolean) as HTMLElement[];
+    const elements = headings.flatMap((h) => {
+      const el = document.querySelector<HTMLElement>(`#${CSS.escape(h.id)}`);
+      return el ? [el] : [];
+    });
 
     if (elements.length === 0) return;
 

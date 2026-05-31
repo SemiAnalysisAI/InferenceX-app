@@ -278,7 +278,7 @@ export default function ThroughputCalculatorDisplay() {
       return config ? getDisplayLabel(config) : hwKey;
     });
     exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
-  }, [results, targetValue, hardwareConfig]);
+  }, [results, targetValue, hardwareConfig, selectedModel]);
 
   const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
     setViewMode(value);
@@ -453,7 +453,7 @@ export default function ThroughputCalculatorDisplay() {
                   availablePrecisions={availablePrecisions}
                 />
 
-                <div className="flex flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex flex-col gap-y-1.5 lg:col-span-1">
                   <LabelWithTooltip
                     htmlFor="calc-cost"
                     label="Cost Provider"
@@ -484,7 +484,7 @@ export default function ThroughputCalculatorDisplay() {
                   </div>
                 </div>
 
-                <div className="flex flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex flex-col gap-y-1.5 lg:col-span-1">
                   <LabelWithTooltip
                     htmlFor="calc-cost-type"
                     label="Token Type"
@@ -517,7 +517,7 @@ export default function ThroughputCalculatorDisplay() {
               </div>
 
               <div className="flex items-end gap-3">
-                <div className="flex flex-col space-y-1.5">
+                <div className="flex flex-col gap-y-1.5">
                   <LabelWithTooltip
                     htmlFor="calc-metric"
                     label="Metric"
@@ -553,7 +553,9 @@ export default function ThroughputCalculatorDisplay() {
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <input
+                        id="calc-target"
                         type="range"
+                        aria-label="Target Interactivity"
                         min={currentRange.min}
                         max={currentRange.max}
                         step={1}

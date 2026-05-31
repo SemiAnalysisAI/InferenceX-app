@@ -89,7 +89,7 @@ export default function ComparisonChangelog({
   }, [selectedDates, selectedDateRange]);
 
   const addableDates = useMemo(
-    () => filteredChangelogs.map((c) => c.date).filter((d) => !datesOnChart.has(d)),
+    () => filteredChangelogs.flatMap((c) => (datesOnChart.has(c.date) ? [] : [c.date])),
     [filteredChangelogs, datesOnChart],
   );
 

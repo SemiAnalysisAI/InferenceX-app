@@ -127,9 +127,9 @@ export function LandingPage() {
               ready to explore.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
-                <CuratedViewCard key={preset.id} preset={preset} />
-              ))}
+              {FAVORITE_PRESETS.flatMap((preset) =>
+                preset.hidden ? [] : [<CuratedViewCard key={preset.id} preset={preset} />],
+              )}
             </div>
           </Card>
         </section>

@@ -41,11 +41,13 @@ export function updateRepoUrl(url: string): string {
  * @param tickItem - The number to format
  * @returns Formatted number as string
  */
+const enUsNumberFormat = new Intl.NumberFormat('en-US');
+
 export function formatNumber(tickItem: number) {
   if (tickItem < 10000) {
     return tickItem.toString();
   }
-  return new Intl.NumberFormat('en-US').format(tickItem);
+  return enUsNumberFormat.format(tickItem);
 }
 
 /**
@@ -250,6 +252,9 @@ export function filterRunsByModel(
     ? new Set(selectedGPUs!.map((gpu) => gpu.replaceAll('_', '-')))
     : null;
 
+  const modelPrefixSet = new Set(modelPrefixes);
+  const precisionSet = filterByPrecision ? new Set(selectedPrecisions!) : null;
+
   const filtered: Record<string, RunInfo> = {};
   for (const [runId, runInfo] of Object.entries(availableRuns)) {
     if (!runInfo.changelog) continue;
@@ -259,8 +264,8 @@ export function filterRunsByModel(
         const parts = key.split('-');
         const gpuSuffix = parts.slice(2).join('-');
         return (
-          modelPrefixes.includes(parts[0]) &&
-          (!filterByPrecision || selectedPrecisions!.includes(parts[1])) &&
+          modelPrefixSet.has(parts[0]) &&
+          (!precisionSet || precisionSet.has(parts[1])) &&
           (!gpuConfigSuffixes || gpuConfigSuffixes.has(gpuSuffix))
         );
       }),
