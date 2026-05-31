@@ -62,6 +62,7 @@ function MultiSelect({
 }: MultiSelectProps) {
   const [internalIsOpen, setInternalIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const listboxId = React.useId();
   const searchStateRef = React.useRef(search);
   searchStateRef.current = search;
   const searchableRef = React.useRef(searchable);
@@ -245,6 +246,7 @@ function MultiSelect({
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-controls={listboxId}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         data-slot="select-trigger"
@@ -327,6 +329,7 @@ function MultiSelect({
       {isOpen && (
         <div
           ref={contentRef}
+          id={listboxId}
           tabIndex={-1}
           data-slot="select-content"
           className={cn(

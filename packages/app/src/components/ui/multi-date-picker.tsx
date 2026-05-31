@@ -179,6 +179,7 @@ export function MultiDatePicker({
                     >
                       {formatDisplayDate(dateStr)}
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveTempDate(dateStr);

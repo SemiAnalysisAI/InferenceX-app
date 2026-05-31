@@ -237,6 +237,7 @@ export default function ChartLegend({
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => {
                 track('inference_legend_search_cleared');
                 setSearchQuery('');
@@ -283,6 +284,7 @@ export default function ChartLegend({
       <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
         {actions.map((action) => (
           <button
+            type="button"
             key={action.id}
             data-testid={action.id}
             onClick={action.onClick}
@@ -318,6 +320,7 @@ export default function ChartLegend({
   const expandButton = hasLongText ? (
     <div className="hidden lg:block mt-2 no-export">
       <button
+        type="button"
         onClick={handleLegendExpand}
         className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
         aria-label={isLegendExpanded ? 'Collapse legend' : 'Expand legend'}

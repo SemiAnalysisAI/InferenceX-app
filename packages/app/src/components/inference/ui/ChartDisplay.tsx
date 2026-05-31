@@ -76,6 +76,7 @@ function E2eXAxisDropdown({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          type="button"
           className="inline-flex items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
           onClick={(e) => e.stopPropagation()}
         >
@@ -86,6 +87,7 @@ function E2eXAxisDropdown({
       <PopoverContent className="w-48 p-1" align="start">
         {xAxisOptions.map((opt) => (
           <button
+            type="button"
             key={opt.label}
             className={`w-full text-left px-3 py-1.5 text-sm rounded hover:bg-accent transition-colors ${
               (opt.value === null && !selectedValue) || opt.value === selectedValue
@@ -680,6 +682,7 @@ export default function ChartDisplay() {
                 />
                 {config.label}
                 <button
+                  type="button"
                   className="ml-1 hover:opacity-70"
                   onClick={() => {
                     removeTrackedConfig(config.id);

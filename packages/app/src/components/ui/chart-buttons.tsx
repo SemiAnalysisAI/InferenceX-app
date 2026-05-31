@@ -110,6 +110,7 @@ export function ChartButtons({
           </PopoverTrigger>
           <PopoverContent align="end" className="w-44 p-1">
             <button
+              type="button"
               data-testid="export-png-button"
               data-ph-capture-attribute-export-type="png"
               data-ph-capture-attribute-chart={chartId}
@@ -122,6 +123,7 @@ export function ChartButtons({
             </button>
             {onExportCsv && (
               <button
+                type="button"
                 data-testid="export-csv-button"
                 data-ph-capture-attribute-export-type="csv"
                 data-ph-capture-attribute-chart={chartId}
@@ -134,6 +136,7 @@ export function ChartButtons({
             )}
             {onExportMp4 && (
               <button
+                type="button"
                 data-testid="export-mp4-button"
                 data-ph-capture-attribute-export-type="mp4"
                 data-ph-capture-attribute-chart={chartId}
