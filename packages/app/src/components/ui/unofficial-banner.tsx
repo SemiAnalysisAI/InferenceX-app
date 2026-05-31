@@ -62,6 +62,7 @@ export function UnofficialBanner({ runs, onDismissRun, onDismissAll }: Unofficia
         </div>
         {multiple && onDismissAll && (
           <button
+            type="button"
             onClick={() => {
               track('unofficial_banner_dismissed_all', { count: runs.length });
               onDismissAll();
@@ -107,6 +108,7 @@ function RunChip({
       </a>
       {onDismiss && (
         <button
+          type="button"
           onClick={() => {
             track('unofficial_banner_run_dismissed', { branch: run.branch });
             onDismiss();

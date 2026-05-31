@@ -604,6 +604,7 @@ export default function ReplayPanel({
         >
           <span className="flex-1">MP4 export failed: {exportError}</span>
           <button
+            type="button"
             onClick={() => setExportError(null)}
             className="text-destructive/70 hover:text-destructive cursor-pointer"
             aria-label="Dismiss"

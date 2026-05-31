@@ -280,6 +280,7 @@ export function CalendarMonthPanel({
 
           return (
             <button
+              type="button"
               key={formatCalendarDate(day)}
               onClick={() => !disabled && !isDisabled && onDateClick(day)}
               onMouseEnter={() => !isDisabled && onDateHover?.(day)}
