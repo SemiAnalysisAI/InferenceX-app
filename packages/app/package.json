@@ -58,7 +58,7 @@
     "dompurify": "^3.4.7",
     "gray-matter": "^4.0.3",
     "iwanthue": "^2.0.0",
-    "lucide-react": "^1.16.0",
+    "lucide-react": "^1.17.0",
     "mp4-muxer": "^5.2.2",
     "next": "^16.2.6",
     "next-mdx-remote": "^6.0.0",
