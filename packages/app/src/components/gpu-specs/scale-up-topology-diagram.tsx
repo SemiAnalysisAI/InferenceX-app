@@ -1,6 +1,14 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { track } from '@/lib/analytics';
@@ -76,21 +84,23 @@ export const ScaleUpTopologyDiagram = forwardRef<
     },
   }));
 
+  const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      navigate('prev');
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigate('next');
+    }
+  });
+
   // Keyboard arrow navigation when dialog is open
   useEffect(() => {
     if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        navigate('prev');
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        navigate('next');
-      }
-    };
+    const handleKeyDown = (e: KeyboardEvent) => onKeyDown(e);
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, navigate]);
+  }, [open]);
 
   return (
     <div className="flex flex-col">
