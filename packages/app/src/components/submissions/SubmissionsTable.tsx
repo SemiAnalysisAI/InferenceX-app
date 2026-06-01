@@ -184,6 +184,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         onBlur={() => {
           if (search.trim()) track('submissions_table_searched', { query: search.trim() });
         }}
+        aria-label="Search configs"
         placeholder="Search configs..."
         className="w-full max-w-sm px-3 py-1.5 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
       />
@@ -191,7 +192,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="w-8 px-2" />
+              <th className="w-8 px-2" aria-label="Expand row" />
               {(
                 [
                   ['GPU', 'hardware'],
@@ -287,7 +288,7 @@ function SubmissionRow({
   return (
     <>
       <tr className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={onToggle}>
-        <td className="px-2 py-2 text-muted-foreground">
+        <td className="p-2 text-muted-foreground">
           {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         </td>
         <td className="px-3 py-2 font-medium">
@@ -357,8 +358,8 @@ function SubmissionRow({
       </tr>
       {isExpanded && (
         <tr className="bg-muted/20">
-          <td />
-          <td colSpan={8} className="px-3 py-3">
+          <td aria-hidden="true" />
+          <td colSpan={8} className="p-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                 <DetailItem label="Vendor:" tip="GPU manufacturer">

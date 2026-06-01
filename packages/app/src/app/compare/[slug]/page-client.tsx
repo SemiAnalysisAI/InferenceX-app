@@ -111,7 +111,7 @@ export default function ComparePageClient({
                 Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
                 {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
                 <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
-                Use the chart controls below to switch sequences, precisions, and metrics — same
+                Use the chart controls below to switch sequences, precisions, and metrics, the same
                 interactions as{' '}
                 <Link href="/" className="underline hover:text-primary">
                   the main inference chart
@@ -121,14 +121,14 @@ export default function ComparePageClient({
               {narrative.length > 0 && (
                 <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
                   {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
+                    <p key={`${para}-${i}`} className="text-sm text-foreground/80">
                       {para}
                       {i === narrative.length - 1 && (
                         <>
                           {' '}
                           <span className="text-muted-foreground italic">
                             (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
-                            {defaultPrecision ?? 'precision'} selection for this URL — table and
+                            {defaultPrecision ?? 'precision'} selection for this URL; table and
                             chart below update if you change sequence, precision, or model in the
                             controls.)
                           </span>

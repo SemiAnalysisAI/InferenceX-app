@@ -283,7 +283,7 @@ export default function GpuMetricsDisplay() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Loading...
+                  Loading…
                 </>
               ) : (
                 'Load'

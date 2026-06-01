@@ -135,9 +135,9 @@ export default function ComparePerDollarPageClient({
               <p className="mt-2 text-sm text-muted-foreground">
                 Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
                 <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
-                Owning-hyperscaler TCO normalized by output tokens — performance per dollar across
+                Owning-hyperscaler TCO normalized by output tokens: performance per dollar across
                 LLM workloads. Pick the more cost-efficient SKU at every target interactivity level.
-                Use the chart controls below to switch sequences, precisions, and metrics — same
+                Use the chart controls below to switch sequences, precisions, and metrics, the same
                 interactions as{' '}
                 <Link href="/" className="underline hover:text-primary">
                   the main inference chart
@@ -150,14 +150,14 @@ export default function ComparePerDollarPageClient({
                   data-testid="compare-per-dollar-narrative"
                 >
                   {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
+                    <p key={`${para}-${i}`} className="text-sm text-foreground/80">
                       {para}
                       {i === narrative.length - 1 && (
                         <>
                           {' '}
                           <span className="text-muted-foreground italic">
                             (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
-                            {defaultPrecision ?? 'precision'} selection for this URL — table and
+                            {defaultPrecision ?? 'precision'} selection for this URL; table and
                             chart below update if you change sequence, precision, or model in the
                             controls.)
                           </span>

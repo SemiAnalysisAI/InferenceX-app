@@ -196,7 +196,7 @@ export function DateRangePicker({
               <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="size-6 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Checking available dates...</p>
+                  <p className="text-sm text-muted-foreground">Checking available dates…</p>
                 </div>
               </div>
             )}

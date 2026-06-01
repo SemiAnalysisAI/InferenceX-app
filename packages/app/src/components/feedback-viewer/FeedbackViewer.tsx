@@ -196,7 +196,7 @@ export default function FeedbackViewer() {
           )}
           {allDecryptsFailed && (
             <p role="alert" className="text-xs text-destructive">
-              All rows failed to decrypt — the key parses but doesn't match the data.
+              All rows failed to decrypt: the key parses but doesn't match the data.
             </p>
           )}
         </form>

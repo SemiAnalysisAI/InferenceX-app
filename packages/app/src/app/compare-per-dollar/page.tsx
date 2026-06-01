@@ -97,8 +97,8 @@ export default async function ComparePerDollarIndexPage() {
           </h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
             {totalUrls.toLocaleString()} head-to-head cost-per-million-tokens comparisons across{' '}
-            {formatModelList(modelsWithPairs)}. Performance normalized by owning-hyperscaler TCO —
-            each page renders the cost-per-token chart and an interpolated dollars-per-million
+            {formatModelList(modelsWithPairs)}. Performance normalized by owning-hyperscaler TCO.
+            Each page renders the cost-per-token chart and an interpolated dollars-per-million
             comparison table so you can pick the cheaper SKU at any target interactivity level.
           </p>
         </Card>

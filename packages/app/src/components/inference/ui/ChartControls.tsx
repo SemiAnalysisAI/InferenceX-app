@@ -130,14 +130,13 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
   );
   const groupedYAxisOptions = useMemo(
     () =>
-      visibleGroups
-        .map((group) => ({
-          groupLabel: group.label,
-          options: group.metrics
-            .filter((m) => METRIC_TITLE_MAP.has(m))
-            .map((m) => ({ value: m, label: METRIC_TITLE_MAP.get(m)! })),
-        }))
-        .filter((g) => g.options.length > 0),
+      visibleGroups.flatMap((group) => {
+        const options = group.metrics.flatMap((m) => {
+          const label = METRIC_TITLE_MAP.get(m);
+          return label === undefined ? [] : [{ value: m, label }];
+        });
+        return options.length > 0 ? [{ groupLabel: group.label, options }] : [];
+      }),
     [visibleGroups],
   );
 
@@ -255,7 +254,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availablePrecisions={availablePrecisions}
             data-testid="precision-multiselect"
           />
-          <div className="flex flex-col space-y-1.5 lg:col-span-2">
+          <div className="flex flex-col gap-1.5 lg:col-span-2">
             <LabelWithTooltip
               htmlFor="y-axis-select"
               label="Y-Axis Metric"
@@ -277,7 +276,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
             isInputMetric && (
-              <div className="flex flex-col space-y-1.5 lg:col-span-1">
+              <div className="flex flex-col gap-1.5 lg:col-span-1">
                 <LabelWithTooltip
                   htmlFor="x-axis-select"
                   label="X-Axis Metric"
@@ -304,7 +303,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
             isInputMetric && (
-              <div className="flex flex-col space-y-1.5 lg:col-span-1">
+              <div className="flex flex-col gap-1.5 lg:col-span-1">
                 <LabelWithTooltip
                   htmlFor="scale-type-select"
                   label="X-Axis Scale"
@@ -328,7 +327,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             )}
 
           {!hideGpuComparison && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
               <LabelWithTooltip
                 htmlFor="gpu-config-select"
                 label="GPU Config"
@@ -349,7 +348,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           )}
 
           {!hideGpuComparison && selectedGPUs.length > 0 && (
-            <div className="flex flex-col space-y-1.5 lg:col-span-2">
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
               <LabelWithTooltip
                 htmlFor="date-picker"
                 label="Comparison Date Range"

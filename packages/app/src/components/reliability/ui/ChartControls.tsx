@@ -18,7 +18,7 @@ export default function ReliabilityChartControls() {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex flex-col space-y-1.5 sm:w-45">
+      <div className="flex flex-col gap-1.5 sm:w-45">
         <LabelWithTooltip
           htmlFor="date-range-select"
           label="Date Range"

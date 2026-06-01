@@ -27,7 +27,7 @@ export function UnofficialDomainNotice() {
         {OFFICIAL_HOSTNAME}
       </a>{' '}
       and is not affiliated with or endorsed by SemiAnalysis. Data shown here may be unofficial,
-      modified, or out of date — visit the official site for authoritative InferenceX™ results.
+      modified, or out of date. Visit the official site for authoritative InferenceX™ results.
     </p>
   );
 }

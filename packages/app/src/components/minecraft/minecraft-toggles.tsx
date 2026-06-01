@@ -74,7 +74,7 @@ export function MinecraftToggles() {
         aria-label={musicOn ? 'Mute music' : 'Unmute music'}
       >
         <span className="relative">
-          <Music className="w-[20px] h-[20px]" />
+          <Music className="size-[20px]" />
           {!musicOn && (
             <span className="absolute inset-0 flex items-center justify-center">
               <span className="block w-[22px] h-[2px] bg-current rotate-45" />
@@ -89,11 +89,7 @@ export function MinecraftToggles() {
         title={soundOn ? 'Mute click sounds' : 'Unmute click sounds'}
         aria-label={soundOn ? 'Mute click sounds' : 'Unmute click sounds'}
       >
-        {soundOn ? (
-          <Volume2 className="w-[20px] h-[20px]" />
-        ) : (
-          <VolumeOff className="w-[20px] h-[20px]" />
-        )}
+        {soundOn ? <Volume2 className="size-[20px]" /> : <VolumeOff className="size-[20px]" />}
       </button>
     </>
   );

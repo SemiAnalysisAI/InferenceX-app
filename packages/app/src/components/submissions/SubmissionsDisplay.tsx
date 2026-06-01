@@ -139,7 +139,7 @@ export default function SubmissionsDisplay() {
           <Card>
             {isLoading ? (
               <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
-                Loading chart data...
+                Loading chart data…
               </div>
             ) : data?.volume ? (
               <SubmissionsChart
@@ -164,7 +164,7 @@ export default function SubmissionsDisplay() {
         <Card>
           {isLoading ? (
             <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
-              Loading submissions...
+              Loading submissions…
             </div>
           ) : data?.summary ? (
             <SubmissionsTable data={data.summary} />

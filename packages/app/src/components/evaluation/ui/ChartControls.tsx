@@ -56,7 +56,7 @@ export default function EvaluationChartControls() {
         />
 
         {/* Benchmark Dropdown */}
-        <div className="flex flex-col space-y-1.5 lg:col-span-1">
+        <div className="flex flex-col gap-1.5 lg:col-span-1">
           <LabelWithTooltip
             htmlFor="eval-benchmark-select"
             label="Benchmark"
@@ -105,7 +105,7 @@ export default function EvaluationChartControls() {
         />
 
         {/* Spacer */}
-        <div className="flex flex-col space-y-1.5 lg:col-span-2" />
+        <div className="flex flex-col gap-1.5 lg:col-span-2" />
       </div>
       <div className="flex flex-col md:flex-row gap-2 md:items-center text-muted-foreground">
         {/* Date picker */}
