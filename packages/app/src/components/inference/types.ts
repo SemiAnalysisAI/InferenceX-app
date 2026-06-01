@@ -231,8 +231,11 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // pre-aggregate_power.py runs (and runs with monitoring disabled) won't
   // emit these fields.
   measuredAvgPower?: { y: number; roof: boolean };
+  measuredPrefillAvgPower?: { y: number; roof: boolean };
+  measuredDecodeAvgPower?: { y: number; roof: boolean };
   measuredJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerTotalToken?: { y: number; roof: boolean };
+  measuredJPerInputToken?: { y: number; roof: boolean };
 }
 
 /**
@@ -260,8 +263,11 @@ export type YAxisMetricKey =
   | 'jOutput'
   | 'jInput'
   | 'measuredAvgPower'
+  | 'measuredPrefillAvgPower'
+  | 'measuredDecodeAvgPower'
   | 'measuredJPerOutputToken'
-  | 'measuredJPerTotalToken';
+  | 'measuredJPerTotalToken'
+  | 'measuredJPerInputToken';
 
 /**
  * Defines the configuration and labels for a specific chart.
@@ -370,10 +376,22 @@ export interface ChartDefinition {
   // The field stays in the type for parity with the other y_* metrics and
   // so a future config can override the default.
   y_measuredAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_measuredPrefillAvgPower?: string;
+  y_measuredPrefillAvgPower_label?: string;
+  y_measuredPrefillAvgPower_title?: string;
+  y_measuredPrefillAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_measuredDecodeAvgPower?: string;
+  y_measuredDecodeAvgPower_label?: string;
+  y_measuredDecodeAvgPower_title?: string;
+  y_measuredDecodeAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_measuredJPerOutputToken?: string;
   y_measuredJPerOutputToken_label?: string;
   y_measuredJPerOutputToken_title?: string;
   y_measuredJPerOutputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_measuredJPerInputToken?: string;
+  y_measuredJPerInputToken_label?: string;
+  y_measuredJPerInputToken_title?: string;
+  y_measuredJPerInputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_measuredJPerTotalToken?: string;
   y_measuredJPerTotalToken_label?: string;
   y_measuredJPerTotalToken_title?: string;
