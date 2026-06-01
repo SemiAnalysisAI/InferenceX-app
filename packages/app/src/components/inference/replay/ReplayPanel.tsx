@@ -170,7 +170,7 @@ export default function ReplayPanel({
 
   // Pre-flight feature detection so the Export button is disabled with a clear
   // reason on browsers that lack WebCodecs (Firefox today, older Safari).
-  const hasWebCodecs = useMemo(() => typeof VideoEncoder !== 'undefined', []);
+  const hasWebCodecs = typeof VideoEncoder !== 'undefined';
   const unavailableReportedRef = useRef(false);
   useEffect(() => {
     if (!hasWebCodecs && !unavailableReportedRef.current) {

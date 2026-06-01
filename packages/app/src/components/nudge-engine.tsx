@@ -451,7 +451,7 @@ function BannerRenderer({
   const { content } = def;
   const Icon = content.icon;
 
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleActivate = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
     onAction();
@@ -467,7 +467,7 @@ function BannerRenderer({
     <section className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4">
       <a
         href={content.href ?? '#'}
-        onClick={handleClick}
+        onClick={handleActivate}
         className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-brand/40 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-4 py-3 transition-all duration-200 hover:border-brand/70 hover:shadow-lg hover:shadow-brand/10"
         data-testid={content.testId}
       >

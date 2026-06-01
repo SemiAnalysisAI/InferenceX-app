@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -464,7 +464,7 @@ export function GlobalFilterProvider({
 }
 
 export function useGlobalFilters() {
-  const context = useContext(GlobalFilterContext);
+  const context = use(GlobalFilterContext);
   if (context === undefined) {
     throw new Error('useGlobalFilters must be used within a GlobalFilterProvider');
   }

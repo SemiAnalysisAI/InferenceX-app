@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -408,7 +408,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 }
 
 export function useEvaluation(): EvaluationChartContextType {
-  const context = useContext(EvaluationContext);
+  const context = use(EvaluationContext);
   if (context === undefined) {
     throw new Error('useEvaluation must be used within an EvaluationProvider');
   }

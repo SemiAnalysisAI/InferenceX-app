@@ -21,6 +21,18 @@ type SortCol = keyof GpuStats;
 
 const fmtStat = (v: number) => (v >= 1000 ? v.toFixed(0) : v.toFixed(1));
 
+const COLS: { key: SortCol; label: string }[] = [
+  { key: 'gpuIndex', label: 'GPU' },
+  { key: 'count', label: 'Samples' },
+  { key: 'min', label: 'Min' },
+  { key: 'max', label: 'Max' },
+  { key: 'mean', label: 'Mean' },
+  { key: 'median', label: 'Median' },
+  { key: 'p95', label: 'P95' },
+  { key: 'p99', label: 'P99' },
+  { key: 'stddev', label: 'StdDev' },
+];
+
 const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   const [sortCol, setSortCol] = useState<SortCol>('gpuIndex');
   const [sortAsc, setSortAsc] = useState(true);
@@ -51,24 +63,12 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
 
   if (stats.length === 0) return null;
 
-  const cols: { key: SortCol; label: string }[] = [
-    { key: 'gpuIndex', label: 'GPU' },
-    { key: 'count', label: 'Samples' },
-    { key: 'min', label: 'Min' },
-    { key: 'max', label: 'Max' },
-    { key: 'mean', label: 'Mean' },
-    { key: 'median', label: 'Median' },
-    { key: 'p95', label: 'P95' },
-    { key: 'p99', label: 'P99' },
-    { key: 'stddev', label: 'StdDev' },
-  ];
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
-            {cols.map((c) => (
+            {COLS.map((c) => (
               <th
                 key={c.key}
                 className="px-2 py-1.5 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"

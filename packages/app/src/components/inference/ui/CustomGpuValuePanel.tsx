@@ -67,7 +67,7 @@ interface GpuValueInputGroupProps {
   inputIdPrefix: string;
   inputValue: string;
   error: string;
-  onChange: (value: string) => void;
+  onChange: (gpuKey: string, value: string) => void;
 }
 
 const GpuValueInputGroup = memo(
@@ -85,7 +85,7 @@ const GpuValueInputGroup = memo(
           value={inputValue}
           placeholder=""
           onChange={(e) => {
-            onChange(e.target.value);
+            onChange(gpuKey, e.target.value);
           }}
           className={error ? 'text-destructive' : ''}
           aria-invalid={Boolean(error)}
@@ -254,9 +254,7 @@ const CustomGpuValuePanel = memo(
                 inputIdPrefix={config.inputIdPrefix}
                 inputValue={(lastCalculatedValues[gpu.base] ?? '').toString()}
                 error={inputErrors[gpu.base] ?? ''}
-                onChange={(value) => {
-                  handleInputChange(gpu.base, value);
-                }}
+                onChange={handleInputChange}
               />
             ))}
           </div>

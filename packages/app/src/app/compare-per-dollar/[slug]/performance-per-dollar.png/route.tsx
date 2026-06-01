@@ -92,6 +92,30 @@ function pointsPath(points: Point[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
+function SeriesPath({
+  points,
+  stroke,
+  dashed,
+}: {
+  points: Point[];
+  stroke: string;
+  dashed: boolean;
+}) {
+  if (points.length < 2) return null;
+  return (
+    <path
+      d={pointsPath(points)}
+      fill="none"
+      stroke={stroke}
+      strokeWidth={9 * R}
+      strokeOpacity={dashed ? 0.55 : 1}
+      strokeDasharray={dashed ? `${14 * R} ${10 * R}` : undefined}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  );
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
@@ -176,22 +200,6 @@ export async function GET(
   const showRangeEndpoints = hasLeftExtension || hasRightExtension;
   const svgWidth = 760 * R;
   const svgHeight = 406 * R;
-
-  function renderSeriesPath(points: Point[], stroke: string, dashed: boolean) {
-    if (points.length < 2) return null;
-    return (
-      <path
-        d={pointsPath(points)}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={9 * R}
-        strokeOpacity={dashed ? 0.55 : 1}
-        strokeDasharray={dashed ? `${14 * R} ${10 * R}` : undefined}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    );
-  }
 
   try {
     return new ImageResponse(
@@ -299,12 +307,12 @@ export async function GET(
                   />
                 );
               })}
-              {renderSeriesPath(aSeries.leftExt, COLORS.a, true)}
-              {renderSeriesPath(aSeries.rightExt, COLORS.a, true)}
-              {renderSeriesPath(aSeries.matched, COLORS.a, false)}
-              {renderSeriesPath(bSeries.leftExt, COLORS.b, true)}
-              {renderSeriesPath(bSeries.rightExt, COLORS.b, true)}
-              {renderSeriesPath(bSeries.matched, COLORS.b, false)}
+              <SeriesPath points={aSeries.leftExt} stroke={COLORS.a} dashed />
+              <SeriesPath points={aSeries.rightExt} stroke={COLORS.a} dashed />
+              <SeriesPath points={aSeries.matched} stroke={COLORS.a} dashed={false} />
+              <SeriesPath points={bSeries.leftExt} stroke={COLORS.b} dashed />
+              <SeriesPath points={bSeries.rightExt} stroke={COLORS.b} dashed />
+              <SeriesPath points={bSeries.matched} stroke={COLORS.b} dashed={false} />
               {aHighlightPoints.map((point, index) => (
                 <circle
                   key={`a-${index}`}

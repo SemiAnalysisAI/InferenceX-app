@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -1134,7 +1134,7 @@ export function InferenceProvider({
 }
 
 export function useInference() {
-  const context = useContext(InferenceContext);
+  const context = use(InferenceContext);
   if (context === undefined) {
     throw new Error('useInference must be used within an InferenceProvider');
   }

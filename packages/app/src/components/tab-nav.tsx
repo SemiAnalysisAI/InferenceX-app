@@ -3,7 +3,7 @@
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useContext, useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useFeatureGate } from '@/lib/use-feature-gate';
@@ -83,7 +83,7 @@ export function TabNav() {
   // the in-flight fetch and even when the fetch fails), so we read it from
   // window.location and re-sync on pathname change, context update
   // (dismiss/clear writes via history.pushState), and popstate.
-  const unofficialCtx = useContext(UnofficialRunContext);
+  const unofficialCtx = use(UnofficialRunContext);
   const ctxRunInfos = unofficialCtx?.unofficialRunInfos;
   const [unofficialIds, setUnofficialIds] = useState('');
   useEffect(() => {

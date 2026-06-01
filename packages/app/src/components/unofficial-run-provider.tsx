@@ -3,8 +3,8 @@
 import {
   type ReactNode,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -96,7 +96,7 @@ export interface UnofficialRunContextType {
 export const UnofficialRunContext = createContext<UnofficialRunContextType | undefined>(undefined);
 
 export function useUnofficialRun() {
-  const context = useContext(UnofficialRunContext);
+  const context = use(UnofficialRunContext);
   if (!context) {
     throw new Error('useUnofficialRun must be used within an UnofficialRunProvider');
   }
@@ -399,30 +399,52 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('popstate', load);
   }, []);
 
+  const contextValue = useMemo<UnofficialRunContextType>(
+    () => ({
+      isUnofficialRun: unofficialRunInfos.length > 0,
+      unofficialRunInfo,
+      unofficialRunInfos,
+      runIndexByUrl,
+      unofficialChartData,
+      unofficialEvalRows,
+      loading,
+      error,
+      clearUnofficialRun,
+      dismissRun,
+      availableModelsAndSequences,
+      getOverlayData,
+      activeOverlayHwTypes,
+      setActiveOverlayHwTypes: setActiveOverlayHwTypesStable,
+      allOverlayHwTypes,
+      toggleOverlayHwType,
+      resetOverlayHwTypes,
+      localOfficialOverride,
+      setLocalOfficialOverride,
+    }),
+    [
+      unofficialRunInfo,
+      unofficialRunInfos,
+      runIndexByUrl,
+      unofficialChartData,
+      unofficialEvalRows,
+      loading,
+      error,
+      clearUnofficialRun,
+      dismissRun,
+      availableModelsAndSequences,
+      getOverlayData,
+      activeOverlayHwTypes,
+      setActiveOverlayHwTypesStable,
+      allOverlayHwTypes,
+      toggleOverlayHwType,
+      resetOverlayHwTypes,
+      localOfficialOverride,
+      setLocalOfficialOverride,
+    ],
+  );
+
   return (
-    <UnofficialRunContext.Provider
-      value={{
-        isUnofficialRun: unofficialRunInfos.length > 0,
-        unofficialRunInfo,
-        unofficialRunInfos,
-        runIndexByUrl,
-        unofficialChartData,
-        unofficialEvalRows,
-        loading,
-        error,
-        clearUnofficialRun,
-        dismissRun,
-        availableModelsAndSequences,
-        getOverlayData,
-        activeOverlayHwTypes,
-        setActiveOverlayHwTypes: setActiveOverlayHwTypesStable,
-        allOverlayHwTypes,
-        toggleOverlayHwType,
-        resetOverlayHwTypes,
-        localOfficialOverride,
-        setLocalOfficialOverride,
-      }}
-    >
+    <UnofficialRunContext.Provider value={contextValue}>
       {unofficialRunInfos.length > 0 && (
         <UnofficialBanner
           runs={unofficialRunInfos}

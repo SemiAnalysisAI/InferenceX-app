@@ -36,6 +36,23 @@ const OVERLAY_ERROR_STROKE_WIDTH = 1.5;
 const getOverlayXPath = (size: number) =>
   `M ${-size},${-size} L ${size},${size} M ${-size},${size} L ${size},${-size}`;
 
+// Static legend for disagg parallelism notation; hoisted so the same element
+// identity is reused every render instead of rebuilt as a prop.
+const PARALLELISM_KEY = (
+  <div className="mt-2 px-1 pr-2 text-[10px] text-muted-foreground/80 leading-tight no-export">
+    <div>
+      <span className="font-mono">P(·/·/·/·)</span> prefill
+      <span className="mx-1">·</span>
+      <span className="font-mono">D(·/·/·/·)</span> decode
+    </div>
+    <div>
+      slots: <span className="font-mono">tp/ep/dpa/nw</span>
+      <span className="mx-1">·</span>
+      <span className="font-mono">T</span>/<span className="font-mono">F</span> = DPA true/false
+    </div>
+  </div>
+);
+
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -433,20 +450,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     [chartData, unofficialChartData],
   );
 
-  const parallelismKey = hasDisaggConfigs ? (
-    <div className="mt-2 px-1 pr-2 text-[10px] text-muted-foreground/80 leading-tight no-export">
-      <div>
-        <span className="font-mono">P(·/·/·/·)</span> prefill
-        <span className="mx-1">·</span>
-        <span className="font-mono">D(·/·/·/·)</span> decode
-      </div>
-      <div>
-        slots: <span className="font-mono">tp/ep/dpa/nw</span>
-        <span className="mx-1">·</span>
-        <span className="font-mono">T</span>/<span className="font-mono">F</span> = DPA true/false
-      </div>
-    </div>
-  ) : null;
+  const parallelismKey = hasDisaggConfigs ? PARALLELISM_KEY : null;
   const unofficialErrorData = useMemo(
     () => unofficialChartData.filter((d) => d.errorMin !== undefined && d.errorMax !== undefined),
     [unofficialChartData],

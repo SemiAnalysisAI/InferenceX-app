@@ -8,7 +8,7 @@ export function HeadingLink({ id }: { id: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'fading'>('idle');
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const handleClick = useCallback(
+  const handleCopyLink = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       clearTimeout(timerRef.current);
@@ -35,7 +35,7 @@ export function HeadingLink({ id }: { id: string }) {
   return (
     <a
       href={`#${id}`}
-      onClick={handleClick}
+      onClick={handleCopyLink}
       aria-label="Copy link to section"
       className={`inline-flex items-center ml-2 no-underline transition-opacity duration-300 text-muted-foreground hover:text-foreground ${visible ? (state === 'fading' ? 'opacity-0' : 'opacity-100') : 'opacity-0 group-hover:opacity-100'}`}
     >
