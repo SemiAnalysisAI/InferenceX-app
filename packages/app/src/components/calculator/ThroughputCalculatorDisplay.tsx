@@ -278,7 +278,7 @@ export default function ThroughputCalculatorDisplay() {
       return config ? getDisplayLabel(config) : hwKey;
     });
     exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
-  }, [results, targetValue, hardwareConfig]);
+  }, [results, targetValue, hardwareConfig, selectedModel]);
 
   const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
     setViewMode(value);

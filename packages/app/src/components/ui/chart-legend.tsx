@@ -154,7 +154,7 @@ export default function ChartLegend({
       });
     }
     return result.filter((row) => row.length > 0);
-  }, [grouped, legendItems, sortedItems, isSidebar]);
+  }, [grouped, legendItems, sortedItems, isSidebar, disableActiveSort]);
 
   const handleLegendExpand = () => {
     onExpandedChange(!isLegendExpanded);

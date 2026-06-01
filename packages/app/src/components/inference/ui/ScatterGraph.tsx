@@ -1842,6 +1842,8 @@ const ScatterGraph = React.memo(
         chartDefinition.chartType,
         xScaleConfig._isLog,
         yScaleConfig.type,
+        getCssColor,
+        resolveColor,
       ],
     );
 
