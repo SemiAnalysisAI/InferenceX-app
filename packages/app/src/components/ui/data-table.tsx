@@ -160,6 +160,7 @@ export function DataTable<T>({
         />
         {search && (
           <button
+            type="button"
             onClick={() => {
               setSearch('');
               setPage(0);
@@ -286,6 +287,7 @@ export function DataTable<T>({
         </div>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => {
               setPage((p) => Math.max(0, p - 1));
               track(`${analyticsPrefix}_page_changed`, { direction: 'prev' });
@@ -300,6 +302,7 @@ export function DataTable<T>({
             {safePage + 1} / {totalPages}
           </span>
           <button
+            type="button"
             onClick={() => {
               setPage((p) => Math.min(totalPages - 1, p + 1));
               track(`${analyticsPrefix}_page_changed`, { direction: 'next' });

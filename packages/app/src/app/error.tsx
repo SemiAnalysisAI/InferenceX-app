@@ -21,6 +21,7 @@ export default function Error({
       <p className="text-lg mb-4">An unexpected error has occurred.</p>
       <p className="text-md text-red-500 mb-8">{error.message}</p>
       <button
+        type="button"
         className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
         onClick={() => {
           track('error_page_retry');

@@ -34,7 +34,7 @@ export interface ScaleUpTopologyDiagramHandle {
 export const ScaleUpTopologyDiagram = forwardRef<
   ScaleUpTopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
->(function ScaleUpTopologyDiagram({ spec, allSpecs }, ref) {
+>(({ spec, allSpecs }, ref) => {
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);

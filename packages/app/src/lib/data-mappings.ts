@@ -48,23 +48,32 @@ interface ModelConfig {
   mtpEngineExclusion?: boolean;
 }
 
+// Total parameter counts appended to each label so users can compare model
+// scale at a glance in the dropdown. For Llama and gpt-oss the count is
+// already part of the canonical name (Llama 3.3 70B, gpt-oss 120B) so no
+// duplication needed.
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
-  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528', prefix: 'dsr1', category: 'default' },
+  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 671B', prefix: 'dsr1', category: 'default' },
   [Model.DeepSeek_V4_Pro]: {
-    label: 'DeepSeek V4 Pro',
+    label: 'DeepSeek V4 Pro 1.6T',
     prefix: 'dsv4',
     category: 'default',
     mtpEngineExclusion: true,
   },
   [Model.Kimi_K2_5]: {
-    label: 'Kimi K2.5',
+    // K2.5 and K2.6 share an architecture, so the dropdown surfaces both
+    // versions joined with a slash — matches the GLM5/5.1 pattern. The
+    // hyphenated `Model.Kimi_K2_5` enum value stays as-is for internal
+    // routing / DB key mapping.
+    label: 'Kimi K2.5/2.6 1T',
     prefix: 'kimik2.5',
     category: 'default',
   },
-  [Model.Qwen3_5]: { label: 'Qwen3.5', prefix: 'qwen3.5', category: 'default' },
-  [Model.GLM_5]: { label: 'GLM5/5.1', prefix: 'glm5', category: 'default' },
+  [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
+  [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
   [Model.MiniMax_M2_5]: {
-    label: 'MiniMax M2.5',
+    // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
+    label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
     category: 'default',
   },

@@ -22,11 +22,24 @@ interface SsrTableData {
 interface ComparePageClientProps {
   a: string;
   b: string;
+  /** Canonical compare slug (e.g. `deepseek-r1-h100-vs-h200`). Used for the
+   *  cross-link to the sibling `/compare-per-dollar/<same-slug>` route. */
+  slug: string;
   label: string;
+  /** Human-readable model name from the slug — drives the eyebrow above the
+   *  H1 so the URL-grouping ("Kimi K2.6", "GLM 5.1", etc.) is legible without
+   *  scanning the URL bar. */
+  modelLabel: string;
   defaultModel: string;
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: SsrTableData;
+  /** One SSR-rendered prose paragraph per interpolated-table row (default
+   *  interactivity target). Each paragraph picks a template variant
+   *  deterministically from the slug so prose stays stable across renders
+   *  but varies across pages in the catalog. Empty array when there's no
+   *  comparable data. */
+  narrative: string[];
   aLabel: string;
   bLabel: string;
   aVendor: string;
@@ -52,11 +65,14 @@ function toPrecisions(value: string | null): string[] | undefined {
 export default function ComparePageClient({
   a,
   b,
+  slug,
   label,
+  modelLabel,
   defaultModel,
   defaultSequence,
   defaultPrecision,
   ssrTableData,
+  narrative,
   aLabel,
   bLabel,
   aVendor,
@@ -88,18 +104,48 @@ export default function ComparePageClient({
           <Card className="flex flex-col gap-3">
             <header>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                GPU comparison
+                {modelLabel} · GPU comparison
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">{label}</h1>
               <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
                 Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
-                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}). Latency,
-                throughput, and cost across LLM workloads. Use the chart controls below to switch
-                models, sequences, precisions, and metrics — same interactions as{' '}
+                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
+                <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
+                Use the chart controls below to switch sequences, precisions, and metrics — same
+                interactions as{' '}
                 <Link href="/" className="underline hover:text-primary">
                   the main inference chart
                 </Link>
                 .
+              </p>
+              {narrative.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
+                  {narrative.map((para, i) => (
+                    <p key={i} className="text-sm text-foreground/80">
+                      {para}
+                      {i === narrative.length - 1 && (
+                        <>
+                          {' '}
+                          <span className="text-muted-foreground italic">
+                            (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
+                            {defaultPrecision ?? 'precision'} selection for this URL — table and
+                            chart below update if you change sequence, precision, or model in the
+                            controls.)
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2 text-sm">
+                <Link
+                  href={`/compare-per-dollar/${slug}`}
+                  className="underline hover:text-primary text-muted-foreground"
+                  onClick={() => track('compare_cross_link_to_per_dollar', { slug })}
+                >
+                  View performance-per-dollar view →
+                </Link>
               </p>
             </header>
             <CompareTableSection

@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
 
 import { getAllPosts } from '@/lib/blog';
-import { allCanonicalComparePairs, canonicalCompareSlug } from '@/lib/compare-slug';
+import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
+import { canonicalCompareSlug } from '@/lib/compare-slug';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 const TABS = [
@@ -13,8 +14,11 @@ const TABS = [
   'gpu-metrics',
 ] as const;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
+  // Only emit (model, pair) URLs that have benchmark data on both sides —
+  // avoids polluting the sitemap with empty pages that hurt crawl budget.
+  const compareSlugs = await getAllComparableCompareSlugs();
 
   return [
     {
@@ -48,6 +52,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: `${BASE_URL}/compare-per-dollar`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
       url: `${BASE_URL}/blog`,
       lastModified: now,
       changeFrequency: 'weekly',
@@ -59,11 +69,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     })),
-    ...allCanonicalComparePairs().map(({ a, b }) => ({
-      url: `${BASE_URL}/compare/${canonicalCompareSlug(a, b)}`,
+    ...compareSlugs.map(({ modelSlug, a, b }) => ({
+      url: `${BASE_URL}/compare/${canonicalCompareSlug(modelSlug, a, b)}`,
       lastModified: now,
       changeFrequency: 'daily' as const,
       priority: 0.7,
     })),
+    // Every indexed per-dollar landing page has a stable data graphic so image
+    // crawlers discover the PNG alongside the canonical comparison URL.
+    ...compareSlugs.map(({ modelSlug, a, b }) => {
+      const url = `${BASE_URL}/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
+      return {
+        url,
+        images: [`${url}/performance-per-dollar.png`],
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      };
+    }),
   ];
 }

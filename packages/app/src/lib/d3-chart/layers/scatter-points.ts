@@ -223,7 +223,7 @@ export function attachScatterTooltipHandlers<
         .attr('y2', ct.rescaleY(curYScale)(d.y));
       tooltip.html(generateTooltipContent(d, false));
     })
-    .on('mousemove', function (event) {
+    .on('mousemove', (event) => {
       if (isPinned()) return;
       const [mx, my] = d3.pointer(event, container);
       const pos = computeTooltipPosition(mx, my, tooltip, container);
@@ -238,7 +238,7 @@ export function attachScatterTooltipHandlers<
       tooltip.style('opacity', 0).style('display', 'none');
       rulerGroup.style('display', 'none');
     })
-    .on('click', function (event, d) {
+    .on('click', (event, d) => {
       event.stopPropagation();
       const [mx, my] = d3.pointer(event, container);
       tooltip.html(generateTooltipContent(d, true));
@@ -253,7 +253,7 @@ export function attachScatterTooltipHandlers<
       onPointClick?.(d, tooltip);
       trackEvent?.(String(d.hwKey), d.x, d.y);
     })
-    .on('dblclick', function (event, d) {
+    .on('dblclick', (event, d) => {
       if (!onPointDblClick) return;
       event.stopPropagation();
       event.preventDefault();

@@ -157,13 +157,15 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('/compare/[slug] with ?i_seq=1k/1k seeds the sequence without a hydration error', () => {
-      visitWithErrorSpy('/compare/h100-vs-h200?i_seq=1k/1k');
+      // Visit the canonical model-prefixed slug so the assertion is directly
+      // about the rendered page, not about a bare-slug redirect interleaving.
+      visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=1k/1k');
       cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
       assertNoHydrationMismatch();
     });
 
     it('/compare/[slug] with invalid ?i_seq=junk falls back to the seeded default', () => {
-      visitWithErrorSpy('/compare/h100-vs-h200?i_seq=junk');
+      visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=junk');
       cy.get('[data-testid="sequence-selector"]')
         .invoke('text')
         .should('not.contain', 'junk')

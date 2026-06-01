@@ -23,6 +23,7 @@ const DASHBOARD_TABS = [
   '/gpu-specs',
   '/gpu-metrics',
   '/submissions',
+  '/current-inferencex-image',
 ];
 
 const NAV_LINKS = [
@@ -52,7 +53,10 @@ const NAV_LINKS = [
 function isActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
-  return pathname.startsWith(href);
+  // Exact match or a child path under `<href>/...`. The bare `startsWith` would
+  // light up `/compare` when the user is on `/compare-per-dollar/...` since the
+  // latter starts with the literal string `/compare`.
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export const Header = ({ starCount }: { starCount?: number | null }) => {

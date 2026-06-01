@@ -47,6 +47,24 @@ describe('JsonLd', () => {
     expect(JSON.parse(body)).toEqual(data);
   });
 
+  it('escapes > so an HTML parser cannot mistake a literal > for the end of a comment/CDATA', () => {
+    const data = { note: 'a > b' };
+    const html = render(data);
+    const body = scriptBody(html);
+    expect(body).toContain(String.raw`\u003e`);
+    expect(body).not.toContain('>');
+    expect(JSON.parse(body)).toEqual(data);
+  });
+
+  it('escapes & so the payload cannot smuggle entity references through the parser', () => {
+    const data = { note: 'Tom & Jerry' };
+    const html = render(data);
+    const body = scriptBody(html);
+    expect(body).toContain(String.raw`\u0026`);
+    expect(body).not.toContain('&');
+    expect(JSON.parse(body)).toEqual(data);
+  });
+
   it('does NOT HTML-escape quotes (Google would reject &quot; in JSON-LD)', () => {
     const html = render({ name: 'GB200' });
     const body = scriptBody(html);

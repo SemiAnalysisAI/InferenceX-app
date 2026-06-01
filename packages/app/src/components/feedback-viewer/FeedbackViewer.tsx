@@ -16,11 +16,10 @@ import {
 import { useFeedbackList } from '@/hooks/api/use-feedback-list';
 import type { FeedbackListRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { relockFeatureGate } from '@/lib/use-feature-gate';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-
-const FEATURE_GATE_KEY = 'inferencex-feature-gate';
 
 interface DecryptedRow {
   id: string;
@@ -132,8 +131,7 @@ export default function FeedbackViewer() {
             size="sm"
             className="h-7 gap-1.5 text-xs text-muted-foreground"
             onClick={() => {
-              localStorage.removeItem(FEATURE_GATE_KEY);
-              window.dispatchEvent(new Event('inferencex:feature-gate:locked'));
+              relockFeatureGate();
               track('feedback_viewer_relocked');
               router.push('/inference');
             }}

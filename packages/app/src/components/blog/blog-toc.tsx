@@ -9,6 +9,14 @@ interface BlogTocProps {
   headings: TocHeading[];
 }
 
+function handleClick(heading: TocHeading) {
+  track('blog_toc_clicked', { heading: heading.text });
+  const el = document.querySelector<HTMLElement>(`#${CSS.escape(heading.id)}`);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - 32;
+  window.scrollTo({ top, behavior: 'smooth' });
+}
+
 export function BlogToc({ headings }: BlogTocProps) {
   const [activeId, setActiveId] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
@@ -103,14 +111,6 @@ export function BlogToc({ headings }: BlogTocProps) {
   }, [activeId, showSidebar]);
 
   if (headings.length === 0) return null;
-
-  function handleClick(heading: TocHeading) {
-    track('blog_toc_clicked', { heading: heading.text });
-    const el = document.querySelector<HTMLElement>(`#${CSS.escape(heading.id)}`);
-    if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY - 32;
-    window.scrollTo({ top, behavior: 'smooth' });
-  }
 
   function itemClass(h: TocHeading, index: number): string {
     const indent = h.level === 2 ? 'pl-3' : h.level === 3 ? 'pl-6' : '';

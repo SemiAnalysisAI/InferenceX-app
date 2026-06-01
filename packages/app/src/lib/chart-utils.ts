@@ -148,6 +148,11 @@ export const Y_AXIS_METRICS = [
   'y_jTotal',
   'y_jOutput',
   'y_jInput',
+  // Measured power / energy (sourced from runner's aggregate_power.py output;
+  // distinct from the spec-sheet TDP-derived jTotal/jOutput/jInput above).
+  'y_measuredAvgPower',
+  'y_measuredJPerOutputToken',
+  'y_measuredJPerTotalToken',
 ] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
@@ -389,6 +394,19 @@ export function createChartDataPoint(
           },
         }
       : {}),
+
+    // Measured power / energy from runner's aggregate_power.py. Gated on the
+    // raw fields existing so points from runs predating the measurement land
+    // without these keys and the chart correctly filters them out.
+    ...(typeof entry.avg_power_w === 'number'
+      ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_output_token === 'number'
+      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_total_token === 'number'
+      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      : {}),
   };
 }
 
@@ -549,7 +567,10 @@ export const calculateRoofline = (
     | `costri.y`
     | `jTotal.y`
     | `jOutput.y`
-    | `jInput.y`,
+    | `jInput.y`
+    | `measuredAvgPower.y`
+    | `measuredJPerOutputToken.y`
+    | `measuredJPerTotalToken.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
   const pointsForRoofline = points.map((p) => {
@@ -619,7 +640,10 @@ export function computeAllRooflines(
             | `costri.y`
             | `jTotal.y`
             | `jOutput.y`
-            | `jInput.y`,
+            | `jInput.y`
+            | `measuredAvgPower.y`
+            | `measuredJPerOutputToken.y`
+            | `measuredJPerTotalToken.y`,
           rooflineDirection,
         );
       }
@@ -663,6 +687,9 @@ export function markRooflinePoints(
       if (newPoint.jTotal) newPoint.jTotal.roof = false;
       if (newPoint.jOutput) newPoint.jOutput.roof = false;
       if (newPoint.jInput) newPoint.jInput.roof = false;
+      if (newPoint.measuredAvgPower) newPoint.measuredAvgPower.roof = false;
+      if (newPoint.measuredJPerOutputToken) newPoint.measuredJPerOutputToken.roof = false;
+      if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
@@ -722,6 +749,15 @@ export function markRooflinePoints(
           newPoint.jOutput.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_jInput' && newPoint.jInput) {
           newPoint.jInput.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredAvgPower' && newPoint.measuredAvgPower) {
+          newPoint.measuredAvgPower.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredJPerOutputToken' &&
+          newPoint.measuredJPerOutputToken
+        ) {
+          newPoint.measuredJPerOutputToken.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredJPerTotalToken' && newPoint.measuredJPerTotalToken) {
+          newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);

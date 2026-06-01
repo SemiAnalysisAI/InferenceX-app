@@ -148,10 +148,13 @@ const TrendChart = React.memo(
         return logScale ? { type: 'log', domain: [0.1, 1] } : { type: 'linear', domain: [0, 1] };
       }
       const valueExtent = d3.extent(allPoints, (d) => d.value) as [number, number];
-      const yRange = valueExtent[1] - valueExtent[0];
+      const dataMin = valueExtent[0];
+      const dataMax = valueExtent[1];
+      // Pad a degenerate extent so the axis renders multiple ticks instead of one raw float.
+      const yRange =
+        dataMax - dataMin > 0 ? dataMax - dataMin : Math.max(Math.abs(dataMax) * 0.1, 1);
       let yMin: number;
       if (logScale) {
-        const dataMin = valueExtent[0];
         if (dataMin <= 0) {
           yMin = 0.1;
         } else if (dataMin < 1) {
@@ -160,9 +163,9 @@ const TrendChart = React.memo(
           yMin = dataMin * 0.95;
         }
       } else {
-        yMin = Math.max(0, valueExtent[0] - yRange * 0.05);
+        yMin = Math.max(0, dataMin - yRange * 0.05);
       }
-      const yMax = valueExtent[1] + yRange * 0.05;
+      const yMax = dataMax + yRange * 0.05;
       return logScale
         ? { type: 'log', domain: [yMin, yMax], nice: true }
         : { type: 'linear', domain: [yMin, yMax], nice: true };

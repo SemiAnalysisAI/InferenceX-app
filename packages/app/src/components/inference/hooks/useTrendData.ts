@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import type {
+  AggDataEntry,
   InferenceData,
   TrackedConfig,
   TrendDataPoint,
@@ -110,9 +111,16 @@ export function useTrendData(
           const metricObj = point[metricKey];
           if (!metricObj || typeof metricObj !== 'object' || !('y' in metricObj)) continue;
 
-          // Use the dynamic x-axis field if provided (e.g. TTFT instead of E2EL)
+          // Use the dynamic x-axis field if provided (e.g. TTFT instead of E2EL).
+          // Typed accessor: a future AggDataEntry field rename would silently fall
+          // through to point.x without this — narrow on `number` so non-scalar
+          // metric structs (roofline {y, roof}) can't sneak into the x-axis value.
           const xField = xAxisFieldByChartType?.[chartType];
-          const xValue = xField ? ((point as any)[xField] ?? point.x) : point.x;
+          let xValue = point.x;
+          if (xField) {
+            const xCandidate = (point as Partial<AggDataEntry>)[xField as keyof AggDataEntry];
+            if (typeof xCandidate === 'number') xValue = xCandidate;
+          }
 
           if (!accumulator.has(config.id)) accumulator.set(config.id, new Map());
           accumulator.get(config.id)!.set(date, {

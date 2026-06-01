@@ -44,6 +44,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const listboxId = React.useId();
   // Defer the trigger label until the component has mounted on the client.
   // The selected value derives from URL params / persisted state which only
   // resolve client-side, so SSR would otherwise lock in the default label and
@@ -125,6 +126,7 @@ export function SearchableSelect({
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-controls={listboxId}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={cn(
@@ -188,7 +190,11 @@ export function SearchableSelect({
               )}
             </div>
           )}
-          <div className="p-1 max-h-72 overflow-y-auto custom-scrollbar">
+          <div
+            id={listboxId}
+            role="listbox"
+            className="p-1 max-h-72 overflow-y-auto custom-scrollbar"
+          >
             {filteredGroups.length === 0 && (
               <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
                 No results

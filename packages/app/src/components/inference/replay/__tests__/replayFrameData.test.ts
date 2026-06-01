@@ -150,26 +150,26 @@ describe('shouldCommitFraction', () => {
   });
 });
 
-describe('commitFraction throttle (rAF-loop invariant)', () => {
-  // Mirrors ReplayPanel.commitFraction: snapshot fractionRef BEFORE mutating
-  // it, then ask the pure predicate whether to call setFraction. The throttle
-  // is load-bearing — if the predicate is given the React-committed value
-  // instead of the ref's previous value, a backward scrub that crosses a
-  // quantum boundary would silently no-op the commit.
-  function makeCommitter() {
-    const fractionRef = { current: 0 };
-    const commits: number[] = [];
-    const setFraction = (v: number) => commits.push(v);
-    const commit = (next: number, opts?: { force?: boolean }) => {
-      const clamped = next < 0 ? 0 : Math.min(1, next);
-      const prev = fractionRef.current;
-      fractionRef.current = clamped;
-      const force = opts?.force ?? false;
-      if (force || shouldCommitFraction(prev, clamped)) setFraction(clamped);
-    };
-    return { fractionRef, commits, commit };
-  }
+// Mirrors ReplayPanel.commitFraction: snapshot fractionRef BEFORE mutating
+// it, then ask the pure predicate whether to call setFraction. The throttle
+// is load-bearing — if the predicate is given the React-committed value
+// instead of the ref's previous value, a backward scrub that crosses a
+// quantum boundary would silently no-op the commit.
+function makeCommitter() {
+  const fractionRef = { current: 0 };
+  const commits: number[] = [];
+  const setFraction = (v: number) => commits.push(v);
+  const commit = (next: number, opts?: { force?: boolean }) => {
+    const clamped = next < 0 ? 0 : Math.min(1, next);
+    const prev = fractionRef.current;
+    fractionRef.current = clamped;
+    const force = opts?.force ?? false;
+    if (force || shouldCommitFraction(prev, clamped)) setFraction(clamped);
+  };
+  return { fractionRef, commits, commit };
+}
 
+describe('commitFraction throttle (rAF-loop invariant)', () => {
   it('advances fractionRef every tick but commits only when the quantum changes', () => {
     const { fractionRef, commits, commit } = makeCommitter();
     // Sub-quantum increments. 0.0001 * 4 = 0.0004 — all round to 0, no commits.

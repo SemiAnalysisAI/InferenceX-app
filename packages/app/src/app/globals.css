@@ -28,6 +28,12 @@
   min-width: 100%;
 }
 
+/* Inline code is already distinguished visually; omit Typography's generated backticks. */
+.blog-prose code::before,
+.blog-prose code::after {
+  content: none;
+}
+
 /* Remove auto-inserted curly quotes from blockquotes in blog prose */
 .blog-prose blockquote p:first-of-type::before,
 .blog-prose blockquote p:last-of-type::after {

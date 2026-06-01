@@ -77,6 +77,7 @@ export function BottomToast({
     >
       <div className="relative flex items-start gap-3 rounded-lg border border-border bg-card p-4 shadow-lg">
         <button
+          type="button"
           onClick={dismiss}
           className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Dismiss"
@@ -91,6 +92,7 @@ export function BottomToast({
           <p className="text-xs text-muted-foreground">{description}</p>
           {action && (
             <button
+              type="button"
               onClick={handleAction}
               className="flex items-center gap-1.5 self-end px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >

@@ -30,7 +30,7 @@ export interface TopologyDiagramHandle {
 export const TopologyDiagram = forwardRef<
   TopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
->(function TopologyDiagram({ spec, allSpecs }, ref) {
+>(({ spec, allSpecs }, ref) => {
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);

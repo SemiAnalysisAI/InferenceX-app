@@ -3,9 +3,10 @@
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -22,54 +23,6 @@ import {
 import { UnofficialRunContext } from '@/components/unofficial-run-provider';
 import { cn } from '@/lib/utils';
 
-const FEATURE_GATE_KEY = 'inferencex-feature-gate';
-const UNLOCK_SEQUENCE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
-
-function useFeatureGate(): boolean {
-  const [unlocked, setUnlocked] = useState(false);
-  const sequenceRef = useRef<string[]>([]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem(FEATURE_GATE_KEY) === '1') {
-      setUnlocked(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (unlocked) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      sequenceRef.current.push(e.key);
-      if (sequenceRef.current.length > UNLOCK_SEQUENCE.length) {
-        sequenceRef.current = sequenceRef.current.slice(-UNLOCK_SEQUENCE.length);
-      }
-      if (
-        sequenceRef.current.length === UNLOCK_SEQUENCE.length &&
-        sequenceRef.current.every((k, i) => k === UNLOCK_SEQUENCE[i])
-      ) {
-        localStorage.setItem(FEATURE_GATE_KEY, '1');
-        setUnlocked(true);
-        window.dispatchEvent(new Event('inferencex:feature-gate:unlocked'));
-        track('feature_gate_unlocked');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [unlocked]);
-
-  useEffect(() => {
-    const handleLock = () => setUnlocked(false);
-    const handleUnlock = () => setUnlocked(true);
-    window.addEventListener('inferencex:feature-gate:locked', handleLock);
-    window.addEventListener('inferencex:feature-gate:unlocked', handleUnlock);
-    return () => {
-      window.removeEventListener('inferencex:feature-gate:locked', handleLock);
-      window.removeEventListener('inferencex:feature-gate:unlocked', handleUnlock);
-    };
-  }, []);
-
-  return unlocked;
-}
-
 const VISIBLE_TABS = [
   { href: '/inference', label: 'Inference Performance', testId: 'tab-trigger-inference' },
   { href: '/evaluation', label: 'Accuracy Evals', testId: 'tab-trigger-evaluation' },
@@ -82,6 +35,11 @@ const GATED_TABS = [
   { href: '/ai-chart', label: 'AI Chart', testId: 'tab-trigger-ai-chart' },
   { href: '/gpu-metrics', label: 'PowerX', testId: 'tab-trigger-gpu-metrics' },
   { href: '/submissions', label: 'Submissions', testId: 'tab-trigger-submissions' },
+  {
+    href: '/current-inferencex-image',
+    label: 'Images',
+    testId: 'tab-trigger-current-inferencex-image',
+  },
   { href: '/feedback', label: 'Feedback', testId: 'tab-trigger-feedback' },
 ] as const;
 
@@ -105,6 +63,11 @@ const currentTabClass = (active: boolean) =>
 function activeTab(pathname: string): string {
   const seg = pathname.split('/').filter(Boolean)[0] || 'inference';
   return seg;
+}
+
+function handleDesktopClick(tab: string) {
+  window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
+  track('tab_changed', { tab });
 }
 
 export function TabNav() {
@@ -146,11 +109,6 @@ export function TabNav() {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
     track('tab_changed', { tab: value });
     router.push(tabHref(`/${value}`));
-  };
-
-  const handleDesktopClick = (tab: string) => {
-    window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
-    track('tab_changed', { tab });
   };
 
   return (

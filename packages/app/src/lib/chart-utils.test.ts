@@ -1219,6 +1219,82 @@ describe('createChartDataPoint energy fields', () => {
 });
 
 // ===========================================================================
+// createChartDataPoint — measured power / energy fields (from runner telemetry)
+// ===========================================================================
+describe('createChartDataPoint measured power fields', () => {
+  it('emits measuredAvgPower when avg_power_w is present on the entry', () => {
+    const e = entry({ avg_power_w: 685.5 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredAvgPower!.y).toBe(685.5);
+    expect(point.measuredAvgPower!.roof).toBe(false);
+  });
+
+  it('emits measuredJPerOutputToken when joules_per_output_token is present', () => {
+    const e = entry({ joules_per_output_token: 8.4 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerOutputToken).toBeDefined();
+    expect(point.measuredJPerOutputToken!.y).toBe(8.4);
+  });
+
+  it('omits both fields when neither is on the entry', () => {
+    // Legacy runs predating aggregate_power.py.
+    const point = createChartDataPoint(
+      '2025-01-01',
+      entry(),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+    expect(point.measuredAvgPower).toBeUndefined();
+    expect(point.measuredJPerOutputToken).toBeUndefined();
+  });
+
+  it('emits one and omits the other when only one is present', () => {
+    // Defensive: aggregator can patch only avg_power_w if total_output_tokens=0.
+    const e = entry({ avg_power_w: 500 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredJPerOutputToken).toBeUndefined();
+  });
+
+  it('preserves a zero measured power value (not falsy-coerced away)', () => {
+    // Guards against a refactor switching the gate from typeof===number to truthiness.
+    const e = entry({ avg_power_w: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredAvgPower!.y).toBe(0);
+  });
+
+  it('emits measuredJPerTotalToken when joules_per_total_token is present', () => {
+    const e = entry({ joules_per_total_token: 0.93 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerTotalToken).toBeDefined();
+    expect(point.measuredJPerTotalToken!.y).toBe(0.93);
+    expect(point.measuredJPerTotalToken!.roof).toBe(false);
+  });
+
+  it('emits J/output and J/total independently — different denominators', () => {
+    // 8k1k workload: J/output ≈ 9 × J/total (input is ~8x output, so output/total ≈ 1/9).
+    const e = entry({ joules_per_output_token: 2.04, joules_per_total_token: 0.23 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerOutputToken!.y).toBe(2.04);
+    expect(point.measuredJPerTotalToken!.y).toBe(0.23);
+  });
+
+  it('omits measuredJPerTotalToken on rows that predate the field', () => {
+    // Rows ingested before joules_per_total_token was added still have avg_power_w
+    // and joules_per_output_token. The new field must be absent (not 0) so the
+    // chart correctly drops them from the J/total view rather than plotting fake data.
+    const e = entry({ avg_power_w: 458, joules_per_output_token: 2.04 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredJPerOutputToken).toBeDefined();
+    expect(point.measuredJPerTotalToken).toBeUndefined();
+  });
+});
+
+// ===========================================================================
 // createChartDataPoint — boolean narrowing for prefill/decode dp_attention, is_multinode
 // ===========================================================================
 describe('createChartDataPoint boolean narrowing', () => {

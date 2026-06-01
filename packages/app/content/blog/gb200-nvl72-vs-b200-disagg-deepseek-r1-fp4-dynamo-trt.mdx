@@ -1,0 +1,192 @@
+---
+title: 'GB200 NVL72 vs B200 on DeepSeek R1 670B: Up to 4.4x Throughput per GPU at 125 tok/s/user'
+subtitle: "DeepSeek R1 FP4 1k/1k. NVL72's 72-GPU NVLink scale-up fabric lets decode run wide EP up to EP=32, where B200's 8-GPU NVLink island caps out at EP=8 over RoCEv2"
+date: '2026-05-23'
+publishDate: '2026-05-23'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - deepseek
+  - nvidia
+  - gb200
+  - b200
+  - nvl72
+  - trtllm
+  - dynamo
+  - wide-ep
+  - disagg
+---
+
+On DeepSeek R1 0528 FP4 1k/1k with Dynamo TRT-LLM + MTP and disaggregated prefill/decode on both SKUs, GB200 NVL72 delivers **up to 4.39x throughput per GPU vs B200 at iso-interactivity** — peaking at 125 tok/s/user (4,130 tok/s/GPU on GB200 NVL72 vs 941 tok/s/GPU on B200).
+
+NVIDIA [GB200 NVL72](https://inferencex.semianalysis.com/gpu-specs) connects all 72 GPUs over NVLink 5 at **900 GB/s per GPU uni-directional** (1.8 TB/s jensen math bidi rx + tx). A [B200](https://inferencex.semianalysis.com/gpu-specs) server connects only 8 GPUs over NVLink; once decode EP needs more than 8 ranks, the all-to-all has to leave the NVLink island and cross **ConnectX-7 RoCEv2 Ethernet at 400 Gbit/s per GPU**. So per-GPU bandwidth available to any wider-than-8 EP collective drops from 900 GB/s to 50 GB/s, 18x. DeepSeek R1's 256 routed experts amortize beautifully when the all-to-all stays on NVLink end-to-end across 16 or 32 ranks.
+
+<Figure
+  srcLight="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-light.png"
+  srcDark="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-dark.png"
+  alt="GB200 NVL72 42U rack layout. 18 compute trays each holding 4 GPUs (72 GPUs total), 9 non-scalable NVSwitch5 trays in the middle of the rack stitching the 72 GPUs into a single NVLink-5 scale-up domain, 4 33 kW power shelves, IPMI management blades, and a drip tray."
+  caption="GB200 NVL72 rack layout — 18 compute trays × 4 GPUs each = 72 GPUs in one NVLink-5 scale-up domain, stitched together by 9 NVSwitch5 trays. The whole rack runs the same fabric the GPUs inside an HGX B200 node use; B200 multinode disagg crosses InfiniBand or RoCEv2 Ethernet between racks at 18x lower per-GPU bandwidth."
+/>
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<Figure
+  srcLight="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/benchmark-light.png"
+  srcDark="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/benchmark-dark.png"
+  alt="DeepSeek R1 0528 FP4 1k/1k tok/s/GPU vs interactivity. GB200 NVL72 (Dynamo TRT, MTP) lighter green and B200 (Dynamo TRT, MTP) darker green. Each curve point labeled with its decode TP value."
+  caption="DeepSeek R1 0528 FP4 1k/1k Pareto frontier. GB200 NVL72 vs B200, both Dynamo TRT-LLM + MTP, both disaggregated prefill/decode. Measured on InferenceX 2026-05-22. Point labels denote decode TP."
+/>
+
+DeepSeek R1 0528 is the 671B-parameter MoE that DeepSeek released in May 2025 — Multi-head Latent Attention (MLA) for KV-cache compression, 256 routed experts with 8 active per token plus 1 shared expert, and 61 transformer layers. Every MoE layer fires a routed all-to-all dispatch followed by an all-to-all combine on each forward pass: roughly 120 all-to-alls per token. That collective volume is exactly what NVLink-class scale-up bandwidth is for.
+
+## Why GB200 NVL72 Wins in the Middle of the Curve
+
+In the middle of the curve — roughly 75–175 tok/s/user on this workload — decode becomes **network-bound on the EP dispatch and combine collectives**. Each MoE layer fires two all-to-all collectives per token: a **dispatch** that routes each token to the 8 of 256 experts it was assigned to (which generally live on remote ranks under wide EP), and a **combine** that gathers the expert outputs back to each token's home rank. Across DeepSeek R1's ~60 MoE layers that is roughly 120 collectives per forward pass.
+
+When the network is fast enough, the runtime **overlaps each dispatch and combine with the matmul compute it is serving**: issue the dispatch, start the expert GEMM on tokens that have already arrived, finish the GEMM in roughly the time it takes for the remaining bytes to land, then issue the combine. The collective latency mostly disappears from the critical path because the GPU was busy doing useful compute throughout.
+
+On ConnectX-7 RoCEv2 Ethernet at 50 GB/s per GPU — 18x less per-rank bandwidth than NVLink — that overlap collapses. The same collective takes up to 18x longer per byte moved, no longer fits inside the GEMM time budget, and **exposes itself as raw communication time**.
+
+## The Numbers
+
+All rows are DeepSeek R1 0528 FP4 at **ISL 1024 / OSL 1024**, Dynamo TRT-LLM with MTP enabled, disaggregated prefill/decode on both SKUs, multinode in both cases, measured on InferenceX on 2026-05-22 (run 26306422380). Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)`, with B200 at $1.95/GPU/hr and GB200 NVL72 at $2.21/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics).
+
+**GB200 NVL72 (Dynamo TRT, MTP), DeepSeek R1 FP4 1k/1k disagg:**
+
+| Conc   | Prefill       | Decode        | tok/s/GPU    | tok/s/user | TPOT (ms) | $/M tok   |
+| ------ | ------------- | ------------- | ------------ | ---------- | --------- | --------- |
+| 4      | 4 GPU, TP=4   | 32 GPU, EP=8  | 60.7         | 286.40     | 3.49      | $10.12    |
+| 8      | 4 GPU, TP=4   | 32 GPU, EP=8  | 111.8        | 272.64     | 3.67      | $5.49     |
+| 12     | 4 GPU, TP=4   | 32 GPU, EP=8  | 165.2        | 257.11     | 3.89      | $3.72     |
+| 24     | 4 GPU, TP=4   | 32 GPU, EP=8  | 274.8        | 222.28     | 4.50      | $2.23     |
+| 48     | 4 GPU, TP=4   | 32 GPU, EP=8  | 363.3        | 207.30     | 4.82      | $1.69     |
+| 180    | 4 GPU, TP=4   | 32 GPU, EP=32 | 1,149.1      | 164.37     | 6.08      | $0.53     |
+| 2,253  | 12 GPU, TP=12 | 32 GPU, EP=32 | 7,698.0      | 90.99      | 10.99     | $0.08     |
+| 4,301  | 8 GPU, TP=8   | 16 GPU, EP=16 | 12,659.7     | 43.29      | 23.10     | $0.05     |
+| 16,130 | 12 GPU, TP=12 | 20 GPU, EP=4  | **14,659.4** | **17.82**  | **56.11** | **$0.04** |
+
+**B200 (Dynamo TRT, MTP), DeepSeek R1 FP4 1k/1k disagg multinode:**
+
+| Conc   | Prefill       | Decode       | tok/s/GPU    | tok/s/user | TPOT (ms) | $/M tok   |
+| ------ | ------------- | ------------ | ------------ | ---------- | --------- | --------- |
+| 6      | 4 GPU, TP=4   | 40 GPU, EP=8 | 49.3         | 309.17     | 3.23      | $10.99    |
+| 10     | 4 GPU, TP=4   | 40 GPU, EP=8 | 118.7        | 277.39     | 3.61      | $4.56     |
+| 15     | 4 GPU, TP=4   | 40 GPU, EP=8 | 168.9        | 261.09     | 3.83      | $3.21     |
+| 25     | 4 GPU, TP=4   | 40 GPU, EP=8 | 242.4        | 224.59     | 4.45      | $2.23     |
+| 45     | 4 GPU, TP=4   | 40 GPU, EP=8 | 369.9        | 191.18     | 5.23      | $1.46     |
+| 90     | 4 GPU, TP=4   | 40 GPU, EP=8 | 577.3        | 150.56     | 6.64      | $0.94     |
+| 180    | 4 GPU, TP=4   | 40 GPU, EP=8 | 897.9        | 126.42     | 7.91      | $0.60     |
+| 875    | 4 GPU, TP=4   | 40 GPU, EP=8 | 2,832.9      | 101.79     | 9.82      | $0.19     |
+| 1,214  | 4 GPU, TP=4   | 16 GPU, EP=8 | 7,111.4      | 74.04      | 13.51     | $0.08     |
+| 4,968  | 12 GPU, TP=12 | 32 GPU, EP=8 | 9,660.7      | 56.35      | 17.75     | $0.06     |
+| 10,860 | 12 GPU, TP=12 | 20 GPU, EP=4 | **12,515.7** | **21.34**  | **46.86** | **$0.04** |
+
+## Iso-Interactivity Throughput Comparison
+
+| Interactivity (tok/s/user) | GB200 NVL72 tok/s/GPU | B200 tok/s/GPU | GB200 NVL72 / B200 |
+| -------------------------- | --------------------- | -------------- | ------------------ |
+| 25                         | 14,125                | 12,292         | 1.15x              |
+| 45                         | 12,508                | 10,853         | 1.15x              |
+| 60                         | 11,017                | 9,185          | 1.20x              |
+| 75                         | 9,379                 | 6,968          | 1.35x              |
+| 90                         | 7,796                 | 4,512          | 1.73x              |
+| 100                        | 6,781                 | 3,047          | 2.23x              |
+| **125**                    | **4,130**             | **941**        | **4.39x**          |
+| 150                        | 1,922                 | 583            | 3.30x              |
+| 175                        | 826                   | 429            | 1.93x              |
+| 200                        | 432                   | 332            | 1.30x              |
+| 225                        | 262                   | 241            | 1.09x              |
+| 250                        | 186                   | 193            | 0.97x              |
+| 275                        | 103                   | 126            | 0.82x              |
+| 300                        | _unreachable_         | 67             | _∞_ (B200 wins)    |
+
+And the same comparison normalized to cost per million tokens, which dilutes the GB200 NVL72 advantage by its 13% per-GPU TCO premium ($2.21 vs $1.95 per GPU-hour):
+
+| Interactivity (tok/s/user) | GB200 NVL72 $/M tok | B200 $/M tok | B200 / GB200 NVL72 |
+| -------------------------- | ------------------- | ------------ | ------------------ |
+| 25                         | $0.0435             | $0.0441      | 1.01x              |
+| 45                         | $0.0491             | $0.0499      | 1.02x              |
+| 60                         | $0.0557             | $0.0590      | 1.06x              |
+| 75                         | $0.0655             | $0.0777      | 1.19x              |
+| 100                        | $0.0905             | $0.1778      | 1.96x              |
+| **125**                    | **$0.1486**         | **$0.5755**  | **3.87x**          |
+| 150                        | $0.3194             | $0.9292      | 2.91x              |
+| 175                        | $0.7430             | $1.2638      | 1.70x              |
+| 200                        | $1.4215             | $1.6314      | 1.15x              |
+| 225                        | $2.3450             | $2.2454      | 0.96x              |
+| 250                        | $3.2962             | $2.8067      | 0.85x (B200 wins)  |
+
+The 4.39x throughput peak (3.87x cost gap) at 125 tok/s/user is where wide EP across the NVLink fabric is doing the most work.
+
+<Figure
+  srcLight="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/benchmark-light.png"
+  srcDark="/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/benchmark-dark.png"
+  alt="DeepSeek R1 0528 FP4 1k/1k tok/s/GPU vs interactivity. GB200 NVL72 (Dynamo TRT, MTP) lighter green and B200 (Dynamo TRT, MTP) darker green. Each curve point labeled with its decode TP value."
+  caption="DeepSeek R1 0528 FP4 1k/1k Pareto frontier. GB200 NVL72 vs B200, both Dynamo TRT-LLM + MTP, both disaggregated prefill/decode. Measured on InferenceX 2026-05-22. Point labels denote decode TP."
+/>
+
+[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp), pre-filtered to B200 and GB200 NVL72 Dynamo TRT MTP on DeepSeek R1 FP4 1k/1k for the 2026-05-22 run.
+
+## When Each SKU Wins
+
+- **GB200 NVL72 Dynamo TRT** is the right choice for everything in the 75 to 200 tok/s/user band where wide EP across the 72-GPU NVLink fabric is the dominant factor. The cost gap peaks at 3.87x in favor of GB200 NVL72 at 125 tok/s/user — chat-style and reasoning serving at production interactivity targets land squarely inside this band.
+
+NVIDIA's [SGLang GB200 NVL72 results](https://lmsys.org/blog/2025-09-25-gb200-part-2/) show the same scale-up fabric advantage on the SGLang stack. AMD's MI300/MI355X have no rack-scale UALoE72 equivalent shipping until [H2 2026 engineering samples](https://newsletter.semianalysis.com/p/ai-cloud-economics) per the inferencex-v2 launch piece, so there is no rack scale comparator on the AMD side yet for this workload.
+
+## Acknowledgments
+
+Thanks to NVIDIA's Dynamo and TensorRT-LLM teams — including Jatin Gangani, Kedar Potdar, Sridhar Ramaswamy, Ishan Dhanani, and Sahithi Chigurupati — for shipping the disagg recipes on both B200 multinode RoCEv2 and GB200 NVL72. Checkout our other blog post on [GB200 NVL72 vs B200 Kimi K2.5 post](https://inferencex.semianalysis.com/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200).
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_seq=1k%2F1k&i_active=b200_dynamo-trt_mtp%2Cgb200_dynamo-trt_mtp">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much faster is GB200 NVL72 than B200 on DeepSeek R1 FP4 with Dynamo TRT-LLM and MTP?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On DeepSeek R1 0528 FP4 at 1k/1k with Dynamo TRT-LLM + MTP and disaggregated prefill/decode on both SKUs, GB200 NVL72 delivers up to 4.39x throughput per GPU vs B200 at iso-interactivity, peaking at 125 tok/s/user (4,130 vs 941 tok/s/GPU on the dashboard's monotone-cubic-Hermite Pareto interpolation). At peak throughput (sub-25 tok/s/user) the gap shrinks to 1.15x because both SKUs run narrow EP=4 with DP attention on the same TP=32 disagg shape and the workload is decode-memory-bandwidth bound. Above 250 tok/s/user the curves cross and B200 wins by about 1.2x because at small batch sizes the workload fits inside an 8-GPU NVLink island and the cross-rack hop is pure overhead. Measured on InferenceX 2026-05-22, run 26306422380."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does GB200 NVL72 win so big in the middle of the throughput-interactivity curve?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The 75–175 tok/s/user band is where decode becomes network-bound on the EP dispatch and combine collectives. Each MoE layer fires an all-to-all dispatch and an all-to-all combine; across about 60 MoE layers that is roughly 120 collectives per token. On NVLink 5 at 900 GB/s per GPU uni-directional (1.8 TB/s bi-di), each dispatch/combine pair fits inside the matmul time budget for that layer's expert GEMMs, so the runtime overlaps the collective behind compute and the latency disappears from the critical path. On ConnectX-7 RoCEv2 Ethernet at 50 GB/s per GPU — 18x slower — the same collective takes 18x longer per byte moved, no longer fits inside the GEMM, and exposes itself as raw latency with the GPU sitting idle waiting on the network. So NVL72 can run EP=16 and EP=32 without paying TPOT cost; B200 multinode cannot overlap the cross-node all-to-all with compute, so it has to drop back to single-node EP=8 where the collective stays on NVLink at the cost of a much smaller wide-EP throughput win."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is GB200 NVL72 also cheaper per million tokens than B200 in this comparison?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes in the 75–175 tok/s/user band, marginally tied at the extremes. GB200 NVL72 TCO is about 13% higher per GPU-hour ($2.21 vs $1.95 per the SemiAnalysis AI Cloud TCO Model), which dilutes the throughput advantage in cost terms. At peak throughput (25 to 60 tok/s/user) cost is essentially tied: 1.01x to 1.06x in favor of GB200 NVL72. At 125 tok/s/user the cost gap is 3.87x (B200 $0.58 per million tokens vs GB200 NVL72 $0.15). Above 225 tok/s/user the cost gap inverts: B200 is 5% cheaper at 225 tok/s/user, 15% cheaper at 250 tok/s/user, and 27% cheaper at 275 tok/s/user."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where does B200 still beat GB200 NVL72 on DeepSeek R1 FP4?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Above roughly 250 tok/s/user. At that interactivity the workload runs at very small batch sizes (4 to 25 concurrent users on a 40-GPU decode pool in the B200 recipe), the per-token decode work is small enough that all-to-all bandwidth isn't the bottleneck, and the workload comfortably fits inside an 8-GPU NVLink island. B200 saves the cross-rack hop and wins by about 1.2x at 275 tok/s/user. NVL72 in this dataset has no recipe that runs below 286 tok/s/user, so above that point only B200 is reachable. The very-low-batch regime is also where rack-scale NVL72's advantage is structurally smallest because there are few tokens in flight for the wide NVLink bandwidth to carry."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do these results extend to other models or only DeepSeek R1?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The pattern is general for sparse MoE models with many routed experts and a high per-layer all-to-all volume. Our prior post on Kimi K2.5 NVFP4 8k/1k showed GB200 NVL72 Dynamo vLLM at 12,587 tok/s/GPU vs B200 at 4,021 tok/s/GPU on peak throughput, a 3.13x advantage from wide EP up to EP=16 on the NVL72 fabric. DeepSeek R1 here is a different model (671B vs 1T parameters, 256 vs 384 experts, MLA vs the K2.5 attention) but the per-MoE-layer all-to-all behavior is similar enough that the headline structure repeats: peak throughput parity-ish, big middle-of-curve gap driven by wide EP on NVLink, and high-interactivity inversion when batches fit on one NVLink island. Dense models or MoE models with fewer routed experts will show much smaller gaps because the all-to-all collective is a smaller fraction of per-step cost."
+      }
+    }
+  ]
+}`}</JsonLd>

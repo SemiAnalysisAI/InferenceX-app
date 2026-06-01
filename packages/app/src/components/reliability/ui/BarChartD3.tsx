@@ -43,13 +43,13 @@ function positionLabelPairs(
   const overlayLabels = group.selectAll<SVGTextElement, ChartItem>('.overlay-label');
 
   const maxWidths = new Map<string, number>();
-  valueLabels.each(function (d) {
+  valueLabels.each((d) => {
     maxWidths.set(
       d.modelLabel,
       measureTextWidth(`${d.successRate.toFixed(1)}%`, '600 12px sans-serif'),
     );
   });
-  overlayLabels.each(function (d) {
+  overlayLabels.each((d) => {
     const prev = maxWidths.get(d.modelLabel) ?? 0;
     const w = measureTextWidth(`${d.n_success}/${d.total} runs`, '500 10px sans-serif');
     maxWidths.set(d.modelLabel, Math.max(prev, w));

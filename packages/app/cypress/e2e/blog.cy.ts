@@ -49,4 +49,20 @@ describe('Blog', () => {
       cy.get('a[href="/blog"]').should('exist');
     });
   });
+
+  describe('Inline code styling', () => {
+    before(() => {
+      cy.visit('/blog/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar');
+    });
+
+    it('does not render generated backticks around inline code', () => {
+      cy.contains('article.prose code', 'zai-org/GLM-5-FP8')
+        .first()
+        .should(($code) => {
+          expect($code.text()).to.equal('zai-org/GLM-5-FP8');
+          expect(getComputedStyle($code[0], '::before').content).to.equal('none');
+          expect(getComputedStyle($code[0], '::after').content).to.equal('none');
+        });
+    });
+  });
 });

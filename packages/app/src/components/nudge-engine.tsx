@@ -355,15 +355,20 @@ function ModalRenderer({
   const { content } = def;
   const Icon = content.icon;
   const idPrefix = def.id;
+  const centered = content.centered;
 
-  return (
+  const dialog = (
     <aside
       data-testid={content.testId}
       role="dialog"
-      aria-modal="false"
+      aria-modal={centered ? 'true' : 'false'}
       aria-labelledby={`${idPrefix}-title`}
       aria-describedby={`${idPrefix}-description`}
-      className={`fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`}
+      className={
+        centered
+          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
+          : `fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
+      }
     >
       <button
         type="button"
@@ -414,6 +419,22 @@ function ModalRenderer({
       )}
     </aside>
   );
+
+  if (centered) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onDismiss}
+          className="absolute inset-0 cursor-default bg-black/50"
+        />
+        {dialog}
+      </div>
+    );
+  }
+
+  return dialog;
 }
 
 function BannerRenderer({

@@ -1558,7 +1558,7 @@ const ScatterGraph = React.memo(
 
                   tooltip.html(generateOverlayTooltipContent(createOverlayConfig(d, false)));
                 })
-                .on('mousemove', function (event) {
+                .on('mousemove', (event) => {
                   if (chartRef.current?.isPinned()) return;
                   const [mx, my] = d3.pointer(event, container);
                   const pos = computeTooltipPosition(mx, my, tooltip, container);
@@ -1571,7 +1571,7 @@ const ScatterGraph = React.memo(
                   tooltip.style('opacity', 0).style('display', 'none');
                   zoomGroup.select('.ruler-group').style('display', 'none');
                 })
-                .on('click', function (event, d) {
+                .on('click', (event, d) => {
                   event.stopPropagation();
                   const [mx, my] = d3.pointer(event, container);
                   tooltip.html(generateOverlayTooltipContent(createOverlayConfig(d, true)));

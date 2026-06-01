@@ -9,9 +9,10 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import type { BenchmarkRow } from './queries/benchmarks.js';
+import type { BenchmarkRow, BenchmarkWorkerRow } from './queries/benchmarks.js';
 import type { EvalRow } from './queries/evaluations.js';
 import type { ReliabilityRow } from './queries/reliability.js';
 import type {
@@ -72,6 +73,8 @@ interface RawBenchmarkResult {
   conc: number;
   image: string | null;
   metrics: Record<string, number>;
+  /** Added in migration 006; older dumps omit this field — surfaced as undefined. */
+  workers?: BenchmarkWorkerRow[] | null;
   error: string | null;
   server_log_id: number | null;
 }
@@ -168,7 +171,11 @@ function getStore(): Store {
 
   // Resolve relative paths from the monorepo root (packages/db/../../), not CWD,
   // since Next.js runs from packages/app/ but .env paths are repo-root-relative.
-  const pkgRoot = resolve(import.meta.dirname, '..');
+  // import.meta.dirname is undefined under Turbopack bundling — derive from
+  // import.meta.url instead, which Turbopack rewrites to a usable file URL.
+  // oxlint-disable-next-line unicorn/prefer-import-meta-properties -- import.meta.dirname is undefined under Turbopack; this is the fallback.
+  const thisDir = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
+  const pkgRoot = resolve(thisDir, '..');
   const monoRoot = resolve(pkgRoot, '../..');
   const resolvedDir = existsSync(resolve(dir)) ? resolve(dir) : resolve(monoRoot, dir);
 
@@ -295,6 +302,10 @@ function toBenchmarkRow(
     conc: br.conc,
     image: br.image,
     metrics: metrics ?? br.metrics,
+    // workers: optional sibling JSONB column. Older dumps (pre-migration 006)
+    // simply lack the field — defensively narrow to an array or undefined so
+    // downstream consumers can rely on the property being well-typed.
+    workers: Array.isArray(br.workers) ? br.workers : undefined,
     date: toDateString(br.date),
     run_url: buildRunUrl(wr),
   };

@@ -126,6 +126,13 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => (
             >
               GPU Reliability
             </Link>
+            <Link
+              data-testid="footer-link-compare-per-dollar"
+              href="/compare-per-dollar"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Performance per Dollar
+            </Link>
           </div>
         </div>
 

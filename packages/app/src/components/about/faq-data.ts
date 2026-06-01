@@ -31,7 +31,15 @@ const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((acc, key) =
   (acc[vendor] ??= []).push(key.toUpperCase());
   return acc;
 }, {});
-const modelNames = Object.values(DB_MODEL_TO_DISPLAY);
+// /about lists each DB bucket as its own bullet, so point releases that
+// elsewhere collapse under one display name (see DB_MODEL_TO_DISPLAY) are
+// expanded back out here.
+const modelNames = Object.values({
+  ...DB_MODEL_TO_DISPLAY,
+  'kimik2.6': 'Kimi-K2.6',
+  'minimaxm2.7': 'MiniMax-M2.7',
+  'glm5.1': 'GLM-5.1',
+});
 
 const frameworkNames = [...new Set(Object.values(FRAMEWORK_LABELS))].map((n) =>
   n.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
