@@ -41,9 +41,11 @@ const GpuCorrelationChart = React.memo(
 
     const points = useMemo(
       () =>
-        data
-          .filter((r) => visibleGpus.has(r.index))
-          .map((r) => ({ x: r[xMetric] ?? 0, y: r[yMetric] ?? 0, gpuIndex: r.index, raw: r })),
+        data.flatMap((r) =>
+          visibleGpus.has(r.index)
+            ? [{ x: r[xMetric] ?? 0, y: r[yMetric] ?? 0, gpuIndex: r.index, raw: r }]
+            : [],
+        ),
       [data, visibleGpus, xMetric, yMetric],
     );
 

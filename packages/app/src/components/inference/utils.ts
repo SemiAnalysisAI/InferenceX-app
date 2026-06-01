@@ -101,11 +101,11 @@ export function processOverlayChartData(
   }
 
   const processedData = data
-    .filter((d) => metricKey in d)
-    .map((d: InferenceData) => {
+    .flatMap((d: InferenceData) => {
+      if (!(metricKey in d)) return [];
       const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
       const xValue = (d as any)[xAxisField] ?? d.x;
-      return { ...d, x: xValue, y: yValue };
+      return [{ ...d, x: xValue, y: yValue }];
     })
     .filter(
       (d) =>

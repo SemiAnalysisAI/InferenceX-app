@@ -33,9 +33,9 @@ export function renderRooflines<T extends { x: number; y: number }>(
     .y((d) => yScale(d.y))
     .curve(d3.curveMonotoneX);
 
-  const entries: RooflineEntry<T>[] = Object.entries(rooflines)
-    .filter(([key, points]) => points.length >= 2 && (!isVisible || isVisible(key)))
-    .map(([key, points]) => ({ key, points }));
+  const entries: RooflineEntry<T>[] = Object.entries(rooflines).flatMap(([key, points]) =>
+    points.length >= 2 && (!isVisible || isVisible(key)) ? [{ key, points }] : [],
+  );
 
   const selection = zoomGroup
     .selectAll<SVGPathElement, RooflineEntry<T>>('.roofline-path')

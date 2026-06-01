@@ -89,7 +89,7 @@ export default function ComparisonChangelog({
   }, [selectedDates, selectedDateRange]);
 
   const addableDates = useMemo(
-    () => filteredChangelogs.map((c) => c.date).filter((d) => !datesOnChart.has(d)),
+    () => filteredChangelogs.flatMap((c) => (datesOnChart.has(c.date) ? [] : [c.date])),
     [filteredChangelogs, datesOnChart],
   );
 
@@ -217,8 +217,11 @@ export default function ComparisonChangelog({
                   )}
                 </div>
                 {item.entries.length > 0 ? (
-                  item.entries.map((entry, entryIndex) => (
-                    <div key={entryIndex} className="text-sm text-muted-foreground pl-5">
+                  item.entries.map((entry) => (
+                    <div
+                      key={entry.config_keys.join(',')}
+                      className="text-sm text-muted-foreground pl-5"
+                    >
                       {selectedGPUs.length > 1 &&
                         (() => {
                           const matchingGpus = selectedGPUs.filter((gpu) =>

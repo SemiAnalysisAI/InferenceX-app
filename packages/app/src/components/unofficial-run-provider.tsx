@@ -118,13 +118,13 @@ export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData 
   }
 
   const result: UnofficialChartData = {};
+  // chartData indices match chartDefinitions order — look up by chartType (loop-invariant)
+  const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
+  const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
+    (d) => d.chartType === 'interactivity',
+  );
   for (const [key, rows] of groups) {
     const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
-    // chartData indices match chartDefinitions order — look up by chartType
-    const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
-    const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
-      (d) => d.chartType === 'interactivity',
-    );
     result[key] = {
       e2e: { data: chartData[e2eIdx] ?? [], gpus: hardwareConfig },
       interactivity: { data: chartData[interactivityIdx] ?? [], gpus: hardwareConfig },
@@ -140,17 +140,17 @@ export function parseAvailableModelsAndSequences(
   if (!chartData) return [];
 
   const result: AvailableModelSequence[] = [];
-  const allModels = Object.values(Model);
-  const allSequences = Object.values(Sequence);
+  const allModels = new Set<string>(Object.values(Model));
+  const allSequences = new Set<string>(Object.values(Sequence));
 
   for (const key of Object.keys(chartData)) {
     const lastUnderscoreIndex = key.lastIndexOf('_');
     if (lastUnderscoreIndex === -1) continue;
     const modelPart = key.slice(0, lastUnderscoreIndex);
     const sequencePart = key.slice(lastUnderscoreIndex + 1);
-    const model = allModels.find((m) => m === modelPart);
-    const sequence = allSequences.find((s) => s === sequencePart);
-    if (!model || !sequence) continue;
+    if (!allModels.has(modelPart) || !allSequences.has(sequencePart)) continue;
+    const model = modelPart as Model;
+    const sequence = sequencePart as Sequence;
     const group = chartData[key];
     const precisions = [
       ...new Set(

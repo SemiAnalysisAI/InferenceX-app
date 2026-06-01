@@ -84,9 +84,9 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
 
 function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
   return new Set(
-    (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
-      .filter(([, c]) => c.category === cat)
-      .map(([m]) => m),
+    (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][]).flatMap(([m, c]) =>
+      c.category === cat ? [m] : [],
+    ),
   );
 }
 
@@ -134,9 +134,9 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
 }
 
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
-  (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
-    .filter(([, c]) => c.prefix)
-    .map(([m, c]) => [c.prefix, m]),
+  (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][]).flatMap(([m, c]) =>
+    c.prefix ? [[c.prefix, m] as [string, Model]] : [],
+  ),
 );
 
 // ---------------------------------------------------------------------------
@@ -159,9 +159,9 @@ const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string; catego
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
 
 export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
-  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][])
-    .filter(([, c]) => c.category === 'deprecated')
-    .map(([s]) => s),
+  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][]).flatMap(
+    ([s, c]) => (c.category === 'deprecated' ? [s] : []),
+  ),
 );
 
 export function isSequenceDeprecated(sequence: Sequence): boolean {

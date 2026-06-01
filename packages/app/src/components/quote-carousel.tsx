@@ -57,9 +57,11 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   }));
   if (order?.length) {
     const orderSet = new Set(order);
-    const pinned = order
-      .map((c) => entries.find((e) => e.org === c))
-      .filter(Boolean) as CompanyEntry[];
+    const entriesByOrg = new Map(entries.map((e) => [e.org, e]));
+    const pinned = order.flatMap((c) => {
+      const entry = entriesByOrg.get(c);
+      return entry ? [entry] : [];
+    });
     const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.org)));
     return [...pinned, ...rest];
   }

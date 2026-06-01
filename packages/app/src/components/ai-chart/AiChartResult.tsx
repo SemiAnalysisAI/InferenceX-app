@@ -367,13 +367,14 @@ function RadarChart({
       rulerType: 'none',
       content: (d) => {
         const metricRows = axes
-          .map((axis, i) => {
+          .flatMap((axis, i) => {
             const raw = d.rawValues[i];
             return raw === null
-              ? ''
-              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`;
+              ? []
+              : [
+                  `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>`,
+                ];
           })
-          .filter(Boolean)
           .join('');
         return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
@@ -441,11 +442,14 @@ function buildLegendItems(colorMap: Record<string, string>): { label: string; co
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   return (
     <div className="flex flex-col gap-4">
-      {charts.map((chart, i) => {
+      {charts.map((chart) => {
         const chartId = `ai-chart-${chart.spec.chartType}`;
         const hasZoom = chart.spec.chartType === 'scatter' || chart.spec.chartType === 'line';
         return (
-          <figure key={i} className="relative rounded-lg">
+          <figure
+            key={`${chart.spec.chartType}-${chart.spec.title}`}
+            className="relative rounded-lg"
+          >
             <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
             <Card id={`${chartId}-export`}>
               <CardHeader>

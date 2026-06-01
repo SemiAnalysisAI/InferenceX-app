@@ -132,18 +132,15 @@ export default function HistoricalTrendsDisplay() {
   // Line configs for TrendChart — one per visible GPU+precision combo
   const lineConfigs = useMemo(
     (): TrendLineConfig[] =>
-      [...trendLines.keys()]
-        .filter((groupKey) => {
-          const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
-          return activeHwTypes.has(baseHwKey);
-        })
-        .map((groupKey) => {
-          const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
-          const precision = groupKey.includes('__') ? groupKey.split('__')[1] : null;
-          const baseLabel = hardwareConfig[baseHwKey]
-            ? getDisplayLabel(hardwareConfig[baseHwKey])
-            : baseHwKey;
-          return {
+      [...trendLines.keys()].flatMap((groupKey) => {
+        const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
+        if (!activeHwTypes.has(baseHwKey)) return [];
+        const precision = groupKey.includes('__') ? groupKey.split('__')[1] : null;
+        const baseLabel = hardwareConfig[baseHwKey]
+          ? getDisplayLabel(hardwareConfig[baseHwKey])
+          : baseHwKey;
+        return [
+          {
             id: groupKey,
             hwKey: baseHwKey,
             label: precision
@@ -151,8 +148,9 @@ export default function HistoricalTrendsDisplay() {
               : baseLabel,
             color: resolveColor(baseHwKey),
             precision: precision ?? selectedPrecisions[0],
-          };
-        }),
+          },
+        ];
+      }),
     [trendLines, activeHwTypes, hardwareConfig, selectedPrecisions, resolveColor],
   );
 
@@ -211,7 +209,9 @@ export default function HistoricalTrendsDisplay() {
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <input
+                      id="historical-target"
                       type="range"
+                      aria-label="Target Interactivity (tok/s/user)"
                       min={interactivityRange.min}
                       max={interactivityRange.max}
                       step={1}

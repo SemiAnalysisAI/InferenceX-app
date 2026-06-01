@@ -182,10 +182,10 @@ function parseRunIds(raw: string | null): { ids: string[]; error: string | null 
   if (!raw) return { ids: [], error: 'runId must be provided' };
   const ids = [
     ...new Set(
-      raw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
+      raw.split(',').flatMap((s) => {
+        const trimmed = s.trim();
+        return trimmed ? [trimmed] : [];
+      }),
     ),
   ];
   if (ids.length === 0 || !ids.every((id) => /^\d+$/u.test(id))) {

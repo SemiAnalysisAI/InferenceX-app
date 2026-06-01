@@ -125,9 +125,11 @@ export async function GET(
 
   const aLabel = HW_REGISTRY[parsed.a]?.label ?? parsed.a.toUpperCase();
   const bLabel = HW_REGISTRY[parsed.b]?.label ?? parsed.b.toUpperCase();
-  const costs = curveRows
-    .flatMap((row) => [row.a?.cost, row.b?.cost])
-    .filter((cost): cost is number => typeof cost === 'number' && Number.isFinite(cost));
+  const costs = curveRows.flatMap((row) =>
+    [row.a?.cost, row.b?.cost].filter(
+      (cost): cost is number => typeof cost === 'number' && Number.isFinite(cost),
+    ),
+  );
   const costMin = costs.length > 0 ? Math.min(...costs) : 0;
   const costMax = costs.length > 0 ? Math.max(...costs) : 1;
   const yAxis = niceAxis(Math.min(0, costMin), costMax);
@@ -164,12 +166,12 @@ export async function GET(
 
   const aSeries = splitByMatchRange(buildSeriesPoints((r) => r.a?.cost ?? null));
   const bSeries = splitByMatchRange(buildSeriesPoints((r) => r.b?.cost ?? null));
-  const aHighlightPoints = plottedRows
-    .filter((row) => row.a)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.a!.cost) }));
-  const bHighlightPoints = plottedRows
-    .filter((row) => row.b)
-    .map((row) => ({ x: scaleX(row.target), y: scaleY(row.b!.cost) }));
+  const aHighlightPoints = plottedRows.flatMap((row) =>
+    row.a ? [{ x: scaleX(row.target), y: scaleY(row.a.cost) }] : [],
+  );
+  const bHighlightPoints = plottedRows.flatMap((row) =>
+    row.b ? [{ x: scaleX(row.target), y: scaleY(row.b.cost) }] : [],
+  );
   const workload = [sequence, precision?.toUpperCase()].filter(Boolean).join(' / ');
   const showRangeEndpoints = hasLeftExtension || hasRightExtension;
   const svgWidth = 760 * R;

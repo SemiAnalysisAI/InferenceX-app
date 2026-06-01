@@ -122,16 +122,23 @@ const TrendChart = React.memo(
       return map;
     }, [lineConfigs]);
 
+    // Reverse lookup: raw point -> owning config (first config in lineConfigs order wins)
+    const configByRawPoint = useMemo(() => {
+      const map = new Map<unknown, TrendLineConfig>();
+      for (const config of lineConfigs) {
+        const data = trendLines.get(config.id);
+        if (!data) continue;
+        for (const point of data) {
+          if (!map.has(point)) map.set(point, config);
+        }
+      }
+      return map;
+    }, [lineConfigs, trendLines]);
+
     // Stable callback to find which config a PreparedPoint belongs to
     const getPointConfig = useCallback(
-      (d: PreparedPoint): TrendLineConfig | undefined => {
-        for (const config of lineConfigs) {
-          const data = trendLines.get(config.id);
-          if (data && data.includes(d.raw)) return config;
-        }
-        return undefined;
-      },
-      [lineConfigs, trendLines],
+      (d: PreparedPoint): TrendLineConfig | undefined => configByRawPoint.get(d.raw),
+      [configByRawPoint],
     );
 
     // Compute scale domains

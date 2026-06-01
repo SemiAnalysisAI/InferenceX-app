@@ -36,13 +36,17 @@ const OVERLAY_ERROR_STROKE_WIDTH = 1.5;
 const getOverlayXPath = (size: number) =>
   `M ${-size},${-size} L ${size},${size} M ${-size},${size} L ${size},${-size}`;
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 const formatDateStr = (dateStr: string) => {
   const [year, month, day] = dateStr.split('-');
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10)));
+  return dateFormatter.format(
+    new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10)),
+  );
 };
 
 const runLinkHTML = (runUrl?: string) =>
@@ -291,21 +295,21 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   );
   const activeHwKeys = useMemo(
     () => [
-      ...configurations.filter((c) => effectiveOfficialHardware.has(c.hwKey)).map((c) => c.hwKey),
-      ...unofficialConfigurations
-        .filter((c) => activeOverlayHwTypes.has(c.hwKey))
-        .map((c) => c.hwKey),
+      ...configurations.flatMap((c) => (effectiveOfficialHardware.has(c.hwKey) ? [c.hwKey] : [])),
+      ...unofficialConfigurations.flatMap((c) =>
+        activeOverlayHwTypes.has(c.hwKey) ? [c.hwKey] : [],
+      ),
     ],
     [configurations, unofficialConfigurations, effectiveOfficialHardware, activeOverlayHwTypes],
   );
   const activeConfigLabels = useMemo(
     () => [
-      ...configurations
-        .filter((c) => effectiveOfficialHardware.has(c.hwKey))
-        .map((c) => c.configLabel),
-      ...unofficialConfigurations
-        .filter((c) => activeOverlayHwTypes.has(c.hwKey))
-        .map((c) => c.configLabel),
+      ...configurations.flatMap((c) =>
+        effectiveOfficialHardware.has(c.hwKey) ? [c.configLabel] : [],
+      ),
+      ...unofficialConfigurations.flatMap((c) =>
+        activeOverlayHwTypes.has(c.hwKey) ? [c.configLabel] : [],
+      ),
     ],
     [configurations, unofficialConfigurations, effectiveOfficialHardware, activeOverlayHwTypes],
   );

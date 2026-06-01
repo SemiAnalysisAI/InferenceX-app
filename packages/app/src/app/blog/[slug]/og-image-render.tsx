@@ -37,7 +37,7 @@ async function loadTile(name: string): Promise<string> {
 
 // Dedupe file loads — same file used multiple times only loads once
 async function loadTiles() {
-  const uniqueFiles = [...new Set(TILE_GRID.filter(Boolean).map((t) => t!.file))];
+  const uniqueFiles = [...new Set(TILE_GRID.flatMap((t) => (t ? [t.file] : [])))];
   const loaded = await Promise.all(uniqueFiles.map(async (f) => [f, await loadTile(f)] as const));
   const cache = Object.fromEntries(loaded);
   return TILE_GRID.map((t) => (t ? { src: cache[t.file], rotate: t.rotate } : null));

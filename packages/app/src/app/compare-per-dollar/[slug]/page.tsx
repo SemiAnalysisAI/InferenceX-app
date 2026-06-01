@@ -80,11 +80,11 @@ export default async function ComparePerDollarPage({ params, searchParams }: Pro
   if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
+        const key = encodeURIComponent(k);
+        if (Array.isArray(v)) return v.map((vv) => `${key}=${encodeURIComponent(vv)}`);
         if (v === undefined) return [];
-        return [[k, v] as const];
+        return [`${key}=${encodeURIComponent(v)}`];
       })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
     permanentRedirect(`/compare-per-dollar/${canonical}${qs ? `?${qs}` : ''}`);
   }

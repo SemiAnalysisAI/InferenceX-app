@@ -41,11 +41,13 @@ export function updateRepoUrl(url: string): string {
  * @param tickItem - The number to format
  * @returns Formatted number as string
  */
+const numberFormatter = new Intl.NumberFormat('en-US');
+
 export function formatNumber(tickItem: number) {
   if (tickItem < 10000) {
     return tickItem.toString();
   }
-  return new Intl.NumberFormat('en-US').format(tickItem);
+  return numberFormatter.format(tickItem);
 }
 
 /**
@@ -244,6 +246,8 @@ export function filterRunsByModel(
 
   const filterByPrecision = selectedPrecisions && selectedPrecisions.length > 0;
   const filterByGpu = selectedGPUs && selectedGPUs.length > 0;
+  const modelPrefixSet = new Set(modelPrefixes);
+  const selectedPrecisionSet = filterByPrecision ? new Set(selectedPrecisions!) : null;
   // Convert hwKey format (underscores as separators) to config-key format (all dashes)
   // e.g. 'mi355x_mori-sglang_mtp' → 'mi355x-mori-sglang-mtp'
   const gpuConfigSuffixes = filterByGpu
@@ -259,8 +263,8 @@ export function filterRunsByModel(
         const parts = key.split('-');
         const gpuSuffix = parts.slice(2).join('-');
         return (
-          modelPrefixes.includes(parts[0]) &&
-          (!filterByPrecision || selectedPrecisions!.includes(parts[1])) &&
+          modelPrefixSet.has(parts[0]) &&
+          (!filterByPrecision || selectedPrecisionSet!.has(parts[1])) &&
           (!gpuConfigSuffixes || gpuConfigSuffixes.has(gpuSuffix))
         );
       }),

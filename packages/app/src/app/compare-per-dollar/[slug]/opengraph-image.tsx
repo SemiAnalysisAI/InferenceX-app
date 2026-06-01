@@ -55,7 +55,7 @@ function getLogoSrc(): Promise<string | null> {
 let tilesPromise: Promise<({ src: string; rotate?: number } | null)[]> | undefined;
 function getTiles(): Promise<({ src: string; rotate?: number } | null)[]> {
   if (!tilesPromise) {
-    const uniqueFiles = [...new Set(TILE_GRID.filter(Boolean).map((t) => t!.file))];
+    const uniqueFiles = [...new Set(TILE_GRID.flatMap((t) => (t ? [t.file] : [])))];
     tilesPromise = Promise.all(
       uniqueFiles.map(async (f) => {
         const src = await readFile(join(process.cwd(), 'public/brand/og-tiles', f))

@@ -712,20 +712,24 @@ const GPUGraph = React.memo(
             onItemHover={handleLegendHover}
             onItemHoverEnd={handleLegendHoverEnd}
             onItemRemove={removeActiveDate}
-            legendItems={allGraphs
-              .filter(({ id }) => idsWithData.has(id))
-              .map(({ date, color, hwKey, id }) => ({
-                name: `${hwKey} ${date}`,
-                hw: id,
-                label: date,
-                color,
-                title: getDisplayLabel(getHardwareConfig(hwKey)),
-                isActive: activeDates.has(id),
-                onClick: () => {
-                  toggleActiveDate(id);
-                  track('interactivity_date_toggled', { date, hw: hwKey });
-                },
-              }))}
+            legendItems={allGraphs.flatMap(({ date, color, hwKey, id }) =>
+              idsWithData.has(id)
+                ? [
+                    {
+                      name: `${hwKey} ${date}`,
+                      hw: id,
+                      label: date,
+                      color,
+                      title: getDisplayLabel(getHardwareConfig(hwKey)),
+                      isActive: activeDates.has(id),
+                      onClick: () => {
+                        toggleActiveDate(id);
+                        track('interactivity_date_toggled', { date, hw: hwKey });
+                      },
+                    },
+                  ]
+                : [],
+            )}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);

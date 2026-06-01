@@ -79,7 +79,7 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
           .split('- ')
           .filter((item) => item.trim() !== '')
           .map((item, index) => (
-            <div key={index}>{item}</div>
+            <div key={`${item}-${index}`}>{item}</div>
           ))}
       </div>
     );
@@ -87,7 +87,7 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
   return (
     <div className="font-normal">
       {desc.map((item, index) => (
-        <div key={index}>{item}</div>
+        <div key={`${item}-${index}`}>{item}</div>
       ))}
     </div>
   );
@@ -231,10 +231,12 @@ const ScatterGraph = React.memo(
       if (availableRuns) {
         const cl = availableRuns[selectedRunId]?.changelog;
         if (cl) {
+          const selectedPrecisionSet = new Set(selectedPrecisions);
           const suffixes = cl.entries.flatMap((entry: any) =>
-            (entry.config_keys ?? entry['config-keys'] ?? [])
-              .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map((key: string) => key.split('-').slice(2).join('-')),
+            (entry.config_keys ?? entry['config-keys'] ?? []).flatMap((key: string) => {
+              const parts = key.split('-');
+              return selectedPrecisionSet.has(parts[1]) ? [parts.slice(2).join('-')] : [];
+            }),
           );
           return new Set(suffixes);
         }
@@ -1246,12 +1248,13 @@ const ScatterGraph = React.memo(
                 placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
 
               // Deduplicate by hw key — pick roofline with most points per hw
+              const selectedPrecisionSet = new Set(selectedPrecisions);
               const bestByHw = new Map<string, [string, InferenceData[]]>();
               for (const [key, pts] of Object.entries(rooflines)) {
                 if (pts.length < 2) continue;
                 const hw = key.split('_').slice(0, -1).join('_');
                 const prec = key.split('_').pop()!;
-                if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisions.includes(prec)) continue;
+                if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisionSet.has(prec)) continue;
                 const prev = bestByHw.get(hw);
                 if (!prev || pts.length > prev[1].length) bestByHw.set(hw, [key, pts]);
               }

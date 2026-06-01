@@ -30,30 +30,32 @@ async function fetchGpuMetrics(runId: string) {
   const gpuArtifacts = artifacts.filter((a) => a.name.startsWith('gpu_metrics'));
   if (gpuArtifacts.length === 0) throw new Error('No gpu_metrics artifacts found for this run');
 
-  const parsedArtifacts: { name: string; data: ReturnType<typeof parseCsvData> }[] = [];
-  for (const artifact of gpuArtifacts) {
-    const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
-    if (!dlResp.ok) {
-      console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
-      continue;
-    }
+  const parsedArtifactsMaybe = await Promise.all(
+    gpuArtifacts.map(async (artifact) => {
+      const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
+      if (!dlResp.ok) {
+        console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
+        return null;
+      }
 
-    const contentLength = dlResp.headers.get('Content-Length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_ARTIFACT_BYTES) {
-      console.warn(`Artifact ${artifact.name} exceeds 50 MB, skipping`);
-      continue;
-    }
+      const contentLength = dlResp.headers.get('Content-Length');
+      if (contentLength && parseInt(contentLength, 10) > MAX_ARTIFACT_BYTES) {
+        console.warn(`Artifact ${artifact.name} exceeds 50 MB, skipping`);
+        return null;
+      }
 
-    const rows = extractZipEntries(
-      Buffer.from(await dlResp.arrayBuffer()),
-      '.csv',
-      (_entryName, contents) => parseCsvData(contents),
-      (entryName, error) => {
-        console.warn(`Failed to parse CSV ${entryName} from ${artifact.name}:`, error);
-      },
-    );
-    if (rows.length > 0) parsedArtifacts.push({ name: artifact.name, data: rows });
-  }
+      const rows = extractZipEntries(
+        Buffer.from(await dlResp.arrayBuffer()),
+        '.csv',
+        (_entryName, contents) => parseCsvData(contents),
+        (entryName, error) => {
+          console.warn(`Failed to parse CSV ${entryName} from ${artifact.name}:`, error);
+        },
+      );
+      return rows.length > 0 ? { name: artifact.name, data: rows } : null;
+    }),
+  );
+  const parsedArtifacts = parsedArtifactsMaybe.filter((a) => a !== null);
 
   if (parsedArtifacts.length === 0) throw new Error('No GPU metrics data found in artifacts');
 

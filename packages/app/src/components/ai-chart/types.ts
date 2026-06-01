@@ -96,19 +96,22 @@ export function validateSpec(raw: Record<string, unknown>): AiChartSpec {
     : Sequence.EightK_OneK;
 
   const rawPrecisions = Array.isArray(raw.precisions) ? (raw.precisions as string[]) : [];
-  const precisions = rawPrecisions
-    .filter((p) => VALID_PRECISIONS.has(p.toLowerCase()))
-    .map((p) => p.toLowerCase());
+  const precisions = rawPrecisions.flatMap((p) => {
+    const lower = p.toLowerCase();
+    return VALID_PRECISIONS.has(lower) ? [lower] : [];
+  });
 
   const rawHwKeys = Array.isArray(raw.hardwareKeys) ? (raw.hardwareKeys as string[]) : [];
-  const hardwareKeys = rawHwKeys
-    .filter((k) => VALID_GPU_BASES.has(k.toLowerCase()))
-    .map((k) => k.toLowerCase());
+  const hardwareKeys = rawHwKeys.flatMap((k) => {
+    const lower = k.toLowerCase();
+    return VALID_GPU_BASES.has(lower) ? [lower] : [];
+  });
 
   const rawFrameworks = Array.isArray(raw.frameworks) ? (raw.frameworks as string[]) : [];
-  const frameworks = rawFrameworks
-    .filter((f) => VALID_FRAMEWORKS.has(f.toLowerCase()))
-    .map((f) => f.toLowerCase());
+  const frameworks = rawFrameworks.flatMap((f) => {
+    const lower = f.toLowerCase();
+    return VALID_FRAMEWORKS.has(lower) ? [lower] : [];
+  });
 
   const disagg = raw.disagg === true ? true : raw.disagg === false ? false : null;
 

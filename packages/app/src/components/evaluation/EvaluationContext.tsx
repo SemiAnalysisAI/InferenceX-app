@@ -109,12 +109,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [rawData, unofficialRawData]);
 
   const availableDates = useMemo(() => {
-    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [];
+    const dbModelKeys = new Set(DISPLAY_MODEL_TO_DB[selectedModel]);
     const dates = new Set(
-      rawData
-        .filter((item) => dbModelKeys.includes(item.model))
-        .map((item) => item.date)
-        .filter(Boolean),
+      rawData.flatMap((item) => (dbModelKeys.has(item.model) && item.date ? [item.date] : [])),
     );
     return [...dates].toSorted();
   }, [rawData, selectedModel]);
@@ -182,11 +179,12 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const availablePrecisions = useMemo(() => {
     const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
     if (!dbModelKeys || dbModelKeys.length === 0) return globalAvailablePrecisions;
+    const dbModelKeySet = new Set(dbModelKeys);
     const precs = [
       ...new Set(
-        [...rawData, ...unofficialRawData]
-          .filter((r) => dbModelKeys.includes(r.model))
-          .map((r) => r.precision),
+        [...rawData, ...unofficialRawData].flatMap((r) =>
+          dbModelKeySet.has(r.model) ? [r.precision] : [],
+        ),
       ),
     ].toSorted();
     return precs.length > 0 ? precs : globalAvailablePrecisions;

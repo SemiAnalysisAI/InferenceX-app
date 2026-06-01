@@ -103,35 +103,41 @@ export function buildEvaluationChartRows(
   if (!dbModelKeys || dbModelKeys.length === 0) return [];
 
   const showPrecision = selectedPrecisions.length > 1;
-  const allData = rawData
-    .filter(
-      (item) =>
+  const dbModelKeySet = new Set(dbModelKeys);
+  const selectedPrecisionSet = new Set(selectedPrecisions);
+  const allData = rawData.flatMap((item): EvaluationChartData[] => {
+    if (
+      !(
         item.task === selectedBenchmark &&
-        dbModelKeys.includes(item.model) &&
+        dbModelKeySet.has(item.model) &&
         (!selectedRunDate || item.date <= selectedRunDate) &&
-        selectedPrecisions.includes(item.precision),
-    )
-    .map((item): EvaluationChartData | null => {
-      const score = item.metrics.em_strict ?? item.metrics.score;
-      if (score === undefined) {
-        console.warn(
-          `[evaluation] dropped row with missing metrics: config_id=${item.config_id} ${item.hardware} ${item.framework} ${item.task}`,
-        );
-        return null;
-      }
+        selectedPrecisionSet.has(item.precision)
+      )
+    ) {
+      return [];
+    }
 
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      if (hwKey === 'unknown') {
-        console.warn(
-          `[evaluation] dropped row with unknown hardware mapping: hardware=${item.hardware} framework=${item.framework} spec=${item.spec_method}`,
-        );
-        return null;
-      }
+    const score = item.metrics.em_strict ?? item.metrics.score;
+    if (score === undefined) {
+      console.warn(
+        `[evaluation] dropped row with missing metrics: config_id=${item.config_id} ${item.hardware} ${item.framework} ${item.task}`,
+      );
+      return [];
+    }
 
-      const hwConfig = getHardwareConfig(hwKey);
-      const hwLabel = hwConfig.label;
+    const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
+    if (hwKey === 'unknown') {
+      console.warn(
+        `[evaluation] dropped row with unknown hardware mapping: hardware=${item.hardware} framework=${item.framework} spec=${item.spec_method}`,
+      );
+      return [];
+    }
 
-      return {
+    const hwConfig = getHardwareConfig(hwKey);
+    const hwLabel = hwConfig.label;
+
+    return [
+      {
         evalResultId: item.id,
         configId: item.config_id,
         hwKey,
@@ -178,9 +184,9 @@ export function buildEvaluationChartRows(
         numPrefillGpu: item.num_prefill_gpu,
         numDecodeGpu: item.num_decode_gpu,
         runUrl: item.run_url ?? undefined,
-      };
-    })
-    .filter((item): item is EvaluationChartData => item !== null);
+      },
+    ];
+  });
 
   // Dedup by (configId, conc) so each distinct config (unique prefill/decode
   // geometry, spec method, precision, etc.) gets its own "latest date" slot
@@ -278,23 +284,27 @@ export function buildEvalChangelogEntries(
   if (!dbModelKeys || dbModelKeys.length === 0) return [];
 
   const showPrecision = selectedPrecisions.length > 1;
-  const rows = rawData
-    .filter((item) => {
-      const rawScore = item.metrics.em_strict ?? item.metrics.score;
-      return (
+  const dbModelKeySet = new Set(dbModelKeys);
+  const selectedPrecisionSet = new Set(selectedPrecisions);
+  const rows = rawData.flatMap((item) => {
+    const rawScore = item.metrics.em_strict ?? item.metrics.score;
+    if (
+      !(
         item.date === selectedRunDate &&
-        dbModelKeys.includes(item.model) &&
-        selectedPrecisions.includes(item.precision) &&
+        dbModelKeySet.has(item.model) &&
+        selectedPrecisionSet.has(item.precision) &&
         rawScore !== undefined
-      );
-    })
-    .map((item) => {
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      const hwConfig = getHardwareConfig(hwKey);
-      const hwLabel = hwConfig.label;
-      // Changelog labels historically omit TP/EP; keep that behavior while
-      // still surfacing the disagg marker.
-      return {
+      )
+    ) {
+      return [];
+    }
+    const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
+    const hwConfig = getHardwareConfig(hwKey);
+    const hwLabel = hwConfig.label;
+    // Changelog labels historically omit TP/EP; keep that behavior while
+    // still surfacing the disagg marker.
+    return [
+      {
         benchmark: item.task,
         configLabel: buildConfigLabel(
           hwLabel,
@@ -309,8 +319,9 @@ export function buildEvalChangelogEntries(
           },
           showPrecision,
         ),
-      };
-    });
+      },
+    ];
+  });
 
   const byBenchmark = new Map<string, Set<string>>();
   for (const item of rows) {

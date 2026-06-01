@@ -107,15 +107,13 @@ export default function WorkflowInfoDisplay({
     const raw = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
     if (!raw) return null;
     // Filter config_keys by selected precisions, drop entries with no matching keys
-    const filtered = raw.entries
-      .map((entry) => ({
-        ...entry,
-        config_keys: entry.config_keys.filter((key) => {
-          const precision = key.split('-')[1];
-          return effectivePrecisions.includes(precision);
-        }),
-      }))
-      .filter((entry) => entry.config_keys.length > 0);
+    const effectivePrecisionSet = new Set(effectivePrecisions);
+    const filtered = raw.entries.flatMap((entry) => {
+      const config_keys = entry.config_keys.filter((key) =>
+        effectivePrecisionSet.has(key.split('-')[1]),
+      );
+      return config_keys.length > 0 ? [{ ...entry, config_keys }] : [];
+    });
     return filtered.length > 0 ? { entries: filtered } : null;
   })();
 
@@ -221,7 +219,7 @@ export default function WorkflowInfoDisplay({
               {changelog && changelog.entries.length > 0 ? (
                 <>
                   {changelog.entries.map((entry, index) => (
-                    <div key={index}>
+                    <div key={entry.config_keys.join(',')}>
                       {index > 0 && <hr className="my-3" />}
                       <div className="flex flex-col gap-2 text-xs line-break-words">
                         <div className="text-xs font-bold">Description</div>

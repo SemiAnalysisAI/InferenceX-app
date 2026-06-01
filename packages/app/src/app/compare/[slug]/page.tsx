@@ -85,11 +85,11 @@ export default async function ComparePage({ params, searchParams }: Props) {
   if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
+        const key = encodeURIComponent(k);
+        if (Array.isArray(v)) return v.map((vv) => `${key}=${encodeURIComponent(vv)}`);
         if (v === undefined) return [];
-        return [[k, v] as const];
+        return [`${key}=${encodeURIComponent(v)}`];
       })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
     // 308 (not 307): bare-slug, alias model, and non-canonical GPU order are
     // all permanent decisions — using a permanent redirect lets search engines
