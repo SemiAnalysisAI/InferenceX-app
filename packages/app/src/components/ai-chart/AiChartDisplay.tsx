@@ -181,7 +181,7 @@ export default function AiChartDisplay() {
           <div className="grid gap-2 sm:grid-cols-2">
             {EXAMPLE_PROMPTS.map((example, i) => (
               <button
-                key={i}
+                key={example}
                 type="button"
                 className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg border p-3 text-left text-sm transition-colors"
                 onClick={() => handleExampleClick(example, i)}

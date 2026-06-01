@@ -67,6 +67,14 @@ const SORT_ICON = {
   none: <ArrowUpDown className="inline size-3 opacity-30" />,
 };
 
+// Derive a stable, reorder-safe row key from the columns' sortable values.
+// Rows have no guaranteed id field (T is generic), but the combination of every
+// sortable column value uniquely identifies a row in practice.
+function getRowKey<T>(row: T, columns: DataTableColumn<T>[]): string {
+  const parts = columns.filter((col) => col.sortValue).map((col) => String(col.sortValue!(row)));
+  return parts.length > 0 ? parts.join('|') : JSON.stringify(row);
+}
+
 export function DataTable<T>({
   data,
   columns,
@@ -196,7 +204,7 @@ export function DataTable<T>({
                       : null;
                 return (
                   <th
-                    key={i}
+                    key={col.header}
                     className={`py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
                     tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
@@ -237,10 +245,13 @@ export function DataTable<T>({
               </tr>
             ) : (
               pageData.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
-                  {columns.map((col, colIndex) => (
+                <tr
+                  key={getRowKey(row, columns)}
+                  className="border-b border-border/50 hover:bg-muted/30"
+                >
+                  {columns.map((col) => (
                     <td
-                      key={colIndex}
+                      key={col.header}
                       className={`py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''}`}
                     >
                       {col.cell(row, safePage * pageSize + rowIndex)}

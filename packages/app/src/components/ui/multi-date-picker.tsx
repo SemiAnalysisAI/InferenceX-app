@@ -172,9 +172,9 @@ export function MultiDatePicker({
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {tempDates.map((dateStr, index) => (
+                  {tempDates.map((dateStr) => (
                     <div
-                      key={index}
+                      key={dateStr}
                       className="px-2 py-1 bg-primary text-primary-foreground rounded-md text-xs flex items-center gap-1 group"
                     >
                       {formatDisplayDate(dateStr)}

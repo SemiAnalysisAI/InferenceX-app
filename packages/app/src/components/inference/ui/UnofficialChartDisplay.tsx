@@ -162,7 +162,7 @@ export function UnofficialChartDisplay() {
   return (
     <>
       {graphs.map((graph, graphIndex) => (
-        <section key={graphIndex}>
+        <section key={graph.chartDefinition.chartType}>
           <figure>
             <Card>
               <ScatterGraph

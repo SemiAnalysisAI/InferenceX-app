@@ -128,13 +128,12 @@ export default function ChartLegend({
     const query = searchQuery.trim().toLowerCase();
     if (!query) return new Set<string>();
     return new Set(
-      legendItems
-        .filter(
-          (item) =>
-            !item.label.toLowerCase().includes(query) &&
-            !(item.title && item.title.toLowerCase().includes(query)),
-        )
-        .map((item) => item.name),
+      legendItems.flatMap((item) =>
+        !item.label.toLowerCase().includes(query) &&
+        !(item.title && item.title.toLowerCase().includes(query))
+          ? [item.name]
+          : [],
+      ),
     );
   }, [legendItems, searchQuery, isSidebar]);
 
@@ -232,6 +231,7 @@ export default function ChartLegend({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onBlur={trackSearchOnBlur}
+            aria-label="Search legend"
             placeholder="Search..."
             className="w-full px-2 py-1 pr-6 rounded-md border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/50"
           />
@@ -424,7 +424,7 @@ export default function ChartLegend({
             isSidebar && row.every((item: CommonLegendItemProps) => hiddenNames.has(item.name));
           return (
             <div
-              key={i}
+              key={row[0].title}
               className={cn(
                 'p-1 rounded-sm shrink-0',
                 i > 0 && 'mt-2',

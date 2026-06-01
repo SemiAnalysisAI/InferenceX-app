@@ -262,6 +262,9 @@ export function CompareInterpolatedTable({
                 Metric
               </th>
               {columns.map((col, ci) => (
+                // Positional editable column: index is the stable key. A
+                // data-derived key (col.target) would change as the user edits
+                // and remount the input mid-edit.
                 <th key={ci} className="px-3 py-2 text-center font-medium min-w-[180px]">
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-xs text-muted-foreground">
@@ -356,6 +359,7 @@ function MetricTableRow({
         {metric.label}
       </td>
       {cells.map((cell, ci) => (
+        // Positional editable column — index is the stable key (see header).
         <td key={ci} className="px-3 py-2 border-r border-border/40 last:border-r-0">
           <div className="flex flex-col items-center gap-0.5">
             <span

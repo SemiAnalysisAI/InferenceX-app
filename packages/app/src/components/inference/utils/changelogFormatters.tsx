@@ -11,7 +11,7 @@ export function formatChangelogDescription(desc: string | string[]) {
           .split('- ')
           .filter((item) => item.trim() !== '')
           .map((item, index) => (
-            <li key={index}>{item}</li>
+            <li key={`${item}-${index}`}>{item}</li>
           ))}
       </ul>
     );
@@ -19,7 +19,7 @@ export function formatChangelogDescription(desc: string | string[]) {
   return (
     <ul className="list-disc pl-4">
       {desc.map((item, index) => (
-        <li key={index}>{item}</li>
+        <li key={`${item}-${index}`}>{item}</li>
       ))}
     </ul>
   );
