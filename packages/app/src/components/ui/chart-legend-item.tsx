@@ -69,8 +69,8 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
             style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
           />
           {canRemove && (
-            <span
-              role="button"
+            <button
+              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -80,7 +80,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
               aria-label={`Hide ${label}`}
             >
               <X size={14} strokeWidth={4} className="text-foreground" />
-            </span>
+            </button>
           )}
         </span>
         <span

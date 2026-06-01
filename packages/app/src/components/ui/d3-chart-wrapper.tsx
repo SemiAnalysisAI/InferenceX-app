@@ -50,6 +50,9 @@ export function D3ChartWrapper({
               ref={svgRef}
               width="100%"
               height={dimensions.height}
+              role="application"
+              tabIndex={0}
+              aria-label="Interactive chart"
               style={{ cursor: grabCursor ? 'grab' : undefined }}
               onMouseDown={
                 grabCursor
@@ -67,6 +70,12 @@ export function D3ChartWrapper({
               }
               onClick={() => {
                 if (isPinned()) {
+                  dismissTooltip();
+                  hideTooltipElements(tooltipRef, svgRef);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && isPinned()) {
                   dismissTooltip();
                   hideTooltipElements(tooltipRef, svgRef);
                 }
