@@ -80,6 +80,15 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     ...(typeof entry.joules_per_total_token === 'number'
       ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
       : {}),
+    ...(typeof entry.prefill_avg_power_w === 'number'
+      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.decode_avg_power_w === 'number'
+      ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_input_token === 'number'
+      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      : {}),
   };
   return point;
 }
