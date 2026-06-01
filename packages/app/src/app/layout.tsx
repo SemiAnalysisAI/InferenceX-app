@@ -4,7 +4,6 @@ import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
-import { DM_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 
 import { Footer } from '@/components/footer/footer';
@@ -28,12 +27,6 @@ import { fetchStarCount } from '@/lib/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
 import { VisitTracker } from '@/providers/visit-tracker';
-
-const dm_sans = DM_Sans({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-dm-sans',
-});
 
 const monocraft = localFont({
   src: './fonts/Monocraft.woff2',
@@ -178,7 +171,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://us-assets.i.posthog.com" />
         <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
       </head>
-      <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
+      <body className="antialiased relative min-h-screen flex flex-col">
         <CircuitBackground />
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />

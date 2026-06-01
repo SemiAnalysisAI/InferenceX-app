@@ -83,7 +83,7 @@
   --color-card: var(--card);
 
   /* Fonts */
-  --font-sans: var(--font-dm-sans);
+  --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: monospace;
 
   /* Breakpoints */
@@ -228,7 +228,7 @@
   --sidebar-ring: #888888;
 
   /* Override ALL fonts to pixel font */
-  --font-dm-sans: var(--font-minecraft, 'Monocraft', monospace);
+  --font-sans: var(--font-minecraft, 'Monocraft', monospace);
   --font-mono: var(--font-minecraft, 'Monocraft', monospace);
 
   /* Kill all border radius — Minecraft has no curves */

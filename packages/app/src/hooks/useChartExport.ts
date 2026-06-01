@@ -27,7 +27,7 @@ export function getExportFontFamily(): string {
     return 'var(--font-minecraft), "Monocraft", monospace';
   }
 
-  return 'var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  return 'Arial, Helvetica, sans-serif';
 }
 
 function getResolvedExportFontFamily(): string {
