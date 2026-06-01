@@ -3,10 +3,17 @@ import { describe, expect, it } from 'vitest';
 import type { AvailableModelSequence } from '@/components/unofficial-run-provider';
 import { Model, Sequence } from '@/lib/data-mappings';
 
-import { computeAutoSwitchDecision } from './unofficial-run-auto-switch';
+import {
+  computeAutoAddPrecisionDecision,
+  computeAutoSwitchDecision,
+} from './unofficial-run-auto-switch';
 
-function entry(model: Model, sequence: Sequence): AvailableModelSequence {
-  return { model, sequence, precisions: [] };
+function entry(
+  model: Model,
+  sequence: Sequence,
+  precisions: string[] = [],
+): AvailableModelSequence {
+  return { model, sequence, precisions };
 }
 
 describe('computeAutoSwitchDecision', () => {
@@ -109,6 +116,165 @@ describe('computeAutoSwitchDecision', () => {
     const a = computeAutoSwitchDecision(orderA, undefined, Model.DeepSeek_R1, '');
     const b = computeAutoSwitchDecision(orderB, undefined, Model.DeepSeek_R1, '');
     expect(a.modelToSet).toBe(b.modelToSet);
+    expect(a.nextKey).toBe(b.nextKey);
+  });
+});
+
+describe('computeAutoAddPrecisionDecision', () => {
+  it('returns no-op and resets the key when no unofficial run is loaded', () => {
+    expect(
+      computeAutoAddPrecisionDecision(
+        [],
+        undefined,
+        ['fp4'],
+        Model.DeepSeek_R1,
+        Sequence.EightK_OneK,
+        'stale-key',
+      ),
+    ).toEqual({ nextKey: '', precisionToAdd: null });
+  });
+
+  it('adds the run precision when the user filter does not intersect it (ATOM/MTP case)', () => {
+    // Regression for issue #412: an ATOM/MTP run is fp8-only, default i_prec is fp4,
+    // so the overlay points are silently filtered out by ScatterGraph.
+    const run = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['fp8'])];
+    const decision = computeAutoAddPrecisionDecision(
+      run,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      '',
+    );
+    expect(decision.precisionToAdd).toBe('fp8');
+    expect(decision.nextKey).toBe(`${Model.DeepSeek_R1}|${Sequence.EightK_OneK}|fp8`);
+  });
+
+  it('respects an explicit i_prec URL pin without advancing the dedupe key', () => {
+    const run = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['fp8'])];
+    const decision = computeAutoAddPrecisionDecision(
+      run,
+      'fp4',
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      '',
+    );
+    expect(decision.precisionToAdd).toBeNull();
+    // Ref must NOT be advanced — if the URL pin is later removed we still want
+    // the auto-add to fire on the same overlay set.
+    expect(decision.nextKey).toBe('');
+  });
+
+  it('does nothing when the user already has at least one run precision selected', () => {
+    const run = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['fp4', 'fp8'])];
+    const decision = computeAutoAddPrecisionDecision(
+      run,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      '',
+    );
+    expect(decision.precisionToAdd).toBeNull();
+    // Key still advances so we don't keep re-evaluating on every render.
+    expect(decision.nextKey).toBe(`${Model.DeepSeek_R1}|${Sequence.EightK_OneK}|fp4,fp8`);
+  });
+
+  it('does nothing when the run has no precisions for the current model+sequence', () => {
+    // Overlay is for a different model — auto-add must not pick precisions
+    // from an unrelated entry. (e.g. multi-run overlay where the user has
+    // navigated to a model only some runs cover.)
+    const run = [entry(Model.Kimi_K2_5, Sequence.EightK_OneK, ['fp8'])];
+    const decision = computeAutoAddPrecisionDecision(
+      run,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      'prev-key',
+    );
+    expect(decision.precisionToAdd).toBeNull();
+    expect(decision.nextKey).toBe('prev-key');
+  });
+
+  it('does not re-fire after the user removes the auto-added precision', () => {
+    // Simulate the post-auto-add state: ref already holds the run's key,
+    // user manually removed fp8 from their selection. We must NOT re-add it.
+    const run = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['fp8'])];
+    const lastKey = `${Model.DeepSeek_R1}|${Sequence.EightK_OneK}|fp8`;
+    const decision = computeAutoAddPrecisionDecision(
+      run,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      lastKey,
+    );
+    expect(decision.precisionToAdd).toBeNull();
+    expect(decision.nextKey).toBe(lastKey);
+  });
+
+  it('re-arms after the overlay set is cleared so a subsequent load can add again', () => {
+    // Step 1: a run loads, fp8 auto-added.
+    const run = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['fp8'])];
+    const first = computeAutoAddPrecisionDecision(
+      run,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      '',
+    );
+    expect(first.precisionToAdd).toBe('fp8');
+
+    // Step 2: user dismisses the run, overlay set goes empty — ref resets.
+    const cleared = computeAutoAddPrecisionDecision(
+      [],
+      undefined,
+      ['fp4', 'fp8'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      first.nextKey,
+    );
+    expect(cleared).toEqual({ nextKey: '', precisionToAdd: null });
+
+    // Step 3: a new run loads with a precision still not in the user's filter.
+    const run2 = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['bf16'])];
+    const second = computeAutoAddPrecisionDecision(
+      run2,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      cleared.nextKey,
+    );
+    expect(second.precisionToAdd).toBe('bf16');
+  });
+
+  it('picks the first precision deterministically when the run has multiple', () => {
+    // Same set of precisions in two different orders should auto-add the same
+    // target. `parseAvailableModelsAndSequences` builds precisions from a
+    // `Set`, so insertion order is not guaranteed across renders.
+    const orderA = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['fp8', 'bf16', 'int4'])];
+    const orderB = [entry(Model.DeepSeek_R1, Sequence.EightK_OneK, ['int4', 'fp8', 'bf16'])];
+    const a = computeAutoAddPrecisionDecision(
+      orderA,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      '',
+    );
+    const b = computeAutoAddPrecisionDecision(
+      orderB,
+      undefined,
+      ['fp4'],
+      Model.DeepSeek_R1,
+      Sequence.EightK_OneK,
+      '',
+    );
+    expect(a.precisionToAdd).toBe(b.precisionToAdd);
     expect(a.nextKey).toBe(b.nextKey);
   });
 });

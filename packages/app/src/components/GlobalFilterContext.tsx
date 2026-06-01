@@ -36,7 +36,10 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
-import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
+import {
+  computeAutoAddPrecisionDecision,
+  computeAutoSwitchDecision,
+} from '@/lib/unofficial-run-auto-switch';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -300,6 +303,28 @@ export function GlobalFilterProvider({
     if (valid.length > 0) return valid;
     return availablePrecisions.length > 0 ? [availablePrecisions[0]] : selectedPrecisions;
   }, [selectedPrecisions, availablePrecisions]);
+
+  // Auto-add a run precision to the user's selection when an unofficial run
+  // is loaded whose precisions don't intersect the current `selectedPrecisions`.
+  // Without this, e.g. an fp8-only ATOM/MTP overlay is silently filtered out
+  // because the default `i_prec` is `fp4` — the chart loads, model is
+  // auto-switched, but no overlay points render. Same dedupe-ref pattern as
+  // the model auto-switch so manual deselects after the fact aren't undone.
+  const lastAutoAddPrecKeyRef = useRef<string>('');
+  useEffect(() => {
+    const decision = computeAutoAddPrecisionDecision(
+      unofficialAvailable,
+      getUrlParam('i_prec'),
+      selectedPrecisions,
+      selectedModel,
+      effectiveSequence,
+      lastAutoAddPrecKeyRef.current,
+    );
+    lastAutoAddPrecKeyRef.current = decision.nextKey;
+    if (decision.precisionToAdd !== null) {
+      setSelectedPrecisionsRaw([...new Set([...selectedPrecisions, decision.precisionToAdd])]);
+    }
+  }, [unofficialAvailable, selectedModel, effectiveSequence, selectedPrecisions, getUrlParam]);
 
   // Dates available for selected model + sequence + precisions
   const availableDates = useMemo(() => {
