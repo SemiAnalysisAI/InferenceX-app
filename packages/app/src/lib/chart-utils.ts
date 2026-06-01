@@ -777,10 +777,7 @@ export function markRooflinePoints(
           newPoint.measuredPrefillAvgPower
         ) {
           newPoint.measuredPrefillAvgPower.roof = onCurrentRoofline;
-        } else if (
-          chartDefYKey === 'y_measuredDecodeAvgPower' &&
-          newPoint.measuredDecodeAvgPower
-        ) {
+        } else if (chartDefYKey === 'y_measuredDecodeAvgPower' && newPoint.measuredDecodeAvgPower) {
           newPoint.measuredDecodeAvgPower.roof = onCurrentRoofline;
         } else if (
           chartDefYKey === 'y_measuredJPerOutputToken' &&
@@ -789,10 +786,7 @@ export function markRooflinePoints(
           newPoint.measuredJPerOutputToken.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_measuredJPerTotalToken' && newPoint.measuredJPerTotalToken) {
           newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
-        } else if (
-          chartDefYKey === 'y_measuredJPerInputToken' &&
-          newPoint.measuredJPerInputToken
-        ) {
+        } else if (chartDefYKey === 'y_measuredJPerInputToken' && newPoint.measuredJPerInputToken) {
           newPoint.measuredJPerInputToken.roof = onCurrentRoofline;
         }
       }
