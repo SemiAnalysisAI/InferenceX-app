@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
@@ -144,23 +144,22 @@ export function useTrendData(
     return result;
   }, [allRows, trackedConfigs, selectedYAxisMetric, xAxisFieldByChartType]);
 
-  // Artificial progress that ramps up while the API call is in flight
+  // Artificial progress that ramps up while the API call is in flight.
+  // Snap to 0 (start) / 1 (done) during render on the isLoading transition so
+  // there's no extra commit, and let the effect own only the ramp interval.
   const [progress, setProgress] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
+  const [prevLoading, setPrevLoading] = useState(isLoading);
+  if (isLoading !== prevLoading) {
+    setPrevLoading(isLoading);
+    setProgress(isLoading ? 0 : 1);
+  }
 
   useEffect(() => {
-    if (isLoading) {
-      setProgress(0);
-      intervalRef.current = setInterval(() => {
-        setProgress((p) => Math.min(p + 0.08 + Math.random() * 0.12, 0.95));
-      }, 100);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setProgress(1);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    if (!isLoading) return;
+    const id = setInterval(() => {
+      setProgress((p) => Math.min(p + 0.08 + Math.random() * 0.12, 0.95));
+    }, 100);
+    return () => clearInterval(id);
   }, [isLoading]);
 
   return { trendLines, loading: isLoading, progress };

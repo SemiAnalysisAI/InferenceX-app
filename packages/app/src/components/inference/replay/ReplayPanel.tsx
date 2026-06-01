@@ -66,7 +66,7 @@ export default function ReplayPanel({
   const { selectedModel, selectedSequence } = inference;
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
-  const history = useBenchmarkHistory(selectedModel, isl, osl);
+  const historyQuery = useBenchmarkHistory(selectedModel, isl, osl);
 
   const effectiveX =
     chartDefinition.chartType === 'e2e'
@@ -74,16 +74,16 @@ export default function ReplayPanel({
       : inference.selectedXAxisMetric;
 
   const timeline = useMemo(() => {
-    if (!history.data) return null;
+    if (!historyQuery.data) return null;
     return buildReplayTimeline(
-      history.data,
+      historyQuery.data,
       chartDefinition,
       inference.selectedYAxisMetric,
       effectiveX ?? null,
       inference.selectedPrecisions,
     );
   }, [
-    history.data,
+    historyQuery.data,
     chartDefinition,
     inference.selectedYAxisMetric,
     effectiveX,
@@ -253,11 +253,15 @@ export default function ReplayPanel({
     };
   }, [playing, timeline, prefersReducedMotion]);
 
-  useEffect(() => {
+  // Reset playback to the start whenever the timeline changes. Done during
+  // render (not in an effect) so the reset commits with the new timeline.
+  const [prevTimeline, setPrevTimeline] = useState(timeline);
+  if (timeline !== prevTimeline) {
+    setPrevTimeline(timeline);
     fractionRef.current = 0;
     setFraction(0);
     setPlaying(false);
-  }, [timeline]);
+  }
 
   const frameData = useMemo(
     () => (timeline ? buildFrameData(timeline, fraction) : []),
@@ -443,7 +447,7 @@ export default function ReplayPanel({
     }
   }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
 
-  if (history.isLoading || !timeline) {
+  if (historyQuery.isLoading || !timeline) {
     return (
       <div
         className="p-4 sm:p-6 flex flex-col"
@@ -468,7 +472,7 @@ export default function ReplayPanel({
         <h3 className="text-base font-semibold">Replay over time</h3>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">
-            Not enough history yet to replay this chart — at least two distinct benchmark dates are
+            Not enough history yet to replay this chart; at least two distinct benchmark dates are
             required.
           </p>
         </div>

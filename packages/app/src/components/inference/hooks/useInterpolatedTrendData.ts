@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
@@ -194,9 +194,10 @@ export function useInterpolatedTrendData({
     if (!allRows || allRows.length === 0) return new Map<string, Map<string, InferenceData[]>>();
 
     const result = new Map<string, Map<string, InferenceData[]>>();
+    const selectedPrecisionSet = new Set(selectedPrecisions);
 
     for (const row of allRows) {
-      if (!selectedPrecisions.includes(row.precision)) continue;
+      if (!selectedPrecisionSet.has(row.precision)) continue;
 
       const point = rowToLightweightPoint(row);
       if (!point) continue;
@@ -248,6 +249,7 @@ export function useInterpolatedTrendData({
     const today = new Date().toISOString().split('T')[0];
     const lines = new Map<string, TrendDataPoint[]>();
     const keysWithData: string[] = [];
+    const keysWithDataSet = new Set<string>();
 
     for (const [groupKey, dateMap] of resultMap) {
       const points = [...dateMap.values()].toSorted(
@@ -262,7 +264,8 @@ export function useInterpolatedTrendData({
         lines.set(groupKey, points);
         // Return base hwKey for legend filtering
         const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
-        if (!keysWithData.includes(baseHwKey)) {
+        if (!keysWithDataSet.has(baseHwKey)) {
+          keysWithDataSet.add(baseHwKey);
           keysWithData.push(baseHwKey);
         }
       }
@@ -271,23 +274,22 @@ export function useInterpolatedTrendData({
     return { trendLines: lines, hwKeysWithData: keysWithData };
   }, [dateGroupedData, targetInteractivity, selectedYAxisMetric]);
 
-  // Artificial progress that ramps up while the API call is in flight
+  // Artificial progress that ramps up while the API call is in flight.
+  // Snap to 0 (start) / 1 (done) during render on the isLoading transition so
+  // there's no extra commit, and let the effect own only the ramp interval.
   const [progress, setProgress] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
+  const [prevLoading, setPrevLoading] = useState(isLoading);
+  if (isLoading !== prevLoading) {
+    setPrevLoading(isLoading);
+    setProgress(isLoading ? 0 : 1);
+  }
 
   useEffect(() => {
-    if (isLoading) {
-      setProgress(0);
-      intervalRef.current = setInterval(() => {
-        setProgress((p) => Math.min(p + 0.08 + Math.random() * 0.12, 0.95));
-      }, 100);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setProgress(1);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    if (!isLoading) return;
+    const id = setInterval(() => {
+      setProgress((p) => Math.min(p + 0.08 + Math.random() * 0.12, 0.95));
+    }, 100);
+    return () => clearInterval(id);
   }, [isLoading]);
 
   if (!enabled) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import {
@@ -136,55 +136,65 @@ const CustomGpuValuePanel = memo(
     const config = PANEL_CONFIG[kind];
     const applyValues = kind === 'costs' ? setUserCosts : setUserPowers;
 
+    const stableGpus = React.useMemo(
+      () =>
+        Object.entries(HW_REGISTRY).flatMap(([base, specs]) =>
+          config.getDefaultValue(specs) > 0 ? [{ base, label: base.toUpperCase(), specs }] : [],
+        ),
+      [config],
+    );
+
+    // Default cost/power values derived from the GPU registry. Memoized so local
+    // state can lazy-init from it and the parent-sync effect can depend on it.
+    const computedDefaults = React.useMemo(
+      () => buildDefaultCustomGpuValues(stableGpus, config.getDefaultValue),
+      [stableGpus, config],
+    );
+
     const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-    const [defaultValues, setDefaultValues] = useState<Record<string, string>>({});
+    const [defaultValues, setDefaultValues] = useState<Record<string, string>>(
+      computedDefaults.defaultValues,
+    );
     const [lastCalculatedValues, setLastCalculatedValues] = useState<
       Record<string, string | number>
-    >({});
+    >(computedDefaults.defaultValues);
 
-    const previousFiltersRef = useRef<CustomGpuPanelFilters>({
+    // Re-seed local state during render if the derived defaults change. Mirrors
+    // the old init effect without forcing an extra commit.
+    const [prevComputedDefaults, setPrevComputedDefaults] = useState(computedDefaults);
+    if (computedDefaults !== prevComputedDefaults) {
+      setPrevComputedDefaults(computedDefaults);
+      setDefaultValues(computedDefaults.defaultValues);
+      setLastCalculatedValues(computedDefaults.defaultValues);
+      setInputErrors({});
+    }
+
+    // Push the defaults up to the InferenceContext. Stays in an effect — it
+    // updates a parent provider, which can't happen during this child's render.
+    useEffect(() => {
+      applyValues(computedDefaults.numericDefaults);
+    }, [applyValues, computedDefaults]);
+
+    // Reset the custom values back to defaults whenever the top-level filters
+    // change. Done during render with a prev-filters comparison instead of an
+    // effect, so the reset commits without an extra stale-UI render.
+    const [prevFilters, setPrevFilters] = useState<CustomGpuPanelFilters>({
       model: selectedModel,
       sequence: selectedSequence,
       precisions: selectedPrecisions,
       yAxisMetric: selectedYAxisMetric,
     });
-
-    const stableGpus = React.useMemo(
-      () =>
-        Object.entries(HW_REGISTRY)
-          .filter(([, specs]) => config.getDefaultValue(specs) > 0)
-          .map(([base, specs]) => ({ base, label: base.toUpperCase(), specs })),
-      [config],
-    );
-
-    useEffect(() => {
-      const { defaultValues: defaults, numericDefaults } = buildDefaultCustomGpuValues(
-        stableGpus,
-        config.getDefaultValue,
-      );
-
-      setDefaultValues(defaults);
-      setLastCalculatedValues(defaults);
+    const currentFilters: CustomGpuPanelFilters = {
+      model: selectedModel,
+      sequence: selectedSequence,
+      precisions: selectedPrecisions,
+      yAxisMetric: selectedYAxisMetric,
+    };
+    if (didCustomGpuPanelFiltersChange(prevFilters, currentFilters)) {
+      setPrevFilters(currentFilters);
+      setLastCalculatedValues(defaultValues);
       setInputErrors({});
-      applyValues(numericDefaults);
-    }, [applyValues, config, stableGpus]);
-
-    useEffect(() => {
-      const prevFilters = previousFiltersRef.current;
-      const currentFilters: CustomGpuPanelFilters = {
-        model: selectedModel,
-        sequence: selectedSequence,
-        precisions: selectedPrecisions,
-        yAxisMetric: selectedYAxisMetric,
-      };
-      const filtersChanged = didCustomGpuPanelFiltersChange(prevFilters, currentFilters);
-
-      if (filtersChanged) {
-        setLastCalculatedValues(defaultValues);
-        setInputErrors({});
-        previousFiltersRef.current = currentFilters;
-      }
-    }, [defaultValues, selectedModel, selectedPrecisions, selectedSequence, selectedYAxisMetric]);
+    }
 
     const handleInputChange = useCallback((gpuKey: string, value: string) => {
       const validationError = validateCustomGpuValueInput(value);

@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -33,14 +33,17 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
-  // Reset transient state whenever a new row is opened.
-  useEffect(() => {
-    if (!open) return;
+  // Reset transient state whenever a new row is opened. Adjusted during render
+  // (not in an effect) so the reset commits in the same render as the new row,
+  // and so the same instance is kept (the Dialog's close animation relies on it).
+  const [prevRowId, setPrevRowId] = useState(row?.evalResultId);
+  if (open && row.evalResultId !== prevRowId) {
+    setPrevRowId(row.evalResultId);
     setFilter('all');
     setPage(0);
     setSearch('');
     setExpanded(new Set());
-  }, [row?.evalResultId, open]);
+  }
 
   // Build a live-fetch context for unofficial runs from the row's identifying
   // fields. The hook ignores this when `evalResultId > 0` (DB-backed path).
@@ -201,14 +204,14 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
         <div className="overflow-auto px-4 py-3">
           {liveUnavailable && (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-              Per-sample data isn&apos;t available for this unofficial run — the workflow URL is
+              Per-sample data isn&apos;t available for this unofficial run; the workflow URL is
               missing or malformed.
             </p>
           )}
           {!liveUnavailable && isUnofficial && (
             <p className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-[11px] text-primary">
-              Unofficial run — samples are streamed live from the workflow artifact. Loads may take
-              a few seconds.
+              Unofficial run: samples are streamed live from the workflow artifact. Loads may take a
+              few seconds.
             </p>
           )}
           {!liveUnavailable && isLoading && (
@@ -255,7 +258,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                   </span>
                 </button>
                 {expanded.has(s.docId) && (
-                  <div className="space-y-2 border-t border-border/50 px-3 py-3 text-xs">
+                  <div className="space-y-2 border-t border-border/50 p-3 text-xs">
                     <FewShotBlock demonstrations={s.demonstrations} />
                     <Block label="Prompt" value={s.prompt} />
                     {s.rawResponse !== null && s.rawResponse !== s.response ? (
@@ -371,7 +374,7 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
 function PassFailBadge({ passed }: { passed: boolean | null }) {
   if (passed === null) {
     return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
+      <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-[10px] text-muted-foreground">
         ?
       </span>
     );
@@ -425,8 +428,7 @@ function FewShotBlock({
         <div className="mt-2 space-y-2">
           {demos.map((d, i) => (
             <div
-              // eslint-disable-next-line react/no-array-index-key -- demo order is the only stable identifier
-              key={i}
+              key={`${d.question}-${d.answer}`}
               className="rounded border border-border/40 bg-muted/30 p-2"
             >
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

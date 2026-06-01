@@ -2030,9 +2030,13 @@ export default function ModelArchitectureDiagram({
     return () => observer.disconnect();
   }, [isExpanded, arch, resolvedTheme, expandedBlocks, toggleBlock]);
 
-  useEffect(() => {
+  // Collapse all blocks when the model changes. Done during render (not in an
+  // effect) so the reset commits in the same render as the new model.
+  const [prevModel, setPrevModel] = useState(model);
+  if (model !== prevModel) {
+    setPrevModel(model);
     setExpandedBlocks(new Set());
-  }, [model]);
+  }
 
   if (!arch) return null;
 

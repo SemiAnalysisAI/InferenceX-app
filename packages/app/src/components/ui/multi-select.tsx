@@ -88,6 +88,16 @@ function MultiSelect({
 
   const prevIsOpenRef = React.useRef(isOpen);
 
+  // Clear the search box each time the dropdown opens. Done during render (not in
+  // an effect) so it doesn't trip no-adjust-state-on-prop-change. Search is left
+  // intact while closed — the content is unmounted, so it's invisible — which lets
+  // the close-analytics effect below read the final query before the next open.
+  const [prevOpenForSearch, setPrevOpenForSearch] = React.useState(isOpen);
+  if (isOpen !== prevOpenForSearch) {
+    setPrevOpenForSearch(isOpen);
+    if (isOpen) setSearch('');
+  }
+
   React.useEffect(() => {
     const handlePointerDownOutside = (event: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -126,16 +136,16 @@ function MultiSelect({
     };
   }, [isOpen]);
 
+  // Fire search analytics when the dropdown closes, reading the final query
+  // before the next open clears it. Stays in an effect because a controlled
+  // `open` prop can close us without setIsOpen running.
   React.useEffect(() => {
     const wasOpen = prevIsOpenRef.current;
     prevIsOpenRef.current = isOpen;
 
-    if (wasOpen && !isOpen) {
-      if (searchUsedRef.current) {
-        track('multi_select_searched', { query: searchStateRef.current });
-        searchUsedRef.current = false;
-      }
-      setSearch('');
+    if (wasOpen && !isOpen && searchUsedRef.current) {
+      track('multi_select_searched', { query: searchStateRef.current });
+      searchUsedRef.current = false;
     }
   }, [isOpen]);
 
@@ -348,6 +358,7 @@ function MultiSelect({
                     setSearch(e.target.value);
                     if (e.target.value) searchUsedRef.current = true;
                   }}
+                  aria-label="Search options"
                   placeholder="Search..."
                   className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
                 />
@@ -399,9 +410,16 @@ function MultiSelect({
                           <div
                             key={option.value}
                             role="option"
+                            tabIndex={isDisabledOption ? -1 : 0}
                             aria-selected={isSelected}
                             data-slot="select-item"
                             onClick={() => !isDisabledOption && handleToggle(option.value)}
+                            onKeyDown={(e) => {
+                              if (!isDisabledOption && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                handleToggle(option.value);
+                              }
+                            }}
                             className={cn(
                               "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                               'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
@@ -428,9 +446,16 @@ function MultiSelect({
                     <div
                       key={option.value}
                       role="option"
+                      tabIndex={isDisabledOption ? -1 : 0}
                       aria-selected={isSelected}
                       data-slot="select-item"
                       onClick={() => !isDisabledOption && handleToggle(option.value)}
+                      onKeyDown={(e) => {
+                        if (!isDisabledOption && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          handleToggle(option.value);
+                        }
+                      }}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                         'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',

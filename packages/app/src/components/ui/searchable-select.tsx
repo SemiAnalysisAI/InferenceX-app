@@ -58,6 +58,16 @@ export function SearchableSelect({
     setMounted(true);
   }, []);
 
+  // Clear the search box each time the dropdown opens. Done during render (not in
+  // an effect) so it doesn't trip no-adjust-state-on-prop-change. Search is left
+  // intact while closed — the content is unmounted, so it's invisible — which lets
+  // the close branch below read the final query for analytics.
+  const [prevOpenForSearch, setPrevOpenForSearch] = React.useState(isOpen);
+  if (isOpen !== prevOpenForSearch) {
+    setPrevOpenForSearch(isOpen);
+    if (isOpen) setSearch('');
+  }
+
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -75,12 +85,9 @@ export function SearchableSelect({
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
       searchRef.current?.focus();
-    } else {
-      if (searchUsedRef.current && trackPrefix) {
-        track(`${trackPrefix}_searched`, { query: search });
-        searchUsedRef.current = false;
-      }
-      setSearch('');
+    } else if (searchUsedRef.current && trackPrefix) {
+      track(`${trackPrefix}_searched`, { query: search });
+      searchUsedRef.current = false;
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -91,22 +98,22 @@ export function SearchableSelect({
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
     const lower = search.toLowerCase();
-    return groups
-      .map((g) => ({
-        label: g.label,
-        options: g.options.filter(
-          (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
-        ),
-      }))
-      .filter((g) => g.options.length > 0);
+    return groups.flatMap((g) => {
+      const options = g.options.filter(
+        (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
+      );
+      return options.length > 0 ? [{ label: g.label, options }] : [];
+    });
   }, [groups, search]);
 
   const selectedLabel = React.useMemo(() => {
+    const labelByValue = new Map<string, string>();
     for (const group of groups) {
-      const match = group.options.find((opt) => opt.value === value);
-      if (match) return match.label;
+      for (const opt of group.options) {
+        if (!labelByValue.has(opt.value)) labelByValue.set(opt.value, opt.label);
+      }
     }
-    return undefined;
+    return labelByValue.get(value);
   }, [groups, value]);
 
   const handleSelect = (optionValue: string) => {
@@ -172,6 +179,7 @@ export function SearchableSelect({
                   setSearch(e.target.value);
                   if (e.target.value) searchUsedRef.current = true;
                 }}
+                aria-label="Search options"
                 placeholder="Search..."
                 className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
               />
@@ -211,10 +219,17 @@ export function SearchableSelect({
                     <div
                       key={option.value}
                       role="option"
+                      tabIndex={0}
                       aria-selected={isSelected}
                       data-slot="select-item"
                       data-value={option.value}
                       onClick={() => handleSelect(option.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelect(option.value);
+                        }
+                      }}
                       className={cn(
                         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
                         'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',

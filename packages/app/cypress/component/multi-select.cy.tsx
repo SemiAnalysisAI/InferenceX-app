@@ -79,6 +79,20 @@ describe('MultiSelect', () => {
     cy.get('[data-slot="select-item"]').contains('AMD MI300X').should('be.visible');
   });
 
+  it('clears the search query when the dropdown is reopened', () => {
+    cy.mount(<MultiSelectWrapper searchable={true} />);
+    cy.get('[data-slot="select-trigger"]').click();
+    cy.get('input[placeholder="Search..."]').type('MI300');
+    cy.get('[data-slot="select-item"]').should('have.length', 1);
+    // Close, then reopen
+    cy.get('body').type('{esc}');
+    cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get('[data-slot="select-trigger"]').click();
+    // Search box is empty and every option is visible again
+    cy.get('input[placeholder="Search..."]').should('have.value', '');
+    cy.get('[data-slot="select-item"]').should('have.length', OPTIONS.length);
+  });
+
   it('maxSelections prevents selecting more items', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm', 'h200-sxm']} maxSelections={2} />);
     cy.get('[data-slot="select-trigger"]').click();

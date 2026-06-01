@@ -3,7 +3,12 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { track } from '@/lib/analytics';
 import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
+
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+
+const trackMock = vi.mocked(track);
 
 let container: HTMLDivElement;
 let root: Root;
@@ -23,6 +28,7 @@ const GROUPS: SearchableSelectGroup[] = [
 ];
 
 beforeEach(() => {
+  trackMock.mockClear();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -50,6 +56,14 @@ function render(props: Partial<React.ComponentProps<typeof SearchableSelect>> = 
 function openMenu() {
   const trigger = container.querySelector('[data-testid="yaxis"]') as HTMLButtonElement;
   act(() => trigger.click());
+}
+
+// Closes the menu the same way a real outside-click does: a document-level
+// mousedown whose target is not inside the component container.
+function closeMenu() {
+  act(() => {
+    document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
 }
 
 // React 18 controlled inputs ignore direct `.value` assignment because the
@@ -126,5 +140,34 @@ describe('SearchableSelect', () => {
     expect(handle).toHaveBeenCalledExactlyOnceWith('y_inputTputPerGpu');
     // Menu closed → no select-item visible
     expect(container.querySelectorAll('[data-slot="select-item"]')).toHaveLength(0);
+  });
+
+  it('clears the search box and restores all options when reopened', () => {
+    render();
+    openMenu();
+    setSearchValue('input');
+    expect(container.querySelectorAll('[data-slot="select-item"]')).toHaveLength(1);
+
+    closeMenu();
+    openMenu();
+
+    const input = container.querySelector('input[placeholder="Search..."]') as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(container.querySelectorAll('[data-slot="select-item"]')).toHaveLength(3);
+  });
+
+  it('fires the search analytics event with the final query when closed', () => {
+    render({ trackPrefix: 'yaxis_metric' });
+    openMenu();
+    setSearchValue('input');
+    closeMenu();
+    expect(trackMock).toHaveBeenCalledWith('yaxis_metric_searched', { query: 'input' });
+  });
+
+  it('does not fire search analytics when the box was never typed in', () => {
+    render({ trackPrefix: 'yaxis_metric' });
+    openMenu();
+    closeMenu();
+    expect(trackMock).not.toHaveBeenCalled();
   });
 });

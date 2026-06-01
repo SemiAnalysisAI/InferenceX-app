@@ -261,9 +261,9 @@ export function GlobalFilterProvider({
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model)
   const availableSequences = useMemo(() => {
-    const unofficialSeqs = unofficialAvailable
-      .filter((a) => a.model === selectedModel)
-      .map((a) => a.sequence as Sequence);
+    const unofficialSeqs = unofficialAvailable.flatMap((a) =>
+      a.model === selectedModel ? [a.sequence as Sequence] : [],
+    );
     if (!availabilityRows) {
       return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : SEQUENCE_OPTIONS;
     }
@@ -282,9 +282,9 @@ export function GlobalFilterProvider({
 
   // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {
-    const unofficialPrecs = unofficialAvailable
-      .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
-      .flatMap((a) => a.precisions);
+    const unofficialPrecs = unofficialAvailable.flatMap((a) =>
+      a.model === selectedModel && a.sequence === effectiveSequence ? a.precisions : [],
+    );
     if (!availabilityRows) {
       return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
     }
@@ -330,13 +330,14 @@ export function GlobalFilterProvider({
     return latest;
   }, [availableDates, selectedRunDate]);
 
-  // Sync selectedRunDate state when effectiveRunDate changes
-  useEffect(() => {
-    if (availableDates.length > 0 && effectiveRunDate !== selectedRunDate) {
-      setSelectedRunDateBase(effectiveRunDate);
-      setSelectedRunDateRev((v) => v + 1);
-    }
-  }, [effectiveRunDate, availableDates]);
+  // Sync selectedRunDate to the derived effectiveRunDate during render. This is a
+  // convergent adjustment — effectiveRunDate is computed from selectedRunDate and
+  // availableDates and settles once they agree — so it avoids the extra commit a
+  // useEffect would add.
+  if (availableDates.length > 0 && effectiveRunDate !== selectedRunDate) {
+    setSelectedRunDateBase(effectiveRunDate);
+    setSelectedRunDateRev((v) => v + 1);
+  }
 
   // ── Workflow info ─────────────────────────────────────────────────────────
   const {
@@ -360,28 +361,29 @@ export function GlobalFilterProvider({
   // Auto-select latest run ID when availableRuns change
   const urlInitRef = useRef({ runIdApplied: false });
 
-  useEffect(() => {
-    if (availableRuns && Object.keys(availableRuns).length > 0) {
-      if (!urlInitRef.current.runIdApplied && hasUrlParam('g_runid')) {
-        const urlRunId = getUrlParam('g_runid')!;
-        urlInitRef.current.runIdApplied = true;
-        if (Object.keys(availableRuns).includes(urlRunId)) {
-          setSelectedRunId(urlRunId);
-          return;
-        }
-      }
-      urlInitRef.current.runIdApplied = true;
+  // Clear the run selection during render when no runs are available (convergent:
+  // once cleared, selectedRunId is '' and this no-ops).
+  if (Object.keys(availableRuns).length === 0 && selectedRunId !== '') {
+    setSelectedRunId('');
+  }
 
-      if (
-        !selectedRunId ||
-        (selectedRunId && !Object.keys(availableRuns).includes(selectedRunId))
-      ) {
-        const runIds = Object.keys(availableRuns);
-        const maxRunId = runIds.reduce((max, id) => (id > max ? id : max), runIds[0]);
-        setSelectedRunId(maxRunId);
+  useEffect(() => {
+    if (Object.keys(availableRuns).length === 0) return;
+
+    if (!urlInitRef.current.runIdApplied && hasUrlParam('g_runid')) {
+      const urlRunId = getUrlParam('g_runid')!;
+      urlInitRef.current.runIdApplied = true;
+      if (Object.keys(availableRuns).includes(urlRunId)) {
+        setSelectedRunId(urlRunId);
+        return;
       }
-    } else if (selectedRunId !== '') {
-      setSelectedRunId('');
+    }
+    urlInitRef.current.runIdApplied = true;
+
+    if (!selectedRunId || !Object.keys(availableRuns).includes(selectedRunId)) {
+      const runIds = Object.keys(availableRuns);
+      const maxRunId = runIds.reduce((max, id) => (id > max ? id : max), runIds[0]);
+      setSelectedRunId(maxRunId);
     }
   }, [availableRuns, selectedRunId]);
 

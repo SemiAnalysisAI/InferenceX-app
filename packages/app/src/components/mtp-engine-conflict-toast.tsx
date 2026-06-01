@@ -53,11 +53,18 @@ interface Props {
 }
 
 export function MtpEngineConflictToast({ detail, onDismiss }: Props) {
+  // Bump a sequence on each new detail so the toast remounts (re-animates) via
+  // its `key`. Done during render with a prev-prop comparison; the analytics
+  // side effect stays in an effect (track reads the stable `detail` prop).
   const [seq, setSeq] = useState(0);
+  const [prevDetail, setPrevDetail] = useState(detail);
+  if (detail !== prevDetail) {
+    setPrevDetail(detail);
+    if (detail) setSeq((n) => n + 1);
+  }
 
   useEffect(() => {
     if (!detail) return;
-    setSeq((n) => n + 1);
     track('inference_mtp_engine_conflict_blocked', {
       kind: detail.kind,
       attempted: detail.kind === 'blocked' ? detail.attempted : null,

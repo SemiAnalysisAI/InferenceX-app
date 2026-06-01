@@ -253,11 +253,13 @@ export function InferenceProvider({
   // GPU dropdown: only show configs that have data for current model + sequence + precision
   const availableGPUs = useMemo(() => {
     if (!availabilityRows) return [];
+    const dbModelKeySet = new Set(dbModelKeys);
+    const effectivePrecisionSet = new Set(effectivePrecisions);
     const hwKeys = new Set<string>();
     for (const r of availabilityRows) {
-      if (!dbModelKeys.includes(r.model)) continue;
+      if (!dbModelKeySet.has(r.model)) continue;
       if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) continue;
-      if (!effectivePrecisions.includes(r.precision)) continue;
+      if (!effectivePrecisionSet.has(r.precision)) continue;
       if (!r.hardware) continue;
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
       if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
@@ -323,10 +325,33 @@ export function InferenceProvider({
     setTrackedConfigs([]);
   }, []);
 
-  // Clear tracked configs whenever the top-level selectors change
-  useEffect(() => {
+  // Clear selector-scoped state (tracked configs, custom cost/power overrides)
+  // whenever the top-level selectors change. Done during render with a prev-deps
+  // comparison (mirroring the old effect dep array, reference equality) so the
+  // reset commits in the same render instead of forcing an extra one.
+  const [prevSelectorDeps, setPrevSelectorDeps] = useState({
+    selectedModel,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedYAxisMetric,
+  });
+  if (
+    prevSelectorDeps.selectedModel !== selectedModel ||
+    prevSelectorDeps.effectiveSequence !== effectiveSequence ||
+    prevSelectorDeps.effectivePrecisions !== effectivePrecisions ||
+    prevSelectorDeps.selectedYAxisMetric !== selectedYAxisMetric
+  ) {
+    setPrevSelectorDeps({
+      selectedModel,
+      effectiveSequence,
+      effectivePrecisions,
+      selectedYAxisMetric,
+    });
     setTrackedConfigs((prev) => (prev.length > 0 ? [] : prev));
-  }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
+    if (selectedYAxisMetric !== 'y_costUser') setUserCosts((prev) => (prev === null ? prev : null));
+    if (selectedYAxisMetric !== 'y_powerUser')
+      setUserPowers((prev) => (prev === null ? prev : null));
+  }
 
   // Ref guard: when true, filter changes don't clear the active preset.
   // FavoritePresetsDropdown sets this while applying a preset so its own
@@ -461,10 +486,10 @@ export function InferenceProvider({
     extractHwKey,
   );
 
-  // Direct fallback: apply pendingHwFilter when hwTypesWithData is already populated
-  // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
-  useEffect(() => {
-    if (!pendingHwFilter || hwTypesWithData.size === 0) return;
+  // Direct fallback: apply pendingHwFilter once hwTypesWithData is populated but
+  // useChartDataFilter didn't fire (e.g. re-selecting the same preset). Done during
+  // render — it converges because applying the filter clears the pending flag.
+  if (pendingHwFilter && hwTypesWithData.size > 0) {
     const filtered = new Set(
       [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, pendingHwFilter, selectedModel)),
     );
@@ -472,7 +497,7 @@ export function InferenceProvider({
       setActiveHwTypes(filtered);
       setPendingHwFilter(null);
     }
-  }, [pendingHwFilter, hwTypesWithData, setActiveHwTypes]);
+  }
 
   const mtpExclusion = hasMtpEngineExclusion(selectedModel);
   const toggleHwType = useCallback(
@@ -685,17 +710,11 @@ export function InferenceProvider({
     setActiveDates(allDateIds);
   }, [allDateIds, setActiveDates]);
 
-  useEffect(() => {
-    if (selectedYAxisMetric !== 'y_costUser') setUserCosts((prev) => (prev === null ? prev : null));
-    if (selectedYAxisMetric !== 'y_powerUser')
-      setUserPowers((prev) => (prev === null ? prev : null));
-  }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
-
   const modelPrefixes = useMemo(
     () =>
-      Object.entries(MODEL_PREFIX_MAPPING)
-        .filter(([, model]) => model === selectedModel)
-        .map(([prefix]) => prefix),
+      Object.entries(MODEL_PREFIX_MAPPING).flatMap(([prefix, model]) =>
+        model === selectedModel ? [prefix] : [],
+      ),
     [selectedModel],
   );
 
