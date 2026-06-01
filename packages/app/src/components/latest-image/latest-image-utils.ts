@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import type { FrameworkReleases } from '@/lib/api';
 
 /** Map framework variants to their base framework for release lookup. */
-export const FRAMEWORK_TO_BASE: Record<string, string> = {
+const FRAMEWORK_TO_BASE: Record<string, string> = {
   vllm: 'vllm',
   sglang: 'sglang',
   'dynamo-sglang': 'sglang',
@@ -12,10 +12,10 @@ export const FRAMEWORK_TO_BASE: Record<string, string> = {
 
 /**
  * Substrings that mark an image tag as unstable / pre-release. Lowercased
- * comparison — kept here (not inlined) so tests can re-import and stay in
- * sync with the runtime classifier.
+ * comparison — kept here (not inlined) to stay in sync with the runtime
+ * classifier.
  */
-export const UNSTABLE_PATTERNS = ['nightly', 'rocm/sgl-dev', 'sglang-rocm'];
+const UNSTABLE_PATTERNS = ['nightly', 'rocm/sgl-dev', 'sglang-rocm'];
 
 /** Age past which the cell is rendered at max red — anything older looks identical. */
 export const AGE_MAX_RED_DAYS = 60;

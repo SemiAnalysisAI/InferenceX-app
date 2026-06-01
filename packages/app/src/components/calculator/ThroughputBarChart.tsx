@@ -200,7 +200,7 @@ export function getCostTypeLabel(costType: CostType): string {
   return '/M tok';
 }
 
-export function generateTooltipHTML(
+function generateTooltipHTML(
   d: InterpolatedResult,
   hardwareConfig: HardwareConfig,
   mode: CalculatorMode,

@@ -1,7 +1,6 @@
 import { prepareWithSegments, walkLineRanges } from '@chenglou/pretext';
 
 import { splitLabel, type LabelSplitMode } from './axis-labels';
-import type { ChartMargin } from './types';
 
 /** Measure single-line text width using pretext (no DOM reflow). */
 export function measureTextWidth(text: string, font: string): number {
@@ -52,58 +51,4 @@ export function computeLeftMargin(labels: string[], options: LeftMarginOptions =
     }
   }
   return Math.max(minMargin, Math.ceil(maxWidth) + padding);
-}
-
-/**
- * Compute dynamic bottom margin based on x-axis tick label widths.
- * Useful when tick labels are rotated (e.g. dates at -30deg).
- *
- * @param labels - X-axis tick label strings
- * @param font - CSS font string for tick labels (default '12px sans-serif')
- * @param rotation - Label rotation in degrees (default 0, use 30 for rotated dates)
- * @param minMargin - Minimum bottom margin (default 40)
- * @param padding - Extra padding (default 16)
- */
-export function computeBottomMargin(
-  labels: string[],
-  font = '12px sans-serif',
-  rotation = 0,
-  minMargin = 40,
-  padding = 16,
-): number {
-  let maxWidth = 0;
-  for (const label of labels) {
-    maxWidth = Math.max(maxWidth, measureTextWidth(label, font));
-  }
-  // When rotated, the vertical space needed is width * sin(angle)
-  const radians = (rotation * Math.PI) / 180;
-  const verticalSpace = rotation > 0 ? maxWidth * Math.sin(radians) : 0;
-  return Math.max(minMargin, Math.ceil(verticalSpace) + padding);
-}
-
-/**
- * Compute a full ChartMargin with dynamic left and bottom based on label content.
- *
- * @param options.yLabels - Y-axis labels for left margin computation
- * @param options.xLabels - X-axis labels for bottom margin computation
- * @param options.xFont - CSS font for x-axis labels
- * @param options.xRotation - X-axis label rotation in degrees
- * @param options.base - Base margins to start from
- */
-export function computeDynamicMargins(options: {
-  yLabels?: string[];
-  xLabels?: string[];
-  xFont?: string;
-  xRotation?: number;
-  base?: Partial<ChartMargin>;
-}): ChartMargin {
-  const { yLabels, xLabels, xFont, xRotation = 0, base = {} } = options;
-  return {
-    top: base.top ?? 24,
-    right: base.right ?? 24,
-    bottom: xLabels
-      ? computeBottomMargin(xLabels, xFont, xRotation, base.bottom ?? 40)
-      : (base.bottom ?? 40),
-    left: yLabels ? computeLeftMargin(yLabels, { minMargin: base.left ?? 60 }) : (base.left ?? 60),
-  };
 }

@@ -79,5 +79,3 @@ export function parseFeedbackBody(raw: unknown): ParseResult {
     },
   };
 }
-
-export const FIELD_LIMITS = { MAX_FIELD_LEN, MAX_PAGE_PATH_LEN };

@@ -94,18 +94,10 @@ export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
   (m) => MODEL_CONFIG[m].category !== 'hidden',
 );
 
-export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
-export const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');
-export const EXPERIMENTAL_MODELS: ReadonlySet<Model> = modelsByCategory('experimental');
+const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');
 
-export function isModelDefault(model: Model): boolean {
-  return DEFAULT_MODELS.has(model);
-}
 export function isModelDeprecated(model: Model): boolean {
   return DEPRECATED_MODELS.has(model);
-}
-export function isModelExperimental(model: Model): boolean {
-  return EXPERIMENTAL_MODELS.has(model);
 }
 
 export function getModelCategory(model: Model): CategoryTag {
@@ -158,7 +150,7 @@ const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string; catego
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
 
-export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
+const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
   (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][]).flatMap(
     ([s, c]) => (c.category === 'deprecated' ? [s] : []),
   ),

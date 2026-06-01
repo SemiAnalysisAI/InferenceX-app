@@ -6,7 +6,6 @@ import {
   getShapeConfig,
   getShapeKeyForPrecision,
   applyNormalState,
-  applyHoverState,
 } from '@/lib/chart-rendering';
 
 import type { ContinuousScale } from '../types';
@@ -148,117 +147,6 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
   }
 
   return points;
-}
-
-/**
- * Attach scatter point tooltip handlers (hover, click, pin).
- * Works for both ScatterGraph and GPUGraph.
- */
-export function attachScatterTooltipHandlers<
-  T extends { precision: string; x: number; y: number; hwKey?: string | number },
->(
-  points: d3.Selection<SVGGElement, T, SVGGElement, unknown>,
-  config: {
-    xScale: ContinuousScale;
-    yScale: ContinuousScale;
-    svgRef: React.RefObject<SVGSVGElement | null> | React.RefObject<SVGSVGElement>;
-    tooltip: d3.Selection<HTMLDivElement | null, unknown, null, undefined>;
-    container: HTMLElement;
-    rulerGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
-    verticalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
-    horizontalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
-    isPinned: () => boolean;
-    pinTooltip: (point: T, isOverlay: boolean) => void;
-    generateTooltipContent: (d: T, pinned: boolean) => string;
-    trackEvent?: (hw: string, x: number, y: number) => void;
-    /** Called after a point is clicked and tooltip is pinned. Use to attach handlers to tooltip buttons. */
-    onPointClick?: (
-      d: T,
-      tooltip: d3.Selection<HTMLDivElement | null, unknown, null, undefined>,
-    ) => void;
-    /** Called on double-click of a point. */
-    onPointDblClick?: (event: MouseEvent, d: T) => void;
-    /** Ref to current scales — when provided, avoids stale-closure bugs after scale recalculation */
-    scalesRef?: React.RefObject<{ xScale: ContinuousScale; yScale: ContinuousScale } | null>;
-    /** Selected precisions, in selection order; controls hover shape key. */
-    selectedPrecisions?: readonly string[];
-  },
-): void {
-  const {
-    xScale,
-    yScale,
-    svgRef,
-    tooltip,
-    container,
-    rulerGroup,
-    verticalRuler,
-    horizontalRuler,
-    isPinned,
-    pinTooltip,
-    generateTooltipContent,
-    trackEvent,
-    onPointClick,
-    onPointDblClick,
-    scalesRef,
-    selectedPrecisions,
-  } = config;
-
-  points
-    .on('mouseenter', function (_event, d) {
-      if (isPinned()) return;
-      applyHoverState(
-        d3.select(this).select('.visible-shape') as any,
-        resolveShapeKey(d.precision, selectedPrecisions),
-      );
-      tooltip.style('opacity', 1).style('display', 'block').style('pointer-events', 'none');
-      const curXScale = scalesRef?.current?.xScale ?? xScale;
-      const curYScale = scalesRef?.current?.yScale ?? yScale;
-      const ct = d3.zoomTransform(svgRef.current!);
-      rulerGroup.style('display', 'block');
-      verticalRuler
-        ?.attr('x1', ct.rescaleX(curXScale)(d.x))
-        .attr('x2', ct.rescaleX(curXScale)(d.x));
-      horizontalRuler
-        ?.attr('y1', ct.rescaleY(curYScale)(d.y))
-        .attr('y2', ct.rescaleY(curYScale)(d.y));
-      tooltip.html(generateTooltipContent(d, false));
-    })
-    .on('mousemove', (event) => {
-      if (isPinned()) return;
-      const [mx, my] = d3.pointer(event, container);
-      const pos = computeTooltipPosition(mx, my, tooltip, container);
-      tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
-    })
-    .on('mouseleave', function (_event, d) {
-      if (isPinned()) return;
-      applyNormalState(
-        d3.select(this).select('.visible-shape') as any,
-        resolveShapeKey(d.precision, selectedPrecisions),
-      );
-      tooltip.style('opacity', 0).style('display', 'none');
-      rulerGroup.style('display', 'none');
-    })
-    .on('click', (event, d) => {
-      event.stopPropagation();
-      const [mx, my] = d3.pointer(event, container);
-      tooltip.html(generateTooltipContent(d, true));
-      const pos = computeTooltipPosition(mx, my, tooltip, container);
-      tooltip
-        .style('left', `${pos.left}px`)
-        .style('top', `${pos.top}px`)
-        .style('opacity', 1)
-        .style('display', 'block')
-        .style('pointer-events', 'auto');
-      pinTooltip(d, false);
-      onPointClick?.(d, tooltip);
-      trackEvent?.(String(d.hwKey), d.x, d.y);
-    })
-    .on('dblclick', (event, d) => {
-      if (!onPointDblClick) return;
-      event.stopPropagation();
-      event.preventDefault();
-      onPointDblClick(event, d);
-    });
 }
 
 /** Compute tooltip left/top, flipping when it would overflow the chart container. */
