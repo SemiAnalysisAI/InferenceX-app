@@ -201,11 +201,16 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     return hwTypes;
   }, [unofficialChartData, unofficialEvalRows]);
 
-  // Reset overlay state when chart data changes
-  useEffect(() => {
+  // Reset overlay state when chart data changes. Done during render with a
+  // prev-value comparison instead of an effect so the reset commits in the same
+  // render rather than after an extra pass. `allOverlayHwTypes` is memoized, so
+  // its identity only changes when the underlying overlay data changes.
+  const [prevOverlayHwTypes, setPrevOverlayHwTypes] = useState(allOverlayHwTypes);
+  if (allOverlayHwTypes !== prevOverlayHwTypes) {
+    setPrevOverlayHwTypes(allOverlayHwTypes);
     setActiveOverlayHwTypes(allOverlayHwTypes);
     setLocalOfficialOverrideRaw(null);
-  }, [allOverlayHwTypes]);
+  }
 
   const toggleOverlayHwType = useCallback(
     (key: string) => {

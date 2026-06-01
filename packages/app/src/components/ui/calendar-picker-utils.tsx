@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -166,9 +166,22 @@ export function useCalendarMonth(
   const selectionResetKey = deps.map((dep) => String(dep ?? '')).join('\u001F');
   const [currentMonth, setCurrentMonth] = useState(() => parseCalendarDate(resetMonthKey));
 
-  useEffect(() => {
+  // Snap the visible month back to the computed reset month whenever any reset
+  // key changes (new selection, available dates, or bounds). Done during render
+  // with a prev-key comparison instead of an effect so the visible month is
+  // correct in the same render rather than after an extra commit; the user can
+  // still freely navigate months between resets via setCurrentMonth.
+  const combinedResetKey = [
+    availableDatesKey,
+    maxAllowedDateKey,
+    resetMonthKey,
+    selectionResetKey,
+  ].join('');
+  const [prevResetKey, setPrevResetKey] = useState(combinedResetKey);
+  if (combinedResetKey !== prevResetKey) {
+    setPrevResetKey(combinedResetKey);
     setCurrentMonth(parseCalendarDate(resetMonthKey));
-  }, [availableDatesKey, maxAllowedDateKey, resetMonthKey, selectionResetKey]);
+  }
 
   return [currentMonth, setCurrentMonth] as const;
 }

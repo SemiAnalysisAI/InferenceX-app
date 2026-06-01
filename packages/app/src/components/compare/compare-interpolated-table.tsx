@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
@@ -118,9 +118,18 @@ export function CompareInterpolatedTable({
   const hasClientDataB = gpuDataPointsB.length > 0;
   const hasClientData = hasClientDataA || hasClientDataB;
 
-  // When client-side data changes (model/sequence/precision), recompute all columns
-  useEffect(() => {
-    if (!hasClientData) return;
+  // When client-side data changes (model/sequence/precision), recompute the
+  // interpolated a/b values for all columns while preserving each column's
+  // user-set target. Done during render with a prev-prop comparison instead of
+  // an effect so the recompute commits in the same render rather than after an
+  // extra pass (which briefly showed stale SSR values). Prev refs start as null
+  // so the first render that has client data recomputes (replacing SSR rows),
+  // matching the original mount-time effect.
+  const [prevDataA, setPrevDataA] = useState<GPUDataPoint[] | null>(null);
+  const [prevDataB, setPrevDataB] = useState<GPUDataPoint[] | null>(null);
+  if (hasClientData && (gpuDataPointsA !== prevDataA || gpuDataPointsB !== prevDataB)) {
+    setPrevDataA(gpuDataPointsA);
+    setPrevDataB(gpuDataPointsB);
     setColumns((prev) =>
       prev.map((col) => ({
         ...col,
@@ -132,7 +141,7 @@ export function CompareInterpolatedTable({
           : col.b,
       })),
     );
-  }, [gpuDataPointsA, gpuDataPointsB, hasClientData, hasClientDataA, hasClientDataB]);
+  }
 
   const reinterpolate = useCallback(
     (target: number, prevA: InterpolatedResult | null, prevB: InterpolatedResult | null) => {

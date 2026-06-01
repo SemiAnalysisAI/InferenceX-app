@@ -30,6 +30,9 @@ export interface QuoteCarouselProps {
   intervalMs?: number;
 }
 
+// Stable empty default so a fresh `{}` per render doesn't churn derived deps.
+const EMPTY_OVERRIDES: NonNullable<QuoteCarouselProps['overrides']> = {};
+
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -100,7 +103,7 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
 
 export function QuoteCarousel({
   quotes,
-  overrides = {},
+  overrides = EMPTY_OVERRIDES,
   moreHref,
   intervalMs = 8_000,
 }: QuoteCarouselProps) {

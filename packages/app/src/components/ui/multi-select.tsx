@@ -6,6 +6,9 @@ import * as React from 'react';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
+// Stable empty default so a fresh `[]` per render doesn't defeat child memoization.
+const EMPTY_VALUES: string[] = [];
+
 interface MultiSelectOption {
   value: string;
   label: string;
@@ -43,7 +46,7 @@ interface MultiSelectProps {
 function MultiSelect({
   options,
   sections,
-  value = [],
+  value = EMPTY_VALUES,
   onChange,
   triggerId,
   triggerTestId,

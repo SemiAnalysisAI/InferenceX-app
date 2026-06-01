@@ -676,13 +676,19 @@ export function InferenceProvider({
     pendingActiveHwTypes,
   ]);
 
-  // Remove selected GPUs that no longer have data for current filters
-  useEffect(() => {
-    if (selectedGPUs.length === 0 || availableGPUs.length === 0) return;
-    const validKeys = new Set(availableGPUs.map((g) => g.value));
-    const valid = selectedGPUs.filter((g) => validKeys.has(g));
-    if (valid.length !== selectedGPUs.length) setSelectedGPUs(valid);
-  }, [availableGPUs]);
+  // Remove selected GPUs that no longer have data for current filters. Done
+  // during render with a prev-value comparison instead of an effect so the prune
+  // commits in the same render. `availableGPUs` is memoized, so its identity only
+  // changes when the available set changes.
+  const [prevAvailableGPUs, setPrevAvailableGPUs] = useState(availableGPUs);
+  if (availableGPUs !== prevAvailableGPUs) {
+    setPrevAvailableGPUs(availableGPUs);
+    if (selectedGPUs.length > 0 && availableGPUs.length > 0) {
+      const validKeys = new Set(availableGPUs.map((g) => g.value));
+      const valid = selectedGPUs.filter((g) => validKeys.has(g));
+      if (valid.length !== selectedGPUs.length) setSelectedGPUs(valid);
+    }
+  }
 
   useEffect(() => {
     if (selectedGPUs.length === 0) {
@@ -706,9 +712,15 @@ export function InferenceProvider({
     }
   }, [dateRangeAvailableDates]);
 
-  useEffect(() => {
+  // Reset the active (toggleable) date set whenever the available date ids
+  // change. Done during render with a prev-value comparison instead of an effect
+  // so the reset commits in the same render. `allDateIds` is memoized, so its
+  // identity only changes when the underlying date set changes.
+  const [prevAllDateIds, setPrevAllDateIds] = useState(allDateIds);
+  if (allDateIds !== prevAllDateIds) {
+    setPrevAllDateIds(allDateIds);
     setActiveDates(allDateIds);
-  }, [allDateIds, setActiveDates]);
+  }
 
   const modelPrefixes = useMemo(
     () =>

@@ -60,13 +60,15 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
   const triggerCountsRef = useRef<Record<string, number>>({});
   const eventDetailRef = useRef<Record<string, unknown> | null>(null);
-  const sessionDismissedRef = useRef<Set<string>>(new Set());
+  // Lazy init so the Set isn't rebuilt and discarded on every render.
+  const sessionDismissedRef = useRef<Set<string> | null>(null);
+  sessionDismissedRef.current ??= new Set();
 
   const activeBanner = activeBannerId ? scopeNudges.find((n) => n.id === activeBannerId) : null;
   const activeOverlay = activeOverlayId ? scopeNudges.find((n) => n.id === activeOverlayId) : null;
 
   const showNudge = useCallback((def: NudgeDefinition) => {
-    if (sessionDismissedRef.current.has(def.id)) return;
+    if (sessionDismissedRef.current!.has(def.id)) return;
     if (!isEligible(def)) return;
 
     if (def.type === 'banner') {
@@ -86,7 +88,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (!activeBanner) return;
     trackNudgeEvent(activeBanner, 'dismissed');
     markDismissed(activeBanner.storageKey, activeBanner.dismissal);
-    sessionDismissedRef.current.add(activeBanner.id);
+    sessionDismissedRef.current!.add(activeBanner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
   }, [activeBanner]);
@@ -95,7 +97,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (!activeOverlay) return;
     trackNudgeEvent(activeOverlay, 'dismissed');
     markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
-    sessionDismissedRef.current.add(activeOverlay.id);
+    sessionDismissedRef.current!.add(activeOverlay.id);
     setActiveOverlayId(null);
     overlayShownRef.current = false;
   }, [activeOverlay]);
@@ -109,7 +111,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     // `bannerShownRef`/`activeBannerId` set — the slot is still occupied.
     if (!dismissesOnAction(activeBanner)) return;
     markDismissed(activeBanner.storageKey, activeBanner.dismissal);
-    sessionDismissedRef.current.add(activeBanner.id);
+    sessionDismissedRef.current!.add(activeBanner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
   }, [activeBanner]);
@@ -127,7 +129,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
     if (!dismissesOnAction(activeOverlay)) return;
     markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
-    sessionDismissedRef.current.add(activeOverlay.id);
+    sessionDismissedRef.current!.add(activeOverlay.id);
     setActiveOverlayId(null);
     overlayShownRef.current = false;
   }, [activeOverlay]);
@@ -142,7 +144,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
     for (const def of sorted) {
       if (!isEligible(def)) continue;
-      if (sessionDismissedRef.current.has(def.id)) continue;
+      if (sessionDismissedRef.current!.has(def.id)) continue;
 
       const triggers = Array.isArray(def.trigger) ? def.trigger : [def.trigger];
 
@@ -176,7 +178,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
           setActiveOverlayId(null);
           overlayShownRef.current = false;
         }
-        sessionDismissedRef.current.add(def.id);
+        sessionDismissedRef.current!.add(def.id);
         if (def.permanentSuppressKey) {
           try {
             localStorage.setItem(def.permanentSuppressKey, '1');

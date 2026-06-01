@@ -5,7 +5,9 @@ import { track } from '@/lib/analytics';
 
 export function ReadingProgressBar({ slug }: { slug: string }) {
   const [progress, setProgress] = useState(0);
-  const firedRef = useRef<Set<number>>(new Set());
+  // Lazy init so the Set isn't rebuilt and discarded on every render.
+  const firedRef = useRef<Set<number> | null>(null);
+  firedRef.current ??= new Set();
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
@@ -23,9 +25,10 @@ export function ReadingProgressBar({ slug }: { slug: string }) {
 
         setProgress(p);
 
+        const fired = firedRef.current!;
         for (const milestone of [25, 50, 75, 100]) {
-          if (p * 100 >= milestone && !firedRef.current.has(milestone)) {
-            firedRef.current.add(milestone);
+          if (p * 100 >= milestone && !fired.has(milestone)) {
+            fired.add(milestone);
             track('blog_read_milestone', { milestone, slug });
           }
         }

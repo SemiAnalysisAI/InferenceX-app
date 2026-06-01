@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
 
@@ -135,9 +135,13 @@ export function DateRangePicker({
     setOpen(isOpen);
   };
 
-  useEffect(() => {
+  // Clear any error whenever the dialog open state changes (render-time reset
+  // instead of an effect, so it applies in the same render rather than after).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     setError('');
-  }, [open]);
+  }
 
   return (
     <div className="space-y-2">

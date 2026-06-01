@@ -65,10 +65,13 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu on route change
-  useEffect(() => {
+  // Close menu on route change (render-time reset instead of an effect, so the
+  // menu closes in the same render the path changes rather than a frame later).
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setMobileMenuOpen(false);
-  }, [pathname]);
+  }
 
   // Close menu on click outside or Escape
   useEffect(() => {

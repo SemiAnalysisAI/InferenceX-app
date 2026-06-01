@@ -152,16 +152,24 @@ export default function ThroughputCalculatorDisplay() {
     }
   }, [availableHwKeys]);
 
-  // Clamp target into range when data changes
-  useEffect(() => {
-    if (!hasData) return;
-    const { min, max } = ranges.interactivity;
-    if (targetValue < min || targetValue > max) {
-      const clamped = Math.max(min, Math.min(max, targetValue));
-      setTargetValue(clamped);
-      setInputValue(String(clamped));
+  // Clamp the (user-editable) target back into range when the data's range
+  // changes. Done during render with a prev-key comparison instead of an effect
+  // so the clamp commits in the same render rather than after an extra pass.
+  const interactivityRangeKey = hasData
+    ? `${ranges.interactivity.min},${ranges.interactivity.max}`
+    : '';
+  const [prevRangeKey, setPrevRangeKey] = useState(interactivityRangeKey);
+  if (interactivityRangeKey !== prevRangeKey) {
+    setPrevRangeKey(interactivityRangeKey);
+    if (hasData) {
+      const { min, max } = ranges.interactivity;
+      if (targetValue < min || targetValue > max) {
+        const clamped = Math.max(min, Math.min(max, targetValue));
+        setTargetValue(clamped);
+        setInputValue(String(clamped));
+      }
     }
-  }, [hasData, ranges]);
+  }
 
   const results: InterpolatedResult[] = useMemo(() => {
     if (!hasData) return [];

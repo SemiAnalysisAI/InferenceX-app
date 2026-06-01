@@ -73,10 +73,14 @@ export function useResponsiveChartDimensions(
     [],
   );
 
-  // update dimensions when height changes
-  useEffect(() => {
+  // Sync the height prop into dimensions whenever it changes, preserving the
+  // independently-observed width. Done during render with a prev-prop comparison
+  // instead of an effect so the new height commits in the same render.
+  const [prevHeight, setPrevHeight] = useState(height);
+  if (height !== prevHeight) {
+    setPrevHeight(height);
     setDimensions((prev) => ({ ...prev, height }));
-  }, [height]);
+  }
 
   return {
     dimensions,
