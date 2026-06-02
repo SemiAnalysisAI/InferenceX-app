@@ -1,7 +1,6 @@
 'use client';
 
 import { Pause, Play, RotateCcw, Video } from 'lucide-react';
-import { flushSync } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -22,21 +21,10 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 import { buildReplayTimeline } from './buildReplayTimeline';
-import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
 import { buildFrameData, dateAtFraction, shouldCommitFraction, spanMs } from './replayFrameData';
 import { useReducedMotion } from './useReducedMotion';
-
-type Mp4ExportGuard = (value: unknown) => value is Mp4ExportError;
-
-// Lowercase pipeline tokens like "mux"/"flush" are jargon in a user-facing
-// banner. The raw stage still flows through telemetry — only the user copy
-// is humanized.
-const STAGE_LABELS: Partial<Record<Mp4ExportStage, string>> = {
-  render: 'while rendering frames',
-  encode: 'while encoding video',
-  flush: 'while finalizing video',
-  mux: 'while finalizing video',
-};
+import { useReplayExport } from './useReplayExport';
+import { useReplaySvgOffset } from './useReplaySvgOffset';
 
 interface ReplayPanelProps {
   parentChartId: string;
@@ -47,6 +35,169 @@ interface ReplayPanelProps {
 
 const SPEED_OPTIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const REPLAY_BODY_MIN_HEIGHT = 480;
+
+// Shared loading / "not enough history" wrapper for the two early-return states.
+function ReplayPlaceholder({ parentChartId, message }: { parentChartId: string; message: string }) {
+  return (
+    <div
+      className="p-4 sm:p-6 flex flex-col"
+      data-testid={`replay-panel-${parentChartId}`}
+      style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
+    >
+      <h3 className="text-base font-semibold">Replay over time</h3>
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+interface ReplayControlsProps {
+  playing: boolean;
+  fraction: number;
+  currentDate: string;
+  speed: number;
+  isExporting: boolean;
+  exportProgress: number | null;
+  hasWebCodecs: boolean;
+  onPlayPause: () => void;
+  onReset: () => void;
+  onScrub: (value: number) => void;
+  onScrubKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onSpeedChange: (v: number) => void;
+  onExportMp4: () => void;
+  onCancelExport: () => void;
+}
+
+// Playback toolbar: play/pause, reset, scrubber, speed select, export + cancel.
+function ReplayControls({
+  playing,
+  fraction,
+  currentDate,
+  speed,
+  isExporting,
+  exportProgress,
+  hasWebCodecs,
+  onPlayPause,
+  onReset,
+  onScrub,
+  onScrubKeyDown,
+  onSpeedChange,
+  onExportMp4,
+  onCancelExport,
+}: ReplayControlsProps) {
+  return (
+    <div
+      className={cn(
+        'no-export mt-4 flex flex-wrap items-center gap-3 px-1',
+        isExporting && 'opacity-60 pointer-events-none',
+      )}
+    >
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={onPlayPause}
+        aria-label={playing ? 'Pause replay' : 'Play replay'}
+        data-testid="replay-play-pause"
+        className="gap-1"
+      >
+        {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+        {playing ? 'Pause' : 'Play'}
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={onReset}
+        aria-label="Reset to start"
+        data-testid="replay-reset"
+      >
+        <RotateCcw className="size-4" />
+      </Button>
+      <input
+        type="range"
+        min={0}
+        max={1000}
+        value={Math.round(fraction * 1000)}
+        step={1}
+        onChange={(e) => onScrub(Number(e.target.value) / 1000)}
+        onKeyDown={onScrubKeyDown}
+        className="flex-1 min-w-[120px] h-2 cursor-pointer accent-foreground"
+        aria-label="Replay timeline"
+        aria-valuetext={currentDate || undefined}
+        data-testid="replay-scrubber"
+      />
+      <span className="text-xs tabular-nums text-muted-foreground min-w-[5.5rem] text-right">
+        {currentDate}
+      </span>
+      <Select value={String(speed)} onValueChange={(v) => onSpeedChange(Number(v))}>
+        <SelectTrigger
+          className="h-8 w-[5.5rem]"
+          aria-label="Playback speed"
+          data-testid="replay-speed-select"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {SPEED_OPTIONS.map((v) => (
+            <SelectItem key={v} value={String(v)} data-testid={`replay-speed-${v}x`}>
+              {v}×
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        variant="default"
+        onClick={onExportMp4}
+        disabled={isExporting || !hasWebCodecs}
+        data-testid="replay-export-mp4"
+        className="gap-1"
+        title={
+          hasWebCodecs ? undefined : 'MP4 export requires a Chromium-based browser (Chrome, Edge).'
+        }
+      >
+        <Video className="size-4" />
+        {isExporting
+          ? exportProgress === null
+            ? 'Exporting…'
+            : `Exporting ${Math.round(exportProgress * 100)}%`
+          : 'Export MP4'}
+      </Button>
+      {isExporting && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onCancelExport}
+          data-testid="replay-export-cancel"
+          className="pointer-events-auto"
+        >
+          Cancel
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// Dismissible MP4 export error banner.
+function ReplayExportError({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div
+      role="alert"
+      data-testid="replay-export-error"
+      className="no-export mt-3 flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+    >
+      <span className="flex-1">MP4 export failed: {message}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="text-destructive/70 hover:text-destructive cursor-pointer"
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
 
 /**
  * Replay panel that drives the actual `<ScatterGraph>` with interpolated frame
@@ -90,96 +241,15 @@ export default function ReplayPanel({
     inference.selectedPrecisions,
   ]);
 
-  // Track the SVG's position inside our relative wrapper so the date overlay
-  // can anchor its bottom-right to the chart plot's top-right (the wrapper
-  // also contains the legend, so we can't anchor to the wrapper edge).
-  // Callback ref — fires when the wrapper element mounts/unmounts, including
-  // after the panel transitions out of the loading state. A useEffect with
-  // [] deps would have run before the wrapper existed and never re-fired.
-  const [svgOffset, setSvgOffset] = useState<{ right: number; top: number } | null>(null);
-  const observersRef = useRef<{ size: ResizeObserver; mutation: MutationObserver } | null>(null);
-  const setChartWrapperEl = useCallback((wrapper: HTMLDivElement | null) => {
-    if (observersRef.current) {
-      observersRef.current.size.disconnect();
-      observersRef.current.mutation.disconnect();
-      observersRef.current = null;
-    }
-    if (!wrapper) {
-      setSvgOffset(null);
-      return;
-    }
-    let svgEl: SVGSVGElement | null = null;
-    const measure = () => {
-      const svg = wrapper.querySelector('svg');
-      if (!svg) return;
-      const wRect = wrapper.getBoundingClientRect();
-      const sRect = svg.getBoundingClientRect();
-      // When the legend sits to the right of the SVG, anchor the date's right
-      // edge to the legend's left edge (with a small gap) so wide dates like
-      // "2026-05-13" can't bleed into the legend column. Fall back to the
-      // SVG's right edge when no legend column is present (mobile/stacked).
-      // The legend container is positioned over the right edge of the SVG, so
-      // its bounding rect overlaps the SVG horizontally — anchor the date's
-      // right edge to the legend's left edge whenever it's present rather
-      // than checking for non-overlap.
-      const legend = wrapper.querySelector<HTMLElement>('[data-testid="chart-legend"]');
-      const legendRect = legend?.getBoundingClientRect();
-      const rightAnchor = legendRect
-        ? wRect.right - legendRect.left + 12
-        : wRect.right - sRect.right + 10;
-      setSvgOffset((prev) => {
-        const next = {
-          right: Math.max(0, rightAnchor),
-          top: sRect.top - wRect.top + 24,
-        };
-        if (prev && prev.right === next.right && prev.top === next.top) return prev;
-        return next;
-      });
-      if (svgEl !== svg) {
-        sizeRO.observe(svg);
-        svgEl = svg;
-      }
-    };
-    const sizeRO = new ResizeObserver(measure);
-    sizeRO.observe(wrapper);
-    const mo = new MutationObserver(measure);
-    mo.observe(wrapper, { childList: true, subtree: true });
-    observersRef.current = { size: sizeRO, mutation: mo };
-    measure();
-  }, []);
-  useEffect(
-    () => () => {
-      observersRef.current?.size.disconnect();
-      observersRef.current?.mutation.disconnect();
-      observersRef.current = null;
-    },
-    [],
-  );
+  const { svgOffset, setChartWrapperEl } = useReplaySvgOffset();
 
   const panelRef = useRef<HTMLDivElement>(null);
 
   const [fraction, setFraction] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState<number | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
-
-  // Pre-flight feature detection so the Export button is disabled with a clear
-  // reason on browsers that lack WebCodecs (Firefox today, older Safari).
-  const hasWebCodecs = typeof VideoEncoder !== 'undefined';
-  const unavailableReportedRef = useRef(false);
-  useEffect(() => {
-    if (!hasWebCodecs && !unavailableReportedRef.current) {
-      unavailableReportedRef.current = true;
-      track('inference_replay_export_unavailable', {
-        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
-      });
-    }
-  }, [hasWebCodecs]);
 
   const speedRef = useRef(speed);
   speedRef.current = speed;
@@ -199,6 +269,24 @@ export default function ReplayPanel({
     const force = opts?.force ?? false;
     if (force || shouldCommitFraction(prev, clamped)) setFraction(clamped);
   }, []);
+
+  const {
+    isExporting,
+    exportProgress,
+    exportError,
+    hasWebCodecs,
+    setExportError,
+    handleExportMp4,
+    handleCancelExport,
+  } = useReplayExport({
+    timeline,
+    selectedModel,
+    chartDefinition,
+    parentChartId,
+    panelRef,
+    commitFraction,
+    setPlaying,
+  });
 
   useEffect(() => {
     if (!playing || !timeline) return;
@@ -340,143 +428,16 @@ export default function ReplayPanel({
     setPlaying(false);
   }, [commitFraction]);
 
-  const handleCancelExport = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
-
-  const handleExportMp4 = useCallback(async () => {
-    if (!timeline) return;
-    setPlaying(false);
-    setIsExporting(true);
-    setExportProgress(0);
-    setExportError(null);
-    const ac = new AbortController();
-    abortRef.current = ac;
-    const startedAt = performance.now();
-    track('inference_replay_export_started', {
-      model: selectedModel,
-      chartType: chartDefinition.chartType,
-      hasWebCodecs,
-    });
-    let stage: Mp4ExportStage = 'init';
-    let frameCount = 0;
-    let lastProgressAt = startedAt;
-    // Late-bound so the catch can narrow the error after the module loads.
-    let guard: Mp4ExportGuard | null = null;
-    try {
-      const mod = await import('./exportMp4');
-      const { exportReplayMp4 } = mod;
-      guard = mod.isMp4ExportError;
-      // Export duration is deterministic from timeline length, NOT playback speed
-      // — the MP4 is an artifact of the dataset, not a recording of the current
-      // UI session. Capped at 60s.
-      const durationSec = Math.max(2, Math.min(60, spanMs(timeline.dates.length) / 1000));
-      const root = panelRef.current;
-      if (!root) throw new Error('Replay panel element is not mounted.');
-      await exportReplayMp4({
-        captureRoot: root,
-        fileName: `InferenceX_${selectedModel}_${chartDefinition.chartType}_replay`,
-        durationSec,
-        signal: ac.signal,
-        renderFrame: async (t) => {
-          // flushSync forces React to commit synchronously; two RAFs let the
-          // browser paint before the capture step reads back the DOM.
-          flushSync(() => commitFraction(t, { force: true }));
-          await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-          });
-        },
-        onStage: (s) => {
-          stage = s;
-        },
-        onProgress: (p) => {
-          lastProgressAt = performance.now();
-          frameCount = Math.round(p * durationSec * 30);
-          setExportProgress(p);
-        },
-      });
-      track('inference_replay_export_completed', {
-        model: selectedModel,
-        chartType: chartDefinition.chartType,
-        durationMs: Math.round(performance.now() - startedAt),
-      });
-    } catch (error) {
-      if (ac.signal.aborted) {
-        track('inference_replay_export_cancelled', {
-          model: selectedModel,
-          chartType: chartDefinition.chartType,
-          frameCount,
-          stage,
-          durationMs: Math.round(performance.now() - startedAt),
-        });
-        return;
-      }
-      console.error('MP4 export failed', error);
-      const message = error instanceof Error ? error.message : 'Export failed.';
-      const errorName = error instanceof Error ? error.name : 'unknown';
-      let encoderState: VideoEncoder['state'] | 'unknown' = 'unknown';
-      let queuedFrames = 0;
-      if (guard?.(error)) {
-        stage = error.stage;
-        encoderState = error.encoderState;
-        queuedFrames = error.queuedFrames;
-      }
-      const elapsedSinceLastProgressMs = Math.round(performance.now() - lastProgressAt);
-      const stageLabel = STAGE_LABELS[stage];
-      setExportError(
-        hasWebCodecs
-          ? `${message}${stageLabel ? ` (${stageLabel})` : ''}`
-          : 'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
-      );
-      track('inference_replay_export_failed', {
-        reason: message.slice(0, 500),
-        errorName,
-        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
-        hasWebCodecs,
-        frameCount,
-        durationMs: Math.round(performance.now() - startedAt),
-        stage,
-        encoderState,
-        queuedFrames,
-        elapsedSinceLastProgressMs,
-      });
-    } finally {
-      setIsExporting(false);
-      setExportProgress(null);
-      abortRef.current = null;
-    }
-  }, [chartDefinition.chartType, parentChartId, selectedModel, timeline, hasWebCodecs]);
-
   if (historyQuery.isLoading || !timeline) {
-    return (
-      <div
-        className="p-4 sm:p-6 flex flex-col"
-        data-testid={`replay-panel-${parentChartId}`}
-        style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
-      >
-        <h3 className="text-base font-semibold">Replay over time</h3>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Loading benchmark history…</p>
-        </div>
-      </div>
-    );
+    return <ReplayPlaceholder parentChartId={parentChartId} message="Loading benchmark history…" />;
   }
 
   if (timeline.dates.length < 2) {
     return (
-      <div
-        className="p-4 sm:p-6 flex flex-col"
-        data-testid={`replay-panel-${parentChartId}`}
-        style={{ minHeight: REPLAY_BODY_MIN_HEIGHT + 140 }}
-      >
-        <h3 className="text-base font-semibold">Replay over time</h3>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">
-            Not enough history yet to replay this chart; at least two distinct benchmark dates are
-            required.
-          </p>
-        </div>
-      </div>
+      <ReplayPlaceholder
+        parentChartId={parentChartId}
+        message="Not enough history yet to replay this chart; at least two distinct benchmark dates are required."
+      />
     );
   }
 
@@ -510,112 +471,24 @@ export default function ReplayPanel({
         </div>
       </div>
 
-      <div
-        className={cn(
-          'no-export mt-4 flex flex-wrap items-center gap-3 px-1',
-          isExporting && 'opacity-60 pointer-events-none',
-        )}
-      >
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handlePlayPause}
-          aria-label={playing ? 'Pause replay' : 'Play replay'}
-          data-testid="replay-play-pause"
-          className="gap-1"
-        >
-          {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-          {playing ? 'Pause' : 'Play'}
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleReset}
-          aria-label="Reset to start"
-          data-testid="replay-reset"
-        >
-          <RotateCcw className="size-4" />
-        </Button>
-        <input
-          type="range"
-          min={0}
-          max={1000}
-          value={Math.round(fraction * 1000)}
-          step={1}
-          onChange={(e) => handleScrub(Number(e.target.value) / 1000)}
-          onKeyDown={handleScrubKeyDown}
-          className="flex-1 min-w-[120px] h-2 cursor-pointer accent-foreground"
-          aria-label="Replay timeline"
-          aria-valuetext={currentDate || undefined}
-          data-testid="replay-scrubber"
-        />
-        <span className="text-xs tabular-nums text-muted-foreground min-w-[5.5rem] text-right">
-          {currentDate}
-        </span>
-        <Select value={String(speed)} onValueChange={(v) => handleSpeedChange(Number(v))}>
-          <SelectTrigger
-            className="h-8 w-[5.5rem]"
-            aria-label="Playback speed"
-            data-testid="replay-speed-select"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SPEED_OPTIONS.map((v) => (
-              <SelectItem key={v} value={String(v)} data-testid={`replay-speed-${v}x`}>
-                {v}×
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          variant="default"
-          onClick={handleExportMp4}
-          disabled={isExporting || !hasWebCodecs}
-          data-testid="replay-export-mp4"
-          className="gap-1"
-          title={
-            hasWebCodecs
-              ? undefined
-              : 'MP4 export requires a Chromium-based browser (Chrome, Edge).'
-          }
-        >
-          <Video className="size-4" />
-          {isExporting
-            ? exportProgress === null
-              ? 'Exporting…'
-              : `Exporting ${Math.round(exportProgress * 100)}%`
-            : 'Export MP4'}
-        </Button>
-        {isExporting && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleCancelExport}
-            data-testid="replay-export-cancel"
-            className="pointer-events-auto"
-          >
-            Cancel
-          </Button>
-        )}
-      </div>
+      <ReplayControls
+        playing={playing}
+        fraction={fraction}
+        currentDate={currentDate}
+        speed={speed}
+        isExporting={isExporting}
+        exportProgress={exportProgress}
+        hasWebCodecs={hasWebCodecs}
+        onPlayPause={handlePlayPause}
+        onReset={handleReset}
+        onScrub={handleScrub}
+        onScrubKeyDown={handleScrubKeyDown}
+        onSpeedChange={handleSpeedChange}
+        onExportMp4={handleExportMp4}
+        onCancelExport={handleCancelExport}
+      />
       {exportError && (
-        <div
-          role="alert"
-          data-testid="replay-export-error"
-          className="no-export mt-3 flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <span className="flex-1">MP4 export failed: {exportError}</span>
-          <button
-            type="button"
-            onClick={() => setExportError(null)}
-            className="text-destructive/70 hover:text-destructive cursor-pointer"
-            aria-label="Dismiss"
-          >
-            ✕
-          </button>
-        </div>
+        <ReplayExportError message={exportError} onDismiss={() => setExportError(null)} />
       )}
     </div>
   );

@@ -116,6 +116,389 @@ function SeriesPath({
   );
 }
 
+// Top header: title block + default-workload card. Satori-compatible (inline
+// styles only).
+function OgHeader({
+  modelLabel,
+  aLabel,
+  bLabel,
+  workload,
+}: {
+  modelLabel: string;
+  aLabel: string;
+  bLabel: string;
+  workload: string;
+}) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 * R }}>
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 19 * R,
+            fontWeight: 700,
+            letterSpacing: '0.13em',
+            textTransform: 'uppercase',
+            color: COLORS.blue,
+          }}
+        >
+          InferenceX Performance per Dollar
+        </div>
+        <div style={{ display: 'flex', fontSize: 41 * R, fontWeight: 800 }}>{modelLabel}</div>
+        <div style={{ display: 'flex', fontSize: 25 * R, color: COLORS.muted }}>
+          {aLabel} vs {bLabel} | Cost per Million Tokens
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          border: `${R}px solid ${COLORS.border}`,
+          borderRadius: 12 * R,
+          padding: `${13 * R}px ${17 * R}px`,
+          background: COLORS.panel,
+          gap: 5 * R,
+        }}
+      >
+        <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
+          DEFAULT WORKLOAD
+        </div>
+        <div style={{ display: 'flex', fontSize: 21 * R, fontWeight: 700 }}>
+          {workload || 'Default comparison'}
+        </div>
+        <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
+          Lower cost is better
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface OgChartProps {
+  svgWidth: number;
+  svgHeight: number;
+  yTicks: number[];
+  yStep: number;
+  scaleX: (value: number) => number;
+  scaleY: (value: number) => number;
+  plottedRows: SsrInterpolatedRow[];
+  aSeries: { matched: Point[]; leftExt: Point[]; rightExt: Point[] };
+  bSeries: { matched: Point[]; leftExt: Point[]; rightExt: Point[] };
+  aHighlightPoints: Point[];
+  bHighlightPoints: Point[];
+  xMin: number;
+  xMax: number;
+  hasLeftExtension: boolean;
+  hasRightExtension: boolean;
+  showRangeEndpoints: boolean;
+}
+
+// The chart: SVG (frame, gridlines, series, highlight dots) plus the absolutely
+// positioned axis labels and captions overlaid on top of it.
+function OgChart({
+  svgWidth,
+  svgHeight,
+  yTicks,
+  yStep,
+  scaleX,
+  scaleY,
+  plottedRows,
+  aSeries,
+  bSeries,
+  aHighlightPoints,
+  bHighlightPoints,
+  xMin,
+  xMax,
+  hasLeftExtension,
+  hasRightExtension,
+  showRangeEndpoints,
+}: OgChartProps) {
+  return (
+    <div style={{ display: 'flex', position: 'relative', width: svgWidth, height: svgHeight }}>
+      <svg
+        width={svgWidth}
+        height={svgHeight}
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        style={{ position: 'absolute', left: 0, top: 0 }}
+      >
+        <rect
+          x={CHART_FRAME.left}
+          y={CHART_FRAME.top}
+          width={CHART_FRAME.width}
+          height={CHART_FRAME.height}
+          rx={13 * R}
+          fill={COLORS.panel}
+          stroke={COLORS.border}
+        />
+        {yTicks.map((tick) => {
+          const y = scaleY(tick);
+          return (
+            <line
+              key={tick}
+              x1={CHART.left}
+              x2={CHART.left + CHART.width}
+              y1={y}
+              y2={y}
+              stroke={COLORS.grid}
+              strokeWidth={2 * R}
+            />
+          );
+        })}
+        {plottedRows.map((row) => {
+          const x = scaleX(row.target);
+          return (
+            <line
+              key={`mark-${row.target}`}
+              x1={x}
+              x2={x}
+              y1={CHART.top + CHART.height}
+              y2={CHART.top + CHART.height + 6 * R}
+              stroke={COLORS.muted}
+              strokeWidth={2 * R}
+            />
+          );
+        })}
+        <SeriesPath points={aSeries.leftExt} stroke={COLORS.a} dashed />
+        <SeriesPath points={aSeries.rightExt} stroke={COLORS.a} dashed />
+        <SeriesPath points={aSeries.matched} stroke={COLORS.a} dashed={false} />
+        <SeriesPath points={bSeries.leftExt} stroke={COLORS.b} dashed />
+        <SeriesPath points={bSeries.rightExt} stroke={COLORS.b} dashed />
+        <SeriesPath points={bSeries.matched} stroke={COLORS.b} dashed={false} />
+        {aHighlightPoints.map((point, index) => (
+          <circle
+            key={`a-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r={10 * R}
+            fill={COLORS.a}
+            stroke={COLORS.background}
+            strokeWidth={4 * R}
+          />
+        ))}
+        {bHighlightPoints.map((point, index) => (
+          <circle
+            key={`b-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r={10 * R}
+            fill={COLORS.b}
+            stroke={COLORS.background}
+            strokeWidth={4 * R}
+          />
+        ))}
+      </svg>
+      {yTicks.map((tick) => (
+        <div
+          key={`y-label-${tick}`}
+          style={{
+            display: 'flex',
+            position: 'absolute',
+            left: CHART_FRAME.left + 14 * R,
+            top: scaleY(tick) - 9 * R,
+            width: CHART.left - CHART_FRAME.left - 28 * R,
+            justifyContent: 'flex-end',
+            color: COLORS.muted,
+            fontSize: 15 * R,
+          }}
+        >
+          {moneyForStep(tick, yStep)}
+        </div>
+      ))}
+      {plottedRows.map((row) => (
+        <div
+          key={`x-label-${row.target}`}
+          style={{
+            display: 'flex',
+            position: 'absolute',
+            left: scaleX(row.target) - 32 * R,
+            top: CHART.top + CHART.height + 15 * R,
+            width: 64 * R,
+            justifyContent: 'center',
+            color: COLORS.muted,
+            fontSize: 16 * R,
+            fontWeight: 600,
+          }}
+        >
+          {row.target}
+        </div>
+      ))}
+      {showRangeEndpoints && hasLeftExtension && (
+        <div
+          style={{
+            display: 'flex',
+            position: 'absolute',
+            left: scaleX(xMin) - 4 * R,
+            top: CHART.top + CHART.height + 16 * R,
+            width: 56 * R,
+            justifyContent: 'flex-start',
+            color: COLORS.faint,
+            fontSize: 13 * R,
+            fontStyle: 'italic',
+          }}
+        >
+          {Math.round(xMin)}
+        </div>
+      )}
+      {showRangeEndpoints && hasRightExtension && (
+        <div
+          style={{
+            display: 'flex',
+            position: 'absolute',
+            left: scaleX(xMax) - 52 * R,
+            top: CHART.top + CHART.height + 16 * R,
+            width: 56 * R,
+            justifyContent: 'flex-end',
+            color: COLORS.faint,
+            fontSize: 13 * R,
+            fontStyle: 'italic',
+          }}
+        >
+          {Math.round(xMax)}
+        </div>
+      )}
+      <div
+        style={{
+          display: 'flex',
+          position: 'absolute',
+          left: CHART.left,
+          top: CHART.top + CHART.height + 38 * R,
+          width: CHART.width,
+          justifyContent: 'center',
+          color: COLORS.muted,
+          fontSize: 15 * R,
+          fontWeight: 600,
+        }}
+      >
+        Interactivity (tok/s/user)
+      </div>
+      {showRangeEndpoints && (
+        <div
+          style={{
+            display: 'flex',
+            position: 'absolute',
+            left: CHART.left,
+            top: CHART.top + CHART.height + 62 * R,
+            width: CHART.width,
+            justifyContent: 'center',
+            color: COLORS.faint,
+            fontSize: 13 * R,
+            fontStyle: 'italic',
+          }}
+        >
+          Dashed segments extend to each SKU's operating envelope, where cost rises steeply
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Right-side panel: legend + per-target matched-cost cards.
+function OgMatchedTable({
+  aLabel,
+  bLabel,
+  plottedRows,
+}: {
+  aLabel: string;
+  bLabel: string;
+  plottedRows: SsrInterpolatedRow[];
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flex: 1,
+        flexDirection: 'column',
+        gap: 17 * R,
+        paddingTop: 18 * R,
+      }}
+    >
+      <div style={{ display: 'flex', fontSize: 18 * R, fontWeight: 700 }}>
+        Matched Interactivity
+      </div>
+      <div style={{ display: 'flex', gap: 20 * R, fontSize: 15 * R, color: COLORS.muted }}>
+        <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
+          <span
+            style={{
+              display: 'flex',
+              width: 19 * R,
+              height: 6 * R,
+              borderRadius: 3 * R,
+              background: COLORS.a,
+            }}
+          />
+          {aLabel}
+        </span>
+        <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
+          <span
+            style={{
+              display: 'flex',
+              width: 19 * R,
+              height: 6 * R,
+              borderRadius: 3 * R,
+              background: COLORS.b,
+            }}
+          />
+          {bLabel}
+        </span>
+      </div>
+      {plottedRows.length > 0 ? (
+        plottedRows.map((row) => (
+          <div
+            key={`row-${row.target}`}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6 * R,
+              border: `${R}px solid ${COLORS.border}`,
+              borderRadius: 10 * R,
+              padding: `${11 * R}px ${13 * R}px`,
+              background: COLORS.panel,
+            }}
+          >
+            <div style={{ display: 'flex', color: COLORS.muted, fontSize: 13 * R }}>
+              {row.target} tok/s/user
+            </div>
+            <div style={{ display: 'flex', gap: 15 * R, fontSize: 19 * R, fontWeight: 700 }}>
+              <span style={{ display: 'flex', color: COLORS.a }}>
+                {row.a ? money(row.a.cost) : 'N/A'}
+              </span>
+              <span style={{ display: 'flex', color: COLORS.b }}>
+                {row.b ? money(row.b.cost) : 'N/A'}
+              </span>
+            </div>
+          </div>
+        ))
+      ) : (
+        <div style={{ display: 'flex', fontSize: 18 * R, color: COLORS.muted }}>
+          No matched cost data available.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OgFooter() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        paddingTop: 9 * R,
+        fontSize: 15 * R,
+        color: COLORS.muted,
+      }}
+    >
+      <span style={{ display: 'flex' }}>
+        Owning-hyperscaler TCO | interpolated from benchmark results
+      </span>
+      <span style={{ display: 'flex', color: COLORS.text, fontWeight: 700 }}>
+        inferencex.semianalysis.com
+      </span>
+    </div>
+  );
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
@@ -215,319 +598,37 @@ export async function GET(
           fontFamily: 'Arial, sans-serif',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 * R }}>
-            <div
-              style={{
-                display: 'flex',
-                fontSize: 19 * R,
-                fontWeight: 700,
-                letterSpacing: '0.13em',
-                textTransform: 'uppercase',
-                color: COLORS.blue,
-              }}
-            >
-              InferenceX Performance per Dollar
-            </div>
-            <div style={{ display: 'flex', fontSize: 41 * R, fontWeight: 800 }}>
-              {parsed.model.label}
-            </div>
-            <div style={{ display: 'flex', fontSize: 25 * R, color: COLORS.muted }}>
-              {aLabel} vs {bLabel} | Cost per Million Tokens
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              border: `${R}px solid ${COLORS.border}`,
-              borderRadius: 12 * R,
-              padding: `${13 * R}px ${17 * R}px`,
-              background: COLORS.panel,
-              gap: 5 * R,
-            }}
-          >
-            <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
-              DEFAULT WORKLOAD
-            </div>
-            <div style={{ display: 'flex', fontSize: 21 * R, fontWeight: 700 }}>
-              {workload || 'Default comparison'}
-            </div>
-            <div style={{ display: 'flex', fontSize: 14 * R, color: COLORS.muted }}>
-              Lower cost is better
-            </div>
-          </div>
-        </div>
+        <OgHeader
+          modelLabel={parsed.model.label}
+          aLabel={aLabel}
+          bLabel={bLabel}
+          workload={workload}
+        />
 
         <div style={{ display: 'flex', flex: 1, gap: 34 * R, marginTop: 22 * R }}>
-          <div
-            style={{ display: 'flex', position: 'relative', width: svgWidth, height: svgHeight }}
-          >
-            <svg
-              width={svgWidth}
-              height={svgHeight}
-              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              style={{ position: 'absolute', left: 0, top: 0 }}
-            >
-              <rect
-                x={CHART_FRAME.left}
-                y={CHART_FRAME.top}
-                width={CHART_FRAME.width}
-                height={CHART_FRAME.height}
-                rx={13 * R}
-                fill={COLORS.panel}
-                stroke={COLORS.border}
-              />
-              {yAxis.ticks.map((tick) => {
-                const y = scaleY(tick);
-                return (
-                  <line
-                    key={tick}
-                    x1={CHART.left}
-                    x2={CHART.left + CHART.width}
-                    y1={y}
-                    y2={y}
-                    stroke={COLORS.grid}
-                    strokeWidth={2 * R}
-                  />
-                );
-              })}
-              {plottedRows.map((row) => {
-                const x = scaleX(row.target);
-                return (
-                  <line
-                    key={`mark-${row.target}`}
-                    x1={x}
-                    x2={x}
-                    y1={CHART.top + CHART.height}
-                    y2={CHART.top + CHART.height + 6 * R}
-                    stroke={COLORS.muted}
-                    strokeWidth={2 * R}
-                  />
-                );
-              })}
-              <SeriesPath points={aSeries.leftExt} stroke={COLORS.a} dashed />
-              <SeriesPath points={aSeries.rightExt} stroke={COLORS.a} dashed />
-              <SeriesPath points={aSeries.matched} stroke={COLORS.a} dashed={false} />
-              <SeriesPath points={bSeries.leftExt} stroke={COLORS.b} dashed />
-              <SeriesPath points={bSeries.rightExt} stroke={COLORS.b} dashed />
-              <SeriesPath points={bSeries.matched} stroke={COLORS.b} dashed={false} />
-              {aHighlightPoints.map((point, index) => (
-                <circle
-                  key={`a-${index}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r={10 * R}
-                  fill={COLORS.a}
-                  stroke={COLORS.background}
-                  strokeWidth={4 * R}
-                />
-              ))}
-              {bHighlightPoints.map((point, index) => (
-                <circle
-                  key={`b-${index}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r={10 * R}
-                  fill={COLORS.b}
-                  stroke={COLORS.background}
-                  strokeWidth={4 * R}
-                />
-              ))}
-            </svg>
-            {yAxis.ticks.map((tick) => (
-              <div
-                key={`y-label-${tick}`}
-                style={{
-                  display: 'flex',
-                  position: 'absolute',
-                  left: CHART_FRAME.left + 14 * R,
-                  top: scaleY(tick) - 9 * R,
-                  width: CHART.left - CHART_FRAME.left - 28 * R,
-                  justifyContent: 'flex-end',
-                  color: COLORS.muted,
-                  fontSize: 15 * R,
-                }}
-              >
-                {moneyForStep(tick, yStep)}
-              </div>
-            ))}
-            {plottedRows.map((row) => (
-              <div
-                key={`x-label-${row.target}`}
-                style={{
-                  display: 'flex',
-                  position: 'absolute',
-                  left: scaleX(row.target) - 32 * R,
-                  top: CHART.top + CHART.height + 15 * R,
-                  width: 64 * R,
-                  justifyContent: 'center',
-                  color: COLORS.muted,
-                  fontSize: 16 * R,
-                  fontWeight: 600,
-                }}
-              >
-                {row.target}
-              </div>
-            ))}
-            {showRangeEndpoints && hasLeftExtension && (
-              <div
-                style={{
-                  display: 'flex',
-                  position: 'absolute',
-                  left: scaleX(xMin) - 4 * R,
-                  top: CHART.top + CHART.height + 16 * R,
-                  width: 56 * R,
-                  justifyContent: 'flex-start',
-                  color: COLORS.faint,
-                  fontSize: 13 * R,
-                  fontStyle: 'italic',
-                }}
-              >
-                {Math.round(xMin)}
-              </div>
-            )}
-            {showRangeEndpoints && hasRightExtension && (
-              <div
-                style={{
-                  display: 'flex',
-                  position: 'absolute',
-                  left: scaleX(xMax) - 52 * R,
-                  top: CHART.top + CHART.height + 16 * R,
-                  width: 56 * R,
-                  justifyContent: 'flex-end',
-                  color: COLORS.faint,
-                  fontSize: 13 * R,
-                  fontStyle: 'italic',
-                }}
-              >
-                {Math.round(xMax)}
-              </div>
-            )}
-            <div
-              style={{
-                display: 'flex',
-                position: 'absolute',
-                left: CHART.left,
-                top: CHART.top + CHART.height + 38 * R,
-                width: CHART.width,
-                justifyContent: 'center',
-                color: COLORS.muted,
-                fontSize: 15 * R,
-                fontWeight: 600,
-              }}
-            >
-              Interactivity (tok/s/user)
-            </div>
-            {showRangeEndpoints && (
-              <div
-                style={{
-                  display: 'flex',
-                  position: 'absolute',
-                  left: CHART.left,
-                  top: CHART.top + CHART.height + 62 * R,
-                  width: CHART.width,
-                  justifyContent: 'center',
-                  color: COLORS.faint,
-                  fontSize: 13 * R,
-                  fontStyle: 'italic',
-                }}
-              >
-                Dashed segments extend to each SKU's operating envelope, where cost rises steeply
-              </div>
-            )}
-          </div>
+          <OgChart
+            svgWidth={svgWidth}
+            svgHeight={svgHeight}
+            yTicks={yAxis.ticks}
+            yStep={yStep}
+            scaleX={scaleX}
+            scaleY={scaleY}
+            plottedRows={plottedRows}
+            aSeries={aSeries}
+            bSeries={bSeries}
+            aHighlightPoints={aHighlightPoints}
+            bHighlightPoints={bHighlightPoints}
+            xMin={xMin}
+            xMax={xMax}
+            hasLeftExtension={hasLeftExtension}
+            hasRightExtension={hasRightExtension}
+            showRangeEndpoints={showRangeEndpoints}
+          />
 
-          <div
-            style={{
-              display: 'flex',
-              flex: 1,
-              flexDirection: 'column',
-              gap: 17 * R,
-              paddingTop: 18 * R,
-            }}
-          >
-            <div style={{ display: 'flex', fontSize: 18 * R, fontWeight: 700 }}>
-              Matched Interactivity
-            </div>
-            <div style={{ display: 'flex', gap: 20 * R, fontSize: 15 * R, color: COLORS.muted }}>
-              <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
-                <span
-                  style={{
-                    display: 'flex',
-                    width: 19 * R,
-                    height: 6 * R,
-                    borderRadius: 3 * R,
-                    background: COLORS.a,
-                  }}
-                />
-                {aLabel}
-              </span>
-              <span style={{ display: 'flex', gap: 7 * R, alignItems: 'center' }}>
-                <span
-                  style={{
-                    display: 'flex',
-                    width: 19 * R,
-                    height: 6 * R,
-                    borderRadius: 3 * R,
-                    background: COLORS.b,
-                  }}
-                />
-                {bLabel}
-              </span>
-            </div>
-            {plottedRows.length > 0 ? (
-              plottedRows.map((row) => (
-                <div
-                  key={`row-${row.target}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6 * R,
-                    border: `${R}px solid ${COLORS.border}`,
-                    borderRadius: 10 * R,
-                    padding: `${11 * R}px ${13 * R}px`,
-                    background: COLORS.panel,
-                  }}
-                >
-                  <div style={{ display: 'flex', color: COLORS.muted, fontSize: 13 * R }}>
-                    {row.target} tok/s/user
-                  </div>
-                  <div style={{ display: 'flex', gap: 15 * R, fontSize: 19 * R, fontWeight: 700 }}>
-                    <span style={{ display: 'flex', color: COLORS.a }}>
-                      {row.a ? money(row.a.cost) : 'N/A'}
-                    </span>
-                    <span style={{ display: 'flex', color: COLORS.b }}>
-                      {row.b ? money(row.b.cost) : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div style={{ display: 'flex', fontSize: 18 * R, color: COLORS.muted }}>
-                No matched cost data available.
-              </div>
-            )}
-          </div>
+          <OgMatchedTable aLabel={aLabel} bLabel={bLabel} plottedRows={plottedRows} />
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            paddingTop: 9 * R,
-            fontSize: 15 * R,
-            color: COLORS.muted,
-          }}
-        >
-          <span style={{ display: 'flex' }}>
-            Owning-hyperscaler TCO | interpolated from benchmark results
-          </span>
-          <span style={{ display: 'flex', color: COLORS.text, fontWeight: 700 }}>
-            inferencex.semianalysis.com
-          </span>
-        </div>
+        <OgFooter />
       </div>,
       {
         ...SIZE,

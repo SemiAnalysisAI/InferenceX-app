@@ -3,7 +3,7 @@
 import { track } from '@/lib/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
@@ -41,12 +41,12 @@ import { getDisplayLabel } from '@/lib/utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
 
+import type { HardwareConfig } from '@/components/inference/types';
+
 import ThroughputBarChart from './ThroughputBarChart';
-import {
-  getChartTitle,
-  getThroughputForType,
-  getTpPerMwForType,
-} from './throughput-bar-chart-utils';
+import { buildComparisonText, getResultLabel } from './calculator-comparison';
+import { useCalculatorSelections } from './useCalculatorSelections';
+import { getChartTitle } from './throughput-bar-chart-utils';
 import type { BarMetric, CostProvider, CostType, InterpolatedResult } from './types';
 import { useThroughputData } from './useThroughputData';
 
@@ -94,6 +94,671 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 const CALCULATOR_MOBILE_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] =
   CALCULATOR_VIEW_MODE_OPTIONS.map(({ testId: _testId, ...option }) => option);
 
+interface CalculatorChartSectionProps {
+  loading: boolean;
+  viewMode: CalculatorViewMode;
+  results: InterpolatedResult[];
+  hardwareConfig: HardwareConfig;
+  mode: 'interactivity_to_throughput';
+  barMetric: BarMetric;
+  costType: CostType;
+  costProvider: CostProvider;
+  targetValue: number;
+  runUrl: string | undefined;
+  selectedModel: Model;
+  selectedPrecisions: string[];
+  selectedSequence: Sequence;
+  selectedRunDate: string | null;
+  selectedBars: Set<string>;
+  isLegendExpanded: boolean;
+  highContrast: boolean;
+  availableHwKeys: string[];
+  visibleHwKeys: Set<string>;
+  legendItems: React.ComponentProps<typeof ChartLegend>['legendItems'];
+  resolveColor: (hwKey: string) => string;
+  onExportCsv: () => void;
+  setIsLegendExpanded: (expanded: boolean) => void;
+  onViewModeChange: (value: CalculatorViewMode) => void;
+  onBarSelect: (resultKey: string) => void;
+  onItemRemove: (hwKey: string) => void;
+  onToggleHighContrast: (checked: boolean) => void;
+  onResetGpus: () => void;
+}
+
+// Chart/table figure: export buttons + view toggle, then either the throughput
+// bar chart (with its sidebar legend) or the calculator table, both sharing the
+// same caption.
+function CalculatorChartSection({
+  loading,
+  viewMode,
+  results,
+  hardwareConfig,
+  mode,
+  barMetric,
+  costType,
+  costProvider,
+  targetValue,
+  runUrl,
+  selectedModel,
+  selectedPrecisions,
+  selectedSequence,
+  selectedRunDate,
+  selectedBars,
+  isLegendExpanded,
+  highContrast,
+  availableHwKeys,
+  visibleHwKeys,
+  legendItems,
+  resolveColor,
+  onExportCsv,
+  setIsLegendExpanded,
+  onViewModeChange,
+  onBarSelect,
+  onItemRemove,
+  onToggleHighContrast,
+  onResetGpus,
+}: CalculatorChartSectionProps) {
+  const captionContent = (
+    <CalculatorCaption
+      barMetric={barMetric}
+      mode={mode}
+      targetValue={targetValue}
+      costType={costType}
+      costProvider={costProvider}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      selectedSequence={selectedSequence}
+      selectedRunDate={selectedRunDate}
+      resultsCount={results.length}
+      viewMode={viewMode}
+      onViewModeChange={onViewModeChange}
+    />
+  );
+
+  return (
+    <section data-testid="calculator-chart-section">
+      <figure data-testid="calculator-figure" className="relative rounded-lg">
+        <ChartButtons
+          chartId="calculator-chart"
+          analyticsPrefix="calculator"
+          zoomResetEvent="d3chart_zoom_reset_calculator-chart"
+          onExportCsv={onExportCsv}
+          setIsLegendExpanded={setIsLegendExpanded}
+          exportFileName={`InferenceX_calculator_${selectedModel}`}
+          leadingControls={
+            <SegmentedToggle
+              value={viewMode}
+              options={CALCULATOR_VIEW_MODE_OPTIONS}
+              onValueChange={onViewModeChange}
+              ariaLabel="View mode"
+              testId="calculator-view-toggle"
+              className="shrink-0"
+            />
+          }
+        />
+        <Card>
+          {loading ? (
+            <Skeleton className="h-125 w-full" />
+          ) : viewMode === 'chart' ? (
+            <ThroughputBarChart
+              caption={captionContent}
+              results={results}
+              hardwareConfig={hardwareConfig}
+              mode={mode}
+              targetValue={targetValue}
+              barMetric={barMetric}
+              costType={costType}
+              runUrl={runUrl}
+              selectedBars={selectedBars}
+              onBarSelect={onBarSelect}
+              colorResolver={resolveColor}
+              legendElement={
+                availableHwKeys.length > 0 ? (
+                  <CalculatorLegend
+                    legendItems={legendItems}
+                    isLegendExpanded={isLegendExpanded}
+                    highContrast={highContrast}
+                    showResetFilter={visibleHwKeys.size < availableHwKeys.length}
+                    onItemRemove={onItemRemove}
+                    onExpandedChange={(expanded) => {
+                      setIsLegendExpanded(expanded);
+                      track('calculator_legend_expanded', { expanded });
+                    }}
+                    onToggleHighContrast={onToggleHighContrast}
+                    onResetGpus={onResetGpus}
+                  />
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              <figcaption>{captionContent}</figcaption>
+              <CalculatorTable
+                results={results}
+                costType={costType}
+                hardwareConfig={hardwareConfig}
+              />
+            </>
+          )}
+        </Card>
+      </figure>
+    </section>
+  );
+}
+
+interface CalculatorLegendProps {
+  legendItems: React.ComponentProps<typeof ChartLegend>['legendItems'];
+  isLegendExpanded: boolean;
+  highContrast: boolean;
+  showResetFilter: boolean;
+  onItemRemove: (hwKey: string) => void;
+  onExpandedChange: (expanded: boolean) => void;
+  onToggleHighContrast: (checked: boolean) => void;
+  onResetGpus: () => void;
+}
+
+// Sidebar legend for the calculator chart with the high-contrast switch and the
+// conditional reset-filter action.
+function CalculatorLegend({
+  legendItems,
+  isLegendExpanded,
+  highContrast,
+  showResetFilter,
+  onItemRemove,
+  onExpandedChange,
+  onToggleHighContrast,
+  onResetGpus,
+}: CalculatorLegendProps) {
+  return (
+    <ChartLegend
+      variant="sidebar"
+      legendItems={legendItems}
+      onItemRemove={onItemRemove}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={onExpandedChange}
+      switches={[
+        {
+          id: 'calc-high-contrast',
+          label: 'High Contrast',
+          checked: highContrast,
+          onCheckedChange: onToggleHighContrast,
+        },
+      ]}
+      actions={
+        showResetFilter
+          ? [
+              {
+                id: 'calc-reset-filter',
+                label: 'Reset filter',
+                onClick: onResetGpus,
+              },
+            ]
+          : []
+      }
+      enableTooltips={true}
+    />
+  );
+}
+
+interface CalculatorComparisonBannerProps {
+  selectedBars: Set<string>;
+  results: InterpolatedResult[];
+  hardwareConfig: HardwareConfig;
+  comparisonText: string[] | null;
+  onClear: () => void;
+}
+
+// Banner below the chart: single-selection hint or the pairwise comparison
+// lines, plus a clear-selection button.
+function CalculatorComparisonBanner({
+  selectedBars,
+  results,
+  hardwareConfig,
+  comparisonText,
+  onClear,
+}: CalculatorComparisonBannerProps) {
+  return (
+    <section data-testid="calculator-comparison-banner">
+      <Card>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            {selectedBars.size === 1 && (
+              <p className="text-sm text-muted-foreground">
+                {(() => {
+                  const resultKey = [...selectedBars][0];
+                  const r = results.find((res) => res.resultKey === resultKey);
+                  if (!r) return resultKey;
+                  return getResultLabel(r, hardwareConfig);
+                })()}{' '}
+                selected. Click another bar to compare.
+              </p>
+            )}
+            {comparisonText && comparisonText.length > 0 && (
+              <div className="space-y-1">
+                {comparisonText.map((text) => (
+                  <p key={text} className="text-sm font-medium">
+                    {text}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
+          >
+            Clear selection
+          </button>
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+interface CalculatorControlsProps {
+  selectedModel: Model;
+  selectedSequence: Sequence;
+  selectedPrecisions: string[];
+  availableModels: Model[];
+  availableSequences: Sequence[];
+  availablePrecisions: string[];
+  costProvider: CostProvider;
+  costType: CostType;
+  barMetric: BarMetric;
+  loading: boolean;
+  hasData: boolean;
+  currentRange: { min: number; max: number };
+  targetValue: number;
+  inputValue: string;
+  openDropdown: string | null;
+  onDropdownOpenChange: (dropdownKey: string) => (isOpen: boolean) => void;
+  onModelChange: (value: string) => void;
+  onSequenceChange: (value: string) => void;
+  onPrecisionChange: (value: string[]) => void;
+  onCostProviderChange: (value: string) => void;
+  onCostTypeChange: (value: string) => void;
+  onBarMetricChange: (value: BarMetric) => void;
+  onSliderChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onInputBlur: () => void;
+}
+
+// Controls card: title + share, the model/sequence/precision/cost/token-type
+// selectors, the metric toggle, and the target-interactivity slider.
+function CalculatorControls({
+  selectedModel,
+  selectedSequence,
+  selectedPrecisions,
+  availableModels,
+  availableSequences,
+  availablePrecisions,
+  costProvider,
+  costType,
+  barMetric,
+  loading,
+  hasData,
+  currentRange,
+  targetValue,
+  inputValue,
+  openDropdown,
+  onDropdownOpenChange,
+  onModelChange,
+  onSequenceChange,
+  onPrecisionChange,
+  onCostProviderChange,
+  onCostTypeChange,
+  onBarMetricChange,
+  onSliderChange,
+  onInputChange,
+  onInputBlur,
+}: CalculatorControlsProps) {
+  return (
+    <Card className="relative z-30">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold mb-2">TCO Calculator</h2>
+            <p className="text-muted-foreground text-sm mb-4">
+              Set a target interactivity (tokens/sec/user) and compare the throughput and cost
+              across all GPUs. Values are interpolated from real benchmark data.
+            </p>
+          </div>
+          <ChartShareActions />
+        </div>
+
+        {/* Controls — grid layout matching inference chart controls */}
+        <TooltipProvider delayDuration={0}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <ModelSelector
+              id="calc-model"
+              data-testid="calc-model-selector"
+              value={selectedModel}
+              onChange={onModelChange}
+              open={openDropdown === 'model'}
+              onOpenChange={onDropdownOpenChange('model')}
+              availableModels={availableModels}
+            />
+            <SequenceSelector
+              id="calc-sequence"
+              data-testid="calc-sequence-selector"
+              value={selectedSequence}
+              onChange={onSequenceChange}
+              open={openDropdown === 'sequence'}
+              onOpenChange={onDropdownOpenChange('sequence')}
+              availableSequences={availableSequences}
+            />
+            <PrecisionSelector
+              id="calc-precision"
+              data-testid="calc-precision-selector"
+              value={selectedPrecisions}
+              onChange={onPrecisionChange}
+              open={openDropdown === 'precision'}
+              onOpenChange={onDropdownOpenChange('precision')}
+              availablePrecisions={availablePrecisions}
+            />
+
+            <div className="flex flex-col gap-1.5 lg:col-span-1">
+              <LabelWithTooltip
+                htmlFor="calc-cost"
+                label="Cost Provider"
+                tooltip="The pricing tier used to calculate cost per million tokens. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental."
+              />
+              <div id="calc-cost" data-testid="calc-cost-selector">
+                <MultiSelect
+                  options={COST_PROVIDER_OPTIONS.map((c) => ({
+                    value: c.value,
+                    label: c.label,
+                  }))}
+                  value={[costProvider]}
+                  onChange={(values) => {
+                    const next = values[0];
+                    if (!next) return;
+                    onCostProviderChange(next);
+                  }}
+                  open={openDropdown === 'costProvider'}
+                  onOpenChange={onDropdownOpenChange('costProvider')}
+                  placeholder="Cost provider"
+                  minSelections={1}
+                  maxSelections={1}
+                  showClearAll={false}
+                  searchable={false}
+                  plainSelectedText
+                  showSelectionSummary={false}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5 lg:col-span-1">
+              <LabelWithTooltip
+                htmlFor="calc-cost-type"
+                label="Token Type"
+                tooltip="Whether to show costs for total tokens, input tokens only, or output tokens only."
+              />
+              <div id="calc-cost-type" data-testid="calc-cost-type-selector">
+                <MultiSelect
+                  options={COST_TYPE_OPTIONS.map((ct) => ({
+                    value: ct.value,
+                    label: ct.label,
+                  }))}
+                  value={[costType]}
+                  onChange={(values) => {
+                    const next = values[0];
+                    if (!next) return;
+                    onCostTypeChange(next);
+                  }}
+                  open={openDropdown === 'costType'}
+                  onOpenChange={onDropdownOpenChange('costType')}
+                  placeholder="Token type"
+                  minSelections={1}
+                  maxSelections={1}
+                  showClearAll={false}
+                  searchable={false}
+                  plainSelectedText
+                  showSelectionSummary={false}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <LabelWithTooltip
+                htmlFor="calc-metric"
+                label="Metric"
+                tooltip="The comparison metric shown in the chart. Throughput (tok/s/gpu), power efficiency (tok/s/MW), or cost per million tokens."
+              />
+              <div className="flex rounded-lg border border-border overflow-hidden h-9">
+                {BAR_METRIC_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    data-testid={`calculator-metric-${opt.value}`}
+                    className={`px-3 text-xs font-medium transition-colors ${
+                      barMetric === opt.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-muted-foreground hover:bg-muted'
+                    }`}
+                    onClick={() => onBarMetricChange(opt.value)}
+                  >
+                    {getBarMetricLabel(opt.value)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Target value slider + input */}
+          {!loading && hasData && (
+            <div className="space-y-2">
+              <LabelWithTooltip
+                htmlFor="calc-target"
+                label="Target Interactivity (tok/s/user)"
+                tooltip="The interactivity operating point used for interpolation. Adjust the slider to compare GPU throughput, cost, and power efficiency at different interactivity levels."
+              />
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <input
+                    id="calc-target"
+                    type="range"
+                    aria-label="Target Interactivity (tok/s/user)"
+                    min={currentRange.min}
+                    max={currentRange.max}
+                    step={1}
+                    value={targetValue}
+                    onChange={onSliderChange}
+                    onPointerUp={() =>
+                      track('calculator_target_slider_set', {
+                        mode: 'interactivity_to_throughput',
+                        value: targetValue,
+                      })
+                    }
+                    className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
+                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
+                    [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
+                    [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
+                    [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                  />
+                  <div
+                    className="relative h-4 text-xs text-muted-foreground"
+                    style={{ marginLeft: 8, marginRight: 8 }}
+                  >
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <span
+                        key={i}
+                        className="absolute -translate-x-1/2"
+                        style={{ left: `${(i / 5) * 100}%` }}
+                      >
+                        {Math.round(
+                          currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <Input
+                  type="number"
+                  value={inputValue}
+                  onChange={onInputChange}
+                  onBlur={onInputBlur}
+                  className="w-24 h-9"
+                  min={0}
+                />
+              </div>
+            </div>
+          )}
+        </TooltipProvider>
+      </div>
+    </Card>
+  );
+}
+
+interface CalculatorCaptionProps {
+  barMetric: BarMetric;
+  mode: 'interactivity_to_throughput';
+  targetValue: number;
+  costType: CostType;
+  costProvider: CostProvider;
+  selectedModel: Model;
+  selectedPrecisions: string[];
+  selectedSequence: Sequence;
+  selectedRunDate: string | null;
+  resultsCount: number;
+  viewMode: CalculatorViewMode;
+  onViewModeChange: (value: CalculatorViewMode) => void;
+}
+
+// Chart caption: title + view toggle (mobile), metadata line, per-metric source
+// badges, the animated disagg caveat banners, and the unofficial-domain notice.
+function CalculatorCaption({
+  barMetric,
+  mode,
+  targetValue,
+  costType,
+  costProvider,
+  selectedModel,
+  selectedPrecisions,
+  selectedSequence,
+  selectedRunDate,
+  resultsCount,
+  viewMode,
+  onViewModeChange,
+}: CalculatorCaptionProps) {
+  return (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-lg font-semibold">
+          {getChartTitle(barMetric, mode, targetValue, costType, costProvider)}
+        </h2>
+        <SegmentedToggle
+          value={viewMode}
+          options={CALCULATOR_MOBILE_VIEW_MODE_OPTIONS}
+          onValueChange={onViewModeChange}
+          ariaLabel="View mode"
+          className="md:hidden shrink-0"
+        />
+      </div>
+      <p className="text-sm text-muted-foreground mb-2">
+        {getModelLabel(selectedModel)} •{' '}
+        {selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')} •{' '}
+        {getSequenceLabel(selectedSequence)} • Source: SemiAnalysis InferenceX™
+        {selectedRunDate && <> • Updated: {selectedRunDate}</>}
+      </p>
+      {barMetric === 'power' && resultsCount > 0 && (
+        <>
+          <p
+            className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
+            data-testid="calculator-cost-badges"
+          >
+            All in Power/GPU:{' '}
+            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
+              <Badge key={base} variant="outline">
+                {base.toUpperCase()}: {specs.power}kW
+              </Badge>
+            ))}
+          </p>
+          <p className="text-muted-foreground">
+            <small>
+              Source:{' '}
+              <Link
+                target="_blank"
+                className="underline hover:text-foreground"
+                href="https://semianalysis.com/datacenter-industry-model/"
+              >
+                SemiAnalysis Datacenter Industry Model
+                <ExternalLinkIcon />
+              </Link>
+            </small>
+          </p>
+        </>
+      )}
+      {barMetric === 'cost' && resultsCount > 0 && (
+        <>
+          <p
+            className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
+            data-testid="calculator-cost-badges"
+          >
+            TCO $/GPU/hr:{' '}
+            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
+              <Badge key={base} variant="outline">
+                {base.toUpperCase()}: $
+                {(costProvider === 'costh'
+                  ? specs.costh
+                  : costProvider === 'costn'
+                    ? specs.costn
+                    : specs.costr
+                ).toFixed(2)}
+                /hr
+              </Badge>
+            ))}
+          </p>
+          <p className="text-muted-foreground">
+            <small>
+              Source:{' '}
+              <Link
+                target="_blank"
+                className="underline hover:text-foreground"
+                href="https://semianalysis.com/ai-cloud-tco-model/"
+              >
+                SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
+                <ExternalLinkIcon />
+              </Link>
+            </small>
+          </p>
+        </>
+      )}
+      <div
+        className={`overflow-hidden transition-all duration-200 ease-in-out ${
+          barMetric === 'cost' ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo
+          TRT) calculate cost per decode GPU or per prefill GPU, rather than per total GPU count.
+          This makes direct cost comparison with aggregated configs not an apples-to-apples
+          comparison.
+        </p>
+      </div>
+      <div
+        className={`overflow-hidden transition-all duration-200 ease-in-out ${
+          barMetric === 'throughput' || barMetric === 'power'
+            ? 'max-h-20 opacity-100'
+            : 'max-h-0 opacity-0'
+        }`}
+      >
+        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo
+          TRT) calculate throughput per decode GPU or per prefill GPU, rather than per total GPU
+          count. This makes direct throughput comparison with aggregated configs not an
+          apples-to-apples comparison.
+        </p>
+      </div>
+      <UnofficialDomainNotice />
+    </>
+  );
+}
+
 export default function ThroughputCalculatorDisplay() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
@@ -124,8 +789,6 @@ export default function ThroughputCalculatorDisplay() {
   const [targetValue, setTargetValue] = useState<number>(35);
   const [inputValue, setInputValue] = useState<string>('35');
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
-  const [visibleHwKeys, setVisibleHwKeys] = useState<Set<string>>(new Set());
-  const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
@@ -133,25 +796,22 @@ export default function ThroughputCalculatorDisplay() {
   const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
     useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
 
+  const {
+    visibleHwKeys,
+    selectedBars,
+    setSelectedBars,
+    toggleGpuVisibility,
+    removeGpu,
+    handleResetGpus,
+    handleBarSelect,
+  } = useCalculatorSelections(availableHwKeys);
+
   // Dynamic vendor-aware colors for visible GPUs
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const { resolveColor } = useThemeColors({
     highContrast,
     activeKeys: visibleKeysArray,
   });
-
-  // Track previous available keys to detect when the GPU set changes
-  const prevAvailableKeyRef = useRef<string>('');
-
-  // Reset visible GPUs when the available set changes (model/sequence/precision change or customer filter toggle)
-  useEffect(() => {
-    if (availableHwKeys.length === 0) return;
-    const key = [...availableHwKeys].toSorted().join(',');
-    if (key !== prevAvailableKeyRef.current) {
-      prevAvailableKeyRef.current = key;
-      setVisibleHwKeys(new Set(availableHwKeys));
-    }
-  }, [availableHwKeys]);
 
   // Clamp the (user-editable) target back into range when the data's range
   // changes. Done during render with a prev-key comparison instead of an effect
@@ -245,42 +905,6 @@ export default function ThroughputCalculatorDisplay() {
     track('calculator_bar_metric_changed', { metric: value });
   }, []);
 
-  const toggleGpuVisibility = useCallback(
-    (hwKey: string) => {
-      setVisibleHwKeys((prev) => {
-        const allVisible = prev.size === availableHwKeys.length;
-        const isVisible = prev.has(hwKey);
-
-        if (isVisible) {
-          if (allVisible) {
-            // If all visible and clicking one, solo it
-            return new Set([hwKey]);
-          } else if (prev.size === 1) {
-            // If only one visible and clicking it, show all
-            return new Set(availableHwKeys);
-          }
-          // Remove it
-          const next = new Set(prev);
-          next.delete(hwKey);
-          return next;
-        }
-        // Add it
-        const next = new Set([...prev, hwKey]);
-        return next;
-      });
-      track('calculator_gpu_toggled', { gpu: hwKey });
-    },
-    [availableHwKeys],
-  );
-
-  const removeGpu = useCallback((hwKey: string) => {
-    setVisibleHwKeys((prev) => {
-      const next = new Set(prev);
-      next.delete(hwKey);
-      return next;
-    });
-  }, []);
-
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = calculatorChartToCsv(results, targetValue, (hwKey) => {
       const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
@@ -294,11 +918,6 @@ export default function ThroughputCalculatorDisplay() {
     track('calculator_view_changed', { view: value });
   }, []);
 
-  const handleResetGpus = useCallback(() => {
-    setVisibleHwKeys(new Set(availableHwKeys));
-    track('calculator_gpu_reset', { gpuCount: availableHwKeys.length });
-  }, [availableHwKeys]);
-
   // Derive runUrl from workflowInfo for the selected sequence
   const runUrl = useMemo(() => {
     if (!Array.isArray(workflowInfo) || workflowInfo.length === 0) return undefined;
@@ -306,86 +925,18 @@ export default function ThroughputCalculatorDisplay() {
     return wf?.runInfoBySequence?.[selectedSequence]?.runUrl;
   }, [workflowInfo, selectedSequence]);
 
-  // Handle bar selection: click to toggle (uses resultKey for unique identification)
-  const handleBarSelect = useCallback((resultKey: string) => {
-    setSelectedBars((prev) => {
-      const next = new Set(prev);
-      if (next.has(resultKey)) {
-        next.delete(resultKey);
-        track('calculator_bar_deselected', { resultKey });
-      } else {
-        next.add(resultKey);
-        track('calculator_bar_selected', { resultKey, totalSelected: next.size });
-      }
-      return next;
-    });
-  }, []);
-
-  // Clear bar selection when results change (data/filter changes)
+  // Clear bar selection when results change (data/filter changes). Lives here
+  // (not in useCalculatorSelections) because `results` depends on visibleHwKeys
+  // produced by that hook.
   useEffect(() => {
     setSelectedBars(new Set());
-  }, [results]);
+  }, [results, setSelectedBars]);
 
   // Generate comparison text when 2+ bars are selected
-  const comparisonText = useMemo(() => {
-    if (selectedBars.size < 2) return null;
-
-    const selectedResults = results.filter((r) => selectedBars.has(r.resultKey));
-    if (selectedResults.length < 2) return null;
-
-    const getLabel = (r: InterpolatedResult) => {
-      const config = hardwareConfig[r.hwKey] || getHardwareConfig(r.hwKey);
-      const baseName = config ? getDisplayLabel(config) : r.hwKey;
-      if (r.precision) return `${baseName} (${r.precision.toUpperCase()})`;
-      return baseName;
-    };
-
-    const metricName =
-      barMetric === 'power' ? 'tok/s/MW' : barMetric === 'cost' ? 'cost efficiency' : 'throughput';
-
-    // Generate pairwise comparisons — always use lower as denominator
-    const comparisons: string[] = [];
-    for (let i = 0; i < selectedResults.length; i++) {
-      for (let j = i + 1; j < selectedResults.length; j++) {
-        const a = selectedResults[i];
-        const b = selectedResults[j];
-        const aVal =
-          barMetric === 'power'
-            ? getTpPerMwForType(a, costType)
-            : barMetric === 'cost'
-              ? costType === 'input'
-                ? a.costInput
-                : costType === 'output'
-                  ? a.costOutput
-                  : a.cost
-              : getThroughputForType(a, costType);
-        const bVal =
-          barMetric === 'power'
-            ? getTpPerMwForType(b, costType)
-            : barMetric === 'cost'
-              ? costType === 'input'
-                ? b.costInput
-                : costType === 'output'
-                  ? b.costOutput
-                  : b.cost
-              : getThroughputForType(b, costType);
-
-        const higher = aVal >= bVal ? a : b;
-        const lower = aVal >= bVal ? b : a;
-        const higherVal = Math.max(aVal, bVal);
-        const lowerVal = Math.min(aVal, bVal);
-
-        if (lowerVal > 0) {
-          const ratio = higherVal / lowerVal;
-          comparisons.push(
-            `${getLabel(higher)} is ${ratio.toFixed(1)}x more ${metricName} than ${getLabel(lower)}`,
-          );
-        }
-      }
-    }
-
-    return comparisons;
-  }, [selectedBars, results, hardwareConfig, barMetric, costType, mode]);
+  const comparisonText = useMemo(
+    () => buildComparisonText(selectedBars, results, hardwareConfig, barMetric, costType),
+    [selectedBars, results, hardwareConfig, barMetric, costType],
+  );
 
   // Build legend items for ChartLegend sidebar, sorted by MODEL_ORDER (same as Inference Performance tab)
   const legendItems = useMemo(() => {
@@ -418,454 +969,82 @@ export default function ThroughputCalculatorDisplay() {
   return (
     <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
-        <Card className="relative z-30">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">TCO Calculator</h2>
-                <p className="text-muted-foreground text-sm mb-4">
-                  Set a target interactivity (tokens/sec/user) and compare the throughput and cost
-                  across all GPUs. Values are interpolated from real benchmark data.
-                </p>
-              </div>
-              <ChartShareActions />
-            </div>
-
-            {/* Controls — grid layout matching inference chart controls */}
-            <TooltipProvider delayDuration={0}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-                <ModelSelector
-                  id="calc-model"
-                  data-testid="calc-model-selector"
-                  value={selectedModel}
-                  onChange={handleModelChange}
-                  open={openDropdown === 'model'}
-                  onOpenChange={handleDropdownOpenChange('model')}
-                  availableModels={availableModels}
-                />
-                <SequenceSelector
-                  id="calc-sequence"
-                  data-testid="calc-sequence-selector"
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
-                  open={openDropdown === 'sequence'}
-                  onOpenChange={handleDropdownOpenChange('sequence')}
-                  availableSequences={availableSequences}
-                />
-                <PrecisionSelector
-                  id="calc-precision"
-                  data-testid="calc-precision-selector"
-                  value={selectedPrecisions}
-                  onChange={handlePrecisionChange}
-                  open={openDropdown === 'precision'}
-                  onOpenChange={handleDropdownOpenChange('precision')}
-                  availablePrecisions={availablePrecisions}
-                />
-
-                <div className="flex flex-col gap-1.5 lg:col-span-1">
-                  <LabelWithTooltip
-                    htmlFor="calc-cost"
-                    label="Cost Provider"
-                    tooltip="The pricing tier used to calculate cost per million tokens. Hyperscaler (e.g. AWS/GCP), Neocloud (e.g. CoreWeave), or 3-year rental."
-                  />
-                  <div id="calc-cost" data-testid="calc-cost-selector">
-                    <MultiSelect
-                      options={COST_PROVIDER_OPTIONS.map((c) => ({
-                        value: c.value,
-                        label: c.label,
-                      }))}
-                      value={[costProvider]}
-                      onChange={(values) => {
-                        const next = values[0];
-                        if (!next) return;
-                        handleCostProviderChange(next);
-                      }}
-                      open={openDropdown === 'costProvider'}
-                      onOpenChange={handleDropdownOpenChange('costProvider')}
-                      placeholder="Cost provider"
-                      minSelections={1}
-                      maxSelections={1}
-                      showClearAll={false}
-                      searchable={false}
-                      plainSelectedText
-                      showSelectionSummary={false}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 lg:col-span-1">
-                  <LabelWithTooltip
-                    htmlFor="calc-cost-type"
-                    label="Token Type"
-                    tooltip="Whether to show costs for total tokens, input tokens only, or output tokens only."
-                  />
-                  <div id="calc-cost-type" data-testid="calc-cost-type-selector">
-                    <MultiSelect
-                      options={COST_TYPE_OPTIONS.map((ct) => ({
-                        value: ct.value,
-                        label: ct.label,
-                      }))}
-                      value={[costType]}
-                      onChange={(values) => {
-                        const next = values[0];
-                        if (!next) return;
-                        handleCostTypeChange(next);
-                      }}
-                      open={openDropdown === 'costType'}
-                      onOpenChange={handleDropdownOpenChange('costType')}
-                      placeholder="Token type"
-                      minSelections={1}
-                      maxSelections={1}
-                      showClearAll={false}
-                      searchable={false}
-                      plainSelectedText
-                      showSelectionSummary={false}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-end gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <LabelWithTooltip
-                    htmlFor="calc-metric"
-                    label="Metric"
-                    tooltip="The comparison metric shown in the chart. Throughput (tok/s/gpu), power efficiency (tok/s/MW), or cost per million tokens."
-                  />
-                  <div className="flex rounded-lg border border-border overflow-hidden h-9">
-                    {BAR_METRIC_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        data-testid={`calculator-metric-${opt.value}`}
-                        className={`px-3 text-xs font-medium transition-colors ${
-                          barMetric === opt.value
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-background text-muted-foreground hover:bg-muted'
-                        }`}
-                        onClick={() => handleBarMetricChange(opt.value)}
-                      >
-                        {getBarMetricLabel(opt.value)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {/* Target value slider + input */}
-              {!loading && hasData && (
-                <div className="space-y-2">
-                  <LabelWithTooltip
-                    htmlFor="calc-target"
-                    label="Target Interactivity (tok/s/user)"
-                    tooltip="The interactivity operating point used for interpolation. Adjust the slider to compare GPU throughput, cost, and power efficiency at different interactivity levels."
-                  />
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <input
-                        id="calc-target"
-                        type="range"
-                        aria-label="Target Interactivity (tok/s/user)"
-                        min={currentRange.min}
-                        max={currentRange.max}
-                        step={1}
-                        value={targetValue}
-                        onChange={handleSliderChange}
-                        onPointerUp={() =>
-                          track('calculator_target_slider_set', { mode, value: targetValue })
-                        }
-                        className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
-                        [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                      />
-                      <div
-                        className="relative h-4 text-xs text-muted-foreground"
-                        style={{ marginLeft: 8, marginRight: 8 }}
-                      >
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <span
-                            key={i}
-                            className="absolute -translate-x-1/2"
-                            style={{ left: `${(i / 5) * 100}%` }}
-                          >
-                            {Math.round(
-                              currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <Input
-                      type="number"
-                      value={inputValue}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      className="w-24 h-9"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              )}
-            </TooltipProvider>
-          </div>
-        </Card>
+        <CalculatorControls
+          selectedModel={selectedModel}
+          selectedSequence={selectedSequence}
+          selectedPrecisions={selectedPrecisions}
+          availableModels={availableModels}
+          availableSequences={availableSequences}
+          availablePrecisions={availablePrecisions}
+          costProvider={costProvider}
+          costType={costType}
+          barMetric={barMetric}
+          loading={loading}
+          hasData={hasData}
+          currentRange={currentRange}
+          targetValue={targetValue}
+          inputValue={inputValue}
+          openDropdown={openDropdown}
+          onDropdownOpenChange={handleDropdownOpenChange}
+          onModelChange={handleModelChange}
+          onSequenceChange={handleSequenceChange}
+          onPrecisionChange={handlePrecisionChange}
+          onCostProviderChange={handleCostProviderChange}
+          onCostTypeChange={handleCostTypeChange}
+          onBarMetricChange={handleBarMetricChange}
+          onSliderChange={handleSliderChange}
+          onInputChange={handleInputChange}
+          onInputBlur={handleInputBlur}
+        />
       </section>
 
       {/* Chart / Table */}
-      <section data-testid="calculator-chart-section">
-        <figure data-testid="calculator-figure" className="relative rounded-lg">
-          <ChartButtons
-            chartId="calculator-chart"
-            analyticsPrefix="calculator"
-            zoomResetEvent="d3chart_zoom_reset_calculator-chart"
-            onExportCsv={handleExportCsv}
-            setIsLegendExpanded={setIsLegendExpanded}
-            exportFileName={`InferenceX_calculator_${selectedModel}`}
-            leadingControls={
-              <SegmentedToggle
-                value={viewMode}
-                options={CALCULATOR_VIEW_MODE_OPTIONS}
-                onValueChange={handleViewModeChange}
-                ariaLabel="View mode"
-                testId="calculator-view-toggle"
-                className="shrink-0"
-              />
-            }
-          />
-          <Card>
-            {loading ? (
-              <Skeleton className="h-125 w-full" />
-            ) : (
-              <>
-                {(() => {
-                  const captionContent = (
-                    <>
-                      <div className="flex items-start justify-between gap-4">
-                        <h2 className="text-lg font-semibold">
-                          {getChartTitle(barMetric, mode, targetValue, costType, costProvider)}
-                        </h2>
-                        <SegmentedToggle
-                          value={viewMode}
-                          options={CALCULATOR_MOBILE_VIEW_MODE_OPTIONS}
-                          onValueChange={handleViewModeChange}
-                          ariaLabel="View mode"
-                          className="md:hidden shrink-0"
-                        />
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {getModelLabel(selectedModel)} •{' '}
-                        {selectedPrecisions
-                          .map((p) => getPrecisionLabel(p as Precision))
-                          .join(', ')}{' '}
-                        • {getSequenceLabel(selectedSequence)} • Source: SemiAnalysis InferenceX™
-                        {selectedRunDate && <> • Updated: {selectedRunDate}</>}
-                      </p>
-                      {barMetric === 'power' && results.length > 0 && (
-                        <>
-                          <p
-                            className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
-                            data-testid="calculator-cost-badges"
-                          >
-                            All in Power/GPU:{' '}
-                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}: {specs.power}kW
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/datacenter-industry-model/"
-                              >
-                                SemiAnalysis Datacenter Industry Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      {barMetric === 'cost' && results.length > 0 && (
-                        <>
-                          <p
-                            className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
-                            data-testid="calculator-cost-badges"
-                          >
-                            TCO $/GPU/hr:{' '}
-                            {Object.entries(HW_REGISTRY).map(([base, specs]) => (
-                              <Badge key={base} variant="outline">
-                                {base.toUpperCase()}: $
-                                {(costProvider === 'costh'
-                                  ? specs.costh
-                                  : costProvider === 'costn'
-                                    ? specs.costn
-                                    : specs.costr
-                                ).toFixed(2)}
-                                /hr
-                              </Badge>
-                            ))}
-                          </p>
-                          <p className="text-muted-foreground">
-                            <small>
-                              Source:{' '}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/ai-cloud-tco-model/"
-                              >
-                                SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </small>
-                          </p>
-                        </>
-                      )}
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          barMetric === 'cost' ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate cost per decode GPU or per prefill GPU,
-                          rather than per total GPU count. This makes direct cost comparison with
-                          aggregated configs not an apples-to-apples comparison.
-                        </p>
-                      </div>
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                          barMetric === 'throughput' || barMetric === 'power'
-                            ? 'max-h-20 opacity-100'
-                            : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                          <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate throughput per decode GPU or per prefill
-                          GPU, rather than per total GPU count. This makes direct throughput
-                          comparison with aggregated configs not an apples-to-apples comparison.
-                        </p>
-                      </div>
-                      <UnofficialDomainNotice />
-                    </>
-                  );
-
-                  return viewMode === 'chart' ? (
-                    <ThroughputBarChart
-                      caption={captionContent}
-                      results={results}
-                      hardwareConfig={hardwareConfig}
-                      mode={mode}
-                      targetValue={targetValue}
-                      barMetric={barMetric}
-                      costType={costType}
-                      runUrl={runUrl}
-                      selectedBars={selectedBars}
-                      onBarSelect={handleBarSelect}
-                      colorResolver={resolveColor}
-                      legendElement={
-                        availableHwKeys.length > 0 ? (
-                          <ChartLegend
-                            variant="sidebar"
-                            legendItems={legendItems}
-                            onItemRemove={removeGpu}
-                            isLegendExpanded={isLegendExpanded}
-                            onExpandedChange={(expanded) => {
-                              setIsLegendExpanded(expanded);
-                              track('calculator_legend_expanded', { expanded });
-                            }}
-                            switches={[
-                              {
-                                id: 'calc-high-contrast',
-                                label: 'High Contrast',
-                                checked: highContrast,
-                                onCheckedChange: (checked: boolean) => {
-                                  setHighContrast(checked);
-                                  track('calculator_high_contrast_toggled', { enabled: checked });
-                                },
-                              },
-                            ]}
-                            actions={
-                              visibleHwKeys.size < availableHwKeys.length
-                                ? [
-                                    {
-                                      id: 'calc-reset-filter',
-                                      label: 'Reset filter',
-                                      onClick: handleResetGpus,
-                                    },
-                                  ]
-                                : []
-                            }
-                            enableTooltips={true}
-                          />
-                        ) : undefined
-                      }
-                    />
-                  ) : (
-                    <>
-                      <figcaption>{captionContent}</figcaption>
-                      <CalculatorTable
-                        results={results}
-                        costType={costType}
-                        hardwareConfig={hardwareConfig}
-                      />
-                    </>
-                  );
-                })()}
-              </>
-            )}
-          </Card>
-        </figure>
-      </section>
+      <CalculatorChartSection
+        loading={loading}
+        viewMode={viewMode}
+        results={results}
+        hardwareConfig={hardwareConfig}
+        mode={mode}
+        barMetric={barMetric}
+        costType={costType}
+        costProvider={costProvider}
+        targetValue={targetValue}
+        runUrl={runUrl}
+        selectedModel={selectedModel}
+        selectedPrecisions={selectedPrecisions}
+        selectedSequence={selectedSequence}
+        selectedRunDate={selectedRunDate}
+        selectedBars={selectedBars}
+        isLegendExpanded={isLegendExpanded}
+        highContrast={highContrast}
+        availableHwKeys={availableHwKeys}
+        visibleHwKeys={visibleHwKeys}
+        legendItems={legendItems}
+        resolveColor={resolveColor}
+        onExportCsv={handleExportCsv}
+        setIsLegendExpanded={setIsLegendExpanded}
+        onViewModeChange={handleViewModeChange}
+        onBarSelect={handleBarSelect}
+        onItemRemove={removeGpu}
+        onToggleHighContrast={(checked) => {
+          setHighContrast(checked);
+          track('calculator_high_contrast_toggled', { enabled: checked });
+        }}
+        onResetGpus={handleResetGpus}
+      />
 
       {/* Comparison banner — only shown in chart view */}
       {viewMode === 'chart' && selectedBars.size > 0 && (
-        <section data-testid="calculator-comparison-banner">
-          <Card>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                {selectedBars.size === 1 && (
-                  <p className="text-sm text-muted-foreground">
-                    {(() => {
-                      const resultKey = [...selectedBars][0];
-                      const r = results.find((res) => res.resultKey === resultKey);
-                      if (!r) return resultKey;
-                      const config = hardwareConfig[r.hwKey] || getHardwareConfig(r.hwKey);
-                      const baseName = config ? getDisplayLabel(config) : r.hwKey;
-                      return r.precision ? `${baseName} (${r.precision.toUpperCase()})` : baseName;
-                    })()}{' '}
-                    selected. Click another bar to compare.
-                  </p>
-                )}
-                {comparisonText && comparisonText.length > 0 && (
-                  <div className="space-y-1">
-                    {comparisonText.map((text) => (
-                      <p key={text} className="text-sm font-medium">
-                        {text}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  track('calculator_selection_cleared', { clearedCount: selectedBars.size });
-                  setSelectedBars(new Set());
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
-              >
-                Clear selection
-              </button>
-            </div>
-          </Card>
-        </section>
+        <CalculatorComparisonBanner
+          selectedBars={selectedBars}
+          results={results}
+          hardwareConfig={hardwareConfig}
+          comparisonText={comparisonText}
+          onClear={() => {
+            track('calculator_selection_cleared', { clearedCount: selectedBars.size });
+            setSelectedBars(new Set());
+          }}
+        />
       )}
     </div>
   );

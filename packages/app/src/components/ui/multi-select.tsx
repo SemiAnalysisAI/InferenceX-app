@@ -22,6 +22,344 @@ export interface MultiSelectSection {
   options: MultiSelectOption[];
 }
 
+interface MultiSelectOptionItemProps {
+  option: MultiSelectOption;
+  isSelected: boolean;
+  isDisabledOption: boolean;
+  onToggle: (value: string) => void;
+}
+
+// Single selectable row inside the dropdown. Rendered identically for both the
+// flat-options and sectioned paths so the markup never drifts between them.
+function MultiSelectOptionItem({
+  option,
+  isSelected,
+  isDisabledOption,
+  onToggle,
+}: MultiSelectOptionItemProps) {
+  return (
+    <div
+      role="option"
+      tabIndex={isDisabledOption ? -1 : 0}
+      aria-selected={isSelected}
+      data-slot="select-item"
+      onClick={() => !isDisabledOption && onToggle(option.value)}
+      onKeyDown={(e) => {
+        if (!isDisabledOption && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onToggle(option.value);
+        }
+      }}
+      className={cn(
+        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
+        'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
+        isSelected && 'bg-primary/10 font-medium',
+        isDisabledOption &&
+          'opacity-50 cursor-not-allowed hover:bg-transparent hover:pl-2 hover:shadow-none',
+      )}
+    >
+      <span className="absolute right-2 flex size-3.5 items-center justify-center">
+        {isSelected && <CheckIcon className="size-4 text-primary" />}
+      </span>
+      <span className="flex items-center gap-2">{option.label}</span>
+    </div>
+  );
+}
+
+interface MultiSelectChipProps {
+  label: string;
+  optionValue: string;
+  disabled: boolean;
+  isMinReached: boolean;
+  onRemove: (optionValue: string, e: React.SyntheticEvent) => void;
+}
+
+// One selected-value chip shown inside the trigger (non-plain-text mode).
+function MultiSelectChip({
+  label,
+  optionValue,
+  disabled,
+  isMinReached,
+  onRemove,
+}: MultiSelectChipProps) {
+  return (
+    <span className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0">
+      {label}
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(e) => onRemove(optionValue, e)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onRemove(optionValue, e);
+          }
+        }}
+        className={cn(
+          'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
+          (disabled || isMinReached) && 'hidden',
+        )}
+        aria-label={`Remove ${label}`}
+        aria-disabled={disabled || isMinReached}
+      >
+        <XIcon className="size-4 text-foreground" />
+      </span>
+    </span>
+  );
+}
+
+interface FilteredSection extends MultiSelectSection {
+  options: MultiSelectOption[];
+}
+
+interface MultiSelectTriggerProps {
+  triggerId?: string;
+  triggerTestId?: string;
+  listboxId: string;
+  isOpen: boolean;
+  disabled: boolean;
+  size: 'sm' | 'default';
+  className?: string;
+  placeholder: string;
+  value: string[];
+  selectedLabels: string[];
+  plainSelectedText: boolean;
+  showClearAll: boolean;
+  minSelections?: number;
+  isMinReached: boolean;
+  onToggleOpen: () => void;
+  onRemove: (optionValue: string, e: React.SyntheticEvent) => void;
+  onClearAll: (e: React.SyntheticEvent) => void;
+}
+
+// The combobox trigger button: selected chips (or plain text), clear-all, and
+// the chevron. Stateless — open/disabled/handlers come from the parent.
+function MultiSelectTrigger({
+  triggerId,
+  triggerTestId,
+  listboxId,
+  isOpen,
+  disabled,
+  size,
+  className,
+  placeholder,
+  value,
+  selectedLabels,
+  plainSelectedText,
+  showClearAll,
+  minSelections,
+  isMinReached,
+  onToggleOpen,
+  onRemove,
+  onClearAll,
+}: MultiSelectTriggerProps) {
+  return (
+    <button
+      type="button"
+      id={triggerId}
+      data-testid={triggerTestId}
+      role="combobox"
+      aria-expanded={isOpen}
+      aria-haspopup="listbox"
+      aria-controls={listboxId}
+      onClick={() => !disabled && onToggleOpen()}
+      disabled={disabled}
+      data-slot="select-trigger"
+      data-size={size}
+      className={cn(
+        "border-input data-placeholder:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/90 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:min-h-9 data-[size=sm]:min-h-8",
+        selectedLabels.length > 0 ? 'py-1' : 'py-2',
+        className,
+      )}
+    >
+      <div className="flex gap-1 flex-1 min-w-0 items-center min-h-5 flex-wrap">
+        {value.length > 0 ? (
+          plainSelectedText ? (
+            <span className="text-foreground block min-w-0 truncate">
+              {selectedLabels.join(', ')}
+            </span>
+          ) : (
+            selectedLabels.map((label, index) => (
+              <MultiSelectChip
+                key={value[index]}
+                label={label}
+                optionValue={value[index]}
+                disabled={disabled}
+                isMinReached={isMinReached}
+                onRemove={onRemove}
+              />
+            ))
+          )
+        ) : (
+          <span className="text-muted-foreground">{placeholder}</span>
+        )}
+      </div>
+      {value.length > 0 && showClearAll && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={onClearAll}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onClearAll(e);
+            }
+          }}
+          className={cn(
+            'hover:bg-destructive/10 hover:text-destructive text-muted-foreground shrink-0 rounded-sm p-1 transition-colors',
+            (disabled || (minSelections !== undefined && minSelections > 0)) &&
+              'cursor-not-allowed opacity-50 pointer-events-none',
+          )}
+          aria-label="Clear all selections"
+          aria-disabled={disabled || (minSelections !== undefined && minSelections > 0)}
+        >
+          <XIcon className="size-4" />
+        </span>
+      )}
+      <ChevronDownIcon
+        className={cn(
+          'size-4 opacity-90 shrink-0 transition-transform',
+          isOpen && 'transform rotate-180',
+        )}
+      />
+    </button>
+  );
+}
+
+interface MultiSelectDropdownProps {
+  contentRef: React.RefObject<HTMLDivElement | null>;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+  listboxId: string;
+  searchable: boolean;
+  search: string;
+  onSearchChange: (next: string) => void;
+  showSelectionSummary: boolean;
+  maxSelections?: number;
+  minSelections?: number;
+  valueCount: number;
+  filteredOptions: MultiSelectOption[];
+  filteredSections: FilteredSection[] | null;
+  value: string[];
+  isMaxReached: boolean;
+  onToggle: (value: string) => void;
+}
+
+// The open dropdown panel: search box, selection summary, and the option list
+// (flat or sectioned). Kept stateless — all state/refs/handlers come from the
+// parent so behavior is unchanged.
+function MultiSelectDropdown({
+  contentRef,
+  searchRef,
+  listboxId,
+  searchable,
+  search,
+  onSearchChange,
+  showSelectionSummary,
+  maxSelections,
+  minSelections,
+  valueCount,
+  filteredOptions,
+  filteredSections,
+  value,
+  isMaxReached,
+  onToggle,
+}: MultiSelectDropdownProps) {
+  return (
+    <div
+      ref={contentRef}
+      id={listboxId}
+      tabIndex={-1}
+      data-slot="select-content"
+      className={cn(
+        'bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 absolute z-[120] mt-1 max-h-60 w-full origin-top overflow-hidden rounded-md border shadow-md',
+      )}
+    >
+      <div className="p-1 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
+        {searchable && (
+          <div className="flex items-center gap-1.5 px-2 pb-1 border-b mb-1">
+            <SearchIcon className="size-3.5 shrink-0 text-muted-foreground mr-2" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              aria-label="Search options"
+              placeholder="Search..."
+              className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSearchChange('');
+                  searchRef.current?.focus();
+                }}
+                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+        {showSelectionSummary && (maxSelections !== undefined || minSelections !== undefined) && (
+          <div className="text-muted-foreground px-2 py-1.5 text-xs border-b mb-1">
+            {valueCount}
+            {maxSelections !== undefined && ` / ${maxSelections}`} selected
+            {minSelections !== undefined && minSelections > 0 && (
+              <span className="block text-xs mt-0.5">Minimum: {minSelections}</span>
+            )}
+          </div>
+        )}
+        {filteredOptions.length === 0 && (
+          <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">No results</div>
+        )}
+        {filteredSections
+          ? filteredSections.map((section) => {
+              if (section.options.length === 0) return null;
+              return (
+                <div key={section.id} className="space-y-0.5">
+                  {section.header && (
+                    <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
+                      {section.header}
+                    </div>
+                  )}
+                  {section.options.map((option) => {
+                    const isSelected = value.includes(option.value);
+                    const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
+
+                    return (
+                      <MultiSelectOptionItem
+                        key={option.value}
+                        option={option}
+                        isSelected={isSelected}
+                        isDisabledOption={isDisabledOption}
+                        onToggle={onToggle}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })
+          : filteredOptions.map((option) => {
+              const isSelected = value.includes(option.value);
+              const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
+
+              return (
+                <MultiSelectOptionItem
+                  key={option.value}
+                  option={option}
+                  isSelected={isSelected}
+                  isDisabledOption={isDisabledOption}
+                  onToggle={onToggle}
+                />
+              );
+            })}
+      </div>
+    </div>
+  );
+}
+
 interface MultiSelectProps {
   options?: MultiSelectOption[];
   sections?: MultiSelectSection[];
@@ -252,230 +590,47 @@ function MultiSelect({
 
   return (
     <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        id={triggerId}
-        data-testid={triggerTestId}
-        role="combobox"
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        aria-controls={listboxId}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+      <MultiSelectTrigger
+        triggerId={triggerId}
+        triggerTestId={triggerTestId}
+        listboxId={listboxId}
+        isOpen={isOpen}
         disabled={disabled}
-        data-slot="select-trigger"
-        data-size={size}
-        className={cn(
-          "border-input data-placeholder:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/90 dark:hover:bg-input/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:min-h-9 data-[size=sm]:min-h-8",
-          selectedLabels.length > 0 ? 'py-1' : 'py-2',
-          className,
-        )}
-      >
-        <div className="flex gap-1 flex-1 min-w-0 items-center min-h-5 flex-wrap">
-          {value.length > 0 ? (
-            plainSelectedText ? (
-              <span className="text-foreground block min-w-0 truncate">
-                {selectedLabels.join(', ')}
-              </span>
-            ) : (
-              selectedLabels.map((label, index) => (
-                <span
-                  key={value[index]}
-                  className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
-                >
-                  {label}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => handleRemove(value[index], e)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleRemove(value[index], e);
-                      }
-                    }}
-                    className={cn(
-                      'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
-                      (disabled || isMinReached) && 'hidden',
-                    )}
-                    aria-label={`Remove ${label}`}
-                    aria-disabled={disabled || isMinReached}
-                  >
-                    <XIcon className="size-4 text-foreground" />
-                  </span>
-                </span>
-              ))
-            )
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
-          )}
-        </div>
-        {value.length > 0 && showClearAll && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={handleClearAll}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleClearAll(e);
-              }
-            }}
-            className={cn(
-              'hover:bg-destructive/10 hover:text-destructive text-muted-foreground shrink-0 rounded-sm p-1 transition-colors',
-              (disabled || (minSelections !== undefined && minSelections > 0)) &&
-                'cursor-not-allowed opacity-50 pointer-events-none',
-            )}
-            aria-label="Clear all selections"
-            aria-disabled={disabled || (minSelections !== undefined && minSelections > 0)}
-          >
-            <XIcon className="size-4" />
-          </span>
-        )}
-        <ChevronDownIcon
-          className={cn(
-            'size-4 opacity-90 shrink-0 transition-transform',
-            isOpen && 'transform rotate-180',
-          )}
-        />
-      </button>
+        size={size}
+        className={className}
+        placeholder={placeholder}
+        value={value}
+        selectedLabels={selectedLabels}
+        plainSelectedText={plainSelectedText}
+        showClearAll={showClearAll}
+        minSelections={minSelections}
+        isMinReached={isMinReached}
+        onToggleOpen={() => setIsOpen(!isOpen)}
+        onRemove={handleRemove}
+        onClearAll={handleClearAll}
+      />
 
       {isOpen && (
-        <div
-          ref={contentRef}
-          id={listboxId}
-          tabIndex={-1}
-          data-slot="select-content"
-          className={cn(
-            'bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 absolute z-[120] mt-1 max-h-60 w-full origin-top overflow-hidden rounded-md border shadow-md',
-          )}
-        >
-          <div className="p-1 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
-            {searchable && (
-              <div className="flex items-center gap-1.5 px-2 pb-1 border-b mb-1">
-                <SearchIcon className="size-3.5 shrink-0 text-muted-foreground mr-2" />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    if (e.target.value) searchUsedRef.current = true;
-                  }}
-                  aria-label="Search options"
-                  placeholder="Search..."
-                  className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch('');
-                      searchRef.current?.focus();
-                    }}
-                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Clear search"
-                  >
-                    <XIcon className="size-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
-            {showSelectionSummary &&
-              (maxSelections !== undefined || minSelections !== undefined) && (
-                <div className="text-muted-foreground px-2 py-1.5 text-xs border-b mb-1">
-                  {value.length}
-                  {maxSelections !== undefined && ` / ${maxSelections}`} selected
-                  {minSelections !== undefined && minSelections > 0 && (
-                    <span className="block text-xs mt-0.5">Minimum: {minSelections}</span>
-                  )}
-                </div>
-              )}
-            {filteredOptions.length === 0 && (
-              <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
-                No results
-              </div>
-            )}
-            {filteredSections
-              ? filteredSections.map((section) => {
-                  if (section.options.length === 0) return null;
-                  return (
-                    <div key={section.id} className="space-y-0.5">
-                      {section.header && (
-                        <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
-                          {section.header}
-                        </div>
-                      )}
-                      {section.options.map((option) => {
-                        const isSelected = value.includes(option.value);
-                        const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
-
-                        return (
-                          <div
-                            key={option.value}
-                            role="option"
-                            tabIndex={isDisabledOption ? -1 : 0}
-                            aria-selected={isSelected}
-                            data-slot="select-item"
-                            onClick={() => !isDisabledOption && handleToggle(option.value)}
-                            onKeyDown={(e) => {
-                              if (!isDisabledOption && (e.key === 'Enter' || e.key === ' ')) {
-                                e.preventDefault();
-                                handleToggle(option.value);
-                              }
-                            }}
-                            className={cn(
-                              "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
-                              'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
-                              isSelected && 'bg-primary/10 font-medium',
-                              isDisabledOption &&
-                                'opacity-50 cursor-not-allowed hover:bg-transparent hover:pl-2 hover:shadow-none',
-                            )}
-                          >
-                            <span className="absolute right-2 flex size-3.5 items-center justify-center">
-                              {isSelected && <CheckIcon className="size-4 text-primary" />}
-                            </span>
-                            <span className="flex items-center gap-2">{option.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })
-              : filteredOptions.map((option) => {
-                  const isSelected = value.includes(option.value);
-                  const isDisabledOption = !isSelected && isMaxReached && maxSelections !== 1;
-
-                  return (
-                    <div
-                      key={option.value}
-                      role="option"
-                      tabIndex={isDisabledOption ? -1 : 0}
-                      aria-selected={isSelected}
-                      data-slot="select-item"
-                      onClick={() => !isDisabledOption && handleToggle(option.value)}
-                      onKeyDown={(e) => {
-                        if (!isDisabledOption && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault();
-                          handleToggle(option.value);
-                        }
-                      }}
-                      className={cn(
-                        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none transition-all duration-150 ease-in-out",
-                        'hover:bg-primary/20 hover:pl-3 hover:shadow-sm',
-                        isSelected && 'bg-primary/10 font-medium',
-                        isDisabledOption &&
-                          'opacity-50 cursor-not-allowed hover:bg-transparent hover:pl-2 hover:shadow-none',
-                      )}
-                    >
-                      <span className="absolute right-2 flex size-3.5 items-center justify-center">
-                        {isSelected && <CheckIcon className="size-4 text-primary" />}
-                      </span>
-                      <span className="flex items-center gap-2">{option.label}</span>
-                    </div>
-                  );
-                })}
-          </div>
-        </div>
+        <MultiSelectDropdown
+          contentRef={contentRef}
+          searchRef={searchRef}
+          listboxId={listboxId}
+          searchable={searchable}
+          search={search}
+          onSearchChange={(next) => {
+            setSearch(next);
+            if (next) searchUsedRef.current = true;
+          }}
+          showSelectionSummary={showSelectionSummary}
+          maxSelections={maxSelections}
+          minSelections={minSelections}
+          valueCount={value.length}
+          filteredOptions={filteredOptions}
+          filteredSections={filteredSections}
+          value={value}
+          isMaxReached={isMaxReached}
+          onToggle={handleToggle}
+        />
       )}
     </div>
   );

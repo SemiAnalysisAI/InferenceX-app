@@ -11,6 +11,7 @@ import type {
   HardwareConfig,
   InferenceData,
   OverlayData,
+  TrackedConfig,
   TrendDataPoint,
 } from '@/components/inference/types';
 import { processOverlayChartData } from '@/components/inference/utils';
@@ -123,6 +124,471 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
     testId: 'inference-table-view-btn',
   },
 ];
+
+interface GraphEntry {
+  model: string;
+  sequence: string;
+  chartDefinition: ChartDefinition;
+  data: InferenceData[];
+}
+
+interface TrendDrillDownDialogProps {
+  open: boolean;
+  trackedConfigs: TrackedConfig[];
+  trendLines: Map<string, TrendDataPoint[]>;
+  xTrendLines: Map<string, TrendDataPoint[]>;
+  currentYLabel: string;
+  currentXLabel: string;
+  logScale: boolean;
+  selectedPrecisions: string[];
+  selectedModel: string;
+  selectedYAxisMetric: string;
+  onClose: () => void;
+  onRemoveConfig: (config: TrackedConfig) => void;
+}
+
+// "Performance Over Time" drill-down modal: tracked-config badges + the Y and
+// X trend charts.
+function TrendDrillDownDialog({
+  open,
+  trackedConfigs,
+  trendLines,
+  xTrendLines,
+  currentYLabel,
+  currentXLabel,
+  logScale,
+  selectedPrecisions,
+  selectedModel,
+  selectedYAxisMetric,
+  onClose,
+  onRemoveConfig,
+}: TrendDrillDownDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose();
+          track('inference_trend_cleared', {
+            configCount: trackedConfigs.length,
+            model: selectedModel,
+            metric: selectedYAxisMetric,
+          });
+        }
+      }}
+    >
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Performance Over Time</DialogTitle>
+          <DialogDescription>
+            Double-click points on the scatter chart to track configurations over time.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {trackedConfigs.map((config) => (
+            <span
+              key={config.id}
+              data-testid="tracked-config-badge"
+              className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium"
+              style={{ borderColor: config.color, color: config.color }}
+            >
+              <span
+                className="inline-block size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: config.color }}
+              />
+              {config.label}
+              <button
+                type="button"
+                className="ml-1 hover:opacity-70"
+                onClick={() => onRemoveConfig(config)}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="relative">
+          <ChartButtons
+            chartId="y-trend"
+            analyticsPrefix="inference"
+            zoomResetEvent="d3chart_zoom_reset_y-trend"
+          />
+          <TrendChart
+            chartId="y-trend"
+            trendLines={trendLines}
+            lineConfigs={trackedConfigs}
+            yLabel={currentYLabel}
+            logScale={logScale}
+            selectedPrecisions={selectedPrecisions}
+          />
+        </div>
+        <div className="relative">
+          <ChartButtons
+            chartId="x-trend"
+            analyticsPrefix="inference"
+            zoomResetEvent="d3chart_zoom_reset_x-trend"
+          />
+          <TrendChart
+            chartId="x-trend"
+            trendLines={xTrendLines}
+            lineConfigs={trackedConfigs}
+            yLabel={currentXLabel}
+            logScale={logScale}
+            selectedPrecisions={selectedPrecisions}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// First-load skeleton placeholders shown before any graph data arrives.
+function ChartSkeletons() {
+  return (
+    <>
+      {Array.from({ length: 2 }).map((_, index) => (
+        <Card key={`skeleton-${index}`}>
+          <Skeleton className="h-7 w-2/4 mb-1" />
+          <Skeleton className="h-5 w-3/4 mb-2" />
+          <Skeleton className="h-[600px] w-full" />
+        </Card>
+      ))}
+    </>
+  );
+}
+
+interface InferenceHeaderCardProps {
+  selectedModel: Model;
+  selectedGPUs: string[];
+  selectedPrecisions: string[];
+  workflowInfo: React.ComponentProps<typeof WorkflowInfoDisplay>['workflowInfo'];
+  changelogs: React.ComponentProps<typeof ComparisonChangelog>['changelogs'];
+  changelogsLoading: boolean;
+  totalDatesQueried: number;
+  selectedDates: string[];
+  setSelectedDates: (dates: string[]) => void;
+  selectedDateRange: { startDate: string; endDate: string };
+  dateRangeAvailableDates: string[];
+}
+
+// Top controls card: title, share actions, chart filters, architecture diagram,
+// and either the workflow-info block or the GPU comparison changelog.
+function InferenceHeaderCard({
+  selectedModel,
+  selectedGPUs,
+  selectedPrecisions,
+  workflowInfo,
+  changelogs,
+  changelogsLoading,
+  totalDatesQueried,
+  selectedDates,
+  setSelectedDates,
+  selectedDateRange,
+  dateRangeAvailableDates,
+}: InferenceHeaderCardProps) {
+  return (
+    <Card>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Inference Performance</h2>
+            <p className="text-muted-foreground text-sm mb-4">
+              Inference performance metrics across different models, hardware configurations, and
+              serving parameters.
+            </p>
+          </div>
+          <ChartShareActions />
+        </div>
+        <ChartControls />
+        <ModelArchitectureDiagram model={selectedModel} />
+        {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
+        {selectedGPUs.length > 0 && (
+          <ComparisonChangelog
+            changelogs={changelogs}
+            selectedGPUs={selectedGPUs}
+            selectedPrecisions={selectedPrecisions}
+            loading={changelogsLoading}
+            totalDatesQueried={totalDatesQueried}
+            selectedDates={selectedDates}
+            selectedDateRange={selectedDateRange}
+            onAddDate={(date) => {
+              if (!selectedDates.includes(date)) {
+                setSelectedDates([...selectedDates, date]);
+              }
+            }}
+            onRemoveDate={(date) => {
+              setSelectedDates(selectedDates.filter((d) => d !== date));
+            }}
+            onAddAllDates={(dates) => {
+              const merged = [...new Set([...selectedDates, ...dates])];
+              setSelectedDates(merged);
+            }}
+            firstAvailableDate={dateRangeAvailableDates[0]}
+          />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+interface ChartGraphSectionProps {
+  graph: GraphEntry;
+  graphIndex: number;
+  viewMode: InferenceViewMode;
+  onViewModeChange: (index: number, value: InferenceViewMode) => void;
+  isTimelineMode: boolean;
+  replayAvailable: boolean;
+  registerReplayHandle: (index: number, handle: ReplayLauncherHandle | null) => void;
+  onReplayOpen: (index: number) => void;
+  overlay: OverlayData | null;
+  selectedModel: string;
+  selectedYAxisMetric: string;
+  selectedXAxisMetric: string | null;
+  selectedE2eXAxisMetric: string | null;
+  setSelectedE2eXAxisMetric: (value: string | null) => void;
+  selectedPrecisions: string[];
+  selectedDateRange: { startDate?: string | null; endDate?: string | null };
+  selectedGPUs: string[];
+  selectedRunDate: string | null;
+  isUnofficialRun: boolean;
+  activeDates: Set<string>;
+  activeHwTypes: Set<string>;
+  setIsLegendExpanded: (expanded: boolean) => void;
+}
+
+/**
+ * Renders one inference chart card: view toggle + export buttons, caption,
+ * and the chart/table body. Handles both the official data path and the
+ * unofficial-run overlay path (overlay rows merged into the table; overlayData
+ * passed through to ScatterGraph).
+ */
+function ChartGraphSection({
+  graph,
+  graphIndex,
+  viewMode,
+  onViewModeChange,
+  isTimelineMode,
+  replayAvailable,
+  registerReplayHandle,
+  onReplayOpen,
+  overlay,
+  selectedModel,
+  selectedYAxisMetric,
+  selectedXAxisMetric,
+  selectedE2eXAxisMetric,
+  setSelectedE2eXAxisMetric,
+  selectedPrecisions,
+  selectedDateRange,
+  selectedGPUs,
+  selectedRunDate,
+  isUnofficialRun,
+  activeDates,
+  activeHwTypes,
+  setIsLegendExpanded,
+}: ChartGraphSectionProps) {
+  const yLabel = `${
+    graph.chartDefinition[`${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition]
+  }`;
+
+  const chartCaption = (
+    <>
+      <h2 className="text-lg font-semibold">
+        {
+          graph.chartDefinition[
+            `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
+          ]
+        }{' '}
+        {(() => {
+          // For Input metrics with dynamic x-axis, use dynamic heading
+          const metricTitle =
+            (graph.chartDefinition[
+              `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
+            ] as string) || '';
+          const isInputMetric = metricTitle.toLowerCase().includes('input');
+          if (
+            graph.chartDefinition.chartType === 'interactivity' &&
+            isInputMetric &&
+            selectedXAxisMetric
+          ) {
+            if (selectedXAxisMetric === 'p99_ttft') {
+              return 'vs. P99 Time To First Token';
+            } else if (selectedXAxisMetric === 'median_ttft') {
+              return 'vs. Median Time To First Token';
+            }
+          }
+
+          // For e2e chart: render clickable inline dropdown for x-axis
+          if (graph.chartDefinition.chartType === 'e2e') {
+            const xAxisLabel =
+              selectedE2eXAxisMetric === 'p99_ttft'
+                ? 'P99 TTFT'
+                : selectedE2eXAxisMetric === 'median_ttft'
+                  ? 'Median TTFT'
+                  : 'End-to-end Latency';
+            const xAxisOptions = [
+              { value: null, label: 'End-to-end Latency' },
+              { value: 'p99_ttft', label: 'P99 TTFT' },
+              { value: 'median_ttft', label: 'Median TTFT' },
+            ];
+            const zoomPrefix =
+              selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0
+                ? 'gpu_timeseries'
+                : 'latency';
+            return (
+              <E2eXAxisDropdown
+                xAxisLabel={xAxisLabel}
+                xAxisOptions={xAxisOptions}
+                selectedValue={selectedE2eXAxisMetric}
+                onSelect={(value) => {
+                  setSelectedE2eXAxisMetric(value);
+                  track('latency_x_axis_metric_selected', {
+                    metric: value ?? 'median_e2el',
+                  });
+                  window.dispatchEvent(
+                    new CustomEvent(`${zoomPrefix}_zoom_reset_chart-${graphIndex}`),
+                  );
+                }}
+              />
+            );
+          }
+
+          // Fall back to configured heading
+          return (
+            graph.chartDefinition[
+              `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
+            ] || graph.chartDefinition.heading
+          );
+        })()}
+      </h2>
+      <p className="text-sm text-muted-foreground mb-2">
+        {getModelLabel(graph.model as Model)} •{' '}
+        {selectedPrecisions.map((prec) => getPrecisionLabel(prec as Precision)).join(', ')} •{' '}
+        {getSequenceLabel(graph.sequence as Sequence)} •{' '}
+        {isUnofficialRun ? 'Source: UNOFFICIAL' : 'Source: SemiAnalysis InferenceX™'}
+        {selectedRunDate && (
+          <>
+            {' '}
+            • Updated:{' '}
+            {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              timeZone: 'UTC',
+            })}
+          </>
+        )}
+      </p>
+      <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
+      <UnofficialDomainNotice />
+    </>
+  );
+
+  const renderBody = () => {
+    if (viewMode === 'table') {
+      const overlayRows = (overlay?.data ?? []).filter((p) =>
+        selectedPrecisions.includes(p.precision),
+      );
+      return (
+        <>
+          {chartCaption}
+          <InferenceTable
+            data={overlayRows.length > 0 ? [...graph.data, ...overlayRows] : graph.data}
+            chartDefinition={graph.chartDefinition}
+            selectedYAxisMetric={selectedYAxisMetric}
+          />
+        </>
+      );
+    }
+
+    return selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0 ? (
+      <GPUGraph
+        chartId={`chart-${graphIndex}`}
+        modelLabel={graph.model}
+        data={graph.data}
+        xLabel={graph.chartDefinition.x_label}
+        yLabel={yLabel}
+        chartDefinition={graph.chartDefinition}
+        caption={chartCaption}
+      />
+    ) : (
+      <div className="relative">
+        <ScatterGraph
+          chartId={`chart-${graphIndex}`}
+          modelLabel={graph.model}
+          data={graph.data}
+          xLabel={graph.chartDefinition.x_label}
+          yLabel={yLabel}
+          chartDefinition={graph.chartDefinition}
+          caption={chartCaption}
+          overlayData={overlay ?? undefined}
+        />
+        {selectedGPUs.length > 0 &&
+          (!selectedDateRange.startDate || !selectedDateRange.endDate) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
+              <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
+                Select a date range to view GPU comparison
+              </p>
+            </div>
+          )}
+      </div>
+    );
+  };
+
+  return (
+    <section key={graph.chartDefinition.chartType} className="pt-8 md:pt-0">
+      <figure data-testid="chart-figure" className="relative rounded-lg">
+        <ChartButtons
+          chartId={`chart-${graphIndex}`}
+          analyticsPrefix={
+            isTimelineMode
+              ? 'gpu_timeseries'
+              : graph.chartDefinition.chartType === 'e2e'
+                ? 'latency'
+                : 'interactivity'
+          }
+          leadingControls={
+            <SegmentedToggle
+              value={viewMode}
+              options={VIEW_MODE_OPTIONS}
+              onValueChange={(v) => onViewModeChange(graphIndex, v)}
+              ariaLabel="View mode"
+              testId={`inference-view-toggle-${graphIndex}`}
+            />
+          }
+          hideImageExport={viewMode === 'table'}
+          setIsLegendExpanded={setIsLegendExpanded}
+          exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
+          onExportMp4={replayAvailable ? () => onReplayOpen(graphIndex) : undefined}
+          onExportCsv={() => {
+            const visibleData = graph.data.filter((d) =>
+              isTimelineMode
+                ? activeDates.has(`${d.date}_${d.hwKey}`)
+                : activeHwTypes.has(d.hwKey as string) && selectedPrecisions.includes(d.precision),
+            );
+            const { headers, rows } = inferenceChartToCsv(visibleData, graph.model, graph.sequence);
+            exportToCsv(
+              `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+              headers,
+              rows,
+            );
+          }}
+        />
+        <Card>
+          {renderBody()}
+          {replayAvailable && (
+            <ReplayLauncher
+              ref={(handle) => registerReplayHandle(graphIndex, handle)}
+              parentChartId={`chart-${graphIndex}`}
+              chartDefinition={graph.chartDefinition}
+              yLabel={yLabel}
+              xLabel={graph.chartDefinition.x_label}
+            />
+          )}
+        </Card>
+      </figure>
+    </section>
+  );
+}
 
 /**
  * Renders the inference chart cards, captions, overlay controls, and trend drill-down dialog for
@@ -329,307 +795,66 @@ export default function ChartDisplay() {
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
-  const displayGraphs = isFirstLoad
-    ? Array.from({ length: 2 }).map((_, index) => (
-        <Card key={`skeleton-${index}`}>
-          <Skeleton className="h-7 w-2/4 mb-1" />
-          <Skeleton className="h-5 w-3/4 mb-2" />
-          <Skeleton className="h-[600px] w-full" />
-        </Card>
-      ))
-    : effectiveGraphs.length === 0
-      ? []
-      : effectiveGraphs.map((graph, graphIndex) => {
-          const isTimelineMode = Boolean(
-            selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
-          );
-          const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
-          return (
-            <section key={graph.chartDefinition.chartType} className="pt-8 md:pt-0">
-              <figure data-testid="chart-figure" className="relative rounded-lg">
-                <ChartButtons
-                  chartId={`chart-${graphIndex}`}
-                  analyticsPrefix={
-                    isTimelineMode
-                      ? 'gpu_timeseries'
-                      : graph.chartDefinition.chartType === 'e2e'
-                        ? 'latency'
-                        : 'interactivity'
-                  }
-                  leadingControls={
-                    <SegmentedToggle
-                      value={getViewMode(graphIndex)}
-                      options={VIEW_MODE_OPTIONS}
-                      onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                      ariaLabel="View mode"
-                      testId={`inference-view-toggle-${graphIndex}`}
-                    />
-                  }
-                  hideImageExport={getViewMode(graphIndex) === 'table'}
-                  setIsLegendExpanded={setIsLegendExpanded}
-                  exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
-                  onExportMp4={
-                    replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined
-                  }
-                  onExportCsv={() => {
-                    const visibleData = graph.data.filter((d) =>
-                      isTimelineMode
-                        ? activeDates.has(`${d.date}_${d.hwKey}`)
-                        : activeHwTypes.has(d.hwKey as string) &&
-                          selectedPrecisions.includes(d.precision),
-                    );
-                    const { headers, rows } = inferenceChartToCsv(
-                      visibleData,
-                      graph.model,
-                      graph.sequence,
-                    );
-                    exportToCsv(
-                      `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
-                      headers,
-                      rows,
-                    );
-                  }}
-                />
-                <Card>
-                  {(() => {
-                    const chartCaption = (
-                      <>
-                        <h2 className="text-lg font-semibold">
-                          {
-                            graph.chartDefinition[
-                              `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                            ]
-                          }{' '}
-                          {(() => {
-                            // For Input metrics with dynamic x-axis, use dynamic heading
-                            const metricTitle =
-                              (graph.chartDefinition[
-                                `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                              ] as string) || '';
-                            const isInputMetric = metricTitle.toLowerCase().includes('input');
-                            if (
-                              graph.chartDefinition.chartType === 'interactivity' &&
-                              isInputMetric &&
-                              selectedXAxisMetric
-                            ) {
-                              if (selectedXAxisMetric === 'p99_ttft') {
-                                return 'vs. P99 Time To First Token';
-                              } else if (selectedXAxisMetric === 'median_ttft') {
-                                return 'vs. Median Time To First Token';
-                              }
-                            }
-
-                            // For e2e chart: render clickable inline dropdown for x-axis
-                            if (graph.chartDefinition.chartType === 'e2e') {
-                              const xAxisLabel =
-                                selectedE2eXAxisMetric === 'p99_ttft'
-                                  ? 'P99 TTFT'
-                                  : selectedE2eXAxisMetric === 'median_ttft'
-                                    ? 'Median TTFT'
-                                    : 'End-to-end Latency';
-                              const xAxisOptions = [
-                                { value: null, label: 'End-to-end Latency' },
-                                { value: 'p99_ttft', label: 'P99 TTFT' },
-                                { value: 'median_ttft', label: 'Median TTFT' },
-                              ];
-                              const zoomPrefix =
-                                selectedDateRange.startDate &&
-                                selectedDateRange.endDate &&
-                                selectedGPUs.length > 0
-                                  ? 'gpu_timeseries'
-                                  : 'latency';
-                              return (
-                                <E2eXAxisDropdown
-                                  xAxisLabel={xAxisLabel}
-                                  xAxisOptions={xAxisOptions}
-                                  selectedValue={selectedE2eXAxisMetric}
-                                  onSelect={(value) => {
-                                    setSelectedE2eXAxisMetric(value);
-                                    track('latency_x_axis_metric_selected', {
-                                      metric: value ?? 'median_e2el',
-                                    });
-                                    window.dispatchEvent(
-                                      new CustomEvent(
-                                        `${zoomPrefix}_zoom_reset_chart-${graphIndex}`,
-                                      ),
-                                    );
-                                  }}
-                                />
-                              );
-                            }
-
-                            // Fall back to configured heading
-                            return (
-                              graph.chartDefinition[
-                                `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                              ] || graph.chartDefinition.heading
-                            );
-                          })()}
-                        </h2>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {getModelLabel(graph.model as Model)} •{' '}
-                          {selectedPrecisions
-                            .map((prec) => getPrecisionLabel(prec as Precision))
-                            .join(', ')}{' '}
-                          • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
-                          {isUnofficialRun
-                            ? 'Source: UNOFFICIAL'
-                            : 'Source: SemiAnalysis InferenceX™'}
-                          {selectedRunDate && (
-                            <>
-                              {' '}
-                              • Updated:{' '}
-                              {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString(
-                                'en-US',
-                                {
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  timeZone: 'UTC',
-                                },
-                              )}
-                            </>
-                          )}
-                        </p>
-                        <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
-                        <UnofficialDomainNotice />
-                      </>
-                    );
-
-                    if (getViewMode(graphIndex) === 'table') {
-                      const overlay =
-                        graph.chartDefinition.chartType === 'e2e'
-                          ? overlayDataByChartType.e2e
-                          : overlayDataByChartType.interactivity;
-                      const overlayRows = (overlay?.data ?? []).filter((p) =>
-                        selectedPrecisions.includes(p.precision),
-                      );
-                      return (
-                        <>
-                          {chartCaption}
-                          <InferenceTable
-                            data={
-                              overlayRows.length > 0 ? [...graph.data, ...overlayRows] : graph.data
-                            }
-                            chartDefinition={graph.chartDefinition}
-                            selectedYAxisMetric={selectedYAxisMetric}
-                          />
-                        </>
-                      );
-                    }
-
-                    return selectedDateRange.startDate &&
-                      selectedDateRange.endDate &&
-                      selectedGPUs.length > 0 ? (
-                      <GPUGraph
-                        chartId={`chart-${graphIndex}`}
-                        modelLabel={graph.model}
-                        data={graph.data}
-                        xLabel={graph.chartDefinition.x_label}
-                        yLabel={`${
-                          graph.chartDefinition[
-                            `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                          ]
-                        }`}
-                        chartDefinition={graph.chartDefinition}
-                        caption={chartCaption}
-                      />
-                    ) : (
-                      <div className="relative">
-                        <ScatterGraph
-                          chartId={`chart-${graphIndex}`}
-                          modelLabel={graph.model}
-                          data={graph.data}
-                          xLabel={graph.chartDefinition.x_label}
-                          yLabel={`${
-                            graph.chartDefinition[
-                              `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                            ]
-                          }`}
-                          chartDefinition={graph.chartDefinition}
-                          caption={chartCaption}
-                          overlayData={
-                            graph.chartDefinition.chartType === 'e2e'
-                              ? (overlayDataByChartType.e2e ?? undefined)
-                              : (overlayDataByChartType.interactivity ?? undefined)
-                          }
-                        />
-                        {selectedGPUs.length > 0 &&
-                          (!selectedDateRange.startDate || !selectedDateRange.endDate) && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
-                              <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-                                Select a date range to view GPU comparison
-                              </p>
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })()}
-                  {replayAvailable && (
-                    <ReplayLauncher
-                      ref={(handle) => {
-                        replayHandlesRef.current[graphIndex] = handle;
-                      }}
-                      parentChartId={`chart-${graphIndex}`}
-                      chartDefinition={graph.chartDefinition}
-                      yLabel={`${
-                        graph.chartDefinition[
-                          `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                        ]
-                      }`}
-                      xLabel={graph.chartDefinition.x_label}
-                    />
-                  )}
-                </Card>
-              </figure>
-            </section>
-          );
-        });
+  const displayGraphs = isFirstLoad ? (
+    <ChartSkeletons />
+  ) : effectiveGraphs.length === 0 ? null : (
+    effectiveGraphs.map((graph, graphIndex) => {
+      const isTimelineMode = Boolean(
+        selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
+      );
+      const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+      const overlay =
+        graph.chartDefinition.chartType === 'e2e'
+          ? overlayDataByChartType.e2e
+          : overlayDataByChartType.interactivity;
+      return (
+        <ChartGraphSection
+          key={graph.chartDefinition.chartType}
+          graph={graph}
+          graphIndex={graphIndex}
+          viewMode={getViewMode(graphIndex)}
+          onViewModeChange={handleViewModeChange}
+          isTimelineMode={isTimelineMode}
+          replayAvailable={replayAvailable}
+          registerReplayHandle={(index, handle) => {
+            replayHandlesRef.current[index] = handle;
+          }}
+          onReplayOpen={(index) => replayHandlesRef.current[index]?.open()}
+          overlay={overlay}
+          selectedModel={selectedModel}
+          selectedYAxisMetric={selectedYAxisMetric}
+          selectedXAxisMetric={selectedXAxisMetric}
+          selectedE2eXAxisMetric={selectedE2eXAxisMetric}
+          setSelectedE2eXAxisMetric={setSelectedE2eXAxisMetric}
+          selectedPrecisions={selectedPrecisions}
+          selectedDateRange={selectedDateRange}
+          selectedGPUs={selectedGPUs}
+          selectedRunDate={selectedRunDate}
+          isUnofficialRun={isUnofficialRun}
+          activeDates={activeDates}
+          activeHwTypes={activeHwTypes}
+          setIsLegendExpanded={setIsLegendExpanded}
+        />
+      );
+    })
+  );
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">
       <section className="relative z-20">
-        <Card>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">Inference Performance</h2>
-                <p className="text-muted-foreground text-sm mb-4">
-                  Inference performance metrics across different models, hardware configurations,
-                  and serving parameters.
-                </p>
-              </div>
-              <ChartShareActions />
-            </div>
-            <ChartControls />
-            <ModelArchitectureDiagram model={selectedModel} />
-            {selectedGPUs.length === 0 && <WorkflowInfoDisplay workflowInfo={workflowInfo} />}
-            {selectedGPUs.length > 0 && (
-              <ComparisonChangelog
-                changelogs={changelogs}
-                selectedGPUs={selectedGPUs}
-                selectedPrecisions={selectedPrecisions}
-                loading={changelogsLoading}
-                totalDatesQueried={totalDatesQueried}
-                selectedDates={selectedDates}
-                selectedDateRange={selectedDateRange}
-                onAddDate={(date) => {
-                  if (!selectedDates.includes(date)) {
-                    setSelectedDates([...selectedDates, date]);
-                  }
-                }}
-                onRemoveDate={(date) => {
-                  setSelectedDates(selectedDates.filter((d) => d !== date));
-                }}
-                onAddAllDates={(dates) => {
-                  const merged = [...new Set([...selectedDates, ...dates])];
-                  setSelectedDates(merged);
-                }}
-                firstAvailableDate={dateRangeAvailableDates[0]}
-              />
-            )}
-          </div>
-        </Card>
+        <InferenceHeaderCard
+          selectedModel={selectedModel}
+          selectedGPUs={selectedGPUs}
+          selectedPrecisions={selectedPrecisions}
+          workflowInfo={workflowInfo}
+          changelogs={changelogs}
+          changelogsLoading={changelogsLoading}
+          totalDatesQueried={totalDatesQueried}
+          selectedDates={selectedDates}
+          setSelectedDates={setSelectedDates}
+          selectedDateRange={selectedDateRange}
+          dateRangeAvailableDates={dateRangeAvailableDates}
+        />
       </section>
 
       {selectedYAxisMetric === 'y_costUser' && (
@@ -645,87 +870,26 @@ export default function ChartDisplay() {
       <div className="flex flex-col gap-4">{displayGraphs}</div>
 
       {/* Performance Over Time — Modal Drill-Down */}
-      <Dialog
+      <TrendDrillDownDialog
         open={
           trackedConfigs.length > 0 &&
           !(selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0)
         }
-        onOpenChange={(open) => {
-          if (!open) {
-            clearTrackedConfigs();
-            track('inference_trend_cleared', {
-              configCount: trackedConfigs.length,
-              model: selectedModel,
-              metric: selectedYAxisMetric,
-            });
-          }
+        trackedConfigs={trackedConfigs}
+        trendLines={trendLines}
+        xTrendLines={xTrendLines}
+        currentYLabel={currentYLabel}
+        currentXLabel={currentXLabel}
+        logScale={logScale}
+        selectedPrecisions={selectedPrecisions}
+        selectedModel={selectedModel}
+        selectedYAxisMetric={selectedYAxisMetric}
+        onClose={clearTrackedConfigs}
+        onRemoveConfig={(config) => {
+          removeTrackedConfig(config.id);
+          track('inference_trend_point_removed', { config: config.hwKey });
         }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Performance Over Time</DialogTitle>
-            <DialogDescription>
-              Double-click points on the scatter chart to track configurations over time.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {trackedConfigs.map((config) => (
-              <span
-                key={config.id}
-                data-testid="tracked-config-badge"
-                className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium"
-                style={{ borderColor: config.color, color: config.color }}
-              >
-                <span
-                  className="inline-block size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: config.color }}
-                />
-                {config.label}
-                <button
-                  type="button"
-                  className="ml-1 hover:opacity-70"
-                  onClick={() => {
-                    removeTrackedConfig(config.id);
-                    track('inference_trend_point_removed', { config: config.hwKey });
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="relative">
-            <ChartButtons
-              chartId="y-trend"
-              analyticsPrefix="inference"
-              zoomResetEvent="d3chart_zoom_reset_y-trend"
-            />
-            <TrendChart
-              chartId="y-trend"
-              trendLines={trendLines}
-              lineConfigs={trackedConfigs}
-              yLabel={currentYLabel}
-              logScale={logScale}
-              selectedPrecisions={selectedPrecisions}
-            />
-          </div>
-          <div className="relative">
-            <ChartButtons
-              chartId="x-trend"
-              analyticsPrefix="inference"
-              zoomResetEvent="d3chart_zoom_reset_x-trend"
-            />
-            <TrendChart
-              chartId="x-trend"
-              trendLines={xTrendLines}
-              lineConfigs={trackedConfigs}
-              yLabel={currentXLabel}
-              logScale={logScale}
-              selectedPrecisions={selectedPrecisions}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      />
     </div>
   );
 }

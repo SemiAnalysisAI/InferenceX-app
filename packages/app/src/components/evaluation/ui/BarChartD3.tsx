@@ -4,12 +4,12 @@ import { track } from '@/lib/analytics';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { getModelSortIndex } from '@/lib/constants';
-import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3Chart';
-import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
-import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
-import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
-import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
+import {
+  D3Chart,
+  type D3ChartHandle,
+  type TooltipConfig,
+  type ZoomConfig,
+} from '@/lib/d3-chart/D3Chart';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import type { EvaluationChartData } from '@/components/evaluation/types';
@@ -25,16 +25,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
 
-const BASE_MARGIN = { top: 24, right: 24, bottom: 52 };
-const OVERLAY_X_SIZE = 6;
-const OVERLAY_X_HOVER_SIZE = 8;
-const OVERLAY_HIT_RADIUS = 10;
-const OVERLAY_ERROR_STROKE_WIDTH = 1.5;
-
-const getOverlayXPath = (size: number) =>
-  `M ${-size},${-size} L ${size},${size} M ${-size},${size} L ${size},${-size}`;
+import { buildEvalBarChartLayers } from './evalBarChartLayers';
+import { buildEvalLegendItems } from './evalBarChartLegendItems';
+import { useEvalChartConfigs } from './useEvalChartConfigs';
 
 // Static legend for disagg parallelism notation; hoisted so the same element
 // identity is reused every render instead of rebuilt as a prop.
@@ -153,6 +147,169 @@ function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, u
   });
 }
 
+// X-axis zoom with a translate constraint that keeps the [0,1] score domain in
+// view. Built per-render because it closes over the current margin + domain.
+function buildEvalZoomConfig(
+  chartMargin: { left: number; right: number },
+  xDomain: [number, number],
+): ZoomConfig {
+  return {
+    enabled: true,
+    axes: 'x',
+    scaleExtent: [1, 20],
+    resetEventName: 'evaluation_zoom_reset_evaluation-chart',
+    constrain: (transform) => {
+      const k = transform.k;
+      const innerWidth =
+        (typeof window === 'undefined' ? 800 : window.innerWidth) -
+        chartMargin.left -
+        chartMargin.right;
+      const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
+      const minTx = -xScale(1) * k + innerWidth;
+      const maxTx = -xScale(0) * k;
+      const tx = minTx < maxTx ? Math.max(minTx, Math.min(maxTx, transform.x)) : transform.x;
+      return d3.zoomIdentity.translate(tx, transform.y).scale(k);
+    },
+  };
+}
+
+// Crosshair tooltip config. Static — the content/ruler accessors don't depend
+// on component state.
+const EVAL_TOOLTIP_CONFIG: TooltipConfig<EvaluationChartData> = {
+  rulerType: 'crosshair',
+  content: generateEvaluationTooltipContent,
+  getRulerX: (d, xs) => (xs as d3.ScaleLinear<number, number>)(d.score),
+  getRulerY: (d, ys) => {
+    const bs = ys as unknown as d3.ScaleBand<string>;
+    return (bs(d.configLabel) || 0) + bs.bandwidth() / 2;
+  },
+  onHoverStart: (sel) => {
+    sel.attr('r', 8);
+  },
+  onHoverEnd: (sel) => {
+    sel.attr('r', 6);
+  },
+  attachToLayer: 1,
+};
+
+// First-load skeleton for the evaluation chart.
+function EvalChartSkeleton() {
+  return (
+    <div className="p-3">
+      <Skeleton className="h-7 w-2/4 mb-1" />
+      <Skeleton className="h-5 w-3/4 mb-2" />
+      <Skeleton className="h-[600px] w-full" />
+    </div>
+  );
+}
+
+interface EvalChartEmptyStateProps {
+  error: boolean;
+  hasSelections: boolean;
+  modelHasEvalData: boolean;
+  hasNoEvalDataForDate: boolean;
+  selectedRunDate: string;
+}
+
+// Skeleton-less empty / error message shown when there is nothing to plot.
+function EvalChartEmptyState({
+  error,
+  hasSelections,
+  modelHasEvalData,
+  hasNoEvalDataForDate,
+  selectedRunDate,
+}: EvalChartEmptyStateProps) {
+  return (
+    <div className="flex items-center justify-center h-100 text-muted-foreground">
+      <div className="text-center">
+        {error ? (
+          'Failed to load eval data.'
+        ) : hasSelections && !modelHasEvalData ? (
+          'No evaluation data is available for this model.'
+        ) : hasNoEvalDataForDate ? (
+          <>
+            <div>No evaluation data available for {formatDateStr(selectedRunDate)}.</div>
+            <div>Try selecting a different date.</div>
+          </>
+        ) : (
+          <>
+            <div>No evaluation data available for selected model and benchmark combination.</div>
+            <div>Try selecting a different combination.</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface EvalBarChartLegendProps {
+  legendItems: React.ComponentProps<typeof ChartLegend>['legendItems'];
+  onItemRemove: (name: string) => void;
+  isLegendExpanded: boolean;
+  showLabels: boolean;
+  highContrast: boolean;
+  showResetFilter: boolean;
+  parallelismKey: ReactNode;
+  onExpandedChange: (expanded: boolean) => void;
+  onToggleLabels: (checked: boolean) => void;
+  onToggleHighContrast: (checked: boolean) => void;
+  onResetFilter: () => void;
+}
+
+// Sidebar legend for the evaluation bar chart, with the show-labels /
+// high-contrast switches, the conditional reset-filter action, and the
+// disagg parallelism key.
+function EvalBarChartLegend({
+  legendItems,
+  onItemRemove,
+  isLegendExpanded,
+  showLabels,
+  highContrast,
+  showResetFilter,
+  parallelismKey,
+  onExpandedChange,
+  onToggleLabels,
+  onToggleHighContrast,
+  onResetFilter,
+}: EvalBarChartLegendProps) {
+  return (
+    <ChartLegend
+      variant="sidebar"
+      legendItems={legendItems}
+      onItemRemove={onItemRemove}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={onExpandedChange}
+      switches={[
+        {
+          id: 'eval-show-labels',
+          label: 'Show Labels',
+          checked: showLabels,
+          onCheckedChange: onToggleLabels,
+        },
+        {
+          id: 'eval-high-contrast',
+          label: 'High Contrast',
+          checked: highContrast,
+          onCheckedChange: onToggleHighContrast,
+        },
+      ]}
+      actions={
+        showResetFilter
+          ? [
+              {
+                id: 'eval-reset-filter',
+                label: 'Reset filter',
+                onClick: onResetFilter,
+              },
+            ]
+          : []
+      }
+      enableTooltips={true}
+      keyIndicators={parallelismKey}
+    />
+  );
+}
+
 export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const {
     loading,
@@ -253,89 +410,22 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     [isUnofficialRun, toggleHardware, unifiedToggle],
   );
 
-  const configurations = useMemo(() => {
-    const configMap = new Map<string, { hwKey: string; configLabel: string }>();
-    unfilteredChartData.forEach((data) => {
-      if (!configMap.has(data.configLabel)) {
-        configMap.set(data.configLabel, {
-          hwKey: String(data.hwKey),
-          configLabel: data.configLabel,
-        });
-      }
-    });
-    return [...configMap.values()].toSorted(
-      (a, b) =>
-        getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) || a.hwKey.localeCompare(b.hwKey),
-    );
-  }, [unfilteredChartData]);
-
-  const unofficialConfigurations = useMemo(() => {
-    const configMap = new Map<string, { hwKey: string; configLabel: string }>();
-    unofficialChartData.forEach((data) => {
-      if (!configMap.has(data.configLabel)) {
-        configMap.set(data.configLabel, {
-          hwKey: String(data.hwKey),
-          configLabel: data.configLabel,
-        });
-      }
-    });
-    return [...configMap.values()].toSorted(
-      (a, b) =>
-        getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) ||
-        a.hwKey.localeCompare(b.hwKey) ||
-        a.configLabel.localeCompare(b.configLabel),
-    );
-  }, [unofficialChartData]);
-
-  const yLabels = useMemo(() => {
-    const labels = new Set<string>();
-    [...chartData, ...unofficialChartData].forEach((item) => labels.add(item.configLabel));
-    return [...labels];
-  }, [chartData, unofficialChartData]);
-
-  const chartMargin = useMemo(
-    () => ({
-      ...BASE_MARGIN,
-      left: computeLeftMargin(yLabels, {
-        split: 'newline',
-        primaryFont: '600 10px sans-serif',
-        secondaryFont: '9px sans-serif',
-        minMargin: 80,
-      }),
-    }),
-    [yLabels],
-  );
-
-  const sortedConfigLabels = useMemo(
-    () => [...configurations, ...unofficialConfigurations].map((c) => c.configLabel),
-    [configurations, unofficialConfigurations],
-  );
-  const activeHwKeys = useMemo(
-    () => [
-      ...configurations.flatMap((c) => (effectiveOfficialHardware.has(c.hwKey) ? [c.hwKey] : [])),
-      ...unofficialConfigurations.flatMap((c) =>
-        activeOverlayHwTypes.has(c.hwKey) ? [c.hwKey] : [],
-      ),
-    ],
-    [configurations, unofficialConfigurations, effectiveOfficialHardware, activeOverlayHwTypes],
-  );
-  const activeConfigLabels = useMemo(
-    () => [
-      ...configurations.flatMap((c) =>
-        effectiveOfficialHardware.has(c.hwKey) ? [c.configLabel] : [],
-      ),
-      ...unofficialConfigurations.flatMap((c) =>
-        activeOverlayHwTypes.has(c.hwKey) ? [c.configLabel] : [],
-      ),
-    ],
-    [configurations, unofficialConfigurations, effectiveOfficialHardware, activeOverlayHwTypes],
-  );
-  const configLabelToHwKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const c of configurations) map.set(c.configLabel, c.hwKey);
-    for (const c of unofficialConfigurations) map.set(c.configLabel, c.hwKey);
-    return map;
-  }, [configurations, unofficialConfigurations]);
+  const {
+    configurations,
+    unofficialConfigurations,
+    yLabels,
+    chartMargin,
+    sortedConfigLabels,
+    activeHwKeys,
+    activeConfigLabels,
+    configLabelToHwKey,
+  } = useEvalChartConfigs({
+    chartData,
+    unofficialChartData,
+    unfilteredChartData,
+    effectiveOfficialHardware,
+    activeOverlayHwTypes,
+  });
   const hcVendorKeyFor = useCallback(
     (configLabel: string) => configLabelToHwKey.get(configLabel) ?? configLabel,
     [configLabelToHwKey],
@@ -362,60 +452,18 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   }, [activeOverlayHwTypes, effectiveOfficialHardware]);
 
   const legendItems = useMemo(
-    () => [
-      // Overlay legend: one entry per loaded unofficial run that contributes
-      // points to the current chart. Same palette color as the chart strokes.
-      ...(unofficialConfigurations.length > 0 && unofficialRunInfos.length > 0
-        ? unofficialRunInfos
-            .map((info, idx) => {
-              const hasPoints = unofficialChartData.some(
-                (d) => overlayRunIndex(d.runUrl ?? null, runIndexByUrl) === idx,
-              );
-              if (!hasPoints) return null;
-              const branch = info.branch || `run ${info.id}`;
-              return {
-                name: `✕ unofficial-run-${info.id}`,
-                label: `✕ ${branch}`,
-                color: overlayRunColor(idx),
-                title: `UNOFFICIAL: ${branch}`,
-                isHighlighted: true,
-                hw: `overlay-run-${info.id}`,
-                isActive: true,
-                onClick: () => {},
-                tooltip: (
-                  <div className="font-normal text-xs">
-                    <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-                    <div>Branch: {branch}</div>
-                    {info.url && (
-                      <a
-                        href={info.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline"
-                      >
-                        View workflow run
-                      </a>
-                    )}
-                  </div>
-                ),
-              };
-            })
-            .filter((x): x is NonNullable<typeof x> => x !== null)
-        : []),
-      ...configurations.map(({ hwKey, configLabel }) => ({
-        name: configLabel,
-        label: configLabel.replaceAll('\n', ' '),
-        color: resolveColor(configLabel, hwKey),
-        title: configLabel.replaceAll('\n', ' '),
-        isHighlighted: highlightedConfigs.has(configLabel),
-        hw: hwKey,
-        isActive: effectiveOfficialHardware.has(hwKey),
-        onClick: () => {
-          handleToggleHardware(hwKey);
-          track('evaluation_hw_toggled', { hw: hwKey });
-        },
-      })),
-    ],
+    () =>
+      buildEvalLegendItems({
+        configurations,
+        unofficialConfigurations,
+        unofficialChartData,
+        unofficialRunInfos,
+        runIndexByUrl,
+        highlightedConfigs,
+        effectiveOfficialHardware,
+        resolveColor,
+        onToggleHardware: handleToggleHardware,
+      }),
     [
       configurations,
       effectiveOfficialHardware,
@@ -458,358 +506,20 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
 
   // Horizontal bar chart: yScale = band (config labels), xScale = linear (scores)
   const layers = useMemo(
-    (): LayerConfig<EvaluationChartData>[] => [
-      {
-        type: 'custom',
-        key: 'error-bars',
-        render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          // Horizontal error bars: swap x/y semantics
-          // getCx = y center, getYMin = x left, getYMax = x right, capWidth = vertical cap height
-          renderErrorBars(group, errorData, {
-            getCx: (d: EvaluationChartData) =>
-              (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
-            getYMin: (d: EvaluationChartData) => xScale(d.errorMin!),
-            getYMax: (d: EvaluationChartData) => xScale(d.errorMax!),
-            capWidth: yScale.bandwidth() / 3,
-            stroke: 'var(--foreground)',
-          });
-          // Rotate error bars 90 degrees — the render draws vertical, we need horizontal.
-          // Instead, manually position: stem is horizontal, caps are vertical.
-          const bars = group.selectAll<SVGGElement, EvaluationChartData>('.error-bar');
-          bars
-            .select('.eb-stem')
-            .attr('x1', (d) => xScale(d.errorMin!))
-            .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
-          const capH = yScale.bandwidth() / 6;
-          bars
-            .select('.eb-cap-top')
-            .attr('x1', (d) => xScale(d.errorMin!))
-            .attr('x2', (d) => xScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-          bars
-            .select('.eb-cap-bot')
-            .attr('x1', (d) => xScale(d.errorMax!))
-            .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-        },
-        onZoom: (group, ctx) => {
-          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-          const yScale = ctx.yScale as d3.ScaleBand<string>;
-          const bars = group.selectAll<SVGGElement, EvaluationChartData>('.error-bar');
-          bars
-            .select('.eb-stem')
-            .attr('x1', (d) => newXScale(d.errorMin!))
-            .attr('x2', (d) => newXScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
-          const capH = yScale.bandwidth() / 6;
-          bars
-            .select('.eb-cap-top')
-            .attr('x1', (d) => newXScale(d.errorMin!))
-            .attr('x2', (d) => newXScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-          bars
-            .select('.eb-cap-bot')
-            .attr('x1', (d) => newXScale(d.errorMax!))
-            .attr('x2', (d) => newXScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-        },
-      },
-      {
-        type: 'custom',
-        key: 'mean-points',
-        render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          return renderPoints(group, chartData, {
-            getCx: (d: EvaluationChartData) => xScale(d.score),
-            getCy: (d: EvaluationChartData) =>
-              (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
-            getColor: (d: EvaluationChartData) =>
-              getCssColor(resolveColor(d.configLabel, d.hwKey as string)),
-            getRadius: () => 6,
-            stroke: 'none',
-            strokeWidth: 0,
-          });
-        },
-        onZoom: (group, ctx) => {
-          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-          const yScale = ctx.yScale as d3.ScaleBand<string>;
-          updatePointsOnZoom<EvaluationChartData>(
-            group,
-            (d) => newXScale(d.score),
-            (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
-          );
-        },
-      },
-      {
-        type: 'custom',
-        key: 'unofficial-error-bars',
-        render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          const capH = yScale.bandwidth() / 6;
-
-          const bars = group
-            .selectAll<SVGGElement, EvaluationChartData>('.unofficial-error-bar')
-            .data(
-              unofficialErrorData,
-              (d) => `${d.configLabel}|${d.score}|${d.errorMin}|${d.errorMax}`,
-            )
-            .join((enter) => {
-              const bar = enter.append('g').attr('class', 'unofficial-error-bar');
-              bar
-                .append('line')
-                .attr('class', 'unofficial-eb-stem')
-                .attr('stroke-width', OVERLAY_ERROR_STROKE_WIDTH);
-              bar
-                .append('line')
-                .attr('class', 'unofficial-eb-cap-top')
-                .attr('stroke-width', OVERLAY_ERROR_STROKE_WIDTH);
-              bar
-                .append('line')
-                .attr('class', 'unofficial-eb-cap-bot')
-                .attr('stroke-width', OVERLAY_ERROR_STROKE_WIDTH);
-              return bar;
-            });
-
-          bars.style('filter', null);
-          bars
-            .selectAll<SVGLineElement, EvaluationChartData>(
-              '.unofficial-eb-stem, .unofficial-eb-cap-top, .unofficial-eb-cap-bot',
-            )
-            .attr('stroke', (d) =>
-              overlayRunColor(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
-            );
-
-          bars
-            .select('.unofficial-eb-stem')
-            .attr('x1', (d) => xScale(d.errorMin!))
-            .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
-
-          bars
-            .select('.unofficial-eb-cap-top')
-            .attr('x1', (d) => xScale(d.errorMin!))
-            .attr('x2', (d) => xScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-
-          bars
-            .select('.unofficial-eb-cap-bot')
-            .attr('x1', (d) => xScale(d.errorMax!))
-            .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-        },
-        onZoom: (group, { newXScale, yScale: ys }) => {
-          const xScale = newXScale as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          const capH = yScale.bandwidth() / 6;
-          const bars = group.selectAll<SVGGElement, EvaluationChartData>('.unofficial-error-bar');
-
-          bars
-            .select('.unofficial-eb-stem')
-            .attr('x1', (d) => xScale(d.errorMin!))
-            .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
-
-          bars
-            .select('.unofficial-eb-cap-top')
-            .attr('x1', (d) => xScale(d.errorMin!))
-            .attr('x2', (d) => xScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-
-          bars
-            .select('.unofficial-eb-cap-bot')
-            .attr('x1', (d) => xScale(d.errorMax!))
-            .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
-        },
-      },
-      {
-        type: 'custom',
-        key: 'score-labels',
-        render: (group, { xScale: xs, yScale: ys }) => {
-          group.selectAll('.score-label-group').remove();
-          if (!showLabels) return;
-          const xScale = xs as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          const labelGroups = group
-            .selectAll('.score-label-group')
-            .data(chartData)
-            .join('g')
-            .attr('class', 'score-label-group')
-            .attr(
-              'transform',
-              (d) =>
-                `translate(${xScale(d.score) + 12},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
-            );
-          labelGroups
-            .append('rect')
-            .attr('class', 'score-label-bg')
-            .attr('rx', 4)
-            .attr('ry', 4)
-            .attr('fill', 'var(--popover)')
-            .attr('stroke', 'var(--border)')
-            .attr('stroke-width', 1);
-          labelGroups
-            .append('text')
-            .attr('class', 'score-label')
-            .attr('text-anchor', 'start')
-            .style('fill', 'var(--foreground)')
-            .attr('font-size', '10px')
-            .attr('font-weight', '600')
-            .attr('dy', '0.35em')
-            .text((d) => d.score.toFixed(3));
-          labelGroups.each(function () {
-            const g = d3.select(this);
-            const bbox = (g.select('text').node() as SVGTextElement).getBBox();
-            g.select('.score-label-bg')
-              .attr('x', bbox.x - 5)
-              .attr('y', bbox.y - 1)
-              .attr('width', bbox.width + 10)
-              .attr('height', bbox.height + 2);
-          });
-        },
-        onZoom: (group, ctx) => {
-          if (!showLabels) return;
-          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-          const yScale = ctx.yScale as d3.ScaleBand<string>;
-          group
-            .selectAll<SVGGElement, EvaluationChartData>('.score-label-group')
-            .attr(
-              'transform',
-              (d) =>
-                `translate(${newXScale(d.score) + 12},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
-            );
-        },
-      },
-      {
-        type: 'custom',
-        key: 'unofficial-overlay',
-        render: (group, { xScale: xs, yScale: ys, layout }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          const svgNode = layout.svg.node();
-          const tooltipNode = svgNode?.nextElementSibling as HTMLDivElement | null;
-          const container = svgNode?.parentElement as HTMLDivElement | null;
-          if (!svgNode || !tooltipNode || !container) return;
-
-          const tooltip = d3.select(tooltipNode);
-          const overlayPoints = group
-            .selectAll<SVGGElement, EvaluationChartData>('.unofficial-eval-point')
-            .data(unofficialChartData, (d) => `${d.configLabel}|${d.score}`)
-            .join((enter) => {
-              const g = enter.append('g').attr('class', 'unofficial-eval-point');
-              g.append('circle')
-                .attr('r', OVERLAY_HIT_RADIUS)
-                .attr('fill', 'transparent')
-                .attr('cursor', 'pointer');
-              g.append('path')
-                .attr('class', 'unofficial-eval-x')
-                .attr('d', getOverlayXPath(OVERLAY_X_SIZE))
-                .attr('fill', 'none')
-                .attr('stroke-width', 2.5)
-                .attr('stroke-linecap', 'round')
-                .attr('cursor', 'pointer');
-              return g;
-            });
-
-          overlayPoints.attr(
-            'transform',
-            (d) =>
-              `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
-          );
-          overlayPoints.style('filter', null);
-
-          overlayPoints
-            .select('.unofficial-eval-x')
-            .attr('stroke', (d) =>
-              overlayRunColor(overlayRunIndex(d.runUrl ?? null, runIndexByUrl)),
-            );
-
-          overlayPoints.each(function (d) {
-            d3.select(this)
-              .selectAll<SVGTextElement, boolean>('.unofficial-score-label')
-              .data(showLabels ? [true] : [])
-              .join('text')
-              .attr('class', 'unofficial-score-label')
-              .attr('x', 12)
-              .attr('text-anchor', 'start')
-              .style('fill', 'var(--foreground)')
-              .attr('font-size', '10px')
-              .attr('font-weight', '600')
-              .attr('dy', '0.35em')
-              .attr('pointer-events', 'none')
-              .text(d.score.toFixed(3));
-          });
-
-          overlayPoints
-            .on('mouseenter', function (_event, d) {
-              if (chartRef.current?.isPinned()) return;
-              d3.select(this)
-                .select('.unofficial-eval-x')
-                .attr('d', getOverlayXPath(OVERLAY_X_HOVER_SIZE))
-                .attr('stroke-width', 3.5);
-              tooltip
-                .style('opacity', 1)
-                .style('display', 'block')
-                .style('pointer-events', 'none')
-                .html(generateEvaluationTooltipContent(d, false, branchForRow(d)));
-            })
-            .on('mousemove', (event) => {
-              if (chartRef.current?.isPinned()) return;
-              const [mx, my] = d3.pointer(event, container);
-              const pos = computeTooltipPosition(mx, my, tooltip, container);
-              tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
-            })
-            .on('mouseleave', function () {
-              if (chartRef.current?.isPinned()) return;
-              d3.select(this)
-                .select('.unofficial-eval-x')
-                .attr('d', getOverlayXPath(OVERLAY_X_SIZE))
-                .attr('stroke-width', 2.5);
-              tooltip.style('opacity', 0).style('display', 'none');
-            })
-            .on('click', (event, d) => {
-              event.stopPropagation();
-              const [mx, my] = d3.pointer(event, container);
-              tooltip
-                .html(generateEvaluationTooltipContent(d, true, branchForRow(d)))
-                .style('opacity', 1)
-                .style('display', 'block')
-                .style('pointer-events', 'auto');
-              const pos = computeTooltipPosition(mx, my, tooltip, container);
-              tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
-              chartRef.current?.pinTooltip(d, true);
-            });
-        },
-        onZoom: (group, { newXScale, yScale: ys }) => {
-          const xScale = newXScale as d3.ScaleLinear<number, number>;
-          const yScale = ys as d3.ScaleBand<string>;
-          group
-            .selectAll<SVGGElement, EvaluationChartData>('.unofficial-eval-point')
-            .attr(
-              'transform',
-              (d) =>
-                `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
-            );
-        },
-      },
-    ],
+    () =>
+      buildEvalBarChartLayers({
+        chartData,
+        errorData,
+        unofficialChartData,
+        unofficialErrorData,
+        getCssColor,
+        resolveColor,
+        showLabels,
+        runIndexByUrl,
+        chartRef,
+        branchForRow,
+        tooltipContent: generateEvaluationTooltipContent,
+      }),
     [
       chartData,
       errorData,
@@ -826,39 +536,21 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   // Show skeleton on first load
   const isInitializing = loading || (!selectedBenchmark && !error);
   if (isInitializing && chartData.length === 0 && unofficialChartData.length === 0) {
-    return (
-      <div className="p-3">
-        <Skeleton className="h-7 w-2/4 mb-1" />
-        <Skeleton className="h-5 w-3/4 mb-2" />
-        <Skeleton className="h-[600px] w-full" />
-      </div>
-    );
+    return <EvalChartSkeleton />;
   }
 
   if (error || (chartData.length === 0 && unofficialChartData.length === 0)) {
-    const hasSelections = selectedBenchmark && selectedModel && selectedRunDate;
+    const hasSelections = Boolean(selectedBenchmark && selectedModel && selectedRunDate);
     const hasNoEvalDataForDate =
       hasSelections && availableDates.length > 0 && !availableDates.includes(selectedRunDate);
     return (
-      <div className="flex items-center justify-center h-100 text-muted-foreground">
-        <div className="text-center">
-          {error ? (
-            'Failed to load eval data.'
-          ) : hasSelections && !modelHasEvalData ? (
-            'No evaluation data is available for this model.'
-          ) : hasNoEvalDataForDate ? (
-            <>
-              <div>No evaluation data available for {formatDateStr(selectedRunDate)}.</div>
-              <div>Try selecting a different date.</div>
-            </>
-          ) : (
-            <>
-              <div>No evaluation data available for selected model and benchmark combination.</div>
-              <div>Try selecting a different combination.</div>
-            </>
-          )}
-        </div>
-      </div>
+      <EvalChartEmptyState
+        error={Boolean(error)}
+        hasSelections={hasSelections}
+        modelHasEvalData={modelHasEvalData}
+        hasNoEvalDataForDate={hasNoEvalDataForDate}
+        selectedRunDate={selectedRunDate}
+      />
     );
   }
 
@@ -881,85 +573,38 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       }}
       yAxis={{ customize: formatYAxisLabels }}
       layers={layers}
-      zoom={{
-        enabled: true,
-        axes: 'x',
-        scaleExtent: [1, 20],
-        resetEventName: 'evaluation_zoom_reset_evaluation-chart',
-        constrain: (transform) => {
-          const k = transform.k;
-          const innerWidth =
-            (typeof window === 'undefined' ? 800 : window.innerWidth) -
-            chartMargin.left -
-            chartMargin.right;
-          const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
-          const minTx = -xScale(1) * k + innerWidth;
-          const maxTx = -xScale(0) * k;
-          const tx = minTx < maxTx ? Math.max(minTx, Math.min(maxTx, transform.x)) : transform.x;
-          return d3.zoomIdentity.translate(tx, transform.y).scale(k);
-        },
-      }}
-      tooltip={{
-        rulerType: 'crosshair',
-        content: generateEvaluationTooltipContent,
-        getRulerX: (d, xs) => (xs as d3.ScaleLinear<number, number>)(d.score),
-        getRulerY: (d, ys) => {
-          const bs = ys as unknown as d3.ScaleBand<string>;
-          return (bs(d.configLabel) || 0) + bs.bandwidth() / 2;
-        },
-        onHoverStart: (sel) => sel.attr('r', 8),
-        onHoverEnd: (sel) => sel.attr('r', 6),
-        attachToLayer: 1,
-      }}
+      zoom={buildEvalZoomConfig(chartMargin, xDomain)}
+      tooltip={EVAL_TOOLTIP_CONFIG}
       legendElement={
-        <ChartLegend
-          variant="sidebar"
+        <EvalBarChartLegend
           legendItems={legendItems}
           onItemRemove={removeHardware}
           isLegendExpanded={isLegendExpanded}
+          showLabels={showLabels}
+          highContrast={highContrast}
+          showResetFilter={
+            effectiveOfficialHardware.size < hwTypesWithData.size ||
+            activeOverlayHwTypes.size < allOverlayHwTypes.size
+          }
+          parallelismKey={parallelismKey}
           onExpandedChange={(expanded) => {
             setIsLegendExpanded(expanded);
             track('evaluation_legend_expanded', { expanded });
           }}
-          switches={[
-            {
-              id: 'eval-show-labels',
-              label: 'Show Labels',
-              checked: showLabels,
-              onCheckedChange: (checked) => {
-                setShowLabels(checked);
-                track('evaluation_show_labels_toggled', { enabled: checked });
-              },
-            },
-            {
-              id: 'eval-high-contrast',
-              label: 'High Contrast',
-              checked: highContrast,
-              onCheckedChange: (checked) => {
-                setHighContrast(checked);
-                track('evaluation_high_contrast_toggled', { enabled: checked });
-              },
-            },
-          ]}
-          actions={
-            effectiveOfficialHardware.size < hwTypesWithData.size ||
-            activeOverlayHwTypes.size < allOverlayHwTypes.size
-              ? [
-                  {
-                    id: 'eval-reset-filter',
-                    label: 'Reset filter',
-                    onClick: () => {
-                      selectAllHwTypes();
-                      setLocalOfficialOverride(null);
-                      resetOverlayHwTypes();
-                      track('evaluation_filter_reset');
-                    },
-                  },
-                ]
-              : []
-          }
-          enableTooltips={true}
-          keyIndicators={parallelismKey}
+          onToggleLabels={(checked) => {
+            setShowLabels(checked);
+            track('evaluation_show_labels_toggled', { enabled: checked });
+          }}
+          onToggleHighContrast={(checked) => {
+            setHighContrast(checked);
+            track('evaluation_high_contrast_toggled', { enabled: checked });
+          }}
+          onResetFilter={() => {
+            selectAllHwTypes();
+            setLocalOfficialOverride(null);
+            resetOverlayHwTypes();
+            track('evaluation_filter_reset');
+          }}
         />
       }
     />

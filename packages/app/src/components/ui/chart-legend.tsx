@@ -71,6 +71,244 @@ export interface ChartLegendProps {
   onItemRemove?: (name: string) => void;
 }
 
+interface LegendScrollContentProps {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  isSidebar: boolean;
+  isOverflowing: boolean;
+  scrollClasses: string;
+  effectiveExpanded: boolean;
+  grouped: boolean;
+  rows: CommonLegendItemProps[][] | null;
+  sortedItems: CommonLegendItemProps[];
+  legendItems: CommonLegendItemProps[];
+  hiddenNames: Set<string>;
+  effectiveRemove?: (name: string) => void;
+  onItemHover?: (id: string) => void;
+  onItemHoverEnd?: () => void;
+  renderItem: (item: CommonLegendItemProps, isHidden: boolean) => React.ReactNode;
+}
+
+// The scrollable legend body — either the grouped (per-GPU sections) layout or
+// the flat list. Behavior matches the original inline JSX exactly.
+function LegendScrollContent({
+  scrollRef,
+  isSidebar,
+  isOverflowing,
+  scrollClasses,
+  effectiveExpanded,
+  grouped,
+  rows,
+  sortedItems,
+  legendItems,
+  hiddenNames,
+  effectiveRemove,
+  onItemHover,
+  onItemHoverEnd,
+  renderItem,
+}: LegendScrollContentProps) {
+  if (grouped && rows) {
+    return (
+      <div
+        ref={scrollRef}
+        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        className={cn(scrollClasses, 'custom-scrollbar')}
+      >
+        {rows.map((row, i) => {
+          const allHidden =
+            isSidebar && row.every((item: CommonLegendItemProps) => hiddenNames.has(item.name));
+          return (
+            <div
+              key={row[0].title}
+              className={cn(
+                'p-1 rounded-sm shrink-0',
+                i > 0 && 'mt-2',
+                allHidden && 'h-0 m-0! p-0! overflow-hidden',
+              )}
+            >
+              <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
+                {row[0].title}
+              </div>
+              <ul
+                className={cn(
+                  'flex flex-wrap gap-x-2 gap-y-1',
+                  effectiveExpanded && 'md:block md:space-y-1',
+                )}
+              >
+                {row.map((item: CommonLegendItemProps) => {
+                  const isHidden = isSidebar && hiddenNames.has(item.name);
+                  return (
+                    <li key={item.name} className={cn(isHidden && 'h-0 m-0! p-0! overflow-hidden')}>
+                      <ChartLegendItem
+                        name={item.name}
+                        hw={item.hw}
+                        label={item.label}
+                        color={item.color}
+                        title={item.title}
+                        isActive={item.isActive}
+                        onClick={item.onClick}
+                        onHover={onItemHover}
+                        onHoverEnd={onItemHoverEnd}
+                        onRemove={effectiveRemove}
+                        sidebarMode={isSidebar}
+                        asFragment
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <ul
+      ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
+      style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+      className={cn(scrollClasses, 'custom-scrollbar')}
+    >
+      {(isSidebar ? sortedItems : legendItems).map((item) =>
+        renderItem(item, isSidebar && hiddenNames.has(item.name)),
+      )}
+    </ul>
+  );
+}
+
+interface LegendBottomControlsProps {
+  grouped: boolean;
+  effectiveExpanded: boolean;
+  isLegendExpanded: boolean;
+  hasLongText: boolean;
+  switches?: LegendSwitchConfig[];
+  actions?: LegendActionConfig[];
+  shapeIndicators: { precision: string; shapeKey: ShapeKey }[] | null;
+  keyIndicators?: React.ReactNode;
+  hasAtomFootnote: boolean;
+  onLegendExpand: () => void;
+}
+
+// The footer cluster below the scroll area: action links, switches, FP shape
+// key, custom key indicators, expand/collapse toggle, and the ATOM footnote.
+// Renders null when there is nothing to show, matching the original behavior.
+function LegendBottomControls({
+  grouped,
+  effectiveExpanded,
+  isLegendExpanded,
+  hasLongText,
+  switches,
+  actions,
+  shapeIndicators,
+  keyIndicators,
+  hasAtomFootnote,
+  onLegendExpand,
+}: LegendBottomControlsProps) {
+  const switchElements =
+    switches && switches.length > 0 ? (
+      <div
+        className={cn(
+          grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2',
+          'no-export',
+        )}
+      >
+        {switches.map((sw) => (
+          <div key={sw.id} className="mt-2 flex items-center gap-2">
+            <Switch
+              id={sw.id}
+              data-testid={sw.id}
+              checked={sw.checked}
+              onCheckedChange={sw.onCheckedChange}
+            />
+            <Label
+              htmlFor={sw.id}
+              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              {sw.label}
+            </Label>
+          </div>
+        ))}
+      </div>
+    ) : null;
+
+  const actionElements =
+    actions && actions.length > 0 ? (
+      <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
+        {actions.map((action) => (
+          <button
+            type="button"
+            key={action.id}
+            data-testid={action.id}
+            onClick={action.onClick}
+            className="mt-2 text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  const fpIndicators = shapeIndicators ? (
+    <div
+      className={cn(
+        'w-full md:w-auto mt-2 px-1 pr-2 gap-x-4 gap-y-1',
+        effectiveExpanded ? 'flex flex-wrap' : 'grid grid-cols-2',
+      )}
+    >
+      {shapeIndicators.map(({ precision, shapeKey }) => {
+        const Icon = SHAPE_ICON[shapeKey];
+        return (
+          <div key={precision} className="flex items-center gap-2">
+            <Icon size={12} className="inline-block fill-gray-500" />
+            <span className="text-xs text-muted-foreground">
+              {getPrecisionLabel(precision as Precision)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
+
+  const expandButton = hasLongText ? (
+    <div className="hidden lg:block mt-2 no-export">
+      <button
+        type="button"
+        onClick={onLegendExpand}
+        className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
+        aria-label={isLegendExpanded ? 'Collapse legend' : 'Expand legend'}
+      >
+        {isLegendExpanded ? <ArrowRightToLine size={16} /> : <ArrowLeftToLine size={16} />}
+        {isLegendExpanded ? 'Collapse' : 'Expand'}
+      </button>
+    </div>
+  ) : null;
+
+  const hasBottomControls =
+    switchElements ||
+    actionElements ||
+    fpIndicators ||
+    keyIndicators ||
+    expandButton ||
+    hasAtomFootnote;
+  if (!hasBottomControls) return null;
+
+  return (
+    <div className="shrink-0 grow-0">
+      {actionElements}
+      {switchElements}
+      {fpIndicators}
+      {keyIndicators}
+      {expandButton}
+      {hasAtomFootnote && (
+        <p className="mt-2 text-[10px] text-muted-foreground/70 leading-tight no-export">
+          <sup>1</sup> The ATOM engine is promising, however it has yet to serve production tokens.
+          It is still in its infant stage.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ChartLegend({
   legendItems,
   isLegendExpanded,
@@ -252,85 +490,6 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  const switchElements =
-    switches && switches.length > 0 ? (
-      <div
-        className={cn(
-          grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2',
-          'no-export',
-        )}
-      >
-        {switches.map((sw) => (
-          <div key={sw.id} className="mt-2 flex items-center gap-2">
-            <Switch
-              id={sw.id}
-              data-testid={sw.id}
-              checked={sw.checked}
-              onCheckedChange={sw.onCheckedChange}
-            />
-            <Label
-              htmlFor={sw.id}
-              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              {sw.label}
-            </Label>
-          </div>
-        ))}
-      </div>
-    ) : null;
-
-  const actionElements =
-    actions && actions.length > 0 ? (
-      <div className="w-full no-export flex flex-wrap gap-x-3 gap-y-1">
-        {actions.map((action) => (
-          <button
-            type="button"
-            key={action.id}
-            data-testid={action.id}
-            onClick={action.onClick}
-            className="mt-2 text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-    ) : null;
-
-  const fpIndicators = shapeIndicators ? (
-    <div
-      className={cn(
-        'w-full md:w-auto mt-2 px-1 pr-2 gap-x-4 gap-y-1',
-        effectiveExpanded ? 'flex flex-wrap' : 'grid grid-cols-2',
-      )}
-    >
-      {shapeIndicators.map(({ precision, shapeKey }) => {
-        const Icon = SHAPE_ICON[shapeKey];
-        return (
-          <div key={precision} className="flex items-center gap-2">
-            <Icon size={12} className="inline-block fill-gray-500" />
-            <span className="text-xs text-muted-foreground">
-              {getPrecisionLabel(precision as Precision)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  ) : null;
-
-  const expandButton = hasLongText ? (
-    <div className="hidden lg:block mt-2 no-export">
-      <button
-        type="button"
-        onClick={handleLegendExpand}
-        className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
-        aria-label={isLegendExpanded ? 'Collapse legend' : 'Expand legend'}
-      >
-        {isLegendExpanded ? <ArrowRightToLine size={16} /> : <ArrowLeftToLine size={16} />}
-        {isLegendExpanded ? 'Collapse' : 'Expand'}
-      </button>
-    </div>
-  ) : null;
-
   // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
   const itemClassName = (item: CommonLegendItemProps, isHidden: boolean) =>
     cn(
@@ -387,102 +546,41 @@ export default function ChartLegend({
     );
   };
 
-  // Bottom controls (switches, FP indicators, expand button, actions)
-  const hasBottomControls =
-    switchElements ||
-    actionElements ||
-    fpIndicators ||
-    keyIndicators ||
-    expandButton ||
-    hasAtomFootnote;
-  const bottomControls = hasBottomControls ? (
-    <div className="shrink-0 grow-0">
-      {actionElements}
-      {switchElements}
-      {fpIndicators}
-      {keyIndicators}
-      {expandButton}
-      {hasAtomFootnote && (
-        <p className="mt-2 text-[10px] text-muted-foreground/70 leading-tight no-export">
-          <sup>1</sup> The ATOM engine is promising, however it has yet to serve production tokens.
-          It is still in its infant stage.
-        </p>
-      )}
-    </div>
-  ) : null;
-
-  // Scroll container content
-  const scrollContent =
-    grouped && rows ? (
-      <div
-        ref={scrollRef}
-        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={cn(scrollClasses, 'custom-scrollbar')}
-      >
-        {rows.map((row, i) => {
-          const allHidden =
-            isSidebar && row.every((item: CommonLegendItemProps) => hiddenNames.has(item.name));
-          return (
-            <div
-              key={row[0].title}
-              className={cn(
-                'p-1 rounded-sm shrink-0',
-                i > 0 && 'mt-2',
-                allHidden && 'h-0 m-0! p-0! overflow-hidden',
-              )}
-            >
-              <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
-                {row[0].title}
-              </div>
-              <ul
-                className={cn(
-                  'flex flex-wrap gap-x-2 gap-y-1',
-                  effectiveExpanded && 'md:block md:space-y-1',
-                )}
-              >
-                {row.map((item: CommonLegendItemProps) => {
-                  const isHidden = isSidebar && hiddenNames.has(item.name);
-                  return (
-                    <li key={item.name} className={cn(isHidden && 'h-0 m-0! p-0! overflow-hidden')}>
-                      <ChartLegendItem
-                        name={item.name}
-                        hw={item.hw}
-                        label={item.label}
-                        color={item.color}
-                        title={item.title}
-                        isActive={item.isActive}
-                        onClick={item.onClick}
-                        onHover={onItemHover}
-                        onHoverEnd={onItemHoverEnd}
-                        onRemove={effectiveRemove}
-                        sidebarMode={isSidebar}
-                        asFragment
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <ul
-        ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
-        style={isSidebar || isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={cn(scrollClasses, 'custom-scrollbar')}
-      >
-        {(isSidebar ? sortedItems : legendItems).map((item) =>
-          renderItem(item, isSidebar && hiddenNames.has(item.name)),
-        )}
-      </ul>
-    );
+  const bottomControls = (
+    <LegendBottomControls
+      grouped={grouped}
+      effectiveExpanded={effectiveExpanded}
+      isLegendExpanded={isLegendExpanded}
+      hasLongText={hasLongText}
+      switches={switches}
+      actions={actions}
+      shapeIndicators={shapeIndicators}
+      keyIndicators={keyIndicators}
+      hasAtomFootnote={hasAtomFootnote}
+      onLegendExpand={handleLegendExpand}
+    />
+  );
 
   const content = (
     <div className={isSidebar ? 'h-full' : 'relative'}>
       <div data-testid="chart-legend" className={outerClasses} style={outerStyle}>
         {searchInput}
-        {scrollContent}
+        <LegendScrollContent
+          scrollRef={scrollRef}
+          isSidebar={isSidebar}
+          isOverflowing={isOverflowing}
+          scrollClasses={scrollClasses}
+          effectiveExpanded={effectiveExpanded}
+          grouped={grouped}
+          rows={rows}
+          sortedItems={sortedItems}
+          legendItems={legendItems}
+          hiddenNames={hiddenNames}
+          effectiveRemove={effectiveRemove}
+          onItemHover={onItemHover}
+          onItemHoverEnd={onItemHoverEnd}
+          renderItem={renderItem}
+        />
         {bottomControls}
       </div>
     </div>

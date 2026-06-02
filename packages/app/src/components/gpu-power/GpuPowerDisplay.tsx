@@ -55,6 +55,452 @@ const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
   },
 ];
 
+interface CorrelationAxisSelectorsProps {
+  corrXMetric: GpuMetricKey;
+  corrYMetric: GpuMetricKey;
+  availableMetrics: ReturnType<typeof getAvailableMetrics>;
+  onXChange: (value: GpuMetricKey) => void;
+  onYChange: (value: GpuMetricKey) => void;
+}
+
+// X/Y axis metric pickers shown only in correlation view.
+function CorrelationAxisSelectors({
+  corrXMetric,
+  corrYMetric,
+  availableMetrics,
+  onXChange,
+  onYChange,
+}: CorrelationAxisSelectorsProps) {
+  return (
+    <div className="flex flex-wrap items-end gap-3 mb-3 no-export">
+      <div className="space-y-1">
+        <Label className="text-xs">X Axis</Label>
+        <Select value={corrXMetric} onValueChange={(v) => onXChange(v as GpuMetricKey)}>
+          <SelectTrigger className="h-8 w-[160px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableMetrics.map((m) => (
+              <SelectItem key={m.key} value={m.key}>
+                {m.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Y Axis</Label>
+        <Select value={corrYMetric} onValueChange={(v) => onYChange(v as GpuMetricKey)}>
+          <SelectTrigger className="h-8 w-[160px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableMetrics.map((m) => (
+              <SelectItem key={m.key} value={m.key}>
+                {m.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
+interface GpuMetricsLegendProps {
+  allGpuIndices: number[];
+  visibleGpus: Set<number>;
+  isLegendExpanded: boolean;
+  allGpusSelected: boolean;
+  downsample: boolean;
+  resetFilterId: string;
+  downsampleId: string;
+  onItemRemove: (hw: string) => void;
+  onToggleGpu: (gpuIndex: number) => void;
+  onExpandedChange: (expanded: boolean) => void;
+  onSelectAll: () => void;
+  onDownsampleChange: (enabled: boolean) => void;
+}
+
+// Shared sidebar legend for both the line-chart and correlation views. The two
+// callers differ only in the reset-filter and downsample switch ids.
+function GpuMetricsLegend({
+  allGpuIndices,
+  visibleGpus,
+  isLegendExpanded,
+  allGpusSelected,
+  downsample,
+  resetFilterId,
+  downsampleId,
+  onItemRemove,
+  onToggleGpu,
+  onExpandedChange,
+  onSelectAll,
+  onDownsampleChange,
+}: GpuMetricsLegendProps) {
+  return (
+    <ChartLegend
+      variant="sidebar"
+      onItemRemove={onItemRemove}
+      legendItems={allGpuIndices.map((gpuIndex) => ({
+        name: `GPU ${gpuIndex}`,
+        hw: String(gpuIndex),
+        label: `GPU ${gpuIndex}`,
+        color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+        isActive: visibleGpus.has(gpuIndex),
+        onClick: () => onToggleGpu(gpuIndex),
+      }))}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={onExpandedChange}
+      actions={
+        allGpusSelected
+          ? []
+          : [
+              {
+                id: resetFilterId,
+                label: 'Reset filter',
+                onClick: onSelectAll,
+              },
+            ]
+      }
+      switches={[
+        {
+          id: downsampleId,
+          label: 'Downsample',
+          checked: downsample,
+          onCheckedChange: onDownsampleChange,
+        },
+      ]}
+    />
+  );
+}
+
+interface GpuMetricsHeaderCardProps {
+  runIdInput: string;
+  loading: boolean;
+  onRunIdChange: (value: string) => void;
+  onLoad: () => void;
+  onRelock: () => void;
+}
+
+// Title, description, re-lock button, run-id input, and Load button.
+function GpuMetricsHeaderCard({
+  runIdInput,
+  loading,
+  onRunIdChange,
+  onLoad,
+  onRelock,
+}: GpuMetricsHeaderCardProps) {
+  return (
+    <Card className="mb-4">
+      <div className="space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold mb-2">PowerX</h2>
+            <p className="text-muted-foreground text-sm">
+              Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs text-muted-foreground"
+              onClick={onRelock}
+              title="Re-lock feature gate"
+            >
+              <Lock className="size-3" />
+              Re-lock feature gate
+            </Button>
+            <ChartShareActions />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 max-w-sm space-y-1">
+            <Label htmlFor="gpu-metrics-run-id">Run ID</Label>
+            <Input
+              id="gpu-metrics-run-id"
+              data-testid="gpu-metrics-run-input"
+              placeholder="e.g. 22806827144"
+              value={runIdInput}
+              onChange={(e) => onRunIdChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onLoad();
+              }}
+            />
+          </div>
+          <Button
+            data-testid="gpu-metrics-load-button"
+            onClick={onLoad}
+            disabled={!runIdInput.trim() || loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Loading…
+              </>
+            ) : (
+              'Load'
+            )}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+interface GpuMetricsRunInfoCardProps {
+  runInfo: GpuPowerRunInfo;
+  artifacts: GpuMetricsArtifact[];
+  currentData: GpuMetricsArtifact['data'];
+  selectedArtifact: string;
+  selectedMetric: GpuMetricKey;
+  availableMetrics: ReturnType<typeof getAvailableMetrics>;
+  onArtifactChange: (name: string) => void;
+  onMetricChange: (value: string) => void;
+}
+
+// Run metadata banner plus the artifact / metric selectors.
+function GpuMetricsRunInfoCard({
+  runInfo,
+  artifacts,
+  currentData,
+  selectedArtifact,
+  selectedMetric,
+  availableMetrics,
+  onArtifactChange,
+  onMetricChange,
+}: GpuMetricsRunInfoCardProps) {
+  return (
+    <Card className="mb-4">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4">
+        <span>
+          <span className="text-muted-foreground">Run:</span>{' '}
+          <a
+            href={runInfo.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand hover:underline font-medium"
+          >
+            {runInfo.name} #{runInfo.id}
+          </a>
+        </span>
+        <span>
+          <span className="text-muted-foreground">Branch:</span> {runInfo.branch}
+        </span>
+        <span>
+          <span className="text-muted-foreground">Date:</span>{' '}
+          {new Date(runInfo.createdAt).toLocaleDateString()}
+        </span>
+        <span>
+          <span className="text-muted-foreground">Status:</span> {runInfo.conclusion}
+        </span>
+        <span>
+          <span className="text-muted-foreground">Data points:</span>{' '}
+          {currentData.length.toLocaleString()}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-end gap-3">
+        {artifacts.length > 1 && (
+          <div className="space-y-1 min-w-0">
+            <Label htmlFor="gpu-metrics-artifact-select">Artifact</Label>
+            <Select value={selectedArtifact} onValueChange={onArtifactChange}>
+              <SelectTrigger
+                id="gpu-metrics-artifact-select"
+                data-testid="gpu-metrics-artifact-select"
+                className="w-full truncate"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {artifacts.map((a) => (
+                  <SelectItem key={a.name} value={a.name}>
+                    {a.name} ({a.data.length.toLocaleString()} rows)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="space-y-1">
+          <Label htmlFor="gpu-metrics-metric-select">Metric</Label>
+          <Select value={selectedMetric} onValueChange={onMetricChange}>
+            <SelectTrigger
+              id="gpu-metrics-metric-select"
+              data-testid="gpu-metrics-metric-select"
+              className="w-[200px]"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMetrics.map((m) => (
+                <SelectItem key={m.key} value={m.key}>
+                  {m.label} ({m.unit})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+interface GpuMetricsChartCardProps {
+  chartView: GpuMetricsView;
+  copied: boolean;
+  currentData: GpuMetricsArtifact['data'];
+  visibleGpus: Set<number>;
+  selectedMetric: GpuMetricKey;
+  selectedArtifact: string;
+  downsample: boolean;
+  metricConfig: (typeof ALL_METRIC_OPTIONS)[number];
+  corrXMetric: GpuMetricKey;
+  corrYMetric: GpuMetricKey;
+  availableMetrics: ReturnType<typeof getAvailableMetrics>;
+  allGpuIndices: number[];
+  isLegendExpanded: boolean;
+  allGpusSelected: boolean;
+  onChartViewChange: (value: GpuMetricsView) => void;
+  onShare: () => void;
+  onCorrXChange: (value: GpuMetricKey) => void;
+  onCorrYChange: (value: GpuMetricKey) => void;
+  onItemRemove: (hw: string) => void;
+  onToggleGpu: (gpuIndex: number) => void;
+  onExpandedChange: (expanded: boolean) => void;
+  onSelectAll: () => void;
+  onDownsampleChange: (enabled: boolean) => void;
+}
+
+// The chart card: view toggle + share, optional correlation axis pickers, and
+// the line-chart / correlation-scatter views (each with its sidebar legend).
+function GpuMetricsChartCard({
+  chartView,
+  copied,
+  currentData,
+  visibleGpus,
+  selectedMetric,
+  selectedArtifact,
+  downsample,
+  metricConfig,
+  corrXMetric,
+  corrYMetric,
+  availableMetrics,
+  allGpuIndices,
+  isLegendExpanded,
+  allGpusSelected,
+  onChartViewChange,
+  onShare,
+  onCorrXChange,
+  onCorrYChange,
+  onItemRemove,
+  onToggleGpu,
+  onExpandedChange,
+  onSelectAll,
+  onDownsampleChange,
+}: GpuMetricsChartCardProps) {
+  const legend = (resetFilterId: string, downsampleId: string) => (
+    <GpuMetricsLegend
+      allGpuIndices={allGpuIndices}
+      visibleGpus={visibleGpus}
+      isLegendExpanded={isLegendExpanded}
+      allGpusSelected={allGpusSelected}
+      downsample={downsample}
+      resetFilterId={resetFilterId}
+      downsampleId={downsampleId}
+      onItemRemove={onItemRemove}
+      onToggleGpu={onToggleGpu}
+      onExpandedChange={onExpandedChange}
+      onSelectAll={onSelectAll}
+      onDownsampleChange={onDownsampleChange}
+    />
+  );
+
+  return (
+    <Card id="gpu-metrics-chart" data-testid="gpu-metrics-chart-container" className="relative">
+      <div className="flex items-center justify-end mb-2">
+        <div className="flex items-center gap-1.5 no-export">
+          <SegmentedToggle
+            value={chartView}
+            options={GPU_METRICS_VIEW_OPTIONS}
+            onValueChange={onChartViewChange}
+            ariaLabel="View mode"
+            className="rounded-md border p-0 gap-0"
+            buttonClassName="p-1.5 rounded-none first:rounded-l-md last:rounded-r-md"
+            activeButtonClassName="bg-muted text-foreground"
+            inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onShare}
+            className="h-7 gap-1.5 text-xs"
+            title="Copy share link"
+            data-testid="gpu-metrics-share-button"
+          >
+            {copied ? (
+              <>
+                <Check className="size-3" />
+                Copied
+              </>
+            ) : (
+              <>
+                <LinkIcon className="size-3" />
+                Share
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {chartView === 'correlation' && (
+        <CorrelationAxisSelectors
+          corrXMetric={corrXMetric}
+          corrYMetric={corrYMetric}
+          availableMetrics={availableMetrics}
+          onXChange={onCorrXChange}
+          onYChange={onCorrYChange}
+        />
+      )}
+
+      {chartView === 'chart' && (
+        <GpuMetricsChart
+          data={currentData}
+          visibleGpus={visibleGpus}
+          metricKey={selectedMetric}
+          artifactName={selectedArtifact}
+          maxPoints={downsample ? 2000 : Infinity}
+          caption={
+            <>
+              <h2 className="text-lg font-semibold">{metricConfig.label} over Time</h2>
+              <UnofficialDomainNotice />
+            </>
+          }
+          legendElement={legend('gpu-metrics-reset-filter', 'gpu-metrics-downsample')}
+        />
+      )}
+      {chartView === 'correlation' && (
+        <GpuCorrelationChart
+          data={currentData}
+          visibleGpus={visibleGpus}
+          xMetric={corrXMetric}
+          yMetric={corrYMetric}
+          maxPoints={downsample ? 2000 : Infinity}
+          caption={
+            <>
+              <h2 className="text-lg font-semibold">Metric Correlation</h2>
+              <UnofficialDomainNotice />
+            </>
+          }
+          legendElement={legend('gpu-metrics-reset-filter-2', 'gpu-metrics-downsample-corr')}
+        />
+      )}
+    </Card>
+  );
+}
+
 export default function GpuMetricsDisplay() {
   const router = useRouter();
   const [runIdInput, setRunIdInput] = useState('22806827144');
@@ -233,65 +679,17 @@ export default function GpuMetricsDisplay() {
 
   return (
     <section data-testid="gpu-metrics-display">
-      <Card className="mb-4">
-        <div className="space-y-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">PowerX</h2>
-              <p className="text-muted-foreground text-sm">
-                Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
-                <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs text-muted-foreground"
-                onClick={() => {
-                  relockFeatureGate();
-                  track('powerx_relocked');
-                  router.push('/inference');
-                }}
-                title="Re-lock feature gate"
-              >
-                <Lock className="size-3" />
-                Re-lock feature gate
-              </Button>
-              <ChartShareActions />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 max-w-sm space-y-1">
-              <Label htmlFor="gpu-metrics-run-id">Run ID</Label>
-              <Input
-                id="gpu-metrics-run-id"
-                data-testid="gpu-metrics-run-input"
-                placeholder="e.g. 22806827144"
-                value={runIdInput}
-                onChange={(e) => setRunIdInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleLoad();
-                }}
-              />
-            </div>
-            <Button
-              data-testid="gpu-metrics-load-button"
-              onClick={handleLoad}
-              disabled={!runIdInput.trim() || loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Loading…
-                </>
-              ) : (
-                'Load'
-              )}
-            </Button>
-          </div>
-        </div>
-      </Card>
+      <GpuMetricsHeaderCard
+        runIdInput={runIdInput}
+        loading={loading}
+        onRunIdChange={setRunIdInput}
+        onLoad={handleLoad}
+        onRelock={() => {
+          relockFeatureGate();
+          track('powerx_relocked');
+          router.push('/inference');
+        }}
+      />
 
       {error && (
         <Card className="mb-4 border-destructive" data-testid="gpu-metrics-error">
@@ -301,273 +699,48 @@ export default function GpuMetricsDisplay() {
 
       {runInfo && artifacts.length > 0 && (
         <>
-          <Card className="mb-4">
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4">
-              <span>
-                <span className="text-muted-foreground">Run:</span>{' '}
-                <a
-                  href={runInfo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-brand hover:underline font-medium"
-                >
-                  {runInfo.name} #{runInfo.id}
-                </a>
-              </span>
-              <span>
-                <span className="text-muted-foreground">Branch:</span> {runInfo.branch}
-              </span>
-              <span>
-                <span className="text-muted-foreground">Date:</span>{' '}
-                {new Date(runInfo.createdAt).toLocaleDateString()}
-              </span>
-              <span>
-                <span className="text-muted-foreground">Status:</span> {runInfo.conclusion}
-              </span>
-              <span>
-                <span className="text-muted-foreground">Data points:</span>{' '}
-                {currentData.length.toLocaleString()}
-              </span>
-            </div>
+          <GpuMetricsRunInfoCard
+            runInfo={runInfo}
+            artifacts={artifacts}
+            currentData={currentData}
+            selectedArtifact={selectedArtifact}
+            selectedMetric={selectedMetric}
+            availableMetrics={availableMetrics}
+            onArtifactChange={handleArtifactChange}
+            onMetricChange={handleMetricChange}
+          />
 
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-end gap-3">
-              {artifacts.length > 1 && (
-                <div className="space-y-1 min-w-0">
-                  <Label htmlFor="gpu-metrics-artifact-select">Artifact</Label>
-                  <Select value={selectedArtifact} onValueChange={handleArtifactChange}>
-                    <SelectTrigger
-                      id="gpu-metrics-artifact-select"
-                      data-testid="gpu-metrics-artifact-select"
-                      className="w-full truncate"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {artifacts.map((a) => (
-                        <SelectItem key={a.name} value={a.name}>
-                          {a.name} ({a.data.length.toLocaleString()} rows)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="space-y-1">
-                <Label htmlFor="gpu-metrics-metric-select">Metric</Label>
-                <Select value={selectedMetric} onValueChange={handleMetricChange}>
-                  <SelectTrigger
-                    id="gpu-metrics-metric-select"
-                    data-testid="gpu-metrics-metric-select"
-                    className="w-[200px]"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMetrics.map((m) => (
-                      <SelectItem key={m.key} value={m.key}>
-                        {m.label} ({m.unit})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Card>
-
-          <Card
-            id="gpu-metrics-chart"
-            data-testid="gpu-metrics-chart-container"
-            className="relative"
-          >
-            <div className="flex items-center justify-end mb-2">
-              <div className="flex items-center gap-1.5 no-export">
-                <SegmentedToggle
-                  value={chartView}
-                  options={GPU_METRICS_VIEW_OPTIONS}
-                  onValueChange={handleChartViewChange}
-                  ariaLabel="View mode"
-                  className="rounded-md border p-0 gap-0"
-                  buttonClassName="p-1.5 rounded-none first:rounded-l-md last:rounded-r-md"
-                  activeButtonClassName="bg-muted text-foreground"
-                  inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShare}
-                  className="h-7 gap-1.5 text-xs"
-                  title="Copy share link"
-                  data-testid="gpu-metrics-share-button"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="size-3" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <LinkIcon className="size-3" />
-                      Share
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {chartView === 'correlation' && (
-              <div className="flex flex-wrap items-end gap-3 mb-3 no-export">
-                <div className="space-y-1">
-                  <Label className="text-xs">X Axis</Label>
-                  <Select
-                    value={corrXMetric}
-                    onValueChange={(v) => setCorrXMetric(v as GpuMetricKey)}
-                  >
-                    <SelectTrigger className="h-8 w-[160px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMetrics.map((m) => (
-                        <SelectItem key={m.key} value={m.key}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Y Axis</Label>
-                  <Select
-                    value={corrYMetric}
-                    onValueChange={(v) => setCorrYMetric(v as GpuMetricKey)}
-                  >
-                    <SelectTrigger className="h-8 w-[160px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMetrics.map((m) => (
-                        <SelectItem key={m.key} value={m.key}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {chartView === 'chart' && (
-              <GpuMetricsChart
-                data={currentData}
-                visibleGpus={visibleGpus}
-                metricKey={selectedMetric}
-                artifactName={selectedArtifact}
-                maxPoints={downsample ? 2000 : Infinity}
-                caption={
-                  <>
-                    <h2 className="text-lg font-semibold">{metricConfig.label} over Time</h2>
-                    <UnofficialDomainNotice />
-                  </>
-                }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    onItemRemove={removeGpu}
-                    legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `GPU ${gpuIndex}`,
-                      hw: String(gpuIndex),
-                      label: `GPU ${gpuIndex}`,
-                      color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
-                      isActive: visibleGpus.has(gpuIndex),
-                      onClick: () => toggleGpu(gpuIndex),
-                    }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('gpu_metrics_legend_expanded', { expanded });
-                    }}
-                    actions={
-                      allGpusSelected
-                        ? []
-                        : [
-                            {
-                              id: 'gpu-metrics-reset-filter',
-                              label: 'Reset filter',
-                              onClick: selectAllGpus,
-                            },
-                          ]
-                    }
-                    switches={[
-                      {
-                        id: 'gpu-metrics-downsample',
-                        label: 'Downsample',
-                        checked: downsample,
-                        onCheckedChange: (c) => {
-                          setDownsample(c);
-                          track('gpu_metrics_downsample_toggled', { enabled: c });
-                        },
-                      },
-                    ]}
-                  />
-                }
-              />
-            )}
-            {chartView === 'correlation' && (
-              <GpuCorrelationChart
-                data={currentData}
-                visibleGpus={visibleGpus}
-                xMetric={corrXMetric}
-                yMetric={corrYMetric}
-                maxPoints={downsample ? 2000 : Infinity}
-                caption={
-                  <>
-                    <h2 className="text-lg font-semibold">Metric Correlation</h2>
-                    <UnofficialDomainNotice />
-                  </>
-                }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    onItemRemove={removeGpu}
-                    legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `GPU ${gpuIndex}`,
-                      hw: String(gpuIndex),
-                      label: `GPU ${gpuIndex}`,
-                      color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
-                      isActive: visibleGpus.has(gpuIndex),
-                      onClick: () => toggleGpu(gpuIndex),
-                    }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('gpu_metrics_legend_expanded', { expanded });
-                    }}
-                    actions={
-                      allGpusSelected
-                        ? []
-                        : [
-                            {
-                              id: 'gpu-metrics-reset-filter-2',
-                              label: 'Reset filter',
-                              onClick: selectAllGpus,
-                            },
-                          ]
-                    }
-                    switches={[
-                      {
-                        id: 'gpu-metrics-downsample-corr',
-                        label: 'Downsample',
-                        checked: downsample,
-                        onCheckedChange: (c) => {
-                          setDownsample(c);
-                          track('gpu_metrics_downsample_toggled', { enabled: c });
-                        },
-                      },
-                    ]}
-                  />
-                }
-              />
-            )}
-          </Card>
+          <GpuMetricsChartCard
+            chartView={chartView}
+            copied={copied}
+            currentData={currentData}
+            visibleGpus={visibleGpus}
+            selectedMetric={selectedMetric}
+            selectedArtifact={selectedArtifact}
+            downsample={downsample}
+            metricConfig={metricConfig}
+            corrXMetric={corrXMetric}
+            corrYMetric={corrYMetric}
+            availableMetrics={availableMetrics}
+            allGpuIndices={allGpuIndices}
+            isLegendExpanded={isLegendExpanded}
+            allGpusSelected={allGpusSelected}
+            onChartViewChange={handleChartViewChange}
+            onShare={handleShare}
+            onCorrXChange={setCorrXMetric}
+            onCorrYChange={setCorrYMetric}
+            onItemRemove={removeGpu}
+            onToggleGpu={toggleGpu}
+            onExpandedChange={(expanded) => {
+              setIsLegendExpanded(expanded);
+              track('gpu_metrics_legend_expanded', { expanded });
+            }}
+            onSelectAll={selectAllGpus}
+            onDownsampleChange={(c) => {
+              setDownsample(c);
+              track('gpu_metrics_downsample_toggled', { enabled: c });
+            }}
+          />
 
           {/* Statistics Table */}
           <Card className="mt-4">

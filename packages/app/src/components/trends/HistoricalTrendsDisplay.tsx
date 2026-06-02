@@ -31,6 +31,114 @@ import {
 import { getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
+interface TargetInteractivitySliderProps {
+  interactivityRange: { min: number; max: number };
+  targetInteractivity: number;
+  interactivityInput: string;
+  onSliderChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onInputBlur: () => void;
+}
+
+// The "Target Interactivity" range slider + numeric input shown above the chart.
+function TargetInteractivitySlider({
+  interactivityRange,
+  targetInteractivity,
+  interactivityInput,
+  onSliderChange,
+  onInputChange,
+  onInputBlur,
+}: TargetInteractivitySliderProps) {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <div className="space-y-2">
+        <LabelWithTooltip
+          htmlFor="historical-target"
+          label="Target Interactivity (tok/s/user)"
+          tooltip="The interactivity operating point used for interpolation. Move the slider to see how each GPU's performance changes at different interactivity levels."
+        />
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <input
+              id="historical-target"
+              type="range"
+              aria-label="Target Interactivity (tok/s/user)"
+              min={interactivityRange.min}
+              max={interactivityRange.max}
+              step={1}
+              value={targetInteractivity}
+              onChange={onSliderChange}
+              onPointerUp={() =>
+                track('historical_trend_target_set', { value: targetInteractivity })
+              }
+              className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
+              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
+              [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
+              [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
+              [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
+              [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
+              [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+            />
+            <div
+              className="relative h-4 text-xs text-muted-foreground"
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              {Array.from({ length: 6 }, (_, i) => (
+                <span
+                  key={i}
+                  className="absolute -translate-x-1/2"
+                  style={{ left: `${(i / 5) * 100}%` }}
+                >
+                  {Math.round(
+                    interactivityRange.min +
+                      (interactivityRange.max - interactivityRange.min) * (i / 5),
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+          <Input
+            type="number"
+            value={interactivityInput}
+            onChange={onInputChange}
+            onBlur={onInputBlur}
+            className="w-24 h-9"
+            min={0}
+          />
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+// Loading skeleton shown while graphs / interpolated trend data resolve.
+function HistoricalTrendsSkeleton() {
+  return (
+    <section data-testid="historical-trends-display">
+      <Card className="relative z-30">
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Historical Trends</h2>
+            <p className="text-muted-foreground text-sm mb-4">
+              Interpolated performance metrics over time at a fixed interactivity operating point.
+            </p>
+          </div>
+          <ChartControls hideGpuComparison />
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-56" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        </div>
+      </Card>
+      <Card className="mt-4">
+        <Skeleton className="h-7 w-2/4 mb-1" />
+        <Skeleton className="h-5 w-3/4 mb-2" />
+        <Skeleton className="h-[600px] w-full" />
+      </Card>
+    </section>
+  );
+}
+
 export default function HistoricalTrendsDisplay() {
   const {
     graphs,
@@ -155,30 +263,7 @@ export default function HistoricalTrendsDisplay() {
   );
 
   if (loading || graphs.length === 0 || trendLoading) {
-    return (
-      <section data-testid="historical-trends-display">
-        <Card className="relative z-30">
-          <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Historical Trends</h2>
-              <p className="text-muted-foreground text-sm mb-4">
-                Interpolated performance metrics over time at a fixed interactivity operating point.
-              </p>
-            </div>
-            <ChartControls hideGpuComparison />
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-56" />
-              <Skeleton className="h-9 w-full" />
-            </div>
-          </div>
-        </Card>
-        <Card className="mt-4">
-          <Skeleton className="h-7 w-2/4 mb-1" />
-          <Skeleton className="h-5 w-3/4 mb-2" />
-          <Skeleton className="h-[600px] w-full" />
-        </Card>
-      </section>
-    );
+    return <HistoricalTrendsSkeleton />;
   }
 
   return (
@@ -199,64 +284,14 @@ export default function HistoricalTrendsDisplay() {
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
-            <TooltipProvider delayDuration={0}>
-              <div className="space-y-2">
-                <LabelWithTooltip
-                  htmlFor="historical-target"
-                  label="Target Interactivity (tok/s/user)"
-                  tooltip="The interactivity operating point used for interpolation. Move the slider to see how each GPU's performance changes at different interactivity levels."
-                />
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <input
-                      id="historical-target"
-                      type="range"
-                      aria-label="Target Interactivity (tok/s/user)"
-                      min={interactivityRange.min}
-                      max={interactivityRange.max}
-                      step={1}
-                      value={targetInteractivity}
-                      onChange={handleSliderChange}
-                      onPointerUp={() =>
-                        track('historical_trend_target_set', { value: targetInteractivity })
-                      }
-                      className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
-                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
-                      [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
-                      [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
-                      [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                      [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
-                      [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                    />
-                    <div
-                      className="relative h-4 text-xs text-muted-foreground"
-                      style={{ marginLeft: 8, marginRight: 8 }}
-                    >
-                      {Array.from({ length: 6 }, (_, i) => (
-                        <span
-                          key={i}
-                          className="absolute -translate-x-1/2"
-                          style={{ left: `${(i / 5) * 100}%` }}
-                        >
-                          {Math.round(
-                            interactivityRange.min +
-                              (interactivityRange.max - interactivityRange.min) * (i / 5),
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <Input
-                    type="number"
-                    value={interactivityInput}
-                    onChange={handleInputChange}
-                    onBlur={handleInputBlur}
-                    className="w-24 h-9"
-                    min={0}
-                  />
-                </div>
-              </div>
-            </TooltipProvider>
+            <TargetInteractivitySlider
+              interactivityRange={interactivityRange}
+              targetInteractivity={targetInteractivity}
+              interactivityInput={interactivityInput}
+              onSliderChange={handleSliderChange}
+              onInputChange={handleInputChange}
+              onInputBlur={handleInputBlur}
+            />
           )}
         </div>
       </Card>

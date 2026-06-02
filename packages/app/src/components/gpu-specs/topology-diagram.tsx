@@ -233,12 +233,18 @@ interface TopologyD3Props {
  *   └──────────────────────────────┘
  *     ┌Pod 2┐ ┌Pod 3┐ ...             ← Extra pods (abstracted)
  */
-function TopologyD3({ spec, config, compact }: TopologyD3Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
+/**
+ * Imperatively builds the D3 SVG topology diagram into `containerEl`. Extracted
+ * from the component effect verbatim so behavior is unchanged; returns the
+ * cleanup that clears the container.
+ */
+function renderTopologyDiagram(
+  containerEl: HTMLDivElement,
+  spec: GpuSpec,
+  config: TopologyD3Props['config'],
+  compact: boolean,
+): () => void {
+  {
     const { railCount, gpuCount, nicCount, nicToLeaf, spineCount, serversPerPod, podCount } =
       config;
 
@@ -407,7 +413,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
     }));
 
     // === Clear and render with D3 ===
-    const container = d3.select(containerRef.current);
+    const container = d3.select(containerEl);
     container.selectAll('*').remove();
 
     const svg = container
@@ -778,6 +784,15 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
     return () => {
       container.selectAll('*').remove();
     };
+  }
+}
+
+function TopologyD3({ spec, config, compact }: TopologyD3Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    return renderTopologyDiagram(containerRef.current, spec, config, compact);
   }, [spec, config, compact]);
 
   return <div ref={containerRef} />;

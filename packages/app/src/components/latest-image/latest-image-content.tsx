@@ -83,6 +83,299 @@ function formatSpecMethod(method: string) {
   return method === 'none' ? 'Off' : method.toUpperCase();
 }
 
+interface ImageFiltersProps {
+  options: ReturnType<typeof deriveOptions>;
+  selectedModel: string;
+  setSelectedModel: (v: string) => void;
+  selectedPrecision: string;
+  setSelectedPrecision: (v: string) => void;
+  selectedSequence: string;
+  setSelectedSequence: (v: string) => void;
+  selectedSpecMethod: string;
+  setSelectedSpecMethod: (v: string) => void;
+  selectedHardware: string;
+  setSelectedHardware: (v: string) => void;
+  selectedNodeType: NodeType;
+  setSelectedNodeType: (v: NodeType) => void;
+  selectedFrameworks: string[];
+  setSelectedFrameworks: (v: string[]) => void;
+}
+
+// Filter toolbar for the image table. Owns no state — every value/setter is
+// passed from the parent so analytics and filtering behavior are unchanged.
+function ImageFilters({
+  options,
+  selectedModel,
+  setSelectedModel,
+  selectedPrecision,
+  setSelectedPrecision,
+  selectedSequence,
+  setSelectedSequence,
+  selectedSpecMethod,
+  setSelectedSpecMethod,
+  selectedHardware,
+  setSelectedHardware,
+  selectedNodeType,
+  setSelectedNodeType,
+  selectedFrameworks,
+  setSelectedFrameworks,
+}: ImageFiltersProps) {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-model-select"
+            label="Model"
+            tooltip="Filter by language model."
+          />
+          <Select
+            value={selectedModel}
+            onValueChange={(v) => {
+              track('current_image_model_changed', { model: v });
+              setSelectedModel(v);
+            }}
+          >
+            <SelectTrigger id="image-model-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Models</SelectItem>
+              {options.models.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-precision-select"
+            label="Precision"
+            tooltip="Numerical precision used for model weights."
+          />
+          <Select
+            value={selectedPrecision}
+            onValueChange={(v) => {
+              track('current_image_precision_changed', { precision: v });
+              setSelectedPrecision(v);
+            }}
+          >
+            <SelectTrigger id="image-precision-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {options.precisions.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p.toUpperCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-sequence-select"
+            label="ISL / OSL"
+            tooltip="Input Sequence Length / Output Sequence Length in tokens."
+          />
+          <Select
+            value={selectedSequence}
+            onValueChange={(v) => {
+              track('current_image_sequence_changed', { sequence: v });
+              setSelectedSequence(v);
+            }}
+          >
+            <SelectTrigger id="image-sequence-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {options.sequences.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-spec-decode-select"
+            label="Spec Decode"
+            tooltip="Speculative decoding method. MTP = Multi-Token Prediction."
+          />
+          <Select
+            value={selectedSpecMethod}
+            onValueChange={(v) => {
+              track('current_image_spec_decode_changed', { spec_decode: v });
+              setSelectedSpecMethod(v);
+            }}
+          >
+            <SelectTrigger id="image-spec-decode-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {options.specMethods.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {formatSpecMethod(m)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-hardware-select"
+            label="GPU SKU"
+            tooltip="Filter by GPU model (e.g. H200, MI300X, B200)."
+          />
+          <Select
+            value={selectedHardware}
+            onValueChange={(v) => {
+              track('current_image_hardware_changed', { hardware: v });
+              setSelectedHardware(v);
+            }}
+          >
+            <SelectTrigger id="image-hardware-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {options.hardwares.map((h) => (
+                <SelectItem key={h} value={h}>
+                  {h.toUpperCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-node-type-select"
+            label="Node Type"
+            tooltip="Single node = vLLM/SGLang/TRT. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools."
+          />
+          <Select
+            value={selectedNodeType}
+            onValueChange={(v) => {
+              track('current_image_node_type_changed', { node_type: v });
+              setSelectedNodeType(v as NodeType);
+            }}
+          >
+            <SelectTrigger id="image-node-type-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="single">Single Node</SelectItem>
+              <SelectItem value="disagg">Disagg (Dynamo / Mori)</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="image-framework-multiselect"
+            label="Framework"
+            tooltip="Filter by inference engine (sglang, vllm, TensorRT, atom). Disagg variants (dynamo-*, mori-*) collapse into their base engine. Empty = all frameworks."
+          />
+          <MultiSelect
+            triggerId="image-framework-multiselect"
+            triggerTestId="image-framework-multiselect"
+            options={options.frameworks.map((fw) => ({
+              value: fw,
+              label: getFrameworkLabel(fw),
+            }))}
+            value={selectedFrameworks}
+            onChange={(v) => {
+              track('current_image_framework_changed', {
+                frameworks: v.join(',') || 'all',
+              });
+              setSelectedFrameworks(v);
+            }}
+            placeholder="All frameworks"
+          />
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+interface ImageRowProps {
+  row: LatestImageRow;
+  index: number;
+  releases: ReturnType<typeof useFrameworkReleases>['data'];
+  today: Date;
+}
+
+// One table row in the image table, with age-based tinting.
+function ImageRow({ row, index, releases, today }: ImageRowProps) {
+  const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
+  const gpuLabel = row.hardware.toUpperCase();
+  const actualLatest = getActualLatestTag(row.framework, releases);
+  const outdated = isOutdated(row.image, actualLatest);
+  const ageDays = daysSince(row.date, today);
+  // Only tint by age when the row is actually outdated (image lags
+  // upstream latest, or uses an unstable tag). Up-to-date configs
+  // shouldn't look alarming just because a day passed.
+  const ageStyle = outdated ? ageColorStyle(ageDays) : undefined;
+  const rowStyle = outdated ? ageRowStyle(ageDays) : undefined;
+
+  return (
+    <tr
+      key={`${row.model}-${row.hardware}-${row.isl}-${row.osl}-${row.spec_method}-${index}`}
+      className={`border-b border-border last:border-b-0 transition-colors ${
+        rowStyle ? 'hover:brightness-110' : 'hover:bg-muted/30'
+      }`}
+      style={rowStyle}
+    >
+      <td className="px-4 py-3 text-sm font-medium">{displayModel}</td>
+      <td className="px-4 py-3 text-sm uppercase">{row.precision}</td>
+      <td className="px-4 py-3 text-sm">{gpuLabel}</td>
+      <td className="px-4 py-3 text-sm">
+        {row.spec_method === 'none' ? (
+          <span className="text-muted-foreground">Off</span>
+        ) : (
+          <span className="uppercase">{row.spec_method}</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-sm">
+        <code
+          className={`rounded px-1.5 py-0.5 font-mono text-xs ${
+            outdated ? 'bg-red-500/20 text-red-400' : 'bg-muted'
+          }`}
+        >
+          {row.image}
+        </code>
+      </td>
+      <td className="px-4 py-3 text-sm">
+        {actualLatest ? (
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{actualLatest}</code>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
+      </td>
+      <td
+        className={`px-4 py-3 text-sm tabular-nums whitespace-nowrap ${
+          ageStyle ? 'font-medium' : 'text-muted-foreground'
+        }`}
+        style={ageStyle}
+        title={`Last submission: ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? ` (≥${AGE_MAX_RED_DAYS}d clamps to max red)` : ''}`}
+      >
+        {ageDays}d
+      </td>
+    </tr>
+  );
+}
+
 export function CurrentImageContent() {
   const { data, isLoading, error } = useLatestImages();
   const { data: releases } = useFrameworkReleases();
@@ -157,191 +450,23 @@ export function CurrentImageContent() {
       )}
 
       {options && (
-        <TooltipProvider delayDuration={0}>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-model-select"
-                label="Model"
-                tooltip="Filter by language model."
-              />
-              <Select
-                value={selectedModel}
-                onValueChange={(v) => {
-                  track('current_image_model_changed', { model: v });
-                  setSelectedModel(v);
-                }}
-              >
-                <SelectTrigger id="image-model-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Models</SelectItem>
-                  {options.models.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-precision-select"
-                label="Precision"
-                tooltip="Numerical precision used for model weights."
-              />
-              <Select
-                value={selectedPrecision}
-                onValueChange={(v) => {
-                  track('current_image_precision_changed', { precision: v });
-                  setSelectedPrecision(v);
-                }}
-              >
-                <SelectTrigger id="image-precision-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {options.precisions.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-sequence-select"
-                label="ISL / OSL"
-                tooltip="Input Sequence Length / Output Sequence Length in tokens."
-              />
-              <Select
-                value={selectedSequence}
-                onValueChange={(v) => {
-                  track('current_image_sequence_changed', { sequence: v });
-                  setSelectedSequence(v);
-                }}
-              >
-                <SelectTrigger id="image-sequence-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.sequences.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-spec-decode-select"
-                label="Spec Decode"
-                tooltip="Speculative decoding method. MTP = Multi-Token Prediction."
-              />
-              <Select
-                value={selectedSpecMethod}
-                onValueChange={(v) => {
-                  track('current_image_spec_decode_changed', { spec_decode: v });
-                  setSelectedSpecMethod(v);
-                }}
-              >
-                <SelectTrigger id="image-spec-decode-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {options.specMethods.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {formatSpecMethod(m)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-hardware-select"
-                label="GPU SKU"
-                tooltip="Filter by GPU model (e.g. H200, MI300X, B200)."
-              />
-              <Select
-                value={selectedHardware}
-                onValueChange={(v) => {
-                  track('current_image_hardware_changed', { hardware: v });
-                  setSelectedHardware(v);
-                }}
-              >
-                <SelectTrigger id="image-hardware-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {options.hardwares.map((h) => (
-                    <SelectItem key={h} value={h}>
-                      {h.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-node-type-select"
-                label="Node Type"
-                tooltip="Single node = vLLM/SGLang/TRT. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools."
-              />
-              <Select
-                value={selectedNodeType}
-                onValueChange={(v) => {
-                  track('current_image_node_type_changed', { node_type: v });
-                  setSelectedNodeType(v as NodeType);
-                }}
-              >
-                <SelectTrigger id="image-node-type-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="single">Single Node</SelectItem>
-                  <SelectItem value="disagg">Disagg (Dynamo / Mori)</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <LabelWithTooltip
-                htmlFor="image-framework-multiselect"
-                label="Framework"
-                tooltip="Filter by inference engine (sglang, vllm, TensorRT, atom). Disagg variants (dynamo-*, mori-*) collapse into their base engine. Empty = all frameworks."
-              />
-              <MultiSelect
-                triggerId="image-framework-multiselect"
-                triggerTestId="image-framework-multiselect"
-                options={options.frameworks.map((fw) => ({
-                  value: fw,
-                  label: getFrameworkLabel(fw),
-                }))}
-                value={selectedFrameworks}
-                onChange={(v) => {
-                  track('current_image_framework_changed', {
-                    frameworks: v.join(',') || 'all',
-                  });
-                  setSelectedFrameworks(v);
-                }}
-                placeholder="All frameworks"
-              />
-            </div>
-          </div>
-        </TooltipProvider>
+        <ImageFilters
+          options={options}
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
+          selectedPrecision={selectedPrecision}
+          setSelectedPrecision={setSelectedPrecision}
+          selectedSequence={selectedSequence}
+          setSelectedSequence={setSelectedSequence}
+          selectedSpecMethod={selectedSpecMethod}
+          setSelectedSpecMethod={setSelectedSpecMethod}
+          selectedHardware={selectedHardware}
+          setSelectedHardware={setSelectedHardware}
+          selectedNodeType={selectedNodeType}
+          setSelectedNodeType={setSelectedNodeType}
+          selectedFrameworks={selectedFrameworks}
+          setSelectedFrameworks={setSelectedFrameworks}
+        />
       )}
 
       {data && filtered.length === 0 && (
@@ -372,66 +497,15 @@ export function CurrentImageContent() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row, i) => {
-                const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-                const gpuLabel = row.hardware.toUpperCase();
-                const actualLatest = getActualLatestTag(row.framework, releases);
-                const outdated = isOutdated(row.image, actualLatest);
-                const ageDays = daysSince(row.date, today);
-                // Only tint by age when the row is actually outdated (image lags
-                // upstream latest, or uses an unstable tag). Up-to-date configs
-                // shouldn't look alarming just because a day passed.
-                const ageStyle = outdated ? ageColorStyle(ageDays) : undefined;
-                const rowStyle = outdated ? ageRowStyle(ageDays) : undefined;
-
-                return (
-                  <tr
-                    key={`${row.model}-${row.hardware}-${row.isl}-${row.osl}-${row.spec_method}-${i}`}
-                    className={`border-b border-border last:border-b-0 transition-colors ${
-                      rowStyle ? 'hover:brightness-110' : 'hover:bg-muted/30'
-                    }`}
-                    style={rowStyle}
-                  >
-                    <td className="px-4 py-3 text-sm font-medium">{displayModel}</td>
-                    <td className="px-4 py-3 text-sm uppercase">{row.precision}</td>
-                    <td className="px-4 py-3 text-sm">{gpuLabel}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {row.spec_method === 'none' ? (
-                        <span className="text-muted-foreground">Off</span>
-                      ) : (
-                        <span className="uppercase">{row.spec_method}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <code
-                        className={`rounded px-1.5 py-0.5 font-mono text-xs ${
-                          outdated ? 'bg-red-500/20 text-red-400' : 'bg-muted'
-                        }`}
-                      >
-                        {row.image}
-                      </code>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {actualLatest ? (
-                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                          {actualLatest}
-                        </code>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-sm tabular-nums whitespace-nowrap ${
-                        ageStyle ? 'font-medium' : 'text-muted-foreground'
-                      }`}
-                      style={ageStyle}
-                      title={`Last submission: ${row.date}${ageDays >= AGE_MAX_RED_DAYS ? ` (≥${AGE_MAX_RED_DAYS}d clamps to max red)` : ''}`}
-                    >
-                      {ageDays}d
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.map((row, i) => (
+                <ImageRow
+                  key={`${row.model}-${row.hardware}-${row.isl}-${row.osl}-${row.spec_method}-${i}`}
+                  row={row}
+                  index={i}
+                  releases={releases}
+                  today={today}
+                />
+              ))}
             </tbody>
           </table>
         </div>
