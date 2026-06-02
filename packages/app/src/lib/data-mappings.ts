@@ -1,3 +1,5 @@
+import type { ExclusionSpec } from './exclusion';
+
 export enum Model {
   Llama3_3_70B = 'Llama-3.3-70B-Instruct-FP8',
   Llama3_1_70B = 'Llama-3.1-70B-Instruct-FP8-KV',
@@ -41,12 +43,22 @@ interface ModelConfig {
   prefix: string;
   category: CategoryTag;
   /**
-   * If true, MTP configs from different engine families (e.g. vLLM and SGLang)
-   * cannot be active simultaneously, since their acceptance-rate forcing
-   * implementations differ and aren't directly comparable on the same graph.
+   * Data-driven exclusion rules for this model (see `exclusion.ts`). Each spec
+   * partitions matching config keys into comparability groups that can't share
+   * a graph with each other. Absent/empty = no exclusion.
    */
-  mtpEngineExclusion?: boolean;
+  exclusion?: ExclusionSpec[];
 }
+
+/**
+ * dsv4 MTP exclusion: MTP configs (`*_mtp`) from different engine families can't
+ * be active together because their acceptance-rate forcing implementations
+ * differ. ATOM and SGLang share the upstream ROCm MTP path, so they form one
+ * comparability group; vLLM is its own group.
+ */
+const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+  { suffix: '_mtp', stripPrefixes: ['dynamo-', 'mori-'], groupAliases: { atom: 'sglang' } },
+];
 
 // Total parameter counts appended to each label so users can compare model
 // scale at a glance in the dropdown. For Llama and gpt-oss the count is
@@ -58,7 +70,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'DeepSeek V4 Pro 1.6T',
     prefix: 'dsv4',
     category: 'default',
-    mtpEngineExclusion: true,
+    exclusion: MTP_ENGINE_EXCLUSION,
   },
   [Model.Kimi_K2_5]: {
     // K2.5 and K2.6 share an architecture, so the dropdown surfaces both
@@ -117,12 +129,17 @@ export function getModelLabel(model: Model): string {
 }
 
 /**
- * True if the model enforces the rule that MTP configs from different engine
- * families can't be shown on the same graph.
+ * Exclusion specs configured for a model (see `exclusion.ts`). Empty when the
+ * model has no exclusion rules.
  */
-export function hasMtpEngineExclusion(model: Model | string | null | undefined): boolean {
-  if (!model) return false;
-  return MODEL_CONFIG[model as Model]?.mtpEngineExclusion === true;
+export function getModelExclusion(model: Model | string | null | undefined): ExclusionSpec[] {
+  if (!model) return [];
+  return MODEL_CONFIG[model as Model]?.exclusion ?? [];
+}
+
+/** True if the model has any config-exclusion rule. */
+export function hasExclusion(model: Model | string | null | undefined): boolean {
+  return getModelExclusion(model).length > 0;
 }
 
 /**
