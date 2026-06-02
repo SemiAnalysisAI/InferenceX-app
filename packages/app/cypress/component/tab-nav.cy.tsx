@@ -2,7 +2,7 @@ import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { TabNav } from '@/components/tab-nav';
-import { UnofficialRunContext } from '@/components/unofficial-run-provider';
+import { UnofficialRunContext } from '@/components/unofficial-run-context';
 import { createMockUnofficialRunContext } from '../support/mock-data';
 
 function createMockRouter() {

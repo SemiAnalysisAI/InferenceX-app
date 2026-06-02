@@ -7,16 +7,7 @@ import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/t
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
-/** True when the field shows a positive finite number strictly outside [min, max]. */
-export function isInteractivityInputOutOfRange(
-  inputValue: string,
-  min: number,
-  max: number,
-): boolean {
-  const parsed = parseFloat(inputValue);
-  if (!Number.isFinite(parsed) || parsed <= 0) return false;
-  return parsed < min || parsed > max;
-}
+import { isInteractivityInputOutOfRange } from './compare-interpolated-table-utils';
 
 interface SsrInterpolatedRow {
   target: number;

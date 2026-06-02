@@ -27,7 +27,7 @@ import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inference
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/components/unofficial-run-context';
 import {
   Model,
   MODEL_OPTIONS,

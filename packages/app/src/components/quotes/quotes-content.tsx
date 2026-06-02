@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
-import { CompanyLogo, highlightBrand } from './quote-utils';
+import { highlightBrand } from './quote-brand';
+import { CompanyLogo } from './quote-utils';
 import { QUOTES } from './quotes-data';
 
 /** Deduplicated logos from all quote orgs. */

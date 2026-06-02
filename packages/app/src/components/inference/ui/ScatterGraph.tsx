@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/components/unofficial-run-context';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark } from '@/lib/data-mappings';

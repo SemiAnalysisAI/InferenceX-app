@@ -11,7 +11,7 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/components/unofficial-run-context';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { exportToCsv } from '@/lib/csv-export';
 import { evaluationChartToCsv } from '@/lib/csv-export-helpers';

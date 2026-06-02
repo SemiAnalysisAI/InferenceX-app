@@ -11,7 +11,7 @@ import {
 import {
   UnofficialRunContext,
   type UnofficialRunContextType,
-} from '@/components/unofficial-run-provider';
+} from '@/components/unofficial-run-context';
 
 import type { InferenceChartContextType } from '@/components/inference/types';
 import type { EvaluationChartContextType } from '@/components/evaluation/types';

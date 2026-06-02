@@ -14,7 +14,7 @@ import type {
   ReliabilityChartContextType,
 } from '@/components/reliability/types';
 import type { GlobalFilterContextType } from '@/components/GlobalFilterContext';
-import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
+import type { UnofficialRunContextType } from '@/components/unofficial-run-context';
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
 import React from 'react';
 

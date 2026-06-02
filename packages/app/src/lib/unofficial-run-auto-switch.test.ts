@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AvailableModelSequence } from '@/components/unofficial-run-provider';
+import type { AvailableModelSequence } from '@/components/unofficial-run-utils';
 import { Model, Sequence } from '@/lib/data-mappings';
 
 import { computeAutoSwitchDecision } from './unofficial-run-auto-switch';

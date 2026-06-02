@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { interpolateForGPU } from '@/components/calculator/interpolation';
-import { isInteractivityInputOutOfRange } from '@/components/compare/compare-interpolated-table';
+import { isInteractivityInputOutOfRange } from '@/components/compare/compare-interpolated-table-utils';
 
 function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
   return {

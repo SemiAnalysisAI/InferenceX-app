@@ -12,7 +12,7 @@ import {
   getThroughputForType,
   getTpPerMwForType,
   getValueLabel,
-} from './ThroughputBarChart';
+} from './throughput-bar-chart-utils';
 
 // ---------------------------------------------------------------------------
 // Test fixtures

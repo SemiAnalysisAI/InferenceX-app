@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api';
 import { Model, Sequence } from '@/lib/data-mappings';
 
-import { buildChartData, parseAvailableModelsAndSequences } from './unofficial-run-provider';
+import { buildChartData, parseAvailableModelsAndSequences } from './unofficial-run-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers

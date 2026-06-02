@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { CompanyLogo, highlightBrand } from '@/components/quotes/quote-utils';
+import { highlightBrand } from '@/components/quotes/quote-brand';
+import { CompanyLogo } from '@/components/quotes/quote-utils';
 
 export interface CarouselQuote {
   text: string;

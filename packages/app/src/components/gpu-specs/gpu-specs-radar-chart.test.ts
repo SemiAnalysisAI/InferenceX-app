@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeGpuData } from '@/components/gpu-specs/gpu-specs-radar-chart';
+import { normalizeGpuData } from '@/components/gpu-specs/gpu-specs-radar-chart-utils';
 import { GPU_CHART_METRICS, GPU_SPECS } from '@/lib/gpu-specs';
 
 const RADAR_METRICS = GPU_CHART_METRICS.filter(

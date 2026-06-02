@@ -1,169 +1,24 @@
 'use client';
 
-import {
-  type ReactNode,
-  createContext,
-  use,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
-import { DB_MODEL_TO_DISPLAY, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import type { BenchmarkRow, EvalRow } from '@/lib/api';
+import type { EvalRow } from '@/lib/api';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/data-mappings';
 
-interface UnofficialRunInfo {
-  id: number;
-  name: string;
-  branch: string;
-  sha: string;
-  createdAt: string;
-  url: string;
-  conclusion: string;
-  status: string;
-  isNonMainBranch: boolean;
-}
-
-type UnofficialChartData = Record<
-  string,
-  {
-    e2e: { data: InferenceData[]; gpus: HardwareConfig };
-    interactivity: { data: InferenceData[]; gpus: HardwareConfig };
-  }
->;
+import { UnofficialRunContext, type UnofficialRunContextType } from './unofficial-run-context';
+import {
+  type AvailableModelSequence,
+  buildChartData,
+  parseAvailableModelsAndSequences,
+  type UnofficialChartData,
+  type UnofficialRunInfo,
+} from './unofficial-run-utils';
 
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
-
-export interface AvailableModelSequence {
-  model: Model;
-  sequence: Sequence;
-  precisions: string[];
-}
-
-export interface UnofficialRunContextType {
-  isUnofficialRun: boolean;
-  /** First run in the loaded set — kept as a convenience alias for overlay labels. */
-  unofficialRunInfo: UnofficialRunInfo | null;
-  /** All runs loaded from the `unofficialrun(s)` URL param (comma-separated). */
-  unofficialRunInfos: UnofficialRunInfo[];
-  /**
-   * Position of each run in the loaded set, keyed by both `run.url` and the
-   * numeric id as a string. Used to derive a distinct hue shift per run for
-   * overlay points so multiple runs are visually separable.
-   */
-  runIndexByUrl: Record<string, number>;
-  unofficialChartData: UnofficialChartData | null;
-  unofficialEvalRows: EvalRow[] | null;
-  loading: boolean;
-  error: string | null;
-  /** Clear every unofficial run. Wipes state + URL. */
-  clearUnofficialRun: () => void;
-  /**
-   * Drop a single run ID. Rewrites the URL to the remaining IDs and filters
-   * local state (chart data + eval rows + run infos) by `run_url` without
-   * refetching the others.
-   */
-  dismissRun: (runId: string) => void;
-  availableModelsAndSequences: AvailableModelSequence[];
-  getOverlayData: (
-    model: Model,
-    sequence: Sequence,
-    chartType: 'e2e' | 'interactivity',
-  ) => {
-    data: InferenceData[];
-    hardwareConfig: HardwareConfig;
-  } | null;
-  // Shared overlay toggle state — both charts read/write the same sets
-  activeOverlayHwTypes: Set<string>;
-  setActiveOverlayHwTypes: (v: Set<string>) => void;
-  allOverlayHwTypes: Set<string>;
-  toggleOverlayHwType: (key: string) => void;
-  resetOverlayHwTypes: () => void;
-  localOfficialOverride: Set<string> | null;
-  setLocalOfficialOverride: (v: Set<string> | null) => void;
-}
-
-/** @internal Exported for test provider wrapping only. */
-export const UnofficialRunContext = createContext<UnofficialRunContextType | undefined>(undefined);
-
-export function useUnofficialRun() {
-  const context = use(UnofficialRunContext);
-  if (!context) {
-    throw new Error('useUnofficialRun must be used within an UnofficialRunProvider');
-  }
-  return context;
-}
-
-/** Build chart data from raw benchmark rows returned by the unofficial-run API. */
-export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData {
-  // Group benchmarks by display model name + Sequence enum value
-  // (keys must match getOverlayData which looks up `${Model}_${Sequence}`)
-  const groups = new Map<string, BenchmarkRow[]>();
-  for (const row of benchmarks) {
-    const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-    const sequence = islOslToSequence(row.isl, row.osl);
-    if (!sequence) continue;
-    const key = `${displayModel}_${sequence}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(row);
-  }
-
-  const result: UnofficialChartData = {};
-  // chartData indices match chartDefinitions order — look up by chartType (loop-invariant)
-  const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
-  const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
-    (d) => d.chartType === 'interactivity',
-  );
-  for (const [key, rows] of groups) {
-    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
-    result[key] = {
-      e2e: { data: chartData[e2eIdx] ?? [], gpus: hardwareConfig },
-      interactivity: { data: chartData[interactivityIdx] ?? [], gpus: hardwareConfig },
-    };
-  }
-
-  return result;
-}
-
-export function parseAvailableModelsAndSequences(
-  chartData: UnofficialChartData | null,
-): AvailableModelSequence[] {
-  if (!chartData) return [];
-
-  const result: AvailableModelSequence[] = [];
-  const allModels = new Set<string>(Object.values(Model));
-  const allSequences = new Set<string>(Object.values(Sequence));
-
-  for (const key of Object.keys(chartData)) {
-    const lastUnderscoreIndex = key.lastIndexOf('_');
-    if (lastUnderscoreIndex === -1) continue;
-    const modelPart = key.slice(0, lastUnderscoreIndex);
-    const sequencePart = key.slice(lastUnderscoreIndex + 1);
-    if (!allModels.has(modelPart) || !allSequences.has(sequencePart)) continue;
-    const model = modelPart as Model;
-    const sequence = sequencePart as Sequence;
-    const group = chartData[key];
-    const precisions = [
-      ...new Set(
-        [...(group?.e2e.data ?? []), ...(group?.interactivity.data ?? [])].map((d) => d.precision),
-      ),
-    ];
-    if (!result.some((r) => r.model === model && r.sequence === sequence)) {
-      result.push({ model, sequence, precisions });
-    }
-  }
-
-  return result;
-}
 
 export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const [unofficialRunInfos, setUnofficialRunInfos] = useState<UnofficialRunInfo[]>([]);

@@ -1,4 +1,4 @@
-import type { AvailableModelSequence } from '@/components/unofficial-run-provider';
+import type { AvailableModelSequence } from '@/components/unofficial-run-utils';
 import type { Model } from '@/lib/data-mappings';
 
 export interface AutoSwitchDecision {

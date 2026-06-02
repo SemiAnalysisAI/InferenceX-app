@@ -15,7 +15,7 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/components/unofficial-run-context';
 import {
   useChartUIState,
   useChartToggleSet,

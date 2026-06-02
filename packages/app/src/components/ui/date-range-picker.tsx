@@ -6,8 +6,8 @@ import { useState } from 'react';
 import { track } from '@/lib/analytics';
 
 import { Button } from '@/components/ui/button';
+import { CalendarMonthPanel } from '@/components/ui/calendar-month-panel';
 import {
-  CalendarMonthPanel,
   formatCalendarDate,
   formatDisplayDate,
   getCalendarMonthNavState,

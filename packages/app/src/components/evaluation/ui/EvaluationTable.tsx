@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/components/unofficial-run-context';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics';
 import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';

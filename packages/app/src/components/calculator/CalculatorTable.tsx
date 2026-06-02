@@ -6,7 +6,7 @@ import type { InterpolatedResult, CostType } from '@/components/calculator/types
 import {
   getThroughputForType,
   getTpPerMwForType,
-} from '@/components/calculator/ThroughputBarChart';
+} from '@/components/calculator/throughput-bar-chart-utils';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import type { HardwareConfig } from '@/components/inference/types';
 import { getDisplayLabel } from '@/lib/utils';

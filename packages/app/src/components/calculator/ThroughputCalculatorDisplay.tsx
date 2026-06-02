@@ -41,11 +41,12 @@ import { getDisplayLabel } from '@/lib/utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
 
-import ThroughputBarChart, {
+import ThroughputBarChart from './ThroughputBarChart';
+import {
   getChartTitle,
   getThroughputForType,
   getTpPerMwForType,
-} from './ThroughputBarChart';
+} from './throughput-bar-chart-utils';
 import type { BarMetric, CostProvider, CostType, InterpolatedResult } from './types';
 import { useThroughputData } from './useThroughputData';
 
