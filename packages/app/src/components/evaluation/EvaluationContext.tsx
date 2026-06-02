@@ -11,7 +11,6 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
@@ -24,16 +23,11 @@ import {
 } from '@/hooks/useChartContext';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
-import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import type { Model } from '@/lib/data-mappings';
 import type { EvalRow } from '@/lib/api';
 
-import {
-  aggregateEvaluationChartRows,
-  buildEvalChangelogEntries,
-  buildEvaluationChartRows,
-} from './chart-data';
-import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
+import { useEvaluationDerivedData } from './useEvaluationDerivedData';
+import type { EvaluationChartContextType } from './types';
 
 /** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
@@ -100,21 +94,30 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return set.size > 0 ? set : null;
   });
 
-  const availableBenchmarks = useMemo(() => {
-    const tasks = new Set([
-      ...rawData.map((item) => item.task),
-      ...unofficialRawData.map((item) => item.task),
-    ]);
-    return [...tasks].toSorted();
-  }, [rawData, unofficialRawData]);
+  const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
 
-  const availableDates = useMemo(() => {
-    const dbModelKeys = new Set(DISPLAY_MODEL_TO_DB[selectedModel]);
-    const dates = new Set(
-      rawData.flatMap((item) => (dbModelKeys.has(item.model) && item.date ? [item.date] : [])),
-    );
-    return [...dates].toSorted();
-  }, [rawData, selectedModel]);
+  const {
+    availableBenchmarks,
+    availableDates,
+    availableHardware,
+    availablePrecisions,
+    unfilteredChartData,
+    chartData,
+    unofficialChartData,
+    highlightedConfigs,
+    changelogEntries,
+    modelHasEvalData,
+    hwTypesWithData,
+  } = useEvaluationDerivedData({
+    rawData,
+    unofficialRawData,
+    selectedModel,
+    selectedBenchmark,
+    selectedRunDate,
+    effectivePrecisions,
+    effectiveEnabledHardware,
+    globalAvailablePrecisions,
+  });
 
   const prevAvailableDatesRef = useRef<string[]>([]);
 
@@ -165,94 +168,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     setSelectedRunDate(closest);
   }, [globalRunDate, availableDates, selectedRunDateRev]);
 
-  const availableHardware = useMemo(() => {
-    const hwSet = new Set<string>();
-    rawData.forEach((item) => {
-      const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      if (hwKey !== 'unknown') hwSet.add(hwKey);
-    });
-    return [...hwSet].toSorted();
-  }, [rawData]);
-
   useAutoInitializeToggleSet(availableHardware, enabledHardware, setEnabledHardware);
-
-  const availablePrecisions = useMemo(() => {
-    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
-    if (!dbModelKeys || dbModelKeys.length === 0) return globalAvailablePrecisions;
-    const dbModelKeySet = new Set(dbModelKeys);
-    const precs = [
-      ...new Set(
-        [...rawData, ...unofficialRawData].flatMap((r) =>
-          dbModelKeySet.has(r.model) ? [r.precision] : [],
-        ),
-      ),
-    ].toSorted();
-    return precs.length > 0 ? precs : globalAvailablePrecisions;
-  }, [rawData, unofficialRawData, selectedModel, globalAvailablePrecisions]);
-
-  const unfilteredChartData: EvaluationChartData[] = useMemo(
-    () =>
-      buildEvaluationChartRows(
-        rawData,
-        selectedBenchmark,
-        selectedModel,
-        effectivePrecisions,
-        selectedRunDate,
-      ),
-    [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions],
-  );
-
-  const unfilteredUnofficialChartData: EvaluationChartData[] = useMemo(
-    () =>
-      buildEvaluationChartRows(
-        unofficialRawData,
-        selectedBenchmark,
-        selectedModel,
-        effectivePrecisions,
-      ),
-    [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions],
-  );
-
-  const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
-
-  const chartData = useMemo(
-    () => aggregateEvaluationChartRows(unfilteredChartData, effectiveEnabledHardware),
-    [unfilteredChartData, effectiveEnabledHardware],
-  );
-
-  const unofficialHardwareWithData = useMemo(
-    () => new Set(unfilteredUnofficialChartData.map((data) => String(data.hwKey))),
-    [unfilteredUnofficialChartData],
-  );
-
-  const unofficialChartData = useMemo(
-    () => aggregateEvaluationChartRows(unfilteredUnofficialChartData, unofficialHardwareWithData),
-    [unfilteredUnofficialChartData, unofficialHardwareWithData],
-  );
-
-  const highlightedConfigs = useMemo(() => {
-    const highlighted = new Set<string>();
-    unfilteredChartData.forEach((data) => {
-      if (data.date === selectedRunDate) highlighted.add(data.configLabel);
-    });
-    return highlighted;
-  }, [unfilteredChartData, selectedRunDate]);
-
-  const changelogEntries: EvalChangelogEntry[] = useMemo(
-    () => buildEvalChangelogEntries(rawData, selectedRunDate, selectedModel, effectivePrecisions),
-    [rawData, selectedRunDate, selectedModel, effectivePrecisions],
-  );
-
-  const modelHasEvalData = useMemo(() => {
-    if (!selectedModel) return false;
-    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [];
-    return [...rawData, ...unofficialRawData].some((item) => dbModelKeys.includes(item.model));
-  }, [rawData, unofficialRawData, selectedModel]);
-
-  const hwTypesWithData = useMemo(
-    () => new Set(unfilteredChartData.map((data) => String(data.hwKey))),
-    [unfilteredChartData],
-  );
 
   useEffect(() => {
     if (hwTypesWithData.size === 0) return;

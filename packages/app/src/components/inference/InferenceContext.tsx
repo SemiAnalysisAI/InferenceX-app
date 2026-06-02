@@ -1,30 +1,9 @@
 'use client';
 
-import {
-  type ReactNode,
-  createContext,
-  use,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-
-import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
-import { track } from '@/lib/analytics';
-import {
-  FAVORITE_PRESETS,
-  type FavoritePreset,
-  matchesPresetHwFilter,
-} from '@/components/favorites/favorite-presets';
+import { type ReactNode, createContext, use, useCallback, useMemo, useRef, useState } from 'react';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import type {
-  InferenceChartContextType,
-  InferenceData,
-  TrackedConfig,
-} from '@/components/inference/types';
+import type { InferenceChartContextType } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -34,24 +13,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  useChartUIState,
-  useChartToggleSet,
-  useChartDataFilter,
-  useUrlStateSync,
-} from '@/hooks/useChartContext';
+import { useChartUIState } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { hasMtpEngineExclusion, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
 import {
   MtpEngineConflictToast,
   type MtpEngineConflictDetail,
 } from '@/components/mtp-engine-conflict-toast';
-import { clearAllMtpFamilies, effectiveLegendItems, resolveMtpToggle } from '@/lib/mtp-exclusion';
-import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
-
 import { useChartData } from './hooks/useChartData';
+import { useInferenceAvailability } from './hooks/useInferenceAvailability';
+import { useTrackedConfigs } from './hooks/useTrackedConfigs';
+import { useInferenceSelectionTracking } from './hooks/useInferenceSelectionTracking';
+import { useInferenceUrlSync } from './hooks/useInferenceUrlSync';
+import { useInferencePresetLoading } from './hooks/useInferencePresetLoading';
+import { useLegendHwFilters } from './hooks/useLegendHwFilters';
+import { usePresetClearSetters } from './hooks/usePresetClearSetters';
+import { useFilteredRuns } from './hooks/useFilteredRuns';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -166,9 +143,6 @@ export function InferenceProvider({
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
-  // --- Tracked configs state ---
-  const [trackedConfigs, setTrackedConfigs] = useState<TrackedConfig[]>([]);
-
   // --- Favorite presets state ---
   const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -221,109 +195,25 @@ export function InferenceProvider({
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
-  const dbModelKeys = useMemo<string[]>(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
-    [selectedModel],
-  );
-
-  const dateRangeAvailableDates = useMemo(() => {
-    if (selectedGPUs.length === 0) return availableDates;
-    if (!availabilityRows) return availableDates;
-    const rows = availabilityRows.filter((r) => {
-      if (!dbModelKeys.includes(r.model)) return false;
-      if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) return false;
-      if (!effectivePrecisions.includes(r.precision)) return false;
-      if (!r.hardware) return false;
-      const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
-      return selectedGPUs.includes(hwKey);
-    });
-    const dates = [...new Set(rows.map((r) => r.date))].toSorted();
-    return dates.length > 0 ? dates : availableDates;
-  }, [
-    availabilityRows,
-    dbModelKeys,
+  const { dateRangeAvailableDates, availableGPUs } = useInferenceAvailability({
+    selectedModel,
     effectiveSequence,
     effectivePrecisions,
     selectedGPUs,
+    availabilityRows,
     availableDates,
-  ]);
+  });
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
-  // GPU dropdown: only show configs that have data for current model + sequence + precision
-  const availableGPUs = useMemo(() => {
-    if (!availabilityRows) return [];
-    const dbModelKeySet = new Set(dbModelKeys);
-    const effectivePrecisionSet = new Set(effectivePrecisions);
-    const hwKeys = new Set<string>();
-    for (const r of availabilityRows) {
-      if (!dbModelKeySet.has(r.model)) continue;
-      if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) continue;
-      if (!effectivePrecisionSet.has(r.precision)) continue;
-      if (!r.hardware) continue;
-      const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
-      if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
-    }
-    return [...hwKeys]
-      .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
-      .map((hw) => ({
-        value: hw,
-        label: getDisplayLabel(getHardwareConfig(hw)),
-      }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions]);
-
   // --- Tracked config functions ---
-  const buildTrackedConfigId = useCallback((point: InferenceData): string => {
-    let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-    if (point.disagg) {
-      key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-    }
-    return key;
-  }, []);
-
-  const addTrackedConfig = useCallback(
-    (point: InferenceData, chartType: string) => {
-      setTrackedConfigs((prev) => {
-        const id = buildTrackedConfigId(point);
-        if (prev.some((c) => c.id === id)) {
-          return prev.filter((c) => c.id !== id);
-        }
-        if (prev.length >= 6) return prev;
-
-        const hwConfig = hardwareConfig[point.hwKey];
-        const label = hwConfig
-          ? `${getDisplayLabel(hwConfig)} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`
-          : `${point.hwKey} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`;
-
-        const color = TABLEAU_10[prev.length % TABLEAU_10.length];
-        return [
-          ...prev,
-          {
-            id,
-            hwKey: point.hwKey as string,
-            precision: point.precision,
-            tp: point.tp,
-            conc: point.conc,
-            label,
-            color,
-            chartType,
-            disagg: point.disagg,
-            num_prefill_gpu: point.num_prefill_gpu,
-            num_decode_gpu: point.num_decode_gpu,
-          },
-        ];
-      });
-    },
-    [buildTrackedConfigId, hardwareConfig],
-  );
-
-  const removeTrackedConfig = useCallback((id: string) => {
-    setTrackedConfigs((prev) => prev.filter((c) => c.id !== id));
-  }, []);
-
-  const clearTrackedConfigs = useCallback(() => {
-    setTrackedConfigs([]);
-  }, []);
+  const {
+    trackedConfigs,
+    setTrackedConfigs,
+    addTrackedConfig,
+    removeTrackedConfig,
+    clearTrackedConfigs,
+  } = useTrackedConfigs(hardwareConfig);
 
   // Clear selector-scoped state (tracked configs, custom cost/power overrides)
   // whenever the top-level selectors change. Done during render with a prev-deps
@@ -357,370 +247,64 @@ export function InferenceProvider({
   // FavoritePresetsDropdown sets this while applying a preset so its own
   // programmatic setter calls don't accidentally deactivate it.
   const presetGuardRef = useRef(false);
-  const clearPresetOnChange = useCallback(() => {
-    if (presetGuardRef.current) return;
-    setActivePresetId((prev) => (prev === null ? prev : null));
-    presetHwFilterRef.current = null;
-  }, []);
-  const setSelectedModelAndClear = useCallback(
-    (v: typeof selectedModel) => {
-      setSelectedModel(v);
-      clearPresetOnChange();
-    },
-    [setSelectedModel, clearPresetOnChange],
-  );
-  const setSelectedSequenceAndClear = useCallback(
-    (v: typeof effectiveSequence) => {
-      setSelectedSequence(v);
-      clearPresetOnChange();
-    },
-    [setSelectedSequence, clearPresetOnChange],
-  );
-  const setSelectedPrecisionsAndClear = useCallback(
-    (v: typeof effectivePrecisions) => {
-      setSelectedPrecisions(v);
-      clearPresetOnChange();
-    },
-    [setSelectedPrecisions, clearPresetOnChange],
-  );
-  const setSelectedYAxisMetricAndClear = useCallback(
-    (v: string) => {
-      setSelectedYAxisMetric(v);
-      clearPresetOnChange();
-    },
-    [setSelectedYAxisMetric, clearPresetOnChange],
-  );
-  const setSelectedGPUsAndClear = useCallback(
-    (v: string[]) => {
-      setSelectedGPUs(v);
-      clearPresetOnChange();
-    },
-    [setSelectedGPUs, clearPresetOnChange],
-  );
-  const setSelectedDatesAndClear = useCallback(
-    (v: string[]) => {
-      setSelectedDates(v);
-      clearPresetOnChange();
-    },
-    [setSelectedDates, clearPresetOnChange],
-  );
-  const setSelectedDateRangeAndClear = useCallback(
-    (v: { startDate: string; endDate: string }) => {
-      setSelectedDateRange(v);
-      clearPresetOnChange();
-    },
-    [setSelectedDateRange, clearPresetOnChange],
-  );
+  const {
+    setSelectedModelAndClear,
+    setSelectedSequenceAndClear,
+    setSelectedPrecisionsAndClear,
+    setSelectedYAxisMetricAndClear,
+    setSelectedGPUsAndClear,
+    setSelectedDatesAndClear,
+    setSelectedDateRangeAndClear,
+  } = usePresetClearSetters({
+    setSelectedModel,
+    setSelectedSequence,
+    setSelectedPrecisions,
+    setSelectedYAxisMetric,
+    setSelectedGPUs,
+    setSelectedDates,
+    setSelectedDateRange,
+    setActivePresetId,
+    presetGuardRef,
+    presetHwFilterRef,
+  });
 
   const loading = chartDataLoading;
   const error = workflowError || chartDataError;
 
-  // ── Toggle sets ───────────────────────────────────────────────────────────
-
+  // ── Legend HW/date toggles + filter side effects ──────────────────────────
   const {
-    activeSet: activeHwTypes,
-    setActiveSet: setActiveHwTypes,
-    toggle: toggleHwRaw,
-    selectAll: selectAllHwRaw,
-    remove: removeHwRaw,
-  } = useChartToggleSet();
-  const {
-    activeSet: activeDates,
-    setActiveSet: setActiveDates,
-    toggle: toggleDateRaw,
-    selectAll: selectAllDatesRaw,
-    remove: removeDateRaw,
-  } = useChartToggleSet();
-
-  const hwFilteredPoints = useMemo(
-    () =>
-      graphs.flatMap((graph) =>
-        graph.data.filter((point) => effectivePrecisions.includes(point.precision)),
-      ),
-    [graphs, effectivePrecisions],
-  );
-  const extractHwKey = useCallback((point: InferenceData) => point.hwKey as string, []);
-
-  // Wrap setActiveHwTypes to intercept resets and apply pendingHwFilter atomically.
-  // Without this, useChartDataFilter resets to "all GPUs" in one render and the
-  // pendingHwFilter effect filters it down in the next — causing a flash/race.
-  const pendingHwFilterRef = useRef(pendingHwFilter);
-  pendingHwFilterRef.current = pendingHwFilter;
-  // Read selectedModel via a ref so the callback identity below stays stable —
-  // matchesPresetHwFilter only consults the model to gate the bare-prefix MTP
-  // skip (mtpEngineExclusion models), and we want the current value at call time.
-  const selectedModelRef = useRef(selectedModel);
-  selectedModelRef.current = selectedModel;
-  // Note: setActiveHwTypes is a useState dispatcher that accepts functional updaters,
-  // but useChartToggleSet narrows the type to (set: Set<string>) => void.
-  // We cast once here to allow passthrough of functional updaters from useChartDataFilter.
-  const setActiveHwTypesDispatch = setActiveHwTypes as (
-    u: Set<string> | ((prev: Set<string>) => Set<string>),
-  ) => void;
-  const setActiveHwTypesWithFilter = useCallback(
-    (update: Set<string> | ((prev: Set<string>) => Set<string>)) => {
-      const filter = pendingHwFilterRef.current;
-      if (!filter) {
-        setActiveHwTypesDispatch(update);
-        return;
-      }
-      // Preset filter is active: evaluate updater to get all available items, then filter.
-      // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
-      const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
-      const filtered = new Set(
-        [...base].filter((k) => matchesPresetHwFilter(k, filter, selectedModelRef.current)),
-      );
-      if (filtered.size > 0) {
-        setActiveHwTypes(filtered);
-        setPendingHwFilter(null);
-      } else {
-        setActiveHwTypes(base);
-      }
-    },
-    [setActiveHwTypes, setActiveHwTypesDispatch],
-  );
-
-  const hwTypesWithData = useChartDataFilter(
-    hwFilteredPoints,
-    setActiveHwTypesWithFilter,
-    extractHwKey,
-  );
-
-  // Direct fallback: apply pendingHwFilter once hwTypesWithData is populated but
-  // useChartDataFilter didn't fire (e.g. re-selecting the same preset). Done during
-  // render — it converges because applying the filter clears the pending flag.
-  if (pendingHwFilter && hwTypesWithData.size > 0) {
-    const filtered = new Set(
-      [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, pendingHwFilter, selectedModel)),
-    );
-    if (filtered.size > 0) {
-      setActiveHwTypes(filtered);
-      setPendingHwFilter(null);
-    }
-  }
-
-  const mtpExclusion = hasMtpEngineExclusion(selectedModel);
-  const toggleHwType = useCallback(
-    (hw: string) => {
-      // Under MTP exclusion, hide MTP keys from inactive families when
-      // computing the toggle "universe". This makes the default-deselected
-      // state (DSv4 on first load) count as "all selected", so clicking a
-      // legend entry solos it instead of just removing it.
-      const toggleUniverse = mtpExclusion
-        ? effectiveLegendItems(hwTypesWithData, activeHwTypes)
-        : hwTypesWithData;
-      if (mtpExclusion) {
-        const decision = resolveMtpToggle(activeHwTypes, hw, toggleUniverse);
-        if (decision.kind === 'block') {
-          setMtpConflict({
-            kind: 'blocked',
-            attempted: decision.attempted,
-            existing: decision.existing,
-          });
-          return;
-        }
-        if (decision.kind === 'silent-disable-all') {
-          setActiveHwTypes(decision.result);
-          setActivePresetId(null);
-          presetHwFilterRef.current = null;
-          return;
-        }
-      }
-      toggleHwRaw(hw, toggleUniverse);
-      setActivePresetId(null);
-      presetHwFilterRef.current = null;
-    },
-    [toggleHwRaw, hwTypesWithData, mtpExclusion, activeHwTypes, setActiveHwTypes],
-  );
-
-  const removeHwType = useCallback(
-    (hw: string) => {
-      removeHwRaw(hw);
-      setActivePresetId(null);
-      presetHwFilterRef.current = null;
-    },
-    [removeHwRaw],
-  );
-
-  const allDateIds = useMemo(() => {
-    const dates: string[] = [];
-    if (selectedDateRange.startDate && selectedDateRange.endDate) {
-      dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
-    }
-    dates.push(...selectedDates);
-    const allIds = new Set<string>();
-    selectedGPUs.forEach((gpu) => {
-      dates.forEach((date) => allIds.add(`${date}_${gpu}`));
-    });
-    return allIds;
-  }, [selectedDateRange, selectedDates, selectedGPUs]);
-
-  const toggleActiveDate = useCallback(
-    (id: string) => toggleDateRaw(id, allDateIds),
-    [toggleDateRaw, allDateIds],
-  );
-  const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
-  const selectAllHwTypes = useCallback(() => {
-    if (mtpExclusion) {
-      const { result, droppedFamilies } = clearAllMtpFamilies(hwTypesWithData);
-      setActiveHwTypes(result);
-      if (droppedFamilies.length > 0) {
-        setMtpConflict({ kind: 'cleared', families: droppedFamilies });
-      }
-      return;
-    }
-    selectAllHwRaw(hwTypesWithData);
-  }, [selectAllHwRaw, hwTypesWithData, mtpExclusion, setActiveHwTypes]);
-  const selectAllActiveDates = useCallback(
-    () => selectAllDatesRaw(allDateIds),
-    [selectAllDatesRaw, allDateIds],
-  );
-
-  // ── Side effects ──────────────────────────────────────────────────────────
-
-  // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes.
-  // Use a stable string key for precisions so array reference changes don't trigger a reset.
-  // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
-  // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
-  // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
-  // Track the last applied key with a ref and include hwTypesWithData in the deps so the
-  // reset commits as soon as data for the new model arrives — without this, switching models
-  // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
-  const precisionsKey = effectivePrecisions.join(',');
-  const lastHwResetKeyRef = useRef('');
-
-  // Restore legend-active selection from URL on first availability of
-  // hwTypesWithData. Sets lastHwResetKeyRef so the reset effect below treats
-  // the current key as already-applied and bails. Empty intersection (e.g.
-  // shared GPUs no longer in availability) falls back to "all available".
-  // Multi-family MTP keys are cleared the same way as the auto-reset path.
-  useEffect(() => {
-    if (!pendingActiveHwTypes) return;
-    if (pendingHwFilterRef.current) return;
-    if (hwTypesWithData.size === 0) return;
-    // Match exact hwKeys (URL-restored) AND bare GPU prefixes (used by
-    // /compare/[a]-vs-[b] pages, which know the GPU key but not which framework
-    // configs exist for it).
-    const prefixes = [...pendingActiveHwTypes].filter((k) => !k.includes('_'));
-    let restored = new Set(
-      [...hwTypesWithData].filter(
-        (k) =>
-          pendingActiveHwTypes.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
-      ),
-    );
-    // Empty intersection (e.g. URL referenced GPUs no longer in availability,
-    // or the URL only contained multi-family MTP keys that get sanitized away)
-    // → fall back to the default "all available" set. MTP sanitization is then
-    // applied below so the fallback itself is engine-exclusion safe.
-    if (restored.size === 0) restored = hwTypesWithData;
-    if (mtpExclusion) {
-      const cleared = clearAllMtpFamilies(restored);
-      restored = cleared.result;
-      if (cleared.droppedFamilies.length > 0) {
-        setMtpConflict({ kind: 'cleared', families: cleared.droppedFamilies });
-      }
-    }
-    setActiveHwTypes(restored);
-    lastHwResetKeyRef.current = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
-    setPendingActiveHwTypes(null);
-  }, [
-    pendingActiveHwTypes,
+    activeHwTypes,
     hwTypesWithData,
-    mtpExclusion,
+    toggleHwType,
+    removeHwType,
+    selectAllHwTypes,
+    activeDates,
+    setActiveDates,
+    toggleActiveDate,
+    removeActiveDate,
+    selectAllActiveDates,
+  } = useLegendHwFilters({
+    graphs,
+    effectivePrecisions,
     selectedModel,
     effectiveSequence,
-    precisionsKey,
-    setActiveHwTypes,
-  ]);
-
-  useEffect(() => {
-    if (pendingHwFilterRef.current) return;
-    if (pendingActiveHwTypes) return;
-    if (hwTypesWithData.size === 0) return;
-    const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
-    if (lastHwResetKeyRef.current === key) return;
-    lastHwResetKeyRef.current = key;
-    const presetFilter = presetHwFilterRef.current;
-    if (presetFilter) {
-      const filtered = new Set(
-        [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
-      );
-      if (filtered.size > 0) {
-        // Presets explicitly chose hw configs — respect their picks. The
-        // matcher already excludes _mtp under bare prefixes for
-        // mtpEngineExclusion models, so we don't fall through to
-        // clearAllMtpFamilies (which would fire the toast). The legend
-        // toggle guard still blocks adding a second engine family later.
-        setActiveHwTypes(filtered);
-        return;
-      }
-    }
-    if (mtpExclusion) {
-      // When multiple engine families' MTP have data, disable them all by
-      // default and surface a toast. The user has to opt in to one engine's
-      // MTP explicitly — never multiple at once.
-      const { result, droppedFamilies } = clearAllMtpFamilies(hwTypesWithData);
-      setActiveHwTypes(result);
-      if (droppedFamilies.length > 0) {
-        setMtpConflict({ kind: 'cleared', families: droppedFamilies });
-      }
-      return;
-    }
-    setActiveHwTypes(hwTypesWithData);
-  }, [
-    selectedModel,
-    effectiveSequence,
-    precisionsKey,
-    hwTypesWithData,
-    mtpExclusion,
+    selectedGPUs,
+    setSelectedGPUs,
+    selectedDates,
+    setSelectedDates,
+    selectedDateRange,
+    setSelectedDateRange,
+    availableGPUs,
+    dateRangeAvailableDates,
+    setUserCosts,
+    pendingHwFilter,
+    setPendingHwFilter,
     pendingActiveHwTypes,
-  ]);
-
-  // Remove selected GPUs that no longer have data for current filters. Done
-  // during render with a prev-value comparison instead of an effect so the prune
-  // commits in the same render. `availableGPUs` is memoized, so its identity only
-  // changes when the available set changes.
-  const [prevAvailableGPUs, setPrevAvailableGPUs] = useState(availableGPUs);
-  if (availableGPUs !== prevAvailableGPUs) {
-    setPrevAvailableGPUs(availableGPUs);
-    if (selectedGPUs.length > 0 && availableGPUs.length > 0) {
-      const validKeys = new Set(availableGPUs.map((g) => g.value));
-      const valid = selectedGPUs.filter((g) => validKeys.has(g));
-      if (valid.length !== selectedGPUs.length) setSelectedGPUs(valid);
-    }
-  }
-
-  useEffect(() => {
-    if (selectedGPUs.length === 0) {
-      setSelectedDateRange({ startDate: '', endDate: '' });
-      setSelectedDates([]);
-      setUserCosts(null);
-    }
-  }, [selectedGPUs]);
-
-  // Reset date range when selected dates are no longer available (e.g. precision change)
-  useEffect(() => {
-    if (!selectedDateRange.startDate || !selectedDateRange.endDate) return;
-    if (selectedGPUs.length === 0) return;
-    // Skip while availability is still loading — empty here means "not loaded yet",
-    // not "no dates", so clearing would wipe URL-restored selections on mount.
-    if (dateRangeAvailableDates.length === 0) return;
-    const dateSet = new Set(dateRangeAvailableDates);
-    if (!dateSet.has(selectedDateRange.startDate) || !dateSet.has(selectedDateRange.endDate)) {
-      setSelectedDateRange({ startDate: '', endDate: '' });
-      setSelectedDates([]);
-    }
-  }, [dateRangeAvailableDates]);
-
-  // Reset the active (toggleable) date set whenever the available date ids
-  // change. Done during render with a prev-value comparison instead of an effect
-  // so the reset commits in the same render. `allDateIds` is memoized, so its
-  // identity only changes when the underlying date set changes.
-  const [prevAllDateIds, setPrevAllDateIds] = useState(allDateIds);
-  if (allDateIds !== prevAllDateIds) {
-    setPrevAllDateIds(allDateIds);
-    setActiveDates(allDateIds);
-  }
+    setPendingActiveHwTypes,
+    presetHwFilterRef,
+    setActivePresetId,
+    setMtpConflict,
+  });
 
   const modelPrefixes = useMemo(
     () =>
@@ -730,239 +314,66 @@ export function InferenceProvider({
     [selectedModel],
   );
 
-  // ── Debounced GPU selection tracking ─────────────────────────────────────
-  // Fire after 3s of no changes so we capture the "settled" selection.
-  // Skip the first render (initial data load) to avoid noise.
-
-  // Scatter chart — tracks activeHwTypes
-  const scatterTrackMounted = useRef(false);
-  useEffect(() => {
-    if (!scatterTrackMounted.current) {
-      scatterTrackMounted.current = true;
-      return;
-    }
-    if (activeHwTypes.size === 0) return;
-    const timer = setTimeout(() => {
-      const gpus = [...activeHwTypes].toSorted();
-      track('inference_gpu_selection_settled', {
-        gpus,
-        gpu_count: gpus.length,
-        model: selectedModel,
-        sequence: effectiveSequence,
-        preset_id: activePresetId,
-        yAxisMetric: selectedYAxisMetric,
-      });
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [activeHwTypes]);
-
-  // Interactivity / E2E chart — tracks activeDates (date+gpu pairs)
-  const e2eTrackMounted = useRef(false);
-  useEffect(() => {
-    if (!e2eTrackMounted.current) {
-      e2eTrackMounted.current = true;
-      return;
-    }
-    if (activeDates.size === 0) return;
-    const timer = setTimeout(() => {
-      const pairs = [...activeDates].toSorted();
-      track('interactivity_selection_settled', {
-        date_gpu_pairs: pairs,
-        pair_count: pairs.length,
-        gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].toSorted(),
-        model: selectedModel,
-        sequence: effectiveSequence,
-        yAxisMetric: selectedYAxisMetric,
-      });
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [activeDates]);
-
-  // Fire once on mount to capture the initial y-axis metric (default or URL-restored)
-  useEffect(() => {
-    track('inference_chart_view', {
-      yAxisMetric: selectedYAxisMetric,
-      source: getUrlParam('i_metric') ? 'url' : 'default',
-    });
-  }, []);
+  // ── Debounced selection tracking + once-on-mount chart-view event ─────────
+  useInferenceSelectionTracking({
+    activeHwTypes,
+    activeDates,
+    selectedModel,
+    effectiveSequence,
+    activePresetId,
+    selectedYAxisMetric,
+    getUrlParam,
+  });
 
   // ── URL sync ──────────────────────────────────────────────────────────────
-
-  // Serialize the legend-active set, omitting (empty string → URL default) when
-  // it equals the full set of items with data. Keeps share URLs short.
-  const iActiveStr = useMemo(() => {
-    if (activeHwTypes.size === 0) return '';
-    if (activeHwTypes.size === hwTypesWithData.size) {
-      let same = true;
-      for (const k of activeHwTypes) {
-        if (!hwTypesWithData.has(k)) {
-          same = false;
-          break;
-        }
-      }
-      if (same) return '';
-    }
-    return [...activeHwTypes].toSorted().join(',');
-  }, [activeHwTypes, hwTypesWithData]);
-
-  useUrlStateSync(
-    {
-      i_metric: selectedYAxisMetric,
-      i_gpus: selectedGPUs.join(','),
-      i_dates: selectedDates.join(','),
-      i_dstart: selectedDateRange.startDate,
-      i_dend: selectedDateRange.endDate,
-      i_optimal: hideNonOptimal ? '' : '0',
-      i_nolabel: hidePointLabels ? '1' : '',
-      i_hc: highContrast ? '1' : '',
-      i_log: logScale ? '1' : '',
-      i_xmetric: selectedXAxisMetric || '',
-      i_e2e_xmetric: selectedE2eXAxisMetric || '',
-      i_scale: scaleType,
-      i_legend: isLegendExpanded ? '' : '0',
-      i_advlabel: useAdvancedLabels ? '1' : '',
-      i_gradlabel: showGradientLabels ? '1' : '',
-      i_linelabel: showLineLabels ? '1' : '',
-      i_speed: showSpeedOverlay ? '1' : '',
-      i_mc: showMinecraftOverlay ? '1' : '',
-      i_active: iActiveStr,
-    },
-    [
-      selectedYAxisMetric,
-      selectedXAxisMetric,
-      selectedE2eXAxisMetric,
-      scaleType,
-      selectedGPUs,
-      selectedDates,
-      selectedDateRange,
-      hideNonOptimal,
-      hidePointLabels,
-      highContrast,
-      logScale,
-      isLegendExpanded,
-      useAdvancedLabels,
-      showGradientLabels,
-      showLineLabels,
-      showSpeedOverlay,
-      showMinecraftOverlay,
-      iActiveStr,
-    ],
-  );
+  useInferenceUrlSync({
+    activeHwTypes,
+    hwTypesWithData,
+    selectedYAxisMetric,
+    selectedXAxisMetric,
+    selectedE2eXAxisMetric,
+    scaleType,
+    selectedGPUs,
+    selectedDates,
+    selectedDateRange,
+    hideNonOptimal,
+    hidePointLabels,
+    highContrast,
+    logScale,
+    isLegendExpanded,
+    useAdvancedLabels,
+    showGradientLabels,
+    showLineLabels,
+    showSpeedOverlay,
+    showMinecraftOverlay,
+  });
 
   // ── URL preset loading ───────────────────────────────────────────────────
   // Reads ?preset= from the URL on mount and applies it. This is the only
   // place preset URL params are consumed — the landing page links here.
-
-  const urlPresetAppliedRef = useRef(false);
-  const presetVersionRef = useRef(0);
-  const [pendingTimelinePreset, setPendingTimelinePreset] = useState<
-    FavoritePreset['config'] | null
-  >(null);
-  const pendingPresetVersionRef = useRef(0);
-
-  // Once dateRangeAvailableDates resolves for a timeline preset, set the full range.
-  useEffect(() => {
-    if (!pendingTimelinePreset || dateRangeAvailableDates.length === 0) return;
-    if (pendingPresetVersionRef.current !== presetVersionRef.current) {
-      setPendingTimelinePreset(null);
-      return;
-    }
-    const first = dateRangeAvailableDates[0];
-    const last = dateRangeAvailableDates.at(-1)!;
-    presetGuardRef.current = true;
-    setSelectedDateRange({ startDate: first, endDate: last });
-    setSelectedDates([]);
-    presetGuardRef.current = false;
-    setPendingTimelinePreset(null);
-  }, [pendingTimelinePreset, dateRangeAvailableDates, setSelectedDateRange, setSelectedDates]);
-
-  const applyPreset = useCallback(
-    (preset: FavoritePreset) => {
-      const version = ++presetVersionRef.current;
-      const { config } = preset;
-      presetGuardRef.current = true;
-      setSelectedModel(config.model);
-      setSelectedSequence(config.sequence);
-      setSelectedPrecisions(config.precisions);
-      setSelectedYAxisMetric(config.yAxisMetric);
-      setPendingHwFilter(config.hwFilter ?? null);
-      presetHwFilterRef.current = config.hwFilter ?? null;
-      setActivePresetId(preset.id);
-      setHighContrast(true);
-      if (config.gpus && config.gpus.length > 0) {
-        setSelectedGPUs(config.gpus);
-        if (config.useDateRange) {
-          setSelectedDateRange({ startDate: '', endDate: '' });
-          setSelectedDates([]);
-          pendingPresetVersionRef.current = version;
-          setPendingTimelinePreset(config);
-        } else {
-          setSelectedDateRange({ startDate: '', endDate: '' });
-          setSelectedDates([]);
-        }
-      } else {
-        setSelectedGPUs([]);
-        setSelectedDateRange({ startDate: '', endDate: '' });
-        setSelectedDates([]);
-      }
-      presetGuardRef.current = false;
-      track('favorite_preset_applied', {
-        preset_id: preset.id,
-        preset_title: preset.title,
-        category: preset.category,
-      });
-    },
-    [
-      setSelectedModel,
-      setSelectedSequence,
-      setSelectedPrecisions,
-      setSelectedYAxisMetric,
-      setSelectedGPUs,
-      setSelectedDates,
-      setSelectedDateRange,
-      setActivePresetId,
-      setHighContrast,
-    ],
-  );
-
-  useEffect(() => {
-    if (urlPresetAppliedRef.current) return;
-    if (typeof window === 'undefined') return;
-    const sp = new URLSearchParams(window.location.search);
-    const presetId = sp.get('preset');
-    if (!presetId) return;
-    const preset = FAVORITE_PRESETS.find((p) => p.id === presetId);
-    if (!preset) return;
-    urlPresetAppliedRef.current = true;
-    sp.delete('preset');
-    const search = sp.toString();
-    window.history.replaceState(
-      null,
-      '',
-      `${window.location.pathname}${search ? `?${search}` : ''}`,
-    );
-    applyPreset(preset);
-  }, [applyPreset]);
+  useInferencePresetLoading({
+    dateRangeAvailableDates,
+    presetGuardRef,
+    presetHwFilterRef,
+    setSelectedModel,
+    setSelectedSequence,
+    setSelectedPrecisions,
+    setSelectedYAxisMetric,
+    setSelectedGPUs,
+    setSelectedDates,
+    setSelectedDateRange,
+    setActivePresetId,
+    setHighContrast,
+    setPendingHwFilter,
+  });
 
   // ── Filtered runs ─────────────────────────────────────────────────────────
-
-  const filteredAvailableRuns = useMemo(
-    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
-    [availableRuns, modelPrefixes, effectivePrecisions],
-  );
-
-  const effectiveSelectedRunId = useMemo(() => {
-    if (!filteredAvailableRuns) return selectedRunId;
-    const filteredRunIds = Object.keys(filteredAvailableRuns);
-    if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
-  }, [filteredAvailableRuns, selectedRunId]);
-
-  // NOTE: We intentionally do NOT sync effectiveSelectedRunId back to
-  // GlobalFilterContext (setSelectedRunId). That would cause a full tree
-  // re-render on every precision change because filteredAvailableRuns
-  // depends on effectivePrecisions. Instead, InferenceContext exposes
-  // effectiveSelectedRunId directly (line ~499).
+  const { filteredAvailableRuns, effectiveSelectedRunId } = useFilteredRuns({
+    availableRuns,
+    modelPrefixes,
+    effectivePrecisions,
+    selectedRunId,
+  });
 
   const handleDateRangeDialogOk = () => {
     setSelectedDateRange({ startDate: '', endDate: '' });

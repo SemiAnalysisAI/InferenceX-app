@@ -6,38 +6,20 @@ import {
   use,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 
-// useLayoutEffect warns during SSR; alias to useEffect on the server (no-op there anyway).
-const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
-
-function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[keyof T] {
-  return (Object.values(e) as string[]).includes(v);
-}
-
-const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
-const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
-
-import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
-
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useUnofficialRun } from '@/components/unofficial-run-context';
-import {
-  Model,
-  MODEL_OPTIONS,
-  Precision,
-  PRECISION_OPTIONS,
-  Sequence,
-  SEQUENCE_OPTIONS,
-} from '@/lib/data-mappings';
-import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
+import { Model, Precision, PRECISION_OPTIONS, Sequence } from '@/lib/data-mappings';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+
+import { useDerivedAvailability } from './global-filter/useDerivedAvailability';
+import { useGlobalUrlInit } from './global-filter/useGlobalUrlInit';
 
 interface RunInfo {
   runId: string;
@@ -168,149 +150,36 @@ export function GlobalFilterProvider({
 
   const [selectedRunId, setSelectedRunId] = useState<string>('');
 
-  // Apply URL param overrides synchronously after the first commit. Runs only
-  // on the client (useEffect on server is a no-op). Updates state before paint
-  // so users with shareable URLs (?i_seq=…&g_model=…) see their values without
-  // flicker, and SSR/client hydration agree because initial state came from
-  // props/defaults on both sides.
-  useIsomorphicLayoutEffect(() => {
-    const applyIfEnum = <T extends Record<string, string>>(
-      key: 'g_model' | 'i_seq',
-      enumType: T,
-      apply: (v: T[keyof T]) => void,
-    ) => {
-      const value = getUrlParam(key);
-      if (value !== undefined && isEnumValue(enumType, value)) apply(value);
-    };
-    const applyIfMatches = (
-      key: 'g_rundate' | 'g_runid',
-      pattern: RegExp,
-      apply: (v: string) => void,
-    ) => {
-      const value = getUrlParam(key);
-      if (value !== undefined && pattern.test(value)) apply(value);
-    };
-
-    applyIfEnum('g_model', Model, setSelectedModel);
-    applyIfEnum('i_seq', Sequence, setSelectedSequence);
-    const urlPrec = getUrlParam('i_prec');
-    if (urlPrec) {
-      const precs = urlPrec
-        .split(',')
-        .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
-      if (precs.length > 0) setSelectedPrecisionsRaw(precs);
-    }
-    applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
-    applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Apply URL param overrides synchronously after the first commit (mount-only).
+  useGlobalUrlInit({
+    getUrlParam,
+    setSelectedModel,
+    setSelectedSequence,
+    setSelectedPrecisionsRaw,
+    setSelectedRunDateBase,
+    setSelectedRunId,
+  });
 
   // ── Availability data ─────────────────────────────────────────────────────
   const { data: availabilityRows } = useAvailability();
   const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
 
-  const dbModelKeys = useMemo<string[]>(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
-    [selectedModel],
-  );
-
-  // Pre-filter availability rows by model once
-  const modelRows = useMemo(
-    () => availabilityRows?.filter((r) => dbModelKeys.includes(r.model)) ?? [],
-    [availabilityRows, dbModelKeys],
-  );
-
-  // Models that have any data (DB ∪ unofficial run)
-  const availableModels = useMemo(() => {
-    if (!availabilityRows) return MODEL_OPTIONS;
-    const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
-    return MODEL_OPTIONS.filter((m) => {
-      if (unofficialModels.has(m)) return true;
-      const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
-      return availabilityRows.some((r) => keys.includes(r.model));
-    });
-  }, [availabilityRows, unofficialAvailable]);
-
-  // Auto-switch the selected model when an unofficial run is loaded that
-  // doesn't include the currently selected model. Without this, navigating
-  // to `?unofficialrun=<id>` while the default `g_model=DeepSeek-R1` sticks
-  // leaves the user staring at a chart with no overlay points — they'd have
-  // to know to open the dropdown and pick the run's model themselves.
-  //
-  // Precedence on first load: the `if (urlModel)` early-bail in
-  // `computeAutoSwitchDecision` is the primary guard for explicit `g_model`
-  // intent. The dedupe ref is a secondary guard for the narrow window after
-  // an auto-switch fires but before the URL-sync effect (below) writes
-  // `g_model` back to the URL — once that runs, `urlModel` is set on every
-  // subsequent render and the ref check is effectively redundant. The ref
-  // still matters across navigations between unofficial runs because it is
-  // reset whenever the overlay set goes empty.
-  const lastAutoSwitchKeyRef = useRef<string>('');
-  useEffect(() => {
-    const decision = computeAutoSwitchDecision(
-      unofficialAvailable,
-      getUrlParam('g_model'),
-      selectedModel,
-      lastAutoSwitchKeyRef.current,
-    );
-    lastAutoSwitchKeyRef.current = decision.nextKey;
-    if (decision.modelToSet !== null) {
-      setSelectedModel(decision.modelToSet);
-    }
-  }, [unofficialAvailable, selectedModel]);
-
-  // Sequences available for the selected model (DB ∪ unofficial run for this model)
-  const availableSequences = useMemo(() => {
-    const unofficialSeqs = unofficialAvailable.flatMap((a) =>
-      a.model === selectedModel ? [a.sequence as Sequence] : [],
-    );
-    if (!availabilityRows) {
-      return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : SEQUENCE_OPTIONS;
-    }
-    const dbSeqs = modelRows
-      .map((r) => islOslToSequence(r.isl, r.osl))
-      .filter((s): s is Sequence => s !== null);
-    const merged = [...new Set([...dbSeqs, ...unofficialSeqs])];
-    return merged.length > 0 ? merged : SEQUENCE_OPTIONS;
-  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
-
-  // Synchronously validated sequence
-  const effectiveSequence = useMemo(() => {
-    if (availableSequences.includes(selectedSequence)) return selectedSequence;
-    return availableSequences[0] ?? selectedSequence;
-  }, [availableSequences, selectedSequence]);
-
-  // Precisions available for the selected model + sequence (DB ∪ unofficial run)
-  const availablePrecisions = useMemo(() => {
-    const unofficialPrecs = unofficialAvailable.flatMap((a) =>
-      a.model === selectedModel && a.sequence === effectiveSequence ? a.precisions : [],
-    );
-    if (!availabilityRows) {
-      return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
-    }
-    const rows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
-    const dbPrecs = rows.map((r) => r.precision);
-    const merged = [...new Set([...dbPrecs, ...unofficialPrecs])].toSorted();
-    return merged.length > 0 ? merged : ['fp4'];
-  }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
-
-  // Synchronously validated precisions
-  const effectivePrecisions = useMemo(() => {
-    const valid = selectedPrecisions.filter((p) => availablePrecisions.includes(p));
-    if (valid.length > 0) return valid;
-    return availablePrecisions.length > 0 ? [availablePrecisions[0]] : selectedPrecisions;
-  }, [selectedPrecisions, availablePrecisions]);
-
-  // Dates available for selected model + sequence + precisions
-  const availableDates = useMemo(() => {
-    if (!availabilityRows) return [];
-    const seqRows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
-    const rows = seqRows.filter((r) => effectivePrecisions.includes(r.precision));
-    if (rows.length === 0) {
-      return [...new Set(seqRows.map((r) => r.date))].toSorted();
-    }
-    return [...new Set(rows.map((r) => r.date))].toSorted();
-  }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
+  const {
+    availableModels,
+    availableSequences,
+    effectiveSequence,
+    availablePrecisions,
+    effectivePrecisions,
+    availableDates,
+  } = useDerivedAvailability({
+    availabilityRows,
+    unofficialAvailable,
+    selectedModel,
+    selectedSequence,
+    selectedPrecisions,
+    getUrlParam,
+    setSelectedModel,
+  });
 
   // When true, keep the user's date if available; otherwise always use latest
   const userPickedDateRef = useRef(Boolean(getUrlParam('g_rundate')));
