@@ -358,7 +358,7 @@ function SubmissionRow({
       </tr>
       {isExpanded && (
         <tr className="bg-muted/20">
-          <td aria-hidden="true" />
+          <td />
           <td colSpan={8} className="p-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
