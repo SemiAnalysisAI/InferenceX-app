@@ -40,6 +40,24 @@
   content: none;
 }
 
+/* Pride theme for the InferenceX wordmark — celebrating June Pride Month.
+   Paints the brand text with the 6-stripe rainbow flag via a clipped gradient. */
+.pride-wordmark {
+  background-image: linear-gradient(
+    90deg,
+    #e40303 0%,
+    #ff8c00 20%,
+    #ffed00 40%,
+    #008026 60%,
+    #004dff 80%,
+    #750787 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
 /* Shiki dual-theme: light by default, dark when .dark class is active */
 .shiki,
 .shiki span {
