@@ -9,7 +9,7 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { TABLE_INSERT_ORDER } from '@semianalysisai/inferencex-constants';
+import { TABLE_INSERT_ORDER, TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
@@ -17,6 +17,24 @@ import { createAdminSql } from './etl/db-utils';
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), readonly: true, max: 1 });
 
 const CURSOR_BATCH = 100;
+
+/**
+ * Tables excluded from the dump by default.
+ *
+ * The weekly public dump is published as a GitHub release asset, which is
+ * hard-capped at 2 GiB (2_147_483_648 bytes). These two tables dominate the
+ * archive — eval_samples (~1.7 GB compressed) + server_logs (~345 MB) are
+ * ~99% of the zip — while the analytically useful tables are tiny
+ * (benchmark_results is only ~20 MB). Including them pushed the archive past
+ * the cap, so every dump since 2026-05-18 failed with
+ * `size must be less than 2147483648`. Excluding them drops the zip from
+ * ~2.07 GB to ~0.36 GB and unblocks the weekly release.
+ *
+ * Set DUMP_INCLUDE_ALL=1 for a complete backup (e.g. when writing somewhere
+ * without the 2 GiB asset limit).
+ */
+const DEFAULT_SKIP = new Set<string>([TABLE_NAMES.evalSamples, TABLE_NAMES.serverLogs]);
+const SKIP = process.env.DUMP_INCLUDE_ALL === '1' ? new Set<string>() : DEFAULT_SKIP;
 
 /** Stream a table to a JSON file using a cursor, writing row-by-row. */
 async function streamTable(table: string, outPath: string): Promise<number> {
@@ -54,6 +72,10 @@ async function dump(): Promise<void> {
   console.log(`  Output: ${outDir}\n`);
 
   for (const table of TABLE_INSERT_ORDER) {
+    if (SKIP.has(table)) {
+      console.log(`  ${table}... skipped (excluded from dump; set DUMP_INCLUDE_ALL=1 to include)`);
+      continue;
+    }
     process.stdout.write(`  ${table}...`);
     const outPath = resolve(outDir, `${table}.json`);
     const count = await streamTable(table, outPath);
