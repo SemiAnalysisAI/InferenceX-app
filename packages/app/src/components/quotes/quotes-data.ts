@@ -326,7 +326,7 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/gmi-yeh',
   },
   {
-    text: 'Now commonly hearing "We want to the Semianalysis for X". Testament to what @dylan522p has built.',
+    text: 'Now commonly hearing "We want the Semianalysis for X". Testament to what @dylan522p has built.',
     name: 'Sriram Krishnan',
     title: 'White House Senior AI Advisor',
     org: 'White House',
