@@ -53,5 +53,5 @@ jobs:
           # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
           gh release create "$TAG" $DUMP_GLOB \
             --title "DB Dump $(date -u +%Y-%m-%d)" \
-            --notes "Weekly full database dump (xz-compressed, split into <2 GiB parts). Reassemble: cat *.tar.xz.part* | xz -d | tar -x" \
+            --notes "Weekly full database dump (xz-compressed, split into <2 GiB parts). Reassemble: `cat *.tar.xz.part* | xz -d | tar -x`" \
             --latest=false
