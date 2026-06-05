@@ -8,7 +8,7 @@ on:
 jobs:
   backup:
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-32vcpu-ubuntu-2404
     permissions:
       contents: write
     steps:
@@ -27,17 +27,23 @@ jobs:
         env:
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
         run: |
+          set -euo pipefail
           DUMP_DIR="inferencex-dump-$(date -u +%Y-%m-%d)"
           pnpm admin:db:dump "$DUMP_DIR"
-          cd packages/db && zip -r "${GITHUB_WORKSPACE}/${DUMP_DIR}.zip" "$DUMP_DIR" && cd -
-          echo "DUMP_ARCHIVE=${DUMP_DIR}.zip" >> "$GITHUB_ENV"
+          # Keep every table intact: tar the dump, compress with xz/lzma2, and split into
+          # <2 GiB parts to stay under GitHub's per-release-asset cap (even as data grows).
+          ( cd packages/db
+            tar -cf - "$DUMP_DIR" \
+              | xz -T0 --lzma2=preset=9e,dict=192MiB \
+              | split -b 1900m -d -a 2 - "${GITHUB_WORKSPACE}/${DUMP_DIR}.tar.xz.part" )
+          echo "DUMP_GLOB=${DUMP_DIR}.tar.xz.part*" >> "$GITHUB_ENV"
           echo "TAG=db-dump/$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" "$DUMP_ARCHIVE" \
+          # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
+          gh release create "$TAG" $DUMP_GLOB \
             --title "DB Dump $(date -u +%Y-%m-%d)" \
-            --notes "Weekly database dump." \
+            --notes "Weekly full database dump (xz-compressed, split into <2 GiB parts). Reassemble: cat *.tar.xz.part* | xz -d | tar -x" \
             --latest=false
