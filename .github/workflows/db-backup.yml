@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           ( cd packages/db
             tar -cf - "$DUMP_DIR" \
-              | xz -v -T0 --memlimit-compress=95% --lzma2=preset=9e,dict=192MiB \
+              | xz -v -T0 --memlimit-compress=99% --lzma2=preset=9e,dict=192MiB \
               | split -b 1900m -d -a 2 - "${GITHUB_WORKSPACE}/${DUMP_DIR}.tar.xz.part" )
           echo "DUMP_GLOB=${DUMP_DIR}.tar.xz.part*" >> "$GITHUB_ENV"
 
