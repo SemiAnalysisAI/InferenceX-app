@@ -197,7 +197,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     trigger: { type: 'immediate' },
     dismissal: {
       type: 'timed',
-      durationMs: 24 * 60 * 60 * 1000,
+      durationMs: 3 * 24 * 60 * 60 * 1000,
       cooldownStartsOnShow: true,
     },
     storageKey: 'inferencex-feedback-modal-snoozed',
