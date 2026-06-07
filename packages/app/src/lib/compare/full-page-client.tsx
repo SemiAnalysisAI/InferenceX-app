@@ -11,6 +11,7 @@ import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
+import { type Lang, compareDict, compareSlugPath } from '@/lib/compare/i18n';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
 
 interface SsrTableData {
@@ -46,6 +47,8 @@ interface ComparePageClientProps {
   bVendor: string;
   aArch: string;
   bArch: string;
+  /** UI language. Defaults to English; `/zh/compare/*` passes 'zh'. */
+  lang?: Lang;
 }
 
 function toModel(value: string): Model | undefined {
@@ -79,6 +82,7 @@ export default function ComparePageClient({
   bVendor,
   aArch,
   bArch,
+  lang = 'en',
 }: ComparePageClientProps) {
   useEffect(() => {
     track('compare_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
@@ -88,6 +92,10 @@ export default function ComparePageClient({
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
   const initialPrecisions = toPrecisions(defaultPrecision);
+
+  const t = compareDict(lang).detail.full;
+  const seqLabel = defaultSequence ?? (lang === 'zh' ? '序列' : 'sequence');
+  const precLabel = defaultPrecision ?? (lang === 'zh' ? '精度' : 'precision');
 
   return (
     <GlobalFilterProvider
@@ -104,20 +112,33 @@ export default function ComparePageClient({
           <Card className="flex flex-col gap-3">
             <header>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {modelLabel} · GPU comparison
+                {t.eyebrow(modelLabel)}
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">{label}</h1>
-              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
-                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
-                <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
-                Use the chart controls below to switch sequences, precisions, and metrics — same
-                interactions as{' '}
-                <Link href="/" className="underline hover:text-primary">
-                  the main inference chart
-                </Link>
-                .
-              </p>
+              {lang === 'zh' ? (
+                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                  <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI 推理基准对比。涵盖各类
+                  LLM
+                  工作负载的延迟、吞吐量与成本。使用下方的图表控件即可切换序列、精度与指标——交互方式与{' '}
+                  <Link href="/" className="underline hover:text-primary">
+                    {t.mainChartLink}
+                  </Link>{' '}
+                  一致。
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                  Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
+                  {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
+                  <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
+                  Use the chart controls below to switch sequences, precisions, and metrics — same
+                  interactions as{' '}
+                  <Link href="/" className="underline hover:text-primary">
+                    {t.mainChartLink}
+                  </Link>
+                  .
+                </p>
+              )}
               {narrative.length > 0 && (
                 <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
                   {narrative.map((para, i) => (
@@ -127,10 +148,7 @@ export default function ComparePageClient({
                         <>
                           {' '}
                           <span className="text-muted-foreground italic">
-                            (Numbers reflect the default {defaultSequence ?? 'sequence'} ·{' '}
-                            {defaultPrecision ?? 'precision'} selection for this URL — table and
-                            chart below update if you change sequence, precision, or model in the
-                            controls.)
+                            {t.caveat(seqLabel, precLabel)}
                           </span>
                         </>
                       )}
@@ -140,11 +158,11 @@ export default function ComparePageClient({
               )}
               <p className="mt-2 text-sm">
                 <Link
-                  href={`/compare-per-dollar/${slug}`}
+                  href={compareSlugPath(lang, 'per-dollar', slug)}
                   className="underline hover:text-primary text-muted-foreground"
                   onClick={() => track('compare_cross_link_to_per_dollar', { slug })}
                 >
-                  View performance-per-dollar view →
+                  {t.crossLink}
                 </Link>
               </p>
             </header>
@@ -154,6 +172,7 @@ export default function ComparePageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              lang={lang}
             />
           </Card>
           <InferenceChartDisplay />
@@ -169,12 +188,14 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  lang,
 }: {
   a: string;
   b: string;
   aLabel: string;
   bLabel: string;
   ssrTableData: SsrTableData;
+  lang: Lang;
 }) {
   const { effectiveSequence, effectivePrecisions, selectedRunDate, selectedModel } =
     useGlobalFilters();
@@ -206,8 +227,7 @@ function CompareTableSection({
   if (ssrTableData.defaultTargets.length === 0) {
     return (
       <div className="border border-border/50 rounded-md px-4 py-3 text-sm text-muted-foreground bg-muted/30">
-        No interpolated comparison data available for the default model. Use the chart controls
-        below to select a model with benchmark data for both GPUs.
+        {compareDict(lang).detail.full.emptyState}
       </div>
     );
   }
@@ -221,6 +241,7 @@ function CompareTableSection({
       interactivityRange={clientRange}
       gpuDataPointsA={pointsA}
       gpuDataPointsB={pointsB}
+      lang={lang}
     />
   );
 }

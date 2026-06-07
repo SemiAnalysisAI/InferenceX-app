@@ -36,6 +36,7 @@ import {
   type CompareModelSlug,
   compareModelDisplayLabel,
 } from '@/lib/compare-slug';
+import { type Lang, compareBasePath } from '@/lib/compare/i18n';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { loadFixture } from '@/lib/test-fixtures';
 
@@ -556,6 +557,139 @@ const FULL_SINGLE_TEMPLATES: ((args: {
     `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/GPU, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
 ];
 
+// ---------------------------------------------------------------------------
+// Chinese (zh-CN) narrative templates — 1:1 with the English pools above so the
+// `/zh/compare*` pages read the same operating points in natural Chinese.
+// Technical units (tok/s/user, tok/s/GPU), currency, and product names stay in
+// their original form; only the connective prose is translated.
+// ---------------------------------------------------------------------------
+
+const ZH_BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
+  low: '低端',
+  middle: '中段',
+  high: '高端',
+};
+
+function fullSummaryZh(i: FullBoth): string {
+  const costPart = i.costTied
+    ? '每 token 成本基本持平'
+    : i.costRatio === null
+      ? null
+      : `${i.cheaper} 每 token 成本低 ${fmtPctDelta(i.costRatio)}`;
+  const tputPart = i.tputTied
+    ? '每 GPU 吞吐量基本持平'
+    : i.tputRatio === null
+      ? null
+      : `${i.faster} 的每 GPU 吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
+  const both = [costPart, tputPart].filter(Boolean).join('；');
+  return both.length > 0 ? both : '差距过小，难分高下';
+}
+
+const PER_DOLLAR_BOTH_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}。在该工作点，${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.cheaper} 略胜 ${i.pricier}——每百万 token ${fmtCost(i.cheaperCost)} 对 ${fmtCost(i.pricierCost)}，每 token 成本相差 ${fmtPctDelta(i.ratio)}。`,
+  (i) =>
+    `把 ${i.modelLabel} 推到 ${i.target} tok/s/user，${i.aLabel} 的每百万 token 成本落在 ${fmtCost(i.aCost)}，而 ${i.bLabel} 为 ${fmtCost(i.bCost)}——${i.cheaper} 领先 ${fmtPctDelta(i.ratio)}。`,
+  (i) =>
+    `${i.aLabel}：每百万 token ${fmtCost(i.aCost)}。${i.bLabel}：${fmtCost(i.bCost)}。两者都在 ${i.modelLabel} 上、${i.target} tok/s/user 时测得，其中 ${i.cheaper} 便宜 ${fmtPctDelta(i.ratio)}。`,
+  (i) =>
+    `在 ${i.range} 交互速率区间的${ZH_BAND_PHRASE[i.band]}——即 ${i.target} tok/s/user——${i.aLabel} 在 ${i.modelLabel} 上的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}。${i.cheaper} 是更便宜的选择，低 ${fmtPctDelta(i.ratio)}。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，按每百万 token 计算，${i.aLabel} 为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 每美元能多产出 ${fmtPctDelta(i.ratio)} 的内容。`,
+];
+
+const PER_DOLLAR_TIED_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本相差不到 ~1%（${fmtCost(i.aCost)} 对 ${fmtCost(i.bCost)}）——在该工作点可视为打平。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel} 每百万 token ${fmtCost(i.aCost)}、${i.bLabel} ${fmtCost(i.bCost)}：成本基本相同。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel}（${fmtCost(i.aCost)}）与 ${i.bLabel}（${fmtCost(i.bCost)}）的每百万 token 成本基本持平。`,
+];
+
+const PER_DOLLAR_ZERO_TEMPLATES_ZH: ((args: {
+  modelLabel: string;
+  aLabel: string;
+  bLabel: string;
+  target: number;
+  aCost: number;
+  bCost: number;
+}) => string)[] = [
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 分别录得每百万 token ${fmtCost(i.aCost)} 与 ${fmtCost(i.bCost)}——其中一方缺少定价或吞吐数据，因此这里的同口径比值没有意义。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel}（${fmtCost(i.aCost)}）与 ${i.bLabel}（${fmtCost(i.bCost)}）的每百万 token 成本：至少有一项输入为零，因此无法用比值表达差距。`,
+];
+
+const PER_DOLLAR_SINGLE_TEMPLATES_ZH: ((args: {
+  modelLabel: string;
+  presentLabel: string;
+  missingLabel: string;
+  target: number;
+  presentCost: number;
+}) => string)[] = [
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.presentLabel} 的每百万 token 成本为 ${fmtCost(i.presentCost)}；我们在这一精确目标上没有 ${i.missingLabel} 的基准数据。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.presentLabel} 的每百万 token 成本为 ${fmtCost(i.presentCost)}。${i.missingLabel} 尚未在该工作点进行基准测试。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，只有 ${i.presentLabel} 有成本数据——每百万 token ${fmtCost(i.presentCost)}。${i.missingLabel} 在该目标上未做测量。`,
+];
+
+const FULL_BOTH_TEMPLATES_ZH: ((i: FullBoth) => string)[] = [
+  (i) =>
+    `在 ${i.modelLabel} 上、交互速率 ${i.target} tok/s/user 时，${i.aLabel} 提供 ${i.aValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.aCost)}；${i.bLabel} 提供 ${i.bValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.bCost)}。在该工作点，${fullSummaryZh(i)}。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.aLabel} 录得 ${i.aValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.aCost)}；${i.bLabel} 录得 ${i.bValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时的吞吐量：${i.aLabel} 达到 ${i.aValue.toFixed(0)} tok/s/GPU，${i.bLabel} 达到 ${i.bValue.toFixed(0)}。每百万 token 成本分别为 ${fmtCost(i.aCost)} 与 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+  (i) =>
+    `${i.aLabel} / ${i.bLabel} 在 ${i.modelLabel} 上、${i.target} tok/s/user 时：${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/GPU，每百万 token ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+  (i) =>
+    `在 ${i.range} 交互速率区间的${ZH_BAND_PHRASE[i.band]}、即 ${i.modelLabel} 上 ${i.target} tok/s/user 时：${i.aLabel} 跑出 ${i.aValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.aCost)}，${i.bLabel} 跑出 ${i.bValue.toFixed(0)}、每百万 token ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+  (i) =>
+    `以 ${i.modelLabel} 上 ${i.target} tok/s/user 为目标，${i.aLabel} 产出 ${i.aValue.toFixed(0)} tok/s/GPU（每百万 token ${fmtCost(i.aCost)}），${i.bLabel} 产出 ${i.bValue.toFixed(0)}（每百万 token ${fmtCost(i.bCost)}）。${fullSummaryZh(i)}。`,
+];
+
+const FULL_SINGLE_TEMPLATES_ZH: ((args: {
+  modelLabel: string;
+  presentLabel: string;
+  missingLabel: string;
+  target: number;
+  presentValue: number;
+  presentCost: number;
+}) => string)[] = [
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.presentLabel} 提供 ${i.presentValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.presentCost)}；${i.missingLabel} 尚未在该目标上进行基准测试。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.presentLabel} 达到 ${i.presentValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.presentCost)}。该工作点没有 ${i.missingLabel} 的数据。`,
+  (i) =>
+    `在 ${i.modelLabel} 上、${i.target} tok/s/user 时，${i.presentLabel}：${i.presentValue.toFixed(0)} tok/s/GPU、每百万 token ${fmtCost(i.presentCost)}。${i.missingLabel} 在此未做测量。`,
+];
+
+/** Bundle the per-language template pools so `compareTableNarrative` can pick a
+ *  set by `lang` without a forest of conditionals at each call site. */
+const NARRATIVE_POOLS = {
+  en: {
+    perDollarBoth: PER_DOLLAR_BOTH_TEMPLATES,
+    perDollarTied: PER_DOLLAR_TIED_TEMPLATES,
+    perDollarZero: PER_DOLLAR_ZERO_TEMPLATES,
+    perDollarSingle: PER_DOLLAR_SINGLE_TEMPLATES,
+    fullBoth: FULL_BOTH_TEMPLATES,
+    fullSingle: FULL_SINGLE_TEMPLATES,
+  },
+  zh: {
+    perDollarBoth: PER_DOLLAR_BOTH_TEMPLATES_ZH,
+    perDollarTied: PER_DOLLAR_TIED_TEMPLATES_ZH,
+    perDollarZero: PER_DOLLAR_ZERO_TEMPLATES_ZH,
+    perDollarSingle: PER_DOLLAR_SINGLE_TEMPLATES_ZH,
+    fullBoth: FULL_BOTH_TEMPLATES_ZH,
+    fullSingle: FULL_SINGLE_TEMPLATES_ZH,
+  },
+} as const;
+
 /** Pick template `rowIndex` in the rotation starting from a per-page hash
  *  offset. Within a single page, paragraphs 0/1/2 always pick three
  *  *consecutive* templates from the pool (never repeating each other), while
@@ -593,9 +727,11 @@ export function compareTableNarrative(
   bLabel: string,
   ssrRows: SsrInterpolatedRow[],
   interactivityRange: { min: number; max: number },
+  lang: Lang = 'en',
 ): string[] {
   if (ssrRows.length === 0) return [];
 
+  const P = NARRATIVE_POOLS[lang] ?? NARRATIVE_POOLS.en;
   const range = `${interactivityRange.min}–${interactivityRange.max} tok/s/user`;
   // Page-level seed: stable across renders, varies by (route variant, model,
   // GPU pair). Template selection rotates by rowIndex from this seed so the
@@ -614,7 +750,7 @@ export function compareTableNarrative(
         if (!(a.cost > 0 && b.cost > 0)) {
           paragraphs.push(
             pickRotated(
-              PER_DOLLAR_ZERO_TEMPLATES,
+              P.perDollarZero,
               pageSeed,
               rowIndex,
             )({
@@ -647,14 +783,14 @@ export function compareTableNarrative(
           range,
           band,
         };
-        const pool = ratio < 1.01 ? PER_DOLLAR_TIED_TEMPLATES : PER_DOLLAR_BOTH_TEMPLATES;
+        const pool = ratio < 1.01 ? P.perDollarTied : P.perDollarBoth;
         paragraphs.push(pickRotated(pool, pageSeed, rowIndex)(inputs));
         continue;
       }
       const present = (a ?? b)!;
       paragraphs.push(
         pickRotated(
-          PER_DOLLAR_SINGLE_TEMPLATES,
+          P.perDollarSingle,
           pageSeed,
           rowIndex,
         )({
@@ -694,13 +830,13 @@ export function compareTableNarrative(
         range,
         band,
       };
-      paragraphs.push(pickRotated(FULL_BOTH_TEMPLATES, pageSeed, rowIndex)(inputs));
+      paragraphs.push(pickRotated(P.fullBoth, pageSeed, rowIndex)(inputs));
       continue;
     }
     const present = (a ?? b)!;
     paragraphs.push(
       pickRotated(
-        FULL_SINGLE_TEMPLATES,
+        P.fullSingle,
         pageSeed,
         rowIndex,
       )({
@@ -724,8 +860,13 @@ export function compareTableNarrative(
 /** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Used by the
  *  master index ledes on both /compare and /compare-per-dollar so the
  *  enumeration stays consistent if a model is added or removed. */
-export function formatModelList(models: CompareModelSlug[]): string {
+export function formatModelList(models: CompareModelSlug[], lang: Lang = 'en'): string {
   const labels = models.map((m) => m.label);
+  if (lang === 'zh') {
+    if (labels.length === 0) return '暂无模型';
+    if (labels.length === 1) return labels[0];
+    return `${labels.slice(0, -1).join('、')} 和 ${labels.at(-1)}`;
+  }
   if (labels.length === 0) return 'no models';
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
@@ -781,15 +922,23 @@ export function buildBreadcrumbJsonLd(
   variant: CompareJsonLdVariant,
   pairLabel: string,
   url: string,
+  lang: Lang = 'en',
 ) {
-  const indexUrl =
-    variant === 'per-dollar' ? `${SITE_URL}/compare-per-dollar` : `${SITE_URL}/compare`;
-  const indexName = variant === 'per-dollar' ? 'GPU Performance per Dollar' : 'GPU Comparisons';
+  const indexUrl = `${SITE_URL}${compareBasePath(lang, variant)}`;
+  const homeName = lang === 'zh' ? '首页' : 'Home';
+  const indexName =
+    lang === 'zh'
+      ? variant === 'per-dollar'
+        ? 'GPU 每美元性能'
+        : 'GPU 对比'
+      : variant === 'per-dollar'
+        ? 'GPU Performance per Dollar'
+        : 'GPU Comparisons';
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 1, name: homeName, item: SITE_URL },
       { '@type': 'ListItem', position: 2, name: indexName, item: indexUrl },
       { '@type': 'ListItem', position: 3, name: pairLabel, item: url },
     ],
@@ -831,25 +980,39 @@ export function buildJsonLd(
   /** Display model name accepted by /api/v1/benchmarks?model=…, used to wire the
    *  Dataset's `distribution: DataDownload` to a real machine-readable export. */
   modelApiKey?: string,
+  lang: Lang = 'en',
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
   const fullLabel = compareModelDisplayLabel(model, a, b);
 
-  const itemListName =
-    variant === 'per-dollar'
+  const isZh = lang === 'zh';
+  const itemListName = isZh
+    ? variant === 'per-dollar'
+      ? `${fullLabel} —— 每美元性能`
+      : `${fullLabel} 推理基准测试`
+    : variant === 'per-dollar'
       ? `${fullLabel} — Performance per Dollar`
       : `${fullLabel} Inference Benchmark`;
-  const itemListDescription =
-    variant === 'per-dollar'
+  const itemListDescription = isZh
+    ? variant === 'per-dollar'
+      ? `${aLabel} 与 ${bLabel} 在 ${model.label} 上的每百万 token 成本。GPU 性能按自建超大规模数据中心 TCO 在各类 LLM 工作负载下归一化。`
+      : `${aLabel} 与 ${bLabel} 在 ${model.label} 上、各类 LLM 工作负载下的 AI 推理基准对比。`
+    : variant === 'per-dollar'
       ? `Cost per million tokens of ${aLabel} versus ${bLabel} on ${model.label}. GPU performance normalized by owning-hyperscaler TCO across LLM workloads.`
       : `Head-to-head AI inference benchmark comparison of ${aLabel} and ${bLabel} on ${model.label} across LLM workloads.`;
-  const datasetName =
-    variant === 'per-dollar'
+  const datasetName = isZh
+    ? variant === 'per-dollar'
+      ? `${aLabel} vs ${bLabel}（${model.label}）每美元性能对比`
+      : `${aLabel} vs ${bLabel}（${model.label}）插值基准对比`
+    : variant === 'per-dollar'
       ? `${aLabel} vs ${bLabel} (${model.label}) Performance-per-Dollar Comparison`
       : `${aLabel} vs ${bLabel} (${model.label}) Interpolated Benchmark Comparison`;
-  const datasetDescription =
-    variant === 'per-dollar'
+  const datasetDescription = isZh
+    ? variant === 'per-dollar'
+      ? `${aLabel} 与 ${bLabel} 在 ${model.label} 上、相同交互速率下的自建超大规模数据中心每百万 token 成本——按美元归一化的推理基准。`
+      : `${aLabel} 与 ${bLabel} 在 ${model.label} 上、相同交互速率下的插值吞吐量、成本、能效与并发数。`
+    : variant === 'per-dollar'
       ? `Owning-hyperscaler cost per million tokens for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels — dollar-normalized inference benchmark.`
       : `Interpolated throughput, cost, power efficiency, and concurrency for ${aLabel} and ${bLabel} on ${model.label} at matched interactivity levels.`;
 
@@ -878,7 +1041,9 @@ export function buildJsonLd(
       }
       return {
         '@type': 'Dataset',
-        name: `${model.label} comparison at ${row.target} tok/s/user interactivity`,
+        name: isZh
+          ? `${model.label} 在 ${row.target} tok/s/user 交互速率下的对比`
+          : `${model.label} comparison at ${row.target} tok/s/user interactivity`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,

@@ -11,10 +11,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  return fullDetailMetadata(slug, 'en');
+  return fullDetailMetadata(slug, 'zh');
 }
 
-export default async function ComparePage({ params, searchParams }: Props) {
+export default async function ComparePageZh({ params, searchParams }: Props) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  return <FullDetailView slug={slug} sp={sp} lang="en" />;
+  return <FullDetailView slug={slug} sp={sp} lang="zh" />;
 }

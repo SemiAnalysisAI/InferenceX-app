@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
 import { track } from '@/lib/analytics';
+import { type Lang, compareDict } from '@/lib/compare/i18n';
 import { cn } from '@/lib/utils';
 
 /** True when the field shows a positive finite number strictly outside [min, max]. */
@@ -43,6 +44,10 @@ export interface CompareInterpolatedTableProps {
    *  'Cost ($/M tok)' → 'Dollar per Million Tokens' so the page reads in full
    *  English to match its "Performance per Dollar" framing. */
   metricLabelOverrides?: Record<string, string>;
+  /** UI language. Drives the header / help / metric-row display labels. The
+   *  metric *keys* (used for filtering and React keys) stay English regardless;
+   *  only the rendered text is localized. Defaults to English. */
+  lang?: Lang;
 }
 
 interface ColumnData {
@@ -97,14 +102,17 @@ export function CompareInterpolatedTable({
   gpuDataPointsB,
   visibleMetricLabels,
   metricLabelOverrides,
+  lang = 'en',
 }: CompareInterpolatedTableProps) {
-  const metricsToRender = (
-    visibleMetricLabels ? METRICS.filter((m) => visibleMetricLabels.includes(m.label)) : METRICS
-  ).map((m) =>
-    metricLabelOverrides && metricLabelOverrides[m.label]
-      ? { ...m, label: metricLabelOverrides[m.label] }
-      : m,
-  );
+  const t = compareDict(lang).table;
+  // Filter by the metric's stable English key, but render a localized (or
+  // per-route-overridden) display label. Keys stay English so filtering and
+  // React keys are language-independent.
+  const metricsToRender = visibleMetricLabels
+    ? METRICS.filter((m) => visibleMetricLabels.includes(m.label))
+    : METRICS;
+  const displayLabelFor = (key: string): string =>
+    metricLabelOverrides?.[key] ?? t.metricLabel[key] ?? key;
   const [columns, setColumns] = useState<ColumnData[]>(() =>
     defaultTargets.map((target, i) => ({
       target,
@@ -251,22 +259,19 @@ export function CompareInterpolatedTable({
   return (
     <div className="border border-border/50 rounded-md overflow-hidden">
       <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/30 border-b border-border/50">
-        Interpolated from real benchmark data. Edit target interactivity values below to compare at
-        different operating points.
+        {t.help}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" data-testid="compare-interpolated-table">
           <thead>
             <tr className="border-b border-border/40">
               <th className="px-3 py-2 text-left font-medium text-muted-foreground min-w-[160px]">
-                Metric
+                {t.metricColumn}
               </th>
               {columns.map((col, ci) => (
                 <th key={ci} className="px-3 py-2 text-center font-medium min-w-[180px]">
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      Interactivity (tok/s/user)
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t.interactivity}</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -301,6 +306,7 @@ export function CompareInterpolatedTable({
               <MetricTableRow
                 key={metric.label}
                 metric={metric}
+                displayLabel={displayLabelFor(metric.label)}
                 columns={columns}
                 aLabel={aLabel}
                 bLabel={bLabel}
@@ -316,12 +322,14 @@ export function CompareInterpolatedTable({
 
 function MetricTableRow({
   metric,
+  displayLabel,
   columns,
   aLabel,
   bLabel,
   winnerClass,
 }: {
   metric: MetricRow;
+  displayLabel: string;
   columns: ColumnData[];
   aLabel: string;
   bLabel: string;
@@ -353,7 +361,7 @@ function MetricTableRow({
   return (
     <tr className="border-t border-border/40">
       <td className="px-3 py-2 text-muted-foreground border-r border-border/40 whitespace-nowrap">
-        {metric.label}
+        {displayLabel}
       </td>
       {cells.map((cell, ci) => (
         <td key={ci} className="px-3 py-2 border-r border-border/40 last:border-r-0">

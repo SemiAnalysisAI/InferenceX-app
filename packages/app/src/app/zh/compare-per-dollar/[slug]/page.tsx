@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import FullDetailView, { fullDetailMetadata } from '@/lib/compare/full-detail-view';
+import PerDollarDetailView, { perDollarDetailMetadata } from '@/lib/compare/per-dollar-detail-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +11,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  return fullDetailMetadata(slug, 'en');
+  return perDollarDetailMetadata(slug, 'zh');
 }
 
-export default async function ComparePage({ params, searchParams }: Props) {
+export default async function ComparePerDollarPageZh({ params, searchParams }: Props) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  return <FullDetailView slug={slug} sp={sp} lang="en" />;
+  return <PerDollarDetailView slug={slug} sp={sp} lang="zh" />;
 }

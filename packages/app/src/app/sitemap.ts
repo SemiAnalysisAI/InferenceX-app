@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next';
 import { getAllPosts } from '@/lib/blog';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
+import { compareBasePath, compareSlugPath } from '@/lib/compare/i18n';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 const TABS = [
@@ -87,5 +88,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       };
     }),
+    // Chinese (zh-CN) compare locale — index + detail pages mirror the English
+    // routes under a /zh prefix. Slightly lower priority as the secondary locale.
+    {
+      url: `${BASE_URL}${compareBasePath('zh', 'full')}`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}${compareBasePath('zh', 'per-dollar')}`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    ...compareSlugs.map(({ modelSlug, a, b }) => ({
+      url: `${BASE_URL}${compareSlugPath('zh', 'full', canonicalCompareSlug(modelSlug, a, b))}`,
+      lastModified: now,
+      changeFrequency: 'daily' as const,
+      priority: 0.5,
+    })),
+    ...compareSlugs.map(({ modelSlug, a, b }) => ({
+      url: `${BASE_URL}${compareSlugPath('zh', 'per-dollar', canonicalCompareSlug(modelSlug, a, b))}`,
+      lastModified: now,
+      changeFrequency: 'daily' as const,
+      priority: 0.5,
+    })),
   ];
 }
