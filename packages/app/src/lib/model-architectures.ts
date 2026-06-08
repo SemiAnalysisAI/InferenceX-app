@@ -577,29 +577,41 @@ export function getHybridAttentionSubBlocks(
 ): SubBlockFlow {
   const win = spec.slidingWindow ?? arch.slidingWindow;
   const isSparse = /sparse/iu.test(spec.label);
+
+  // Local branch (both variants): a sliding window over recent tokens plus the
+  // always-attended sink tokens (StreamingLLM-style). Keeping these as two
+  // explicit blocks balances the flow against the two-stage compressed branch.
+  const localPath: ArchSubBlock[] = [
+    {
+      name: 'Sliding Window',
+      detail: win ? `last ${win} tokens` : 'local KV',
+      type: 'attention',
+    },
+    { name: 'Attention Sink', detail: 'first tokens', type: 'operation' },
+  ];
+
+  // Compressed branch: CSA lightly compresses then sparsely selects via the
+  // lightning indexer; HCA compresses heavily then attends over the latent KV.
   const compressedPath: ArchSubBlock[] = isSparse
     ? [
         { name: 'Token Compression', detail: '1 entry / 4 tokens', type: 'operation' },
         { name: 'Lightning Indexer', detail: 'sparse top-1024', type: 'attention' },
       ]
-    : [{ name: 'Heavy Compression', detail: '1 entry / 128 tokens', type: 'attention' }];
+    : [
+        { name: 'Heavy Compression', detail: '1 entry / 128 tokens', type: 'operation' },
+        { name: 'Compressed Attn', detail: 'over latent KV', type: 'attention' },
+      ];
 
   return {
     layout: 'parallel',
     leftLabel: 'Local',
     rightLabel: 'Compressed',
-    leftPath: [
-      {
-        name: 'Sliding Window',
-        detail: win ? `last ${win} tokens` : 'local KV',
-        type: 'attention',
-      },
-    ],
+    leftPath: localPath,
     rightPath: compressedPath,
     mergeBlocks: [
       {
-        name: 'Shared-KV MQA + Sink',
-        detail: arch.numHeads ? `${arch.numHeads} heads · 1 KV` : undefined,
+        name: 'Shared-KV MQA',
+        detail: arch.numHeads ? `${arch.numHeads} heads · ${arch.numKVHeads ?? 1} KV` : undefined,
         type: 'attention',
       },
       {

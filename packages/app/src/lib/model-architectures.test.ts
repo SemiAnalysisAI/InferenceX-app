@@ -731,19 +731,31 @@ describe('getHybridAttentionSubBlocks', () => {
     expect(csaFlow.layout).toBe('parallel');
     if (csaFlow.layout !== 'parallel') return;
     expect(csaFlow.leftLabel).toBe('Local');
+    // Local branch shows the sliding window AND the always-attended sink as two
+    // explicit blocks, balancing the two-stage compressed branch (no lonely
+    // long connector line).
     expect(csaFlow.leftPath[0].name).toBe('Sliding Window');
     expect(csaFlow.leftPath[0].detail).toContain('128');
+    expect(csaFlow.leftPath[1].name).toBe('Attention Sink');
+    expect(csaFlow.leftPath).toHaveLength(2);
     // CSA compressed branch runs the lightning indexer (sparse top-k)
     expect(csaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(true);
-    expect(csaFlow.mergeBlocks[0].name).toContain('MQA');
+    // Columns are balanced so the parallel flow renders symmetrically
+    expect(csaFlow.rightPath).toHaveLength(csaFlow.leftPath.length);
+    // Sink now lives in the local branch, so the merge block is plain MQA
+    expect(csaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA');
     expect(csaFlow.mergeBlocks.at(-1)?.name).toBe('Output Projection');
 
     const hcaFlow = getHybridAttentionSubBlocks(arch, hca);
     if (hcaFlow.layout !== 'parallel') return;
     expect(hcaFlow.leftPath[0].name).toBe('Sliding Window');
+    expect(hcaFlow.leftPath[1].name).toBe('Attention Sink');
     // HCA compressed branch is heavy compression (no sparse indexer)
     expect(hcaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(false);
     expect(hcaFlow.rightPath[0].name).toBe('Heavy Compression');
+    expect(hcaFlow.rightPath[1].name).toBe('Compressed Attn');
+    // Balanced here too
+    expect(hcaFlow.rightPath).toHaveLength(hcaFlow.leftPath.length);
   });
 
   it('all hybrid sub-blocks have valid types', () => {

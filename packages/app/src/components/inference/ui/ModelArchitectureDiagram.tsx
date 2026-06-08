@@ -493,6 +493,32 @@ function renderDiagram(
       .attr('marker-end', 'url(#arch-arrow)');
   }
 
+  // Draw a +, −, or × glyph from geometric strokes, perfectly centered at
+  // (gx, gy). Rendering these as lines instead of <text> sidesteps font
+  // baseline drift, which left the symbol sitting slightly low inside the
+  // merge / expand circles regardless of dy tuning.
+  function drawCircleGlyph(gx: number, gy: number, color: string, symbol: string) {
+    const arm = 5;
+    const seg = (x1: number, y1: number, x2: number, y2: number) =>
+      g
+        .append('line')
+        .attr('x1', x1)
+        .attr('y1', y1)
+        .attr('x2', x2)
+        .attr('y2', y2)
+        .attr('stroke', color)
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round')
+        .style('pointer-events', 'none');
+    if (symbol === '×') {
+      seg(gx - arm, gy - arm, gx + arm, gy + arm);
+      seg(gx - arm, gy + arm, gx + arm, gy - arm);
+    } else {
+      seg(gx - arm, gy, gx + arm, gy); // horizontal arm (+ and −)
+      if (symbol !== '−') seg(gx, gy - arm, gx, gy + arm); // vertical arm (+ only)
+    }
+  }
+
   function drawResidualBypass(branchY: number, mergeY: number) {
     // Tap the residual from the input stream ABOVE the norm (in the arrow gap)
     // so the horizontal connector doesn't run across the RMSNorm block.
@@ -514,16 +540,7 @@ function renderDiagram(
       .attr('fill', bgSubtle)
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1.5);
-    g.append('text')
-      .attr('x', cx)
-      .attr('y', mergeY)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('fill', fg)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .attr('font-family', 'inherit')
-      .text('+');
+    drawCircleGlyph(cx, mergeY, fg, '+');
   }
 
   function drawBlock(
@@ -629,16 +646,7 @@ function renderDiagram(
       .attr('stroke-width', 1)
       .style('pointer-events', 'none');
 
-    g.append('text')
-      .attr('x', iconX)
-      .attr('y', iconY)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('fill', c.stroke)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .style('pointer-events', 'none')
-      .text(isBlockExpanded ? '\u2212' : '+');
+    drawCircleGlyph(iconX, iconY, c.stroke, isBlockExpanded ? '\u2212' : '+');
 
     g.append('rect')
       .attr('x', x)
@@ -917,16 +925,7 @@ function renderDiagram(
           .attr('fill', bgSubtle)
           .attr('stroke', mutedFg)
           .attr('stroke-width', 1.5);
-        g.append('text')
-          .attr('x', mergeCx)
-          .attr('y', circleCy)
-          .attr('text-anchor', 'middle')
-          .attr('dy', '0.35em')
-          .attr('fill', fg)
-          .attr('font-size', '14px')
-          .attr('font-weight', 700)
-          .attr('font-family', 'inherit')
-          .text(block.circleSymbol);
+        drawCircleGlyph(mergeCx, circleCy, fg, block.circleSymbol);
       } else {
         drawSingleSubBlock(block, subInnerXLocal, msy, subInnerWLocal);
       }
@@ -1286,16 +1285,7 @@ function renderDiagram(
       .attr('stroke', borderColor)
       .attr('stroke-width', 1)
       .style('pointer-events', 'none');
-    g.append('text')
-      .attr('x', iconX)
-      .attr('y', iconY)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('fill', mutedFg)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .style('pointer-events', 'none')
-      .text('+');
+    drawCircleGlyph(iconX, iconY, mutedFg, '+');
 
     g.append('rect')
       .attr('x', x)
@@ -1598,16 +1588,7 @@ function renderDiagram(
       .attr('stroke', ec.stroke)
       .attr('stroke-width', 1)
       .style('pointer-events', 'none');
-    g.append('text')
-      .attr('x', expIconX)
-      .attr('y', expIconY)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('fill', ec.stroke)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .style('pointer-events', 'none')
-      .text(isExpExpanded ? '\u2212' : '+');
+    drawCircleGlyph(expIconX, expIconY, ec.stroke, isExpExpanded ? '\u2212' : '+');
 
     g.append('rect')
       .attr('x', innerX)
