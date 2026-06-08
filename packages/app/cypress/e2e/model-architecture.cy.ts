@@ -350,10 +350,16 @@ describe('Model Architecture Diagram', () => {
     it('Hybrid attention is expandable and drills down to a Sliding Window block', () => {
       cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
+      // The union-softmax caption only appears once the attention drill-down is open
+      cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
       // Hybrid attention drills down (unlike gpt-oss sink/full GQA, which does not)
       cy.get('[data-testid="expand-altAttention0"]').should('exist');
       cy.get('[data-testid="expand-altAttention0"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      // Caption clarifies the two branches feed one softmax (not two attentions)
+      cy.get('[data-testid="hybrid-attention-note"]')
+        .should('be.visible')
+        .and('contain', 'single softmax');
       // Expert grid still expandable within the block
       cy.get('[data-testid="expand-altExperts0"]').should('exist');
     });

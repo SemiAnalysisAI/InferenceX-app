@@ -2132,6 +2132,19 @@ export default function ModelArchitectureDiagram({
       >
         <div ref={containerRef} className="px-4 pb-4">
           <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
+          {arch.attentionType === 'Hybrid' &&
+            (expandedBlocks.has('altAttention0') || expandedBlocks.has('altAttention1')) && (
+              <p
+                className="mt-2 text-[11px] leading-snug text-muted-foreground"
+                data-testid="hybrid-attention-note"
+              >
+                <span className="font-medium text-foreground">Local</span> and{' '}
+                <span className="font-medium text-foreground">Compressed</span> are two KV sources,
+                not two separate attentions: each query attends in a{' '}
+                <span className="font-medium text-foreground">single softmax</span> to the union of
+                sliding-window + selected compressed keys, with a learnable per-head attention sink.
+              </p>
+            )}
           {arch.features && arch.features.length > 0 && (
             <div className="mt-3 pt-3 border-t border-border/50">
               <div className="flex flex-wrap gap-1.5 items-center">
