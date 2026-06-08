@@ -558,3 +558,55 @@ export function getFFNSubBlocks(
     ],
   };
 }
+
+/**
+ * Hybrid attention sub-blocks (DeepSeek V4-style CSA / HCA layers).
+ *
+ * Unlike a standard GQA layer, every hybrid attention layer fuses two KV
+ * sources for each query: a local sliding-window branch (recent uncompressed
+ * tokens) and a compressed-KV branch, combined by a shared-KV MQA with a
+ * learnable attention sink. The compressed branch depends on the layer type —
+ * CSA runs a lightning indexer (sparse top-k) over lightly compressed KV, while
+ * HCA attends densely over heavily compressed KV. Rendering this as a flow makes
+ * the sliding-window attention an explicit, visible block rather than a one-line
+ * `window=N` annotation.
+ */
+export function getHybridAttentionSubBlocks(
+  arch: ModelArchitecture,
+  spec: AlternatingLayerSpec,
+): SubBlockFlow {
+  const win = spec.slidingWindow ?? arch.slidingWindow;
+  const isSparse = /sparse/iu.test(spec.label);
+  const compressedPath: ArchSubBlock[] = isSparse
+    ? [
+        { name: 'Token Compression', detail: '1 entry / 4 tokens', type: 'operation' },
+        { name: 'Lightning Indexer', detail: 'sparse top-1024', type: 'attention' },
+      ]
+    : [{ name: 'Heavy Compression', detail: '1 entry / 128 tokens', type: 'attention' }];
+
+  return {
+    layout: 'parallel',
+    leftLabel: 'Local',
+    rightLabel: 'Compressed',
+    leftPath: [
+      {
+        name: 'Sliding Window',
+        detail: win ? `last ${win} tokens` : 'local KV',
+        type: 'attention',
+      },
+    ],
+    rightPath: compressedPath,
+    mergeBlocks: [
+      {
+        name: 'Shared-KV MQA + Sink',
+        detail: arch.numHeads ? `${arch.numHeads} heads · 1 KV` : undefined,
+        type: 'attention',
+      },
+      {
+        name: 'Output Projection',
+        detail: arch.hiddenSize ? `→ ${arch.hiddenSize.toLocaleString()}` : undefined,
+        type: 'projection',
+      },
+    ],
+  };
+}

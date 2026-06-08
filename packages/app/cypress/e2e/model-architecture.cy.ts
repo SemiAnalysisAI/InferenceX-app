@@ -347,10 +347,14 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="alternating-indicator"]').should('exist');
     });
 
-    it('Hybrid attention is NOT expandable; expert grid is expandable within a block', () => {
+    it('Hybrid attention is expandable and drills down to a Sliding Window block', () => {
       cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
-      cy.get('[data-testid="expand-attention"]').should('not.exist');
+      // Hybrid attention drills down (unlike gpt-oss sink/full GQA, which does not)
+      cy.get('[data-testid="expand-altAttention0"]').should('exist');
+      cy.get('[data-testid="expand-altAttention0"]').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      // Expert grid still expandable within the block
       cy.get('[data-testid="expand-altExperts0"]').should('exist');
     });
 

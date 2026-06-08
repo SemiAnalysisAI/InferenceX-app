@@ -18,6 +18,7 @@ import {
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
+  getHybridAttentionSubBlocks,
   getModelArchitecture,
 } from '@/lib/model-architectures';
 
@@ -143,6 +144,21 @@ function renderDiagram(
     hasAlternatingLayers && expandedBlocks.has('altExperts1'),
   ];
 
+  // Hybrid models (DeepSeek V4) expose an expandable attention drill-down inside
+  // each alternating block, revealing the sliding-window branch as an explicit
+  // block alongside the compressed branch. gpt-oss (AlternatingSinkGQA) keeps a
+  // static attention block.
+  const altAttnExpandable = hasAlternatingLayers && arch.attentionType === 'Hybrid';
+  const altAttnExpanded = [
+    altAttnExpandable && expandedBlocks.has('altAttention0'),
+    altAttnExpandable && expandedBlocks.has('altAttention1'),
+  ];
+  const altAttnFlow: (SubBlockFlow | null)[] = altAttnExpandable
+    ? [0, 1].map((i) =>
+        alternatingSpecs[i] ? getHybridAttentionSubBlocks(arch, alternatingSpecs[i]) : null,
+      )
+    : [null, null];
+
   // Calculate flow height for either sequential or parallel layouts
   function getFlowHeight(flow: SubBlockFlow, hasLabel: boolean): number {
     if (flow.layout === 'sequential') {
@@ -200,6 +216,10 @@ function renderDiagram(
   const altExpertsExpandedH = [
     altExpertsExpanded[0] ? getFlowHeight(ffnFlow, true) : 0,
     altExpertsExpanded[1] ? getFlowHeight(ffnFlow, true) : 0,
+  ];
+  const altAttnExpandedH = [
+    altAttnExpanded[0] && altAttnFlow[0] ? getFlowHeight(altAttnFlow[0], false) : 0,
+    altAttnExpanded[1] && altAttnFlow[1] ? getFlowHeight(altAttnFlow[1], false) : 0,
   ];
 
   // Compute vertical positions
@@ -273,6 +293,7 @@ function renderDiagram(
   const altBlockEnd = [0, 0];
   const altNorm1Y = [0, 0];
   const altAttnY = [0, 0];
+  const altAttnExpandedStartY = [0, 0];
   const altMerge1Y = [0, 0];
   const altNorm2Y = [0, 0];
   const altRouterY = [0, 0];
@@ -310,6 +331,12 @@ function renderDiagram(
 
         altAttnY[bi] = y;
         y += blockH;
+
+        // Expanded hybrid-attention sub-blocks (sliding window + compressed)
+        altAttnExpandedStartY[bi] = y;
+        if (altAttnExpanded[bi]) {
+          y += altAttnExpandedH[bi];
+        }
 
         y += 4;
         altMerge1Y[bi] = y + mergeGap / 2;
@@ -467,11 +494,14 @@ function renderDiagram(
   }
 
   function drawResidualBypass(branchY: number, mergeY: number) {
+    // Tap the residual from the input stream ABOVE the norm (in the arrow gap)
+    // so the horizontal connector doesn't run across the RMSNorm block.
+    const tapY = branchY - arrowH / 2;
     bgG
       .append('path')
       .attr(
         'd',
-        `M ${cx} ${branchY} L ${residLeftX} ${branchY} L ${residLeftX} ${mergeY} L ${cx - circleR} ${mergeY}`,
+        `M ${cx} ${tapY} L ${residLeftX} ${tapY} L ${residLeftX} ${mergeY} L ${cx - circleR} ${mergeY}`,
       )
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
@@ -488,7 +518,7 @@ function renderDiagram(
       .attr('x', cx)
       .attr('y', mergeY)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '14px')
       .attr('font-weight', 700)
@@ -520,7 +550,7 @@ function renderDiagram(
       .attr('x', x + w / 2)
       .attr('y', by + h / 2 - (subText ? 7 : 0))
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '13px')
       .attr('font-weight', 600)
@@ -532,7 +562,7 @@ function renderDiagram(
         .attr('x', x + w / 2)
         .attr('y', by + h / 2 + 10)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-family', 'inherit')
@@ -566,7 +596,7 @@ function renderDiagram(
       .attr('x', x + w / 2 - 8)
       .attr('y', by + h / 2 - (subText ? 7 : 0))
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '13px')
       .attr('font-weight', 600)
@@ -579,7 +609,7 @@ function renderDiagram(
         .attr('x', x + w / 2 - 8)
         .attr('y', by + h / 2 + 10)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-family', 'inherit')
@@ -603,7 +633,7 @@ function renderDiagram(
       .attr('x', iconX)
       .attr('y', iconY)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', c.stroke)
       .attr('font-size', '14px')
       .attr('font-weight', 700)
@@ -649,7 +679,7 @@ function renderDiagram(
       .attr('x', bx + subBw / 2)
       .attr('y', by + subBlockH / 2 - (block.detail ? 5 : 0))
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', fontSize.name)
       .attr('font-weight', 500)
@@ -661,7 +691,7 @@ function renderDiagram(
         .attr('x', bx + subBw / 2)
         .attr('y', by + subBlockH / 2 + 8)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', fontSize.detail)
         .attr('font-family', 'inherit')
@@ -698,7 +728,7 @@ function renderDiagram(
         .attr('x', x + w / 2)
         .attr('y', sy + 8)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '10px')
         .attr('font-weight', 600)
@@ -723,7 +753,7 @@ function renderDiagram(
           .attr('x', leftCx)
           .attr('y', sy + 6)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', '9px')
           .attr('font-weight', 600)
@@ -735,7 +765,7 @@ function renderDiagram(
           .attr('x', rightCx)
           .attr('y', sy + 6)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', '9px')
           .attr('font-weight', 600)
@@ -891,7 +921,7 @@ function renderDiagram(
           .attr('x', mergeCx)
           .attr('y', circleCy)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', fg)
           .attr('font-size', '14px')
           .attr('font-weight', 700)
@@ -963,7 +993,7 @@ function renderDiagram(
             .attr('x', lcx)
             .attr('y', sy + 6)
             .attr('text-anchor', 'middle')
-            .attr('dominant-baseline', 'central')
+            .attr('dy', '0.35em')
             .attr('fill', mutedFg)
             .attr('font-size', '9px')
             .attr('font-weight', 600)
@@ -1227,7 +1257,7 @@ function renderDiagram(
       .attr('x', x + w / 2 - 8)
       .attr('y', by + h / 2 - 8)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '13px')
       .attr('font-weight', 600)
@@ -1239,7 +1269,7 @@ function renderDiagram(
       .attr('x', x + w / 2 - 8)
       .attr('y', by + h / 2 + 10)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', mutedFg)
       .attr('font-size', '11px')
       .attr('font-family', 'inherit')
@@ -1260,7 +1290,7 @@ function renderDiagram(
       .attr('x', iconX)
       .attr('y', iconY)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', mutedFg)
       .attr('font-size', '14px')
       .attr('font-weight', 700)
@@ -1354,7 +1384,7 @@ function renderDiagram(
         .attr('x', width - pad.right - denseBadgeW / 2 - 4)
         .attr('y', denseTxStart)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-weight', 600)
@@ -1512,7 +1542,7 @@ function renderDiagram(
         .attr('x', ex + expertSize / 2)
         .attr('y', ey + expertSize / 2)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', isActive ? fg : mutedFg)
         .attr('font-size', '9px')
         .attr('font-weight', isActive ? 600 : 400)
@@ -1527,7 +1557,7 @@ function renderDiagram(
         .attr('x', ex + expertSize / 2)
         .attr('y', ey + expertSize / 2)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '14px')
         .attr('font-weight', 700)
@@ -1549,7 +1579,7 @@ function renderDiagram(
         .attr('x', ex + expertSize / 2)
         .attr('y', ey + expertSize / 2)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '9px')
         .attr('font-weight', 600)
@@ -1572,7 +1602,7 @@ function renderDiagram(
       .attr('x', expIconX)
       .attr('y', expIconY)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', ec.stroke)
       .attr('font-size', '14px')
       .attr('font-weight', 700)
@@ -1639,7 +1669,7 @@ function renderDiagram(
           .attr('x', width - pad.right - badgeW / 2 - 4)
           .attr('y', altBlockStart[bi])
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', '11px')
           .attr('font-weight', 600)
@@ -1660,7 +1690,8 @@ function renderDiagram(
         drawBlock(innerX, altNorm1Y[bi], innerW, smallH, 'norm', 'RMSNorm');
         drawArrow(altNorm1Y[bi] + smallH, altAttnY[bi]);
 
-        // Attention (non-expandable — AlternatingSinkGQA)
+        // Attention — expandable hybrid drill-down (DeepSeek V4 CSA/HCA) or a
+        // static block (gpt-oss AlternatingSinkGQA).
         const headSub = [
           arch.numHeads ? `${arch.numHeads} heads` : null,
           arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
@@ -1674,9 +1705,29 @@ function renderDiagram(
         const attnSub = specWindow
           ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${specWindow}`
           : headSub || undefined;
-        drawBlock(innerX, altAttnY[bi], innerW, blockH, 'attention', spec.label, attnSub);
+        if (altAttnExpandable) {
+          drawExpandableBlock(
+            innerX,
+            altAttnY[bi],
+            innerW,
+            blockH,
+            'attention',
+            spec.label,
+            attnSub,
+            altAttnExpanded[bi],
+            `altAttention${bi}`,
+          );
+          const flow = altAttnFlow[bi];
+          if (altAttnExpanded[bi] && flow) {
+            drawFlow(flow, altAttnExpandedStartY[bi], innerX, innerW);
+          }
+        } else {
+          drawBlock(innerX, altAttnY[bi], innerW, blockH, 'attention', spec.label, attnSub);
+        }
 
-        const aBottom = altAttnY[bi] + blockH + 4;
+        const aBottom = altAttnExpanded[bi]
+          ? altAttnExpandedStartY[bi] + altAttnExpandedH[bi] + 4
+          : altAttnY[bi] + blockH + 4;
         drawArrow(aBottom, altMerge1Y[bi] - circleR);
         drawResidualBypass(altNorm1Y[bi], altMerge1Y[bi]);
         drawArrow(altMerge1Y[bi] + circleR, altNorm2Y[bi]);
@@ -1734,7 +1785,7 @@ function renderDiagram(
           .attr('x', cx)
           .attr('y', altIndicatorY)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', `${labelFontSize}px`)
           .attr('font-weight', 500)
@@ -1775,7 +1826,7 @@ function renderDiagram(
       .attr('x', width - pad.right - badgeW / 2 - 4)
       .attr('y', txStart)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', mutedFg)
       .attr('font-size', '11px')
       .attr('font-weight', 600)

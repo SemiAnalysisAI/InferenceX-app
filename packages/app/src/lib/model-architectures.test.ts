@@ -10,6 +10,7 @@ import {
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
+  getHybridAttentionSubBlocks,
   getModelArchitecture,
   MODEL_ARCHITECTURES,
 } from './model-architectures';
@@ -714,6 +715,43 @@ describe('getFFNSubBlocks', () => {
       const allBlocks = getAllBlocks(flow);
       expect(allBlocks.length).toBeGreaterThanOrEqual(4);
       for (const block of allBlocks) {
+        expect(validTypes).toContain(block.type);
+        expect(block.name.length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('getHybridAttentionSubBlocks', () => {
+  it('exposes the sliding-window branch as an explicit block for DeepSeek V4', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro)!;
+    const [hca, csa] = arch.alternatingLayers!;
+
+    const csaFlow = getHybridAttentionSubBlocks(arch, csa);
+    expect(csaFlow.layout).toBe('parallel');
+    if (csaFlow.layout !== 'parallel') return;
+    expect(csaFlow.leftLabel).toBe('Local');
+    expect(csaFlow.leftPath[0].name).toBe('Sliding Window');
+    expect(csaFlow.leftPath[0].detail).toContain('128');
+    // CSA compressed branch runs the lightning indexer (sparse top-k)
+    expect(csaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(true);
+    expect(csaFlow.mergeBlocks[0].name).toContain('MQA');
+    expect(csaFlow.mergeBlocks.at(-1)?.name).toBe('Output Projection');
+
+    const hcaFlow = getHybridAttentionSubBlocks(arch, hca);
+    if (hcaFlow.layout !== 'parallel') return;
+    expect(hcaFlow.leftPath[0].name).toBe('Sliding Window');
+    // HCA compressed branch is heavy compression (no sparse indexer)
+    expect(hcaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(false);
+    expect(hcaFlow.rightPath[0].name).toBe('Heavy Compression');
+  });
+
+  it('all hybrid sub-blocks have valid types', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro)!;
+    const validTypes = ['projection', 'activation', 'operation', 'attention'];
+    for (const spec of arch.alternatingLayers!) {
+      const flow = getHybridAttentionSubBlocks(arch, spec);
+      for (const block of getAllBlocks(flow)) {
         expect(validTypes).toContain(block.type);
         expect(block.name.length).toBeGreaterThan(0);
       }
