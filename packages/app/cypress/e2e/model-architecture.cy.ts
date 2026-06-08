@@ -371,7 +371,7 @@ describe('Model Architecture Diagram', () => {
 
     it('shows DeepSeek V4 Pro features (incl. sliding window) and developer info', () => {
       cy.contains('Hybrid CSA + HCA Attention').should('be.visible');
-      cy.contains('Sliding Window Attention (128 tokens)').should('be.visible');
+      cy.contains('Sliding window (128 tokens)').should('be.visible');
       cy.contains('Released by DeepSeek').should('be.visible');
     });
   });

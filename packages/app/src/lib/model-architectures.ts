@@ -176,7 +176,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 1048576, // 1M
     features: [
       'Hybrid CSA + HCA Attention',
-      'Sliding Window Attention (128 tokens)',
+      'Sliding window (128 tokens)',
       'Attention Sink',
       'MLA-style Shared-KV MQA',
       'Lightning Indexer (sparse top-k)',

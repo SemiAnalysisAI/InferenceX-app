@@ -189,7 +189,7 @@ describe('getModelArchitecture', () => {
   it('DeepSeek V4 Pro surfaces sliding-window attention and hybrid components in features', () => {
     const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
     expect(arch?.features).toBeDefined();
-    expect(arch?.features).toContain('Sliding Window Attention (128 tokens)');
+    expect(arch?.features).toContain('Sliding window (128 tokens)');
     expect(arch?.features).toContain('Hybrid CSA + HCA Attention');
     expect(arch?.features).toContain('Attention Sink');
     expect(arch?.features).toContain('Multi-Token Prediction');
