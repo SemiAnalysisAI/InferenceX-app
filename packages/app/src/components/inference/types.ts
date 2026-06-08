@@ -481,6 +481,15 @@ export interface ScatterGraphProps {
    * playback).
    */
   niceAxes?: boolean;
+  /**
+   * Pin each line label to a stable anchor along its roofline so it tracks the
+   * line smoothly instead of re-running the per-frame greedy placement (which
+   * makes labels teleport between candidate positions as the lines animate).
+   * Defaults to false. The replay panel passes true so labels keep a positional
+   * "affinity" across frames. Trades the static chart's per-frame de-overlap for
+   * positional stability — appropriate while the chart is animating.
+   */
+  pinLineLabels?: boolean;
 }
 /**
  * @file types.ts

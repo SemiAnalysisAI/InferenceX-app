@@ -496,6 +496,7 @@ export default function ReplayPanel({
           chartDefinition={chartDefinition}
           transitionDuration={0}
           niceAxes={false}
+          pinLineLabels
         />
         <div
           className="absolute -translate-y-full pointer-events-none text-2xl font-bold tabular-nums opacity-85 leading-none pb-1"

@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
+import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -122,6 +123,7 @@ const ScatterGraph = React.memo(
     overlayData,
     transitionDuration = 750,
     niceAxes = true,
+    pinLineLabels = false,
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
@@ -173,6 +175,11 @@ const ScatterGraph = React.memo(
       unofficialRunInfos,
     } = useUnofficialRun();
     const chartRef = useRef<D3ChartHandle>(null);
+
+    // Pinned line-label anchors (data-space x) keyed by line-label key. Persists
+    // across renders so each label keeps a stable spot along its line during
+    // replay animation. Only read/written when `pinLineLabels` is true.
+    const lineLabelAnchorRef = useRef<Map<string, number>>(new Map());
 
     // Effective active hw types for rendering — shared override when present, else global
     const effectiveOfficialHwTypes = localOfficialOverride ?? activeHwTypes;
@@ -946,6 +953,71 @@ const ScatterGraph = React.memo(
                 if (!prev || e.points.length > prev.points.length) bestByGroup.set(groupKey, e);
               }
 
+              // Place one label per series. When pinned (replay), reuse a stored
+              // data-space anchor so the label tracks the same spot along its line
+              // as it animates; otherwise re-run greedy placement each render and
+              // hide on collision (the static chart's de-overlap behavior).
+              const anchors = lineLabelAnchorRef.current;
+              const placeLabel = (
+                key: string,
+                hw: string,
+                label: string,
+                color: string,
+                pts: InferenceData[],
+              ) => {
+                const candidates = [
+                  pts[Math.min(1, pts.length - 1)], // near start
+                  pts[Math.floor(pts.length / 2)], // midpoint
+                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))], // right-third
+                  pts.at(-1)!, // endpoint
+                ];
+                if (pinLineLabels) {
+                  let anchorX = anchors.get(key);
+                  if (anchorX === undefined) {
+                    // First sighting: pick the first non-colliding candidate
+                    // (endpoint as fallback) and remember its data-x for later
+                    // frames so the label no longer hops between candidates.
+                    let chosen = candidates.at(-1)!;
+                    for (const pt of candidates) {
+                      if (!collides(xScale(pt.x), yScale(pt.y))) {
+                        chosen = pt;
+                        break;
+                      }
+                    }
+                    anchorX = chosen.x;
+                    anchors.set(key, anchorX);
+                  }
+                  const pt = pointNearestX(pts, anchorX);
+                  const px = xScale(pt.x);
+                  const py = yScale(pt.y);
+                  placed.push({ x: px, y: py });
+                  // Stay visible across frames — positional stability is the goal
+                  // during animation, so we don't hide on transient collisions.
+                  lineLabels.push({ key, hw, label, color, x: px, y: py, visible: true });
+                  return;
+                }
+                for (const pt of candidates) {
+                  const px = xScale(pt.x);
+                  const py = yScale(pt.y);
+                  if (!collides(px, py)) {
+                    lineLabels.push({ key, hw, label, color, x: px, y: py, visible: true });
+                    placed.push({ x: px, y: py });
+                    return;
+                  }
+                }
+                // All candidates collide — hide this label.
+                const pt = pts[0];
+                lineLabels.push({
+                  key,
+                  hw,
+                  label,
+                  color,
+                  x: xScale(pt.x),
+                  y: yScale(pt.y),
+                  visible: false,
+                });
+              };
+
               // Sort entries by highest y-value first (top of chart) for priority
               const sorted = [...bestByGroup.values()].toSorted((a, b) => {
                 const ay = yScale(a.points[0].y);
@@ -954,47 +1026,13 @@ const ScatterGraph = React.memo(
               });
 
               for (const entry of sorted) {
-                const pts = entry.points;
-                const candidates = [
-                  pts[Math.min(1, pts.length - 1)], // top-left (near start)
-                  pts[Math.floor(pts.length / 2)], // midpoint
-                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))], // right-third
-                  pts.at(-1)!, // endpoint
-                ];
-
-                const label = lineLabelText(entry.hw, entry.precision, multiPrecision);
-                let foundPlacement = false;
-                for (const pt of candidates) {
-                  const px = xScale(pt.x);
-                  const py = yScale(pt.y);
-                  if (!collides(px, py)) {
-                    lineLabels.push({
-                      key: entry.key,
-                      hw: entry.hw,
-                      label,
-                      color: getCssColor(resolveColor(entry.hw)),
-                      x: px,
-                      y: py,
-                      visible: true,
-                    });
-                    placed.push({ x: px, y: py });
-                    foundPlacement = true;
-                    break;
-                  }
-                }
-                // If all candidates collide, hide this label
-                if (!foundPlacement) {
-                  const pt = pts[0];
-                  lineLabels.push({
-                    key: entry.key,
-                    hw: entry.hw,
-                    label,
-                    color: getCssColor(resolveColor(entry.hw)),
-                    x: xScale(pt.x),
-                    y: yScale(pt.y),
-                    visible: false,
-                  });
-                }
+                placeLabel(
+                  entry.key,
+                  entry.hw,
+                  lineLabelText(entry.hw, entry.precision, multiPrecision),
+                  getCssColor(resolveColor(entry.hw)),
+                  entry.points,
+                );
               }
 
               // Also add hidden entries for any curve that wasn't placed (so the
@@ -1039,49 +1077,22 @@ const ScatterGraph = React.memo(
                 .toSorted(([, a], [, b]) => yScale(a.points[0].y) - yScale(b.points[0].y));
 
               for (const [ovKey, group] of sortedOverlay) {
-                const labelKey = `overlay-${ovKey}`;
-                const pts = group.points;
-                const candidates = [
-                  pts[Math.min(1, pts.length - 1)],
-                  pts[Math.floor(pts.length / 2)],
-                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
-                  pts.at(-1)!,
-                ];
-                const label = overlayLabelText(
-                  group.runIndex,
+                placeLabel(
+                  `overlay-${ovKey}`,
                   group.hwKey,
-                  group.points[0]?.precision ?? '',
+                  overlayLabelText(group.runIndex, group.hwKey, group.points[0]?.precision ?? ''),
+                  overlayRunColor(group.runIndex),
+                  group.points,
                 );
-                let placedOverlay = false;
-                for (const pt of candidates) {
-                  const px = xScale(pt.x);
-                  const py = yScale(pt.y);
-                  if (!collides(px, py)) {
-                    lineLabels.push({
-                      key: labelKey,
-                      hw: group.hwKey,
-                      label,
-                      color: overlayRunColor(group.runIndex),
-                      x: px,
-                      y: py,
-                      visible: true,
-                    });
-                    placed.push({ x: px, y: py });
-                    placedOverlay = true;
-                    break;
-                  }
-                }
-                if (!placedOverlay) {
-                  const pt = pts[0];
-                  lineLabels.push({
-                    key: labelKey,
-                    hw: group.hwKey,
-                    label,
-                    color: overlayRunColor(group.runIndex),
-                    x: xScale(pt.x),
-                    y: yScale(pt.y),
-                    visible: false,
-                  });
+              }
+
+              // Drop anchors for series no longer present so the map stays bounded
+              // and a re-appearing series gets a fresh, in-range anchor.
+              if (pinLineLabels) {
+                const live = new Set(lineLabels.map((l) => l.key));
+                // Deleting the current key during Map iteration is well-defined.
+                for (const k of anchors.keys()) {
+                  if (!live.has(k)) anchors.delete(k);
                 }
               }
             } else {
@@ -1127,8 +1138,12 @@ const ScatterGraph = React.memo(
                   visible: true,
                 });
               }
+              // Pinned (replay): keep labels exactly at their endpoints, which
+              // already move smoothly with the line. The vertical de-overlap
+              // nudge below reshuffles positions as endpoints shift frame-to-
+              // frame, so skip it to preserve positional affinity.
               const visible = lineLabels.filter((l) => l.visible);
-              if (visible.length > 1) {
+              if (visible.length > 1 && !pinLineLabels) {
                 const yRange = yScale.range();
                 const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
                 const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
@@ -1793,6 +1808,7 @@ const ScatterGraph = React.memo(
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      pinLineLabels,
       showSpeedOverlay,
       showMinecraftOverlay,
       gradientColorByPoint,
