@@ -1667,10 +1667,13 @@ function renderDiagram(
         ]
           .filter(Boolean)
           .join('  \u00B7  ');
-        const attnSub =
-          bi === 0 && arch.slidingWindow
-            ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${arch.slidingWindow}`
-            : headSub || undefined;
+        // Sliding-window note is per layer-type: a hybrid model (e.g. DeepSeek
+        // V4) carries the window on every attention variant, whereas gpt-oss
+        // only puts it on its sliding block. Drive it off the spec, not bi.
+        const specWindow = spec.slidingWindow;
+        const attnSub = specWindow
+          ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${specWindow}`
+          : headSub || undefined;
         drawBlock(innerX, altAttnY[bi], innerW, blockH, 'attention', spec.label, attnSub);
 
         const aBottom = altAttnY[bi] + blockH + 4;
@@ -1909,7 +1912,7 @@ function renderDiagram(
     },
     {
       label: 'Attention',
-      value: hasAlternatingLayers ? 'Sink/Full GQA' : arch.attentionType,
+      value: arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType,
     },
     {
       label: 'Context',

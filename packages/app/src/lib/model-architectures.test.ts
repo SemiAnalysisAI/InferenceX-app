@@ -20,6 +20,7 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.Llama3_3_70B,
       Model.Llama3_1_70B,
       Model.DeepSeek_R1,
+      Model.DeepSeek_V4_Pro,
       Model.GptOss,
       Model.Kimi_K2_5,
       Model.MiniMax_M2_5,
@@ -158,6 +159,66 @@ describe('getModelArchitecture', () => {
     expect(arch?.vocabSize).toBe(129280);
   });
 
+  it('returns architecture for DeepSeek V4 Pro with MoE and Hybrid attention details', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch).toBeDefined();
+    expect(arch?.totalParams).toBe(1600);
+    expect(arch?.activeParams).toBe(49);
+    expect(arch?.architectureType).toBe('moe');
+    expect(arch?.attentionType).toBe('Hybrid');
+    expect(arch?.attentionExpandable).toBe(false);
+    expect(arch?.numLayers).toBe(61);
+    expect(arch?.hiddenSize).toBe(7168);
+    expect(arch?.numHeads).toBe(128);
+    expect(arch?.numKVHeads).toBe(1);
+    expect(arch?.headDim).toBe(512);
+    expect(arch?.ffnDim).toBe(3072);
+    expect(arch?.numExperts).toBe(385);
+    expect(arch?.activeExperts).toBe(6);
+    expect(arch?.hasSharedExpert).toBe(true);
+    // First 3 layers use hash-routed MoE (not dense FFN), so no dense block.
+    expect(arch?.denseFFNLayers).toBeUndefined();
+    expect(arch?.slidingWindow).toBe(128);
+    expect(arch?.contextWindow).toBe(1048576);
+    expect(arch?.developer).toBe('DeepSeek');
+    expect(arch?.vocabSize).toBe(129280);
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro');
+  });
+
+  it('DeepSeek V4 Pro surfaces sliding-window attention and hybrid components in features', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch?.features).toBeDefined();
+    expect(arch?.features).toContain('Sliding Window Attention (128 tokens)');
+    expect(arch?.features).toContain('Hybrid CSA + HCA Attention');
+    expect(arch?.features).toContain('Attention Sink');
+    expect(arch?.features).toContain('Multi-Token Prediction');
+  });
+
+  it('DeepSeek V4 Pro has alternatingLayers with CSA and HCA specs, each carrying a sliding window', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch?.alternatingLayers).toBeDefined();
+    expect(arch?.alternatingLayers).toHaveLength(2);
+
+    const [hca, csa] = arch!.alternatingLayers!;
+    expect(hca.label).toBe('Heavily Compressed Attention');
+    expect(hca.count).toBe(31);
+    expect(hca.description).toContain('sliding window');
+    expect(hca.slidingWindow).toBe(128);
+
+    expect(csa.label).toBe('Compressed Sparse Attention');
+    expect(csa.count).toBe(30);
+    expect(csa.description).toContain('sliding window');
+    expect(csa.description).toContain('lightning indexer');
+    expect(csa.slidingWindow).toBe(128);
+  });
+
+  it('DeepSeek V4 Pro alternating layer counts sum to numLayers', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch?.alternatingLayers).toBeDefined();
+    const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
+    expect(totalAlternating).toBe(arch!.numLayers);
+  });
+
   it('returns architecture for Kimi K2.5 with MoE and MLA details', () => {
     const arch = getModelArchitecture(Model.Kimi_K2_5);
     expect(arch).toBeDefined();
@@ -241,10 +302,13 @@ describe('getModelArchitecture', () => {
     expect(sliding.count).toBe(18);
     expect(sliding.description).toContain('128-token sliding window');
     expect(sliding.description).toContain('attention sink');
+    expect(sliding.slidingWindow).toBe(128);
 
     expect(full.label).toBe('Causal Grouped Query Attention');
     expect(full.count).toBe(18);
     expect(full.description).toContain('full causal masking');
+    // Full-attention block has no sliding window (per-spec, not block-index).
+    expect(full.slidingWindow).toBeUndefined();
   });
 
   it('gpt-oss alternating layer counts sum to numLayers', () => {
@@ -296,6 +360,11 @@ describe('getArchitectureSummary', () => {
   it('returns MoE summary for DeepSeek R1', () => {
     const arch = getModelArchitecture(Model.DeepSeek_R1);
     expect(getArchitectureSummary(arch!)).toBe('MoE 671B (37B active)');
+  });
+
+  it('returns MoE summary for DeepSeek V4 Pro with trillion-scale params', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(getArchitectureSummary(arch!)).toBe('MoE 1.6T (49B active)');
   });
 
   it('returns MoE summary for gpt-oss 120B', () => {

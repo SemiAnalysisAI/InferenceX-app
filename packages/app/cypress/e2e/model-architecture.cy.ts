@@ -313,4 +313,56 @@ describe('Model Architecture Diagram', () => {
       cy.contains('Released by OpenAI').should('be.visible');
     });
   });
+
+  describe('Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)', () => {
+    before(() => {
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        delete doc.body.dataset.scrollLocked;
+        doc.body.style.removeProperty('pointer-events');
+      });
+      cy.get('[role="combobox"]').filter(':visible').first().click();
+      cy.get('[role="option"]').contains('DeepSeek V4 Pro').click();
+
+      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
+          cy.get('[data-testid="model-architecture-toggle"]').click();
+        }
+      });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('shows MoE and Hybrid badges for DeepSeek V4 Pro', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Hybrid');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '1.6T');
+    });
+
+    it('shows two separate hybrid (CSA/HCA) blocks with an alternating indicator', () => {
+      cy.get('[data-testid="expand-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-altBlock1"]').should('exist');
+      cy.get('[data-testid="expand-transformer"]').should('not.exist');
+      cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
+      cy.get('[data-testid="alternating-indicator"]').should('exist');
+    });
+
+    it('Hybrid attention is NOT expandable; expert grid is expandable within a block', () => {
+      cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="collapse-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-attention"]').should('not.exist');
+      cy.get('[data-testid="expand-altExperts0"]').should('exist');
+    });
+
+    it('expert grid can be expanded to show SwiGLU details', () => {
+      cy.get('[data-testid="expand-altExperts0"]').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('shows DeepSeek V4 Pro features (incl. sliding window) and developer info', () => {
+      cy.contains('Hybrid CSA + HCA Attention').should('be.visible');
+      cy.contains('Sliding Window Attention (128 tokens)').should('be.visible');
+      cy.contains('Released by DeepSeek').should('be.visible');
+    });
+  });
 });

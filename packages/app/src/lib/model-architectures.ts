@@ -23,6 +23,12 @@ export interface AlternatingLayerSpec {
   count: number;
   /** Color key for visual distinction */
   colorKey: 'attention' | 'ffn' | 'norm' | 'router' | 'expert';
+  /**
+   * Sliding-window size (in tokens) for this layer type, when it includes a
+   * local sliding-window attention branch. Rendered as `window=N` in the
+   * diagram. Omit for layer types that use full / non-windowed attention.
+   */
+  slidingWindow?: number;
 }
 
 /**
@@ -93,6 +99,7 @@ export interface ModelArchitecture {
  * - https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct
  * - https://huggingface.co/deepseek-ai/DeepSeek-R1-0528
  * - https://github.com/deepseek-ai/DeepSeek-V3
+ * - https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro (config.json, inference/model.py, DeepSeek_V4.pdf)
  * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
  * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
@@ -123,6 +130,68 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     releaseDate: '2025-05-28',
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-R1-0528',
+  },
+  [Model.DeepSeek_V4_Pro]: {
+    model: Model.DeepSeek_V4_Pro,
+    totalParams: 1600, // 1.6T
+    activeParams: 49,
+    architectureType: 'moe',
+    attentionType: 'Hybrid',
+    // Hybrid CSA/HCA is a bespoke compressed-attention stack, not the standard
+    // Q/K/V GQA layout — render it as static blocks, not the GQA drill-down.
+    attentionExpandable: false,
+    numLayers: 61,
+    hiddenSize: 7168,
+    numHeads: 128,
+    // Shared single-latent KV (MLA-lineage MQA): num_key_value_heads = 1.
+    numKVHeads: 1,
+    headDim: 512,
+    vocabSize: 129280,
+    ffnDim: 3072, // moe_intermediate_size
+    numExperts: 385, // 384 routed + 1 shared
+    activeExperts: 6,
+    hasSharedExpert: true,
+    // Attention layers interleave two compressed variants; every layer also
+    // carries a 128-token sliding-window branch plus a learnable attention sink.
+    // Counts: 31 HCA + 30 CSA = 61 (the extra MTP block is sliding-window only).
+    alternatingLayers: [
+      {
+        label: 'Heavily Compressed Attention',
+        description:
+          'HCA: the KV of every 128 tokens is consolidated into a single entry and attended densely, alongside a 128-token sliding window of uncompressed KV and a learnable attention sink.',
+        count: 31,
+        colorKey: 'attention',
+        slidingWindow: 128,
+      },
+      {
+        label: 'Compressed Sparse Attention',
+        description:
+          'CSA: the KV of every 4 tokens is compressed to one entry, then a lightning indexer selects the top-1024 compressed blocks for sparse attention, alongside a 128-token sliding window and a learnable attention sink.',
+        count: 30,
+        colorKey: 'attention',
+        slidingWindow: 128,
+      },
+    ],
+    slidingWindow: 128,
+    contextWindow: 1048576, // 1M
+    features: [
+      'Hybrid CSA + HCA Attention',
+      'Sliding Window Attention (128 tokens)',
+      'Attention Sink',
+      'MLA-style Shared-KV MQA',
+      'Lightning Indexer (sparse top-k)',
+      'Manifold-Constrained Hyper-Connections (mHC)',
+      'sqrt-softplus Routing',
+      'Auxiliary-loss-free Load Balancing',
+      'Hash Routing (first 3 layers)',
+      'Multi-Token Prediction',
+      'YaRN RoPE (1M context)',
+      'FP4 Experts + FP8 Mixed Precision',
+      'Muon Optimizer',
+    ],
+    releaseDate: '2026-06-08',
+    developer: 'DeepSeek',
+    sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro',
   },
   [Model.Llama3_3_70B]: {
     model: Model.Llama3_3_70B,
@@ -182,6 +251,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
         description: 'GQA with 128-token sliding window and learnable attention sink tokens',
         count: 18,
         colorKey: 'attention',
+        slidingWindow: 128,
       },
       {
         label: 'Causal Grouped Query Attention',
