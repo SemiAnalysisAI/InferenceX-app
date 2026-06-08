@@ -60,7 +60,7 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
-  g_model: 'DeepSeek-R1-0528',
+  g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
   i_seq: '8k/1k',

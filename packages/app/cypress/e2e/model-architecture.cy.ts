@@ -2,7 +2,10 @@ describe('Model Architecture Diagram', () => {
   before(() => {
     // Use desktop viewport to ensure all UI elements are visible
     cy.viewport(1280, 800);
-    cy.visit('/inference', {
+    // Pin to DeepSeek R1 — it has a rich architecture diagram (MoE + dense blocks)
+    // that the tests below exercise. The app's default model is DeepSeek V4 Pro,
+    // which has no architecture entry, so we select R1 explicitly via URL.
+    cy.visit('/inference?g_model=DeepSeek-R1-0528', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -11,7 +14,7 @@ describe('Model Architecture Diagram', () => {
     cy.get('[data-testid="inference-chart-display"]').should('be.visible');
   });
 
-  it('architecture toggle renders for default model (DeepSeek R1) with MoE badges', () => {
+  it('architecture toggle renders for DeepSeek R1 with MoE badges', () => {
     cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
     cy.get('[data-testid="model-architecture-toggle"]').should(
       'contain.text',

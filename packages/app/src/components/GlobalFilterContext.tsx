@@ -141,7 +141,7 @@ export function GlobalFilterProvider({
 
   // ── Core filter state ─────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<Model>(
-    () => initialModel ?? Model.DeepSeek_R1,
+    () => initialModel ?? Model.DeepSeek_V4_Pro,
   );
 
   const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
