@@ -124,6 +124,8 @@ const ScatterGraph = React.memo(
     transitionDuration = 750,
     niceAxes = true,
     pinLineLabels = false,
+    xExtentOverride,
+    yExtentOverride,
   }: ScatterGraphProps) => {
     const {
       activeHwTypes,
@@ -446,9 +448,10 @@ const ScatterGraph = React.memo(
 
     const xScaleConfig = useMemo(() => {
       const ext =
-        visiblePoints.length > 0
+        xExtentOverride ??
+        (visiblePoints.length > 0
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
-          : ([0, 100] as [number, number]);
+          : ([0, 100] as [number, number]));
 
       let useLog = false;
       if (isInputTputMetric) {
@@ -467,13 +470,14 @@ const ScatterGraph = React.memo(
         nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes]);
+    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes, xExtentOverride]);
 
     const yScaleConfig = useMemo(() => {
       const ext =
-        visiblePoints.length > 0
+        yExtentOverride ??
+        (visiblePoints.length > 0
           ? (d3.extent(visiblePoints, (d) => d.y) as [number, number])
-          : ([0, 100] as [number, number]);
+          : ([0, 100] as [number, number]));
       const range = ext[1] - ext[0];
       const useLog = !isInputTputMetric && logScale;
 
@@ -491,7 +495,7 @@ const ScatterGraph = React.memo(
         domain: [yMin, ext[1] * 1.05] as [number, number],
         nice: niceAxes,
       };
-    }, [visiblePoints, isInputTputMetric, logScale, niceAxes]);
+    }, [visiblePoints, isInputTputMetric, logScale, niceAxes, yExtentOverride]);
 
     // --- Axis configs ---
     const xAxisConfig = useMemo(

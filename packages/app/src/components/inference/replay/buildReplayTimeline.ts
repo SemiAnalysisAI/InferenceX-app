@@ -56,6 +56,31 @@ export function computeStepDomain(
   return { x: safeDomain(xMin, xMax), y: safeDomain(yMin, yMax) };
 }
 
+// Bounding box across ALL steps for configs passing `hwFilter`. Unlike
+// computeStepDomain (one step), this is the fixed extent used for the entire
+// replay so the axes stay constant and the frontier visibly marches toward them
+// over time instead of the axes refitting to each frame.
+export function computeFullRunDomain(
+  timeline: ReplayTimeline,
+  hwFilter: (hwKey: string) => boolean,
+): StepDomain {
+  let xMin = Infinity;
+  let xMax = -Infinity;
+  let yMin = Infinity;
+  let yMax = -Infinity;
+  for (const c of timeline.configs) {
+    if (!hwFilter(c.hwKey)) continue;
+    for (const v of c.stepValues) {
+      if (!v.visible) continue;
+      if (v.x < xMin) xMin = v.x;
+      if (v.x > xMax) xMax = v.x;
+      if (v.y < yMin) yMin = v.y;
+      if (v.y > yMax) yMax = v.y;
+    }
+  }
+  return { x: safeDomain(xMin, xMax), y: safeDomain(yMin, yMax) };
+}
+
 const buildPointConfigId = (point: InferenceData): string => {
   let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
   if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;

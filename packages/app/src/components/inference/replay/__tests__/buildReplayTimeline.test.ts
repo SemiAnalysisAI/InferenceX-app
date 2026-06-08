@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api';
 import type { ChartDefinition } from '@/components/inference/types';
 
-import { buildReplayTimeline, computeStepDomain } from '../buildReplayTimeline';
+import {
+  buildReplayTimeline,
+  computeFullRunDomain,
+  computeStepDomain,
+} from '../buildReplayTimeline';
 
 const ALL_HW = () => true;
 
@@ -151,6 +155,51 @@ describe('buildReplayTimeline', () => {
     const mi355xOnly = computeStepDomain(t, 0, (hw) => hw.startsWith('mi355x'));
     expect(everything.x[1]).toBeGreaterThanOrEqual(400);
     expect(mi355xOnly.x[1]).toBeLessThan(50); // padded around 5
+  });
+
+  it('computeFullRunDomain spans every step, not just one frame', () => {
+    const rows = [
+      baseRow({ date: '2025-01-01', metrics: { tput_per_gpu: 100, median_intvty: 10 }, conc: 8 }),
+      baseRow({ date: '2025-02-01', metrics: { tput_per_gpu: 200, median_intvty: 20 }, conc: 8 }),
+      baseRow({
+        date: '2025-02-01',
+        metrics: { tput_per_gpu: 5000, median_intvty: 200 },
+        conc: 16,
+      }),
+    ];
+    const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
+    const full = computeFullRunDomain(t, ALL_HW);
+    // The fixed extent reaches the run's largest observation (step 1's conc=16
+    // config) even though it isn't present at step 0 — that's what keeps the
+    // axes constant while the early frontier sits small in the corner.
+    expect(full.x[1]).toBeGreaterThanOrEqual(200);
+    expect(full.y[1]).toBeGreaterThanOrEqual(5000);
+    // And it never undershoots the per-step boxes.
+    const d0 = computeStepDomain(t, 0, ALL_HW);
+    expect(full.x[1]).toBeGreaterThanOrEqual(d0.x[1]);
+    expect(full.y[1]).toBeGreaterThanOrEqual(d0.y[1]);
+  });
+
+  it('computeFullRunDomain respects the hw filter', () => {
+    const rows = [
+      baseRow({
+        hardware: 'mi355x',
+        framework: 'sglang',
+        date: '2025-01-01',
+        metrics: { tput_per_gpu: 50, median_intvty: 5 },
+      }),
+      baseRow({
+        hardware: 'b200',
+        framework: 'trt',
+        date: '2025-02-01',
+        metrics: { tput_per_gpu: 5000, median_intvty: 400 },
+      }),
+    ];
+    const t = buildReplayTimeline(rows, interactivityChartDef, 'y_tpPerGpu', null, ['fp4']);
+    const everything = computeFullRunDomain(t, ALL_HW);
+    const mi355xOnly = computeFullRunDomain(t, (hw) => hw.startsWith('mi355x'));
+    expect(everything.x[1]).toBeGreaterThanOrEqual(400);
+    expect(mi355xOnly.x[1]).toBeLessThan(50); // padded around 5, ignores b200
   });
 
   it('separates configs that differ in concurrency or tp', () => {

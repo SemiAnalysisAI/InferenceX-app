@@ -490,6 +490,15 @@ export interface ScatterGraphProps {
    * positional stability — appropriate while the chart is animating.
    */
   pinLineLabels?: boolean;
+  /**
+   * Fixed x/y data extents `[min, max]` to base the axes on, instead of fitting
+   * to the currently rendered points. The normal domain padding (and log /
+   * zero-baseline handling) is still applied on top. Replay passes the whole
+   * run's extent so the axes stay constant across the animation and you can see
+   * the frontier expand toward them over time.
+   */
+  xExtentOverride?: [number, number];
+  yExtentOverride?: [number, number];
 }
 /**
  * @file types.ts
