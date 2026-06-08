@@ -107,6 +107,9 @@ function renderDiagram(
   const subBlockH = 34;
   const subArrowH = 12;
   const subPadY = 10;
+  // Gap between a block and its drill-down flow so the dashed expansion rect
+  // reads as separate from the block above it (not overlapping its border).
+  const drillGap = 8;
 
   // Architecture flags
   const isMoE = arch.architectureType === 'moe';
@@ -262,6 +265,7 @@ function renderDiagram(
       denseAttnY = y;
       y += blockH;
 
+      if (denseAttnExpanded) y += drillGap;
       denseAttnExpandedStartY = y;
       if (denseAttnExpanded) {
         y += denseAttnExpandedH;
@@ -390,6 +394,7 @@ function renderDiagram(
         y += blockH;
 
         // Expanded hybrid-attention sub-blocks (sliding window + compressed)
+        if (altAttnExpanded[bi]) y += drillGap;
         altAttnExpandedStartY[bi] = y;
         if (altAttnExpanded[bi]) {
           y += altAttnExpandedH[bi];
@@ -445,6 +450,7 @@ function renderDiagram(
     y += blockH;
 
     // Expanded attention sub-blocks (only for non-MLA, non-AlternatingSinkGQA)
+    if (attnExpanded) y += drillGap;
     attnExpandedStartY = y;
     if (attnExpanded) {
       y += attnExpandedH;
@@ -1431,15 +1437,27 @@ function renderDiagram(
     .filter(Boolean)
     .join('  \u00B7  ');
   drawBlock(pad.left, embedY, bw, blockH, 'embedding', 'Token Embedding', embedSub || undefined);
+
+  // A block's incoming arrow should land on its first RMSNorm when the block is
+  // expanded (so there's a continuous line into the norm, through the container
+  // border), or on the block's top when collapsed.
+  const denseEntryY = denseTxExpanded ? denseNorm1Y : denseTxStart;
+  const hashEntryY = hashBlockExpanded ? hashNorm1Y : hashTxStart;
+  const altEntryY = [
+    altBlockExpanded[0] ? altNorm1Y[0] : altBlockStart[0],
+    altBlockExpanded[1] ? altNorm1Y[1] : altBlockStart[1],
+  ];
+  const mainEntryY = txExpanded ? norm1Y : txStart;
+
   drawArrow(
     embedY + blockH,
     hasDenseLayers
-      ? denseTxStart
+      ? denseEntryY
       : hasHashBlock
-        ? hashTxStart
+        ? hashEntryY
         : hasAlternatingLayers
-          ? altBlockStart[0]
-          : txStart,
+          ? altEntryY[0]
+          : mainEntryY,
   );
 
   // === DENSE TRANSFORMER BLOCK (for MoE models with initial dense layers) ===
@@ -1569,7 +1587,7 @@ function renderDiagram(
     // Arrow from dense block to next block
     drawArrow(
       denseTxEnd,
-      hasHashBlock ? hashTxStart : hasAlternatingLayers ? altBlockStart[0] : txStart,
+      hasHashBlock ? hashEntryY : hasAlternatingLayers ? altEntryY[0] : mainEntryY,
     );
   }
 
@@ -1823,7 +1841,7 @@ function renderDiagram(
     }
 
     // Arrow from the hash block to the first alternating block (or main transformer)
-    drawArrow(hashTxEnd, hasAlternatingLayers ? altBlockStart[0] : txStart);
+    drawArrow(hashTxEnd, hasAlternatingLayers ? altEntryY[0] : mainEntryY);
   }
 
   // === ALTERNATING TRANSFORMER BLOCKS (gpt-oss style) ===
@@ -1958,7 +1976,7 @@ function renderDiagram(
       // Draw alternating indicator between the two blocks
       if (bi === 0) {
         // Arrow from block 0 end through indicator to block 1 start (drawn first, behind text)
-        drawArrow(altBlockEnd[0] + 2, altBlockStart[1]);
+        drawArrow(altBlockEnd[0] + 2, altEntryY[1]);
 
         // Opaque background rect behind the label so it doesn't overlap the arrow
         const cardBg = isDark ? '#131416' : '#eaebec';
