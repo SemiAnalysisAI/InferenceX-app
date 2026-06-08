@@ -521,5 +521,22 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
+
+    // Regression: SSR'd HTML must reflect the URL-supplied model so share links
+    // open straight to the right model without a flash of the default. See #430.
+    it('?g_model= seeds the model selector before client hydration', () => {
+      cy.request('/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
+        expect(response.body).to.contain('DeepSeek V4 Pro 1.6T');
+        expect(response.body).not.to.contain('DeepSeek R1 0528 671B');
+      });
+    });
+
+    it('renders the URL-supplied model in the dropdown after navigating', () => {
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      });
+      cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
+      cy.get('[data-testid="calc-model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+    });
   });
 });
