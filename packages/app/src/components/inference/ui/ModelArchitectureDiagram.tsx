@@ -2186,7 +2186,9 @@ function renderDiagram(
       ? [
           {
             label: 'Experts',
-            value: `${arch.activeExperts}/${arch.numExperts}`,
+            // Active per token = routed top-k + the always-on shared expert, so
+            // show "6+1/385" (not "6/385"): the shared expert is active too.
+            value: `${arch.activeExperts}${arch.hasSharedExpert ? '+1' : ''}/${arch.numExperts}`,
           },
         ]
       : []),
