@@ -39,6 +39,30 @@ describe('Line Labels Toggle', () => {
     );
   });
 
+  it('line labels render in the foreground, after the scatter points', () => {
+    // Labels were toggled on in the test above and remain on here.
+    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
+
+    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+      const svg = $svg[0];
+      const dots = svg.querySelectorAll('.dot-group');
+      const labels = svg.querySelectorAll('g.line-label');
+      expect(dots.length, 'scatter dot groups exist').to.be.greaterThan(0);
+      expect(labels.length, 'line labels exist').to.be.greaterThan(0);
+
+      // Every label must paint after every dot group. Comparing the *last* dot
+      // group against the *first* label is sufficient: if the earliest label
+      // follows the latest dot in document order, all labels are in front.
+      const lastDot = dots.item(dots.length - 1)!;
+      const firstLabel = labels.item(0)!;
+      const relation = lastDot.compareDocumentPosition(firstLabel);
+      expect(
+        relation & Node.DOCUMENT_POSITION_FOLLOWING,
+        'line label follows the scatter points in DOM order (foreground)',
+      ).to.be.greaterThan(0);
+    });
+  });
+
   it('toggling Line Labels off removes label elements', () => {
     cy.get('#scatter-line-labels').click();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');

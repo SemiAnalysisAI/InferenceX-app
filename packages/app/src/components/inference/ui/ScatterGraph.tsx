@@ -1760,9 +1760,33 @@ const ScatterGraph = React.memo(
         },
       };
 
+      // ── Last layer: keep line labels in the foreground ──
+      // Line labels are created inside the rooflines layer, which must render
+      // *before* the dot groups so the roofline paths sit behind the points.
+      // That ordering would otherwise leave the labels painted under the scatter
+      // points and the overlay marks. Re-raise every `.line-label` to the end of
+      // the zoomGroup after all other layers have rendered (and on each zoom) so
+      // they always read as foreground. `.raise()` only reorders z-index — label
+      // x/y placement (and the hide-on-collision / vertical-nudge de-overlap in
+      // the rooflines layer) is untouched, so labels still never overlap one
+      // another. Mirrors GPUGraph, whose line-label layer is already rendered
+      // last. Selects overlay line labels (key `overlay-*`) too, so unofficial
+      // run overlays get the same foreground treatment.
+      const lineLabelForegroundLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'line-label-foreground',
+        render: (zoomGroup) => {
+          zoomGroup.selectAll('.line-label').raise();
+        },
+        onZoom: (zoomGroup) => {
+          zoomGroup.selectAll('.line-label').raise();
+        },
+      };
+
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
       result.push(speedOverlayLayer);
+      result.push(lineLabelForegroundLayer);
       return result;
     }, [
       rooflines,
