@@ -790,6 +790,16 @@ function renderDiagram(
     const parallelStartY = sy;
     const colFontSize = { name: '10px', detail: '8px' };
 
+    const maxRows = Math.max(flow.leftPath.length, flow.rightPath.length);
+    const rowsH = (n: number) => n * subBlockH + Math.max(0, n - 1) * subArrowH;
+    const colAreaH = rowsH(maxRows);
+    // Vertically center each column within the shared column area so an unequal
+    // split (e.g. 1 local vs 2 compressed) reads as an intentional branch merge
+    // rather than leaving the shorter column's connector dangling as a long
+    // unattached line beside the taller column.
+    const leftStartY = parallelStartY + (colAreaH - rowsH(flow.leftPath.length)) / 2;
+    const rightStartY = parallelStartY + (colAreaH - rowsH(flow.rightPath.length)) / 2;
+
     g.append('line')
       .attr('x1', mergeCx)
       .attr('y1', splitTopY)
@@ -799,10 +809,7 @@ function renderDiagram(
       .attr('stroke-width', 1);
 
     g.append('path')
-      .attr(
-        'd',
-        `M ${mergeCx} ${splitMidY} L ${leftCx} ${splitMidY} L ${leftCx} ${parallelStartY - 2}`,
-      )
+      .attr('d', `M ${mergeCx} ${splitMidY} L ${leftCx} ${splitMidY} L ${leftCx} ${leftStartY - 2}`)
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1)
@@ -811,14 +818,14 @@ function renderDiagram(
     g.append('path')
       .attr(
         'd',
-        `M ${mergeCx} ${splitMidY} L ${rightCx} ${splitMidY} L ${rightCx} ${parallelStartY - 2}`,
+        `M ${mergeCx} ${splitMidY} L ${rightCx} ${splitMidY} L ${rightCx} ${rightStartY - 2}`,
       )
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1)
       .attr('marker-end', 'url(#arch-arrow-sub)');
 
-    let lsy = parallelStartY;
+    let lsy = leftStartY;
     for (let i = 0; i < flow.leftPath.length; i++) {
       drawSingleSubBlock(flow.leftPath[i], leftX, lsy, colW, colFontSize);
       lsy += subBlockH;
@@ -836,7 +843,7 @@ function renderDiagram(
     }
     const leftEndY = lsy;
 
-    let rsy = parallelStartY;
+    let rsy = rightStartY;
     for (let i = 0; i < flow.rightPath.length; i++) {
       drawSingleSubBlock(flow.rightPath[i], rightX, rsy, colW, colFontSize);
       rsy += subBlockH;
@@ -854,9 +861,7 @@ function renderDiagram(
     }
     const rightEndY = rsy;
 
-    const maxRows = Math.max(flow.leftPath.length, flow.rightPath.length);
-    const mergeStartY =
-      parallelStartY + maxRows * subBlockH + Math.max(0, maxRows - 1) * subArrowH + subArrowH + 4;
+    const mergeStartY = parallelStartY + colAreaH + subArrowH + 4;
 
     const subInnerXLocal = x + 16;
     const subInnerWLocal = w - 40;

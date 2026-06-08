@@ -731,31 +731,30 @@ describe('getHybridAttentionSubBlocks', () => {
     expect(csaFlow.layout).toBe('parallel');
     if (csaFlow.layout !== 'parallel') return;
     expect(csaFlow.leftLabel).toBe('Local');
-    // Local branch shows the sliding window AND the always-attended sink as two
-    // explicit blocks, balancing the two-stage compressed branch (no lonely
-    // long connector line).
+    // Local branch is the sliding-window KV source (one explicit block). The
+    // sink is NOT here — it is a learnable softmax bias on the shared MQA.
     expect(csaFlow.leftPath[0].name).toBe('Sliding Window');
     expect(csaFlow.leftPath[0].detail).toContain('128');
-    expect(csaFlow.leftPath[1].name).toBe('Attention Sink');
-    expect(csaFlow.leftPath).toHaveLength(2);
-    // CSA compressed branch runs the lightning indexer (sparse top-k)
-    expect(csaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(true);
-    // Columns are balanced so the parallel flow renders symmetrically
-    expect(csaFlow.rightPath).toHaveLength(csaFlow.leftPath.length);
-    // Sink now lives in the local branch, so the merge block is plain MQA
-    expect(csaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA');
+    expect(csaFlow.leftPath).toHaveLength(1);
+    expect(csaFlow.leftPath.some((b) => b.name === 'Attention Sink')).toBe(false);
+    // CSA compressed branch: light compression then the learned lightning
+    // indexer (sparse top-k) — two stages.
+    expect(csaFlow.rightPath.map((b) => b.name)).toEqual([
+      'Token Compression',
+      'Lightning Indexer',
+    ]);
+    // The fused attention is a single shared-KV MQA that carries the sink
+    expect(csaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA + Sink');
     expect(csaFlow.mergeBlocks.at(-1)?.name).toBe('Output Projection');
 
     const hcaFlow = getHybridAttentionSubBlocks(arch, hca);
     if (hcaFlow.layout !== 'parallel') return;
     expect(hcaFlow.leftPath[0].name).toBe('Sliding Window');
-    expect(hcaFlow.leftPath[1].name).toBe('Attention Sink');
-    // HCA compressed branch is heavy compression (no sparse indexer)
+    expect(hcaFlow.leftPath).toHaveLength(1);
+    // HCA compressed branch is a single heavy-compression source (no indexer)
     expect(hcaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(false);
-    expect(hcaFlow.rightPath[0].name).toBe('Heavy Compression');
-    expect(hcaFlow.rightPath[1].name).toBe('Compressed Attn');
-    // Balanced here too
-    expect(hcaFlow.rightPath).toHaveLength(hcaFlow.leftPath.length);
+    expect(hcaFlow.rightPath.map((b) => b.name)).toEqual(['Heavy Compression']);
+    expect(hcaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA + Sink');
   });
 
   it('all hybrid sub-blocks have valid types', () => {

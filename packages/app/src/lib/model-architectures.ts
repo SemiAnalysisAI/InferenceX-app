@@ -578,29 +578,26 @@ export function getHybridAttentionSubBlocks(
   const win = spec.slidingWindow ?? arch.slidingWindow;
   const isSparse = /sparse/iu.test(spec.label);
 
-  // Local branch (both variants): a sliding window over recent tokens plus the
-  // always-attended sink tokens (StreamingLLM-style). Keeping these as two
-  // explicit blocks balances the flow against the two-stage compressed branch.
+  // Both branches are KV *sources* whose selected indices are unioned and fed to
+  // a single shared-KV MQA softmax — they are not two attentions merged after
+  // the fact. The local branch contributes the recent sliding-window tokens; the
+  // compressed branch contributes selected long-range tokens. CSA lightly
+  // compresses (1/4) then sparsely selects via the learned lightning indexer;
+  // HCA compresses heavily (1/128) and keeps the few resulting entries.
   const localPath: ArchSubBlock[] = [
     {
       name: 'Sliding Window',
       detail: win ? `last ${win} tokens` : 'local KV',
       type: 'attention',
     },
-    { name: 'Attention Sink', detail: 'first tokens', type: 'operation' },
   ];
 
-  // Compressed branch: CSA lightly compresses then sparsely selects via the
-  // lightning indexer; HCA compresses heavily then attends over the latent KV.
   const compressedPath: ArchSubBlock[] = isSparse
     ? [
         { name: 'Token Compression', detail: '1 entry / 4 tokens', type: 'operation' },
         { name: 'Lightning Indexer', detail: 'sparse top-1024', type: 'attention' },
       ]
-    : [
-        { name: 'Heavy Compression', detail: '1 entry / 128 tokens', type: 'operation' },
-        { name: 'Compressed Attn', detail: 'over latent KV', type: 'attention' },
-      ];
+    : [{ name: 'Heavy Compression', detail: '1 entry / 128 tokens', type: 'attention' }];
 
   return {
     layout: 'parallel',
@@ -608,9 +605,12 @@ export function getHybridAttentionSubBlocks(
     rightLabel: 'Compressed',
     leftPath: localPath,
     rightPath: compressedPath,
+    // The union of both branches' indices is consumed by one MQA softmax that
+    // carries a per-head learnable attention sink (a softmax-denominator bias,
+    // not literal sink tokens) — hence the sink lives on the MQA block here.
     mergeBlocks: [
       {
-        name: 'Shared-KV MQA',
+        name: 'Shared-KV MQA + Sink',
         detail: arch.numHeads ? `${arch.numHeads} heads · ${arch.numKVHeads ?? 1} KV` : undefined,
         type: 'attention',
       },
