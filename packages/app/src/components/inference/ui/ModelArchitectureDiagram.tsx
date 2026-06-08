@@ -134,6 +134,11 @@ function renderDiagram(
   const denseAttnExpanded = isAttnExpandable && expandedBlocks.has('denseAttention');
   const denseFFNExpanded = expandedBlocks.has('denseFFN');
 
+  // Hash-routed MoE prefix block (DeepSeek V4: first N layers route by token id).
+  const hasHashBlock = isMoE && (arch.hashRoutedLayers ?? 0) > 0;
+  const hashBlockExpanded = hasHashBlock && expandedBlocks.has('hashBlock');
+  const hashExpertsExpanded = hasHashBlock && expandedBlocks.has('hashExperts');
+
   // Alternating block expand states (for models with alternating attention like gpt-oss)
   const altBlockExpanded = [
     hasAlternatingLayers && expandedBlocks.has('altBlock0'),
@@ -221,6 +226,7 @@ function renderDiagram(
     altAttnExpanded[0] && altAttnFlow[0] ? getFlowHeight(altAttnFlow[0], false) : 0,
     altAttnExpanded[1] && altAttnFlow[1] ? getFlowHeight(altAttnFlow[1], false) : 0,
   ];
+  const hashExpertsExpandedH = hashExpertsExpanded ? getFlowHeight(ffnFlow, true) : 0;
 
   // Compute vertical positions
   let y = pad.top;
@@ -285,6 +291,57 @@ function renderDiagram(
       y += collapsedTxH;
     }
     denseTxEnd = y;
+    y += arrowH;
+  }
+
+  // === HASH-ROUTED MoE PREFIX BLOCK (DeepSeek V4: first N layers use hash routing) ===
+  let hashTxStart = 0;
+  let hashNorm1Y = 0;
+  let hashAttnY = 0;
+  let hashMerge1Y = 0;
+  let hashNorm2Y = 0;
+  let hashExpertY = 0;
+  let hashFFNExpandedStartY = 0;
+  let hashMerge2Y = 0;
+  let hashTxEnd = 0;
+
+  if (hasHashBlock) {
+    hashTxStart = y;
+    if (hashBlockExpanded) {
+      y += 14;
+
+      hashNorm1Y = y;
+      y += smallH + arrowH;
+
+      hashAttnY = y;
+      y += blockH;
+
+      y += 4;
+      hashMerge1Y = y + mergeGap / 2;
+      y += mergeGap;
+
+      y += arrowH;
+      hashNorm2Y = y;
+      y += smallH + arrowH;
+
+      // Hash Router + Expert grid (drawExpertGrid lays out router above eY)
+      y += blockH + arrowH;
+      hashExpertY = y;
+      y += expertGridH;
+
+      hashFFNExpandedStartY = y;
+      if (hashExpertsExpanded) {
+        y += hashExpertsExpandedH;
+      }
+
+      hashMerge2Y = y + mergeGap / 2;
+      y += mergeGap;
+
+      y += 14;
+    } else {
+      y += collapsedTxH;
+    }
+    hashTxEnd = y;
     y += arrowH;
   }
 
@@ -519,28 +576,59 @@ function renderDiagram(
     }
   }
 
+  // Models with hyper-connections (mHC) replace the plain residual add with a
+  // multi-stream mixer; when present, residual merges render as an "mHC ×N" pill
+  // instead of a "+" circle. N = number of parallel residual streams.
+  const hcStreams = arch.hyperConnections ?? 0;
+  const isHyperConn = hcStreams > 1;
+
   function drawResidualBypass(branchY: number, mergeY: number) {
     // Tap the residual from the input stream ABOVE the norm (in the arrow gap)
     // so the horizontal connector doesn't run across the RMSNorm block.
     const tapY = branchY - arrowH / 2;
+    // Keep the node's vertical half-height = circleR so the spine arrows (drawn
+    // by callers to mergeY ± circleR) still meet its top/bottom edges.
+    const nodeHalfW = isHyperConn ? 25 : circleR;
     bgG
       .append('path')
       .attr(
         'd',
-        `M ${cx} ${tapY} L ${residLeftX} ${tapY} L ${residLeftX} ${mergeY} L ${cx - circleR} ${mergeY}`,
+        `M ${cx} ${tapY} L ${residLeftX} ${tapY} L ${residLeftX} ${mergeY} L ${cx - nodeHalfW} ${mergeY}`,
       )
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1.5)
       .attr('opacity', 0.6);
-    g.append('circle')
-      .attr('cx', cx)
-      .attr('cy', mergeY)
-      .attr('r', circleR)
-      .attr('fill', bgSubtle)
-      .attr('stroke', mutedFg)
-      .attr('stroke-width', 1.5);
-    drawCircleGlyph(cx, mergeY, fg, '+');
+    if (isHyperConn) {
+      g.append('rect')
+        .attr('x', cx - nodeHalfW)
+        .attr('y', mergeY - circleR)
+        .attr('width', nodeHalfW * 2)
+        .attr('height', circleR * 2)
+        .attr('rx', circleR)
+        .attr('fill', bgSubtle)
+        .attr('stroke', mutedFg)
+        .attr('stroke-width', 1.5);
+      g.append('text')
+        .attr('x', cx)
+        .attr('y', mergeY)
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.35em')
+        .attr('fill', fg)
+        .attr('font-size', '8.5px')
+        .attr('font-weight', 700)
+        .attr('font-family', 'inherit')
+        .text(`mHC ×${hcStreams}`);
+    } else {
+      g.append('circle')
+        .attr('cx', cx)
+        .attr('cy', mergeY)
+        .attr('r', circleR)
+        .attr('fill', bgSubtle)
+        .attr('stroke', mutedFg)
+        .attr('stroke-width', 1.5);
+      drawCircleGlyph(cx, mergeY, fg, '+');
+    }
   }
 
   function drawBlock(
@@ -1345,7 +1433,13 @@ function renderDiagram(
   drawBlock(pad.left, embedY, bw, blockH, 'embedding', 'Token Embedding', embedSub || undefined);
   drawArrow(
     embedY + blockH,
-    hasDenseLayers ? denseTxStart : hasAlternatingLayers ? altBlockStart[0] : txStart,
+    hasDenseLayers
+      ? denseTxStart
+      : hasHashBlock
+        ? hashTxStart
+        : hasAlternatingLayers
+          ? altBlockStart[0]
+          : txStart,
   );
 
   // === DENSE TRANSFORMER BLOCK (for MoE models with initial dense layers) ===
@@ -1473,7 +1567,10 @@ function renderDiagram(
     }
 
     // Arrow from dense block to next block
-    drawArrow(denseTxEnd, hasAlternatingLayers ? altBlockStart[0] : txStart);
+    drawArrow(
+      denseTxEnd,
+      hasHashBlock ? hashTxStart : hasAlternatingLayers ? altBlockStart[0] : txStart,
+    );
   }
 
   // Compute labels
@@ -1491,11 +1588,15 @@ function renderDiagram(
     n2Y: number,
     m2Y: number,
     expertBlockId: string,
+    routerLabel = 'MoE Router',
+    routerSubOverride?: string,
   ) {
     const routedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
-    const routerSub = `Top-${arch.activeExperts} of ${routedCount} routed${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+    const routerSub =
+      routerSubOverride ??
+      `Top-${arch.activeExperts} of ${routedCount} routed${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
     const rY = n2Y + smallH + arrowH;
-    drawBlock(innerX, rY, innerW, blockH, 'router', 'MoE Router', routerSub);
+    drawBlock(innerX, rY, innerW, blockH, 'router', routerLabel, routerSub);
     drawArrow(rY + blockH, rY + blockH + arrowH);
 
     const ec = getColor('expert', isDark);
@@ -1615,6 +1716,114 @@ function renderDiagram(
     const expertBottom = isExpExpanded ? expandedStartY + expandedH : eY + expertGridH;
     drawArrow(expertBottom, m2Y - circleR);
     drawResidualBypass(n2Y, m2Y);
+  }
+
+  // === HASH-ROUTED MoE PREFIX BLOCK (DeepSeek V4: first N layers route by token id) ===
+  if (hasHashBlock) {
+    if (hashBlockExpanded) {
+      // Container
+      g.append('rect')
+        .attr('x', pad.left - 4)
+        .attr('y', hashTxStart)
+        .attr('width', bw + 8)
+        .attr('height', hashTxEnd - hashTxStart)
+        .attr('rx', 10)
+        .attr('fill', 'none')
+        .attr('stroke', borderColor)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '6,3');
+
+      // Collapse badge
+      const hashBadge = `− ×${arch.hashRoutedLayers} layers`;
+      const hashBadgeW = hashBadge.length * 7 + 16;
+      g.append('rect')
+        .attr('x', width - pad.right - hashBadgeW - 4)
+        .attr('y', hashTxStart - 11)
+        .attr('width', hashBadgeW)
+        .attr('height', 22)
+        .attr('rx', 11)
+        .attr('fill', bgSubtle)
+        .attr('stroke', borderColor)
+        .attr('stroke-width', 1);
+      g.append('text')
+        .attr('x', width - pad.right - hashBadgeW / 2 - 4)
+        .attr('y', hashTxStart)
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.35em')
+        .attr('fill', mutedFg)
+        .attr('font-size', '11px')
+        .attr('font-weight', 600)
+        .attr('font-family', 'inherit')
+        .text(hashBadge);
+      g.append('rect')
+        .attr('x', width - pad.right - hashBadgeW - 4)
+        .attr('y', hashTxStart - 11)
+        .attr('width', hashBadgeW)
+        .attr('height', 22)
+        .attr('rx', 11)
+        .attr('fill', 'transparent')
+        .style('cursor', 'pointer')
+        .attr('data-testid', 'collapse-hashBlock')
+        .on('click', () => onBlockClick('hashBlock'));
+
+      // RMSNorm 1
+      drawBlock(innerX, hashNorm1Y, innerW, smallH, 'norm', 'RMSNorm');
+      drawArrow(hashNorm1Y + smallH, hashAttnY);
+
+      // Attention — static hybrid block (same attention stack as the rest)
+      const hashHeadSub = [
+        arch.numHeads ? `${arch.numHeads} heads` : null,
+        arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
+      ]
+        .filter(Boolean)
+        .join('  ·  ');
+      drawBlock(
+        innerX,
+        hashAttnY,
+        innerW,
+        blockH,
+        'attention',
+        attnLabel,
+        hashHeadSub || undefined,
+      );
+
+      drawArrow(hashAttnY + blockH + 4, hashMerge1Y - circleR);
+      drawResidualBypass(hashNorm1Y, hashMerge1Y);
+      drawArrow(hashMerge1Y + circleR, hashNorm2Y);
+
+      // RMSNorm 2
+      drawBlock(innerX, hashNorm2Y, innerW, smallH, 'norm', 'RMSNorm');
+      drawArrow(hashNorm2Y + smallH, hashNorm2Y + smallH + arrowH);
+
+      // Hash Router + Expert grid (token-id → fixed experts, not a learned gate)
+      const hashRoutedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
+      const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+      drawExpertGrid(
+        hashExpertY,
+        hashExpertsExpanded,
+        hashExpertsExpandedH,
+        hashFFNExpandedStartY,
+        hashNorm2Y,
+        hashMerge2Y,
+        'hashExperts',
+        'Hash Router',
+        hashRouterSub,
+      );
+    } else {
+      const hashSub = `×${arch.hashRoutedLayers} first layers · token-id → experts`;
+      drawCollapsedTransformerBlock(
+        pad.left,
+        hashTxStart,
+        bw,
+        collapsedTxH,
+        'Hash-Routed MoE',
+        hashSub,
+        'hashBlock',
+      );
+    }
+
+    // Arrow from the hash block to the first alternating block (or main transformer)
+    drawArrow(hashTxEnd, hasAlternatingLayers ? altBlockStart[0] : txStart);
   }
 
   // === ALTERNATING TRANSFORMER BLOCKS (gpt-oss style) ===
@@ -2143,6 +2352,23 @@ export default function ModelArchitectureDiagram({
                 not two separate attentions: each query attends in a{' '}
                 <span className="font-medium text-foreground">single softmax</span> to the union of
                 sliding-window + selected compressed keys, with a learnable per-head attention sink.
+              </p>
+            )}
+          {(arch.hyperConnections ?? 0) > 1 &&
+            ['altBlock0', 'altBlock1', 'hashBlock', 'transformer', 'denseTransformer'].some((id) =>
+              expandedBlocks.has(id),
+            ) && (
+              <p
+                className="mt-2 text-[11px] leading-snug text-muted-foreground"
+                data-testid="mhc-note"
+              >
+                <span className="font-medium text-foreground">
+                  Hyper-Connections (mHC ×{arch.hyperConnections})
+                </span>{' '}
+                replace each residual with {arch.hyperConnections} parallel streams combined by
+                learned, Sinkhorn-normalized weights — read ({arch.hyperConnections}→1), output, and
+                a {arch.hyperConnections}×{arch.hyperConnections} stream mix — shown as the mHC ×
+                {arch.hyperConnections} nodes.
               </p>
             )}
           {arch.features && arch.features.length > 0 && (

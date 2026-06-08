@@ -177,8 +177,12 @@ describe('getModelArchitecture', () => {
     expect(arch?.numExperts).toBe(385);
     expect(arch?.activeExperts).toBe(6);
     expect(arch?.hasSharedExpert).toBe(true);
-    // First 3 layers use hash-routed MoE (not dense FFN), so no dense block.
+    // First 3 layers use hash-routed MoE (not dense FFN), so no dense block —
+    // they render as a dedicated hash-routed prefix block instead.
     expect(arch?.denseFFNLayers).toBeUndefined();
+    expect(arch?.hashRoutedLayers).toBe(3);
+    // mHC: residuals are replaced by 4 parallel hyper-connection streams.
+    expect(arch?.hyperConnections).toBe(4);
     expect(arch?.slidingWindow).toBe(128);
     expect(arch?.contextWindow).toBe(1048576);
     expect(arch?.developer).toBe('DeepSeek');
@@ -200,24 +204,26 @@ describe('getModelArchitecture', () => {
     expect(arch?.alternatingLayers).toBeDefined();
     expect(arch?.alternatingLayers).toHaveLength(2);
 
+    // Counts describe the learned-router layers (the first 3 hash-routed layers
+    // are split out into their own block): 29 HCA + 29 CSA + 3 hash = 61.
     const [hca, csa] = arch!.alternatingLayers!;
     expect(hca.label).toBe('Heavily Compressed Attention');
-    expect(hca.count).toBe(31);
+    expect(hca.count).toBe(29);
     expect(hca.description).toContain('sliding window');
     expect(hca.slidingWindow).toBe(128);
 
     expect(csa.label).toBe('Compressed Sparse Attention');
-    expect(csa.count).toBe(30);
+    expect(csa.count).toBe(29);
     expect(csa.description).toContain('sliding window');
     expect(csa.description).toContain('lightning indexer');
     expect(csa.slidingWindow).toBe(128);
   });
 
-  it('DeepSeek V4 Pro alternating layer counts sum to numLayers', () => {
+  it('DeepSeek V4 Pro alternating + hash-routed layer counts sum to numLayers', () => {
     const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
     expect(arch?.alternatingLayers).toBeDefined();
     const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
-    expect(totalAlternating).toBe(arch!.numLayers);
+    expect(totalAlternating + (arch!.hashRoutedLayers ?? 0)).toBe(arch!.numLayers);
   });
 
   it('returns architecture for Kimi K2.5 with MoE and MLA details', () => {

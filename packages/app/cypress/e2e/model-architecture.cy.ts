@@ -347,6 +347,20 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="alternating-indicator"]').should('exist');
     });
 
+    it('shows a hash-routed MoE prefix block; mHC caption appears once a block is open', () => {
+      // First 3 layers render as a separate hash-routed prefix block
+      cy.get('[data-testid="expand-hashBlock"]').should('exist');
+      // mHC caption only appears once a block exposing the mixer nodes is expanded
+      cy.get('[data-testid="mhc-note"]').should('not.exist');
+      cy.get('[data-testid="expand-hashBlock"]').click({ force: true });
+      cy.get('[data-testid="collapse-hashBlock"]').should('exist');
+      cy.get('[data-testid="model-architecture-svg"]').contains('Hash Router').should('exist');
+      cy.get('[data-testid="mhc-note"]').should('be.visible').and('contain', 'Hyper-Connections');
+      // Restore collapsed state for subsequent tests (shared state: testIsolation off)
+      cy.get('[data-testid="collapse-hashBlock"]').click({ force: true });
+      cy.get('[data-testid="mhc-note"]').should('not.exist');
+    });
+
     it('Hybrid attention is expandable and drills down to a Sliding Window block', () => {
       cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');

@@ -70,12 +70,22 @@ export interface ModelArchitecture {
   /** Intermediate dimension of the dense FFN layers (differs from MoE expert FFN dim) */
   denseFFNDim?: number;
   /**
+   * Number of leading MoE layers that use hash routing (token-id → fixed experts)
+   * instead of the learned gate. Rendered as a separate stacked prefix block.
+   */
+  hashRoutedLayers?: number;
+  /**
    * Alternating layer type pattern (e.g., gpt-oss uses sliding_attention/full_attention).
    * Each entry describes one category of layer and how many of that type exist.
    */
   alternatingLayers?: AlternatingLayerSpec[];
   /** Sliding window size in tokens (for models using sliding/local attention) */
   slidingWindow?: number;
+  /**
+   * Number of parallel residual streams for hyper-connections (mHC). When > 1,
+   * residual merges render as "mHC ×N" mixer nodes instead of a plain "+" add.
+   */
+  hyperConnections?: number;
   /** Context window size (in tokens) */
   contextWindow?: number;
   /** Special architectural features */
@@ -151,28 +161,32 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     numExperts: 385, // 384 routed + 1 shared
     activeExperts: 6,
     hasSharedExpert: true,
-    // Attention layers interleave two compressed variants; every layer also
-    // carries a 128-token sliding-window branch plus a learnable attention sink.
-    // Counts: 31 HCA + 30 CSA = 61 (the extra MTP block is sliding-window only).
+    // First 3 layers use hash-routed MoE (shown as a separate prefix block); the
+    // remaining 58 learned-router layers interleave two compressed-attention
+    // variants. Every layer also carries a 128-token sliding-window branch plus a
+    // learnable attention sink. Counts below are the learned-router layers:
+    // 29 HCA + 29 CSA + 3 hash-routed = 61 (the extra MTP block is SWA-only).
+    hashRoutedLayers: 3,
     alternatingLayers: [
       {
         label: 'Heavily Compressed Attention',
         description:
-          'HCA: the KV of every 128 tokens is consolidated into a single entry and attended densely, alongside a 128-token sliding window of uncompressed KV and a learnable attention sink.',
-        count: 31,
+          'HCA (learned-router layers): the KV of every 128 tokens is consolidated into a single entry and attended densely, alongside a 128-token sliding window of uncompressed KV and a learnable attention sink.',
+        count: 29,
         colorKey: 'attention',
         slidingWindow: 128,
       },
       {
         label: 'Compressed Sparse Attention',
         description:
-          'CSA: the KV of every 4 tokens is compressed to one entry, then a lightning indexer selects the top-1024 compressed blocks for sparse attention, alongside a 128-token sliding window and a learnable attention sink.',
-        count: 30,
+          'CSA (learned-router layers): the KV of every 4 tokens is compressed to one entry, then a lightning indexer selects the top-1024 compressed blocks for sparse attention, alongside a 128-token sliding window and a learnable attention sink.',
+        count: 29,
         colorKey: 'attention',
         slidingWindow: 128,
       },
     ],
     slidingWindow: 128,
+    hyperConnections: 4, // mHC: 4 parallel residual streams (hc_mult)
     contextWindow: 1048576, // 1M
     features: [
       'Hybrid CSA + HCA Attention',
