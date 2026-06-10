@@ -532,3 +532,58 @@ Now that we have discussed performance benchmarks in detail, let’s discuss tot
 </DashboardCTA>
 
 _The article continues with the full total cost of ownership and cost-per-token analysis for H200 and GB200 NVL72 in the [subscriber edition on the SemiAnalysis newsletter](https://newsletter.semianalysis.com/p/deepseekv4-16t-day-0-to-day-43-performance)._
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much did MI355X SGLang DeepSeek V4 Pro performance improve in the first 26 days?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AMD MI355X SGLang DeepSeek V4 Pro throughput improved by more than 100x in the first 26 days after launch. The Day 0 FP8 build on 2026-04-25 was technically working but pinned at 1-2 tok/s/user interactivity, far below usable serving levels. The gains came almost entirely from replacing PyTorch-native fallback paths with real AITER, Triton, TileLang, and FlyDSL kernels, with major step changes from enabling native FP4 (MXFP4) weight MoE, introducing AITER mHC kernels at every layer, and retiring remaining fallbacks (FlashMLA from TileLang to Triton, AITER FlyDSL FP4 MoE, fused hash-topk, DSv4 radix attention, fused store-cache, fused WQA/WKV projection, and fused paged-compress). Measured on InferenceX."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the cost per million output tokens for DeepSeek V4 Pro on GB300 NVL72 with MTP?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On GB300 NVL72 SGLang with MTP enabled, DeepSeek V4 Pro reaches $0.156 per million output tokens at 50 tok/s/user on the 8K input / 1K output workload, per the InferenceX TCO calculator. The rack-scale advantage comes from NVLink scale-up to 72 GPUs, which lets DeepSeek V4's MoE dispatch/combine all-to-all run entirely on NVLink instead of spilling onto the slower scale-out fabric, while amortizing expert-weight loads across far more ranks. 8-GPU NVLink islands like B200 and B300 hit that wall much earlier when scaled out over InfiniBand."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the DeepSeek V4 attention architecture and how does CSA / HCA reduce KV cache?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "DeepSeek V4 replaces Multi-head Latent Attention (MLA) with Compressed Sparse Attention (CSA) and Heavily Compressed Attention (HCA). HCA's KV cache combines a sliding window of KV embeddings with compressed KV entries, each entry compressing key and value across 128 tokens (m'=128) for DeepSeek V4 Pro. CSA uses the same compression mechanism at a lower rate (m=4) and applies sparse attention on the compressed entries via a lightning indexer that inherits the sparse-attention pattern from DeepSeek V3.2. Interleaving CSA and HCA delivers a roughly 50x reduction in KV cache size at 1M context length."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How did B200 vLLM tokens per provisioned megawatt improve for DeepSeek V4 Pro?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "B200 vLLM tokens per second per all-in provisioned utility megawatt improved from about 300,000 on Day 0 to nearly 500,000 by 2026-06-05 at 50 tok/s/user interactivity on DeepSeek V4 Pro. Because B200's all-in utility power envelope is fixed near 2.17 kW per GPU, this roughly 1.7x jump is a pure software gain from MegaMoE grouped-FP4 GEMMs, wider expert parallelism, the FP4 weight path, and scheduler tuning. Tokens per all-in provisioned-utility MW is the best figure of merit for fleet-scale ROI because it reflects PUE and datacenter overhead alongside raw per-GPU throughput."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is MegaMoE in DeepSeek V4 and how much does it speed up MoE layers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "MegaMoE is a fused MoE kernel introduced with DeepSeek V4 that splits experts into waves and schedules each wave separately, achieving finer-grained overlap between the dispatch all-to-all, Linear 1, Activation, Linear 2, and combine all-to-all than prior implementations that synced at every operation boundary. The DeepSeek V4 paper reports a theoretical 1.92x speedup over the naive kernel in the DeepSeek V4 Flash configuration, which implies the naive kernel spends close to 50% of its time on dispatch and combine communication."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which inference stacks shipped Day 0 support for DeepSeek V4 Pro?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Only NVIDIA CUDA (via native SGLang and native vLLM) and Huawei CANN on Ascend 950DT shipped working Day 0 support for DeepSeek V4 Pro. AMD ROCm on MI355X worked technically but was pinned at 1-2 tok/s/user interactivity, well below usable serving levels. NVIDIA TensorRT-LLM was broken out of the box because mhcFusedHcKernel.cu had a hardcoded FHC_HIDDEN=4096 constant that silently corrupted hidden states for DeepSeek V4 Pro's 7168 hidden size; a SemiAnalysis-authored patch was merged days later. This is a sharp contrast to the DeepSeek V3 / R1 launch where only NVIDIA CUDA worked on Day 0."
+      }
+    }
+  ]
+}`}</JsonLd>
