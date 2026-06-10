@@ -272,9 +272,9 @@ describe('buildAvailabilityHwKey', () => {
 
 /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
 function parseRgb(color: string): [number, number, number] {
-  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu);
+  const hex = color.match(/^#(?<r>[0-9a-f]{2})(?<g>[0-9a-f]{2})(?<b>[0-9a-f]{2})$/iu);
   if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
-  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/u);
+  const rgb = color.match(/rgb\((?<r>\d+),\s*(?<g>\d+),\s*(?<b>\d+)\)/u);
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
   throw new Error(`Cannot parse color: ${color}`);
 }

@@ -2,12 +2,12 @@ import type { AiProvider } from '@/components/ai-chart/types';
 
 interface ProviderDef {
   label: string;
-  buildRequest(
+  buildRequest: (
     systemPrompt: string,
     userPrompt: string,
     apiKey: string,
-  ): { url: string; init: RequestInit };
-  parseResponse(json: any): string;
+  ) => { url: string; init: RequestInit };
+  parseResponse: (json: any) => string;
 }
 
 const PROVIDERS: Record<AiProvider, ProviderDef> = {

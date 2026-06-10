@@ -31,14 +31,14 @@ export interface SkipTracker {
    * @param context - Human-readable label for where the error occurred.
    * @param err - The caught error.
    */
-  recordDbError(context: string, err: Error): void;
+  recordDbError: (context: string, err: Error) => void;
   /**
    * Capture a point-in-time snapshot of the current skip counters and
    * unmapped-name sets. Used together with `diff()` to report per-artifact drops.
    *
    * @returns A `SkipSnapshot` with copies of the current counts and name sets.
    */
-  snapshot(): SkipSnapshot;
+  snapshot: () => SkipSnapshot;
   /**
    * Compute the incremental change in skip counters since a previous snapshot.
    * Use this to emit per-artifact warnings without scanning the full totals.
@@ -46,7 +46,7 @@ export interface SkipTracker {
    * @param before - Snapshot taken before processing the artifact.
    * @returns Counts of newly dropped rows and arrays of newly seen unmapped names.
    */
-  diff(before: SkipSnapshot): {
+  diff: (before: SkipSnapshot) => {
     droppedModel: number;
     droppedHw: number;
     droppedIslOsl: number;

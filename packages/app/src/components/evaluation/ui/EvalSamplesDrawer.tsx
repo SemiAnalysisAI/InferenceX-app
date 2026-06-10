@@ -338,8 +338,8 @@ interface FilterChipProps {
  */
 function extractRunIdFromUrl(url: string | undefined): string | null {
   if (!url) return null;
-  const m = url.match(/\/actions\/runs\/(\d+)/u);
-  return m ? m[1] : null;
+  const m = url.match(/\/actions\/runs\/(?<runId>\d+)/u);
+  return m?.groups?.runId ?? null;
 }
 
 function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {

@@ -46,8 +46,8 @@ export const parseLabelComponents = (label: string): string[] => {
   const parts = label.split('+');
   return parts.map((p) => {
     // Strip the leading "NxNNN" multiplier (e.g., "1x" or "3x")
-    const match = p.match(/^\d+x(.+)$/u);
-    return match ? match[1] : p;
+    const match = p.match(/^\d+x(?<strategy>.+)$/u);
+    return match?.groups?.strategy ?? p;
   });
 };
 

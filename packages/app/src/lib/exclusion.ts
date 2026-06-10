@@ -39,9 +39,9 @@ export interface ExclusionSpec {
 /** Compiled resolvers for a model's exclusion specs. */
 export interface Exclusion {
   /** Literal engine family of a participating key (for display), else null. */
-  familyOf(hwKey: string): string | null;
+  familyOf: (hwKey: string) => string | null;
   /** Comparability-group id of a participating key (for exclusion), else null. */
-  groupOf(hwKey: string): string | null;
+  groupOf: (hwKey: string) => string | null;
 }
 
 /**
