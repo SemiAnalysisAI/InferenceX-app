@@ -23,6 +23,8 @@ import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
+import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
+import { getDisplayLabel } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -43,7 +45,7 @@ import {
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
-import { hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 
 import ChartControls from './ChartControls';
 import ComparisonChangelog from './ComparisonChangelog';
@@ -383,10 +385,15 @@ export default function ChartDisplay() {
                       graph.model,
                       graph.sequence,
                     );
+                    const issueNotes = matchKnownConfigIssues(graph.model, visibleData).map(
+                      (issue) =>
+                        knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                    );
                     exportToCsv(
                       `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
                       headers,
                       rows,
+                      issueNotes,
                     );
                   }}
                 />

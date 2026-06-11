@@ -26,10 +26,12 @@ function escapeCsvCell(value: string | number | boolean | null | undefined): str
 export function buildCsv(
   headers: string[],
   rows: (string | number | boolean | null | undefined)[][],
+  notes: string[] = [],
 ): string {
+  const noteLines = notes.map((note) => `# ${note}`);
   const headerLine = headers.map(escapeCsvCell).join(',');
   const dataLines = rows.map((row) => row.map(escapeCsvCell).join(','));
-  return [csvLicensePreamble(), headerLine, ...dataLines].join('\n');
+  return [csvLicensePreamble(), ...noteLines, headerLine, ...dataLines].join('\n');
 }
 
 /** Trigger a CSV file download in the browser */
@@ -48,7 +50,8 @@ export function exportToCsv(
   filename: string,
   headers: string[],
   rows: (string | number | boolean | null | undefined)[][],
+  notes: string[] = [],
 ): void {
-  const csv = buildCsv(headers, rows);
+  const csv = buildCsv(headers, rows, notes);
   downloadCsv(filename, csv);
 }
