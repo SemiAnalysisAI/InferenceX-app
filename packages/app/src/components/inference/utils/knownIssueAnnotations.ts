@@ -69,6 +69,25 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+/**
+ * Live overlap of the floating legend panel over the SVG's right edge, used
+ * as `rightInset` so warning boxes sit beside the legend instead of under it.
+ * Returns 0 when no legend is present (or outside the browser).
+ */
+export function measureLegendRightInset(
+  chartId: string,
+  svgNode: SVGSVGElement | null,
+  marginLeft: number,
+  width: number,
+): number {
+  if (!svgNode || typeof document === 'undefined') return 0;
+  const legend = document.querySelector(`#${chartId} .legend-container`);
+  if (!legend) return 0;
+  const innerRight = svgNode.getBoundingClientRect().left + marginLeft + width;
+  const overlap = innerRight - legend.getBoundingClientRect().left;
+  return clamp(overlap, 0, width * 0.4);
+}
+
 export function renderKnownIssueAnnotations(
   g: d3.Selection<SVGGElement, unknown, null, undefined>,
   defs: d3.Selection<SVGDefsElement, unknown, null, undefined>,

@@ -65,6 +65,7 @@ import {
 } from '@/components/inference/utils/paretoLabels';
 import {
   type KnownIssueAnnotation,
+  measureLegendRightInset,
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
 
@@ -1796,18 +1797,6 @@ const ScatterGraph = React.memo(
       };
 
       // ── Known-issue annotations: warning box + arrow to the affected line ──
-      // Boxes right-align against the legend panel, which floats over the
-      // SVG's right edge when expanded — measure the live overlap so they sit
-      // beside it rather than under it.
-      const knownIssueRightInset = (ctx: RenderContext): number => {
-        const svgNode = ctx.layout.svg.node();
-        const legend = document.querySelector(`#${chartId} .legend-container`);
-        if (!svgNode || !legend) return 0;
-        const innerRight =
-          svgNode.getBoundingClientRect().left + ctx.layout.margin.left + ctx.width;
-        const overlap = innerRight - legend.getBoundingClientRect().left;
-        return Math.max(0, Math.min(overlap, ctx.width * 0.4));
-      };
       const drawKnownIssues = (
         ctx: RenderContext,
         xScale: ContinuousScale,
@@ -1820,7 +1809,12 @@ const ScatterGraph = React.memo(
           xScale,
           yScale,
           annotations: knownIssueAnnotations,
-          rightInset: knownIssueRightInset(ctx),
+          rightInset: measureLegendRightInset(
+            chartId,
+            ctx.layout.svg.node(),
+            ctx.layout.margin.left,
+            ctx.width,
+          ),
           background: getCssColor('--background'),
           foreground: getCssColor('--foreground'),
           mutedForeground: getCssColor('--muted-foreground'),
