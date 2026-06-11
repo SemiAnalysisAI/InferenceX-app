@@ -29,7 +29,7 @@ export const KNOWN_CONFIG_ISSUES: KnownConfigIssue[] = [
   {
     hwKey: 'gb300_dynamo-trt_mtp',
     model: Model.DeepSeek_R1,
-    precisions: ['fp4'],
+    precisions: ['fp8'],
     summary: 'Accuracy issues',
     filed: 'Apr 21, 2026',
     url: 'https://github.com/NVIDIA/srt-slurm/issues/51',

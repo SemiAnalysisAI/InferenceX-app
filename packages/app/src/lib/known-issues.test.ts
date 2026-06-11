@@ -5,17 +5,17 @@ import { KNOWN_CONFIG_ISSUES, knownIssueCsvNote, matchKnownConfigIssues } from '
 const DSR1 = 'DeepSeek-R1-0528';
 
 describe('matchKnownConfigIssues', () => {
-  it('matches the GB300 Dynamo TRT MTP entry for DeepSeek R1 FP4', () => {
+  it('matches the GB300 Dynamo TRT MTP entry for DeepSeek R1 FP8', () => {
     const issues = matchKnownConfigIssues(DSR1, [
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
     ]);
     expect(issues).toHaveLength(1);
     expect(issues[0].url).toBe('https://github.com/NVIDIA/srt-slurm/issues/51');
   });
 
-  it('does not match GB300 Dynamo TRT MTP for non-FP4 precisions', () => {
+  it('does not match GB300 Dynamo TRT MTP for non-FP8 precisions', () => {
     const issues = matchKnownConfigIssues(DSR1, [
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
     ]);
     expect(issues).toHaveLength(0);
   });
