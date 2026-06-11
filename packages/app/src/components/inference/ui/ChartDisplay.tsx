@@ -173,8 +173,14 @@ export default function ChartDisplay() {
     track('inference_view_changed', { view: value, chartIndex: index });
   };
 
-  const { unofficialRunInfo, unofficialRunInfos, runIndexByUrl, getOverlayData, isUnofficialRun } =
-    useUnofficialRun();
+  const {
+    unofficialRunInfo,
+    unofficialRunInfos,
+    runIndexByUrl,
+    getOverlayData,
+    isUnofficialRun,
+    activeOverlayHwTypes,
+  } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
@@ -385,9 +391,24 @@ export default function ChartDisplay() {
                       graph.model,
                       graph.sequence,
                     );
-                    const issueNotes = matchKnownConfigIssues(graph.model, visibleData).map(
-                      (issue) =>
-                        knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                    // Match warnings against the same series the chart annotates,
+                    // including visible unofficial-run overlay series.
+                    const overlay =
+                      graph.chartDefinition.chartType === 'e2e'
+                        ? overlayDataByChartType.e2e
+                        : overlayDataByChartType.interactivity;
+                    const visibleOverlayRows = isTimelineMode
+                      ? []
+                      : (overlay?.data ?? []).filter(
+                          (p) =>
+                            activeOverlayHwTypes.has(p.hwKey as string) &&
+                            selectedPrecisions.includes(p.precision),
+                        );
+                    const issueNotes = matchKnownConfigIssues(graph.model, [
+                      ...visibleData,
+                      ...visibleOverlayRows,
+                    ]).map((issue) =>
+                      knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
                     );
                     exportToCsv(
                       `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
