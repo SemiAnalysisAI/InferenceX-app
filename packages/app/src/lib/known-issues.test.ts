@@ -47,8 +47,8 @@ describe('matchKnownConfigIssues', () => {
 
   it('returns each issue at most once even with many matching points', () => {
     const issues = matchKnownConfigIssues(DSR1, [
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
       { hwKey: 'mi355x_mori-sglang_mtp', precision: 'fp4' },
     ]);
     expect(issues).toHaveLength(2);
