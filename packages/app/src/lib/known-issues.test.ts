@@ -5,27 +5,34 @@ import { KNOWN_CONFIG_ISSUES, knownIssueCsvNote, matchKnownConfigIssues } from '
 const DSR1 = 'DeepSeek-R1-0528';
 
 describe('matchKnownConfigIssues', () => {
-  it('matches the GB300 Dynamo TRT MTP entry for DeepSeek R1 FP8', () => {
+  it('matches the GB300 Dynamo TRT MTP entry for DeepSeek R1 FP4', () => {
     const issues = matchKnownConfigIssues(DSR1, [
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
     ]);
     expect(issues).toHaveLength(1);
     expect(issues[0].url).toBe('https://github.com/NVIDIA/srt-slurm/issues/51');
   });
 
-  it('does not match GB300 Dynamo TRT MTP for non-FP8 precisions', () => {
+  it('does not match GB300 Dynamo TRT MTP for non-FP4 precisions', () => {
     const issues = matchKnownConfigIssues(DSR1, [
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
     ]);
     expect(issues).toHaveLength(0);
   });
 
-  it('matches the MI355X MoRI SGLang MTP entry regardless of precision', () => {
-    for (const precision of ['fp4', 'fp8']) {
-      const issues = matchKnownConfigIssues(DSR1, [{ hwKey: 'mi355x_mori-sglang_mtp', precision }]);
-      expect(issues).toHaveLength(1);
-      expect(issues[0].url).toBe('https://github.com/sgl-project/sglang/issues/27194');
-    }
+  it('matches the MI355X MoRI SGLang MTP entry for DeepSeek R1 FP8', () => {
+    const issues = matchKnownConfigIssues(DSR1, [
+      { hwKey: 'mi355x_mori-sglang_mtp', precision: 'fp8' },
+    ]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].url).toBe('https://github.com/sgl-project/sglang/issues/27194');
+  });
+
+  it('does not match MI355X MoRI SGLang MTP for non-FP8 precisions', () => {
+    const issues = matchKnownConfigIssues(DSR1, [
+      { hwKey: 'mi355x_mori-sglang_mtp', precision: 'fp4' },
+    ]);
+    expect(issues).toHaveLength(0);
   });
 
   it('does not match other models', () => {
@@ -47,9 +54,9 @@ describe('matchKnownConfigIssues', () => {
 
   it('returns each issue at most once even with many matching points', () => {
     const issues = matchKnownConfigIssues(DSR1, [
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
-      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp8' },
-      { hwKey: 'mi355x_mori-sglang_mtp', precision: 'fp4' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
+      { hwKey: 'gb300_dynamo-trt_mtp', precision: 'fp4' },
+      { hwKey: 'mi355x_mori-sglang_mtp', precision: 'fp8' },
     ]);
     expect(issues).toHaveLength(2);
   });
