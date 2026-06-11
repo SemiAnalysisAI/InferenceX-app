@@ -133,6 +133,13 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => (
             >
               Performance per Dollar
             </Link>
+            <Link
+              data-testid="footer-link-pause-ai"
+              href="/pause-ai"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Pause AI
+            </Link>
           </div>
         </div>
 

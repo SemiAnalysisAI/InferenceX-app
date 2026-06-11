@@ -58,6 +58,23 @@ describe('Page Load & Navigation', () => {
       );
     });
   });
+
+  it('navigates from the footer to the pause ai page', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+
+    cy.get('[data-testid="footer-link-pause-ai"]').scrollIntoView().click();
+
+    cy.location('pathname').should('eq', '/pause-ai');
+    cy.get('[data-testid="pause-ai-page"]').within(() => {
+      cy.get('h1').should('contain.text', 'We measure the acceleration');
+      cy.get('[data-testid="pause-ai-core-messages"] article').should('have.length', 3);
+      cy.contains('a', 'Visit pauseai.info').should('have.attr', 'href', 'https://pauseai.info/');
+    });
+  });
 });
 
 // Toggle visibility, click behavior, and aria-label are covered by
