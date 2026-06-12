@@ -316,4 +316,94 @@ describe('Model Architecture Diagram', () => {
       cy.contains('Released by OpenAI').should('be.visible');
     });
   });
+
+  describe('Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)', () => {
+    before(() => {
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        delete doc.body.dataset.scrollLocked;
+        doc.body.style.removeProperty('pointer-events');
+      });
+      cy.get('[role="combobox"]').filter(':visible').first().click();
+      cy.get('[role="option"]').contains('DeepSeek V4 Pro').click();
+
+      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
+          cy.get('[data-testid="model-architecture-toggle"]').click();
+        }
+      });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('shows MoE and Hybrid badges for DeepSeek V4 Pro', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'Hybrid');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '1.6T');
+    });
+
+    it('shows two separate hybrid (CSA/HCA) blocks with an alternating indicator', () => {
+      cy.get('[data-testid="expand-altBlock0"]').should('exist');
+      cy.get('[data-testid="expand-altBlock1"]').should('exist');
+      cy.get('[data-testid="expand-transformer"]').should('not.exist');
+      cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
+      cy.get('[data-testid="alternating-indicator"]').should('exist');
+    });
+
+    it('shows a hash-routed MoE prefix block; mHC caption appears once a block is open', () => {
+      // First 3 layers render as a separate hash-routed prefix block
+      cy.get('[data-testid="expand-hashBlock"]').should('exist');
+      // mHC caption only appears once a block exposing the mixer nodes is expanded
+      cy.get('[data-testid="mhc-note"]').should('not.exist');
+      cy.get('[data-testid="expand-hashBlock"]').click({ force: true });
+      cy.get('[data-testid="collapse-hashBlock"]').should('exist');
+      cy.get('[data-testid="model-architecture-svg"]').contains('Hash Router').should('exist');
+      cy.get('[data-testid="mhc-note"]').should('be.visible').and('contain', 'Hyper-Connections');
+      // Restore collapsed state for subsequent tests (shared state: testIsolation off)
+      cy.get('[data-testid="collapse-hashBlock"]').click({ force: true });
+      cy.get('[data-testid="mhc-note"]').should('not.exist');
+    });
+
+    it('Hybrid attention is expandable and drills down to a Sliding Window block', () => {
+      cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="collapse-altBlock0"]').should('exist');
+      // The union-softmax caption only appears once the attention drill-down is open
+      cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
+      // Hybrid attention drills down (unlike gpt-oss sink/full GQA, which does not)
+      cy.get('[data-testid="expand-altAttention0"]').should('exist');
+      cy.get('[data-testid="expand-altAttention0"]').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      // Caption clarifies the two branches feed one softmax (not two attentions)
+      cy.get('[data-testid="hybrid-attention-note"]')
+        .should('be.visible')
+        .and('contain', 'single softmax');
+      // Expert grid still expandable within the block
+      cy.get('[data-testid="expand-altExperts0"]').should('exist');
+    });
+
+    it('expert grid can be expanded to show SwiGLU details', () => {
+      cy.get('[data-testid="expand-altExperts0"]').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('collapsing the parent block hides the union-softmax caption (no orphan caption)', () => {
+      // altBlock0 + altAttention0 are expanded from the previous tests; collapsing
+      // the parent removes the drill-down from the SVG, so the caption must go too
+      // even though altAttention0 stays in the expansion state.
+      cy.get('[data-testid="hybrid-attention-note"]').should('be.visible');
+      cy.get('[data-testid="collapse-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
+      // Re-expanding the parent restores the remembered drill-down and its caption.
+      cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="hybrid-attention-note"]')
+        .should('be.visible')
+        .and('contain', 'single softmax');
+    });
+
+    it('shows DeepSeek V4 Pro features (incl. sliding window) and developer info', () => {
+      cy.contains('Hybrid CSA + HCA Attention').should('be.visible');
+      cy.contains('Sliding window (128 tokens)').should('be.visible');
+      cy.contains('Released by DeepSeek').should('be.visible');
+    });
+  });
 });
