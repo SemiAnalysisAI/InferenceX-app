@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import iwanthue from 'iwanthue';
 
 import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
@@ -28,6 +29,10 @@ vi.mock('@/lib/constants', async (importOriginal) => {
     getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
   };
 });
+
+// spy-wrap iwanthue (real implementation) so the palette-cache tests can
+// assert how often the expensive clustering actually runs.
+vi.mock('iwanthue', { spy: true });
 
 // ---------------------------------------------------------------------------
 // fixture factory
@@ -438,6 +443,46 @@ describe('generateHighContrastColors', () => {
     const result = generateHighContrastColors(['h100_vllm', 'mi300x_sglang'], 'dark');
     expect(isNotReddish(parseRgb(result['h100_vllm']))).toBe(true);
     expect(isNotGreenish(parseRgb(result['mi300x_sglang']))).toBe(true);
+  });
+
+  // ---------- Palette caching ----------
+  // iwanthue's force-vector clustering costs tens of ms per call; results are
+  // deterministic per (vendor, theme, count, mode), so repeats must be free.
+  // These tests use signatures (5 NVIDIA keys, light theme) no other test in
+  // this file requests, since the cache is module-level.
+
+  it('caches palettes — a repeated request does not re-run iwanthue', () => {
+    const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm', 'gb200_vllm'];
+
+    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const first = generateHighContrastColors(keys, 'light');
+    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+
+    const second = generateHighContrastColors(keys, 'light');
+    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1); // cache hit
+    expect(second).toEqual(first);
+  });
+
+  it('cache is key-name independent — same vendor/count/theme reuses the palette', () => {
+    // Same signature as the test above (NVIDIA × 5 × light), different names:
+    // palettes depend on the group shape, not on which GPUs are in it.
+    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const result = generateHighContrastColors(
+      ['h100_sglang', 'h200_sglang', 'b200_sglang', 'b300_sglang', 'gb300_sglang'],
+      'light',
+    );
+    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore); // cache hit
+    expect(Object.keys(result)).toHaveLength(5);
+    expect(new Set(Object.values(result)).size).toBe(5); // still distinct colors
+  });
+
+  it('a different count is a different cache entry', () => {
+    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    generateHighContrastColors(
+      ['h100_trt', 'h200_trt', 'b200_trt', 'b300_trt', 'gb200_trt', 'gb300_trt', 'gb200_vllm'],
+      'light',
+    );
+    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
   });
 });
 
