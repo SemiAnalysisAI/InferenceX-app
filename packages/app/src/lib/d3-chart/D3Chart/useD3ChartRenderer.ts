@@ -446,6 +446,18 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             },
           },
         );
+
+        // setupZoom only replays the stored transform (re-emitting a zoom
+        // event over the freshly drawn base-scale DOM) when it is non-identity.
+        // The identity replay used to dismiss a pinned tooltip as a side
+        // effect of that emit — keep that behavior when the replay is skipped,
+        // since the chart under the tooltip was just rebuilt.
+        const restored = zoomTransformRef.current;
+        if (restored.k === 1 && restored.x === 0 && restored.y === 0 && isPinned()) {
+          dismissTooltip(true);
+          tooltip.style('opacity', 0).style('display', 'none').style('pointer-events', 'none');
+          renderGroup.select('.ruler-group').style('display', 'none');
+        }
       }
 
       // ── Animate from old positions to new positions ──
