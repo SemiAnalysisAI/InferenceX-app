@@ -11,6 +11,7 @@
 import { act, createElement, useReducer } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as d3 from 'd3';
 
 import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
@@ -283,6 +284,42 @@ describe('ScatterGraph toggle decoration', () => {
     rerender();
 
     expect(rebuildCount()).toBeGreaterThan(buildsAfterMount);
+    unmount();
+  });
+
+  it('animates rooflines together with dots on a domain-changing toggle', () => {
+    // Real transition duration: the rebuild restores each surviving element to
+    // its old position/path and schedules a "data-update" transition that only
+    // starts on the next timer tick. Regression: the decoration effect used to
+    // re-apply final roofline `d` attrs in the same commit, so the curve
+    // teleported to its destination while the dots animated.
+    const { container, rerender, unmount } = mountChart({ transitionDuration: 750 });
+
+    const b200Roofline = () =>
+      container.querySelector<SVGPathElement>('.roofline-path[data-hw-key="b200"]')!;
+    const b200Dot = () => dotGroups(container, 'b200')[0];
+    const dBefore = b200Roofline().getAttribute('d');
+    const dotTransformBefore = b200Dot().getAttribute('transform');
+    expect(dBefore).toBeTruthy();
+
+    // Hide the extreme-owning hw → domains shrink → full render + animation.
+    inferenceState.current = {
+      ...inferenceState.current,
+      activeHwTypes: new Set(['b200']),
+    };
+    rerender();
+
+    // At commit end the transitions are scheduled but have not ticked: both
+    // the roofline path and the dots must still sit at their OLD coordinates,
+    // each with a pending transition toward the new ones.
+    expect(b200Roofline().getAttribute('d')).toBe(dBefore);
+    expect(b200Dot().getAttribute('transform')).toBe(dotTransformBefore);
+    expect((b200Roofline() as unknown as { __transition?: object }).__transition).toBeTruthy();
+    expect((b200Dot() as unknown as { __transition?: object }).__transition).toBeTruthy();
+
+    // jsdom can't run the SVG transform interpolator (no transform.baseVal),
+    // so cancel the scheduled transitions before teardown.
+    d3.select(container).selectAll('.dot-group, .roofline-path').interrupt('data-update');
     unmount();
   });
 

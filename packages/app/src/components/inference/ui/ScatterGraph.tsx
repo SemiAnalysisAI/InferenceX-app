@@ -123,6 +123,18 @@ const isSameScaleConfig = (a: ScaleConfigValue, b: ScaleConfigValue): boolean =>
   a.domain[0] === b.domain[0] &&
   a.domain[1] === b.domain[1];
 
+// True when the node has a scheduled or running d3 transition with this name.
+// Reads d3-transition's per-node schedule store (`__transition`) because
+// d3.active() only reports transitions that already started, and the chart's
+// entrance transitions are scheduled in the same commit but start on the next
+// timer tick.
+const hasNamedTransition = (node: Element, name: string): boolean => {
+  const schedules = (node as Element & { __transition?: Record<string, { name?: string }> })
+    .__transition;
+  if (!schedules) return false;
+  return Object.values(schedules).some((schedule) => schedule?.name === name);
+};
+
 // Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth
 const parseHwKeyToLabel = (hwKey: string): { name: string; label: string } => {
   const config = getHardwareConfig(hwKey);
@@ -2039,9 +2051,14 @@ const ScatterGraph = React.memo(
     // change (legend hw toggles, precision toggles, optimal-only, high
     // contrast, theme). This is the cheap "Effect 4" display-toggle path from
     // docs/d3-charts.md — the full chart rebuild only runs when data or scale
-    // domains actually change. Runs after the D3 render effect in the same
-    // commit (child layout effects fire first), so on rebuild commits it's an
-    // idempotent re-apply.
+    // domains actually change.
+    //
+    // This effect can run in the same commit as (right after) the full render
+    // effect, while the renderer's old→new "data-update" entrance transitions
+    // are scheduled but not yet started. It therefore NEVER writes the
+    // attributes those transitions animate — dot-group `transform` and
+    // roofline `d` — or a freshly rebuilt roofline would start its transition
+    // already at the destination and teleport while the dots animate.
     useLayoutEffect(() => {
       const svg = chartRef.current?.getSvgElement?.();
       const ctx = lastRenderCtxRef.current;
@@ -2050,17 +2067,10 @@ const ScatterGraph = React.memo(
       const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
       if (zoomGroup.empty()) return;
 
-      // Position with the same scales the zoom handler would use: rescale the
-      // base scales by the current transform when the user is zoomed in.
-      const t = d3.zoomTransform(svg);
-      const zoomed = t.k !== 1 || t.x !== 0 || t.y !== 0;
-      const xScale = zoomed ? t.rescaleX(ctx.xScale as ContinuousScale) : ctx.xScale;
-      const yScale = zoomed ? t.rescaleY(ctx.yScale as ContinuousScale) : ctx.yScale;
-      const decorationCtx: RenderContext = { ...ctx, xScale, yScale };
-
       // Dots: visibility, vendor recolor, precision shape, tracked-ring color.
       // Hand-rolled rather than a full renderScatterPoints pass so we skip
-      // re-writing label text on every point (the expensive part of the join).
+      // re-writing label text on every point (the expensive part of the join)
+      // — and, critically, never touch the animated `transform`.
       zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
         const sel = d3.select(this);
         const visible = ir.isPointVisible(d);
@@ -2076,18 +2086,70 @@ const ScatterGraph = React.memo(
         sel.select('.tracked-ring').attr('stroke', color);
       });
 
-      // Rooflines, gradient defs, parallelism + line labels (incl. overlay run
-      // labels): re-run the layer render — stroke colors, visibility, and
-      // label placement all depend on the visible set. Known-issue
-      // annotations likewise follow the visible series. Layer renders are
-      // idempotent data joins; labels that newly enter here can sit above the
-      // dots until the next full rebuild, which is cosmetic only
-      // (pointer-events: none).
-      for (const key of ['rooflines', 'known-issues'] as const) {
-        const layer = layersRef.current.find((l) => l.key === key);
-        if (layer && layer.type === 'custom' && layer.render) {
-          layer.render(zoomGroup, decorationCtx);
+      // Rooflines: visibility + solid-stroke recolor as direct writes (never
+      // `d`). Gradient strokes keep their url(#…) reference — gradient stop
+      // colors come from the fixed parallelism palette and don't change with
+      // the active set.
+      zoomGroup.selectAll<SVGPathElement, unknown>('.roofline-path').each(function () {
+        const hw = this.dataset.hwKey;
+        const precision = this.dataset.precision;
+        if (!hw || !precision) return;
+        const el = d3.select(this);
+        const visible =
+          ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+        el.style('opacity', visible ? 1 : 0);
+        const stroke = el.attr('stroke');
+        if (stroke && !stroke.startsWith('url(')) {
+          el.attr('stroke', ir.getCssColor(ir.resolveColor(hw)));
         }
+      });
+
+      // Parallelism / line labels: visibility via data attributes (mirrors
+      // handleLegendHoverEnd). Placement-level updates happen below.
+      zoomGroup
+        .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
+        .style('opacity', function () {
+          const hw = (this as SVGGElement).dataset.hwKey;
+          const precision = (this as SVGGElement).dataset.precision;
+          if (!hw) return 0;
+          if (!precision) return ir.effectiveActiveHwTypes.has(hw) ? 1 : 0;
+          return ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision)
+            ? 1
+            : 0;
+        });
+
+      // Label placement (greedy collision layout) depends on the visible set,
+      // so when labels are shown, re-run the rooflines layer render — UNLESS
+      // an entrance transition is still pending/running, because that render
+      // also rewrites roofline `d` and would defeat the animation. In that
+      // case the in-flight render was produced with current interaction state
+      // anyway; the direct writes above keep visibility correct.
+      const entranceInFlight = zoomGroup
+        .selectAll<SVGPathElement, unknown>('.roofline-path')
+        .nodes()
+        .some((node) => hasNamedTransition(node, 'data-update'));
+
+      // Current (possibly zoomed) scales for layer re-renders — same scales
+      // the zoom handler would use.
+      const t = d3.zoomTransform(svg);
+      const zoomed = t.k !== 1 || t.x !== 0 || t.y !== 0;
+      const xScale = zoomed ? t.rescaleX(ctx.xScale as ContinuousScale) : ctx.xScale;
+      const yScale = zoomed ? t.rescaleY(ctx.yScale as ContinuousScale) : ctx.yScale;
+      const decorationCtx: RenderContext = { ...ctx, xScale, yScale };
+
+      const layerByKey = (key: string) => layersRef.current.find((l) => l.key === key);
+      if ((showGradientLabels || showLineLabels) && !entranceInFlight) {
+        const rooflineLayer = layerByKey('rooflines');
+        if (rooflineLayer?.type === 'custom' && rooflineLayer.render) {
+          rooflineLayer.render(zoomGroup, decorationCtx);
+        }
+      }
+
+      // Known-issue annotations follow the visible series; their layer writes
+      // no animated attributes, so re-rendering is always safe.
+      const knownIssueLayer = layerByKey('known-issues');
+      if (knownIssueLayer?.type === 'custom' && knownIssueLayer.render) {
+        knownIssueLayer.render(zoomGroup, decorationCtx);
       }
     }, [
       isPointVisible,
@@ -2098,6 +2160,7 @@ const ScatterGraph = React.memo(
       resolveColor,
       knownIssueAnnotations,
       showGradientLabels,
+      showLineLabels,
       gradientColorByPoint,
     ]);
 
