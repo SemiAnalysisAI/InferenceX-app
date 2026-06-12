@@ -51,15 +51,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'kimi-k26',
     displayName: 'Kimi-K2.5',
-    // Both K2.5 and K2.6 point releases share an architecture (mirroring
+    // K2.5, K2.6, and K2.7-Code point releases share an architecture (mirroring
     // DISPLAY_MODEL_TO_DB in packages/constants/src/models.ts). The slug uses
-    // the newer version name; the dbKey list pulls data from both DB buckets
-    // so the slug is populated today and stays populated when K2.6 data lands.
-    dbKeys: ['kimik2.6', 'kimik2.5'],
-    // Slug groups two point releases sharing one architecture — the header
-    // surfaces both versions so the URL doesn't read as "only K2.6". Param
+    // the K2.6 version name for URL stability; the dbKey list pulls data from
+    // all three DB buckets so the slug stays populated across point releases.
+    dbKeys: ['kimik2.7-code', 'kimik2.6', 'kimik2.5'],
+    // Slug groups three point releases sharing one architecture — the header
+    // surfaces every version so the URL doesn't read as "only K2.6". Param
     // count appended so the label conveys model scale alongside the version.
-    label: 'Kimi K2.5/K2.6 1T',
+    label: 'Kimi K2.5/K2.6/K2.7-Code 1T',
   },
   {
     slug: 'glm-5-1',

@@ -86,8 +86,10 @@ export const MODEL_TO_KEY: Record<string, string> = {
   // Qwen3.5
   'Qwen/Qwen3.5-397B-A17B': 'qwen3.5',
   'Qwen/Qwen3.5-397B-A17B-FP8': 'qwen3.5',
-  // Kimi-K2.5
+  // Kimi-K2.5 / K2.6 / K2.7-Code (same architecture, distinct DB buckets)
   'moonshotai/Kimi-K2.5': 'kimik2.5',
+  'moonshotai/Kimi-K2.6': 'kimik2.6',
+  'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
   // MiniMax-M2.5
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   // GLM-5

@@ -302,6 +302,7 @@ describe('buildInferenceCompareUrl', () => {
       ['glm5.1', 'GLM-5'],
       ['llama70b', 'Llama-3.3-70B-Instruct-FP8'],
       ['kimik2.6', 'Kimi-K2.5'],
+      ['kimik2.7-code', 'Kimi-K2.5'],
       ['minimaxm2.7', 'MiniMax-M2.5'],
     ];
     for (const [dbModel, expectedDisplay] of cases) {
