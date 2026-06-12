@@ -133,6 +133,116 @@ describe('rowToAggDataEntry', () => {
     expect(entry.avg_power_w).toBeUndefined();
     expect(entry.joules_per_output_token).toBeUndefined();
   });
+
+  it('passes through multinode / disagg role-split power scalars when present', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          tput_per_gpu: 100,
+          prefill_avg_power_w: 612.3,
+          decode_avg_power_w: 701.5,
+          joules_per_input_token: 1.2,
+          // disagg: joules_per_output_token IS the per-stage decode value.
+          joules_per_output_token: 9.7,
+        },
+      }),
+    );
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.decode_avg_power_w).toBe(701.5);
+    expect(entry.joules_per_input_token).toBe(1.2);
+    expect(entry.joules_per_output_token).toBe(9.7);
+  });
+
+  it('passes through per-worker measured power array intact', () => {
+    const workers = [
+      { role: 'prefill' as const, worker_idx: 0, num_gpus: 4, avg_power_w: 588.4 },
+      { role: 'prefill' as const, worker_idx: 1, num_gpus: 4, avg_power_w: 601.2 },
+      { role: 'decode' as const, worker_idx: 0, num_gpus: 8, avg_power_w: 712.1 },
+      { role: 'frontend' as const, worker_idx: 0, num_gpus: 0, avg_power_w: 0 },
+    ];
+    const entry = rowToAggDataEntry(makeRow({ workers }));
+    expect(entry.workers).toEqual(workers);
+  });
+
+  it('defensively drops a non-array workers payload', () => {
+    // The DB JSONB column is untyped at the wire boundary, so guard against a
+    // malformed row reaching downstream consumers.
+    const entry = rowToAggDataEntry(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      makeRow({ workers: 'oops' as any }),
+    );
+    expect(entry.workers).toBeUndefined();
+  });
+
+  it('leaves multinode role-split scalars and workers undefined for legacy rows', () => {
+    // Single-node configs predating the multinode runner don't emit any of
+    // the role-split fields; transform must yield undefined (not 0) so the
+    // chart layer can distinguish "no measurement" from a real zero.
+    const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
+    expect(entry.prefill_avg_power_w).toBeUndefined();
+    expect(entry.decode_avg_power_w).toBeUndefined();
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.workers).toBeUndefined();
+  });
+
+  it('passes through cluster-wide temp/util/mem scalars when present', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          tput_per_gpu: 100,
+          avg_temp_c: 68.4,
+          peak_temp_c: 79.2,
+          avg_util_pct: 88.5,
+          avg_mem_used_mb: 71234.5,
+        },
+      }),
+    );
+    expect(entry.avg_temp_c).toBe(68.4);
+    expect(entry.peak_temp_c).toBe(79.2);
+    expect(entry.avg_util_pct).toBe(88.5);
+    expect(entry.avg_mem_used_mb).toBe(71234.5);
+  });
+
+  it('leaves cluster-wide temp/util/mem fields undefined when absent (legacy rows)', () => {
+    // Same undefined-vs-zero distinction as the measured-power scalars —
+    // historic rows predate the perfmon CSV scrape, so missing values must
+    // not be silently coerced to 0.
+    const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
+    expect(entry.avg_temp_c).toBeUndefined();
+    expect(entry.peak_temp_c).toBeUndefined();
+    expect(entry.avg_util_pct).toBeUndefined();
+    expect(entry.avg_mem_used_mb).toBeUndefined();
+  });
+
+  it('preserves new optional WorkerPower fields (hosts, telemetry) on workers entries', () => {
+    const workers = [
+      {
+        role: 'prefill' as const,
+        worker_idx: 0,
+        hosts: ['pn0'],
+        num_gpus: 4,
+        avg_power_w: 612.3,
+        avg_temp_c: 71.2,
+        peak_temp_c: 78,
+        avg_util_pct: 92.1,
+        avg_mem_used_mb: 65432,
+      },
+      {
+        role: 'decode' as const,
+        worker_idx: 0,
+        hosts: ['dn0', 'dn1', 'dn2', 'dn3'],
+        num_gpus: 16,
+        avg_power_w: 712.1,
+      },
+    ];
+    const entry = rowToAggDataEntry(makeRow({ workers }));
+    expect(entry.workers).toEqual(workers);
+    expect(entry.workers![0].hosts).toEqual(['pn0']);
+    expect(entry.workers![0].avg_temp_c).toBe(71.2);
+    expect(entry.workers![1].hosts).toEqual(['dn0', 'dn1', 'dn2', 'dn3']);
+    // Optional telemetry fields stay undefined when source omits them.
+    expect(entry.workers![1].avg_temp_c).toBeUndefined();
+  });
 });
 
 describe('transformBenchmarkRows', () => {

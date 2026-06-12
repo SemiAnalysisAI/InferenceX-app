@@ -13,8 +13,8 @@ import {
 // ── matchesPresetHwFilter ────────────────────────────────────────────
 
 describe('matchesPresetHwFilter', () => {
-  const dsv4 = Model.DeepSeek_V4_Pro; // mtpEngineExclusion = true
-  const dsr1 = Model.DeepSeek_R1; // no MTP exclusion
+  const dsv4 = Model.DeepSeek_V4_Pro; // has an MTP exclusion rule
+  const dsr1 = Model.DeepSeek_R1; // no exclusion rule
 
   it('matches a bare GPU prefix against any framework variant on that GPU', () => {
     expect(matchesPresetHwFilter('b300_sglang', ['b300'], dsv4)).toBe(true);
@@ -22,8 +22,8 @@ describe('matchesPresetHwFilter', () => {
     expect(matchesPresetHwFilter('b300_dynamo-vllm', ['b300'], dsv4)).toBe(true);
   });
 
-  it('skips _mtp keys via a bare GPU prefix only for mtpEngineExclusion models', () => {
-    // dsv4 has mtpEngineExclusion → MTP keys filtered out under bare prefix
+  it('skips _mtp keys via a bare GPU prefix only for models with an exclusion rule', () => {
+    // dsv4 has an MTP exclusion rule → MTP keys filtered out under bare prefix
     expect(matchesPresetHwFilter('b300_sglang_mtp', ['b300'], dsv4)).toBe(false);
     expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], dsv4)).toBe(false);
     // dsr1 (and other models) → bare prefix still pulls MTP variants through

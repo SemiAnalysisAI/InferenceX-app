@@ -55,6 +55,9 @@ export function normalizeArtifactRows(
       conc: params.conc,
       image: params.image,
       metrics: params.metrics,
+      // Surface the same per-worker payload the DB path emits so unofficial
+      // overlays carry the multinode measured-power breakdown too.
+      workers: params.workers,
       date,
       run_url: runUrl,
     });

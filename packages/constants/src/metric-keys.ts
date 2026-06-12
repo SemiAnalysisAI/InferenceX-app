@@ -45,10 +45,35 @@ export const METRIC_KEYS = new Set([
   'std_intvty',
   // measured power / energy (emitted by runner's aggregate_power.py)
   // avg_power_w:             mean per-GPU draw (W) during the load window
-  // joules_per_output_token: avg_power_w * num_gpus * duration / total_output_tokens
-  // joules_per_total_token:  avg_power_w * num_gpus * duration / (total_input + total_output)
-  //                          — workload-shape-fair view that doesn't treat prompt as free
+  // joules_per_output_token: energy / total_output_tokens. CLUSTER-WIDE on
+  //                          single-node / non-disagg (total_system_energy);
+  //                          PER-STAGE decode_energy on disagg (decode GPUs only),
+  //                          symmetric with joules_per_input_token below.
+  // joules_per_total_token:  total_system_energy / (total_input + total_output)
+  //                          — cluster-wide; workload-shape-fair view that
+  //                          doesn't treat prompt as free.
   'avg_power_w',
   'joules_per_output_token',
   'joules_per_total_token',
+  // multinode / disagg role splits (emitted only when the deployment has
+  // distinct prefill / decode workers)
+  // prefill_avg_power_w / decode_avg_power_w:  mean per-GPU draw within each role
+  // joules_per_input_token:  prefill_energy / total_input_tokens (prefill GPUs only).
+  //   The disagg output counterpart is joules_per_output_token above (decode GPUs
+  //   only) — there is no separate _decode key.
+  'prefill_avg_power_w',
+  'decode_avg_power_w',
+  'joules_per_input_token',
+  // cluster-wide GPU telemetry beyond power (emitted by aggregate_power.py when
+  // the perfmon CSVs include temperature, utilization, or memory samples).
+  // avg_temp_c:        mean per-GPU temperature (Celsius) during load window
+  // peak_temp_c:       max instantaneous per-GPU temperature in window
+  // avg_util_pct:      mean per-GPU GPU-utilization percent (0-100)
+  // avg_mem_used_mb:   mean per-GPU memory used (MiB / MB)
+  // Single-node and multinode runs both surface these as flat scalars; the
+  // per-worker breakdown carries the same fields on each entry in workers[].
+  'avg_temp_c',
+  'peak_temp_c',
+  'avg_util_pct',
+  'avg_mem_used_mb',
 ]);

@@ -78,6 +78,8 @@ export interface NudgeContent {
   primaryAction?: NudgeAction;
   /** Extra CSS class on the modal container (e.g. branded border). */
   containerClassName?: string;
+  /** Render as a true center-of-page modal with a backdrop instead of a bottom-right card. */
+  centered?: boolean;
   /** Extra CSS class on the primary action button (e.g. glow effect). */
   actionClassName?: string;
   /** Badge text rendered next to the title (e.g. "New"). */

@@ -11,7 +11,6 @@ import {
   compareModelDisplayLabel,
   parseCompareSlug,
 } from '@/lib/compare-slug';
-import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import {
   buildBreadcrumbJsonLd,
   buildJsonLd,
@@ -33,14 +32,6 @@ export const dynamic = 'force-dynamic';
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-export async function generateStaticParams() {
-  // Only enumerate (model, pair) combos with benchmark data on both sides.
-  // Direct URL hits to non-enumerated combos still render via the dynamic
-  // SSR path (with the empty-state fallback).
-  const slugs = await getAllComparableCompareSlugs();
-  return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -88,7 +79,10 @@ export default async function ComparePage({ params, searchParams }: Props) {
   // redirect — the original PR #351 redirect dropped these, but with bare slugs
   // now redirecting unconditionally we need to keep them.
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  if (canonical !== slug) {
+  // canonical is always lowercase; compare against lowercased input so mixed-case
+  // URLs (e.g. /compare/H100-vs-H200) don't emit a fresh 308 + CDN cache entry
+  // every hit when they actually match the canonical content.
+  if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
         if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);

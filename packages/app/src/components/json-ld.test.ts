@@ -9,7 +9,7 @@ function render(data: object): string {
 }
 
 function scriptBody(html: string): string {
-  const match = html.match(/<script[^>]*>([\s\S]*?)<\/script[^>]*>/iu);
+  const match = html.match(/<script[^>]*>(?<body>[\s\S]*?)<\/script[^>]*>/iu);
   if (!match) throw new Error(`no <script> in: ${html}`);
   return match[1];
 }
@@ -44,6 +44,24 @@ describe('JsonLd', () => {
     const html = render(data);
     const body = scriptBody(html);
     expect(body).not.toContain('<b>');
+    expect(JSON.parse(body)).toEqual(data);
+  });
+
+  it('escapes > so an HTML parser cannot mistake a literal > for the end of a comment/CDATA', () => {
+    const data = { note: 'a > b' };
+    const html = render(data);
+    const body = scriptBody(html);
+    expect(body).toContain(String.raw`\u003e`);
+    expect(body).not.toContain('>');
+    expect(JSON.parse(body)).toEqual(data);
+  });
+
+  it('escapes & so the payload cannot smuggle entity references through the parser', () => {
+    const data = { note: 'Tom & Jerry' };
+    const html = render(data);
+    const body = scriptBody(html);
+    expect(body).toContain(String.raw`\u0026`);
+    expect(body).not.toContain('&');
     expect(JSON.parse(body)).toEqual(data);
   });
 

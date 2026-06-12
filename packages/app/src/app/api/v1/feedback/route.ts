@@ -5,6 +5,7 @@ import { utf8ToBytes } from '@noble/ciphers/utils.js';
 import { getWriteDb } from '@semianalysisai/inferencex-db/connection';
 import { type Cipher, createCipher, loadKey } from '@semianalysisai/inferencex-db/lib/encryption';
 
+import { trackServer } from '@/lib/analytics-server';
 import { parseFeedbackBody } from './parse';
 
 const aadFor = (column: string) => utf8ToBytes(`user_feedback:${column}`);
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 204 });
   }
 
+  const pagePath = body.pagePath ?? null;
   let cipher: Cipher;
   let sql: ReturnType<typeof getWriteDb>;
   try {
@@ -62,6 +64,12 @@ export async function POST(request: Request) {
     sql = getWriteDb();
   } catch (error) {
     console.error('feedback: misconfigured', error);
+    trackServer('feedback_submission_failed', {
+      error_code: 'E_CRYPTO',
+      error_name: error instanceof Error ? error.name : 'Unknown',
+      error_message: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+      page_path: pagePath,
+    });
     return serverError('E_CRYPTO');
   }
 
@@ -94,6 +102,12 @@ export async function POST(request: Request) {
     `;
   } catch (error) {
     console.error('feedback: insert failed', error);
+    trackServer('feedback_submission_failed', {
+      error_code: 'E_INSERT',
+      error_name: error instanceof Error ? error.name : 'Unknown',
+      error_message: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+      page_path: pagePath,
+    });
     return serverError('E_INSERT');
   }
 

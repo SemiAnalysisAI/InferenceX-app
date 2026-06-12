@@ -3,7 +3,7 @@
 import type { MouseEvent } from 'react';
 
 interface RouterLike {
-  push(href: string): void;
+  push: (href: string) => void;
 }
 
 /**

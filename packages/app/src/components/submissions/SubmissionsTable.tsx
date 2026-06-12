@@ -71,6 +71,34 @@ function getModelDisplayName(dbModel: string): string {
   return dbModel;
 }
 
+function SortHeader({
+  label,
+  field,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  field: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (field: SortKey) => void;
+}) {
+  return (
+    <th
+      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortKey === field && (
+          <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </span>
+    </th>
+  );
+}
+
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -147,20 +175,6 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
     });
   }, []);
 
-  const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
-    <th
-      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
-      onClick={() => handleSort(field)}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        {sortKey === field && (
-          <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        )}
-      </span>
-    </th>
-  );
-
   return (
     <div className="flex flex-col gap-3">
       <input
@@ -178,13 +192,26 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           <thead className="bg-muted/50">
             <tr>
               <th className="w-8 px-2" />
-              <SortHeader label="GPU" field="hardware" />
-              <SortHeader label="Model" field="model" />
-              <SortHeader label="Precision" field="precision" />
-              <SortHeader label="Spec Method" field="spec_method" />
-              <SortHeader label="Framework" field="framework" />
-              <SortHeader label="Date" field="date" />
-              <SortHeader label="Datapoints" field="total_datapoints" />
+              {(
+                [
+                  ['GPU', 'hardware'],
+                  ['Model', 'model'],
+                  ['Precision', 'precision'],
+                  ['Spec Method', 'spec_method'],
+                  ['Framework', 'framework'],
+                  ['Date', 'date'],
+                  ['Datapoints', 'total_datapoints'],
+                ] as [string, SortKey][]
+              ).map(([label, field]) => (
+                <SortHeader
+                  key={field}
+                  label={label}
+                  field={field}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              ))}
               <th
                 className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
                 scope="col"

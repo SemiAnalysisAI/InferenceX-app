@@ -113,13 +113,23 @@ describe('flattenReusedIngestArtifactBundle', () => {
     expect(readReusedIngestMetadata(root)?.sourceRunId).toBe('25763435778');
   });
 
-  it('rejects flattening when it would overwrite an existing artifact', () => {
+  it('keeps the run-local artifact when a reused artifact collides', () => {
     const root = tempDir();
     fs.mkdirSync(path.join(root, 'results_bmk'));
+    fs.writeFileSync(path.join(root, 'results_bmk', 'fresh.json'), '[]');
     fs.mkdirSync(path.join(root, 'reused-ingest-artifacts', 'results_bmk'), {
       recursive: true,
     });
+    fs.writeFileSync(
+      path.join(root, 'reused-ingest-artifacts', 'results_bmk', 'reused.json'),
+      '[]',
+    );
+    fs.mkdirSync(path.join(root, 'reused-ingest-artifacts', 'run-stats'), { recursive: true });
 
-    expect(() => flattenReusedIngestArtifactBundle(root)).toThrow(/destination already exists/u);
+    expect(flattenReusedIngestArtifactBundle(root)).toEqual(['run-stats']);
+    expect(fs.existsSync(path.join(root, 'reused-ingest-artifacts'))).toBe(false);
+    expect(fs.existsSync(path.join(root, 'run-stats'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'results_bmk', 'fresh.json'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'results_bmk', 'reused.json'))).toBe(false);
   });
 });

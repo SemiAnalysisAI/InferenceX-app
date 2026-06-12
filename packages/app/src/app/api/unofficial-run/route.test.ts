@@ -206,6 +206,36 @@ describe('normalizeArtifactRows', () => {
     );
     expect(rows.every((r) => r.date === '2026-03-11')).toBe(true);
   });
+
+  it('surfaces the per-worker measured-power array on the BenchmarkRow', () => {
+    const workers = [
+      {
+        role: 'prefill',
+        worker_idx: 0,
+        hosts: ['pn0'],
+        num_gpus: 4,
+        avg_power_w: 612.3,
+        avg_temp_c: 71.2,
+      },
+      {
+        role: 'decode',
+        worker_idx: 0,
+        hosts: ['dn0', 'dn1'],
+        num_gpus: 8,
+        avg_power_w: 712.1,
+      },
+    ];
+    const rows = normalizeArtifactRows([rawRow({ workers })], '2026-03-01');
+    expect(rows[0].workers).toHaveLength(2);
+    expect(rows[0].workers![0].hosts).toEqual(['pn0']);
+    expect(rows[0].workers![0].avg_temp_c).toBe(71.2);
+    expect(rows[0].workers![1].role).toBe('decode');
+  });
+
+  it('leaves workers undefined when the artifact omits the field', () => {
+    const rows = normalizeArtifactRows([rawRow()], '2026-03-01');
+    expect(rows[0].workers).toBeUndefined();
+  });
 });
 
 describe('normalizeEvalArtifactRows', () => {

@@ -15,7 +15,10 @@ import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
-const wrapMetric = (n: number): { y: number } => ({ y: n });
+// Trend points never sit on a roofline — they're synthetic per-(date, config)
+// aggregates, not the per-load Pareto-frontier points the chart marks. Hardcode
+// roof:false so the field shape lines up with InferenceData without a cast.
+const wrapMetric = (n: number): { y: number; roof: boolean } => ({ y: n, roof: false });
 
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
@@ -38,8 +41,11 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
   const outTokPerHr = (outputTput * 3600) / 1_000_000;
   const inTokPerHr = (inputTput * 3600) / 1_000_000;
 
-  // Build metric objects matching InferenceData shape
-  return {
+  // Build metric objects matching InferenceData shape. Measured-power keys are
+  // only set when the runner-side aggregate_power.py emitted them — leaving the
+  // field undefined lets extractMetric return null and the trend show a real
+  // gap instead of a flat-zero line.
+  const point: InferenceData = {
     x: m.median_intvty ?? 0,
     y: tput,
     hwKey,
@@ -65,7 +71,26 @@ function rowToLightweightPoint(row: BenchmarkRow): InferenceData | null {
     jTotal: wrapMetric(power > 0 && tput ? (power * 1000) / tput : 0),
     ...(outputTput ? { jOutput: wrapMetric(power > 0 ? (power * 1000) / outputTput : 0) } : {}),
     ...(inputTput ? { jInput: wrapMetric(power > 0 ? (power * 1000) / inputTput : 0) } : {}),
-  } as unknown as InferenceData;
+    ...(typeof entry.avg_power_w === 'number'
+      ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_output_token === 'number'
+      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_total_token === 'number'
+      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      : {}),
+    ...(typeof entry.prefill_avg_power_w === 'number'
+      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.decode_avg_power_w === 'number'
+      ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_input_token === 'number'
+      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      : {}),
+  };
+  return point;
 }
 
 /**
@@ -104,9 +129,17 @@ export function interpolateMetricAtInteractivity(
       : null;
   }
 
-  // Extract metric values from frontier points
+  // Extract metric values from frontier points. If ANY point is missing the
+  // metric (e.g. measured-power keys on a row that predates aggregate_power.py),
+  // bail out — silently coercing nulls to zero would render a flat-zero trend
+  // line that looks like real data.
   const xs = sorted.map((p) => p.x);
-  const metricYs = sorted.map((p) => extractMetric(p, metricKey) ?? 0);
+  const metricYs: number[] = [];
+  for (const p of sorted) {
+    const v = extractMetric(p, metricKey);
+    if (v === null) return null;
+    metricYs.push(v);
+  }
 
   // Monotone cubic Hermite spline interpolation
   const slopes = monotoneSlopes(xs, metricYs);

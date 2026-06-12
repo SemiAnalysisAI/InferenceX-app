@@ -326,12 +326,20 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/gmi-yeh',
   },
   {
-    text: 'Now commonly hearing "We want to the Semianalysis for X". Testament to what @dylan522p has built.',
+    text: 'Now commonly hearing "We want the Semianalysis for X". Testament to what @dylan522p has built.',
     name: 'Sriram Krishnan',
     title: 'White House Senior AI Advisor',
     org: 'White House',
     logo: 'white-house.svg',
     link: 'https://x.com/sriramk/status/2048824255702262135',
+  },
+  {
+    text: 'At EmbeddedLLM, our team works deep in the production inference stack, including major maintainer and contributor work in vLLM, so we see every day how much real-world AI performance depends on the full system: model, runtime, kernels, scheduling, and hardware. InferenceX\u2122 matters because it benchmarks that full system continuously and openly. It turns inference from a marketing conversation into an engineering discipline, giving AI labs, neoclouds, and enterprises the data they need to make decisions on throughput, cost, and efficiency at production scale.',
+    name: 'Pin Siang Tan',
+    title: 'Co-founder & CTO, EmbeddedLLM',
+    org: 'EmbeddedLLM',
+    logo: 'embeddedllm.webp',
+    link: 'https://www.linkedin.com/in/tanpinsiang',
   },
 ];
 

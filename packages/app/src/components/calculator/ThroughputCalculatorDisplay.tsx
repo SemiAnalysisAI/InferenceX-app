@@ -6,7 +6,8 @@ import { BarChart3, Table2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
-import { useGlobalFilters } from '@/components/GlobalFilterContext';
+import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { GlobalFilterProvider, useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -93,7 +94,22 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 const CALCULATOR_MOBILE_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] =
   CALCULATOR_VIEW_MODE_OPTIONS.map(({ testId: _testId, ...option }) => option);
 
-export default function ThroughputCalculatorDisplay() {
+export default function ThroughputCalculatorDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+  if (urlSeed && (urlSeed.model || urlSeed.sequence || urlSeed.precisions)) {
+    return (
+      <GlobalFilterProvider
+        initialModel={urlSeed.model}
+        initialSequence={urlSeed.sequence}
+        initialPrecisions={urlSeed.precisions}
+      >
+        <ThroughputCalculatorInner />
+      </GlobalFilterProvider>
+    );
+  }
+  return <ThroughputCalculatorInner />;
+}
+
+function ThroughputCalculatorInner() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
     if (isOpen) {

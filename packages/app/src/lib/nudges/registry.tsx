@@ -7,13 +7,19 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { FEEDBACK_SUBMITTED_EVENT, FeedbackForm } from '@/components/feedback-modal';
+import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+
+// Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
+const FeedbackForm = dynamic(
+  () => import('@/components/feedback-modal').then((m) => m.FeedbackForm),
+  { ssr: false },
+);
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
-import { FEEDBACK_ELIGIBLE_EVENT } from '@/lib/visit-tracking';
 import type { NudgeDefinition } from './types';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -188,10 +194,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'feedback-modal',
     type: 'modal',
-    trigger: { type: 'event', event: FEEDBACK_ELIGIBLE_EVENT, delayMs: 2000 },
+    trigger: { type: 'immediate' },
     dismissal: {
       type: 'timed',
-      durationMs: 90 * 24 * 60 * 60 * 1000,
+      durationMs: 3 * 24 * 60 * 60 * 1000,
       cooldownStartsOnShow: true,
     },
     storageKey: 'inferencex-feedback-modal-snoozed',
@@ -203,8 +209,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: MessageSquareText,
       iconClassName: 'text-brand',
       title: 'Help us improve InferenceX',
-      description: "You're a regular! We'd love to hear what's working and what isn't.",
+      description: "We'd love to hear what's working and what isn't.",
       testId: 'feedback-modal',
+      centered: true,
       renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
     },
     analytics: {

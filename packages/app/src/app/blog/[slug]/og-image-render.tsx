@@ -102,6 +102,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
             <img
               key={i}
               src={tile.src}
+              alt=""
               style={{
                 position: 'absolute',
                 left: 12 + col * 90,
@@ -180,7 +181,7 @@ export async function renderOgImage(meta: BlogPostMeta) {
               timeZone: 'UTC',
             })}
           </span>
-          <img src={logoSrc} height={80} />
+          <img src={logoSrc} height={80} alt="SemiAnalysis" />
         </div>
       </div>
     </div>,

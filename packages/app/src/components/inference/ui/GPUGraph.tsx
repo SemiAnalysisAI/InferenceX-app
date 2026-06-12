@@ -42,6 +42,12 @@ import {
   generateGPUGraphTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
+import {
+  type KnownIssueAnnotation,
+  measureLegendRightInset,
+  renderKnownIssueAnnotations,
+} from '@/components/inference/utils/knownIssueAnnotations';
+import { matchKnownConfigIssues } from '@/lib/known-issues';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -58,7 +64,7 @@ function labelTextFor(pts: InferenceData[]): string {
 }
 
 const GPUGraph = React.memo(
-  ({ chartId, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
+  ({ chartId, modelLabel, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
     const {
       hardwareConfig,
       selectedPrecisions,
@@ -210,6 +216,70 @@ const GPUGraph = React.memo(
         );
       return pts;
     }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
+
+    // Warning annotations for visible series with known upstream issues —
+    // same treatment the scatter view gets, applied to the date-comparison view.
+    // Lines here are colored per (gpu, date) pair, so take the first active
+    // pair's color as the series swatch.
+    const knownIssueAnnotations = useMemo(
+      (): KnownIssueAnnotation[] =>
+        matchKnownConfigIssues(modelLabel, filteredData).map((issue) => {
+          const cfg = getHardwareConfig(issue.hwKey);
+          const colorEntry = allGraphs.find(
+            (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
+          );
+          return {
+            issue,
+            label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
+            color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
+            points: filteredData
+              .filter(
+                (p) =>
+                  String(p.hwKey) === issue.hwKey &&
+                  (!issue.precisions || issue.precisions.includes(p.precision)),
+              )
+              .map((p) => ({ x: p.x, y: p.y })),
+          };
+        }),
+      [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor],
+    );
+
+    const drawKnownIssues = (
+      ctx: RenderContext,
+      xScale: ContinuousScale,
+      yScale: ContinuousScale,
+    ) => {
+      renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
+        chartId,
+        width: ctx.width,
+        height: ctx.height,
+        xScale,
+        yScale,
+        annotations: knownIssueAnnotations,
+        rightInset: measureLegendRightInset(
+          chartId,
+          ctx.layout.svg.node(),
+          ctx.layout.margin.left,
+          ctx.width,
+        ),
+        background: getCssColor('--background'),
+        foreground: getCssColor('--foreground'),
+        mutedForeground: getCssColor('--muted-foreground'),
+        onLinkClick: (a) =>
+          track('inference_known_issue_clicked', {
+            hwKey: a.issue.hwKey,
+            issue: a.issue.issueRef,
+          }),
+      });
+    };
+    const knownIssueLayer: CustomLayerConfig = {
+      type: 'custom',
+      key: 'known-issues',
+      render: (_zoomGroup, ctx) =>
+        drawKnownIssues(ctx, ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale),
+      onZoom: (_zoomGroup, ctx) =>
+        drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
+    };
 
     // Compute scale domains
     const xExtent = useMemo(() => {
@@ -649,6 +719,7 @@ const GPUGraph = React.memo(
             },
           },
           lineLabelLayer,
+          knownIssueLayer,
         ]}
         zoom={{
           enabled: true,

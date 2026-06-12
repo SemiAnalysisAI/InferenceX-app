@@ -40,11 +40,17 @@ export async function bulkIngestBenchmarkRows(
   const concs = deduped.map((r) => r.conc);
   const images = deduped.map((r) => r.image);
   const metricsJsons = deduped.map((r) => JSON.stringify(r.metrics));
+  // workers is optional — encode missing values as JSON null so the JSONB
+  // unnest input has a homogeneous type (jsonb[]) and stores SQL NULL in the
+  // column for rows that didn't emit a per-worker breakdown.
+  const workersJsons = deduped.map((r) =>
+    r.workers === undefined ? null : JSON.stringify(r.workers),
+  );
 
   const result = await sql<{ inserted: boolean; id: number }[]>`
     insert into benchmark_results (
       workflow_run_id, config_id, benchmark_type, date,
-      isl, osl, conc, image, metrics
+      isl, osl, conc, image, metrics, workers
     )
     select
       ${workflowRunId},
@@ -55,11 +61,13 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(osls)}::int[]),
       unnest(${sql.array(concs)}::int[]),
       unnest(${sql.array(images)}),
-      unnest(${sql.array(metricsJsons)}::jsonb[])
+      unnest(${sql.array(metricsJsons)}::jsonb[]),
+      unnest(${sql.array(workersJsons)}::jsonb[])
     on conflict (workflow_run_id, config_id, benchmark_type, isl, osl, conc)
     do update set
       metrics = excluded.metrics,
-      image = excluded.image
+      image = excluded.image,
+      workers = excluded.workers
     returning (xmax = 0) as inserted, id
   `;
 

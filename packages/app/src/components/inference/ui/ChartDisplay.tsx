@@ -23,6 +23,8 @@ import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
+import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
+import { getDisplayLabel } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -43,7 +45,7 @@ import {
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
-import { hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 
 import ChartControls from './ChartControls';
 import ComparisonChangelog from './ComparisonChangelog';
@@ -76,6 +78,7 @@ function E2eXAxisDropdown({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          type="button"
           className="inline-flex items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
           onClick={(e) => e.stopPropagation()}
         >
@@ -86,6 +89,7 @@ function E2eXAxisDropdown({
       <PopoverContent className="w-48 p-1" align="start">
         {xAxisOptions.map((opt) => (
           <button
+            type="button"
             key={opt.label}
             className={`w-full text-left px-3 py-1.5 text-sm rounded hover:bg-accent transition-colors ${
               (opt.value === null && !selectedValue) || opt.value === selectedValue
@@ -169,8 +173,14 @@ export default function ChartDisplay() {
     track('inference_view_changed', { view: value, chartIndex: index });
   };
 
-  const { unofficialRunInfo, unofficialRunInfos, runIndexByUrl, getOverlayData, isUnofficialRun } =
-    useUnofficialRun();
+  const {
+    unofficialRunInfo,
+    unofficialRunInfos,
+    runIndexByUrl,
+    getOverlayData,
+    isUnofficialRun,
+    activeOverlayHwTypes,
+  } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
@@ -190,7 +200,7 @@ export default function ChartDisplay() {
         const info = unofficialRunInfos[runIndexByUrl[url]];
         return info ? { branch: info.branch, url: info.url } : undefined;
       }
-      const idMatch = url.match(/\/runs\/(\d+)/u);
+      const idMatch = url.match(/\/runs\/(?<runId>\d+)/u);
       if (idMatch && idMatch[1] in runIndexByUrl) {
         const info = unofficialRunInfos[runIndexByUrl[idMatch[1]]];
         return info ? { branch: info.branch, url: info.url } : undefined;
@@ -381,10 +391,30 @@ export default function ChartDisplay() {
                       graph.model,
                       graph.sequence,
                     );
+                    // Match warnings against the same series the chart annotates,
+                    // including visible unofficial-run overlay series.
+                    const overlay =
+                      graph.chartDefinition.chartType === 'e2e'
+                        ? overlayDataByChartType.e2e
+                        : overlayDataByChartType.interactivity;
+                    const visibleOverlayRows = isTimelineMode
+                      ? []
+                      : (overlay?.data ?? []).filter(
+                          (p) =>
+                            activeOverlayHwTypes.has(p.hwKey as string) &&
+                            selectedPrecisions.includes(p.precision),
+                        );
+                    const issueNotes = matchKnownConfigIssues(graph.model, [
+                      ...visibleData,
+                      ...visibleOverlayRows,
+                    ]).map((issue) =>
+                      knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                    );
                     exportToCsv(
                       `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
                       headers,
                       rows,
+                      issueNotes,
                     );
                   }}
                 />
@@ -680,6 +710,7 @@ export default function ChartDisplay() {
                 />
                 {config.label}
                 <button
+                  type="button"
                   className="ml-1 hover:opacity-70"
                   onClick={() => {
                     removeTrackedConfig(config.id);

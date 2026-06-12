@@ -44,8 +44,13 @@ describe('Compare-per-dollar canonical slug redirect', () => {
 
   it('preserves query params across the bare-slug redirect', () => {
     cy.visit('/compare-per-dollar/h100-vs-h200?i_seq=1k/1k');
-    cy.location('pathname').should('eq', '/compare-per-dollar/deepseek-r1-h100-vs-h200');
-    cy.location('search').should('contain', 'i_seq=1k%2F1k');
+    // Assert pathname and search together so Cypress retries the pair atomically:
+    // on Firefox, reading them as two separate commands can catch a window where the
+    // redirect has landed but `search` momentarily reads empty mid-navigation.
+    cy.location().should((loc) => {
+      expect(loc.pathname).to.eq('/compare-per-dollar/deepseek-r1-h100-vs-h200');
+      expect(loc.search).to.contain('i_seq=1k%2F1k');
+    });
   });
 
   it('serves a non-deepseek canonical slug without redirecting', () => {

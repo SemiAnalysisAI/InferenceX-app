@@ -5,11 +5,12 @@ description: Download and analyze InferenceX ML inference benchmark data — GPU
 
 # Setup
 
-Download the latest database dump from GitHub releases:
+Download the latest database dump from GitHub releases. It is xz-compressed and split into
+one or more `.tar.xz.part*` files; reassemble them by piping `cat` through `xz` (requires `xz`):
 
 ```bash
-gh release download --repo SemiAnalysisAI/InferenceX-app --pattern 'inferencex-dump-*.zip' --dir .
-unzip inferencex-dump-*.zip
+gh release download --repo SemiAnalysisAI/InferenceX-app --pattern 'inferencex-dump-*.tar.xz.part*' --dir .
+cat inferencex-dump-*.tar.xz.part* | xz -d -T0 | tar -x
 ```
 
 # Data

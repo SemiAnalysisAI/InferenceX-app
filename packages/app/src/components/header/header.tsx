@@ -103,7 +103,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="text-lg font-bold tracking-tight">InferenceX</span>
+            <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image

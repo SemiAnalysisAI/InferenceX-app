@@ -180,7 +180,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       if (url) {
         const direct = runIndexByUrl[url];
         if (direct !== undefined) return unofficialRunInfos[direct]?.branch;
-        const idMatch = url.match(/\/runs\/(\d+)/u);
+        const idMatch = url.match(/\/runs\/(?<runId>\d+)/u);
         if (idMatch) {
           const viaId = runIndexByUrl[idMatch[1]];
           if (viaId !== undefined) return unofficialRunInfos[viaId]?.branch;

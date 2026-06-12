@@ -129,7 +129,7 @@ describe('GPU_SPECS', () => {
     const nvidiaGpus = GPU_SPECS.filter((s) => s.vendor === 'nvidia');
     expect(nvidiaGpus.length).toBe(6);
     for (const gpu of nvidiaGpus) {
-      expect(gpu.name).toMatch(/^(H|B|GB)/u);
+      expect(gpu.name).toMatch(/^(?:H|B|GB)/u);
     }
   });
 

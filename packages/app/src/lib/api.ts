@@ -3,6 +3,8 @@
  * Each function is a thin fetch wrapper returning typed data.
  */
 
+import type { WorkerPower } from '@/components/inference/types';
+
 import type { SubmissionsResponse } from './submissions-types';
 
 export interface BenchmarkRow {
@@ -28,6 +30,15 @@ export interface BenchmarkRow {
   conc: number;
   image: string | null;
   metrics: Record<string, number>;
+  /**
+   * Per-worker measured power for multinode / disagg runs. The runner emits
+   * this as a JSONB sibling of the scalar metrics; the API layer surfaces it
+   * as a separate field here so the scalar `metrics` index signature can stay
+   * `Record<string, number>` and existing `m.x ?? 0` call sites keep narrowing
+   * cleanly. Undefined for single-node runs and any run predating
+   * aggregate_power.py.
+   */
+  workers?: WorkerPower[];
   date: string;
   run_url: string | null;
 }

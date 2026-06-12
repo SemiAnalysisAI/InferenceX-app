@@ -19,7 +19,11 @@ export function flattenReusedIngestArtifactBundle(rootDir: string): string[] {
     const source = path.join(bundleDir, name);
     const dest = path.join(rootDir, name);
     if (fs.existsSync(dest)) {
-      throw new Error(`Cannot flatten reused artifact '${name}'; destination already exists`);
+      // The run re-produced this artifact itself; the fresh copy wins over
+      // the one reused from the source run.
+      console.warn(`  [WARN] Skipping reused artifact '${name}'; the run has a fresher copy`);
+      fs.rmSync(source, { recursive: true, force: true });
+      continue;
     }
     fs.renameSync(source, dest);
     moved.push(name);

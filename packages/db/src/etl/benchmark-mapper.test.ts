@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapBenchmarkRow } from './benchmark-mapper';
+import { extractWorkers, mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 
 /** Minimal valid v1 benchmark row. */
@@ -387,5 +387,186 @@ describe('mapBenchmarkRow', () => {
 
       expect(result!.config.isMultinode).toBe(false);
     });
+  });
+
+  describe('workers payload (multinode / disagg measured power)', () => {
+    it('leaves workers undefined when the row omits the field', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(makeV1Row(), tracker);
+
+      expect(result!.workers).toBeUndefined();
+    });
+
+    it('extracts a multinode disagg workers array intact', () => {
+      const tracker = createSkipTracker();
+      const workers = [
+        {
+          role: 'prefill',
+          worker_idx: 0,
+          hosts: ['pn0'],
+          num_gpus: 4,
+          avg_power_w: 612.3,
+          avg_temp_c: 71.2,
+          peak_temp_c: 78,
+          avg_util_pct: 92.1,
+          avg_mem_used_mb: 65432,
+        },
+        {
+          role: 'decode',
+          worker_idx: 0,
+          hosts: ['dn0', 'dn1', 'dn2', 'dn3'],
+          num_gpus: 16,
+          avg_power_w: 712.1,
+        },
+      ];
+      const result = mapBenchmarkRow(makeV2Row({ workers }), tracker);
+
+      expect(result!.workers).toHaveLength(2);
+      expect(result!.workers![0].role).toBe('prefill');
+      expect(result!.workers![0].hosts).toEqual(['pn0']);
+      expect(result!.workers![0].avg_power_w).toBe(612.3);
+      expect(result!.workers![0].avg_temp_c).toBe(71.2);
+      expect(result!.workers![0].peak_temp_c).toBe(78);
+      expect(result!.workers![0].avg_util_pct).toBe(92.1);
+      expect(result!.workers![0].avg_mem_used_mb).toBe(65432);
+      expect(result!.workers![1].role).toBe('decode');
+      expect(result!.workers![1].hosts).toEqual(['dn0', 'dn1', 'dn2', 'dn3']);
+      expect(result!.workers![1].num_gpus).toBe(16);
+      // Optional telemetry fields stay absent when the source omits them.
+      expect(result!.workers![1].avg_temp_c).toBeUndefined();
+    });
+
+    it('does not write workers into the metrics record', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV1Row({
+          workers: [{ role: 'prefill', worker_idx: 0, num_gpus: 4, avg_power_w: 500 }],
+        }),
+        tracker,
+      );
+
+      // workers is an array — parseNum yields undefined, but the explicit
+      // NON_METRIC_KEYS entry is what guarantees it never leaks into metrics.
+      expect(result!.metrics).not.toHaveProperty('workers');
+    });
+
+    it('captures new cluster-wide temp / util / mem scalars into metrics', () => {
+      // These are flat scalars on the agg row (sibling of avg_power_w), so
+      // the auto-capture path must store them under their raw keys without
+      // emitting a "[WARN] auto-captured unexpected metric" warning. The
+      // warning suppression is verified indirectly: METRIC_KEYS now contains
+      // these keys, so a clean test run never produces a warning.
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV1Row({
+          avg_temp_c: 68.4,
+          peak_temp_c: 79.2,
+          avg_util_pct: 88.5,
+          avg_mem_used_mb: 71234.5,
+        }),
+        tracker,
+      );
+
+      expect(result!.metrics.avg_temp_c).toBe(68.4);
+      expect(result!.metrics.peak_temp_c).toBe(79.2);
+      expect(result!.metrics.avg_util_pct).toBe(88.5);
+      expect(result!.metrics.avg_mem_used_mb).toBe(71234.5);
+    });
+
+    it('backward-compat: row without temp/util/mem still maps cleanly', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(makeV1Row(), tracker);
+
+      expect(result).not.toBeNull();
+      expect(result!.metrics).not.toHaveProperty('avg_temp_c');
+      expect(result!.metrics).not.toHaveProperty('peak_temp_c');
+      expect(result!.metrics).not.toHaveProperty('avg_util_pct');
+      expect(result!.metrics).not.toHaveProperty('avg_mem_used_mb');
+      expect(result!.workers).toBeUndefined();
+    });
+  });
+});
+
+describe('extractWorkers', () => {
+  it('returns undefined for non-array input', () => {
+    expect(extractWorkers(undefined)).toBeUndefined();
+    expect(extractWorkers(null)).toBeUndefined();
+    expect(extractWorkers('not-an-array')).toBeUndefined();
+    expect(extractWorkers(42)).toBeUndefined();
+    expect(extractWorkers({ role: 'prefill' })).toBeUndefined();
+  });
+
+  it('returns undefined for an empty array', () => {
+    expect(extractWorkers([])).toBeUndefined();
+  });
+
+  it('keeps well-formed entries and drops malformed ones', () => {
+    const result = extractWorkers([
+      { role: 'prefill', worker_idx: 0, num_gpus: 4, avg_power_w: 500 },
+      // missing role
+      { worker_idx: 1, num_gpus: 4, avg_power_w: 500 },
+      // missing avg_power_w
+      { role: 'decode', worker_idx: 0, num_gpus: 4 },
+      // ok
+      { role: 'frontend', worker_idx: 0, num_gpus: 0, avg_power_w: 0 },
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result![0].role).toBe('prefill');
+    expect(result![1].role).toBe('frontend');
+    expect(result![1].avg_power_w).toBe(0);
+  });
+
+  it('coerces string-numeric values via parseNum / parseInt2', () => {
+    const result = extractWorkers([
+      {
+        role: 'decode',
+        worker_idx: '2',
+        num_gpus: '8',
+        avg_power_w: '712.5',
+        avg_temp_c: '71.5',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result![0].worker_idx).toBe(2);
+    expect(result![0].num_gpus).toBe(8);
+    expect(result![0].avg_power_w).toBe(712.5);
+    expect(result![0].avg_temp_c).toBe(71.5);
+  });
+
+  it('drops hosts when it is not an all-string array', () => {
+    const result = extractWorkers([
+      {
+        role: 'prefill',
+        worker_idx: 0,
+        num_gpus: 4,
+        avg_power_w: 500,
+        hosts: 'pn0',
+      },
+      {
+        role: 'decode',
+        worker_idx: 0,
+        num_gpus: 4,
+        avg_power_w: 500,
+        hosts: ['dn0', 42],
+      },
+      {
+        role: 'agg',
+        worker_idx: 0,
+        num_gpus: 4,
+        avg_power_w: 500,
+        hosts: ['ok'],
+      },
+    ]);
+
+    expect(result).toHaveLength(3);
+    expect(result![0].hosts).toBeUndefined();
+    expect(result![1].hosts).toBeUndefined();
+    expect(result![2].hosts).toEqual(['ok']);
+  });
+
+  it('returns undefined when every entry is malformed', () => {
+    expect(extractWorkers([null, 'bad', 0, undefined])).toBeUndefined();
   });
 });

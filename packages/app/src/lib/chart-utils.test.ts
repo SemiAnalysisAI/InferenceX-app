@@ -272,9 +272,9 @@ describe('buildAvailabilityHwKey', () => {
 
 /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
 function parseRgb(color: string): [number, number, number] {
-  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu);
+  const hex = color.match(/^#(?<r>[0-9a-f]{2})(?<g>[0-9a-f]{2})(?<b>[0-9a-f]{2})$/iu);
   if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
-  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/u);
+  const rgb = color.match(/rgb\((?<r>\d+),\s*(?<g>\d+),\s*(?<b>\d+)\)/u);
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
   throw new Error(`Cannot parse color: ${color}`);
 }
@@ -1291,6 +1291,79 @@ describe('createChartDataPoint measured power fields', () => {
     expect(point.measuredAvgPower).toBeDefined();
     expect(point.measuredJPerOutputToken).toBeDefined();
     expect(point.measuredJPerTotalToken).toBeUndefined();
+  });
+});
+
+// ===========================================================================
+// createChartDataPoint — per-stage measured power / energy (disagg prefill/decode)
+// ===========================================================================
+describe('createChartDataPoint per-stage measured power fields', () => {
+  it('emits measuredPrefillAvgPower when prefill_avg_power_w is present', () => {
+    const e = entry({ prefill_avg_power_w: 920.3 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower).toBeDefined();
+    expect(point.measuredPrefillAvgPower!.y).toBe(920.3);
+    expect(point.measuredPrefillAvgPower!.roof).toBe(false);
+  });
+
+  it('emits measuredDecodeAvgPower when decode_avg_power_w is present', () => {
+    const e = entry({ decode_avg_power_w: 612.1 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredDecodeAvgPower).toBeDefined();
+    expect(point.measuredDecodeAvgPower!.y).toBe(612.1);
+    expect(point.measuredDecodeAvgPower!.roof).toBe(false);
+  });
+
+  it('emits measuredJPerInputToken when joules_per_input_token is present', () => {
+    const e = entry({ joules_per_input_token: 0.27 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerInputToken).toBeDefined();
+    expect(point.measuredJPerInputToken!.y).toBe(0.27);
+    expect(point.measuredJPerInputToken!.roof).toBe(false);
+  });
+
+  it('omits all per-stage fields on legacy rows predating per-stage attribution', () => {
+    // Single-node / pre-disagg runs emit avg_power_w only, no prefill/decode split.
+    const e = entry({ avg_power_w: 685.5 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower).toBeUndefined();
+    expect(point.measuredDecodeAvgPower).toBeUndefined();
+    expect(point.measuredJPerInputToken).toBeUndefined();
+  });
+
+  it('emits prefill and decode independently — the disagg per-stage split', () => {
+    // GB300 disagg: prefill GPUs run compute-bound (higher W) than decode GPUs.
+    const e = entry({ prefill_avg_power_w: 948, decode_avg_power_w: 631 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower!.y).toBe(948);
+    expect(point.measuredDecodeAvgPower!.y).toBe(631);
+    expect(point.measuredPrefillAvgPower!.y).toBeGreaterThan(point.measuredDecodeAvgPower!.y);
+  });
+
+  it('preserves a zero per-stage power value (not falsy-coerced away)', () => {
+    // Same typeof===number gate as total power — 0 W must survive, not be dropped.
+    const e = entry({ prefill_avg_power_w: 0, decode_avg_power_w: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower).toBeDefined();
+    expect(point.measuredPrefillAvgPower!.y).toBe(0);
+    expect(point.measuredDecodeAvgPower).toBeDefined();
+    expect(point.measuredDecodeAvgPower!.y).toBe(0);
+  });
+
+  it('carries total and per-stage power together on a full disagg row', () => {
+    const e = entry({
+      avg_power_w: 853,
+      prefill_avg_power_w: 948,
+      decode_avg_power_w: 631,
+      joules_per_input_token: 0.18,
+      joules_per_output_token: 1.64,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower!.y).toBe(853);
+    expect(point.measuredPrefillAvgPower!.y).toBe(948);
+    expect(point.measuredDecodeAvgPower!.y).toBe(631);
+    expect(point.measuredJPerInputToken!.y).toBe(0.18);
+    expect(point.measuredJPerOutputToken!.y).toBe(1.64);
   });
 });
 

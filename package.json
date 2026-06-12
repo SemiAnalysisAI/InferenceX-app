@@ -18,9 +18,9 @@
     "typecheck": "tsc --noEmit",
     "security": "pnpm audit && audit-ci",
     "lint": "oxlint --no-error-on-unmatched-pattern",
-    "lint:fix": "oxlint --no-error-on-unmatched-pattern --fix",
-    "fmt": "oxfmt --check",
-    "fmt:fix": "oxfmt --write",
+    "lint:fix": "oxlint --fix --no-error-on-unmatched-pattern",
+    "fmt": "oxfmt --check --no-error-on-unmatched-pattern",
+    "fmt:fix": "oxfmt --write --no-error-on-unmatched-pattern",
     "test": "pnpm --filter *app --color=always test",
     "test:e2e": "pnpm --filter *app --color=always test:e2e",
     "test:e2e:component": "pnpm --filter *app --color=always test:e2e:component",
@@ -43,9 +43,9 @@
   "devDependencies": {
     "audit-ci": "^7.1.0",
     "is-ci": "^4.1.0",
-    "lefthook": "^2.1.6",
-    "oxfmt": "^0.50.0",
-    "oxlint": "^1.65.0",
+    "lefthook": "^2.1.9",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.69.0",
     "rimraf": "^6.1.3",
     "typescript": "^6.0.3"
   },
@@ -53,5 +53,5 @@
     "node": ">=18.0.0",
     "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@11.1.3"
+  "packageManager": "pnpm@11.5.2"
 }
