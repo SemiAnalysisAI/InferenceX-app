@@ -9,6 +9,7 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   'dynamo-sglang': { label: 'Dynamo SGLang' },
   'dynamo-trt': { label: 'Dynamo TRT' },
   'dynamo-vllm': { label: 'Dynamo vLLM' },
+  'mooncake-atom': { label: 'Mooncake ATOM¹' },
   'mori-sglang': { label: 'MoRI SGLang' },
   sglang: { label: 'SGLang' },
   trt: { label: 'TRT' },
@@ -26,6 +27,7 @@ export const SPEC_METHOD_KEYS = new Set(['mtp', 'none']);
  * Single source of truth — consumed by ETL, frontend, and changelog processing.
  */
 export const FRAMEWORK_ALIASES: Record<string, { canonical: string; disagg?: boolean }> = {
+  'atom-disagg': { canonical: 'mooncake-atom', disagg: true },
   'sglang-disagg': { canonical: 'mori-sglang', disagg: true },
   trtllm: { canonical: 'trt' },
   'dynamo-trtllm': { canonical: 'dynamo-trt' },

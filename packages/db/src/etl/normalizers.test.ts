@@ -204,6 +204,17 @@ describe('normalizeFramework', () => {
     });
   });
 
+  it('normalizes atom-disagg to mooncake-atom + disagg=true', () => {
+    expect(normalizeFramework('atom-disagg', false)).toEqual({
+      framework: 'mooncake-atom',
+      disagg: true,
+    });
+    expect(normalizeFramework('ATOM-DISAGG', false)).toEqual({
+      framework: 'mooncake-atom',
+      disagg: true,
+    });
+  });
+
   it('renames dynamo-trtllm to dynamo-trt and forces disagg=true (framework implies it)', () => {
     expect(normalizeFramework('dynamo-trtllm', false)).toEqual({
       framework: 'dynamo-trt',
