@@ -346,11 +346,11 @@ export async function GET(
               <img
                 src={logoSrc}
                 alt=""
-                height={48 * R}
+                height={144 * R}
                 style={{
                   position: 'absolute',
-                  left: CHART.left + CHART.width / 2 - 56 * R,
-                  top: CHART.top + CHART.height / 2 - 24 * R,
+                  left: CHART.left + CHART.width / 2 - 168 * R,
+                  top: CHART.top + CHART.height / 2 - 72 * R,
                   opacity: 0.12,
                 }}
               />
