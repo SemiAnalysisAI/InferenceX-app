@@ -25,12 +25,58 @@ export interface ScatterPointConfig<T> {
    * Defaults to `[d.precision]` per-point (all points render as circles).
    */
   selectedPrecisions?: readonly string[];
+  /**
+   * Per-point shape resolver. Takes precedence over `selectedPrecisions`.
+   * Use when the shape mapping must stay current between layer-config
+   * recreations (e.g. read through a ref so a precision toggle doesn't have
+   * to rebuild the whole chart).
+   */
+  getShapeKey?: (d: T) => ShapeKey;
 }
 
 const resolveShapeKey = (precision: string, selectedPrecisions?: readonly string[]): ShapeKey =>
   selectedPrecisions && selectedPrecisions.length > 0
     ? getShapeKeyForPrecision(precision, selectedPrecisions)
     : 'circle';
+
+/**
+ * Ensure a dot-group's `.visible-shape` matches the target shape and fill.
+ * Swaps the SVG element (remove/append) when its tag needs to change, and
+ * stamps the shape key on the element so other code (e.g. useStickyTooltip's
+ * reset path) can restore normal-state attrs without knowing precisions.
+ *
+ * Shared by the full layer render and by ScatterGraph's lightweight toggle
+ * decoration pass, so both produce identical DOM.
+ */
+export function syncPointShape(
+  g: d3.Selection<SVGGElement, unknown, null, undefined>,
+  shapeKey: ShapeKey,
+  fill: string,
+): void {
+  const targetType = getShapeConfig(shapeKey).type;
+  const existing = g.select<SVGElement>('.visible-shape').node();
+  const currentType = existing?.tagName.toLowerCase();
+  if (!existing || currentType !== targetType) {
+    g.select('.visible-shape').remove();
+    const shape = g
+      .append(targetType)
+      .attr('class', 'visible-shape')
+      .attr('data-shape-key', shapeKey)
+      .attr('fill', fill)
+      .attr('stroke', 'none')
+      .attr('cursor', 'pointer') as d3.Selection<
+      SVGCircleElement | SVGRectElement | SVGPathElement,
+      unknown,
+      null,
+      undefined
+    >;
+    applyNormalState(shape, shapeKey);
+  } else {
+    const shape = g.select<SVGElement>('.visible-shape');
+    shape.attr('fill', fill).attr('data-shape-key', shapeKey);
+    applyNormalState(shape as any, shapeKey);
+  }
+}
 
 /**
  * Render scatter points into a zoom group: group → hit area → shape → optional label.
@@ -95,37 +141,13 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     }
   }
 
-  // Update shape type (if selectedPrecisions changed) + colors on all points.
-  // The shape element is swapped (remove/append) when its SVG tag needs to change.
-  // The chosen shape key is stamped on the element so other code (e.g.
-  // useStickyTooltip's reset path) can restore normal-state attrs without
-  // knowing selectedPrecisions.
+  // Update shape type (if the shape mapping changed) + colors on all points.
   points.each(function (d) {
     const g = d3.select(this);
-    const shapeKey = resolveShapeKey(d.precision, config.selectedPrecisions);
-    const targetType = getShapeConfig(shapeKey).type;
-    const existing = g.select<SVGElement>('.visible-shape').node();
-    const currentType = existing?.tagName.toLowerCase();
-    if (!existing || currentType !== targetType) {
-      g.select('.visible-shape').remove();
-      const shape = g
-        .append(targetType)
-        .attr('class', 'visible-shape')
-        .attr('data-shape-key', shapeKey)
-        .attr('fill', config.getColor(d))
-        .attr('stroke', 'none')
-        .attr('cursor', 'pointer') as d3.Selection<
-        SVGCircleElement | SVGRectElement | SVGPathElement,
-        unknown,
-        null,
-        undefined
-      >;
-      applyNormalState(shape, shapeKey);
-    } else {
-      const shape = g.select<SVGElement>('.visible-shape');
-      shape.attr('fill', config.getColor(d)).attr('data-shape-key', shapeKey);
-      applyNormalState(shape as any, shapeKey);
-    }
+    const shapeKey = config.getShapeKey
+      ? config.getShapeKey(d)
+      : resolveShapeKey(d.precision, config.selectedPrecisions);
+    syncPointShape(g, shapeKey, config.getColor(d));
   });
 
   // Update labels: use data join so labels are created/removed properly on toggle

@@ -2,7 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
@@ -22,7 +22,8 @@ import type {
   ZoomContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
-import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
+import { useStableValue } from '@/hooks/useStableValue';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -100,6 +101,27 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
 };
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+
+// Referentially stable "no overlay data" result (see processedOverlayData).
+const EMPTY_OVERLAY_DATA: InferenceData[] = [];
+
+// Scale configs are recomputed from the visible points on every render, but a
+// legend / precision toggle usually leaves the actual domain untouched (x-min
+// is pinned at 0; extremes are owned by a handful of points). Comparing by
+// value lets those toggles keep the previous config object, so the chart
+// render effect doesn't tear down and rebuild the SVG for identical scales.
+interface ScaleConfigValue {
+  type: 'log' | 'linear';
+  domain: [number, number];
+  nice: boolean;
+  _isLog?: boolean;
+}
+const isSameScaleConfig = (a: ScaleConfigValue, b: ScaleConfigValue): boolean =>
+  a.type === b.type &&
+  a.nice === b.nice &&
+  a._isLog === b._isLog &&
+  a.domain[0] === b.domain[0] &&
+  a.domain[1] === b.domain[1];
 
 // Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth
 const parseHwKeyToLabel = (hwKey: string): { name: string; label: string } => {
@@ -343,7 +365,10 @@ const ScatterGraph = React.memo(
     );
 
     const processedOverlayData = useMemo(() => {
-      if (!overlayData?.data) return [];
+      // Stable empty reference: without an overlay this must not churn on
+      // precision changes — it feeds the `layers` memo, and a new identity
+      // there forces a full chart rebuild.
+      if (!overlayData?.data) return EMPTY_OVERLAY_DATA;
       return overlayData.data.filter((p) => selectedPrecisions.includes(p.precision));
     }, [overlayData, selectedPrecisions]);
 
@@ -375,12 +400,6 @@ const ScatterGraph = React.memo(
       resolveColor,
       getCssColor,
     ]);
-
-    // Combined data for D3 scale domain (includes overlay so scales fit both datasets)
-    const chartScaleData = useMemo(() => {
-      if (processedOverlayData.length === 0) return filteredData;
-      return [...filteredData, ...processedOverlayData];
-    }, [filteredData, processedOverlayData]);
 
     const overlayRooflines = useMemo(() => {
       interface Entry {
@@ -473,7 +492,7 @@ const ScatterGraph = React.memo(
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
 
-    const xScaleConfig = useMemo(() => {
+    const xScaleConfigRaw = useMemo(() => {
       const ext =
         visiblePoints.length > 0
           ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
@@ -497,8 +516,9 @@ const ScatterGraph = React.memo(
         _isLog: useLog,
       };
     }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes]);
+    const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
 
-    const yScaleConfig = useMemo(() => {
+    const yScaleConfigRaw = useMemo(() => {
       const ext =
         visiblePoints.length > 0
           ? (d3.extent(visiblePoints, (d) => d.y) as [number, number])
@@ -521,6 +541,7 @@ const ScatterGraph = React.memo(
         nice: niceAxes,
       };
     }, [visiblePoints, isInputTputMetric, logScale, niceAxes]);
+    const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
     // --- Axis configs ---
     const xAxisConfig = useMemo(
@@ -565,6 +586,39 @@ const ScatterGraph = React.memo(
       },
       [effectiveActiveHwTypes, selectedPrecisions],
     );
+
+    // --- Interaction state ref ---
+    // Latest visibility predicates, color resolvers, and active sets — read by
+    // long-lived D3 closures (layer renders, zoom handlers, hover handlers).
+    // Routing these reads through a ref keeps them out of the `layers` /
+    // `tooltipConfig` dependency arrays, so a legend or precision toggle no
+    // longer tears down and rebuilds the whole chart: the decoration effect
+    // below restyles the existing DOM instead (see docs/d3-charts.md "Why 4
+    // Effects" — this is the cheap Effect-4 "display toggle" path). Same
+    // refs-over-closures rule as docs/pitfalls.md "Stale Closures in D3 Event
+    // Handlers".
+    const interactionRef = useRef({
+      isPointVisible,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      activeOverlayHwTypes,
+      getCssColor,
+      resolveColor,
+      knownIssueAnnotations,
+    });
+    interactionRef.current = {
+      isPointVisible,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      activeOverlayHwTypes,
+      getCssColor,
+      resolveColor,
+      knownIssueAnnotations,
+    };
+
+    // Render context from the last D3 render — lets the decoration effect
+    // restyle with the same layout/scales the chart was drawn with.
+    const lastRenderCtxRef = useRef<RenderContext | null>(null);
 
     const handleLegendHover = useCallback(
       (hwKey: string) => {
@@ -694,12 +748,12 @@ const ScatterGraph = React.memo(
         onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
           applyHoverState(
             sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, selectedPrecisions),
+            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           ),
         onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
           applyNormalState(
             sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, selectedPrecisions),
+            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           ),
         onPointClick: (d: InferenceData) => {
           track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
@@ -736,7 +790,6 @@ const ScatterGraph = React.memo(
         addTrackedConfig,
         removeTrackedConfig,
         chartDefinition.chartType,
-        selectedPrecisions,
       ],
     );
 
@@ -747,6 +800,10 @@ const ScatterGraph = React.memo(
         type: 'custom',
         key: 'rooflines',
         render: (zoomGroup, ctx) => {
+          // Visibility / colors come from the interaction ref so this closure
+          // stays correct between layer recreations (toggles restyle via the
+          // decoration effect instead of rebuilding the chart).
+          const ir = interactionRef.current;
           const xScale = ctx.xScale as ContinuousScale;
           const yScale = ctx.yScale as ContinuousScale;
           const { defs } = ctx.layout;
@@ -786,8 +843,8 @@ const ScatterGraph = React.memo(
             const hw = key.split('_').slice(0, -1).join('_');
             const precision = key.split('_').pop()!;
             const visible =
-              effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(precision);
-            let stroke = getCssColor(resolveColor(hw));
+              ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+            let stroke = ir.getCssColor(ir.resolveColor(hw));
 
             if (showGradientLabels) {
               const pointLabels = allPointLabelsByKey[key];
@@ -860,7 +917,7 @@ const ScatterGraph = React.memo(
               const hw = key.split('_').slice(0, -1).join('_');
               const precision = key.split('_').pop()!;
               const visible =
-                effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(precision);
+                ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
 
               const segments: { label: string; color: string; points: InferenceData[] }[] = [];
               let cur = {
@@ -960,7 +1017,7 @@ const ScatterGraph = React.memo(
             const isInteractivity = chartDefinition.chartType === 'interactivity';
             // With >1 precision selected each precision is its own curve, so label
             // every curve and include the precision in the text.
-            const multiPrecision = selectedPrecisions.length > 1;
+            const multiPrecision = ir.selectedPrecisions.length > 1;
             const LABEL_H = 18;
             const LABEL_W = 120; // approximate label width for overlap check
 
@@ -1008,7 +1065,7 @@ const ScatterGraph = React.memo(
                       key: entry.key,
                       hw: entry.hw,
                       label,
-                      color: getCssColor(resolveColor(entry.hw)),
+                      color: ir.getCssColor(ir.resolveColor(entry.hw)),
                       x: px,
                       y: py,
                       visible: true,
@@ -1025,7 +1082,7 @@ const ScatterGraph = React.memo(
                     key: entry.key,
                     hw: entry.hw,
                     label,
-                    color: getCssColor(resolveColor(entry.hw)),
+                    color: ir.getCssColor(ir.resolveColor(entry.hw)),
                     x: xScale(pt.x),
                     y: yScale(pt.y),
                     visible: false,
@@ -1042,7 +1099,7 @@ const ScatterGraph = React.memo(
                     key: entry.key,
                     hw: entry.hw,
                     label: lineLabelText(entry.hw, entry.precision, multiPrecision),
-                    color: getCssColor(resolveColor(entry.hw)),
+                    color: ir.getCssColor(ir.resolveColor(entry.hw)),
                     x: xScale(entry.points[0].x),
                     y: yScale(entry.points[0].y),
                     visible: false,
@@ -1070,7 +1127,8 @@ const ScatterGraph = React.memo(
               };
               const sortedOverlay = Object.entries(overlayRooflines)
                 .filter(
-                  ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
+                  ([, group]) =>
+                    ir.activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
                 )
                 .toSorted(([, a], [, b]) => yScale(a.points[0].y) - yScale(b.points[0].y));
 
@@ -1134,7 +1192,7 @@ const ScatterGraph = React.memo(
                   key: entry.key,
                   hw: entry.hw,
                   label: lineLabelText(entry.hw, entry.precision, multiPrecision),
-                  color: getCssColor(resolveColor(entry.hw)),
+                  color: ir.getCssColor(ir.resolveColor(entry.hw)),
                   x: xScale(pt.x),
                   y: yScale(pt.y),
                   visible: true,
@@ -1143,7 +1201,7 @@ const ScatterGraph = React.memo(
               // Endpoint labels for overlay rooflines too (one per (hw, runIndex)),
               // labeled with the run's branch name to mirror the overlay legend.
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
-                if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                if (group.points.length < 2 || !ir.activeOverlayHwTypes.has(group.hwKey)) continue;
                 const info = unofficialRunInfos[group.runIndex];
                 const branchOrHw = info
                   ? `✕ ${info.branch || `run ${info.id}`}`
@@ -1232,6 +1290,7 @@ const ScatterGraph = React.memo(
             });
         },
         onZoom: (zoomGroup, ctx) => {
+          const ir = interactionRef.current;
           const newXScale = ctx.newXScale as ContinuousScale;
           const newYScale = ctx.newYScale as ContinuousScale;
           const { defs } = ctx.layout;
@@ -1302,7 +1361,7 @@ const ScatterGraph = React.memo(
           // Update line label positions on zoom
           if (showLineLabels) {
             const isInteractivity = chartDefinition.chartType === 'interactivity';
-            const multiPrecision = selectedPrecisions.length > 1;
+            const multiPrecision = ir.selectedPrecisions.length > 1;
             const LABEL_H = 18;
             const LABEL_W = 120;
 
@@ -1319,7 +1378,8 @@ const ScatterGraph = React.memo(
                 if (pts.length < 2) continue;
                 const hw = key.split('_').slice(0, -1).join('_');
                 const prec = key.split('_').pop()!;
-                if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisions.includes(prec)) continue;
+                if (!ir.effectiveActiveHwTypes.has(hw) || !ir.selectedPrecisions.includes(prec))
+                  continue;
                 const groupKey = multiPrecision ? key : hw;
                 const prev = bestByGroup.get(groupKey);
                 if (!prev || pts.length > prev[1].length) bestByGroup.set(groupKey, [key, pts]);
@@ -1361,7 +1421,8 @@ const ScatterGraph = React.memo(
               // official labels post-zoom.
               const overlayVisible = Object.entries(overlayRooflines)
                 .filter(
-                  ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
+                  ([, group]) =>
+                    ir.activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
                 )
                 .toSorted(([, a], [, b]) => newYScale(a.points[0].y) - newYScale(b.points[0].y));
               for (const [ovKey, group] of overlayVisible) {
@@ -1417,7 +1478,8 @@ const ScatterGraph = React.memo(
                 if (pts.length < 2) return;
                 const hw = key.split('_').slice(0, -1).join('_');
                 const prec = key.split('_').pop()!;
-                if (!effectiveActiveHwTypes.has(hw) || !selectedPrecisions.includes(prec)) return;
+                if (!ir.effectiveActiveHwTypes.has(hw) || !ir.selectedPrecisions.includes(prec))
+                  return;
                 const groupKey = multiPrecision ? key : hw;
                 if (seen.has(groupKey)) return;
                 seen.add(groupKey);
@@ -1426,7 +1488,7 @@ const ScatterGraph = React.memo(
               });
               // Overlay rooflines: per-(hw, runIndex) endpoint labels.
               for (const [ovKey, group] of Object.entries(overlayRooflines)) {
-                if (group.points.length < 2 || !activeOverlayHwTypes.has(group.hwKey)) continue;
+                if (group.points.length < 2 || !ir.activeOverlayHwTypes.has(group.hwKey)) continue;
                 const pt = group.points.at(-1)!;
                 zoomLabels.push({
                   key: `overlay-${ovKey}`,
@@ -1472,11 +1534,16 @@ const ScatterGraph = React.memo(
         key: 'points',
         data: pointsData,
         config: {
+          // Visibility / colors / shapes read the interaction ref so these
+          // accessors stay current between layer recreations (toggles restyle
+          // via the decoration effect instead of rebuilding the chart).
           getColor: (d) =>
             (showGradientLabels && gradientColorByPoint.get(d)) ||
-            getCssColor(resolveColor(d.hwKey as string)),
-          getOpacity: (d) => (isPointVisible(d) ? 1 : 0),
-          getPointerEvents: (d) => (isPointVisible(d) ? 'auto' : 'none'),
+            interactionRef.current.getCssColor(
+              interactionRef.current.resolveColor(d.hwKey as string),
+            ),
+          getOpacity: (d) => (interactionRef.current.isPointVisible(d) ? 1 : 0),
+          getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: hidePointLabels || showGradientLabels,
           getLabelText: (d) => (useAdvancedLabels ? getPointLabel(d) : String(d.tp)),
           foreground: 'var(--foreground)',
@@ -1484,7 +1551,8 @@ const ScatterGraph = React.memo(
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
           },
-          selectedPrecisions,
+          getShapeKey: (d) =>
+            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
         },
         keyFn: buildPointConfigId,
       };
@@ -1802,22 +1870,26 @@ const ScatterGraph = React.memo(
         xScale: ContinuousScale,
         yScale: ContinuousScale,
       ) => {
+        // Annotations / colors via the interaction ref: they change with the
+        // visible series, and the decoration effect re-runs this layer on
+        // toggles without recreating it.
+        const ir = interactionRef.current;
         renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
           chartId,
           width: ctx.width,
           height: ctx.height,
           xScale,
           yScale,
-          annotations: knownIssueAnnotations,
+          annotations: ir.knownIssueAnnotations,
           rightInset: measureLegendRightInset(
             chartId,
             ctx.layout.svg.node(),
             ctx.layout.margin.left,
             ctx.width,
           ),
-          background: getCssColor('--background'),
-          foreground: getCssColor('--foreground'),
-          mutedForeground: getCssColor('--muted-foreground'),
+          background: ir.getCssColor('--background'),
+          foreground: ir.getCssColor('--foreground'),
+          mutedForeground: ir.getCssColor('--muted-foreground'),
           onLinkClick: (a) =>
             track('inference_known_issue_clicked', {
               hwKey: a.issue.hwKey,
@@ -1839,8 +1911,12 @@ const ScatterGraph = React.memo(
       result.push(speedOverlayLayer);
       result.push(knownIssueLayer);
       return result;
+      // Interaction state (visibility, colors, precision shapes, known-issue
+      // annotations) is deliberately NOT a dependency: layer closures read it
+      // through interactionRef, and the decoration effect restyles the
+      // existing DOM when it changes. Only data/structure changes recreate
+      // the layers (and with them, the full chart render).
     }, [
-      knownIssueAnnotations,
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,
@@ -1849,19 +1925,13 @@ const ScatterGraph = React.memo(
       showMinecraftOverlay,
       gradientColorByPoint,
       chartId,
-      effectiveActiveHwTypes,
-      selectedPrecisions,
-      getCssColor,
-      resolveColor,
       pointsData,
-      isPointVisible,
       hidePointLabels,
       useAdvancedLabels,
       buildPointConfigId,
       overlayData,
       processedOverlayData,
       overlayRooflines,
-      activeOverlayHwTypes,
       unofficialRunInfos,
       runIndexByUrl,
       hardwareConfig,
@@ -1869,12 +1939,20 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       chartDefinition,
-      chartDefinition.chartType,
     ]);
+
+    // Layers handle for the decoration effect — lets it re-run individual
+    // custom layer renders (rooflines/labels, known issues) without waiting
+    // for a full chart rebuild.
+    const layersRef = useRef(layers);
+    layersRef.current = layers;
 
     // --- onRender: tracked rings, CSS transitions, log tick formatting, dblclick ---
     const onRender = useCallback(
       (ctx: RenderContext) => {
+        // Stash the render context for the decoration effect.
+        lastRenderCtxRef.current = ctx;
+        const ir = interactionRef.current;
         const { zoomGroup } = ctx.layout;
 
         // CSS transitions for smooth opacity animation on hw toggle
@@ -1890,7 +1968,7 @@ const ScatterGraph = React.memo(
             .attr('class', 'tracked-ring')
             .attr('r', POINT_SIZE + 5)
             .attr('fill', 'none')
-            .attr('stroke', getCssColor(resolveColor(d.hwKey)))
+            .attr('stroke', ir.getCssColor(ir.resolveColor(d.hwKey)))
             .attr('stroke-width', 2)
             .attr('opacity', 0.7)
             .attr('pointer-events', 'none');
@@ -1908,6 +1986,7 @@ const ScatterGraph = React.memo(
             else addTrackedConfig(d, chartDefinition.chartType);
 
             // Update ring DOM immediately (onRender only runs inside the D3 effect)
+            const irNow = interactionRef.current;
             const group = d3.select(this);
             group
               .selectAll<SVGCircleElement, boolean>('.tracked-ring')
@@ -1916,7 +1995,7 @@ const ScatterGraph = React.memo(
               .attr('class', 'tracked-ring')
               .attr('r', POINT_SIZE + 5)
               .attr('fill', 'none')
-              .attr('stroke', getCssColor(resolveColor(d.hwKey)))
+              .attr('stroke', irNow.getCssColor(irNow.resolveColor(d.hwKey)))
               .attr('stroke-width', 2)
               .attr('opacity', 0.7)
               .attr('pointer-events', 'none');
@@ -1955,6 +2034,72 @@ const ScatterGraph = React.memo(
     );
 
     // --- Side effects ---
+
+    // Toggle decoration: restyle the existing DOM when visibility or colors
+    // change (legend hw toggles, precision toggles, optimal-only, high
+    // contrast, theme). This is the cheap "Effect 4" display-toggle path from
+    // docs/d3-charts.md — the full chart rebuild only runs when data or scale
+    // domains actually change. Runs after the D3 render effect in the same
+    // commit (child layout effects fire first), so on rebuild commits it's an
+    // idempotent re-apply.
+    useLayoutEffect(() => {
+      const svg = chartRef.current?.getSvgElement?.();
+      const ctx = lastRenderCtxRef.current;
+      if (!svg || !ctx) return;
+      const ir = interactionRef.current;
+      const zoomGroup = d3.select(svg).select<SVGGElement>('.zoom-group');
+      if (zoomGroup.empty()) return;
+
+      // Position with the same scales the zoom handler would use: rescale the
+      // base scales by the current transform when the user is zoomed in.
+      const t = d3.zoomTransform(svg);
+      const zoomed = t.k !== 1 || t.x !== 0 || t.y !== 0;
+      const xScale = zoomed ? t.rescaleX(ctx.xScale as ContinuousScale) : ctx.xScale;
+      const yScale = zoomed ? t.rescaleY(ctx.yScale as ContinuousScale) : ctx.yScale;
+      const decorationCtx: RenderContext = { ...ctx, xScale, yScale };
+
+      // Dots: visibility, vendor recolor, precision shape, tracked-ring color.
+      // Hand-rolled rather than a full renderScatterPoints pass so we skip
+      // re-writing label text on every point (the expensive part of the join).
+      zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
+        const sel = d3.select(this);
+        const visible = ir.isPointVisible(d);
+        sel.style('opacity', visible ? 1 : 0).style('pointer-events', visible ? 'auto' : 'none');
+        const color =
+          (showGradientLabels && gradientColorByPoint.get(d)) ||
+          ir.getCssColor(ir.resolveColor(d.hwKey as string));
+        syncPointShape(
+          sel as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
+          getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
+          color,
+        );
+        sel.select('.tracked-ring').attr('stroke', color);
+      });
+
+      // Rooflines, gradient defs, parallelism + line labels (incl. overlay run
+      // labels): re-run the layer render — stroke colors, visibility, and
+      // label placement all depend on the visible set. Known-issue
+      // annotations likewise follow the visible series. Layer renders are
+      // idempotent data joins; labels that newly enter here can sit above the
+      // dots until the next full rebuild, which is cosmetic only
+      // (pointer-events: none).
+      for (const key of ['rooflines', 'known-issues'] as const) {
+        const layer = layersRef.current.find((l) => l.key === key);
+        if (layer && layer.type === 'custom' && layer.render) {
+          layer.render(zoomGroup, decorationCtx);
+        }
+      }
+    }, [
+      isPointVisible,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      activeOverlayHwTypes,
+      getCssColor,
+      resolveColor,
+      knownIssueAnnotations,
+      showGradientLabels,
+      gradientColorByPoint,
+    ]);
 
     // Dismiss tooltip on filter changes
     useEffect(() => {
@@ -2010,7 +2155,10 @@ const ScatterGraph = React.memo(
       <D3Chart<InferenceData>
         ref={chartRef}
         chartId={chartId}
-        data={chartScaleData}
+        // Stable across toggles: the render effect keys on this for "data
+        // changed" rebuilds; scale domains come from x/yScaleConfig (computed
+        // from the visible points), and visibility is applied via opacity.
+        data={pointsData}
         margin={CHART_MARGIN}
         watermark={getChartWatermark(isUnofficialRun)}
         testId="scatter-graph"
