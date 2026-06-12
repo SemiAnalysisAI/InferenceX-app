@@ -82,17 +82,17 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'kimik2.5',
     category: 'default',
   },
+  [Model.MiniMax_M3]: {
+    label: 'MiniMax M3 428B',
+    prefix: 'minimaxm3',
+    category: 'default',
+  },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
   [Model.MiniMax_M2_5]: {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
     label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
-    category: 'default',
-  },
-  [Model.MiniMax_M3]: {
-    label: 'MiniMax M3 428B',
-    prefix: 'minimaxm3',
     category: 'default',
   },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'default' },
