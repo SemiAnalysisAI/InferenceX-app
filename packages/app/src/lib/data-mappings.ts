@@ -8,6 +8,7 @@ export enum Model {
   Qwen3_5 = 'Qwen-3.5-397B-A17B',
   Kimi_K2_5 = 'Kimi-K2.5',
   MiniMax_M2_5 = 'MiniMax-M2.5',
+  MiniMax_M3 = 'MiniMax-M3',
   GLM_5 = 'GLM-5',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
@@ -87,6 +88,11 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
     label: 'MiniMax M2.5/2.7 230B',
     prefix: 'minimaxm2.5',
+    category: 'default',
+  },
+  [Model.MiniMax_M3]: {
+    label: 'MiniMax M3 428B',
+    prefix: 'minimaxm3',
     category: 'default',
   },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'default' },

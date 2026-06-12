@@ -24,6 +24,10 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
       expect.arrayContaining(['minimaxm2.5', 'minimaxm2.7']),
     );
   });
+
+  it('maps minimaxm3 to its own MiniMax-M3 display name', () => {
+    expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).toEqual(['minimaxm3']);
+  });
 });
 
 describe('sequenceToIslOsl', () => {
