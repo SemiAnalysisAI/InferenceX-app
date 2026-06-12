@@ -37,6 +37,7 @@ const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((acc, key) =
 const modelNames = Object.values({
   ...DB_MODEL_TO_DISPLAY,
   'kimik2.6': 'Kimi-K2.6',
+  'kimik2.7-code': 'Kimi-K2.7-Code',
   'minimaxm2.7': 'MiniMax-M2.7',
   'glm5.1': 'GLM-5.1',
 });

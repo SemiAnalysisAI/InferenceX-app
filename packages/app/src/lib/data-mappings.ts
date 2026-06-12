@@ -73,11 +73,11 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     exclusion: MTP_ENGINE_EXCLUSION,
   },
   [Model.Kimi_K2_5]: {
-    // K2.5 and K2.6 share an architecture, so the dropdown surfaces both
-    // versions joined with a slash — matches the GLM5/5.1 pattern. The
+    // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
+    // all versions joined with a slash — matches the GLM5/5.1 pattern. The
     // hyphenated `Model.Kimi_K2_5` enum value stays as-is for internal
     // routing / DB key mapping.
-    label: 'Kimi K2.5/2.6 1T',
+    label: 'Kimi K2.5/2.6/2.7-Code 1T',
     prefix: 'kimik2.5',
     category: 'default',
   },
