@@ -2361,8 +2361,14 @@ export default function ModelArchitectureDiagram({
       >
         <div ref={containerRef} className="px-4 pb-4">
           <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
+          {/* The drill-down only renders while its parent block is expanded, so gate
+              the caption on the parent too — collapsing the parent leaves the child
+              id in expandedBlocks (state is restored on re-expand), and the caption
+              must not outlive the drawing it explains. */}
           {arch.attentionType === 'Hybrid' &&
-            (expandedBlocks.has('altAttention0') || expandedBlocks.has('altAttention1')) && (
+            [0, 1].some(
+              (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
+            ) && (
               <p
                 className="mt-2 text-[11px] leading-snug text-muted-foreground"
                 data-testid="hybrid-attention-note"

@@ -386,6 +386,20 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
 
+    it('collapsing the parent block hides the union-softmax caption (no orphan caption)', () => {
+      // altBlock0 + altAttention0 are expanded from the previous tests; collapsing
+      // the parent removes the drill-down from the SVG, so the caption must go too
+      // even though altAttention0 stays in the expansion state.
+      cy.get('[data-testid="hybrid-attention-note"]').should('be.visible');
+      cy.get('[data-testid="collapse-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
+      // Re-expanding the parent restores the remembered drill-down and its caption.
+      cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+      cy.get('[data-testid="hybrid-attention-note"]')
+        .should('be.visible')
+        .and('contain', 'single softmax');
+    });
+
     it('shows DeepSeek V4 Pro features (incl. sliding window) and developer info', () => {
       cy.contains('Hybrid CSA + HCA Attention').should('be.visible');
       cy.contains('Sliding window (128 tokens)').should('be.visible');
