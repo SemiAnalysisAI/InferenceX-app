@@ -9,7 +9,7 @@ const RELOAD_GATE_KEY = 'chunk_reload';
  * the literal `ChunkLoadError` substring.
  */
 const CHUNK_ERROR_RE =
-  /Loading chunk |Failed to (load|fetch)(?: dynamically imported)? (?:module|chunk)|ChunkLoadError/iu;
+  /Loading chunk |Failed to (?:load|fetch)(?: dynamically imported)? (?:module|chunk)|ChunkLoadError/iu;
 
 let installed = false;
 

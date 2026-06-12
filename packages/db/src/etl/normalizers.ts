@@ -221,7 +221,7 @@ export function parseInt2(v: any): number | undefined {
  * @returns An object with `isl` and `osl` in tokens, or `null` if no match is found.
  */
 export function parseIslOsl(name: string): { isl: number; osl: number } | null {
-  const m = name.match(/[_-](\d+)k(\d+)k[_\-.]/iu);
+  const m = name.match(/[_-](?<isl>\d+)k(?<osl>\d+)k[_\-.]/iu);
   if (!m) return null;
   return { isl: parseInt(m[1], 10) * 1024, osl: parseInt(m[2], 10) * 1024 };
 }

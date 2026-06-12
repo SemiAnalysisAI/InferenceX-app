@@ -59,7 +59,7 @@ interface ExportOptions {
   signal?: AbortSignal;
 }
 
-const CSS_VAR_RE = /var\(--([^)]+)\)/u;
+const CSS_VAR_RE = /var\(--(?<varName>[^)]+)\)/u;
 const WATERMARK_HEIGHT = 48;
 const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
 

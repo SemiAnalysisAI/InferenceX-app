@@ -27,7 +27,7 @@ describe('PARAM_DEFAULTS', () => {
 
   it('has expected default for g_model', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-R1-0528');
+    expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-V4-Pro');
   });
 
   it('has expected default for i_seq', async () => {
@@ -164,7 +164,7 @@ describe('writeUrlParams + buildShareUrl', () => {
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
 
     // write default value, should be omitted
-    writeUrlParams({ g_model: 'DeepSeek-R1-0528' });
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
@@ -375,14 +375,14 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('preserves unofficialruns alongside other in-memory share params', async () => {
-    setupWindow('?unofficialruns=111&g_model=DeepSeek-R1-0528', '/inference');
+    setupWindow('?unofficialruns=111&g_model=DeepSeek-V4-Pro', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
 
-    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+    writeUrlParams({ g_model: 'DeepSeek-R1-0528' });
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toContain('g_model=DeepSeek-V4-Pro');
+    expect(url).toContain('g_model=DeepSeek-R1-0528');
     expect(url).toContain('unofficialruns=111');
   });
 

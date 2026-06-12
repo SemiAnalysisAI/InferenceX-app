@@ -83,7 +83,7 @@ export interface TocHeading {
 
 export function extractHeadings(rawMdx: string): TocHeading[] {
   const stripped = rawMdx.replaceAll(/```[\s\S]*?```/gu, '');
-  const headingRegex = /^(#{1,3})\s+(.+)$/gmu;
+  const headingRegex = /^(?<hashes>#{1,3})\s+(?<title>.+)$/gmu;
   const headings: TocHeading[] = [];
   const seen = new Set<string>();
   const parents: string[] = []; // parents[level] = slug of most recent heading at that level

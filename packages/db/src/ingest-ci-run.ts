@@ -76,7 +76,7 @@ if (isDownloadMode) {
     process.exit(1);
   }
 
-  const match = input.match(/\/runs\/(\d+)/u);
+  const match = input.match(/\/runs\/(?<runId>\d+)/u);
   const parsedId = match ? match[1] : /^\d+$/u.test(input) ? input : null;
   if (!parsedId) {
     console.error(`Could not parse run ID from: ${input}`);
@@ -567,7 +567,7 @@ async function main(): Promise<void> {
     const samplesByTask = new Map<string, string>();
     for (const f of files) {
       if (!f.startsWith('samples_') || !f.endsWith('.jsonl')) continue;
-      const m = f.match(/^samples_(.+?)_[^_]+\.jsonl$/u);
+      const m = f.match(/^samples_(?<task>.+?)_[^_]+\.jsonl$/u);
       const task = m ? m[1].toLowerCase() : null;
       if (!task) continue;
       try {

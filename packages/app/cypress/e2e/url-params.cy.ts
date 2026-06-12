@@ -25,7 +25,7 @@ const assertNoHydrationMismatch = () => {
   cy.get('@consoleError').then((spy) => {
     const calls = (spy as unknown as { args: unknown[][] }).args;
     const hydration = calls.filter((args) =>
-      args.some((a) => typeof a === 'string' && /hydrat(ion|ed) (mismatch|failed)/iu.test(a)),
+      args.some((a) => typeof a === 'string' && /hydrat(?:ion|ed) (?:mismatch|failed)/iu.test(a)),
     );
     expect(hydration, JSON.stringify(hydration)).to.have.length(0);
   });

@@ -183,7 +183,7 @@ async function mapWorkflowDir(
     }
   }
   if (!githubRunId) {
-    const match = workflowDir.match(/_(\d{10,})$/u);
+    const match = workflowDir.match(/_(?<runId>\d{10,})$/u);
     if (match) githubRunId = parseInt(match[1], 10);
   }
   if (!githubRunId) {
@@ -247,8 +247,8 @@ async function mapWorkflowDir(
   // artifacts map to the same DB conflict key, the newest is processed last
   // and wins the ON CONFLICT DO UPDATE (latest-attempt-wins).
   const sortedBmkZips = [...bmkZipFiles].toSorted((a, b) => {
-    const idA = a.match(/_(\d{10,})\.zip$/u)?.[1];
-    const idB = b.match(/_(\d{10,})\.zip$/u)?.[1];
+    const idA = a.match(/_(?<artifactId>\d{10,})\.zip$/u)?.[1];
+    const idB = b.match(/_(?<artifactId>\d{10,})\.zip$/u)?.[1];
     const tsA = idA ? (artifactCreatedAt.get(Number(idA)) ?? '') : '';
     const tsB = idB ? (artifactCreatedAt.get(Number(idB)) ?? '') : '';
     return tsA.localeCompare(tsB);
@@ -374,7 +374,7 @@ async function mapWorkflowDir(
     );
     const samplesByTask = new Map<string, string>();
     for (const [name, text] of sampleTexts) {
-      const m = name.match(/^samples_(.+?)_[^_]+\.jsonl$/u);
+      const m = name.match(/^samples_(?<task>.+?)_[^_]+\.jsonl$/u);
       if (m) samplesByTask.set(m[1].toLowerCase(), text);
     }
 
