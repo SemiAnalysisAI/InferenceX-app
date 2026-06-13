@@ -224,20 +224,20 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing modals
   // -------------------------------------------------------------------------
   {
-    id: 'dsv4-launch-modal',
+    id: 'minimax-m3-launch-modal',
     type: 'modal',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-dsv4-modal-dismissed',
+    storageKey: 'inferencex-minimax-m3-modal-dismissed',
     priority: 50,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'DeepSeek V4 Pro is live',
+      title: 'MiniMax M3 is live',
       description:
-        'Day-zero benchmarks for DeepSeek V4 Pro are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
-      testId: 'dsv4-launch-modal',
+        'Day-zero benchmarks for MiniMax M3 are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
+      testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       badge: 'New',
       dismissLabel: 'Maybe Later',
@@ -245,14 +245,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         label: 'Explore',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?preset=dsv4-launch';
+          window.location.href = '/inference?preset=minimax-m3-launch';
         },
       },
     },
     analytics: {
-      shown: 'dsv4_modal_shown',
-      dismissed: 'dsv4_modal_dismissed',
-      action: 'dsv4_modal_explored',
+      shown: 'minimax_m3_modal_shown',
+      dismissed: 'minimax_m3_modal_dismissed',
+      action: 'minimax_m3_modal_explored',
     },
   },
   {
@@ -294,30 +294,30 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'dsv4-launch-banner',
+    id: 'minimax-m3-launch-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-dsv4-banner-dismissed-v2',
+    storageKey: 'inferencex-minimax-m3-banner-dismissed',
     priority: 60,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'DeepSeek V4 Pro benchmarks are live',
+      title: 'MiniMax M3 benchmarks are live',
       description: 'First inference numbers across NVIDIA and AMD GPUs, click to explore.',
       testId: 'launch-banner',
       badge: 'New',
-      href: '/inference?preset=dsv4-launch',
+      href: '/inference?preset=minimax-m3-launch',
       onLinkClick: () => {
-        window.location.href = '/inference?preset=dsv4-launch';
+        window.location.href = '/inference?preset=minimax-m3-launch';
       },
     },
     analytics: {
       shown: 'launch_banner_shown',
       dismissed: 'launch_banner_dismissed',
       action: 'launch_banner_clicked',
-      properties: { banner_id: 'dsv4-launch', preset_id: 'dsv4-launch' },
+      properties: { banner_id: 'minimax-m3-launch', preset_id: 'minimax-m3-launch' },
     },
   },
 ];

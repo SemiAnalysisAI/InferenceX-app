@@ -62,13 +62,13 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('contains the expected set of migrated nudges', () => {
     const ids = NUDGE_REGISTRY.map((n) => n.id).toSorted();
     expect(ids).toEqual([
-      'dsv4-launch-banner',
-      'dsv4-launch-modal',
       'eval-samples',
       'export',
       'feedback-modal',
       'github-star-modal',
       'gradient-label',
+      'minimax-m3-launch-banner',
+      'minimax-m3-launch-modal',
       'reproducibility',
       'star-nudge',
     ]);
