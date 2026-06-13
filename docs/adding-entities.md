@@ -71,6 +71,15 @@ Present what you inferred and get confirmation + category in a single step. Incl
 
 Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPRECATED_MODELS`, `MODEL_PREFIX_MAPPING`, `getModelLabel()`) is derived automatically.
 
+**`packages/app/src/lib/compare-slug.ts`** (easy to miss — the /compare and /compare-per-dollar pages do NOT derive from `MODEL_CONFIG`):
+
+- `COMPARE_MODEL_SLUGS` — add an entry with `{ slug, displayName, dbKeys, label }`. `displayName` must match the `Model` enum value; `dbKeys` lists the DB buckets to query. Place it per the ordering comment (Chinese-lab flagships first, newer family member leads). Without this entry the model is absent from /compare, /compare-per-dollar, the sitemap, and their OG images.
+- `COMPARE_MODEL_ALIASES` — only if a family-level or older-version slug should 308 to the new entry.
+
+**`packages/app/src/lib/compare-ssr.ts`**:
+
+- `KNOWN_MODELS` — add the display name so `?g_model=` URL overrides validate on compare pages.
+
 ---
 
 ## Featuring a Day-0 Model

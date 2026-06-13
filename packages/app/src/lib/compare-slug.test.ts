@@ -43,6 +43,15 @@ describe('parseCompareSlug — new model-prefixed form', () => {
     expect(parsed?.b).toBe('gb200');
   });
 
+  it('parses the minimax-m3 slug as its own model, distinct from minimax-m27', () => {
+    const parsed = parseCompareSlug('minimax-m3-h100-vs-h200');
+    expect(parsed?.model.slug).toBe('minimax-m3');
+    expect(parsed?.model.dbKeys).toEqual(['minimaxm3']);
+    expect(parsed?.a).toBe('h100');
+    expect(parsed?.b).toBe('h200');
+    expect(parsed?.isAliasModel).toBe(false);
+  });
+
   it('preserves non-canonical GPU order so caller can redirect', () => {
     const parsed = parseCompareSlug('kimi-k26-h200-vs-h100');
     expect(parsed?.a).toBe('h200');
@@ -257,6 +266,11 @@ describe('getCompareModelBySlug', () => {
     expect(getCompareModelBySlug('kimi')).toBe(KIMI_K26);
     expect(getCompareModelBySlug('kimi-k25')).toBe(KIMI_K26);
     expect(getCompareModelBySlug('glm-5')).toBe(GLM_51);
+  });
+
+  it('keeps the bare minimax alias on the M2 series, with minimax-m3 canonical', () => {
+    expect(getCompareModelBySlug('minimax')?.slug).toBe('minimax-m27');
+    expect(getCompareModelBySlug('minimax-m3')?.slug).toBe('minimax-m3');
   });
 
   it('returns null for unknown slugs', () => {
