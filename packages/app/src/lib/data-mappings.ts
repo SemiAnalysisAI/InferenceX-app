@@ -66,7 +66,6 @@ const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
 // already part of the canonical name (Llama 3.3 70B, gpt-oss 120B) so no
 // duplication needed.
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
-  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 671B', prefix: 'dsr1', category: 'default' },
   [Model.DeepSeek_V4_Pro]: {
     label: 'DeepSeek V4 Pro 1.6T',
     prefix: 'dsv4',
@@ -87,8 +86,9 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'minimaxm3',
     category: 'default',
   },
-  [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
+  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 671B', prefix: 'dsr1', category: 'default' },
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
+  [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.MiniMax_M2_5]: {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
     label: 'MiniMax M2.5/2.7 230B',
