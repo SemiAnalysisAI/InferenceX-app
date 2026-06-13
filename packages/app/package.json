@@ -86,7 +86,7 @@
     "cypress-split": "^1.24.31",
     "dotenv": "^17.4.2",
     "dotenv-cli": "^11.0.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.0",
