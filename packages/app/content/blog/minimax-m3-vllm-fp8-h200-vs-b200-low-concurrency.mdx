@@ -28,8 +28,8 @@ That inversion is a day-0 kernel-coverage gap. vLLM's Blackwell FP8 block-scale 
 <Figure
   srcLight="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-light.png"
   srcDark="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-dark.png"
-  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 8192/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. At low interactivity (high batch) B300 and B200 lead on per-GPU throughput; the B200 non-MTP curve falls off steeply at high interactivity (low batch) where H200 sustains more throughput per GPU."
-  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 8192 / OSL 1024, measured 2026-06-13. B300, B200, H200, and H100, each non-MTP and MTP. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8). The headline 1024/1024 figures are in the tables below."
+  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 1024/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. At low interactivity (high batch) B300 and B200 lead on per-GPU throughput; the B200 non-MTP curve falls off steeply at high interactivity (low batch) where H200 and even H100 sustain more throughput per GPU."
+  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 1024 / OSL 1024, measured 2026-06-13. B300, B200, H200, and H100, each non-MTP and MTP. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8)."
 />
 
 ## MiniMax M3 Model Architecture
@@ -91,6 +91,13 @@ All rows are MiniMax M3 on vLLM FP8, single-node, non-MTP, measured on Inference
 
 The 8192/1024 table is the crossover in one view: H200 leads at concurrency 4–16 (low batch), B200 takes the lead at concurrency 32–64, where batch is large enough that DeepGEMM amortizes its overhead and Blackwell's FLOPS and HBM bandwidth take over. At concurrency 64 B200 delivers 2,007 tok/s/GPU to H200's 1,501 — a 1.34x throughput lead, the regime where the silicon wins.
 
+<Figure
+  srcLight="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-8k1k-light.png"
+  srcDark="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-8k1k-dark.png"
+  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 8192/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. B300 and B200 lead at low interactivity (high batch); the B200 non-MTP curve drops off at high interactivity (low batch) where H200 sustains more throughput per GPU."
+  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 8192 / OSL 1024, measured 2026-06-13. Same SKUs and MTP split as the 1024/1024 chart above. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8)."
+/>
+
 ## Iso-Interactivity Comparison
 
 Throughput per GPU at matched interactivity, interpolated along each SKU's Pareto frontier (which combines the TP=4, TP=8, and EP=4/8 recipes, exactly as the dashboard does when all recipes are toggled on).
@@ -124,8 +131,8 @@ At 60 tok/s/user, serving M3 on B200 costs 3.36x what it costs on H200 today —
 <Figure
   srcLight="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-light.png"
   srcDark="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-dark.png"
-  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 8192/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. At low interactivity (high batch) B300 and B200 lead on per-GPU throughput; the B200 non-MTP curve falls off steeply at high interactivity (low batch) where H200 sustains more throughput per GPU."
-  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 8192 / OSL 1024, measured 2026-06-13. B300, B200, H200, and H100, each non-MTP and MTP. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8). The headline 1024/1024 figures are in the tables below."
+  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 1024/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. At low interactivity (high batch) B300 and B200 lead on per-GPU throughput; the B200 non-MTP curve falls off steeply at high interactivity (low batch) where H200 and even H100 sustain more throughput per GPU."
+  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 1024 / OSL 1024, measured 2026-06-13. B300, B200, H200, and H100, each non-MTP and MTP. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8)."
 />
 
 [Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-06-13&g_runid=27451860491&g_model=MiniMax-M3&i_prec=fp8&i_active=b200_vllm%2Ch200_vllm&i_linelabel=1), pre-filtered to MiniMax M3 vLLM FP8, B200 vs H200.
