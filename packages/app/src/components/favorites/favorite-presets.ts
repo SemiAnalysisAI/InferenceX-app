@@ -150,7 +150,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     config: {
       model: Model.MiniMax_M3,
       sequence: Sequence.EightK_OneK,
-      precisions: ['fp4', 'fp4fp8', 'fp8'],
+      precisions: ['fp4', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
     },
