@@ -1,5 +1,5 @@
 import type { AvailableModelSequence } from '@/components/unofficial-run-provider';
-import type { Model } from '@/lib/data-mappings';
+import { Sequence, type Model } from '@/lib/data-mappings';
 
 export interface AutoSwitchDecision {
   /** New value the caller should write into the dedupe ref. */
@@ -86,4 +86,32 @@ export function computeUnofficialOverrideDecision(
     return { nextKey: lastKey, shouldOverride: false };
   }
   return { nextKey: key, shouldOverride: true };
+}
+
+/**
+ * Pick the sequence shown when an unofficial run loads without an `i_seq`
+ * URL pin. Keep this branch's 8K/256 preference when that sequence exists for
+ * the model that will be displayed, otherwise fall back to an actual sequence
+ * from the run so its points are visible.
+ */
+export function selectUnofficialDefaultSequence(
+  unofficialAvailable: AvailableModelSequence[],
+  selectedModel: Model,
+  urlModel: string | undefined,
+): Sequence | null {
+  if (unofficialAvailable.length === 0) return null;
+
+  const sortedModels = [...new Set(unofficialAvailable.map((entry) => entry.model))].toSorted();
+  const targetModel =
+    urlModel ?? (sortedModels.includes(selectedModel) ? selectedModel : sortedModels[0]);
+  const sequences = [
+    ...new Set(
+      unofficialAvailable
+        .filter((entry) => entry.model === targetModel)
+        .map((entry) => entry.sequence),
+    ),
+  ];
+
+  if (sequences.includes(Sequence.EightK_256)) return Sequence.EightK_256;
+  return sequences.toSorted()[0] ?? null;
 }

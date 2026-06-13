@@ -6,6 +6,7 @@ import { Model, Sequence } from '@/lib/data-mappings';
 import {
   computeAutoSwitchDecision,
   computeUnofficialOverrideDecision,
+  selectUnofficialDefaultSequence,
 } from './unofficial-run-auto-switch';
 
 function entry(model: Model, sequence: Sequence): AvailableModelSequence {
@@ -188,5 +189,51 @@ describe('computeUnofficialOverrideDecision', () => {
     const b = computeUnofficialOverrideDecision(orderB, undefined, '');
     expect(a.nextKey).toBe(b.nextKey);
     expect(a.shouldOverride).toBe(b.shouldOverride);
+  });
+});
+
+describe('selectUnofficialDefaultSequence', () => {
+  it('prefers 8k/256 when the displayed model provides it', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625),
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_256),
+    ];
+    expect(selectUnofficialDefaultSequence(run, Model.DeepSeek_V4_Pro, undefined)).toBe(
+      Sequence.EightK_256,
+    );
+  });
+
+  it('uses the run sequence when 8k/256 is unavailable', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625)];
+    expect(selectUnofficialDefaultSequence(run, Model.DeepSeek_R1, undefined)).toBe(
+      Sequence.EightK_625,
+    );
+  });
+
+  it('chooses a sequence for the current covered model', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625),
+      entry(Model.Kimi_K2_5, Sequence.OneK_OneK),
+    ];
+    expect(selectUnofficialDefaultSequence(run, Model.Kimi_K2_5, undefined)).toBe(
+      Sequence.OneK_OneK,
+    );
+  });
+
+  it('uses an explicitly pinned model when selecting the sequence', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625),
+      entry(Model.Kimi_K2_5, Sequence.OneK_OneK),
+    ];
+    expect(selectUnofficialDefaultSequence(run, Model.DeepSeek_V4_Pro, Model.Kimi_K2_5)).toBe(
+      Sequence.OneK_OneK,
+    );
+  });
+
+  it('returns null when an explicitly pinned model is absent from the run', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625)];
+    expect(
+      selectUnofficialDefaultSequence(run, Model.DeepSeek_V4_Pro, Model.DeepSeek_R1),
+    ).toBeNull();
   });
 });
