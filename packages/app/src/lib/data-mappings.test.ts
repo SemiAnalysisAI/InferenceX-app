@@ -133,6 +133,15 @@ describe('getModelAndSequenceFromArtifact', () => {
     expect(result).toEqual({ model: Model.DeepSeek_V4_Pro, sequence: Sequence.EightK_256 });
   });
 
+  it('parses structured artifact with dsv4 prefix and 8k/625 ISL/OSL', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'dsv4',
+      isl: 8192,
+      osl: 625,
+    });
+    expect(result).toEqual({ model: Model.DeepSeek_V4_Pro, sequence: Sequence.EightK_625 });
+  });
+
   it('returns undefined for unknown model prefix', () => {
     const result = getModelAndSequenceFromArtifact({
       infmax_model_prefix: 'unknown',
@@ -216,6 +225,7 @@ describe('getSequenceLabel', () => {
     expect(getSequenceLabel(Sequence.OneK_EightK)).toBe('1K / 8K');
     expect(getSequenceLabel(Sequence.EightK_OneK)).toBe('8K / 1K');
     expect(getSequenceLabel(Sequence.EightK_256)).toBe('8K / 256');
+    expect(getSequenceLabel(Sequence.EightK_625)).toBe('8K / 625');
   });
 
   it('falls back to the sequence value for unknown sequence', () => {

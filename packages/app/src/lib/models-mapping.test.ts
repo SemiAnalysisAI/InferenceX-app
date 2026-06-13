@@ -52,6 +52,10 @@ describe('sequenceToIslOsl', () => {
     expect(sequenceToIslOsl('8k/256')).toEqual({ isl: 8192, osl: 256 });
   });
 
+  it('converts 8k/625 to 8192/625', () => {
+    expect(sequenceToIslOsl('8k/625')).toEqual({ isl: 8192, osl: 625 });
+  });
+
   it('returns null for unknown sequences', () => {
     expect(sequenceToIslOsl('4k/4k')).toBeNull();
     expect(sequenceToIslOsl('')).toBeNull();
@@ -75,13 +79,17 @@ describe('islOslToSequence', () => {
     expect(islOslToSequence(8192, 256)).toBe('8k/256');
   });
 
+  it('converts 8192/625 to 8k/625', () => {
+    expect(islOslToSequence(8192, 625)).toBe('8k/625');
+  });
+
   it('returns null for unknown ISL/OSL combos', () => {
     expect(islOslToSequence(4096, 4096)).toBeNull();
     expect(islOslToSequence(0, 0)).toBeNull();
   });
 
   it('round-trips with sequenceToIslOsl', () => {
-    for (const seq of ['1k/1k', '1k/8k', '8k/1k', '8k/256']) {
+    for (const seq of ['1k/1k', '1k/8k', '8k/1k', '8k/256', '8k/625']) {
       const islOsl = sequenceToIslOsl(seq)!;
       expect(islOslToSequence(islOsl.isl, islOsl.osl)).toBe(seq);
     }
