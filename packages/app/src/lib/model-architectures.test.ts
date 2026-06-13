@@ -25,6 +25,7 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.GptOss,
       Model.Kimi_K2_5,
       Model.MiniMax_M2_5,
+      Model.MiniMax_M3,
     ];
 
     for (const model of models) {
@@ -274,6 +275,29 @@ describe('getModelArchitecture', () => {
     const arch = getModelArchitecture(Model.MiniMax_M2_5);
     expect(arch?.denseFFNLayers).toBeUndefined();
     expect(arch?.denseFFNDim).toBeUndefined();
+  });
+
+  it('returns architecture for MiniMax M3 with MoE, sparse attention, and shared expert', () => {
+    const arch = getModelArchitecture(Model.MiniMax_M3);
+    expect(arch).toBeDefined();
+    expect(arch?.totalParams).toBe(428);
+    expect(arch?.activeParams).toBe(23);
+    expect(arch?.architectureType).toBe('moe');
+    expect(arch?.attentionType).toBe('GQA');
+    expect(arch?.attentionExpandable).toBe(false);
+    expect(arch?.numLayers).toBe(60);
+    expect(arch?.hiddenSize).toBe(6144);
+    expect(arch?.numHeads).toBe(64);
+    expect(arch?.numKVHeads).toBe(4);
+    expect(arch?.headDim).toBe(128);
+    expect(arch?.ffnDim).toBe(3072);
+    expect(arch?.numExperts).toBe(129);
+    expect(arch?.activeExperts).toBe(4);
+    expect(arch?.hasSharedExpert).toBe(true);
+    expect(arch?.contextWindow).toBe(1048576);
+    expect(arch?.vocabSize).toBe(200064);
+    expect(arch?.developer).toBe('MiniMax');
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M3');
   });
 
   it('returns architecture for gpt-oss 120B with MoE, alternating attention, and sink tokens', () => {

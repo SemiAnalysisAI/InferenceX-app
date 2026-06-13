@@ -31,10 +31,12 @@ export interface CompareModelSlug {
 }
 
 // Order matches the master /compare and /compare-per-dollar index display:
-// DeepSeek V4 Pro → R1 → Kimi → GLM → MiniMax → Qwen → gpt-oss → Llama 70B.
-// Per product spec — flagship Chinese-developed models first, smaller open
-// US-developed models at the bottom. Qwen sits between MiniMax and gpt-oss to
-// keep the Chinese-lab cluster contiguous before the US transition.
+// DeepSeek V4 Pro → R1 → Kimi → GLM → MiniMax M3 → MiniMax M2 → Qwen →
+// gpt-oss → Llama 70B. Per product spec — flagship Chinese-developed models
+// first, smaller open US-developed models at the bottom. Qwen sits between
+// MiniMax and gpt-oss to keep the Chinese-lab cluster contiguous before the
+// US transition. The two MiniMax entries stay adjacent with the newer M3
+// flagship leading the older M2 series.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'deepseek-v4',
@@ -68,6 +70,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // uses the newer version name but the data pull covers both DB buckets.
     dbKeys: ['glm5.1', 'glm5'],
     label: 'GLM 5/5.1',
+  },
+  {
+    slug: 'minimax-m3',
+    displayName: 'MiniMax-M3',
+    // M3 is a new 428B architecture (MiniMax Sparse Attention), not a point
+    // release of the M2 series, so it gets its own slug and dbKey rather than
+    // joining the minimax-m27 group.
+    dbKeys: ['minimaxm3'],
+    label: 'MiniMax M3 428B',
   },
   {
     slug: 'minimax-m27',

@@ -92,6 +92,8 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
   // MiniMax-M2.5
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
+  // MiniMax-M3 (428B, distinct architecture from the M2 series)
+  'MiniMaxAI/MiniMax-M3': 'minimaxm3',
   // GLM-5
   'zai-org/GLM-5-FP8': 'glm5',
   'amd/GLM-5.1-MXFP4': 'glm5.1',

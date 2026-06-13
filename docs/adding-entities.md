@@ -71,6 +71,25 @@ Present what you inferred and get confirmation + category in a single step. Incl
 
 Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPRECATED_MODELS`, `MODEL_PREFIX_MAPPING`, `getModelLabel()`) is derived automatically.
 
+**`packages/app/src/lib/compare-slug.ts`** (easy to miss — the /compare and /compare-per-dollar pages do NOT derive from `MODEL_CONFIG`):
+
+- `COMPARE_MODEL_SLUGS` — add an entry with `{ slug, displayName, dbKeys, label }`. `displayName` must match the `Model` enum value; `dbKeys` lists the DB buckets to query. Place it per the ordering comment (Chinese-lab flagships first, newer family member leads). Without this entry the model is absent from /compare, /compare-per-dollar, the sitemap, and their OG images.
+- `COMPARE_MODEL_ALIASES` — only if a family-level or older-version slug should 308 to the new entry.
+
+**`packages/app/src/lib/compare-ssr.ts`**:
+
+- `KNOWN_MODELS` — add the display name so `?g_model=` URL overrides validate on compare pages.
+
+**`packages/app/src/app/compare/page.tsx`** and **`packages/app/src/app/compare-per-dollar/page.tsx`**:
+
+- `DESCRIPTION` — these SEO meta strings hardcode a sample model list ("…, Qwen 3.5 397B-A17B, and more"). Add the new model if it should appear in the catalog blurb.
+
+**`packages/app/src/lib/model-architectures.ts`** (optional — powers the per-model architecture diagram on the inference tab):
+
+- `MODEL_ARCHITECTURES` — add a `[Model.X]` entry with verified config.json values. Omitted models simply render no diagram (`getModelArchitecture` returns `undefined`), so this is non-blocking but expected for parity with other models.
+
+`/about` needs no change — its model list derives from `DB_MODEL_TO_DISPLAY` and includes the new key automatically once `models.ts` is updated.
+
 ---
 
 ## Featuring a Day-0 Model

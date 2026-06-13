@@ -241,6 +241,43 @@ describe('Model Architecture Diagram', () => {
     });
   });
 
+  describe('Collapsible Transformer Blocks (MoE model - MiniMax M3)', () => {
+    before(() => {
+      // Clear any stale Radix scroll lock from prior Select interactions
+      cy.document().then((doc) => {
+        delete doc.body.dataset.scrollLocked;
+        doc.body.style.removeProperty('pointer-events');
+      });
+      cy.get('[role="combobox"]').filter(':visible').first().click();
+      cy.get('[role="option"]').contains('MiniMax M3').click();
+
+      cy.get('[data-testid="model-architecture-toggle"]').should('be.visible');
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="model-architecture-svg"]:visible').length === 0) {
+          cy.get('[data-testid="model-architecture-toggle"]').click();
+        }
+      });
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    });
+
+    it('shows MoE and GQA badges for MiniMax M3', () => {
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'MoE');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', 'GQA');
+      cy.get('[data-testid="model-architecture-toggle"]').should('contain.text', '428B');
+    });
+
+    it('GQA attention is NOT expandable (sparse attention rendered as a static block)', () => {
+      cy.get('[data-testid="expand-transformer"]').click({ force: true });
+      cy.get('[data-testid="expand-attention"]').should('not.exist');
+      cy.get('[data-testid="expand-experts"]').should('exist');
+    });
+
+    it('shows MiniMax M3 sparse-attention features', () => {
+      cy.contains('MiniMax Sparse Attention (MSA)').should('be.visible');
+      cy.contains('GQA with QK Norm').should('be.visible');
+    });
+  });
+
   describe('Alternating Attention Blocks (MoE model - gpt-oss 120B)', () => {
     before(() => {
       // Clear any stale Radix scroll lock from prior Select interactions
