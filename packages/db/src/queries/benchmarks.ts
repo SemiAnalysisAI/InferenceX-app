@@ -65,6 +65,10 @@ export async function getLatestBenchmarks(
     // Date-filtered: use base table with DISTINCT ON (the view only has the absolute latest)
     // exact=true: only return data from this exact date (for GPU comparison)
     // exact=false (default): return latest data as of this date (for main chart)
+    // Same-day tiebreak by wr.run_started_at (latest sweep wins), mirroring the
+    // latest_benchmarks view (migration 003). br.date is a calendar day, so two
+    // sweeps on the same day tie on date alone and Postgres would otherwise pick
+    // an arbitrary one — leaving an older run's points shadowing a same-day re-sweep.
     const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
     const rows = await sql`
       SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
@@ -99,7 +103,8 @@ export async function getLatestBenchmarks(
       WHERE c.model = ANY(${modelKeys})
         AND br.error IS NULL
         AND ${dateFilter}
-      ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
+      ORDER BY br.config_id, br.conc, br.isl, br.osl,
+               br.date DESC, wr.run_started_at DESC NULLS LAST
     `;
     return rows as unknown as BenchmarkRow[];
   }

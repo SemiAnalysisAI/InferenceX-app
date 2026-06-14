@@ -328,6 +328,29 @@ const STRIP_HISTORY_KEYS = new Set([
   'mean_itl',
 ]);
 
+/**
+ * Comparator for DISTINCT ON (config, conc, isl, osl) selection: latest calendar
+ * day first, then — for sweeps on the same day — the latest workflow run first by
+ * `run_started_at` (NULLS LAST). Mirrors the SQL date-filtered query and the
+ * `latest_benchmarks` view (migration 003): a calendar day alone ties two same-day
+ * sweeps, so without this an older run's points can shadow a same-day re-sweep.
+ * `run_started_at` is an ISO-8601 string, so localeCompare orders it chronologically.
+ * Exported so the same-day tiebreak is unit-tested in parity with the SQL.
+ */
+export function compareBenchmarkRecency(
+  aDate: string,
+  bDate: string,
+  aStarted: string | null,
+  bStarted: string | null,
+): number {
+  const dateCmp = bDate.localeCompare(aDate);
+  if (dateCmp !== 0) return dateCmp;
+  if (aStarted === bStarted) return 0;
+  if (aStarted === null) return 1;
+  if (bStarted === null) return -1;
+  return bStarted.localeCompare(aStarted);
+}
+
 export function getLatestBenchmarks(
   modelKey: string | string[],
   date?: string,
@@ -350,10 +373,17 @@ export function getLatestBenchmarks(
     return true;
   });
 
-  // DISTINCT ON (config_id, conc, isl, osl) — keep the one with the latest date
+  // DISTINCT ON (config_id, conc, isl, osl) — keep the one with the latest date,
+  // tiebreaking same-day runs by run_started_at so the latest sweep wins.
   const seen = new Map<string, RawBenchmarkResult>();
-  // Sort by date DESC so first-seen wins
-  candidates.sort((a, b) => toDateString(b.date).localeCompare(toDateString(a.date)));
+  candidates.sort((a, b) =>
+    compareBenchmarkRecency(
+      toDateString(a.date),
+      toDateString(b.date),
+      s.latestRunsById.get(a.workflow_run_id)?.run_started_at ?? null,
+      s.latestRunsById.get(b.workflow_run_id)?.run_started_at ?? null,
+    ),
+  );
   for (const br of candidates) {
     const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}`;
     if (!seen.has(key)) seen.set(key, br);
