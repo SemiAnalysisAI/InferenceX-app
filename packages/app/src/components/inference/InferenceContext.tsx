@@ -202,6 +202,43 @@ export function InferenceProvider({
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
+  // Runs available for the current model selection, and which one is selected.
+  // Computed here (above useChartData) so the chart can query "as of" the selected
+  // run. Re-exposed on the context value below.
+  const modelPrefixes = useMemo(
+    () =>
+      Object.entries(MODEL_PREFIX_MAPPING)
+        .filter(([, model]) => model === selectedModel)
+        .map(([prefix]) => prefix),
+    [selectedModel],
+  );
+
+  const filteredAvailableRuns = useMemo(
+    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
+    [availableRuns, modelPrefixes, effectivePrecisions],
+  );
+
+  const effectiveSelectedRunId = useMemo(() => {
+    if (!filteredAvailableRuns) return selectedRunId;
+    const filteredRunIds = Object.keys(filteredAvailableRuns);
+    if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
+    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
+  }, [filteredAvailableRuns, selectedRunId]);
+
+  // The latest run for this model on the selected date. GitHub run ids increase
+  // monotonically with time, so the lexicographically-greatest id is the newest run.
+  const latestRunIdForModel = useMemo(() => {
+    const ids = filteredAvailableRuns ? Object.keys(filteredAvailableRuns) : [];
+    return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
+  }, [filteredAvailableRuns]);
+
+  // Only constrain the query when an earlier-than-latest run is selected; otherwise
+  // the chart shows the full latest view (and reuses the materialized-view fast path).
+  const asOfRunId =
+    effectiveSelectedRunId && latestRunIdForModel && effectiveSelectedRunId !== latestRunIdForModel
+      ? effectiveSelectedRunId
+      : undefined;
+
   const {
     graphs,
     loading: chartDataLoading,
@@ -223,6 +260,7 @@ export function InferenceProvider({
     isActive,
     latestDate,
     compareGpuPair ?? null,
+    asOfRunId,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -699,14 +737,6 @@ export function InferenceProvider({
       setUserPowers((prev) => (prev === null ? prev : null));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
 
-  const modelPrefixes = useMemo(
-    () =>
-      Object.entries(MODEL_PREFIX_MAPPING)
-        .filter(([, model]) => model === selectedModel)
-        .map(([prefix]) => prefix),
-    [selectedModel],
-  );
-
   // ── Debounced GPU selection tracking ─────────────────────────────────────
   // Fire after 3s of no changes so we capture the "settled" selection.
   // Skip the first render (initial data load) to avoid noise.
@@ -922,19 +952,9 @@ export function InferenceProvider({
   }, [applyPreset]);
 
   // ── Filtered runs ─────────────────────────────────────────────────────────
-
-  const filteredAvailableRuns = useMemo(
-    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
-    [availableRuns, modelPrefixes, effectivePrecisions],
-  );
-
-  const effectiveSelectedRunId = useMemo(() => {
-    if (!filteredAvailableRuns) return selectedRunId;
-    const filteredRunIds = Object.keys(filteredAvailableRuns);
-    if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
-  }, [filteredAvailableRuns, selectedRunId]);
-
+  // filteredAvailableRuns / effectiveSelectedRunId are computed above the data
+  // fetch (so the chart can query "as of" the selected run).
+  //
   // NOTE: We intentionally do NOT sync effectiveSelectedRunId back to
   // GlobalFilterContext (setSelectedRunId). That would cause a full tree
   // re-render on every precision change because filteredAvailableRuns

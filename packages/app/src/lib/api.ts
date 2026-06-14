@@ -126,10 +126,12 @@ export function fetchBenchmarks(
   date?: string,
   exact?: boolean,
   signal?: AbortSignal,
+  runId?: string,
 ) {
   const params = new URLSearchParams({ model });
   if (date) params.set('date', date);
   if (exact) params.set('exact', 'true');
+  if (runId) params.set('runId', runId);
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`, signal);
 }
 

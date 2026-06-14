@@ -5,12 +5,41 @@ import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 describe('benchmarkQueryOptions', () => {
   it('builds query key from model and date', () => {
     const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01');
-    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'latest']);
+    expect(opts.queryKey).toEqual([
+      'benchmarks',
+      'DeepSeek-R1-0528',
+      '2026-03-01',
+      'latest',
+      'all',
+    ]);
   });
 
   it('builds exact query key when exact=true', () => {
     const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01', true, true);
-    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'exact']);
+    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'exact', 'all']);
+  });
+
+  it('includes the runId in the query key for the as-of-run view', () => {
+    const opts = benchmarkQueryOptions(
+      'DeepSeek-R1-0528',
+      '2026-03-01',
+      true,
+      false,
+      '27489075807',
+    );
+    expect(opts.queryKey).toEqual([
+      'benchmarks',
+      'DeepSeek-R1-0528',
+      '2026-03-01',
+      'latest',
+      '27489075807',
+    ]);
+  });
+
+  it('produces distinct keys for different runIds (no cache collision)', () => {
+    const a = benchmarkQueryOptions('m', '2026-03-01', true, false, '100');
+    const b = benchmarkQueryOptions('m', '2026-03-01', true, false, '101');
+    expect(a.queryKey).not.toEqual(b.queryKey);
   });
 
   it('produces distinct keys for different models', () => {

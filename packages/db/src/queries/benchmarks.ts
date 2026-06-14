@@ -59,6 +59,14 @@ export async function getLatestBenchmarks(
   modelKey: string | string[],
   date?: string,
   exact?: boolean,
+  /**
+   * GitHub run id to view the chart "as of" — restricts results to runs that
+   * started no later than this one, so selecting an earlier same-day run shows
+   * the state of the data at that point in time (later runs don't render yet).
+   * No-op when this is the latest run (the filter then includes everything).
+   * Only applied on the date-filtered (non-`exact`) path used by the main chart.
+   */
+  asOfRunId?: string,
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   if (date) {
@@ -70,6 +78,21 @@ export async function getLatestBenchmarks(
     // sweeps on the same day tie on date alone and Postgres would otherwise pick
     // an arbitrary one — leaving an older run's points shadowing a same-day re-sweep.
     const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
+    // "As of run" filter (main chart only): keep results whose run started no later
+    // than the selected run. run_started_at is an absolute timestamp, so this also
+    // naturally includes all earlier-date runs. NULLs (pre-migration-003 runs that
+    // lack the timestamp) are kept so old history doesn't blank out; COALESCE to
+    // infinity makes an unknown asOfRunId a no-op rather than excluding everything.
+    const runFilter =
+      !exact && asOfRunId
+        ? sql`AND (
+            wr.run_started_at IS NULL
+            OR wr.run_started_at <= COALESCE(
+              (SELECT lwr.run_started_at FROM latest_workflow_runs lwr WHERE lwr.github_run_id = ${Number(asOfRunId)}),
+              'infinity'::timestamptz
+            )
+          )`
+        : sql``;
     const rows = await sql`
       SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
         c.hardware,
@@ -103,6 +126,7 @@ export async function getLatestBenchmarks(
       WHERE c.model = ANY(${modelKeys})
         AND br.error IS NULL
         AND ${dateFilter}
+        ${runFilter}
       ORDER BY br.config_id, br.conc, br.isl, br.osl,
                br.date DESC, wr.run_started_at DESC NULLS LAST
     `;

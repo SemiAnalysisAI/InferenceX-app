@@ -59,6 +59,7 @@ describe('GET /api/v1/benchmarks', () => {
       ['dsr1'],
       undefined,
       undefined,
+      undefined,
     );
   });
 
@@ -72,6 +73,7 @@ describe('GET /api/v1/benchmarks', () => {
       ['dsr1'],
       '2026-03-01',
       undefined,
+      undefined,
     );
   });
 
@@ -82,7 +84,45 @@ describe('GET /api/v1/benchmarks', () => {
       req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01&exact=true'),
     );
     expect(res.status).toBe(200);
-    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith('mock-sql', ['dsr1'], '2026-03-01', true);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      '2026-03-01',
+      true,
+      undefined,
+    );
+  });
+
+  it('passes a numeric runId through to the query', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01&runId=27489075807'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      '2026-03-01',
+      undefined,
+      '27489075807',
+    );
+  });
+
+  it('ignores a non-numeric runId (treated as latest)', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-03-01&runId=not-a-run'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      '2026-03-01',
+      undefined,
+      undefined,
+    );
   });
 
   it('returns 500 when query throws', async () => {

@@ -85,12 +85,22 @@ export function useChartData(
   latestAvailableDate?: string,
   /** When set, only series for these two registry GPU keys are shown (compare pages). */
   compareGpuPair?: readonly [string, string] | null,
+  /**
+   * GitHub run id for the "as of run" view. Set only when an earlier-than-latest
+   * run is selected; the chart then shows the data as it stood at that run.
+   */
+  asOfRunId?: string,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
   // materialized view instead of firing a redundant second fetch with identical data.
-  const queryDate =
-    selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
+  //
+  // The '' shortcut hits the materialized view, which has no run-level filter, so it
+  // is only valid for the latest run. When an earlier run is selected (asOfRunId set)
+  // we must query the date-filtered path so the run cutoff applies.
+  const queryDate = asOfRunId
+    ? (selectedRunDate ?? '')
+    : selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
       ? ''
       : selectedRunDate;
 
@@ -98,7 +108,7 @@ export function useChartData(
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(selectedModel, queryDate, enabled);
+  } = useBenchmarks(selectedModel, queryDate, enabled, asOfRunId);
 
   // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(

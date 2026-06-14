@@ -355,10 +355,17 @@ export function getLatestBenchmarks(
   modelKey: string | string[],
   date?: string,
   exact?: boolean,
+  asOfRunId?: string,
 ): BenchmarkRow[] {
   const s = getStore();
   const dateStr = date ? toDateString(date) : undefined;
   const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
+
+  // "As of run" cutoff (main chart only): the selected run's start time. Mirrors the
+  // SQL runFilter — results from runs that started after this are excluded. Null/unknown
+  // means no cutoff (a no-op, matching the SQL COALESCE-to-infinity behavior).
+  const asOfStartedAt =
+    !exact && asOfRunId ? (s.latestRuns.get(Number(asOfRunId))?.run_started_at ?? null) : null;
 
   // Filter to successful benchmarks for this model with a valid latest workflow run
   const candidates = s.benchmarks.filter((br) => {
@@ -366,6 +373,12 @@ export function getLatestBenchmarks(
     const c = s.configs.get(br.config_id);
     if (!c || !modelKeys.has(c.model)) return false;
     if (!s.latestRunsById.has(br.workflow_run_id)) return false;
+    if (asOfStartedAt) {
+      // Keep NULL run_started_at (old history) so it never blanks out; drop runs
+      // that started after the selected one.
+      const started = s.latestRunsById.get(br.workflow_run_id)?.run_started_at ?? null;
+      if (started !== null && started > asOfStartedAt) return false;
+    }
     if (dateStr) {
       const brDate = toDateString(br.date);
       return exact ? brDate === dateStr : brDate <= dateStr;
