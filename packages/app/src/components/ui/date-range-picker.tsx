@@ -92,12 +92,12 @@ export function DateRangePicker({
       return;
     }
 
-    if (!tempRange.startDate) {
-      setTempRange({ startDate: dateStr, endDate: '' });
-      setSelectingStart(false);
-    } else {
+    if (tempRange.startDate) {
       const [start, end] = [tempRange.startDate, dateStr].toSorted();
       setTempRange({ startDate: start, endDate: end });
+    } else {
+      setTempRange({ startDate: dateStr, endDate: '' });
+      setSelectingStart(false);
     }
   };
 

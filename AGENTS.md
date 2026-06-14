@@ -117,6 +117,53 @@ When adding a chart feature (toggle, label, overlay, filter, export, share-link 
 
 If the feature genuinely cannot apply to overlays (e.g., it depends on data only ingested for official runs), say so explicitly in code comments and the PR description. Default to "must support overlays."
 
+## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
+
+The blog-writing workflow (`.claude/skills/write-inferencex-blog/`) ships a Python port of the chart's interpolation algorithm at `.claude/skills/write-inferencex-blog/iso_interactivity.py`. It exists so iso-interactivity tables in blog posts produce **exactly the same numbers** readers see when they hover the rendered chart. Linear-interpolation shell scripts will produce visibly different values — Cursor Bugbot has flagged this on prior posts.
+
+The Python helper is a 1:1 port of these three TypeScript functions:
+
+- `paretoFrontUpperLeft` — `packages/app/src/components/calculator/interpolation.ts`
+- `monotoneSlopes` (Steffen 1990, matches `d3.curveMonotoneX`) — same file
+- `hermiteInterpolate` — same file
+
+Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` which composes them with the "no extrapolation → return null" rule.
+
+**Rule: any PR that changes any of those four TypeScript functions MUST also update `.claude/skills/write-inferencex-blog/iso_interactivity.py` in the same commit.** Drift between the TS and Python implementations means the blog tables will silently diverge from the live chart on the very next post — readers will see one number in the table and a different one in the chart they click through to. This includes:
+
+- Changing the Pareto frontier definition (upper-left → lower-left, or adding tie-breaking rules)
+- Switching from Steffen's monotone slopes to a different spline construction (Fritsch-Carlson, natural cubic, etc.)
+- Loosening or tightening the extrapolation rule (currently: return `null` outside `[min x, max x]`)
+- Adjusting the Y-clamp behavior that prevents spline overshoot
+
+The Python file has a header comment explaining the pipeline and a `_cli()` entrypoint for stdin/stdout JSON usage. When you update it, keep the structure 1:1 with the TS so future readers can diff the two files line by line. Run the helper against a known dataset and confirm the outputs match what the chart renders before merging.
+
+## Model Parameter Counts (verified)
+
+Authoritative total / active parameter counts for every model in the dashboard. Use these when updating `MODEL_CONFIG` labels in `packages/app/src/lib/data-mappings.ts` or any blog/docs prose. Verify against the HF model card before adding a new model — point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
+
+| Model                  | Total | Active      | HF ID                               | Source                             |
+| ---------------------- | ----- | ----------- | ----------------------------------- | ---------------------------------- |
+| DeepSeek-R1-0528       | 671B  | 37B         | `deepseek-ai/DeepSeek-R1-0528`      | HF model card                      |
+| DeepSeek-V4-Pro        | 1.6T  | 49B         | `deepseek-ai/DeepSeek-V4-Pro`       | HF model card                      |
+| Kimi-K2.5              | 1T    | 32B         | `moonshotai/Kimi-K2.5`              | HF model card                      |
+| Kimi-K2.6              | 1T    | 32B         | `moonshotai/Kimi-K2.6`              | HF model card                      |
+| Kimi-K2.7-Code         | 1T    | 32B         | `moonshotai/Kimi-K2.7-Code`         | HF model card                      |
+| Qwen3.5-397B-A17B      | 397B  | 17B         | `Qwen/Qwen3.5-397B-A17B`            | HF model card                      |
+| GLM-5                  | 744B  | 40B         | `zai-org/GLM-5`                     | HF model card                      |
+| GLM-5.1                | 744B  | 40B         | `zai-org/GLM-5.1-FP8`               | HF model card (same base as GLM-5) |
+| MiniMax-M2.5           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.5`            | HF model card                      |
+| MiniMax-M2.7           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.7`            | NVIDIA M2.7 blog                   |
+| gpt-oss-120b           | 120B  | 5.1B        | `openai/gpt-oss-120b`               | HF model card                      |
+| Llama-3.3-70B-Instruct | 70B   | 70B (dense) | `meta-llama/Llama-3.3-70B-Instruct` | HF model card                      |
+
+**Common mislabel traps** (have all bitten this repo at least once — do not repeat):
+
+- **GLM-5 ≠ 355B.** 355B is GLM-4.5. GLM-5 jumped to 744B / 40B active (256-expert MoE with DSA).
+- **MiniMax-M2.5/M2.7 ≠ 456B.** 456B is the older MiniMax-Text-01 / M1 (32 large experts). The M2 series is a different architecture: 230B / 10B active, 256 small experts.
+- **DeepSeek-R1 is 671B, not 685B.** HF metadata shows 685B because the bundled MTP head adds ~14B; the core MoE is 671B / 37B active.
+- **Kimi K2.5, K2.6, and K2.7-Code are post-training refinements**, not new pre-trained sizes. Same 1T / 32B / 384-expert backbone as the original K2. K2.7-Code is a coding-focused refinement of the same backbone.
+
 ## Common Development Tasks
 
 ### Modify chart appearance/behavior
@@ -171,6 +218,28 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 2. Create a per-section context provider (see `InferenceContext.tsx`, `EvaluationContext.tsx` for patterns)
 3. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
 4. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
+
+### Bumping dependencies
+
+Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit each step separately so failures are easy to bisect.
+
+1. **Bump versions**: `pnpm taze -I -r latest` (interactive, all workspaces). Approve what you want, skip what you don't.
+2. **Resolve install errors**:
+   - `ERR_PNPM_IGNORED_BUILDS` after a pnpm major bump means new `allowBuilds` entries in `pnpm-workspace.yaml` were left as placeholder strings — set them to `true` (or `false` if you don't want the build script to run).
+   - pnpm 11 moved `pnpm.overrides` from `package.json` to `pnpm-workspace.yaml`. Overrides left in `package.json` are silently ignored. Migrate them.
+3. **Audit security**: `pnpm security` (runs `pnpm audit && audit-ci`). For each remaining vulnerability, add a targeted override in `pnpm-workspace.yaml`:
+
+   ```yaml
+   overrides:
+     <pkg>@<vulnerable-range>: '>=<min-patched-version>'
+   ```
+
+   - **Use the lowest patched version** (e.g. `>=8.5.10`, not `>=8.5.14`). pnpm resolves to the highest available that satisfies the constraint, so we automatically get the latest patch — and the override doesn't go stale when 8.5.15 ships.
+   - **Use the narrow `<vulnerable-range>` selector** (not bare `<pkg>:`) so the override only fires on vulnerable resolutions and doesn't disturb pins already on safe versions.
+   - **Verify minimum set**: drop any override that doesn't map to a current advisory. Test by removing it and re-running `pnpm security`.
+
+4. **Fix lint/format**: `pnpm lint:fix && pnpm fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `require-unicode-regexp`, `unicorn/no-negated-condition`) — fix manually. For mechanical bulk changes, delegate to a subagent and verify with `pnpm typecheck`.
+5. **Final check**: `pnpm lint && pnpm fmt && pnpm typecheck && pnpm security` all pass. Pre-commit hook reruns these.
 
 ## Subsystem Docs
 

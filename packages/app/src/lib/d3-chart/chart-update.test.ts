@@ -79,7 +79,7 @@ describe('renderAxes', () => {
       expect(tickTexts.length).toBeGreaterThan(0);
       // Every formatted tick should start with $
       for (const t of tickTexts) {
-        expect(t).toMatch(/^\$/);
+        expect(t).toMatch(/^\$/u);
       }
     });
 
@@ -98,7 +98,7 @@ describe('renderAxes', () => {
       });
       expect(tickTexts.length).toBeGreaterThan(0);
       for (const t of tickTexts) {
-        expect(t).toMatch(/ms$/);
+        expect(t).toMatch(/ms$/u);
       }
     });
 

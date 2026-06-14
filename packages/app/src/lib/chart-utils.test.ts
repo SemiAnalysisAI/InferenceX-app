@@ -60,12 +60,12 @@ function pt(
     costhi: { y: 2, roof: false },
     costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
-    ...(opts.outputTputY !== undefined
-      ? { outputTputPerGpu: { y: opts.outputTputY, roof: false } }
-      : {}),
-    ...(opts.inputTputY !== undefined
-      ? { inputTputPerGpu: { y: opts.inputTputY, roof: false } }
-      : {}),
+    ...(opts.outputTputY === undefined
+      ? {}
+      : { outputTputPerGpu: { y: opts.outputTputY, roof: false } }),
+    ...(opts.inputTputY === undefined
+      ? {}
+      : { inputTputPerGpu: { y: opts.inputTputY, roof: false } }),
   } as InferenceData;
 }
 
@@ -178,30 +178,30 @@ function fullPt(
     costhi: { y: 2, roof: false },
     costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
-    ...(vals.costhOutputY !== undefined
-      ? { costhOutput: { y: vals.costhOutputY, roof: false } }
-      : {}),
-    ...(vals.costnOutputY !== undefined
-      ? { costnOutput: { y: vals.costnOutputY, roof: false } }
-      : {}),
-    ...(vals.costrOutputY !== undefined
-      ? { costrOutput: { y: vals.costrOutputY, roof: false } }
-      : {}),
-    ...(vals.jTotalY !== undefined ? { jTotal: { y: vals.jTotalY, roof: false } } : {}),
-    ...(vals.jOutputY !== undefined ? { jOutput: { y: vals.jOutputY, roof: false } } : {}),
-    ...(vals.jInputY !== undefined ? { jInput: { y: vals.jInputY, roof: false } } : {}),
-    ...(vals.outputTputY !== undefined
-      ? { outputTputPerGpu: { y: vals.outputTputY, roof: false } }
-      : {}),
-    ...(vals.inputTputY !== undefined
-      ? { inputTputPerGpu: { y: vals.inputTputY, roof: false } }
-      : {}),
-    ...(vals.inputTputPerMwY !== undefined
-      ? { inputTputPerMw: { y: vals.inputTputPerMwY, roof: false } }
-      : {}),
-    ...(vals.outputTputPerMwY !== undefined
-      ? { outputTputPerMw: { y: vals.outputTputPerMwY, roof: false } }
-      : {}),
+    ...(vals.costhOutputY === undefined
+      ? {}
+      : { costhOutput: { y: vals.costhOutputY, roof: false } }),
+    ...(vals.costnOutputY === undefined
+      ? {}
+      : { costnOutput: { y: vals.costnOutputY, roof: false } }),
+    ...(vals.costrOutputY === undefined
+      ? {}
+      : { costrOutput: { y: vals.costrOutputY, roof: false } }),
+    ...(vals.jTotalY === undefined ? {} : { jTotal: { y: vals.jTotalY, roof: false } }),
+    ...(vals.jOutputY === undefined ? {} : { jOutput: { y: vals.jOutputY, roof: false } }),
+    ...(vals.jInputY === undefined ? {} : { jInput: { y: vals.jInputY, roof: false } }),
+    ...(vals.outputTputY === undefined
+      ? {}
+      : { outputTputPerGpu: { y: vals.outputTputY, roof: false } }),
+    ...(vals.inputTputY === undefined
+      ? {}
+      : { inputTputPerGpu: { y: vals.inputTputY, roof: false } }),
+    ...(vals.inputTputPerMwY === undefined
+      ? {}
+      : { inputTputPerMw: { y: vals.inputTputPerMwY, roof: false } }),
+    ...(vals.outputTputPerMwY === undefined
+      ? {}
+      : { outputTputPerMw: { y: vals.outputTputPerMwY, roof: false } }),
   } as InferenceData;
 }
 
@@ -272,9 +272,9 @@ describe('buildAvailabilityHwKey', () => {
 
 /** Parse a hex (#rrggbb) or rgb() color into [r, g, b]. */
 function parseRgb(color: string): [number, number, number] {
-  const hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  const hex = color.match(/^#(?<r>[0-9a-f]{2})(?<g>[0-9a-f]{2})(?<b>[0-9a-f]{2})$/iu);
   if (hex) return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)];
-  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  const rgb = color.match(/rgb\((?<r>\d+),\s*(?<g>\d+),\s*(?<b>\d+)\)/u);
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
   throw new Error(`Cannot parse color: ${color}`);
 }
@@ -318,7 +318,7 @@ describe('generateHighContrastColors', () => {
   it('returns a valid hex color for a single key', () => {
     const result = generateHighContrastColors(['gpu-a'], 'dark');
     expect(Object.keys(result)).toHaveLength(1);
-    expect(result['gpu-a']).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(result['gpu-a']).toMatch(/^#[0-9a-f]{6}$/iu);
   });
 
   it('returns one color per key', () => {
@@ -1215,6 +1215,155 @@ describe('createChartDataPoint energy fields', () => {
     const e = entry({ input_tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.jInput).toBeUndefined();
+  });
+});
+
+// ===========================================================================
+// createChartDataPoint — measured power / energy fields (from runner telemetry)
+// ===========================================================================
+describe('createChartDataPoint measured power fields', () => {
+  it('emits measuredAvgPower when avg_power_w is present on the entry', () => {
+    const e = entry({ avg_power_w: 685.5 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredAvgPower!.y).toBe(685.5);
+    expect(point.measuredAvgPower!.roof).toBe(false);
+  });
+
+  it('emits measuredJPerOutputToken when joules_per_output_token is present', () => {
+    const e = entry({ joules_per_output_token: 8.4 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerOutputToken).toBeDefined();
+    expect(point.measuredJPerOutputToken!.y).toBe(8.4);
+  });
+
+  it('omits both fields when neither is on the entry', () => {
+    // Legacy runs predating aggregate_power.py.
+    const point = createChartDataPoint(
+      '2025-01-01',
+      entry(),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+    expect(point.measuredAvgPower).toBeUndefined();
+    expect(point.measuredJPerOutputToken).toBeUndefined();
+  });
+
+  it('emits one and omits the other when only one is present', () => {
+    // Defensive: aggregator can patch only avg_power_w if total_output_tokens=0.
+    const e = entry({ avg_power_w: 500 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredJPerOutputToken).toBeUndefined();
+  });
+
+  it('preserves a zero measured power value (not falsy-coerced away)', () => {
+    // Guards against a refactor switching the gate from typeof===number to truthiness.
+    const e = entry({ avg_power_w: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredAvgPower!.y).toBe(0);
+  });
+
+  it('emits measuredJPerTotalToken when joules_per_total_token is present', () => {
+    const e = entry({ joules_per_total_token: 0.93 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerTotalToken).toBeDefined();
+    expect(point.measuredJPerTotalToken!.y).toBe(0.93);
+    expect(point.measuredJPerTotalToken!.roof).toBe(false);
+  });
+
+  it('emits J/output and J/total independently — different denominators', () => {
+    // 8k1k workload: J/output ≈ 9 × J/total (input is ~8x output, so output/total ≈ 1/9).
+    const e = entry({ joules_per_output_token: 2.04, joules_per_total_token: 0.23 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerOutputToken!.y).toBe(2.04);
+    expect(point.measuredJPerTotalToken!.y).toBe(0.23);
+  });
+
+  it('omits measuredJPerTotalToken on rows that predate the field', () => {
+    // Rows ingested before joules_per_total_token was added still have avg_power_w
+    // and joules_per_output_token. The new field must be absent (not 0) so the
+    // chart correctly drops them from the J/total view rather than plotting fake data.
+    const e = entry({ avg_power_w: 458, joules_per_output_token: 2.04 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower).toBeDefined();
+    expect(point.measuredJPerOutputToken).toBeDefined();
+    expect(point.measuredJPerTotalToken).toBeUndefined();
+  });
+});
+
+// ===========================================================================
+// createChartDataPoint — per-stage measured power / energy (disagg prefill/decode)
+// ===========================================================================
+describe('createChartDataPoint per-stage measured power fields', () => {
+  it('emits measuredPrefillAvgPower when prefill_avg_power_w is present', () => {
+    const e = entry({ prefill_avg_power_w: 920.3 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower).toBeDefined();
+    expect(point.measuredPrefillAvgPower!.y).toBe(920.3);
+    expect(point.measuredPrefillAvgPower!.roof).toBe(false);
+  });
+
+  it('emits measuredDecodeAvgPower when decode_avg_power_w is present', () => {
+    const e = entry({ decode_avg_power_w: 612.1 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredDecodeAvgPower).toBeDefined();
+    expect(point.measuredDecodeAvgPower!.y).toBe(612.1);
+    expect(point.measuredDecodeAvgPower!.roof).toBe(false);
+  });
+
+  it('emits measuredJPerInputToken when joules_per_input_token is present', () => {
+    const e = entry({ joules_per_input_token: 0.27 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredJPerInputToken).toBeDefined();
+    expect(point.measuredJPerInputToken!.y).toBe(0.27);
+    expect(point.measuredJPerInputToken!.roof).toBe(false);
+  });
+
+  it('omits all per-stage fields on legacy rows predating per-stage attribution', () => {
+    // Single-node / pre-disagg runs emit avg_power_w only, no prefill/decode split.
+    const e = entry({ avg_power_w: 685.5 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower).toBeUndefined();
+    expect(point.measuredDecodeAvgPower).toBeUndefined();
+    expect(point.measuredJPerInputToken).toBeUndefined();
+  });
+
+  it('emits prefill and decode independently — the disagg per-stage split', () => {
+    // GB300 disagg: prefill GPUs run compute-bound (higher W) than decode GPUs.
+    const e = entry({ prefill_avg_power_w: 948, decode_avg_power_w: 631 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower!.y).toBe(948);
+    expect(point.measuredDecodeAvgPower!.y).toBe(631);
+    expect(point.measuredPrefillAvgPower!.y).toBeGreaterThan(point.measuredDecodeAvgPower!.y);
+  });
+
+  it('preserves a zero per-stage power value (not falsy-coerced away)', () => {
+    // Same typeof===number gate as total power — 0 W must survive, not be dropped.
+    const e = entry({ prefill_avg_power_w: 0, decode_avg_power_w: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillAvgPower).toBeDefined();
+    expect(point.measuredPrefillAvgPower!.y).toBe(0);
+    expect(point.measuredDecodeAvgPower).toBeDefined();
+    expect(point.measuredDecodeAvgPower!.y).toBe(0);
+  });
+
+  it('carries total and per-stage power together on a full disagg row', () => {
+    const e = entry({
+      avg_power_w: 853,
+      prefill_avg_power_w: 948,
+      decode_avg_power_w: 631,
+      joules_per_input_token: 0.18,
+      joules_per_output_token: 1.64,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredAvgPower!.y).toBe(853);
+    expect(point.measuredPrefillAvgPower!.y).toBe(948);
+    expect(point.measuredDecodeAvgPower!.y).toBe(631);
+    expect(point.measuredJPerInputToken!.y).toBe(0.18);
+    expect(point.measuredJPerOutputToken!.y).toBe(1.64);
   });
 });
 

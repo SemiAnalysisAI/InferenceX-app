@@ -35,7 +35,7 @@ export function hwToGpuKey(hw: string): string | null {
 const DB_MODEL_KEYS = new Set(Object.keys(DB_MODEL_TO_DISPLAY));
 
 /** Precision suffixes that can appear on `infmax_model_prefix` values. */
-const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/i;
+const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/iu;
 
 /** Explicit aliases for prefixes that don't match any DB key after suffix stripping. */
 const PREFIX_ALIASES: Record<string, string> = {
@@ -86,10 +86,14 @@ export const MODEL_TO_KEY: Record<string, string> = {
   // Qwen3.5
   'Qwen/Qwen3.5-397B-A17B': 'qwen3.5',
   'Qwen/Qwen3.5-397B-A17B-FP8': 'qwen3.5',
-  // Kimi-K2.5
+  // Kimi-K2.5 / K2.6 / K2.7-Code (same architecture, distinct DB buckets)
   'moonshotai/Kimi-K2.5': 'kimik2.5',
+  'moonshotai/Kimi-K2.6': 'kimik2.6',
+  'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
   // MiniMax-M2.5
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
+  // MiniMax-M3 (428B, distinct architecture from the M2 series)
+  'MiniMaxAI/MiniMax-M3': 'minimaxm3',
   // GLM-5
   'zai-org/GLM-5-FP8': 'glm5',
   'amd/GLM-5.1-MXFP4': 'glm5.1',
@@ -221,7 +225,7 @@ export function parseInt2(v: any): number | undefined {
  * @returns An object with `isl` and `osl` in tokens, or `null` if no match is found.
  */
 export function parseIslOsl(name: string): { isl: number; osl: number } | null {
-  const m = name.match(/[_-](\d+)k(\d+)k[_\-.]/i);
+  const m = name.match(/[_-](?<isl>\d+)k(?<osl>\d+)k[_\-.]/iu);
   if (!m) return null;
   return { isl: parseInt(m[1], 10) * 1024, osl: parseInt(m[2], 10) * 1024 };
 }

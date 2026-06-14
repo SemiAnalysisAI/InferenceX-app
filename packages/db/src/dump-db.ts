@@ -46,7 +46,7 @@ async function streamTable(table: string, outPath: string): Promise<number> {
 }
 
 async function dump(): Promise<void> {
-  const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-').slice(0, 19);
+  const timestamp = new Date().toISOString().replaceAll(/[:.]/gu, '-').slice(0, 19);
   const outDir = resolve(process.argv[2] ?? `inferencex-dump-${timestamp}`);
   mkdirSync(outDir, { recursive: true });
 

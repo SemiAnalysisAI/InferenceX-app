@@ -161,11 +161,11 @@ describe('interpolateMetricAtInteractivity', () => {
       makePoint({ x: 20, tpPerGpu: { y: 800, roof: false } }),
       makePoint({ x: 40, tpPerGpu: { y: 600, roof: false } }),
     ];
-    // jOutput is not set on these points — extractMetric returns null, so metric values are 0
+    // jOutput is not set on these points. Returning 0 would render a flat
+    // zero-line that looks like real data (the bug F4 fixed); return null
+    // so the trend chart can show a gap instead.
     const result = interpolateMetricAtInteractivity(points, 30, 'jOutput');
-    // With all metric values being 0, the result should be 0 (clamped from spline of zeros)
-    expect(result).not.toBeNull();
-    expect(result!).toBe(0);
+    expect(result).toBeNull();
   });
 
   it('handles two frontier points at close x values', () => {

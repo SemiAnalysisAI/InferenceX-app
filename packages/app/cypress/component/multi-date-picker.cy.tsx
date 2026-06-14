@@ -68,7 +68,7 @@ describe('MultiDatePicker', () => {
     cy.mount(<MultiDatePickerWrapper initialDates={['2025-11-02']} maxDates={3} />);
     cy.contains('Nov 2, 2025').click();
     // Calendar opens to November. Available within range: Nov 2, 5, 10, 15, 20.
-    cy.get('.grid-cols-7 button').contains(/^5$/).click();
+    cy.get('.grid-cols-7 button').contains(/^5$/u).click();
     cy.get('.grid-cols-7 button').contains('10').click();
     // Should see the selected dates as pills
     cy.contains('Selected Dates:').should('be.visible');
@@ -82,7 +82,7 @@ describe('MultiDatePicker', () => {
     cy.mount(<MultiDatePickerWrapper initialDates={['2025-11-02']} maxDates={2} />);
     cy.contains('Nov 2, 2025').click();
     // Calendar opens to November (month of selected date). Select one more.
-    cy.get('.grid-cols-7 button').contains(/^5$/).click();
+    cy.get('.grid-cols-7 button').contains(/^5$/u).click();
     // Now at maxDates=2, third date (10) should be disabled
     cy.get('.grid-cols-7 button').contains('10').should('be.disabled');
   });

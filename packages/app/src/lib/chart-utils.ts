@@ -152,6 +152,14 @@ export const Y_AXIS_METRICS = [
   'y_jTotal',
   'y_jOutput',
   'y_jInput',
+  // Measured power / energy (sourced from runner's aggregate_power.py output;
+  // distinct from the spec-sheet TDP-derived jTotal/jOutput/jInput above).
+  'y_measuredAvgPower',
+  'y_measuredPrefillAvgPower',
+  'y_measuredDecodeAvgPower',
+  'y_measuredJPerOutputToken',
+  'y_measuredJPerTotalToken',
+  'y_measuredJPerInputToken',
 ] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
@@ -195,7 +203,7 @@ export function normalizeEvalHardwareKey(
 
   // Strip additional qualifiers not relevant to GPU identification
   // e.g., "b200 nb" -> "b200", "h200 cw" -> "h200"
-  hwName = hwName.replace(/\s+(nb|cw|nv|dgxc|amds|cr|amd)$/i, '');
+  hwName = hwName.replace(/\s+(?:nb|cw|nv|dgxc|amds|cr|amd)$/iu, '');
 
   // Try to find a more specific hardware config that includes framework
   if (framework) {
@@ -393,6 +401,28 @@ export function createChartDataPoint(
           },
         }
       : {}),
+
+    // Measured power / energy from runner's aggregate_power.py. Gated on the
+    // raw fields existing so points from runs predating the measurement land
+    // without these keys and the chart correctly filters them out.
+    ...(typeof entry.avg_power_w === 'number'
+      ? { measuredAvgPower: { y: entry.avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.prefill_avg_power_w === 'number'
+      ? { measuredPrefillAvgPower: { y: entry.prefill_avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.decode_avg_power_w === 'number'
+      ? { measuredDecodeAvgPower: { y: entry.decode_avg_power_w, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_output_token === 'number'
+      ? { measuredJPerOutputToken: { y: entry.joules_per_output_token, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_total_token === 'number'
+      ? { measuredJPerTotalToken: { y: entry.joules_per_total_token, roof: false } }
+      : {}),
+    ...(typeof entry.joules_per_input_token === 'number'
+      ? { measuredJPerInputToken: { y: entry.joules_per_input_token, roof: false } }
+      : {}),
   };
 }
 
@@ -553,7 +583,13 @@ export const calculateRoofline = (
     | `costri.y`
     | `jTotal.y`
     | `jOutput.y`
-    | `jInput.y`,
+    | `jInput.y`
+    | `measuredAvgPower.y`
+    | `measuredPrefillAvgPower.y`
+    | `measuredDecodeAvgPower.y`
+    | `measuredJPerOutputToken.y`
+    | `measuredJPerTotalToken.y`
+    | `measuredJPerInputToken.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
   const pointsForRoofline = points.map((p) => {
@@ -623,7 +659,13 @@ export function computeAllRooflines(
             | `costri.y`
             | `jTotal.y`
             | `jOutput.y`
-            | `jInput.y`,
+            | `jInput.y`
+            | `measuredAvgPower.y`
+            | `measuredPrefillAvgPower.y`
+            | `measuredDecodeAvgPower.y`
+            | `measuredJPerOutputToken.y`
+            | `measuredJPerTotalToken.y`
+            | `measuredJPerInputToken.y`,
           rooflineDirection,
         );
       }
@@ -667,6 +709,12 @@ export function markRooflinePoints(
       if (newPoint.jTotal) newPoint.jTotal.roof = false;
       if (newPoint.jOutput) newPoint.jOutput.roof = false;
       if (newPoint.jInput) newPoint.jInput.roof = false;
+      if (newPoint.measuredAvgPower) newPoint.measuredAvgPower.roof = false;
+      if (newPoint.measuredPrefillAvgPower) newPoint.measuredPrefillAvgPower.roof = false;
+      if (newPoint.measuredDecodeAvgPower) newPoint.measuredDecodeAvgPower.roof = false;
+      if (newPoint.measuredJPerOutputToken) newPoint.measuredJPerOutputToken.roof = false;
+      if (newPoint.measuredJPerTotalToken) newPoint.measuredJPerTotalToken.roof = false;
+      if (newPoint.measuredJPerInputToken) newPoint.measuredJPerInputToken.roof = false;
 
       for (const chartDefYKey of Y_AXIS_METRICS) {
         const rooflinePoints = computedRooflines[hwKey]?.[chartDefYKey];
@@ -726,6 +774,24 @@ export function markRooflinePoints(
           newPoint.jOutput.roof = onCurrentRoofline;
         } else if (chartDefYKey === 'y_jInput' && newPoint.jInput) {
           newPoint.jInput.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredAvgPower' && newPoint.measuredAvgPower) {
+          newPoint.measuredAvgPower.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredPrefillAvgPower' &&
+          newPoint.measuredPrefillAvgPower
+        ) {
+          newPoint.measuredPrefillAvgPower.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredDecodeAvgPower' && newPoint.measuredDecodeAvgPower) {
+          newPoint.measuredDecodeAvgPower.roof = onCurrentRoofline;
+        } else if (
+          chartDefYKey === 'y_measuredJPerOutputToken' &&
+          newPoint.measuredJPerOutputToken
+        ) {
+          newPoint.measuredJPerOutputToken.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredJPerTotalToken' && newPoint.measuredJPerTotalToken) {
+          newPoint.measuredJPerTotalToken.roof = onCurrentRoofline;
+        } else if (chartDefYKey === 'y_measuredJPerInputToken' && newPoint.measuredJPerInputToken) {
+          newPoint.measuredJPerInputToken.roof = onCurrentRoofline;
         }
       }
       finalProcessedData.push(newPoint);

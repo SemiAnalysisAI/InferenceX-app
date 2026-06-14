@@ -17,7 +17,7 @@ import {
   getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/chart-rendering';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
@@ -32,8 +32,6 @@ interface TrendChartProps {
   caption?: React.ReactNode;
   /** Selected precisions, in selection order; controls scatter-point shape assignment. */
   selectedPrecisions?: readonly string[];
-  /** Currently selected model — drives day-0 watermark for dsv4. */
-  selectedModel?: string;
 }
 
 const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
@@ -64,7 +62,6 @@ const TrendChart = React.memo(
     legendElement,
     caption,
     selectedPrecisions,
-    selectedModel,
   }: TrendChartProps) => {
     // All data points flattened for computing axis domains — only from VISIBLE configs
     const visibleConfigIds = useMemo(() => new Set(lineConfigs.map((c) => c.id)), [lineConfigs]);
@@ -91,7 +88,7 @@ const TrendChart = React.memo(
       for (const config of lineConfigs) {
         const data = trendLines.get(config.id);
         if (!data || data.length === 0) continue;
-        const safeId = config.id.replaceAll(/[|]/g, '_');
+        const safeId = config.id.replaceAll(/[|]/gu, '_');
         const precision = config.precision ?? 'fp4';
         const prepared = data
           .map((d) => {
@@ -121,7 +118,7 @@ const TrendChart = React.memo(
     // Reverse lookup: safeId -> config
     const safeIdToConfig = useMemo(() => {
       const map = new Map<string, TrendLineConfig>();
-      for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/g, '_'), c);
+      for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/gu, '_'), c);
       return map;
     }, [lineConfigs]);
 
@@ -151,10 +148,13 @@ const TrendChart = React.memo(
         return logScale ? { type: 'log', domain: [0.1, 1] } : { type: 'linear', domain: [0, 1] };
       }
       const valueExtent = d3.extent(allPoints, (d) => d.value) as [number, number];
-      const yRange = valueExtent[1] - valueExtent[0];
+      const dataMin = valueExtent[0];
+      const dataMax = valueExtent[1];
+      // Pad a degenerate extent so the axis renders multiple ticks instead of one raw float.
+      const yRange =
+        dataMax - dataMin > 0 ? dataMax - dataMin : Math.max(Math.abs(dataMax) * 0.1, 1);
       let yMin: number;
       if (logScale) {
-        const dataMin = valueExtent[0];
         if (dataMin <= 0) {
           yMin = 0.1;
         } else if (dataMin < 1) {
@@ -163,9 +163,9 @@ const TrendChart = React.memo(
           yMin = dataMin * 0.95;
         }
       } else {
-        yMin = Math.max(0, valueExtent[0] - yRange * 0.05);
+        yMin = Math.max(0, dataMin - yRange * 0.05);
       }
-      const yMax = valueExtent[1] + yRange * 0.05;
+      const yMax = dataMax + yRange * 0.05;
       return logScale
         ? { type: 'log', domain: [yMin, yMax], nice: true }
         : { type: 'linear', domain: [yMin, yMax], nice: true };
@@ -302,7 +302,7 @@ const TrendChart = React.memo(
         data={flatPointData}
         height={600}
         margin={CHART_MARGIN}
-        watermark={getModelWatermark(selectedModel)}
+        watermark={getChartWatermark()}
         testId="trend-chart-svg"
         grabCursor
         instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset"

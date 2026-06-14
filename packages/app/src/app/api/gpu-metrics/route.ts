@@ -66,7 +66,7 @@ async function fetchGpuMetrics(runId: string) {
 export async function GET(request: NextRequest) {
   const runId = request.nextUrl.searchParams.get('runId');
 
-  if (!runId || !/^\d+$/.test(runId)) {
+  if (!runId || !/^\d+$/u.test(runId)) {
     return NextResponse.json({ error: 'runId must be a numeric workflow run ID' }, { status: 400 });
   }
 

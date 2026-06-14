@@ -49,6 +49,44 @@ describe('ChartButtons', () => {
     });
   });
 
+  describe('with MP4 export', () => {
+    it('shows MP4 option in the export popover and triggers the callback', () => {
+      const onExportMp4 = cy.stub().as('mp4Export');
+      const onExportCsv = cy.stub().as('csvExport');
+      cy.mount(
+        <div style={{ position: 'relative', width: 400, height: 200 }}>
+          <div id="test-chart">Chart content</div>
+          <ChartButtons
+            chartId="test-chart"
+            analyticsPrefix="test"
+            onExportCsv={onExportCsv}
+            onExportMp4={onExportMp4}
+          />
+        </div>,
+      );
+      cy.get('[data-testid="export-button"]').click();
+      cy.get('[data-testid="export-png-button"]').should('be.visible');
+      cy.get('[data-testid="export-csv-button"]').should('be.visible');
+      cy.get('[data-testid="export-mp4-button"]').should('be.visible').click();
+      cy.get('@mp4Export').should('have.been.calledOnce');
+      cy.get('@csvExport').should('not.have.been.called');
+    });
+
+    it('shows the popover when only MP4 export is provided (no CSV)', () => {
+      const onExportMp4 = cy.stub().as('mp4Export');
+      cy.mount(
+        <div style={{ position: 'relative', width: 400, height: 200 }}>
+          <div id="test-chart">Chart content</div>
+          <ChartButtons chartId="test-chart" analyticsPrefix="test" onExportMp4={onExportMp4} />
+        </div>,
+      );
+      cy.get('[data-testid="export-button"]').click();
+      cy.get('[data-testid="export-csv-button"]').should('not.exist');
+      cy.get('[data-testid="export-mp4-button"]').click();
+      cy.get('@mp4Export').should('have.been.calledOnce');
+    });
+  });
+
   describe('hideZoomReset', () => {
     it('hides zoom reset button when hideZoomReset is true', () => {
       cy.mount(

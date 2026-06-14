@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 
 const baseUrl = (
   process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'https://inferencex.semianalysis.com'
-).replace(/\/$/, '');
+).replace(/\/$/u, '');
 
 // `import.meta.dirname` is undefined when this script runs through tsx's CJS
 // loader (no `"type": "module"` in packages/app/package.json). `__dirname` is

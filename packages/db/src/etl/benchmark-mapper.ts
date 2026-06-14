@@ -57,6 +57,10 @@ const NON_METRIC_KEYS = new Set([
   'decode_num_workers',
   'num_prefill_gpu',
   'num_decode_gpu',
+  // per-worker measured-power array (not a numeric scalar). Surfaced as a
+  // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
+  // stays Record<string, number> for the index signature on BenchmarkRow.
+  'workers',
 ]);
 
 /**
@@ -68,6 +72,23 @@ const NON_METRIC_KEYS = new Set([
 // Deduplicate warnings: each unexpected key only prints once per process.
 const _warnedMetricKeys = new Set<string>();
 
+/**
+ * One per-worker entry from aggregate_power.py's `workers` array.
+ * Fields after `avg_power_w` are optional because the perfmon CSVs may not
+ * include the corresponding sample columns on every run.
+ */
+export interface WorkerPower {
+  role: string;
+  worker_idx: number;
+  hosts?: string[];
+  num_gpus: number;
+  avg_power_w: number;
+  avg_temp_c?: number;
+  peak_temp_c?: number;
+  avg_util_pct?: number;
+  avg_mem_used_mb?: number;
+}
+
 export interface BenchmarkParams {
   config: ConfigParams;
   isl: number;
@@ -75,6 +96,15 @@ export interface BenchmarkParams {
   conc: number;
   image: string | null;
   metrics: Record<string, number>;
+  /**
+   * Per-worker measured-power breakdown emitted by the runner's
+   * aggregate_power.py on multinode / disagg runs. Stored on
+   * benchmark_results in a dedicated JSONB column (added in migration 006)
+   * rather than inside `metrics` so the metrics index signature can stay
+   * `Record<string, number>`. Undefined for single-node runs and any run
+   * predating the multinode patch.
+   */
+  workers?: WorkerPower[];
 }
 
 /**
@@ -185,6 +215,13 @@ export function mapBenchmarkRow(
   // Artifact names encode '/' as '#' to avoid path separators; restore the URI.
   const image = row.image ? String(row.image).replaceAll('#', '/') : null;
 
+  // Per-worker measured-power breakdown. The runner emits this as an array
+  // of objects sibling to the scalar metrics; we surface it on a dedicated
+  // BenchmarkParams.workers field so downstream consumers can treat it as
+  // structured data without polluting the flat metrics record. Defensive
+  // narrowing — anything other than a non-empty array of objects is dropped.
+  const workers = extractWorkers(row.workers);
+
   return {
     config: {
       hardware: gpuKey,
@@ -210,5 +247,50 @@ export function mapBenchmarkRow(
     conc,
     image,
     metrics,
+    workers,
   };
+}
+
+/**
+ * Narrow a raw `workers` value from the artifact JSON to `WorkerPower[]` or
+ * undefined. Each entry must have a string `role`, a numeric `worker_idx`,
+ * `num_gpus`, and `avg_power_w` to be kept; anything else is dropped. Optional
+ * telemetry scalars (`avg_temp_c`, `peak_temp_c`, `avg_util_pct`,
+ * `avg_mem_used_mb`) and the `hosts[]` list are preserved when present and
+ * well-typed, ignored otherwise. Returns undefined for any non-array input or
+ * an empty array so the eventual JSONB column stores null rather than `[]`.
+ */
+export function extractWorkers(raw: unknown): WorkerPower[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out: WorkerPower[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const role = typeof e.role === 'string' ? e.role : null;
+    const worker_idx = parseInt2(e.worker_idx);
+    const num_gpus = parseInt2(e.num_gpus);
+    const avg_power_w = parseNum(e.avg_power_w);
+    if (
+      role === null ||
+      worker_idx === undefined ||
+      num_gpus === undefined ||
+      avg_power_w === undefined
+    )
+      continue;
+
+    const w: WorkerPower = { role, worker_idx, num_gpus, avg_power_w };
+    if (Array.isArray(e.hosts) && e.hosts.every((h) => typeof h === 'string')) {
+      w.hosts = e.hosts as string[];
+    }
+    const avg_temp_c = parseNum(e.avg_temp_c);
+    if (avg_temp_c !== undefined) w.avg_temp_c = avg_temp_c;
+    const peak_temp_c = parseNum(e.peak_temp_c);
+    if (peak_temp_c !== undefined) w.peak_temp_c = peak_temp_c;
+    const avg_util_pct = parseNum(e.avg_util_pct);
+    if (avg_util_pct !== undefined) w.avg_util_pct = avg_util_pct;
+    const avg_mem_used_mb = parseNum(e.avg_mem_used_mb);
+    if (avg_mem_used_mb !== undefined) w.avg_mem_used_mb = avg_mem_used_mb;
+    out.push(w);
+  }
+  return out.length > 0 ? out : undefined;
 }

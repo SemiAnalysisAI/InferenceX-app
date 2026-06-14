@@ -47,13 +47,13 @@ describe('First-load navigation', () => {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.removeItem('inferencex-star-modal-dismissed');
-        win.localStorage.removeItem('inferencex-dsv4-modal-dismissed');
-        win.localStorage.removeItem('inferencex-dsv4-banner-dismissed');
+        win.localStorage.removeItem('inferencex-minimax-m3-modal-dismissed');
+        win.localStorage.removeItem('inferencex-minimax-m3-banner-dismissed');
       },
     });
 
     // Banner (inline) and overlay modal coexist in independent slots.
-    cy.get('[data-testid="dsv4-launch-modal"]').should('be.visible');
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
     cy.get('body').should('not.have.attr', 'data-scroll-locked');
   });
 
@@ -65,6 +65,11 @@ describe('First-load navigation', () => {
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
     cy.location('pathname').should('eq', '/inference');
+  });
+
+  it('navigates to comparisons from the header with one click', () => {
+    cy.get('[data-testid="nav-link-compare"]').click();
+    cy.location('pathname').should('eq', '/compare');
   });
 
   it('navigates to dashboard from the landing CTA with one click', () => {

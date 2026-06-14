@@ -71,7 +71,7 @@ describe('DatePicker', () => {
     cy.contains('Run Date:').click();
     // Date 2 is not in availableDates, so it should be disabled with line-through
     cy.get('.grid-cols-7 button')
-      .contains(/^2$/)
+      .contains(/^2$/u)
       .should('be.disabled')
       .and('have.class', 'line-through');
   });

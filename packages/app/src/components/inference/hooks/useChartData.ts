@@ -14,7 +14,12 @@ import type {
 } from '@/components/inference/types';
 import { filterDataByCostLimit } from '@/components/inference/utils';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
-import { GPU_ALIAS_TO_CANONICAL, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import {
+  GPU_ALIAS_TO_CANONICAL,
+  getHardwareConfig,
+  getModelSortIndex,
+  hardwareKeyMatchesAnyBase,
+} from '@/lib/constants';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import {
@@ -99,6 +104,8 @@ export function useChartData(
    * sequence) pair surfaces as its own series in the legend.
    */
   extraSequences: Sequence[] = [],
+  /** When set, only series for these two registry GPU keys are shown (compare pages). */
+  compareGpuPair?: readonly [string, string] | null,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -398,6 +405,12 @@ export function useChartData(
         // Filter by selected GPUs if any
         filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
 
+        if (compareGpuPair) {
+          filteredData = filteredData.filter((d) =>
+            hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair),
+          );
+        }
+
         filteredData = filterDataByCostLimit(filteredData, chartDefinition, selectedYAxisMetric);
 
         // Filter to points that have the selected metric, then remap x/y
@@ -409,7 +422,12 @@ export function useChartData(
               .map((d: InferenceData) => {
                 const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
                 const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
-                const xValue = (d as any)[xAxisField] ?? d.x;
+                // xAxisField is `keyof AggDataEntry`; InferenceData embeds those
+                // fields via `Partial<Omit<AggDataEntry, ...>>`, so a typed
+                // accessor catches a future field rename (silent fallthrough to
+                // d.x would otherwise mask the regression).
+                const xCandidate = (d as Partial<AggDataEntry>)[xAxisField];
+                const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
                 return {
                   ...d,
                   x: xValue,
@@ -445,6 +463,7 @@ export function useChartData(
     userCosts,
     userPowers,
     stableChartDefinitions,
+    compareGpuPair,
   ]);
 
   return { graphs, loading, error, hardwareConfig };

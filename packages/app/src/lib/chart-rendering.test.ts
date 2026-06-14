@@ -19,6 +19,10 @@ function mockScale(min: number, max: number) {
   return { domain: () => [min, max] } as any;
 }
 
+function mockSelection() {
+  return { attr: vi.fn().mockReturnThis() } as any;
+}
+
 // ===========================================================================
 // SHAPE_CONFIG (keyed by shape name)
 // ===========================================================================
@@ -38,8 +42,8 @@ describe('SHAPE_CONFIG', () => {
 
   it('triangle config has type "path" with an SVG path string', () => {
     expect(SHAPE_CONFIG.triangle.type).toBe('path');
-    expect(SHAPE_CONFIG.triangle.normal.d).toMatch(/^M /);
-    expect(SHAPE_CONFIG.triangle.hover.d).toMatch(/^M /);
+    expect(SHAPE_CONFIG.triangle.normal.d).toMatch(/^M /u);
+    expect(SHAPE_CONFIG.triangle.hover.d).toMatch(/^M /u);
   });
 
   it('diamond config has type "path" with a distinct path from triangle', () => {
@@ -112,10 +116,6 @@ describe('getShapeConfig', () => {
 // applyNormalState
 // ===========================================================================
 describe('applyNormalState', () => {
-  function mockSelection() {
-    return { attr: vi.fn().mockReturnThis() } as any;
-  }
-
   it('sets path attributes for triangle', () => {
     const sel = mockSelection();
     applyNormalState(sel, 'triangle');
@@ -153,10 +153,6 @@ describe('applyNormalState', () => {
 // applyHoverState
 // ===========================================================================
 describe('applyHoverState', () => {
-  function mockSelection() {
-    return { attr: vi.fn().mockReturnThis() } as any;
-  }
-
   it('sets hover path attributes for triangle', () => {
     const sel = mockSelection();
     applyHoverState(sel, 'triangle');

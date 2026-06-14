@@ -7,9 +7,17 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
+import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+
+// Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
+const FeedbackForm = dynamic(
+  () => import('@/components/feedback-modal').then((m) => m.FeedbackForm),
+  { ssr: false },
+);
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
 import type { NudgeDefinition } from './types';
@@ -154,7 +162,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     id: 'eval-samples',
     type: 'toast',
     trigger: { type: 'timer', delayMs: 1500 },
-    dismissal: { type: 'timed', durationMs: 7 * 24 * 60 * 60 * 1000 },
+    // Re-show every week so returning users see it again. Cadence runs from
+    // first show (or last suppress event), not from dismissal — matches the
+    // pre-refactor `EvalSamplesNudge` behavior.
+    dismissal: {
+      type: 'timed',
+      durationMs: 7 * 24 * 60 * 60 * 1000,
+      cooldownStartsOnShow: true,
+    },
     storageKey: 'inferencex-eval-samples-nudge-dismissed',
     permanentSuppressEvent: 'inferencex:eval-samples-opened',
     priority: 30,
@@ -174,23 +189,55 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   // -------------------------------------------------------------------------
+  // Dashboard modals
+  // -------------------------------------------------------------------------
+  {
+    id: 'feedback-modal',
+    type: 'modal',
+    trigger: { type: 'immediate' },
+    dismissal: {
+      type: 'timed',
+      durationMs: 3 * 24 * 60 * 60 * 1000,
+      cooldownStartsOnShow: true,
+    },
+    storageKey: 'inferencex-feedback-modal-snoozed',
+    permanentSuppressKey: 'inferencex-feedback-modal-submitted',
+    permanentSuppressEvent: FEEDBACK_SUBMITTED_EVENT,
+    priority: 5,
+    scope: 'dashboard',
+    content: {
+      icon: MessageSquareText,
+      iconClassName: 'text-brand',
+      title: 'Help us improve InferenceX',
+      description: "We'd love to hear what's working and what isn't.",
+      testId: 'feedback-modal',
+      centered: true,
+      renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
+    },
+    analytics: {
+      shown: 'feedback_modal_shown',
+      dismissed: 'feedback_modal_dismissed',
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // Landing modals
   // -------------------------------------------------------------------------
   {
-    id: 'dsv4-launch-modal',
+    id: 'minimax-m3-launch-modal',
     type: 'modal',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-dsv4-modal-dismissed',
+    storageKey: 'inferencex-minimax-m3-modal-dismissed',
     priority: 50,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'DeepSeek V4 Pro is live',
+      title: 'MiniMax M3 is live',
       description:
-        'Day-zero benchmarks for DeepSeek V4 Pro are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
-      testId: 'dsv4-launch-modal',
+        'Day-zero benchmarks for MiniMax M3 are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
+      testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       badge: 'New',
       dismissLabel: 'Maybe Later',
@@ -198,14 +245,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         label: 'Explore',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
-          window.location.href = '/inference?preset=dsv4-launch';
+          window.location.href = '/inference?preset=minimax-m3-launch';
         },
       },
     },
     analytics: {
-      shown: 'dsv4_modal_shown',
-      dismissed: 'dsv4_modal_dismissed',
-      action: 'dsv4_modal_explored',
+      shown: 'minimax_m3_modal_shown',
+      dismissed: 'minimax_m3_modal_dismissed',
+      action: 'minimax_m3_modal_explored',
     },
   },
   {
@@ -247,30 +294,30 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // Landing banner
   // -------------------------------------------------------------------------
   {
-    id: 'dsv4-launch-banner',
+    id: 'minimax-m3-launch-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-dsv4-banner-dismissed',
+    storageKey: 'inferencex-minimax-m3-banner-dismissed',
     priority: 60,
     scope: 'landing',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'DeepSeek V4 Pro benchmarks are live',
+      title: 'MiniMax M3 benchmarks are live',
       description: 'First inference numbers across NVIDIA and AMD GPUs, click to explore.',
       testId: 'launch-banner',
       badge: 'New',
-      href: '/inference?preset=dsv4-launch',
+      href: '/inference?preset=minimax-m3-launch',
       onLinkClick: () => {
-        window.location.href = '/inference?preset=dsv4-launch';
+        window.location.href = '/inference?preset=minimax-m3-launch';
       },
     },
     analytics: {
       shown: 'launch_banner_shown',
       dismissed: 'launch_banner_dismissed',
       action: 'launch_banner_clicked',
-      properties: { banner_id: 'dsv4-launch', preset_id: 'dsv4-launch' },
+      properties: { banner_id: 'minimax-m3-launch', preset_id: 'minimax-m3-launch' },
     },
   },
 ];

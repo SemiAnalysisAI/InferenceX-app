@@ -78,4 +78,31 @@ describe('Line Labels Toggle', () => {
     // Labels should be rendered
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
+
+  it('appends the precision to each line label when multiple precisions are selected', () => {
+    cy.visit('/inference?i_linelabel=1&i_prec=fp4,fp8', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+
+    // With both FP4 and FP8 shown, each curve is its own line and the label
+    // must carry the precision so the two curves of the same hardware are
+    // distinguishable (e.g. "B200 (vLLM) FP8" vs "B200 (vLLM) FP4").
+    cy.get('[data-testid="scatter-graph"] svg g.line-label .ll-text')
+      .should('have.length.greaterThan', 0)
+      .then(($texts) => {
+        const labels = $texts.toArray().map((el) => el.textContent ?? '');
+        // At least one label for each selected precision.
+        expect(
+          labels.some((t) => /\bFP8\b/u.test(t)),
+          'an FP8 line label exists',
+        ).to.equal(true);
+        expect(
+          labels.some((t) => /\bFP4\b/u.test(t)),
+          'an FP4 line label exists',
+        ).to.equal(true);
+      });
+  });
 });

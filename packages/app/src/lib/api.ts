@@ -3,6 +3,8 @@
  * Each function is a thin fetch wrapper returning typed data.
  */
 
+import type { WorkerPower } from '@/components/inference/types';
+
 import type { SubmissionsResponse } from './submissions-types';
 
 export interface BenchmarkRow {
@@ -28,6 +30,15 @@ export interface BenchmarkRow {
   conc: number;
   image: string | null;
   metrics: Record<string, number>;
+  /**
+   * Per-worker measured power for multinode / disagg runs. The runner emits
+   * this as a JSONB sibling of the scalar metrics; the API layer surfaces it
+   * as a separate field here so the scalar `metrics` index signature can stay
+   * `Record<string, number>` and existing `m.x ?? 0` call sites keep narrowing
+   * cleanly. Undefined for single-node runs and any run predating
+   * aggregate_power.py.
+   */
+  workers?: WorkerPower[];
   date: string;
   run_url: string | null;
 }
@@ -256,4 +267,40 @@ export function fetchEvalSamplesLive(
 
 export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
+}
+
+export interface FeedbackListRow {
+  id: string;
+  created_at: string;
+  doing_well_ciphertext: string | null;
+  doing_poorly_ciphertext: string | null;
+  want_to_see_ciphertext: string | null;
+  user_agent_ciphertext: string | null;
+  page_path_ciphertext: string | null;
+}
+
+export function fetchFeedbackList(signal?: AbortSignal) {
+  return fetchJson<{ rows: FeedbackListRow[] }>('/api/v1/feedback/list', signal);
+}
+
+export interface LatestImageRow {
+  model: string;
+  hardware: string;
+  framework: string;
+  precision: string;
+  spec_method: string;
+  isl: number;
+  osl: number;
+  image: string;
+  date: string;
+}
+
+export function fetchLatestImages() {
+  return fetchJson<LatestImageRow[]>('/api/v1/latest-images');
+}
+
+export type FrameworkReleases = Record<string, string | null>;
+
+export function fetchFrameworkReleases() {
+  return fetchJson<FrameworkReleases>('/api/v1/framework-releases');
 }

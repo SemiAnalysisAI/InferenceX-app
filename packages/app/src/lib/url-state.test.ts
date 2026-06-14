@@ -27,7 +27,7 @@ describe('PARAM_DEFAULTS', () => {
 
   it('has expected default for g_model', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-R1-0528');
+    expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-V4-Pro');
   });
 
   it('has expected default for i_seq', async () => {
@@ -164,7 +164,7 @@ describe('writeUrlParams + buildShareUrl', () => {
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
 
     // write default value, should be omitted
-    writeUrlParams({ g_model: 'DeepSeek-R1-0528' });
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
@@ -305,7 +305,7 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toMatch(/i_active=h100(?:,|%2C)b200/);
+    expect(url).toMatch(/i_active=h100(?:,|%2C)b200/u);
     expect(url).not.toContain('e_active');
     expect(url).not.toContain('r_active');
   });
@@ -318,7 +318,7 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toMatch(/e_active=h100(?:,|%2C)b200/);
+    expect(url).toMatch(/e_active=h100(?:,|%2C)b200/u);
     expect(url).not.toContain('i_active');
     expect(url).not.toContain('r_active');
   });
@@ -331,7 +331,7 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toMatch(/r_active=dsr1(?:,|%2C)llama70b/);
+    expect(url).toMatch(/r_active=dsr1(?:,|%2C)llama70b/u);
     expect(url).not.toContain('i_active');
     expect(url).not.toContain('e_active');
   });
@@ -362,7 +362,7 @@ describe('buildShareUrl unofficialrun handling', () => {
 
     const url = buildShareUrl();
     // URLSearchParams encodes comma as %2C — accept either form.
-    expect(url).toMatch(/unofficialruns=111(?:,|%2C)222(?:,|%2C)333/);
+    expect(url).toMatch(/unofficialruns=111(?:,|%2C)222(?:,|%2C)333/u);
   });
 
   it('canonicalizes the singular alias "unofficialrun" to plural "unofficialruns"', async () => {
@@ -370,19 +370,19 @@ describe('buildShareUrl unofficialrun handling', () => {
     const { buildShareUrl } = await import('@/lib/url-state');
 
     const url = buildShareUrl();
-    expect(url).toMatch(/[?&]unofficialruns=/);
-    expect(url).not.toMatch(/[?&]unofficialrun=/);
+    expect(url).toMatch(/[?&]unofficialruns=/u);
+    expect(url).not.toMatch(/[?&]unofficialrun=/u);
   });
 
   it('preserves unofficialruns alongside other in-memory share params', async () => {
-    setupWindow('?unofficialruns=111&g_model=DeepSeek-R1-0528', '/inference');
+    setupWindow('?unofficialruns=111&g_model=DeepSeek-V4-Pro', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
 
-    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+    writeUrlParams({ g_model: 'DeepSeek-R1-0528' });
     await vi.advanceTimersByTimeAsync(200);
 
     const url = buildShareUrl();
-    expect(url).toContain('g_model=DeepSeek-V4-Pro');
+    expect(url).toContain('g_model=DeepSeek-R1-0528');
     expect(url).toContain('unofficialruns=111');
   });
 

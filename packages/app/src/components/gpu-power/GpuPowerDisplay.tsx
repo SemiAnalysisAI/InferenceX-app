@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+import { relockFeatureGate } from '@/lib/use-feature-gate';
+
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
@@ -35,7 +37,6 @@ import {
 } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
-const FEATURE_GATE_KEY = 'inferencex-feature-gate';
 
 type GpuMetricsView = 'chart' | 'correlation';
 
@@ -248,8 +249,7 @@ export default function GpuMetricsDisplay() {
                 size="sm"
                 className="h-7 gap-1.5 text-xs text-muted-foreground"
                 onClick={() => {
-                  localStorage.removeItem(FEATURE_GATE_KEY);
-                  window.dispatchEvent(new Event('inferencex:feature-gate:locked'));
+                  relockFeatureGate();
                   track('powerx_relocked');
                   router.push('/inference');
                 }}
@@ -486,15 +486,15 @@ export default function GpuMetricsDisplay() {
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
                     actions={
-                      !allGpusSelected
-                        ? [
+                      allGpusSelected
+                        ? []
+                        : [
                             {
                               id: 'gpu-metrics-reset-filter',
                               label: 'Reset filter',
                               onClick: selectAllGpus,
                             },
                           ]
-                        : []
                     }
                     switches={[
                       {
@@ -542,15 +542,15 @@ export default function GpuMetricsDisplay() {
                       track('gpu_metrics_legend_expanded', { expanded });
                     }}
                     actions={
-                      !allGpusSelected
-                        ? [
+                      allGpusSelected
+                        ? []
+                        : [
                             {
                               id: 'gpu-metrics-reset-filter-2',
                               label: 'Reset filter',
                               onClick: selectAllGpus,
                             },
                           ]
-                        : []
                     }
                     switches={[
                       {

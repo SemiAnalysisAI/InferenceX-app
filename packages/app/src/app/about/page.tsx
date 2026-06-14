@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS } from '@/components/about/faq-data';
+import { JsonLd } from '@/components/json-ld';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = {
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <main className="relative">
-      <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
+      <JsonLd data={faqJsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4 pb-8">
         <section>
           <Card>

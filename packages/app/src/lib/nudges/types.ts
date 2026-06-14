@@ -25,7 +25,17 @@ export type NudgeTrigger =
 export type NudgeDismissal =
   | { type: 'session' }
   | { type: 'permanent' }
-  | { type: 'timed'; durationMs: number };
+  | {
+      type: 'timed';
+      durationMs: number;
+      /**
+       * When true the cooldown timer starts at first show, giving a
+       * "remind every N" cadence (the nudge re-appears after `durationMs`
+       * regardless of whether the user dismissed it). When false (the default)
+       * the timer starts on user dismissal — the nudge is "snoozed for N".
+       */
+      cooldownStartsOnShow?: boolean;
+    };
 
 export interface NudgeCondition {
   check: () => boolean;
@@ -44,6 +54,10 @@ export interface NudgeAction {
   onClick: (eventDetail?: unknown) => void;
 }
 
+export interface NudgeRenderContext {
+  dismiss: () => void;
+}
+
 export interface NudgeContent {
   icon: ComponentType<{ className?: string }>;
   iconClassName?: string;
@@ -53,6 +67,9 @@ export interface NudgeContent {
   /** data-testid on the nudge container (preserves existing selectors). */
   testId?: string;
 
+  /** Escape hatch (modals): replaces the default body. Engine still renders chrome + X. */
+  renderContent?: (ctx: NudgeRenderContext) => ReactNode;
+
   // -- Modal-specific (ignored by toasts/banners) --
 
   /** Label for the dismiss button (default "Maybe Later"). */
@@ -61,6 +78,8 @@ export interface NudgeContent {
   primaryAction?: NudgeAction;
   /** Extra CSS class on the modal container (e.g. branded border). */
   containerClassName?: string;
+  /** Render as a true center-of-page modal with a backdrop instead of a bottom-right card. */
+  centered?: boolean;
   /** Extra CSS class on the primary action button (e.g. glow effect). */
   actionClassName?: string;
   /** Badge text rendered next to the title (e.g. "New"). */
@@ -123,6 +142,14 @@ export interface NudgeDefinition {
   permanentSuppressEvent?: string;
 
   content: NudgeContent;
+
+  /**
+   * When the action button is clicked, should the nudge be persisted as
+   * dismissed and visually cleared? Defaults to `true` for `toast`/`modal`
+   * (action = engagement) and `false` for `banner` (banner action navigates;
+   * leaving it visible avoids a flash before the page transition completes).
+   */
+  dismissOnAction?: boolean;
 
   /** Override default `{id}_shown` / `{id}_dismissed` / `{id}_action` event names. */
   analytics?: NudgeAnalyticsOverrides;

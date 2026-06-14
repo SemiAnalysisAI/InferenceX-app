@@ -1,5 +1,5 @@
 import type { BenchmarkRow } from '@/lib/api';
-import { hasMtpEngineExclusion, Model, Sequence } from '@/lib/data-mappings';
+import { getModelExclusion, Model, Sequence } from '@/lib/data-mappings';
 
 export interface FavoritePreset {
   id: string;
@@ -26,23 +26,20 @@ export interface FavoritePreset {
  * Match an hwKey against a preset's hwFilter. Exact entries always match
  * exactly (so MTP keys like `h100_dynamo-trt_mtp` can be explicitly opted in).
  * Bare GPU prefixes (no underscore) match any framework variant on that GPU,
- * but for models with `mtpEngineExclusion` (currently dsv4) they also skip
- * `_mtp` keys — otherwise the preset would surface two engine families'
- * forced-acceptance MTP numbers on the same chart, which the legend toggle
- * guard already blocks for explicit user actions.
+ * but for models with an exclusion rule (currently dsv4 MTP) they also skip
+ * keys matching the rule's suffix — otherwise the preset would surface two
+ * comparability groups on the same chart, which the legend toggle guard already
+ * blocks for explicit user actions.
  */
 export function matchesPresetHwFilter(
   hwKey: string,
   filter: string[],
   model: Model | string | null | undefined,
 ): boolean {
-  const skipMtpOnPrefix = hasMtpEngineExclusion(model);
+  const excludedSuffixes = getModelExclusion(model).map((spec) => spec.suffix);
+  const isExcludedVariant = excludedSuffixes.some((suffix) => hwKey.endsWith(suffix));
   return filter.some(
-    (f) =>
-      hwKey === f ||
-      (!f.includes('_') &&
-        hwKey.startsWith(`${f}_`) &&
-        !(skipMtpOnPrefix && hwKey.endsWith('_mtp'))),
+    (f) => hwKey === f || (!f.includes('_') && hwKey.startsWith(`${f}_`) && !isExcludedVariant),
   );
 }
 
@@ -141,7 +138,26 @@ export function findConfigChangeDates(
 }
 
 export const FAVORITE_PRESETS: FavoritePreset[] = [
-  // 0 — DeepSeek V4 Pro launch (all configs)
+  // 0 — MiniMax M3 launch (all configs) — current day-0 featured model
+  {
+    id: 'minimax-m3-launch',
+    title: 'MiniMax M3 — First Look',
+    description:
+      'First benchmarks of MiniMax M3 across every available GPU. New configurations appear here as they come online.',
+    tags: ['MiniMax', 'M3', 'New'],
+    category: 'comparison',
+    wide: true,
+    config: {
+      model: Model.MiniMax_M3,
+      sequence: Sequence.EightK_OneK,
+      precisions: ['fp4', 'fp8'],
+      yAxisMetric: 'y_tpPerGpu',
+      hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
+    },
+  },
+  // Hidden — previous DeepSeek V4 Pro launch preset (all configs), retired when MiniMax M3
+  // became the day-0 model. Retained so prior ?preset=dsv4-launch links (banner, modal,
+  // external shares) keep working.
   {
     id: 'dsv4-launch',
     title: 'DeepSeek V4 Pro — First Look',
@@ -150,6 +166,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     tags: ['DeepSeek', 'V4-Pro', 'New'],
     category: 'comparison',
     wide: true,
+    hidden: true,
     config: {
       model: Model.DeepSeek_V4_Pro,
       sequence: Sequence.EightK_OneK,

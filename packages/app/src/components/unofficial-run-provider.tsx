@@ -41,7 +41,7 @@ type UnofficialChartData = Record<
   }
 >;
 
-const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/i;
+const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
 export interface AvailableModelSequence {
   model: Model;
@@ -316,8 +316,8 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
       const belongsToDismissed = (rowUrl?: string | null) => {
         if (!rowUrl) return false;
         if (rowUrl === target.url) return true;
-        const m = rowUrl.match(/\/runs\/(\d+)/);
-        return m !== null && m[1] === runId;
+        const m = rowUrl.match(/\/runs\/(?<runId>\d+)/u);
+        return m?.groups?.runId === runId;
       };
 
       // Compute the filtered chart data BEFORE any setState so we can pass the

@@ -8,7 +8,7 @@ import { useTheme } from 'next-themes';
 import { useInference } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getModelWatermark } from '@/lib/data-mappings';
+import { getChartWatermark } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -42,14 +42,31 @@ import {
   generateGPUGraphTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
+import {
+  type KnownIssueAnnotation,
+  measureLegendRightInset,
+  renderKnownIssueAnnotations,
+} from '@/components/inference/utils/knownIssueAnnotations';
+import { matchKnownConfigIssues } from '@/lib/known-issues';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
+// Label text combines the hw config (display label) and the date so
+// both dimensions of the GPU comparison view are legible on the chart,
+// not only the legend. Falls back to the raw hwKey if the config
+// lookup misses (legacy data).
+function labelTextFor(pts: InferenceData[]): string {
+  const hwKey = String(pts[0].hwKey);
+  const date = String(pts[0].date);
+  const cfg = getHardwareConfig(hwKey);
+  const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
+  return `${hwLabel} • ${date}`;
+}
+
 const GPUGraph = React.memo(
-  ({ chartId, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
+  ({ chartId, modelLabel, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
     const {
       hardwareConfig,
-      selectedModel,
       selectedPrecisions,
       selectedYAxisMetric,
       selectedGPUs,
@@ -200,6 +217,70 @@ const GPUGraph = React.memo(
       return pts;
     }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
 
+    // Warning annotations for visible series with known upstream issues —
+    // same treatment the scatter view gets, applied to the date-comparison view.
+    // Lines here are colored per (gpu, date) pair, so take the first active
+    // pair's color as the series swatch.
+    const knownIssueAnnotations = useMemo(
+      (): KnownIssueAnnotation[] =>
+        matchKnownConfigIssues(modelLabel, filteredData).map((issue) => {
+          const cfg = getHardwareConfig(issue.hwKey);
+          const colorEntry = allGraphs.find(
+            (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
+          );
+          return {
+            issue,
+            label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
+            color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
+            points: filteredData
+              .filter(
+                (p) =>
+                  String(p.hwKey) === issue.hwKey &&
+                  (!issue.precisions || issue.precisions.includes(p.precision)),
+              )
+              .map((p) => ({ x: p.x, y: p.y })),
+          };
+        }),
+      [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor],
+    );
+
+    const drawKnownIssues = (
+      ctx: RenderContext,
+      xScale: ContinuousScale,
+      yScale: ContinuousScale,
+    ) => {
+      renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
+        chartId,
+        width: ctx.width,
+        height: ctx.height,
+        xScale,
+        yScale,
+        annotations: knownIssueAnnotations,
+        rightInset: measureLegendRightInset(
+          chartId,
+          ctx.layout.svg.node(),
+          ctx.layout.margin.left,
+          ctx.width,
+        ),
+        background: getCssColor('--background'),
+        foreground: getCssColor('--foreground'),
+        mutedForeground: getCssColor('--muted-foreground'),
+        onLinkClick: (a) =>
+          track('inference_known_issue_clicked', {
+            hwKey: a.issue.hwKey,
+            issue: a.issue.issueRef,
+          }),
+      });
+    };
+    const knownIssueLayer: CustomLayerConfig = {
+      type: 'custom',
+      key: 'known-issues',
+      render: (_zoomGroup, ctx) =>
+        drawKnownIssues(ctx, ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale),
+      onZoom: (_zoomGroup, ctx) =>
+        drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
+    };
+
     // Compute scale domains
     const xExtent = useMemo(() => {
       if (filteredData.length === 0) return [0, 100] as [number, number];
@@ -228,7 +309,7 @@ const GPUGraph = React.memo(
         const graphIndex = allGraphs.findIndex(
           ({ date, hwKey }) => d.date === date && d.hwKey === hwKey,
         );
-        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+        return graphIndex === -1 ? '#6b7280' : allGraphs[graphIndex].color;
       },
       [allGraphs],
     );
@@ -237,7 +318,7 @@ const GPUGraph = React.memo(
       () => (key: string) => {
         const graphId = key.split('_').slice(0, -1).join('_');
         const graphIndex = allGraphs.findIndex((d) => d.id === graphId);
-        return graphIndex !== -1 ? allGraphs[graphIndex].color : '#6b7280';
+        return graphIndex === -1 ? '#6b7280' : allGraphs[graphIndex].color;
       },
       [allGraphs],
     );
@@ -293,18 +374,6 @@ const GPUGraph = React.memo(
           }
 
           const lineLabels: LineLabel[] = [];
-
-          // Label text combines the hw config (display label) and the date so
-          // both dimensions of the GPU comparison view are legible on the chart,
-          // not only the legend. Falls back to the raw hwKey if the config
-          // lookup misses (legacy data).
-          const labelTextFor = (pts: InferenceData[]): string => {
-            const hwKey = String(pts[0].hwKey);
-            const date = String(pts[0].date);
-            const cfg = getHardwareConfig(hwKey);
-            const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
-            return `${hwLabel} • ${date}`;
-          };
 
           if (isInteractivity) {
             // Greedy placement: try start → midpoint → 2/3-along → endpoint.
@@ -608,7 +677,7 @@ const GPUGraph = React.memo(
         chartId={chartId}
         data={filteredData}
         margin={CHART_MARGIN}
-        watermark={getModelWatermark(selectedModel)}
+        watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}
@@ -650,6 +719,7 @@ const GPUGraph = React.memo(
             },
           },
           lineLabelLayer,
+          knownIssueLayer,
         ]}
         zoom={{
           enabled: true,

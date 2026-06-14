@@ -13,8 +13,8 @@ import {
 // ── matchesPresetHwFilter ────────────────────────────────────────────
 
 describe('matchesPresetHwFilter', () => {
-  const dsv4 = Model.DeepSeek_V4_Pro; // mtpEngineExclusion = true
-  const dsr1 = Model.DeepSeek_R1; // no MTP exclusion
+  const dsv4 = Model.DeepSeek_V4_Pro; // has an MTP exclusion rule
+  const dsr1 = Model.DeepSeek_R1; // no exclusion rule
 
   it('matches a bare GPU prefix against any framework variant on that GPU', () => {
     expect(matchesPresetHwFilter('b300_sglang', ['b300'], dsv4)).toBe(true);
@@ -22,8 +22,8 @@ describe('matchesPresetHwFilter', () => {
     expect(matchesPresetHwFilter('b300_dynamo-vllm', ['b300'], dsv4)).toBe(true);
   });
 
-  it('skips _mtp keys via a bare GPU prefix only for mtpEngineExclusion models', () => {
-    // dsv4 has mtpEngineExclusion → MTP keys filtered out under bare prefix
+  it('skips _mtp keys via a bare GPU prefix only for models with an exclusion rule', () => {
+    // dsv4 has an MTP exclusion rule → MTP keys filtered out under bare prefix
     expect(matchesPresetHwFilter('b300_sglang_mtp', ['b300'], dsv4)).toBe(false);
     expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], dsv4)).toBe(false);
     // dsr1 (and other models) → bare prefix still pulls MTP variants through
@@ -110,7 +110,7 @@ describe('subtractMonths', () => {
   it('handles month-end overflow (Mar 31 - 1 month)', () => {
     // March 31 minus 1 month: Feb has no 31st, JS Date rolls to Mar 3
     const result = subtractMonths('2025-03-31', 1);
-    expect(result).toMatch(/^2025-0[23]-/);
+    expect(result).toMatch(/^2025-0[23]-/u);
   });
 
   it('returns same date for 0 months', () => {
@@ -118,7 +118,7 @@ describe('subtractMonths', () => {
   });
 
   it('returns YYYY-MM-DD format', () => {
-    expect(subtractMonths('2025-06-15', 3)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(subtractMonths('2025-06-15', 3)).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
   });
 });
 

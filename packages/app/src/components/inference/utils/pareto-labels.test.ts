@@ -298,7 +298,7 @@ describe('PARETO_LABEL_COLORS', () => {
 
   it('all colors are valid hex strings', () => {
     for (const color of PARETO_LABEL_COLORS) {
-      expect(color).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(color).toMatch(/^#[0-9a-f]{6}$/iu);
     }
   });
 });

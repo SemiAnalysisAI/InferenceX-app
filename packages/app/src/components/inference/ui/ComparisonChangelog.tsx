@@ -101,10 +101,10 @@ export default function ComparisonChangelog({
 
   const label =
     filteredChangelogs.length > 0
-      ? `Config Changelog (${filteredChangelogs.length} date${filteredChangelogs.length !== 1 ? 's' : ''} with changes)`
+      ? `Config Changelog (${filteredChangelogs.length} date${filteredChangelogs.length === 1 ? '' : 's'} with changes)`
       : loading
         ? 'Config Changelog (loading...)'
-        : `Config Changelog (${totalDatesQueried} date${totalDatesQueried !== 1 ? 's' : ''} queried — no matching changelog data)`;
+        : `Config Changelog (${totalDatesQueried} date${totalDatesQueried === 1 ? '' : 's'} queried — no matching changelog data)`;
 
   return (
     <div className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden transition-all">

@@ -32,6 +32,18 @@ describe('buildCsv', () => {
     expect(lines[2]).toBe('B200 NVL72,88.1,false');
   });
 
+  it('inserts notes as comment lines between the preamble and the header', () => {
+    const note = 'WARNING: GB300 NVL72 (Dynamo TRT, MTP) — accuracy issues reported';
+    const result = buildCsv(['A'], [['1']], [note]);
+    const lines = result.split('\n');
+
+    const noteIndex = lines.indexOf(`# ${note}`);
+    expect(noteIndex).toBeGreaterThan(-1);
+    expect(lines[noteIndex + 1]).toBe('A');
+    // Notes must not disturb the data section
+    expect(dataLines(result)).toBe('A\n1');
+  });
+
   it('escapes cells containing commas', () => {
     const result = buildCsv(['Label'], [['H100, SXM']]);
     expect(dataLines(result)).toBe('Label\n"H100, SXM"');

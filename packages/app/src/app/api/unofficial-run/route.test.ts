@@ -17,6 +17,10 @@ vi.mock('adm-zip', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+function makeRequest(params: string) {
+  return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
+}
+
 /** Minimal raw artifact row matching the shape produced by CI benchmarks. */
 function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -250,6 +254,36 @@ describe('normalizeArtifactRows', () => {
     expect(rows[0].metrics.output_tput_per_gpu).toBe(489.17);
     expect(rows[0].metrics.mean_tpot).toBe(0.01635);
   });
+
+  it('surfaces the per-worker measured-power array on the BenchmarkRow', () => {
+    const workers = [
+      {
+        role: 'prefill',
+        worker_idx: 0,
+        hosts: ['pn0'],
+        num_gpus: 4,
+        avg_power_w: 612.3,
+        avg_temp_c: 71.2,
+      },
+      {
+        role: 'decode',
+        worker_idx: 0,
+        hosts: ['dn0', 'dn1'],
+        num_gpus: 8,
+        avg_power_w: 712.1,
+      },
+    ];
+    const rows = normalizeArtifactRows([rawRow({ workers })], '2026-03-01');
+    expect(rows[0].workers).toHaveLength(2);
+    expect(rows[0].workers![0].hosts).toEqual(['pn0']);
+    expect(rows[0].workers![0].avg_temp_c).toBe(71.2);
+    expect(rows[0].workers![1].role).toBe('decode');
+  });
+
+  it('leaves workers undefined when the artifact omits the field', () => {
+    const rows = normalizeArtifactRows([rawRow()], '2026-03-01');
+    expect(rows[0].workers).toBeUndefined();
+  });
 });
 
 describe('normalizeEvalArtifactRows', () => {
@@ -325,10 +359,6 @@ describe('GET /api/unofficial-run', () => {
     const mod = await import('./route');
     GET = mod.GET as any;
   });
-
-  function makeRequest(params: string) {
-    return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
-  }
 
   it('returns 400 for missing runId', async () => {
     const res = await GET(makeRequest(''));

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import {
@@ -26,8 +27,15 @@ import chartDefinitions from '@/components/inference/inference-chart-config.json
 import type { ChartDefinition } from '@/components/inference/types';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
-// Build Y-axis metric options from static chart config JSON — available immediately, no API wait
-const METRIC_GROUPS = [
+/**
+ * Y-axis metric options from static chart config JSON — available immediately, no API wait.
+ *
+ * Groups marked `gated: true` are hidden unless the konami-code feature gate is unlocked
+ * (see useFeatureGate). Use this for surfaces that are wired but whose underlying data
+ * pipeline is in the rollout phase (e.g. measured-power telemetry waiting on a runner-
+ * side aggregation PR to start populating the DB).
+ */
+const METRIC_GROUPS: { label: string; metrics: string[]; gated?: boolean }[] = [
   {
     label: 'Throughput',
     metrics: [
@@ -46,6 +54,18 @@ const METRIC_GROUPS = [
   },
   { label: 'Cost per Million Input Tokens', metrics: ['y_costhi', 'y_costni', 'y_costri'] },
   { label: 'All-in Provisioned Energy per Token', metrics: ['y_jTotal', 'y_jOutput', 'y_jInput'] },
+  {
+    label: 'Measured Energy',
+    metrics: [
+      'y_measuredPrefillAvgPower',
+      'y_measuredDecodeAvgPower',
+      'y_measuredAvgPower',
+      'y_measuredJPerInputToken',
+      'y_measuredJPerOutputToken',
+      'y_measuredJPerTotalToken',
+    ],
+    gated: true,
+  },
   { label: 'Custom User Values', metrics: ['y_costUser', 'y_powerUser'] },
 ];
 
@@ -60,18 +80,6 @@ const METRIC_TITLE_MAP = (() => {
   }
   return map;
 })();
-
-/** Map from metric key → group label (e.g. "Throughput", "Cost per Million Total Tokens") */
-const METRIC_GROUP_MAP = new Map<string, string>(
-  METRIC_GROUPS.flatMap((g) => g.metrics.map((m) => [m, g.label] as const)),
-);
-
-const GROUPED_Y_AXIS_OPTIONS = METRIC_GROUPS.map((group) => ({
-  groupLabel: group.label,
-  options: group.metrics
-    .filter((m) => METRIC_TITLE_MAP.has(m))
-    .map((m) => ({ value: m, label: METRIC_TITLE_MAP.get(m)! })),
-})).filter((g) => g.options.length > 0);
 
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
@@ -115,8 +123,32 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setScaleType,
   } = useInference();
 
-  // Y-axis metric options — built from static chart config JSON (no API dependency)
-  const groupedYAxisOptions = GROUPED_Y_AXIS_OPTIONS;
+  // Y-axis metric options — built from static chart config JSON (no API dependency).
+  // Hidden groups (Measured Energy) appear only after the ↑↑↓↓ feature gate unlocks.
+  const featureGateUnlocked = useFeatureGate();
+  const visibleGroups = useMemo(
+    () => METRIC_GROUPS.filter((g) => !g.gated || featureGateUnlocked),
+    [featureGateUnlocked],
+  );
+  const metricGroupMap = useMemo(
+    () =>
+      new Map<string, string>(
+        visibleGroups.flatMap((g) => g.metrics.map((m) => [m, g.label] as const)),
+      ),
+    [visibleGroups],
+  );
+  const groupedYAxisOptions = useMemo(
+    () =>
+      visibleGroups
+        .map((group) => ({
+          groupLabel: group.label,
+          options: group.metrics
+            .filter((m) => METRIC_TITLE_MAP.has(m))
+            .map((m) => ({ value: m, label: METRIC_TITLE_MAP.get(m)! })),
+        }))
+        .filter((g) => g.options.length > 0),
+    [visibleGroups],
+  );
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -126,7 +158,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
         precision: selectedPrecisions.join(','),
         yAxisMetric: selectedYAxisMetric,
         yAxisMetricLabel: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
-        yAxisMetricGroup: METRIC_GROUP_MAP.get(selectedYAxisMetric) ?? 'Unknown',
+        yAxisMetricGroup: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
       });
     }
   };
@@ -177,7 +209,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     track('inference_y_axis_metric_selected', {
       metric: value,
       metric_label: METRIC_TITLE_MAP.get(value) ?? value,
-      metric_group: METRIC_GROUP_MAP.get(value) ?? 'Unknown',
+      metric_group: metricGroupMap.get(value) ?? 'Unknown',
     });
     setTimeout(trackCombinedFilters, 0);
   };

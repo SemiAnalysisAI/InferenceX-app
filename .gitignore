@@ -58,9 +58,16 @@
 **/cypress/screenshots/
 **/cypress/downloads/
 
+# playwright mcp artifacts (per-session snapshots/console logs)
+.playwright-mcp/
+
 # wsl shenanigans
 C:*
 .vercel
 
 # one-off local scripts (ad-hoc DB migrations, scratch SQL, etc.)
 **/scratch/
+
+# python bytecode (e.g. .claude/skills/*/iso-interactivity.py imports)
+**/__pycache__/
+**/*.pyc

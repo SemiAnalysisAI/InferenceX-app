@@ -1,4 +1,14 @@
 import type { DbClient } from '../connection.js';
+import type { WorkerPower } from '../etl/benchmark-mapper.js';
+
+/**
+ * One entry in `BenchmarkRow.workers` — mirrors the runner's aggregate_power.py
+ * per-worker payload. Structurally identical to the ingest-side {@link WorkerPower},
+ * so it is aliased to that single definition rather than redeclared, keeping the
+ * shape from drifting within this package. The read side keeps the
+ * `BenchmarkWorkerRow` name it's referenced by (json-provider, BenchmarkRow.workers).
+ */
+export type BenchmarkWorkerRow = WorkerPower;
 
 export interface BenchmarkRow {
   hardware: string;
@@ -23,6 +33,13 @@ export interface BenchmarkRow {
   conc: number;
   image: string | null;
   metrics: Record<string, number>;
+  /**
+   * Per-worker measured-power breakdown emitted on multinode / disagg runs.
+   * Stored in the dedicated `workers` JSONB column on `benchmark_results`
+   * (added in migration 006). Null for single-node runs and any run predating
+   * aggregate_power.py's multinode patch — surfaced as undefined here.
+   */
+  workers?: BenchmarkWorkerRow[];
   date: string;
   run_url: string | null;
 }
@@ -73,6 +90,7 @@ export async function getLatestBenchmarks(
         br.conc,
         br.image,
         br.metrics,
+        br.workers,
         br.date::text,
         CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
       FROM benchmark_results br
@@ -111,6 +129,7 @@ export async function getLatestBenchmarks(
       lb.conc,
       lb.image,
       lb.metrics,
+      lb.workers,
       lb.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM latest_benchmarks lb
@@ -157,6 +176,7 @@ export async function getAllBenchmarksForHistory(
       br.osl,
       br.conc,
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
+      br.workers,
       br.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM configs c

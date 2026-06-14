@@ -18,6 +18,8 @@ export const VALID_TABS = [
   'ai-chart',
   'gpu-metrics',
   'submissions',
+  'current-inferencex-image',
+  'feedback',
 ] as const;
 
 export type TabKey = (typeof VALID_TABS)[number];
@@ -67,6 +69,15 @@ export const TAB_META: Record<TabKey, { title: string; description: string }> = 
     title: 'Benchmark Submissions',
     description:
       'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes across GPU vendors.',
+  },
+  'current-inferencex-image': {
+    title: 'Current InferenceX Image',
+    description:
+      'Current InferenceX Docker image tags per model, GPU SKU, and configuration. Compares deployed images against latest vLLM and SGLang releases to flag outdated tags.',
+  },
+  feedback: {
+    title: 'User Feedback',
+    description: 'Internal: decrypt and review user-submitted feedback.',
   },
 };
 

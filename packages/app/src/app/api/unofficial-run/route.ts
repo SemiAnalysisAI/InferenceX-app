@@ -55,6 +55,9 @@ export function normalizeArtifactRows(
       conc: params.conc,
       image: params.image,
       metrics: params.metrics,
+      // Surface the same per-worker payload the DB path emits so unofficial
+      // overlays carry the multinode measured-power breakdown too.
+      workers: params.workers,
       date,
       run_url: runUrl,
     });
@@ -185,7 +188,7 @@ function parseRunIds(raw: string | null): { ids: string[]; error: string | null 
         .filter(Boolean),
     ),
   ];
-  if (ids.length === 0 || !ids.every((id) => /^\d+$/.test(id))) {
+  if (ids.length === 0 || !ids.every((id) => /^\d+$/u.test(id))) {
     return { ids: [], error: 'runId must be a comma-separated list of numeric values' };
   }
   return { ids, error: null };

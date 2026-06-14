@@ -1,0 +1,201 @@
+---
+title: 'B200 NVFP4 vs H200 INT4 on Kimi K2.5/K2.6: Up to 2.95x Better Performance per Dollar'
+subtitle: "On vLLM 8K/1K the NVFP4 path on B200 is 2.71x–2.95x cheaper per million tokens than H200 INT4 across the entire 30–90 tok/s/user serving band, and 2.45x–2.74x cheaper than B200 INT4 on the same silicon. Both factors decompose cleanly into B200's HBM bandwidth, HBM capacity, and NVFP4 tensor cores"
+date: '2026-05-26'
+publishDate: '2026-05-26'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - kimi
+  - nvidia
+  - b200
+  - h200
+  - vllm
+  - nvfp4
+---
+
+Kimi K2.5 and K2.6 are the open-weights models behind xAI's Cursor Composer 2 and Composer 2.5 — 1M+ daily active users from the Cursor IDE, and the current leader on SWE-Bench Pro at 58.6%. On the 8K/1K workload, vLLM on NVIDIA B200 in NVFP4 serves K2.5/K2.6 cheaper than H200 in INT4 across the entire single-node Pareto frontier. **B200 NVFP4 is 2.71x–2.95x cheaper per million tokens than H200 INT4 in the 30–90 tok/s/user serving band**, peaking at **2.95x at 32 tok/s/user** ($0.140/M on B200 NVFP4 vs $0.413/M on H200 INT4 — a 66% reduction). On the same B200 silicon, swapping INT4 for NVFP4 is worth another **2.45x–2.74x at iso-interactivity** ($0.397/M → $0.154/M at 40 tok/s/user). Measured on SemiAnalysis InferenceX, 2026-05-19, [GHA run 26118912054](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26118912054).
+
+Both SKUs run the same `vllm/vllm-openai:v0.21.0` container. The spread comes from the silicon and the precision. B200 has 2.27x H200's FP8 dense throughput (4,500 vs 1,979 TFLOP/s), 1.67x its HBM bandwidth (8 vs 4.8 TB/s), and 2.00x its NVLink scale-up bandwidth (900 vs 450 GB/s uni-di). On the FP4 axis H200 has nothing — Hopper SM90 has no FP4 tensor cores, and the [official datasheet](https://resources.nvidia.com/en-us-data-center-overview/gtc24-h200-datasheet) stops at FP8. B200's NVFP4 cores deliver 9,000 TFLOP/s. The measured 3x cost-per-token gap is what those silicon ratios look like once you fold in B200's 1.38x TCO penalty ($1.95 vs $1.41 per GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics)).
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<Figure
+  srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/benchmark-light.png"
+  srcDark="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/benchmark-dark.png"
+  alt="Kimi K2.5/K2.6 1T at FP4 / INT4 on 8K / 1K, three vLLM curves: B200 NVFP4 (light green, circles) peaks ~3.9k tok/s/GPU at 32 tok/s/user; B200 INT4 (light green, squares) peaks ~1.8k tok/s/GPU at 26 tok/s/user; H200 INT4 (dark green, squares) peaks ~1.17k tok/s/GPU at 16.7 tok/s/user. The B200 NVFP4 curve sits roughly 3x above H200 INT4 and 2x above B200 INT4 across the entire overlap range. Point labels denote GPU count per config (TP=4 for B200 NVFP4 high-throughput arm, TP=8 elsewhere)."
+  caption="Kimi K2.5/K2.6 (1T total, 32B active) vLLM at ISL 8192 / OSL 1024 on a single NVIDIA node. Source: SemiAnalysis InferenceX, 2026-05-19. Point labels denote GPU count per config."
+/>
+
+## Kimi K2.5 / K2.6 Model Architecture & DownStream Cursor Composer 2.5 Model
+
+[Kimi K2.5](https://huggingface.co/moonshotai/Kimi-K2.5) (released 2026-01-27) and [Kimi K2.6](https://huggingface.co/moonshotai/Kimi-K2.6) (released 2026-04-20) share the original Kimi K2 backbone: a **1.0T-parameter MoE with 32B activated per token**, **DeepSeek-style top-8-of-385 expert routing across 61 transformer layers (1 dense block + 60 MoE blocks)**, **Multi-head Latent Attention (MLA)**, SwiGLU, **YaRN RoPE**, a 163,840-token vocabulary, and a **256K context window** (262,144 tokens). The HF checkpoints are [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) and [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6) — the two are post-training refinements on the same pre-trained architecture, so **every serving result in this post applies one-to-one to both**.
+
+<Figure
+  srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/kimi-k2-architecture-light.png"
+  srcDark="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/kimi-k2-architecture-dark.png"
+  alt="Kimi K2.5/K2.6 architecture diagram from the Moonshot AI model card: token embedding (d=7168, vocab=163840) → 1 dense transformer block (FFN=18432) → 60 MoE transformer blocks (Multi-head Latent Attention, top-8 of 385 experts) → RMSNorm → output LM head (vocab=163840). Type: MoE. Layers: 1D + 60M. Attention: MLA. Context: 262K. Experts: 8/385. Features: Multi-head Latent Attention, DeepSeek-style MoE, YaRN RoPE. Released by Moonshot AI on Jan 26, 2026."
+  caption="Kimi K2.5/K2.6 architecture (1.0T total / 32B active / 262K context). Shared backbone across both releases — K2.6 is a post-training refinement of the K2.5 pre-trained weights. Source: Moonshot AI model card via the SemiAnalysis InferenceX dashboard."
+/>
+
+**K2.5 and K2.6 are the open-weights models powering xAI's Cursor Composer 2 and Composer 2.5**, serving 1M+ daily active users from the Cursor IDE. **K2.6 also leads frontier models on the public agentic-coding benchmarks**: 58.6% on SWE-Bench Pro — ahead of GPT-5.4 (57.7%), Claude Opus 4.6 (53.4%), and Gemini 3.1 Pro (54.2%) — and 80.2% on SWE-Bench Verified ([Moonshot K2.6 model card](https://huggingface.co/moonshotai/Kimi-K2.6)). Cline's [production deployment data](https://cline.bot/blog/moonshots-kimi-k2-for-coding-our-first-impressions-in-cline) puts it at 3.3% failure rate on complex diff-editing tasks, matching Claude 4 Sonnet. K2.6's Agent Swarm primitive fans out to **300 parallel sub-agents across 4,000 coordinated steps**, up from K2.5's 100 / 1,500. If you're hosting an OSS agentic coding stack today, K2.5 or K2.6 is the model you're serving.
+
+A note on quantization: Moonshot ships K2.5/K2.6 with **native INT4 weights** as the default open-weights checkpoint, which is what the H200 INT4 and B200 INT4 curves in this post use directly. The **B200 NVFP4 curve uses a NVFP4 requantization of the same weights** so B200's FP4 tensor cores can do the MoE GEMMs at full rate. H200 cannot run this path — Hopper SM90 has no FP4 tensor cores.
+
+## On-Paper Specs
+
+NVIDIA B200 SXM (Blackwell, 2025) vs NVIDIA H200 SXM (Hopper, 2024) — both are NVIDIA, both run vLLM, both ship in 8-GPU NVLink islands. The radar below normalizes each axis to the cross-vendor maximum in [`/gpu-specs`](/gpu-specs), so the visible polygons compress against axes where GB200 NVL72 / GB300 NVL72 set the ceiling (Scale Up Domain Memory + BW at world-size 72), and the FP4 axis is dominated by GB300 NVL72 at 15,000 TFLOP/s — B200's 9,000 TFLOP/s reads ~60% on that axis.
+
+<Figure
+  srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-light.png"
+  srcDark="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-dark.png"
+  alt="GPU specs radar comparing H200 SXM (dark green) and B200 SXM (light green) from /gpu-specs. B200 fills more of the polygon on every per-GPU axis except Memory (where it reads ~60% vs H200's ~45% — both compress against the MI355X 288 GB ceiling). B200's most visible advantages on the radar: Mem BW (100%, H200 ~55%), Scale Up BW (100%, H200 ~50%), BF16 + FP8 TFLOP/s (~85%, H200 ~35%). H200 reads 0% on the FP4 axis because Hopper has no FP4 tensor cores."
+  caption="B200 SXM (light green) vs H200 SXM (dark green) on /gpu-specs. Values normalized per axis to the cross-vendor maximum across all SKUs. B200 leads H200 on every per-GPU axis; the FP4 axis is where the gap is unbounded — H200 reads 0% because Hopper has no FP4 tensor-core path. Scale-up-domain axes compress against GB200/GB300 NVL72 at world-size 72, so both 8-GPU SKUs read ~11% there."
+/>
+
+| Spec                               | H200 SXM            | B200 SXM            | B200 / H200 |
+| ---------------------------------- | ------------------- | ------------------- | ----------- |
+| HBM capacity                       | 141 GB              | 180 GB              | 1.28x       |
+| HBM bandwidth                      | 4.8 TB/s            | 8 TB/s              | **1.67x**   |
+| Dense FP4 (TFLOP/s)                | — (no FP4 cores)    | 9,000               | **∞**       |
+| Dense FP8 (TFLOP/s)                | 1,979               | 4,500               | **2.27x**   |
+| Dense BF16 (TFLOP/s)               | 989                 | 2,250               | 2.27x       |
+| Scale-up BW per GPU (uni-di)       | 450 GB/s (NVLink 4) | 900 GB/s (NVLink 5) | **2.00x**   |
+| Scale-up world size                | 8                   | 8                   | 1.00x       |
+| Scale-up domain HBM capacity       | 1.13 TB             | 1.44 TB             | 1.28x       |
+| Scale-up domain HBM BW (aggregate) | 38.4 TB/s           | 64 TB/s             | 1.67x       |
+| TCO (SemiAnalysis AI Cloud Model)  | $1.41/GPU/hr        | $1.95/GPU/hr        | 1.38x       |
+
+**Mapping silicon to measured perf.** When both SKUs run vLLM INT4 on the same model, the workload is bounded by **HBM bandwidth on the decode path** — each step streams the active expert weights through HBM, batched across in-flight users. B200's 1.67x HBM BW advantage shows up directly in the throughput: at iv = 26 tok/s/user, **B200 INT4 hits 1,791 tok/s/GPU vs H200 INT4's interpolated 1,055 — a 1.70x ratio, sitting right at the silicon limit**. After the 1.38x TCO penalty, B200 INT4 lands a 1.22x cost-per-token advantage over H200 INT4.
+
+**HBM capacity buys a second silicon win that doesn't show up in the radar: lower TP, less collective overhead per token.** Kimi K2.5/K2.6 in INT4 weighs roughly **500 GB of live model state** (1T total params at ~4 bits each, plus activations, KV cache, paged attention scratch). On B200's **180 GB per GPU**, that fits in **4 GPUs (720 GB aggregate, ~30% headroom for KV cache and activations) → TP=4 is viable**. On H200's **141 GB per GPU**, the same model needs **at least 8 GPUs (1,128 GB aggregate) to leave meaningful KV cache headroom → TP=8 is required**. Every Pareto-winning B200 NVFP4 point in this post is **TP=4**; every measured H200 INT4 point is **TP=8**.
+
+Halving the tensor-parallel world size halves the collective traffic per decode step — one fewer log₂N AllReduce hop on the attention output projection, on the MoE gather, and on the post-MLP reduce. Amdahl's law on the serial-collectives bottleneck pulls the per-step latency floor down. The B200 NVFP4 curve doesn't just sit above B200 INT4 by the precision ratio; it also pulls left on the interactivity axis because each decode step finishes sooner.
+
+**The precision unlock sits on top of both.** Switching B200's path from INT4 to NVFP4 doubles its dense-tensor-core throughput — the path that does the bulk of MoE GEMMs in K2 — without re-paying for HBM. B200 NVFP4 hits **3,879 tok/s/GPU at 32 tok/s/user, 2.17x B200 INT4's peak at 26 tok/s/user**. Compose the three factors — **1.67x HBM BW (decode-bound throughput floor) × ~2x NVFP4 (the precision unlock) × the TP=4-vs-TP=8 collectives win** — and divide by the 1.38x TCO penalty. That lands at the measured **2.95x cost-per-million-tokens advantage** at the headline interactivity point.
+
+## The Numbers
+
+All rows are Kimi K2.5 / K2.6 at **ISL 8192 / OSL 1024** on a single 8-GPU node, measured on InferenceX on 2026-05-19, [GHA run 26118912054](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26118912054). Throughput is per-GPU. Cost per million tokens uses the SemiAnalysis AI Cloud TCO model: H200 at $1.41/GPU/hr, B200 at $1.95/GPU/hr. Formula: `$/M tok = TCO\_$/GPU/hr × 1e6 / (3600 × tput_per_gpu)`.
+
+**H200 vLLM INT4 (TP=8)** — the reference point:
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 384.4     | 91.18      | 10.97     | $1.019     |
+| 8    | 590.2     | 70.28      | 14.23     | $0.664     |
+| 16   | 797.9     | 46.64      | 21.44     | $0.491     |
+| 32   | 990.9     | 28.86      | 34.65     | $0.395     |
+| 64   | 1,174.5   | 16.67      | 59.98     | $0.334     |
+
+**B200 vLLM INT4 (TP=8)** — the same precision on Blackwell silicon, isolating the silicon-only delta:
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 446.7     | 104.36     | 9.58      | $1.213     |
+| 8    | 692.8     | 81.12      | 12.33     | $0.782     |
+| 16   | 969.4     | 59.21      | 16.89     | $0.559     |
+| 32   | 1,351.4   | 40.48      | 24.70     | $0.401     |
+| 64   | 1,790.7   | 26.01      | 38.45     | $0.303     |
+
+**B200 vLLM NVFP4 (TP=4 + TP=8)** — the headline-winning recipe; the dense Pareto-winning arm is TP=4 across all concurrencies, with one TP=8 conc=4 point extending the high-interactivity end:
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens | TP   |
+| ---- | --------- | ---------- | --------- | ---------- | ---- |
+| 4    | 532.0     | 125.51     | 7.97      | $1.018     | TP=8 |
+| 4    | 947.4     | 111.08     | 9.00      | $0.572     | TP=4 |
+| 8    | 1,537.2   | 90.66      | 11.03     | $0.352     | TP=4 |
+| 16   | 2,318.7   | 67.40      | 14.84     | $0.234     | TP=4 |
+| 32   | 3,202.7   | 46.83      | 21.35     | $0.169     | TP=4 |
+| 64   | 3,879.3   | 32.19      | 31.07     | **$0.140** | TP=4 |
+
+The bolded row is the headline: **$0.140 per million tokens on B200 NVFP4 at 32 tok/s/user**, the lowest serving cost on the chart.
+
+## Iso-Interactivity Cost Comparison
+
+Cost per million tokens at matched interactivity, interpolated along each SKU's Pareto frontier. Cells outside a frontier's measured range render as `_unreachable_` (and the ratio column as `_∞_`). The overlap range across all three curves is **30–90 tok/s/user** — that's where the meaningful three-way comparison lives.
+
+| Interactivity (tok/s/user) | H200 INT4 $/M | B200 INT4 $/M | B200 NVFP4 $/M | H200 / B200 NVFP4 | H200 / B200 INT4 | B200 INT4 / B200 NVFP4 |
+| -------------------------- | ------------- | ------------- | -------------- | ----------------- | ---------------- | ---------------------- |
+| **32**                     | **$0.413**    | **$0.343**    | **$0.140**     | **2.95x**         | **1.20x**        | **2.45x**              |
+| 35                         | $0.427        | $0.362        | $0.145         | 2.95x             | 1.18x            | 2.50x                  |
+| 40                         | $0.453        | $0.397        | $0.154         | 2.94x             | 1.14x            | 2.58x                  |
+| 50                         | $0.511        | $0.477        | $0.177         | 2.88x             | 1.07x            | 2.69x                  |
+| 60                         | $0.569        | $0.566        | $0.206         | 2.75x             | 1.00x            | **2.74x**              |
+| 70                         | $0.660        | $0.655        | $0.244         | 2.71x             | 1.01x            | 2.69x                  |
+| 80                         | $0.811        | $0.766        | $0.286         | 2.84x             | 1.06x            | 2.68x                  |
+| 90                         | $0.996        | $0.927        | $0.347         | 2.87x             | 1.07x            | 2.67x                  |
+| 100                        | _unreachable_ | $1.123        | $0.421         | _∞_               | _unreachable_    | 2.67x                  |
+| 110                        | _unreachable_ | _unreachable_ | $0.550         | _∞_               | _∞_              | _∞_                    |
+| 125                        | _unreachable_ | _unreachable_ | $1.000         | _∞_               | _∞_              | _∞_                    |
+
+**The B200 NVFP4 vs H200 INT4 gap is flat across the overlap: 2.71x–2.95x from 30 to 90 tok/s/user.** Both ends of the curve get the same advantage. At the low-interactivity / high-batch end, the workload is decode-bound and B200's HBM bandwidth + NVFP4 tensor cores both stay saturated. At the high-interactivity / low-batch end, NVFP4 keeps reducing per-token compute as the batch shrinks. The same-precision row (H200 INT4 vs B200 INT4) tells a different story: it narrows to **1.00x–1.07x at 60–80 tok/s/user**, where B200's silicon advantage just about pays for its TCO premium. The precision unlock is what carries the headline.
+
+Above 100 tok/s/user, only B200 NVFP4 has a recipe at all. H200 INT4's frontier ends at 91 tok/s/user (conc=4 saturates per-step compute); B200 INT4 ends at 104. **B200 NVFP4 still serves out to 125 tok/s/user at $1.00/M** — a regime neither Hopper recipe reaches.
+
+<Figure
+  srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/benchmark-light.png"
+  srcDark="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/benchmark-dark.png"
+  alt="Kimi K2.5/K2.6 1T at FP4 / INT4 on 8K / 1K, three vLLM curves: B200 NVFP4 (light green, circles) peaks ~3.9k tok/s/GPU at 32 tok/s/user; B200 INT4 (light green, squares) peaks ~1.8k tok/s/GPU at 26 tok/s/user; H200 INT4 (dark green, squares) peaks ~1.17k tok/s/GPU at 16.7 tok/s/user. The B200 NVFP4 curve sits roughly 3x above H200 INT4 and 2x above B200 INT4 across the entire overlap range. Point labels denote GPU count per config (TP=4 for B200 NVFP4 high-throughput arm, TP=8 elsewhere)."
+  caption="Kimi K2.5/K2.6 (1T total, 32B active) vLLM at ISL 8192 / OSL 1024 on a single NVIDIA node. Source: SemiAnalysis InferenceX, 2026-05-19. Point labels denote GPU count per config."
+/>
+
+[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm), pre-filtered to B200 + H200 vLLM Kimi K2.5/K2.6 across FP4 and INT4 on the same 2026-05-19 run.
+
+## Acknowledgments
+
+Kimi K2.5 and K2.6 are the work of [Moonshot AI](https://www.moonshot.ai/), with weights at [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) and [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6). The vLLM NVFP4 path on Blackwell is the work of the [vLLM project](https://github.com/vllm-project/vllm) and NVIDIA's TensorRT-LLM / AITER kernel teams whose FP4 MoE kernels vLLM links against. Continuous benchmarking by SemiAnalysis on InferenceX. Speed is the moat.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much cheaper is NVIDIA B200 NVFP4 than H200 INT4 on Kimi K2.5 and K2.6?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On the 8K/1K workload with vLLM, B200 NVFP4 is 2.71x to 2.95x cheaper per million tokens than H200 INT4 across the entire 30 to 90 tok/s/user serving band. The peak gap is 2.95x at 32 tok/s/user, where B200 NVFP4 serves at $0.140 per million tokens vs H200 INT4 at $0.413 per million tokens — a 65 percent cost reduction. Above 100 tok/s/user, H200 INT4 has no recipe at all, while B200 NVFP4 still serves out to 125 tok/s/user at $1.00 per million tokens. Costs use the SemiAnalysis AI Cloud TCO Model: H200 at $1.41 per GPU per hour and B200 at $1.95 per GPU per hour. Measured on InferenceX, GHA run 26118912054, 2026-05-19."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much of the gap is silicon vs how much is the precision unlock?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Three factors compose. (1) HBM bandwidth: B200 has 1.67x H200's HBM BW (8 vs 4.8 TB/s) and the workload is decode-bound, so at iv = 26 tok/s/user B200 INT4 hits 1,791 tok/s/GPU vs an interpolated 1,055 for H200 INT4 — 1.70x, sitting right at the silicon ratio. (2) HBM capacity unlocks lower tensor parallelism: Kimi K2.5/K2.6 INT4 weighs about 500 GB of live model state, which fits in 4 B200 GPUs (180 GB each, 720 GB aggregate) but needs 8 H200 GPUs (141 GB each, 1,128 GB) to leave meaningful KV cache headroom. Every Pareto-winning B200 NVFP4 recipe in this post is TP=4; every H200 INT4 point is TP=8. Halving the tensor-parallel world size halves the collective traffic per decode step (one fewer log-base-2-N AllReduce hop) and pulls the per-step latency floor down by Amdahl's law on the serial-collectives bottleneck. (3) Precision unlock: switching B200 from INT4 to NVFP4 doubles dense tensor-core throughput, lifting B200 NVFP4 peak to 3,879 tok/s/GPU (2.17x B200 INT4 peak). The three multiply and then get divided by the 1.38x TCO penalty for B200 ($1.95 vs $1.41 per GPU per hour), landing at the measured 2.71x-2.95x cost-per-million-tokens advantage. NVFP4 is the precision lever; HBM bandwidth is the throughput floor; HBM capacity is the TP-reduction lever; H200 has none of the three (Hopper has no FP4 tensor-core support, lower HBM BW, and lower HBM capacity forces TP=8)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is the NVFP4 vs INT4 gap on the same B200 silicon worth the swap?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. On the same B200 hardware, switching the vLLM precision from native INT4 to NVFP4 is worth 2.45x to 2.74x at iso-interactivity in the 30 to 90 tok/s/user serving band, peaking at 2.74x at 60 tok/s/user ($0.566 INT4 vs $0.206 NVFP4 per million tokens). Mechanism: NVFP4 lights up B200's 9,000 TFLOP/s FP4 tensor cores, which the INT4 path does not use. NVFP4 also extends the reachable interactivity range — B200 INT4 caps at 104 tok/s/user, B200 NVFP4 serves out to 125 tok/s/user. No silicon change, no TCO change, just precision."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why is Kimi K2.5 / K2.6 the model that matters here?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kimi K2.5 and K2.6 are the open-weights models powering xAI's Cursor Composer 2 and Composer 2.5 backends, serving over one million daily active users from the Cursor IDE. K2.6 also leads frontier models on the public agentic-coding benchmarks: 58.6 percent on SWE-Bench Pro, ahead of GPT-5.4 (57.7), Claude Opus 4.6 (53.4), and Gemini 3.1 Pro (54.2), and 80.2 percent on SWE-Bench Verified. Cline's production deployment data shows it hitting 3.3 percent failure rate on complex diff-editing tasks, matching Claude 4 Sonnet. The architecture is 1T total parameters with 32B active per token, 384 experts (8 selected plus 1 shared), 61 transformer layers, Multi-head Latent Attention, and a 256K context window. K2.5 (released 2026-01-27) and K2.6 (released 2026-04-20) share the same pre-trained backbone, so every serving result in this post applies one-to-one to both — they are post-training refinements, not new architectures. For anyone hosting an OSS agentic coding stack today, K2.5 or K2.6 is the model they are serving."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What's not yet covered for Kimi K2.5 / K2.6 serving?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Four gaps. First, AMD MI355X has no InferenceX recipe for K2.5 / K2.6 yet; the same precision unlock argument should apply once kernel coverage lands (MI355X has 10,066 TFLOP/s FP4 tensor cores, slightly above B200). Second, PD-disaggregated serving (mori-sglang on AMD, NVIDIA Dynamo) is the next ~1.5x lever and has no K2 recipe in the InferenceX loop yet. Third, the GB200 NVL72 and GB300 NVL72 rack-scale wide expert parallelism path has not been wired in for K2.5 / K2.6, despite the 384-expert architecture being a natural fit. Fourth, this post measures 8K / 1K; the 32K / 2K and 128K / 2K agentic tool-call workloads would re-rank the curves once KV cache pressure starts mattering for a model with a 256K context window."
+      }
+    }
+  ]
+}`}</JsonLd>

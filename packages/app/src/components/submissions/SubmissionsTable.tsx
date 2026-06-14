@@ -1,12 +1,13 @@
 'use client';
 
-import { ChevronDown, ChevronRight, Info } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions-types';
 import { getFrameworkLabel } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import {
   TooltipProvider,
   TooltipRoot,
@@ -14,7 +15,15 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 
-import { getVendor } from './submissions-utils';
+import {
+  buildInferenceCompareUrl,
+  computePreviousImages,
+  computePreviousRuns,
+  getVendor,
+  submissionRowKey,
+} from './submissions-utils';
+
+const ROW_PAGE_SIZE = 100;
 
 function DetailItem({
   label,
@@ -41,7 +50,14 @@ function DetailItem({
   );
 }
 
-type SortKey = 'hardware' | 'model' | 'precision' | 'framework' | 'date' | 'total_datapoints';
+type SortKey =
+  | 'hardware'
+  | 'model'
+  | 'precision'
+  | 'spec_method'
+  | 'framework'
+  | 'date'
+  | 'total_datapoints';
 type SortDir = 'asc' | 'desc';
 
 interface SubmissionsTableProps {
@@ -55,14 +71,43 @@ function getModelDisplayName(dbModel: string): string {
   return dbModel;
 }
 
-const submissionRowKey = (row: SubmissionSummaryRow) =>
-  `${row.model}_${row.hardware}_${row.framework}_${row.precision}_${row.spec_method}_${row.disagg}_${row.is_multinode}_${row.num_prefill_gpu}_${row.num_decode_gpu}_${row.prefill_tp}_${row.prefill_ep}_${row.decode_tp}_${row.decode_ep}_${row.date}`;
+function SortHeader({
+  label,
+  field,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  field: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (field: SortKey) => void;
+}) {
+  return (
+    <th
+      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortKey === field && (
+          <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </span>
+    </th>
+  );
+}
 
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
+
+  const previousImages = useMemo(() => computePreviousImages(data), [data]);
+  const previousRuns = useMemo(() => computePreviousRuns(data), [data]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -86,6 +131,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         row.model.includes(q) ||
         row.framework.includes(q) ||
         row.precision.includes(q) ||
+        row.spec_method.includes(q) ||
         getVendor(row.hardware).toLowerCase().includes(q) ||
         getModelDisplayName(row.model).toLowerCase().includes(q),
     );
@@ -101,6 +147,20 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
     });
   }, [filtered, sortKey, sortDir]);
 
+  // Reset visible count when the filtered/sorted view changes so the user
+  // always lands at the top of the new result set instead of mid-list.
+  useEffect(() => {
+    setVisibleCount(ROW_PAGE_SIZE);
+  }, [search, sortKey, sortDir]);
+
+  const visibleRows = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
+  const hiddenCount = Math.max(0, sorted.length - visibleRows.length);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + ROW_PAGE_SIZE);
+    track('submissions_table_load_more', { previous_count: visibleCount });
+  }, [visibleCount]);
+
   const toggleRow = useCallback((key: string) => {
     setExpandedRows((prev) => {
       const next = new Set(prev);
@@ -114,20 +174,6 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
       return next;
     });
   }, []);
-
-  const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
-    <th
-      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
-      onClick={() => handleSort(field)}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        {sortKey === field && (
-          <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        )}
-      </span>
-    </th>
-  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -146,16 +192,36 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           <thead className="bg-muted/50">
             <tr>
               <th className="w-8 px-2" />
-              <SortHeader label="GPU" field="hardware" />
-              <SortHeader label="Model" field="model" />
-              <SortHeader label="Precision" field="precision" />
-              <SortHeader label="Framework" field="framework" />
-              <SortHeader label="Date" field="date" />
-              <SortHeader label="Datapoints" field="total_datapoints" />
+              {(
+                [
+                  ['GPU', 'hardware'],
+                  ['Model', 'model'],
+                  ['Precision', 'precision'],
+                  ['Spec Method', 'spec_method'],
+                  ['Framework', 'framework'],
+                  ['Date', 'date'],
+                  ['Datapoints', 'total_datapoints'],
+                ] as [string, SortKey][]
+              ).map(([label, field]) => (
+                <SortHeader
+                  key={field}
+                  label={label}
+                  field={field}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
+              ))}
+              <th
+                className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
+                scope="col"
+              >
+                Compare
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {sorted.map((row) => {
+            {visibleRows.map((row) => {
               const key = submissionRowKey(row);
               const isExpanded = expandedRows.has(key);
               return (
@@ -163,13 +229,15 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                   key={key}
                   row={row}
                   isExpanded={isExpanded}
+                  previousImage={previousImages.get(key) ?? null}
+                  previousRun={previousRuns.get(key) ?? null}
                   onToggle={() => toggleRow(key)}
                 />
               );
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
                   {search ? 'No matching submissions found.' : 'No submission data available.'}
                 </td>
               </tr>
@@ -177,8 +245,23 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           </tbody>
         </table>
       </div>
+      {hiddenCount > 0 && (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            data-testid="submissions-load-more"
+          >
+            Show {Math.min(ROW_PAGE_SIZE, hiddenCount)} more
+            <span className="text-muted-foreground">({hiddenCount} hidden)</span>
+          </Button>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
-        {filtered.length} config{filtered.length !== 1 ? 's' : ''} ·{' '}
+        Showing {visibleRows.length} of {filtered.length} config
+        {filtered.length === 1 ? '' : 's'} ·{' '}
         {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()} total datapoints
       </p>
     </div>
@@ -188,13 +271,18 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 function SubmissionRow({
   row,
   isExpanded,
+  previousImage,
+  previousRun,
   onToggle,
 }: {
   row: SubmissionSummaryRow;
   isExpanded: boolean;
+  previousImage: string | null;
+  previousRun: SubmissionSummaryRow | null;
   onToggle: () => void;
 }) {
   const vendor = getVendor(row.hardware);
+  const compareUrl = previousRun ? buildInferenceCompareUrl(row, previousRun) : null;
 
   return (
     <>
@@ -212,14 +300,65 @@ function SubmissionRow({
         </td>
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
+        <td className="px-3 py-2 uppercase">
+          {row.spec_method && row.spec_method !== 'none' ? (
+            row.spec_method
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
         <td className="px-3 py-2 tabular-nums">{row.date}</td>
         <td className="px-3 py-2 tabular-nums">{row.total_datapoints.toLocaleString()}</td>
+        <td className="px-3 py-2">
+          {compareUrl && previousRun ? (
+            <TooltipProvider>
+              <TooltipRoot>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <a
+                      href={compareUrl}
+                      data-testid="submissions-compare-runs-link-inline"
+                      onClick={() => {
+                        track('submissions_compare_runs_clicked', {
+                          source: 'inline',
+                          config: submissionRowKey(row),
+                          model: row.model,
+                          hardware: row.hardware,
+                          framework: row.framework,
+                          previous_date: previousRun.date,
+                          new_date: row.date,
+                          image_changed: previousImage !== null,
+                        });
+                      }}
+                    >
+                      <GitCompare className="size-3.5" />
+                      <span className="hidden lg:inline">vs prev</span>
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" collisionPadding={10}>
+                  <span className="text-xs">
+                    Compare {previousRun.date} → {row.date} on chart
+                  </span>
+                </TooltipContent>
+              </TooltipRoot>
+            </TooltipProvider>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          )}
+        </td>
       </tr>
       {isExpanded && (
         <tr className="bg-muted/20">
           <td />
-          <td colSpan={6} className="px-3 py-3">
+          <td colSpan={8} className="px-3 py-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                 <DetailItem label="Vendor:" tip="GPU manufacturer">
@@ -288,11 +427,53 @@ function SubmissionRow({
                 <div className="col-span-2 md:col-span-4">
                   <DetailItem
                     label="Image:"
-                    tip="Container image used for this benchmark configuration"
+                    tip={
+                      previousImage
+                        ? 'Container image used for this benchmark configuration. The previous run of this config used a different image — shown on the left.'
+                        : 'Container image used for this benchmark configuration'
+                    }
                   >
-                    <span className="font-mono text-xs break-all">{row.image ?? '—'}</span>
+                    {previousImage ? (
+                      <span
+                        data-testid="submissions-image-diff"
+                        className="font-mono text-xs break-all"
+                      >
+                        <span className="text-muted-foreground">{previousImage}</span>
+                        <span className="mx-2 text-muted-foreground" aria-label="changed to">
+                          →
+                        </span>
+                        <span>{row.image}</span>
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs break-all">{row.image ?? '—'}</span>
+                    )}
                   </DetailItem>
                 </div>
+                {compareUrl && previousRun && (
+                  <div className="col-span-2 md:col-span-4 flex justify-end">
+                    <Button asChild variant="outline" size="sm">
+                      <a
+                        href={compareUrl}
+                        data-testid="submissions-compare-runs-link"
+                        onClick={() => {
+                          track('submissions_compare_runs_clicked', {
+                            source: 'expanded',
+                            config: submissionRowKey(row),
+                            model: row.model,
+                            hardware: row.hardware,
+                            framework: row.framework,
+                            previous_date: previousRun.date,
+                            new_date: row.date,
+                            image_changed: previousImage !== null,
+                          });
+                        }}
+                      >
+                        <GitCompare className="size-3.5" />
+                        Compare {previousRun.date} → {row.date} on chart
+                      </a>
+                    </Button>
+                  </div>
+                )}
               </div>
             </TooltipProvider>
           </td>

@@ -10,6 +10,7 @@ import {
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
+  getHybridAttentionSubBlocks,
   getModelArchitecture,
   MODEL_ARCHITECTURES,
 } from './model-architectures';
@@ -20,9 +21,11 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.Llama3_3_70B,
       Model.Llama3_1_70B,
       Model.DeepSeek_R1,
+      Model.DeepSeek_V4_Pro,
       Model.GptOss,
       Model.Kimi_K2_5,
       Model.MiniMax_M2_5,
+      Model.MiniMax_M3,
     ];
 
     for (const model of models) {
@@ -158,6 +161,72 @@ describe('getModelArchitecture', () => {
     expect(arch?.vocabSize).toBe(129280);
   });
 
+  it('returns architecture for DeepSeek V4 Pro with MoE and Hybrid attention details', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch).toBeDefined();
+    expect(arch?.totalParams).toBe(1600);
+    expect(arch?.activeParams).toBe(49);
+    expect(arch?.architectureType).toBe('moe');
+    expect(arch?.attentionType).toBe('Hybrid');
+    expect(arch?.attentionExpandable).toBe(false);
+    expect(arch?.numLayers).toBe(61);
+    expect(arch?.hiddenSize).toBe(7168);
+    expect(arch?.numHeads).toBe(128);
+    expect(arch?.numKVHeads).toBe(1);
+    expect(arch?.headDim).toBe(512);
+    expect(arch?.ffnDim).toBe(3072);
+    expect(arch?.numExperts).toBe(385);
+    expect(arch?.activeExperts).toBe(6);
+    expect(arch?.hasSharedExpert).toBe(true);
+    // First 3 layers use hash-routed MoE (not dense FFN), so no dense block —
+    // they render as a dedicated hash-routed prefix block instead.
+    expect(arch?.denseFFNLayers).toBeUndefined();
+    expect(arch?.hashRoutedLayers).toBe(3);
+    // mHC: residuals are replaced by 4 parallel hyper-connection streams.
+    expect(arch?.hyperConnections).toBe(4);
+    expect(arch?.slidingWindow).toBe(128);
+    expect(arch?.contextWindow).toBe(1048576);
+    expect(arch?.developer).toBe('DeepSeek');
+    expect(arch?.vocabSize).toBe(129280);
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro');
+  });
+
+  it('DeepSeek V4 Pro surfaces sliding-window attention and hybrid components in features', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch?.features).toBeDefined();
+    expect(arch?.features).toContain('Sliding window (128 tokens)');
+    expect(arch?.features).toContain('Hybrid CSA + HCA Attention');
+    expect(arch?.features).toContain('Attention Sink');
+    expect(arch?.features).toContain('Multi-Token Prediction');
+  });
+
+  it('DeepSeek V4 Pro has alternatingLayers with CSA and HCA specs, each carrying a sliding window', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch?.alternatingLayers).toBeDefined();
+    expect(arch?.alternatingLayers).toHaveLength(2);
+
+    // Counts describe the learned-router layers (the first 3 hash-routed layers
+    // are split out into their own block): 29 HCA + 29 CSA + 3 hash = 61.
+    const [hca, csa] = arch!.alternatingLayers!;
+    expect(hca.label).toBe('Heavily Compressed Attention');
+    expect(hca.count).toBe(29);
+    expect(hca.description).toContain('sliding window');
+    expect(hca.slidingWindow).toBe(128);
+
+    expect(csa.label).toBe('Compressed Sparse Attention');
+    expect(csa.count).toBe(29);
+    expect(csa.description).toContain('sliding window');
+    expect(csa.description).toContain('lightning indexer');
+    expect(csa.slidingWindow).toBe(128);
+  });
+
+  it('DeepSeek V4 Pro alternating + hash-routed layer counts sum to numLayers', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(arch?.alternatingLayers).toBeDefined();
+    const totalAlternating = arch!.alternatingLayers!.reduce((sum, l) => sum + l.count, 0);
+    expect(totalAlternating + (arch!.hashRoutedLayers ?? 0)).toBe(arch!.numLayers);
+  });
+
   it('returns architecture for Kimi K2.5 with MoE and MLA details', () => {
     const arch = getModelArchitecture(Model.Kimi_K2_5);
     expect(arch).toBeDefined();
@@ -208,6 +277,29 @@ describe('getModelArchitecture', () => {
     expect(arch?.denseFFNDim).toBeUndefined();
   });
 
+  it('returns architecture for MiniMax M3 with MoE, sparse attention, and shared expert', () => {
+    const arch = getModelArchitecture(Model.MiniMax_M3);
+    expect(arch).toBeDefined();
+    expect(arch?.totalParams).toBe(428);
+    expect(arch?.activeParams).toBe(23);
+    expect(arch?.architectureType).toBe('moe');
+    expect(arch?.attentionType).toBe('GQA');
+    expect(arch?.attentionExpandable).toBe(false);
+    expect(arch?.numLayers).toBe(60);
+    expect(arch?.hiddenSize).toBe(6144);
+    expect(arch?.numHeads).toBe(64);
+    expect(arch?.numKVHeads).toBe(4);
+    expect(arch?.headDim).toBe(128);
+    expect(arch?.ffnDim).toBe(3072);
+    expect(arch?.numExperts).toBe(129);
+    expect(arch?.activeExperts).toBe(4);
+    expect(arch?.hasSharedExpert).toBe(true);
+    expect(arch?.contextWindow).toBe(1048576);
+    expect(arch?.vocabSize).toBe(200064);
+    expect(arch?.developer).toBe('MiniMax');
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M3');
+  });
+
   it('returns architecture for gpt-oss 120B with MoE, alternating attention, and sink tokens', () => {
     const arch = getModelArchitecture(Model.GptOss);
     expect(arch).toBeDefined();
@@ -241,10 +333,13 @@ describe('getModelArchitecture', () => {
     expect(sliding.count).toBe(18);
     expect(sliding.description).toContain('128-token sliding window');
     expect(sliding.description).toContain('attention sink');
+    expect(sliding.slidingWindow).toBe(128);
 
     expect(full.label).toBe('Causal Grouped Query Attention');
     expect(full.count).toBe(18);
     expect(full.description).toContain('full causal masking');
+    // Full-attention block has no sliding window (per-spec, not block-index).
+    expect(full.slidingWindow).toBeUndefined();
   });
 
   it('gpt-oss alternating layer counts sum to numLayers', () => {
@@ -296,6 +391,11 @@ describe('getArchitectureSummary', () => {
   it('returns MoE summary for DeepSeek R1', () => {
     const arch = getModelArchitecture(Model.DeepSeek_R1);
     expect(getArchitectureSummary(arch!)).toBe('MoE 671B (37B active)');
+  });
+
+  it('returns MoE summary for DeepSeek V4 Pro with trillion-scale params', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro);
+    expect(getArchitectureSummary(arch!)).toBe('MoE 1.6T (49B active)');
   });
 
   it('returns MoE summary for gpt-oss 120B', () => {
@@ -645,6 +745,54 @@ describe('getFFNSubBlocks', () => {
       const allBlocks = getAllBlocks(flow);
       expect(allBlocks.length).toBeGreaterThanOrEqual(4);
       for (const block of allBlocks) {
+        expect(validTypes).toContain(block.type);
+        expect(block.name.length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('getHybridAttentionSubBlocks', () => {
+  it('exposes the sliding-window branch as an explicit block for DeepSeek V4', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro)!;
+    const [hca, csa] = arch.alternatingLayers!;
+
+    const csaFlow = getHybridAttentionSubBlocks(arch, csa);
+    expect(csaFlow.layout).toBe('parallel');
+    if (csaFlow.layout !== 'parallel') return;
+    expect(csaFlow.leftLabel).toBe('Local');
+    // Local branch is the sliding-window KV source (one explicit block). The
+    // sink is NOT here — it is a learnable softmax bias on the shared MQA.
+    expect(csaFlow.leftPath[0].name).toBe('Sliding Window');
+    expect(csaFlow.leftPath[0].detail).toContain('128');
+    expect(csaFlow.leftPath).toHaveLength(1);
+    expect(csaFlow.leftPath.some((b) => b.name === 'Attention Sink')).toBe(false);
+    // CSA compressed branch: light compression then the learned lightning
+    // indexer (sparse top-k) — two stages.
+    expect(csaFlow.rightPath.map((b) => b.name)).toEqual([
+      'Token Compression',
+      'Lightning Indexer',
+    ]);
+    // The fused attention is a single shared-KV MQA that carries the sink
+    expect(csaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA + Sink');
+    expect(csaFlow.mergeBlocks.at(-1)?.name).toBe('Output Projection');
+
+    const hcaFlow = getHybridAttentionSubBlocks(arch, hca);
+    if (hcaFlow.layout !== 'parallel') return;
+    expect(hcaFlow.leftPath[0].name).toBe('Sliding Window');
+    expect(hcaFlow.leftPath).toHaveLength(1);
+    // HCA compressed branch is a single heavy-compression source (no indexer)
+    expect(hcaFlow.rightPath.some((b) => b.name === 'Lightning Indexer')).toBe(false);
+    expect(hcaFlow.rightPath.map((b) => b.name)).toEqual(['Heavy Compression']);
+    expect(hcaFlow.mergeBlocks[0].name).toBe('Shared-KV MQA + Sink');
+  });
+
+  it('all hybrid sub-blocks have valid types', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_Pro)!;
+    const validTypes = ['projection', 'activation', 'operation', 'attention'];
+    for (const spec of arch.alternatingLayers!) {
+      const flow = getHybridAttentionSubBlocks(arch, spec);
+      for (const block of getAllBlocks(flow)) {
         expect(validTypes).toContain(block.type);
         expect(block.name.length).toBeGreaterThan(0);
       }

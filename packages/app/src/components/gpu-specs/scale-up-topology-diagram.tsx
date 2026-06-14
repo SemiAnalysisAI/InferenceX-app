@@ -34,7 +34,7 @@ export interface ScaleUpTopologyDiagramHandle {
 export const ScaleUpTopologyDiagram = forwardRef<
   ScaleUpTopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
->(function ScaleUpTopologyDiagram({ spec, allSpecs }, ref) {
+>(({ spec, allSpecs }, ref) => {
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
   const displayedIndexRef = useRef(0);
@@ -265,7 +265,7 @@ function renderSwitchedTopology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')
@@ -418,7 +418,7 @@ function renderMeshTopology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')
@@ -586,7 +586,7 @@ function renderSwitchedNvl72Topology(
     .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
 
   // Add background logo watermark
-  const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/g, '-')}-${compact ? 'c' : 'e'}`;
+  const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
   svg
     .append('defs')
     .append('pattern')

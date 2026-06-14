@@ -29,7 +29,7 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function updateRepoUrl(url: string): string {
   return url.replaceAll(
-    /https?:\/\/github\.com\/InferenceMAX\/InferenceMAX\//g,
+    /https?:\/\/github\.com\/InferenceMAX\/InferenceMAX\//gu,
     'https://github.com/SemiAnalysisAI/InferenceX/',
   );
 }

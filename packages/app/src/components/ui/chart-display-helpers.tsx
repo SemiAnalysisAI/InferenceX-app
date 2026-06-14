@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
@@ -93,15 +92,7 @@ function getCostValues(selectedYAxisMetric: string) {
 }
 
 export function ChartShareActions() {
-  return (
-    <div className="flex items-center gap-1.5">
-      <ShareButton />
-      <div className="hidden sm:flex items-center gap-1.5">
-        <ShareTwitterButton />
-        <ShareLinkedInButton />
-      </div>
-    </div>
-  );
+  return <ShareButton />;
 }
 
 export function MetricAssumptionNotes({

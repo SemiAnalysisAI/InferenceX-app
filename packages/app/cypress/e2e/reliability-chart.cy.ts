@@ -96,7 +96,7 @@ describe('Reliability Chart — Content & Interactions', () => {
       .should('have.length.greaterThan', 0)
       .first()
       .invoke('text')
-      .should('match', /\d+\.\d+%/);
+      .should('match', /\d+\.\d+%/u);
   });
 
   it('High Contrast toggle exists and can be enabled', () => {
@@ -116,7 +116,7 @@ describe('Reliability Chart — Content & Interactions', () => {
       .should('have.length.greaterThan', 0)
       .then(($ticks) => {
         const texts = [...$ticks].map((el) => el.textContent || '');
-        const hasPercentage = texts.some((t) => /\d+%/.test(t));
+        const hasPercentage = texts.some((t) => /\d+%/u.test(t));
         expect(hasPercentage).to.equal(true);
       });
   });

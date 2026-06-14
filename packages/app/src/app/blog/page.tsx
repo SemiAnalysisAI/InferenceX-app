@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { BlogPostCard } from '@/components/blog/blog-post-card';
 import { BlogTagLink } from '@/components/blog/blog-tag-link';
 import { Card } from '@/components/ui/card';
+import { JsonLd } from '@/components/json-ld';
 import { getAllPosts } from '@/lib/blog';
 import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
 
@@ -41,7 +42,7 @@ export default async function BlogPage({
 
   return (
     <main className="relative">
-      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <section className="flex flex-col gap-4">
           <Card>
@@ -54,9 +55,9 @@ export default async function BlogPage({
                 <Link
                   href="/blog"
                   className={`rounded-full px-3 py-0.5 text-xs transition-colors ${
-                    !activeTag
-                      ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    activeTag
+                      ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      : 'bg-primary/15 text-primary ring-1 ring-primary/30'
                   }`}
                 >
                   All

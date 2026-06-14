@@ -18,11 +18,15 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
   it('groups point-release DB keys under the same display name', () => {
     expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(expect.arrayContaining(['glm5', 'glm5.1']));
     expect(DISPLAY_MODEL_TO_DB['Kimi-K2.5']).toEqual(
-      expect.arrayContaining(['kimik2.5', 'kimik2.6']),
+      expect.arrayContaining(['kimik2.5', 'kimik2.6', 'kimik2.7-code']),
     );
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M2.5']).toEqual(
       expect.arrayContaining(['minimaxm2.5', 'minimaxm2.7']),
     );
+  });
+
+  it('maps minimaxm3 to its own MiniMax-M3 display name', () => {
+    expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).toEqual(['minimaxm3']);
   });
 });
 

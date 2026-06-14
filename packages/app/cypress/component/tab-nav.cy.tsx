@@ -90,3 +90,59 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     );
   });
 });
+
+describe('TabNav — Hidden popover for gated tabs', () => {
+  afterEach(() => {
+    cy.window().then((win) => {
+      win.history.replaceState(null, '', '/');
+      win.localStorage.removeItem('inferencex-feature-gate');
+    });
+  });
+
+  it('omits the Hidden trigger and gated links when the feature gate is locked', () => {
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    mountTabNav({});
+    cy.get('[data-testid="tab-trigger-inference"]').should('exist');
+    cy.get('[data-testid="tab-trigger-gpu-specs"]').should('exist');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-feedback"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
+  });
+
+  it('renders the Hidden trigger when unlocked; popover reveals all 4 gated links', () => {
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({});
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible').and('contain.text', 'Hidden');
+    // Gated links are inside the closed popover, so they're not yet in the DOM.
+    cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-hidden"]').click();
+    cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
+    cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
+    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('have.attr', 'href', '/gpu-metrics');
+    cy.get('[data-testid="tab-trigger-submissions"]').should('have.attr', 'href', '/submissions');
+    cy.get('[data-testid="tab-trigger-feedback"]').should('have.attr', 'href', '/feedback');
+  });
+
+  it('forwards the unofficialruns param onto every gated link in the popover', () => {
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({ search: '?unofficialruns=42' });
+    cy.get('[data-testid="tab-trigger-hidden"]').click();
+    cy.get('[data-testid="tab-trigger-feedback"]').should(
+      'have.attr',
+      'href',
+      '/feedback?unofficialruns=42',
+    );
+  });
+
+  it('highlights the Hidden trigger when the current path is one of the gated tabs', () => {
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({ pathname: '/feedback' });
+    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
+  });
+
+  it('does NOT highlight the Hidden trigger on a non-gated path', () => {
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    mountTabNav({ pathname: '/inference' });
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.have.class', 'border-secondary');
+  });
+});

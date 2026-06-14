@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 import type { SubmissionVolumeRow, SubmissionSummaryRow } from '@/lib/submissions-types';
 
 import {
+  buildInferenceCompareUrl,
   computeCumulative,
+  computePreviousImages,
+  computePreviousRuns,
   computeTotalStats,
   getVendor,
   groupVolumeByWeek,
   isNonNvidia,
+  submissionRowKey,
 } from './submissions-utils';
 
 describe('getVendor', () => {
@@ -130,5 +134,194 @@ describe('computeTotalStats', () => {
     expect(stats.totalConfigs).toBe(2);
     expect(stats.uniqueModels).toBe(1);
     expect(stats.uniqueGpus).toBe(2);
+  });
+});
+
+describe('computePreviousImages', () => {
+  const base: Omit<SubmissionSummaryRow, 'date' | 'image'> = {
+    model: 'dsr1',
+    hardware: 'h200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'mtp',
+    disagg: false,
+    is_multinode: false,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    total_datapoints: 10,
+    distinct_sequences: 2,
+    distinct_concurrencies: 5,
+    max_concurrency: 64,
+  };
+
+  it('flags the row where the image changed, not the steady-state rows', () => {
+    const oldImg = 'lmsysorg/sglang:v0.5.9-cu130';
+    const newImg = 'lmsysorg/sglang:v0.5.11-cu130';
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, date: '2026-05-10', image: oldImg },
+      { ...base, date: '2026-05-11', image: oldImg },
+      { ...base, date: '2026-05-12', image: newImg }, // bump day
+      { ...base, date: '2026-05-13', image: newImg },
+    ];
+    const map = computePreviousImages(rows);
+    expect(map.size).toBe(1);
+    expect(map.get(submissionRowKey(rows[2]))).toBe(oldImg);
+  });
+
+  it('does not cross config boundaries', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, hardware: 'h200', date: '2026-05-10', image: 'img-a' },
+      { ...base, hardware: 'b300', date: '2026-05-11', image: 'img-b' },
+    ];
+    expect(computePreviousImages(rows).size).toBe(0);
+  });
+
+  it('ignores rows missing image data', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, date: '2026-05-10', image: null },
+      { ...base, date: '2026-05-11', image: 'img-new' },
+    ];
+    expect(computePreviousImages(rows).size).toBe(0);
+  });
+
+  it('returns empty for a single-row config', () => {
+    const rows: SubmissionSummaryRow[] = [{ ...base, date: '2026-05-10', image: 'img-a' }];
+    expect(computePreviousImages(rows).size).toBe(0);
+  });
+});
+
+describe('computePreviousRuns', () => {
+  const base: Omit<SubmissionSummaryRow, 'date' | 'image'> = {
+    model: 'dsr1',
+    hardware: 'h200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'mtp',
+    disagg: false,
+    is_multinode: false,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    total_datapoints: 10,
+    distinct_sequences: 2,
+    distinct_concurrencies: 5,
+    max_concurrency: 64,
+  };
+
+  it('returns the immediately preceding run for each row of the same config', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, date: '2026-05-10', image: 'img-a' },
+      { ...base, date: '2026-05-11', image: 'img-a' },
+      { ...base, date: '2026-05-12', image: 'img-b' },
+    ];
+    const map = computePreviousRuns(rows);
+    expect(map.size).toBe(2);
+    expect(map.get(submissionRowKey(rows[1]))?.date).toBe('2026-05-10');
+    expect(map.get(submissionRowKey(rows[2]))?.date).toBe('2026-05-11');
+    expect(map.has(submissionRowKey(rows[0]))).toBe(false);
+  });
+
+  it('does not cross config boundaries', () => {
+    const rows: SubmissionSummaryRow[] = [
+      { ...base, hardware: 'h200', date: '2026-05-10', image: 'img-a' },
+      { ...base, hardware: 'b300', date: '2026-05-11', image: 'img-b' },
+    ];
+    expect(computePreviousRuns(rows).size).toBe(0);
+  });
+
+  it('returns empty for a single-row config', () => {
+    const rows: SubmissionSummaryRow[] = [{ ...base, date: '2026-05-10', image: 'img-a' }];
+    expect(computePreviousRuns(rows).size).toBe(0);
+  });
+});
+
+describe('buildInferenceCompareUrl', () => {
+  const base: Omit<SubmissionSummaryRow, 'date' | 'image'> = {
+    model: 'dsr1',
+    hardware: 'h200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'mtp',
+    disagg: false,
+    is_multinode: false,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    total_datapoints: 10,
+    distinct_sequences: 2,
+    distinct_concurrencies: 5,
+    max_concurrency: 64,
+  };
+
+  it('builds an /inference URL with the expected params', () => {
+    const previous: SubmissionSummaryRow = { ...base, date: '2026-05-10', image: 'img-a' };
+    const current: SubmissionSummaryRow = { ...base, date: '2026-05-12', image: 'img-b' };
+    const url = buildInferenceCompareUrl(current, previous);
+    expect(url).not.toBeNull();
+    const parsed = new URL(`https://example.com${url}`);
+    expect(parsed.pathname).toBe('/inference');
+    expect(parsed.searchParams.get('g_model')).toBe('DeepSeek-R1-0528');
+    expect(parsed.searchParams.get('g_rundate')).toBe('2026-05-12');
+    expect(parsed.searchParams.get('i_dstart')).toBe('2026-05-10');
+    expect(parsed.searchParams.get('i_dend')).toBe('2026-05-12');
+    expect(parsed.searchParams.get('i_prec')).toBe('fp8');
+    // hwKey reflects framework + spec_method
+    expect(parsed.searchParams.get('i_gpus')).toContain('h200');
+    expect(parsed.searchParams.get('i_gpus')).toContain('mtp');
+  });
+
+  it('returns null when the model prefix has no display mapping', () => {
+    const previous: SubmissionSummaryRow = {
+      ...base,
+      model: 'unknown-model',
+      date: '2026-05-10',
+      image: 'img-a',
+    };
+    const current: SubmissionSummaryRow = {
+      ...base,
+      model: 'unknown-model',
+      date: '2026-05-12',
+      image: 'img-b',
+    };
+    expect(buildInferenceCompareUrl(current, previous)).toBeNull();
+  });
+
+  it('handles DB prefixes that include point-release suffix (gptoss120b, glm5.1, llama70b)', () => {
+    const cases: [string, string][] = [
+      ['gptoss120b', 'gpt-oss-120b'],
+      ['glm5.1', 'GLM-5'],
+      ['llama70b', 'Llama-3.3-70B-Instruct-FP8'],
+      ['kimik2.6', 'Kimi-K2.5'],
+      ['kimik2.7-code', 'Kimi-K2.5'],
+      ['minimaxm2.7', 'MiniMax-M2.5'],
+    ];
+    for (const [dbModel, expectedDisplay] of cases) {
+      const previous: SubmissionSummaryRow = {
+        ...base,
+        model: dbModel,
+        date: '2026-05-10',
+        image: 'img-a',
+      };
+      const current: SubmissionSummaryRow = {
+        ...base,
+        model: dbModel,
+        date: '2026-05-12',
+        image: 'img-b',
+      };
+      const url = buildInferenceCompareUrl(current, previous);
+      expect(url, `expected URL for ${dbModel}`).not.toBeNull();
+      const parsed = new URL(`https://example.com${url}`);
+      expect(parsed.searchParams.get('g_model')).toBe(expectedDisplay);
+    }
   });
 });

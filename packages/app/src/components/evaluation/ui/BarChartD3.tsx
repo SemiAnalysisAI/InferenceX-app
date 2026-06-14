@@ -17,7 +17,7 @@ import {
   type EvalBenchmark,
   type Precision,
   getEvalBenchmarkLabel,
-  getModelWatermark,
+  getChartWatermark,
   getPrecisionLabel,
 } from '@/lib/data-mappings';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -180,7 +180,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       if (url) {
         const direct = runIndexByUrl[url];
         if (direct !== undefined) return unofficialRunInfos[direct]?.branch;
-        const idMatch = url.match(/\/runs\/(\d+)/);
+        const idMatch = url.match(/\/runs\/(?<runId>\d+)/u);
         if (idMatch) {
           const viaId = runIndexByUrl[idMatch[1]];
           if (viaId !== undefined) return unofficialRunInfos[viaId]?.branch;
@@ -762,7 +762,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 .style('pointer-events', 'none')
                 .html(generateEvaluationTooltipContent(d, false, branchForRow(d)));
             })
-            .on('mousemove', function (event) {
+            .on('mousemove', (event) => {
               if (chartRef.current?.isPinned()) return;
               const [mx, my] = d3.pointer(event, container);
               const pos = computeTooltipPosition(mx, my, tooltip, container);
@@ -776,7 +776,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 .attr('stroke-width', 2.5);
               tooltip.style('opacity', 0).style('display', 'none');
             })
-            .on('click', function (event, d) {
+            .on('click', (event, d) => {
               event.stopPropagation();
               const [mx, my] = d3.pointer(event, container);
               tooltip
@@ -861,7 +861,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       data={chartData}
       height={chartHeight}
       margin={chartMargin}
-      watermark={getModelWatermark(selectedModel, isUnofficialRun)}
+      watermark={getChartWatermark(isUnofficialRun)}
       grabCursor={false}
       caption={caption}
       xScale={{ type: 'linear', domain: xDomain }}
@@ -881,7 +881,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         constrain: (transform) => {
           const k = transform.k;
           const innerWidth =
-            (typeof window !== 'undefined' ? window.innerWidth : 800) -
+            (typeof window === 'undefined' ? 800 : window.innerWidth) -
             chartMargin.left -
             chartMargin.right;
           const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);

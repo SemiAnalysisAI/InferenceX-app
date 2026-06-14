@@ -2,12 +2,12 @@ import type { AiProvider } from '@/components/ai-chart/types';
 
 interface ProviderDef {
   label: string;
-  buildRequest(
+  buildRequest: (
     systemPrompt: string,
     userPrompt: string,
     apiKey: string,
-  ): { url: string; init: RequestInit };
-  parseResponse(json: any): string;
+  ) => { url: string; init: RequestInit };
+  parseResponse: (json: any) => string;
 }
 
 const PROVIDERS: Record<AiProvider, ProviderDef> = {
@@ -136,9 +136,9 @@ export async function callLlm(
       json?.error?.message ?? json?.error?.type ?? `${provider} request failed (${res.status})`;
     // Strip anything that looks like an API key to prevent accidental leaks in UI
     const msg = String(raw)
-      .replaceAll(/sk-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
-      .replaceAll(/key-[a-zA-Z0-9_-]{10,}/g, '[REDACTED]')
-      .replaceAll(/Bearer\s+\S+/gi, 'Bearer [REDACTED]');
+      .replaceAll(/sk-[a-zA-Z0-9_-]{10,}/gu, '[REDACTED]')
+      .replaceAll(/key-[a-zA-Z0-9_-]{10,}/gu, '[REDACTED]')
+      .replaceAll(/Bearer\s+\S+/giu, 'Bearer [REDACTED]');
     throw new Error(msg);
   }
 

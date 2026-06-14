@@ -23,6 +23,7 @@ const DASHBOARD_TABS = [
   '/gpu-specs',
   '/gpu-metrics',
   '/submissions',
+  '/current-inferencex-image',
 ];
 
 const NAV_LINKS = [
@@ -32,6 +33,12 @@ const NAV_LINKS = [
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
+  },
+  {
+    href: '/compare',
+    label: 'Comparisons',
+    testId: 'nav-link-compare',
+    event: 'header_compare_clicked',
   },
   {
     href: '/quotes',
@@ -46,7 +53,10 @@ const NAV_LINKS = [
 function isActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   if (href === '/inference') return DASHBOARD_TABS.some((tab) => pathname.startsWith(tab));
-  return pathname.startsWith(href);
+  // Exact match or a child path under `<href>/...`. The bare `startsWith` would
+  // light up `/compare` when the user is on `/compare-per-dollar/...` since the
+  // latter starts with the literal string `/compare`.
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export const Header = ({ starCount }: { starCount?: number | null }) => {
@@ -93,7 +103,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="text-lg font-bold tracking-tight">InferenceX</span>
+            <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image
