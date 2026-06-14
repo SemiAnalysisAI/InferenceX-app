@@ -186,7 +186,11 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('/inference?i_prec=fp8 seeds the precision without a hydration error', () => {
-      visitWithErrorSpy('/inference?i_prec=fp8');
+      // Pair `i_prec=fp8` with a model that actually has FP8 in availability.
+      // The default model (DeepSeek-V4-Pro) is FP4-only in the test fixtures,
+      // so `effectivePrecisions` would otherwise intersect the URL selection
+      // with the available set and fall back to FP4.
+      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8');
       cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
       assertNoHydrationMismatch();
     });
