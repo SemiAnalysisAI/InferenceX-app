@@ -8,7 +8,7 @@ import { useFeatureGate } from '@/lib/use-feature-gate';
 import { useInference } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
-  SequenceSelector,
+  MultiSequenceSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -100,6 +100,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setSelectedModel,
     selectedSequence,
     setSelectedSequence,
+    extraSequences,
+    setExtraSequences,
     selectedPrecisions,
     setSelectedPrecisions,
     selectedYAxisMetric,
@@ -178,6 +180,22 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setTimeout(trackCombinedFilters, 0);
   };
 
+  const handleSequencesChange = (values: Sequence[]) => {
+    if (values.length === 0) return;
+    const [primary, ...extras] = values;
+    if (primary !== selectedSequence) {
+      handleSequenceChange(primary);
+    }
+    setExtraSequences(extras);
+    if (extras.length > 0) {
+      track('inference_sequence_overlay_changed', {
+        primary,
+        extras: extras.join(','),
+        count: values.length,
+      });
+    }
+  };
+
   const handlePrecisionChange = (value: string[]) => {
     setSelectedPrecisions(value);
     track('inference_precision_selected', {
@@ -246,9 +264,9 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availableModels={availableModels}
             data-testid="model-selector"
           />
-          <SequenceSelector
-            value={selectedSequence}
-            onChange={handleSequenceChange}
+          <MultiSequenceSelector
+            value={[selectedSequence, ...extraSequences]}
+            onChange={handleSequencesChange}
             open={openDropdown === 'sequence'}
             onOpenChange={handleDropdownOpenChange('sequence')}
             availableSequences={availableSequences}

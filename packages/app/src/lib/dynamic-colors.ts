@@ -14,7 +14,7 @@ import { getModelSortIndex } from '@/lib/constants';
 // Vendor detection
 // ---------------------------------------------------------------------------
 
-export type Vendor = 'nvidia' | 'amd' | 'unknown';
+export type Vendor = 'nvidia' | 'amd' | 'huawei' | 'unknown';
 
 /** Determine vendor from a hardware key by looking up GPU_VENDORS. */
 export function getVendor(hwKey: string): Vendor {
@@ -23,6 +23,7 @@ export function getVendor(hwKey: string): Vendor {
   const vendor = GPU_VENDORS[base];
   if (vendor === 'NVIDIA') return 'nvidia';
   if (vendor === 'AMD') return 'amd';
+  if (vendor === 'Huawei') return 'huawei';
   return 'unknown';
 }
 

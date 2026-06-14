@@ -179,12 +179,15 @@ export default function ChartDisplay() {
     runIndexByUrl,
     getOverlayData,
     isUnofficialRun,
+    mergeAsIngested,
     activeOverlayHwTypes,
   } = useUnofficialRun();
 
-  // Compute overlay data for each chart type — must match useChartData processing
+  // Compute overlay data for each chart type — must match useChartData processing.
+  // When `mergeAsIngested` is on, the unofficial rows are already promoted to
+  // official series via InferenceContext, so suppress the X-shape overlay layer.
   const overlayDataByChartType = useMemo(() => {
-    if (!unofficialRunInfo || !getOverlayData) {
+    if (mergeAsIngested || !unofficialRunInfo || !getOverlayData) {
       return { e2e: null, interactivity: null };
     }
 
@@ -250,6 +253,7 @@ export default function ChartDisplay() {
       interactivity: processData(interactivityRaw, 'interactivity'),
     };
   }, [
+    mergeAsIngested,
     unofficialRunInfo,
     unofficialRunInfos,
     runIndexByUrl,

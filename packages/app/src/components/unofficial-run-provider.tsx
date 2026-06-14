@@ -20,6 +20,7 @@ import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Model, Sequence } from '@/lib/data-mappings';
+import { readUrlParams } from '@/lib/url-state';
 
 interface UnofficialRunInfo {
   id: number;
@@ -51,6 +52,15 @@ export interface AvailableModelSequence {
 
 export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
+  /**
+   * When true, unofficial-run rows are promoted to first-class series in the
+   * inference scatter — each (run, GPU config) pair becomes its own legend
+   * entry with the run's branch name, and the rows participate in the same
+   * filter pipeline as ingested data (Optimal-only, hardware toggles, etc.)
+   * instead of rendering as a separate X-shape overlay.
+   */
+  mergeAsIngested: boolean;
+  setMergeAsIngested: (v: boolean) => void;
   /** First run in the loaded set — kept as a convenience alias for overlay labels. */
   unofficialRunInfo: UnofficialRunInfo | null;
   /** All runs loaded from the `unofficialrun(s)` URL param (comma-separated). */
@@ -175,6 +185,34 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   const [availableModelsAndSequences, setAvailableModelsAndSequences] = useState<
     AvailableModelSequence[]
   >([]);
+
+  // Promote unofficial rows to ingested-style series. Initial value seeded
+  // from the URL snapshot in `url-state.ts` (which captures share-link params
+  // at module load BEFORE its deferred cleanup strips them) so a share link
+  // like `?unofficialrun=…&i_uoff_ingested=1` starts checked. Reading
+  // `window.location.search` here would race against that cleanup and lose
+  // the value. Under SSR the value is false; we re-sync after mount and on
+  // popstate via the listener attached below.
+  const [mergeAsIngested, setMergeAsIngestedRaw] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return readUrlParams().i_uoff_ingested === '1';
+  });
+  // Re-sync after hydration in case the server rendered with the SSR default.
+  // Source of truth is `readUrlParams()` (snapshot captured before url-state's
+  // deferred cleanup), not the live address bar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const fromUrl = readUrlParams().i_uoff_ingested === '1';
+    setMergeAsIngestedRaw((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, []);
+  const setMergeAsIngested = useCallback((v: boolean) => {
+    setMergeAsIngestedRaw(v);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (v) url.searchParams.set('i_uoff_ingested', '1');
+    else url.searchParams.delete('i_uoff_ingested');
+    window.history.replaceState({}, '', url);
+  }, []);
 
   // --- Shared overlay toggle state (unified across both charts) ---
   const [activeOverlayHwTypes, setActiveOverlayHwTypes] = useState<Set<string>>(new Set());
@@ -345,8 +383,19 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    const load = () => {
+    const load = (isPopstate: boolean) => {
       const params = new URLSearchParams(window.location.search);
+      // On popstate the browser restored the previous history entry, so the
+      // URL is the source of truth for the merge toggle. Don't re-sync on
+      // the initial mount call — by then `url-state.ts`'s deferred cleanup
+      // may have stripped `i_uoff_ingested` from the address bar, and the
+      // seeded `useState` already reflects the snapshot. (`setMergeAsIngested`
+      // writes `i_uoff_ingested=1` via `replaceState` when the user toggles,
+      // so back/forward replays it.)
+      if (isPopstate) {
+        setMergeAsIngestedRaw(params.get('i_uoff_ingested') === '1');
+      }
+
       let unofficialRunIdParam: string | undefined;
       for (const [key, value] of params) {
         if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
@@ -389,15 +438,18 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
         .finally(() => setLoading(false));
     };
 
-    load();
-    window.addEventListener('popstate', load);
-    return () => window.removeEventListener('popstate', load);
+    load(false);
+    const onPopstate = () => load(true);
+    window.addEventListener('popstate', onPopstate);
+    return () => window.removeEventListener('popstate', onPopstate);
   }, []);
 
   return (
     <UnofficialRunContext.Provider
       value={{
         isUnofficialRun: unofficialRunInfos.length > 0,
+        mergeAsIngested,
+        setMergeAsIngested,
         unofficialRunInfo,
         unofficialRunInfos,
         runIndexByUrl,

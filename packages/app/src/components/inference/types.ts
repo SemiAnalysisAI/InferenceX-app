@@ -665,6 +665,19 @@ export interface InferenceChartContextType {
   activePresetId: string | null;
   setActivePresetId: (id: string | null) => void;
   presetGuardRef: React.RefObject<boolean>;
+  /**
+   * Per-hwKey CSS color overrides. Populated when unofficial-as-ingested
+   * merging is on so each synthesized run series gets the same per-run color
+   * the overlay legend would have shown. Empty when nothing is merged.
+   */
+  hwColorOverrides: Record<string, string>;
+  /**
+   * Additional ISL/OSL sequences to overlay on the inference chart alongside
+   * `selectedSequence`. Empty by default. When non-empty, each (GPU, sequence)
+   * pair becomes its own legend line via a `__seq<compact>` hwKey suffix.
+   */
+  extraSequences: Sequence[];
+  setExtraSequences: (sequences: Sequence[]) => void;
   /** Compare pages only: slug GPU pair used to filter benchmark series. */
   compareGpuPair: readonly [string, string] | null;
 }

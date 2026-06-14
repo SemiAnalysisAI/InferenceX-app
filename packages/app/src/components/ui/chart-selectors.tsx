@@ -132,17 +132,9 @@ interface SequenceSelectorProps {
   'data-testid'?: string;
 }
 
-export function SequenceSelector({
-  id = 'sequence-select',
-  value,
-  onChange,
-  open,
-  onOpenChange,
-  availableSequences,
-  'data-testid': testId,
-}: SequenceSelectorProps) {
+function buildSequenceSections(availableSequences: string[]) {
   const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
-  const sections = [
+  return [
     {
       id: 'default',
       options: groups.default.map((seq) => ({
@@ -165,6 +157,18 @@ export function SequenceSelector({
         ]
       : []),
   ];
+}
+
+export function SequenceSelector({
+  id = 'sequence-select',
+  value,
+  onChange,
+  open,
+  onOpenChange,
+  availableSequences,
+  'data-testid': testId,
+}: SequenceSelectorProps) {
+  const sections = buildSequenceSections(availableSequences);
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
@@ -193,6 +197,69 @@ export function SequenceSelector({
           showClearAll={false}
           searchable={false}
           plainSelectedText
+          showSelectionSummary={false}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface MultiSequenceSelectorProps {
+  id?: string;
+  /** Selected sequences, primary-first. minSelections=1 is enforced. */
+  value: string[];
+  onChange: (value: Sequence[]) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  availableSequences: string[];
+  maxSelections?: number;
+  'data-testid'?: string;
+}
+
+/**
+ * Sequence picker that allows multiple ISL/OSL selections so the inference
+ * chart can overlay e.g. 1K/1K and 8K/1K as separate series on the same
+ * axes. The first selected value is treated as the "primary" sequence by
+ * the data pipeline; additional picks become `extraSequences` and each
+ * (hw, sequence) row gets a synth hwKey so it lands in its own legend line.
+ */
+export function MultiSequenceSelector({
+  id = 'sequence-multiselect',
+  value,
+  onChange,
+  open,
+  onOpenChange,
+  availableSequences,
+  maxSelections = 3,
+  'data-testid': testId,
+}: MultiSequenceSelectorProps) {
+  const sections = buildSequenceSections(availableSequences);
+
+  return (
+    <div className="flex flex-col space-y-1.5 lg:col-span-1">
+      <LabelWithTooltip
+        htmlFor={id}
+        label="ISL / OSL"
+        tooltip="Input Sequence Length / Output Sequence Length. Pick more than one to overlay multiple shapes on the same chart (e.g. 1K/1K + 8K/1K) — each (GPU, sequence) becomes its own legend line."
+      />
+      <div>
+        <MultiSelect
+          sections={sections}
+          value={value}
+          onChange={(values) => {
+            if (values.length === 0) return;
+            track('selector_sequence_changed', { sequence: values.join(',') });
+            onChange(values as Sequence[]);
+          }}
+          open={open}
+          onOpenChange={onOpenChange}
+          triggerId={id}
+          triggerTestId={testId}
+          placeholder="ISL / OSL"
+          minSelections={1}
+          maxSelections={maxSelections}
+          showClearAll={false}
+          searchable={false}
           showSelectionSummary={false}
         />
       </div>

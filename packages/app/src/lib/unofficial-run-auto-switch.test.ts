@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { AvailableModelSequence } from '@/components/unofficial-run-provider';
 import { Model, Sequence } from '@/lib/data-mappings';
 
-import { computeAutoSwitchDecision } from './unofficial-run-auto-switch';
+import {
+  computeAutoSwitchDecision,
+  computeUnofficialOverrideDecision,
+  selectUnofficialDefaultSequence,
+} from './unofficial-run-auto-switch';
 
 function entry(model: Model, sequence: Sequence): AvailableModelSequence {
   return { model, sequence, precisions: [] };
@@ -110,5 +114,126 @@ describe('computeAutoSwitchDecision', () => {
     const b = computeAutoSwitchDecision(orderB, undefined, Model.DeepSeek_R1, '');
     expect(a.modelToSet).toBe(b.modelToSet);
     expect(a.nextKey).toBe(b.nextKey);
+  });
+});
+
+describe('computeUnofficialOverrideDecision', () => {
+  it('returns no-op and resets the key when no unofficial run is loaded', () => {
+    expect(computeUnofficialOverrideDecision([], undefined, 'stale-key')).toEqual({
+      nextKey: '',
+      shouldOverride: false,
+    });
+  });
+
+  it('fires the override on a fresh run set when the URL does not pin the param', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
+    const decision = computeUnofficialOverrideDecision(run, undefined, '');
+    expect(decision.shouldOverride).toBe(true);
+    expect(decision.nextKey).toBe(Model.DeepSeek_V4_Pro);
+  });
+
+  it('respects an explicit URL pin even on a fresh run set', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
+    const decision = computeUnofficialOverrideDecision(run, '1k/1k', '');
+    expect(decision.shouldOverride).toBe(false);
+    // Ref must not be advanced — if the URL is later cleared we still want
+    // a fresh load of the same run to fire the override.
+    expect(decision.nextKey).toBe('');
+  });
+
+  it('does not re-fire after the override has already been applied for this run set', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
+    const lastKey = Model.DeepSeek_V4_Pro;
+    const decision = computeUnofficialOverrideDecision(run, undefined, lastKey);
+    expect(decision.shouldOverride).toBe(false);
+    expect(decision.nextKey).toBe(lastKey);
+  });
+
+  it('re-arms after the overlay set is cleared so a subsequent load can override again', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
+    const first = computeUnofficialOverrideDecision(run, undefined, '');
+    expect(first.shouldOverride).toBe(true);
+
+    const cleared = computeUnofficialOverrideDecision([], undefined, first.nextKey);
+    expect(cleared).toEqual({ nextKey: '', shouldOverride: false });
+
+    const run2 = [entry(Model.Kimi_K2_5, Sequence.OneK_OneK)];
+    const second = computeUnofficialOverrideDecision(run2, undefined, cleared.nextKey);
+    expect(second.shouldOverride).toBe(true);
+  });
+
+  it('ignores sequence-only deltas in the dedupe key', () => {
+    const oneK = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
+    const both = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK),
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK),
+    ];
+    const first = computeUnofficialOverrideDecision(oneK, undefined, '');
+    const second = computeUnofficialOverrideDecision(both, undefined, first.nextKey);
+    expect(first.nextKey).toBe(second.nextKey);
+    expect(second.shouldOverride).toBe(false);
+  });
+
+  it('produces a deterministic key across insertion orders', () => {
+    const orderA = [
+      entry(Model.MiniMax_M2_5, Sequence.OneK_OneK),
+      entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK),
+      entry(Model.Kimi_K2_5, Sequence.OneK_OneK),
+    ];
+    const orderB = [
+      entry(Model.Kimi_K2_5, Sequence.OneK_OneK),
+      entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK),
+      entry(Model.MiniMax_M2_5, Sequence.OneK_OneK),
+    ];
+    const a = computeUnofficialOverrideDecision(orderA, undefined, '');
+    const b = computeUnofficialOverrideDecision(orderB, undefined, '');
+    expect(a.nextKey).toBe(b.nextKey);
+    expect(a.shouldOverride).toBe(b.shouldOverride);
+  });
+});
+
+describe('selectUnofficialDefaultSequence', () => {
+  it('prefers 8k/256 when the displayed model provides it', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625),
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_256),
+    ];
+    expect(selectUnofficialDefaultSequence(run, Model.DeepSeek_V4_Pro, undefined)).toBe(
+      Sequence.EightK_256,
+    );
+  });
+
+  it('uses the run sequence when 8k/256 is unavailable', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625)];
+    expect(selectUnofficialDefaultSequence(run, Model.DeepSeek_R1, undefined)).toBe(
+      Sequence.EightK_625,
+    );
+  });
+
+  it('chooses a sequence for the current covered model', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625),
+      entry(Model.Kimi_K2_5, Sequence.OneK_OneK),
+    ];
+    expect(selectUnofficialDefaultSequence(run, Model.Kimi_K2_5, undefined)).toBe(
+      Sequence.OneK_OneK,
+    );
+  });
+
+  it('uses an explicitly pinned model when selecting the sequence', () => {
+    const run = [
+      entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625),
+      entry(Model.Kimi_K2_5, Sequence.OneK_OneK),
+    ];
+    expect(selectUnofficialDefaultSequence(run, Model.DeepSeek_V4_Pro, Model.Kimi_K2_5)).toBe(
+      Sequence.OneK_OneK,
+    );
+  });
+
+  it('returns null when an explicitly pinned model is absent from the run', () => {
+    const run = [entry(Model.DeepSeek_V4_Pro, Sequence.EightK_625)];
+    expect(
+      selectUnofficialDefaultSequence(run, Model.DeepSeek_V4_Pro, Model.DeepSeek_R1),
+    ).toBeNull();
   });
 });

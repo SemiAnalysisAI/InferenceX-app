@@ -1,3 +1,5 @@
+import { islOslToSequence } from '@semianalysisai/inferencex-constants';
+
 import type { ExclusionSpec } from './exclusion';
 
 export enum Model {
@@ -170,6 +172,8 @@ export enum Sequence {
   OneK_OneK = '1k/1k',
   OneK_EightK = '1k/8k',
   EightK_OneK = '8k/1k',
+  EightK_256 = '8k/256',
+  EightK_625 = '8k/625',
 }
 
 const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string; category: CategoryTag }> =
@@ -177,6 +181,8 @@ const SEQUENCE_CONFIG: Record<Sequence, { label: string; compact: string; catego
     [Sequence.OneK_OneK]: { label: '1K / 1K', compact: '1k1k', category: 'default' },
     [Sequence.OneK_EightK]: { label: '1K / 8K', compact: '1k8k', category: 'deprecated' },
     [Sequence.EightK_OneK]: { label: '8K / 1K', compact: '8k1k', category: 'default' },
+    [Sequence.EightK_256]: { label: '8K / 256', compact: '8k256', category: 'default' },
+    [Sequence.EightK_625]: { label: '8K / 625', compact: '8k625', category: 'default' },
   };
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
@@ -281,13 +287,10 @@ export function getModelAndSequence(
 export function getModelAndSequenceFromArtifact(
   artifact: any,
 ): { model: Model; sequence: Sequence } | undefined {
-  let seq = '';
-  seq += artifact.isl === 1024 ? '1k' : '8k';
-  seq += artifact.osl === 1024 ? '1k' : '8k';
-
   const model = MODEL_PREFIX_MAPPING[artifact.infmax_model_prefix as string];
-  const sequence = SEQUENCE_PREFIX_MAPPING[seq];
-  if (model && sequence) {
+  const seqStr = islOslToSequence(Number(artifact.isl), Number(artifact.osl));
+  const sequence = seqStr ? (seqStr as Sequence) : undefined;
+  if (model && sequence && SEQUENCE_CONFIG[sequence]) {
     return { model, sequence };
   }
 

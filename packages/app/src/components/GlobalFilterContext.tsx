@@ -36,7 +36,11 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
-import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
+import {
+  computeAutoSwitchDecision,
+  computeUnofficialOverrideDecision,
+  selectUnofficialDefaultSequence,
+} from '@/lib/unofficial-run-auto-switch';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -256,6 +260,29 @@ export function GlobalFilterProvider({
     lastAutoSwitchKeyRef.current = decision.nextKey;
     if (decision.modelToSet !== null) {
       setSelectedModel(decision.modelToSet);
+    }
+  }, [unofficialAvailable, selectedModel]);
+
+  // TEMPORARY (this branch only): prefer `8K / 256` when an unofficial run
+  // provides it and the URL didn't pin `i_seq`. Otherwise use a sequence that
+  // is actually present in the run so an uncommon shape such as 8K/625 is
+  // visible on first load. Manual sequence picks stick because the URL gets
+  // `i_seq` written by the URL-sync effect after the override fires.
+  const lastUnofficialSeqOverrideRef = useRef<string>('');
+  useEffect(() => {
+    const decision = computeUnofficialOverrideDecision(
+      unofficialAvailable,
+      getUrlParam('i_seq'),
+      lastUnofficialSeqOverrideRef.current,
+    );
+    lastUnofficialSeqOverrideRef.current = decision.nextKey;
+    if (decision.shouldOverride) {
+      const sequence = selectUnofficialDefaultSequence(
+        unofficialAvailable,
+        selectedModel,
+        getUrlParam('g_model'),
+      );
+      if (sequence !== null) setSelectedSequence(sequence);
     }
   }, [unofficialAvailable, selectedModel]);
 

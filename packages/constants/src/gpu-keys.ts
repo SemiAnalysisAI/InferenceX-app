@@ -122,6 +122,17 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costn: 1.9,
     costr: 2.1,
   },
+  '950dt': {
+    vendor: 'Huawei',
+    arch: 'Ascend',
+    label: 'Ascend 950DT',
+    sort: 9,
+    tdp: 9.99,
+    power: 9.99,
+    costh: 9.99,
+    costn: 9.99,
+    costr: 9.99,
+  },
 };
 
 /** Canonical set of GPU key strings used across all packages. */
@@ -146,7 +157,9 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
  * Layout (approximate):
  *   0-12    (gap)
  *   12-42   AMD reds/oranges
- *   42-120  (gap)
+ *   42-60   (gap)
+ *   60-90   Huawei amber/yellow
+ *   90-120  (gap)
  *   120-170 NVIDIA greens
  *   170-275 (gap)
  *   275-330 unknown / fallback (purples)
@@ -157,6 +170,7 @@ export const VENDOR_OKLCH_ZONES: Record<
   { start: number; end: number; chroma: { light: number; dark: number } }
 > = {
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
+  huawei: { start: 60, end: 90, chroma: { light: 0.16, dark: 0.18 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
   unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
 };
@@ -165,23 +179,25 @@ export const VENDOR_OKLCH_ZONES: Record<
  * Preferred HSL hue zones for high-contrast mode.
  * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
  * from different vendors are visually distinct and vendor-appropriate
- * (NVIDIA = greens, AMD = reds/oranges, unknown = blues/purples).
+ * (NVIDIA = greens, AMD = reds/oranges, Huawei = amber/yellow, unknown = blues/purples).
  * When a vendor has too many items to fit with sufficient spacing, the zone
  * expands symmetrically — these are preferred zones, not hard constraints.
  *
  * Layout (360° wheel):
- *   NVIDIA:  60–195  (135°) — greens through cyans
- *   AMD:     300–360 + 0–60  (120°, wraps) — magentas through oranges
+ *   NVIDIA:  90–195  (105°) — greens through cyans
+ *   Huawei:  30–60   (30°) — amber/yellow
+ *   AMD:     300–360 + 0–30  (90°, wraps) — magentas through reds
  *   unknown: 195–300 (105°) — blues/purples
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
  * are split into two segments).
  */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
-  nvidia: [{ start: 60, span: 135 }],
+  nvidia: [{ start: 90, span: 105 }],
+  huawei: [{ start: 30, span: 30 }],
   amd: [
     { start: 300, span: 60 },
-    { start: 0, span: 60 },
+    { start: 0, span: 30 },
   ],
   unknown: [{ start: 195, span: 105 }],
 };

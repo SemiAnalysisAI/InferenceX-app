@@ -16,11 +16,17 @@ import { filterDataByCostLimit } from '@/components/inference/utils';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import {
   GPU_ALIAS_TO_CANONICAL,
+  getHardwareConfig,
   getModelSortIndex,
   hardwareKeyMatchesAnyBase,
 } from '@/lib/constants';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import type { Model, Sequence } from '@/lib/data-mappings';
+import {
+  makeSeqSynthHardwareEntry,
+  makeSeqSynthKey,
+  makeSequenceFilter,
+} from '@/lib/sequence-synth-key';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 
 /** Build deduplicated comparison dates, excluding the main run date. */
@@ -39,7 +45,13 @@ export function buildComparisonDates(
   return [...new Set(dates.filter((d) => d !== selectedRunDate))];
 }
 
-/** Filter data by GPU key, resolving aliases to canonical keys. */
+/** Filter data by GPU key, resolving aliases to canonical keys.
+ *
+ * Multi-sequence overlay rows arrive with hwKeys of the form
+ * `${origHwKey}__seq<compact>`. The GPU selector still picks canonical keys,
+ * so strip the `__seq` suffix before matching: a selected `b200_vllm` should
+ * match `b200_vllm__seq1k1k`.
+ */
 export function filterByGPU<T extends { hwKey: unknown }>(
   data: T[],
   selectedGPUs: string[],
@@ -47,7 +59,9 @@ export function filterByGPU<T extends { hwKey: unknown }>(
 ): T[] {
   if (selectedGPUs.length === 0) return data;
   return data.filter((dp) => {
-    const hwKey = String(dp.hwKey);
+    const rawKey = String(dp.hwKey);
+    const seqIdx = rawKey.indexOf('__seq');
+    const hwKey = seqIdx === -1 ? rawKey : rawKey.slice(0, seqIdx);
     const canonical = aliasMap[hwKey];
     return (
       selectedGPUs.includes(hwKey) || (canonical !== undefined && selectedGPUs.includes(canonical))
@@ -83,6 +97,13 @@ export function useChartData(
   selectedRunDate?: string,
   enabled = true,
   latestAvailableDate?: string,
+  /**
+   * Additional sequences to overlay alongside `selectedSequence`. When this
+   * list is non-empty, rows for ALL (primary + extras) sequences are pulled
+   * in, and each row's hwKey gets a `__seq<compact>` suffix so the (hw,
+   * sequence) pair surfaces as its own series in the legend.
+   */
+  extraSequences: Sequence[] = [],
   /** When set, only series for these two registry GPU keys are shown (compare pages). */
   compareGpuPair?: readonly [string, string] | null,
 ) {
@@ -122,27 +143,71 @@ export function useChartData(
   // so we derive a stable key from dataUpdatedAt timestamps to avoid cascading memo invalidation.
   const comparisonDataKey = comparisonQueries.map((q) => q.dataUpdatedAt).join(',');
 
+  // Build the full sequence list (primary + extras, dedup, drop unresolvable).
+  // Order matters for synth-key stability: primary always comes first so that
+  // when `extraSequences` is later cleared the row hwKeys land back on the
+  // primary's compact form.
+  const allSequences = useMemo<Sequence[]>(() => {
+    const seen = new Set<Sequence>();
+    const out: Sequence[] = [];
+    for (const s of [selectedSequence, ...extraSequences]) {
+      if (!s || seen.has(s)) continue;
+      if (!sequenceToIslOsl(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out;
+  }, [selectedSequence, extraSequences]);
+
+  // Pre-compute a per-sequence ISL/OSL filter. Indexed parallel to allSequences.
+  type SeqFilter = ((r: { isl: number; osl: number }) => boolean) | null;
+  const sequenceFilters = useMemo<SeqFilter[]>(
+    () => allSequences.map((s) => makeSequenceFilter(s)),
+    [allSequences],
+  );
+
+  const isMultiSequence = allSequences.length > 1;
+
+  // Match a row against the active sequence list, returning the matched
+  // sequence (or null). Used to drive hwKey suffixing for the overlay case.
+  const matchSequence = useMemo(
+    () =>
+      (r: { isl: number; osl: number }): Sequence | null => {
+        for (let i = 0; i < sequenceFilters.length; i++) {
+          const f = sequenceFilters[i];
+          if (f && f(r)) return allSequences[i];
+        }
+        return null;
+      },
+    [sequenceFilters, allSequences],
+  );
+
   // Merge main rows with comparison date rows.
   // Stamp each row with the *requested* date (not the actual DB date) so that
   // GPUGraph's activeDates filter (keyed by user-selected date) matches the points.
-  const sequenceIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
   const rows = useMemo(() => {
-    if (!allRows || !sequenceIslOsl) return [];
-    const seqFilter = (r: { isl: number; osl: number }) =>
-      r.isl === sequenceIslOsl.isl && r.osl === sequenceIslOsl.osl;
-    const seqFiltered = allRows.filter(seqFilter);
+    if (!allRows || allSequences.length === 0) return [];
 
-    // For each (hw, framework, spec_method, disagg, precision) group, keep only
-    // rows from the most recent date. When parallelism settings change between runs,
-    // old config_ids create stale data points under the same legend line — drop them.
+    const seqMatcher = matchSequence;
+    type RowWithSeq = (typeof allRows)[number] & { _seq: Sequence };
+    const seqFiltered: RowWithSeq[] = [];
+    for (const r of allRows) {
+      const seq = seqMatcher(r);
+      if (seq) seqFiltered.push({ ...r, _seq: seq });
+    }
+
+    // For each (hw, framework, spec_method, disagg, precision, sequence) group,
+    // keep only rows from the most recent date. The sequence is part of the
+    // dedup key so 1K/1K and 8K/1K rows don't shadow each other when both are
+    // selected.
     const maxDatePerGroup = new Map<string, string>();
     for (const r of seqFiltered) {
-      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}`;
+      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}|${r._seq}`;
       const cur = maxDatePerGroup.get(key);
       if (!cur || r.date > cur) maxDatePerGroup.set(key, r.date);
     }
     const deduped = seqFiltered.filter((r) => {
-      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}`;
+      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}|${r._seq}`;
       return r.date === maxDatePerGroup.get(key);
     });
 
@@ -151,19 +216,70 @@ export function useChartData(
     );
     if (comparisonDates.length === 0) return mainRows;
     const extraRows = comparisonQueries.flatMap((q, i) =>
-      (q.data ?? [])
-        .filter(seqFilter)
-        .map((r) => ({ ...r, date: comparisonDates[i], actualDate: r.date })),
+      (q.data ?? []).flatMap((r) => {
+        const seq = seqMatcher(r);
+        if (!seq) return [];
+        return [{ ...r, _seq: seq, date: comparisonDates[i], actualDate: r.date }];
+      }),
     );
     return [...mainRows, ...extraRows];
-  }, [allRows, sequenceIslOsl, comparisonDates, comparisonDataKey, selectedRunDate]);
+  }, [allRows, allSequences, matchSequence, comparisonDates, comparisonDataKey, selectedRunDate]);
 
-  // Transform filtered rows into chart data
+  // Transform filtered rows into chart data.
+  //
+  // When `isMultiSequence` is on, we run `transformBenchmarkRows` once per
+  // sequence and rewrite each output point's `hwKey` to `${origHwKey}__seq<compact>`.
+  // This is what makes (B200, 1K/1K) and (B200, 8K/1K) surface as separate
+  // legend lines (and separate roofline groups) rather than collapsing onto
+  // a single B200 series.
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)
       return { chartData: [] as InferenceData[][], hardwareConfig: {} as HardwareConfig };
-    return transformBenchmarkRows(rows);
-  }, [rows]);
+
+    if (!isMultiSequence) {
+      return transformBenchmarkRows(rows);
+    }
+
+    type RowWithSeq = (typeof rows)[number] & { _seq: Sequence };
+    const groupedBySeq = new Map<Sequence, RowWithSeq[]>();
+    for (const r of rows as RowWithSeq[]) {
+      const arr = groupedBySeq.get(r._seq);
+      if (arr) arr.push(r);
+      else groupedBySeq.set(r._seq, [r]);
+    }
+
+    const mergedHardware: HardwareConfig = {} as HardwareConfig;
+    // One InferenceData[] per chart definition, accumulating across sequences.
+    const mergedChart: InferenceData[][] = (chartDefinitions as ChartDefinition[]).map(
+      () => [] as InferenceData[],
+    );
+
+    for (const [seq, seqRows] of groupedBySeq) {
+      const { chartData: perSeq, hardwareConfig: perSeqHw } = transformBenchmarkRows(seqRows);
+      // Synth hw entries: one per (origHwKey, seq) pair seen this iteration.
+      for (const origHwKey of Object.keys(perSeqHw)) {
+        const synthHwKey = makeSeqSynthKey(origHwKey, seq);
+        if (synthHwKey in mergedHardware) continue;
+        mergedHardware[synthHwKey] = makeSeqSynthHardwareEntry(
+          getHardwareConfig(origHwKey),
+          origHwKey,
+          seq,
+          synthHwKey,
+        );
+      }
+      // Append each chart def's data with hwKey rewritten to the synth key.
+      for (let i = 0; i < perSeq.length; i++) {
+        for (const point of perSeq[i]) {
+          mergedChart[i].push({
+            ...point,
+            hwKey: makeSeqSynthKey(point.hwKey, seq),
+          });
+        }
+      }
+    }
+
+    return { chartData: mergedChart, hardwareConfig: mergedHardware };
+  }, [rows, isMultiSequence]);
 
   // Sort hardware config — stabilize reference when keys haven't changed.
   // Different sequences for the same model often have the same GPU configs,

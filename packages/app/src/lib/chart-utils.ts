@@ -20,16 +20,19 @@ import { getVendor, type Vendor } from '@/lib/dynamic-colors';
  * In Lab space: 0° = red, 90° = yellow, 180° = green, 270° = blue.
  * NVIDIA must not be red/rose/pink (wraps around 0°: 320–40°).
  * AMD must not be green (roughly 120–195°).
+ * Huawei must not be red (AMD zone) or green (NVIDIA zone).
  */
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
   amd: (hue) => hue >= 120 && hue <= 195, // green zone
+  huawei: (hue) => hue >= 320 || hue <= 40 || (hue >= 120 && hue <= 195), // avoid red + green
   unknown: null,
 };
 
 /**
  * Preferred hue ranges (CIELab) — used when a vendor has few items so they
- * cluster in the brand-appropriate zone. NVIDIA = greens, AMD = reds/oranges.
+ * cluster in the brand-appropriate zone. NVIDIA = greens, AMD = reds/oranges,
+ * Huawei = amber/yellow.
  */
 const PREFERRED_ZONE: Record<
   Vendor,
@@ -37,6 +40,7 @@ const PREFERRED_ZONE: Record<
 > = {
   nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
+  huawei: { hmin: 50, hmax: 95, cmin: 60 }, // amber/yellow
   unknown: null,
 };
 

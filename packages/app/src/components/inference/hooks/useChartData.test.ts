@@ -60,6 +60,20 @@ describe('filterByGPU', () => {
   it('excludes when neither key nor alias matches', () => {
     expect(filterByGPU([{ hwKey: 'unknown' }], ['h100'], {})).toHaveLength(0);
   });
+
+  it('matches multi-sequence synth keys by stripping the __seq<compact> suffix', () => {
+    // When extraSequences is on, useChartData rewrites each row's hwKey to
+    // `${origHwKey}__seq<compact>` so (gpu, sequence) splits into separate
+    // legend lines. The GPU selector still picks canonical keys, so the
+    // filter has to look past the suffix.
+    const data = [
+      { hwKey: 'b200_vllm__seq1k1k' },
+      { hwKey: 'b200_vllm__seq8k1k' },
+      { hwKey: 'h100__seq1k1k' },
+    ];
+    const result = filterByGPU(data, ['b200_vllm'], {});
+    expect(result.map((d) => d.hwKey)).toEqual(['b200_vllm__seq1k1k', 'b200_vllm__seq8k1k']);
+  });
 });
 
 describe('flipRooflineDirection', () => {

@@ -165,10 +165,13 @@ const ScatterGraph = React.memo(
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
+      hwColorOverrides,
     } = useInference();
 
     const {
       isUnofficialRun,
+      mergeAsIngested,
+      setMergeAsIngested,
       activeOverlayHwTypes,
       setActiveOverlayHwTypes,
       allOverlayHwTypes,
@@ -234,11 +237,22 @@ const ScatterGraph = React.memo(
       () => [...effectiveOfficialHwTypes],
       [effectiveOfficialHwTypes],
     );
-    const { resolveColor, getCssColor } = useThemeColors({
+    const { resolveColor: baseResolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
       activeKeys: activeOfficialKeys,
     });
+
+    // Wrap resolveColor so synthesized unofficial-as-ingested hwKeys (provided
+    // by InferenceContext via `hwColorOverrides`) get their per-run palette
+    // color even when the vendor system would otherwise pick a GPU-derived hue.
+    const resolveColor = useCallback(
+      (identifier: string, hardwareKey?: string): string => {
+        if (identifier in hwColorOverrides) return hwColorOverrides[identifier];
+        return baseResolveColor(identifier, hardwareKey);
+      },
+      [baseResolveColor, hwColorOverrides],
+    );
 
     // --- Changelog ---
     const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
@@ -1961,6 +1975,19 @@ const ScatterGraph = React.memo(
       chartRef.current?.dismissTooltip();
     }, [selectedPrecisions, selectedYAxisMetric, hideNonOptimal, overlayData, chartId]);
 
+    // Clean up overlay DOM elements when overlayData is removed (e.g. when
+    // unofficial-as-ingested is toggled on). The layer system has no built-in
+    // teardown for layers that drop out of the array, so the previous render's
+    // X-shape points / dashed rooflines would otherwise stick around.
+    useEffect(() => {
+      if (overlayData) return;
+      const svg = chartRef.current?.getSvgElement?.();
+      if (!svg) return;
+      const root = d3.select(svg);
+      root.selectAll('.unofficial-overlay-pt').remove();
+      root.selectAll('.overlay-roofline-path').remove();
+    }, [overlayData]);
+
     // Dismiss when pinned point's hardware becomes hidden
     useEffect(() => {
       const pp = chartRef.current?.getPinnedPoint() as InferenceData | null;
@@ -2122,6 +2149,19 @@ const ScatterGraph = React.memo(
               track('latency_legend_expanded', { expanded });
             }}
             switches={[
+              ...(isUnofficialRun
+                ? [
+                    {
+                      id: 'scatter-uoff-as-ingested',
+                      label: 'Show as ingested',
+                      checked: mergeAsIngested,
+                      onCheckedChange: (checked: boolean) => {
+                        setMergeAsIngested(checked);
+                        track('latency_unofficial_as_ingested_toggled', { enabled: checked });
+                      },
+                    },
+                  ]
+                : []),
               ...(selectedYAxisMetric === 'y_inputTputPerGpu'
                 ? []
                 : [

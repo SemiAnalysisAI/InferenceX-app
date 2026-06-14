@@ -163,6 +163,12 @@ describe('buildChartData', () => {
     expect(Object.keys(result)).toEqual(['DeepSeek-R1-0528_8k/1k']);
   });
 
+  it('maps the offline TRT 8k/625 sequence correctly', () => {
+    const rows = [stubRow({ model: 'dsv4', isl: 8192, osl: 625 })];
+    const result = buildChartData(rows);
+    expect(Object.keys(result)).toEqual(['DeepSeek-V4-Pro_8k/625']);
+  });
+
   it('skips rows with unmapped ISL/OSL', () => {
     const rows = [stubRow({ model: 'dsr1', isl: 4096, osl: 4096 })];
     const result = buildChartData(rows);

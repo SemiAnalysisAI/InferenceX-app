@@ -224,15 +224,22 @@ async function processSingleRun(
   const bmkArtifact = artifacts
     .filter((a) => a.name === 'results_bmk')
     .toSorted((a, b) => b.id - a.id)[0];
+  // Fallback: some workflows (e.g. the Mock-ascend uploader) emit one
+  // `bmk_<config>_conc<N>_<gpu>_<idx>` artifact per concurrency instead of a
+  // single aggregated `results_bmk`. When the canonical artifact is absent,
+  // gather everything matching `bmk_*` and concatenate the rows.
+  const perConfigBmkArtifacts = bmkArtifact
+    ? []
+    : artifacts.filter((a) => a.name.startsWith('bmk_'));
   const evalArtifact = artifacts
     .filter((a) => a.name === 'eval_results_all')
     .toSorted((a, b) => b.id - a.id)[0];
 
-  if (!bmkArtifact && !evalArtifact) {
+  if (!bmkArtifact && perConfigBmkArtifacts.length === 0 && !evalArtifact) {
     return {
       errorResponse: NextResponse.json(
         {
-          error: `No results_bmk or eval_results_all artifact found for runId ${runId}`,
+          error: `No results_bmk, bmk_*, or eval_results_all artifact found for runId ${runId}`,
         },
         { status: 404 },
       ),
@@ -253,6 +260,17 @@ async function processSingleRun(
     );
     if (errorResponse) return { errorResponse };
     benchmarks = normalizeArtifactRows(rows, date, runUrl || null);
+  } else if (perConfigBmkArtifacts.length > 0) {
+    const allRows: Record<string, unknown>[] = [];
+    for (const artifact of perConfigBmkArtifacts) {
+      const { rows, errorResponse } = await downloadArtifactRows(
+        artifact.archive_download_url,
+        githubToken,
+      );
+      if (errorResponse) return { errorResponse };
+      allRows.push(...rows);
+    }
+    benchmarks = normalizeArtifactRows(allRows, date, runUrl || null);
   }
 
   if (evalArtifact) {

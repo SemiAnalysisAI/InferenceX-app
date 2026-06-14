@@ -207,6 +207,54 @@ describe('normalizeArtifactRows', () => {
     expect(rows.every((r) => r.date === '2026-03-11')).toBe(true);
   });
 
+  it('normalizes the offline B300 TRT compatibility row', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawRow({
+          hw: 'b300',
+          model: 'deepseek-ai/DeepSeek-V4-Pro',
+          infmax_model_prefix: 'dsv4',
+          framework: 'trt',
+          precision: 'fp4',
+          isl: 8192,
+          osl: 625,
+          conc: 32,
+          prefill_tp: 4,
+          prefill_ep: 1,
+          prefill_dp_attention: false,
+          prefill_num_workers: 0,
+          decode_tp: 4,
+          decode_ep: 1,
+          decode_dp_attention: false,
+          decode_num_workers: 0,
+          num_prefill_gpu: 4,
+          num_decode_gpu: 4,
+          spec_decoding: 'mtp',
+          tput_per_gpu: 489.17,
+          output_tput_per_gpu: 489.17,
+          mean_tpot: 0.01635,
+        }),
+      ],
+      '2026-06-13',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      hardware: 'b300',
+      framework: 'trt',
+      model: 'dsv4',
+      precision: 'fp4',
+      spec_method: 'mtp',
+      isl: 8192,
+      osl: 625,
+      conc: 32,
+      decode_tp: 4,
+      decode_ep: 1,
+      num_decode_gpu: 4,
+    });
+    expect(rows[0].metrics.output_tput_per_gpu).toBe(489.17);
+    expect(rows[0].metrics.mean_tpot).toBe(0.01635);
+  });
+
   it('surfaces the per-worker measured-power array on the BenchmarkRow', () => {
     const workers = [
       {
