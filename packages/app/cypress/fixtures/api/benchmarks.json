@@ -11192,9 +11192,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g10"
-        ],
+        "hosts": ["mia1-p01-g10"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 959.658,
@@ -11203,9 +11201,7 @@
       },
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g16"
-        ],
+        "hosts": ["mia1-p01-g16"],
         "num_gpus": 8,
         "worker_idx": 1,
         "avg_power_w": 953.342,
@@ -11214,9 +11210,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g17"
-        ],
+        "hosts": ["mia1-p01-g17"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 812.882,

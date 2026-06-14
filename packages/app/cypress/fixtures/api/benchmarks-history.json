@@ -53811,9 +53811,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g18"
-        ],
+        "hosts": ["mia1-p01-g18"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 271.002,
@@ -53822,9 +53820,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g19"
-        ],
+        "hosts": ["mia1-p01-g19"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 436.864,
@@ -53892,9 +53888,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g10"
-        ],
+        "hosts": ["mia1-p01-g10"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 632.283,
@@ -53903,9 +53897,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g16"
-        ],
+        "hosts": ["mia1-p01-g16"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 652.647,
@@ -53914,9 +53906,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g17"
-        ],
+        "hosts": ["mia1-p01-g17"],
         "num_gpus": 8,
         "worker_idx": 1,
         "avg_power_w": 659.952,
@@ -53984,9 +53974,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g10"
-        ],
+        "hosts": ["mia1-p01-g10"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 959.658,
@@ -53995,9 +53983,7 @@
       },
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g16"
-        ],
+        "hosts": ["mia1-p01-g16"],
         "num_gpus": 8,
         "worker_idx": 1,
         "avg_power_w": 953.342,
@@ -54006,9 +53992,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g17"
-        ],
+        "hosts": ["mia1-p01-g17"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 812.882,
@@ -57145,9 +57129,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g18"
-        ],
+        "hosts": ["mia1-p01-g18"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 293.26,
@@ -57156,9 +57138,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g19"
-        ],
+        "hosts": ["mia1-p01-g19"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 409.456,
@@ -57226,9 +57206,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g18"
-        ],
+        "hosts": ["mia1-p01-g18"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 393.638,
@@ -57237,9 +57215,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g19"
-        ],
+        "hosts": ["mia1-p01-g19"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 570.651,
@@ -57307,9 +57283,7 @@
     "workers": [
       {
         "role": "prefill",
-        "hosts": [
-          "mia1-p01-g10"
-        ],
+        "hosts": ["mia1-p01-g10"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 979.746,
@@ -57318,9 +57292,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g16"
-        ],
+        "hosts": ["mia1-p01-g16"],
         "num_gpus": 8,
         "worker_idx": 0,
         "avg_power_w": 758.127,
@@ -57329,9 +57301,7 @@
       },
       {
         "role": "decode",
-        "hosts": [
-          "mia1-p01-g17"
-        ],
+        "hosts": ["mia1-p01-g17"],
         "num_gpus": 8,
         "worker_idx": 1,
         "avg_power_w": 742.783,
