@@ -410,8 +410,8 @@ describe('mergeUnofficialIntoOfficial', () => {
 
 // Pull a hue out of an `oklch(L C H)` string for assertions below.
 function hueOf(s: string): number {
-  const m = s.match(/oklch\([^)]*\s+([\d.]+)\)/);
-  return m ? Number(m[1]) : NaN;
+  const m = s.match(/oklch\([^)]*\s+(?<hue>[\d.]+)\)/u);
+  return m?.groups?.hue ? Number(m.groups.hue) : NaN;
 }
 
 describe('synth hwKey color integration with generateVendorColors', () => {
