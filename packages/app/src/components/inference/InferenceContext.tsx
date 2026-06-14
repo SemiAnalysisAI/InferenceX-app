@@ -48,7 +48,7 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { hasMtpEngineExclusion, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { hasMtpEngineExclusion, MODEL_PREFIX_MAPPING, Sequence } from '@/lib/data-mappings';
 import {
   MtpEngineConflictToast,
   type MtpEngineConflictDetail,
@@ -141,6 +141,32 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
+
+  // ── Multi-sequence overlay ────────────────────────────────────────────────
+  // `extraSequences` is the inference-tab-only list of additional ISL/OSL
+  // shapes to render alongside the primary `selectedSequence`. Empty by
+  // default — when non-empty, `useChartData` pulls rows for all
+  // [primary, ...extras] and suffixes each row's hwKey with `__seq<compact>`
+  // so e.g. B200@1K/1K and B200@8K/1K surface as two distinct legend lines.
+  const [extraSequences, setExtraSequencesRaw] = useState<Sequence[]>(() => {
+    const urlExtra = getUrlParam('i_seq_extra');
+    if (!urlExtra) return [];
+    const valid = urlExtra
+      .split(',')
+      .filter((s): s is Sequence => Object.values(Sequence).includes(s as Sequence));
+    return valid;
+  });
+  const setExtraSequences = useCallback((seqs: Sequence[]) => {
+    // Dedup defensively; preserve order.
+    const seen = new Set<Sequence>();
+    setExtraSequencesRaw(
+      seqs.filter((s) => {
+        if (seen.has(s)) return false;
+        seen.add(s);
+        return true;
+      }),
+    );
+  }, []);
   const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
   const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
     () => getUrlParam('i_mc') === '1',
@@ -174,6 +200,20 @@ export function InferenceProvider({
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
+  // Drop extras that aren't currently available or duplicate the primary —
+  // mirrors the `effectivePrecisions` pattern so a stale URL/preset selection
+  // doesn't pin a sequence the current model can't render.
+  const effectiveExtraSequences = useMemo(() => {
+    const out: Sequence[] = [];
+    const availSet = new Set<string>(availableSequences as string[]);
+    for (const s of extraSequences) {
+      if (s === effectiveSequence) continue;
+      if (!availSet.has(s)) continue;
+      out.push(s);
+    }
+    return out;
+  }, [extraSequences, availableSequences, effectiveSequence]);
+
   const {
     graphs: officialGraphs,
     loading: chartDataLoading,
@@ -194,6 +234,7 @@ export function InferenceProvider({
     effectiveRunDate,
     isActive,
     latestDate,
+    effectiveExtraSequences,
   );
 
   // ── Promote unofficial rows to first-class series when toggled ────────────
@@ -241,6 +282,7 @@ export function InferenceProvider({
       unofficialChartData,
       selectedModel,
       selectedSequence: effectiveSequence,
+      extraSequences: effectiveExtraSequences,
       selectedYAxisMetric,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -264,6 +306,7 @@ export function InferenceProvider({
     unofficialChartData,
     selectedModel,
     effectiveSequence,
+    effectiveExtraSequences,
     selectedYAxisMetric,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
@@ -606,6 +649,13 @@ export function InferenceProvider({
   // reset commits as soon as data for the new model arrives — without this, switching models
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
+  // Include `extraSequences` and `mergeAsIngested` in the reset key so that
+  // toggling either flips the active set to include the newly-introduced
+  // synth hwKeys. Without these, `useChartDataFilter.reconcileActiveSet` only
+  // removes stale keys — never adds new ones — so merged or sequence-tagged
+  // series silently render hidden. (Addresses Cursor "Merged series stay
+  // legend-inactive" review finding.)
+  const extraSequencesKey = effectiveExtraSequences.join(',');
   const lastHwResetKeyRef = useRef('');
 
   // Restore legend-active selection from URL on first availability of
@@ -631,7 +681,7 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(restored);
-    lastHwResetKeyRef.current = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
+    lastHwResetKeyRef.current = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${extraSequencesKey}|${mergeAsIngested ? '1' : '0'}`;
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
@@ -640,6 +690,8 @@ export function InferenceProvider({
     selectedModel,
     effectiveSequence,
     precisionsKey,
+    extraSequencesKey,
+    mergeAsIngested,
     setActiveHwTypes,
   ]);
 
@@ -647,7 +699,7 @@ export function InferenceProvider({
     if (pendingHwFilterRef.current) return;
     if (pendingActiveHwTypes) return;
     if (hwTypesWithData.size === 0) return;
-    const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
+    const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${extraSequencesKey}|${mergeAsIngested ? '1' : '0'}`;
     if (lastHwResetKeyRef.current === key) return;
     lastHwResetKeyRef.current = key;
     const presetFilter = presetHwFilterRef.current;
@@ -681,6 +733,8 @@ export function InferenceProvider({
     selectedModel,
     effectiveSequence,
     precisionsKey,
+    extraSequencesKey,
+    mergeAsIngested,
     hwTypesWithData,
     mtpExclusion,
     pendingActiveHwTypes,
@@ -830,6 +884,7 @@ export function InferenceProvider({
       i_speed: showSpeedOverlay ? '1' : '',
       i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
+      i_seq_extra: effectiveExtraSequences.join(','),
     },
     [
       selectedYAxisMetric,
@@ -850,6 +905,7 @@ export function InferenceProvider({
       showSpeedOverlay,
       showMinecraftOverlay,
       iActiveStr,
+      effectiveExtraSequences,
     ],
   );
 
@@ -1058,6 +1114,8 @@ export function InferenceProvider({
       setActivePresetId,
       presetGuardRef,
       hwColorOverrides,
+      extraSequences: effectiveExtraSequences,
+      setExtraSequences,
     }),
     [
       activeHwTypes,
@@ -1112,6 +1170,8 @@ export function InferenceProvider({
       clearTrackedConfigs,
       activePresetId,
       hwColorOverrides,
+      effectiveExtraSequences,
+      setExtraSequences,
     ],
   );
 

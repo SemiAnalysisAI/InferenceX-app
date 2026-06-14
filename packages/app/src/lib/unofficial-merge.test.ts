@@ -332,6 +332,80 @@ describe('mergeUnofficialIntoOfficial', () => {
     expect(result.graphs).toHaveLength(2);
     expect(result.graphs.every((g) => g.data.length > 0)).toBe(true);
   });
+
+  it('merges overlay rows from multiple sequences and tags each synth hwKey with __seq', () => {
+    // Build an overlay map that has data for BOTH 1K/1K and 8K/1K so the
+    // multi-sequence path has something to fan out.
+    const data = makeOverlayChartData();
+    const e2eData8k = [makeOverlayPoint({ conc: 64, tpPerGpu: { y: 600, roof: false } })];
+    const interactivity8k = [makeOverlayPoint({ conc: 64, tpPerGpu: { y: 600, roof: false } })];
+    data['DeepSeek-R1-0528_8k/1k'] = {
+      e2e: {
+        data: e2eData8k,
+        gpus: {
+          h100_vllm: { name: 'h100_vllm', label: 'H100', suffix: '(VLLM)', gpu: 'NVIDIA H100' },
+        },
+      },
+      interactivity: {
+        data: interactivity8k,
+        gpus: {
+          h100_vllm: { name: 'h100_vllm', label: 'H100', suffix: '(VLLM)', gpu: 'NVIDIA H100' },
+        },
+      },
+    };
+
+    const { graphs, hardwareConfig } = emptyOfficial();
+    const result = mergeUnofficialIntoOfficial({
+      graphs,
+      hardwareConfig,
+      unofficialChartData: data,
+      selectedModel: 'DeepSeek-R1-0528',
+      selectedSequence: '1k/1k',
+      extraSequences: ['8k/1k'],
+      selectedYAxisMetric: 'y_tpPerGpu',
+      selectedXAxisMetric: null,
+      selectedE2eXAxisMetric: null,
+      runIndexByUrl: RUN_INDEX,
+      unofficialRunInfos: RUN_INFOS,
+    });
+
+    // Each chart graph receives rows from both sequences with a __seq tag
+    // landing BEFORE the __uorun tag so the resulting key is
+    // base__seq<compact>__uorun<id>.
+    const e2eGraph = result.graphs.find((g) => g.chartDefinition.chartType === 'e2e')!;
+    const synthKeys = e2eGraph.data.map((d) => String(d.hwKey));
+    expect(synthKeys).toContain('h100_vllm__seq1k1k__uorun100');
+    expect(synthKeys).toContain('h100_vllm__seq8k1k__uorun100');
+
+    // Hardware config carries the sequence in the label so the legend can
+    // tell the two H100 lines apart at a glance.
+    expect(result.hardwareConfig['h100_vllm__seq1k1k__uorun100'].label).toContain('1K / 1K');
+    expect(result.hardwareConfig['h100_vllm__seq8k1k__uorun100'].label).toContain('8K / 1K');
+
+    // Base GPU prefix survives both suffixes — getModelSortIndex /
+    // isKnownGpu / getVendor all use split('_')[0].
+    expect('h100_vllm__seq1k1k__uorun100'.split('_')[0]).toBe('h100');
+  });
+
+  it('falls back to single-sequence behavior when extraSequences only contains the primary', () => {
+    const { graphs, hardwareConfig } = emptyOfficial();
+    const result = mergeUnofficialIntoOfficial({
+      graphs,
+      hardwareConfig,
+      unofficialChartData: makeOverlayChartData(),
+      selectedModel: 'DeepSeek-R1-0528',
+      selectedSequence: '1k/1k',
+      extraSequences: ['1k/1k'], // duplicate — should dedup down to single-sequence
+      selectedYAxisMetric: 'y_tpPerGpu',
+      selectedXAxisMetric: null,
+      selectedE2eXAxisMetric: null,
+      runIndexByUrl: RUN_INDEX,
+      unofficialRunInfos: RUN_INFOS,
+    });
+    const e2eGraph = result.graphs.find((g) => g.chartDefinition.chartType === 'e2e')!;
+    // No __seq suffix when only one sequence is effectively active.
+    expect(e2eGraph.data.every((d) => !String(d.hwKey).includes('__seq'))).toBe(true);
+  });
 });
 
 // Pull a hue out of an `oklch(L C H)` string for assertions below.

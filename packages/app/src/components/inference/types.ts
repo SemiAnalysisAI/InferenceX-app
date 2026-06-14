@@ -537,6 +537,13 @@ export interface InferenceChartContextType {
    * the overlay legend would have shown. Empty when nothing is merged.
    */
   hwColorOverrides: Record<string, string>;
+  /**
+   * Additional ISL/OSL sequences to overlay on the inference chart alongside
+   * `selectedSequence`. Empty by default. When non-empty, each (GPU, sequence)
+   * pair becomes its own legend line via a `__seq<compact>` hwKey suffix.
+   */
+  extraSequences: Sequence[];
+  setExtraSequences: (sequences: Sequence[]) => void;
 }
 export interface CalculateUserCostsRequest {
   model: string;

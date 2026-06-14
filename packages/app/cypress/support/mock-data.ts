@@ -251,6 +251,8 @@ export function createMockInferenceContext(
     setActivePresetId: namedStub('setActivePresetId'),
     presetGuardRef: { current: false } as React.RefObject<boolean>,
     hwColorOverrides: {},
+    extraSequences: [],
+    setExtraSequences: namedStub('setExtraSequences'),
     ...overrides,
   };
 }
