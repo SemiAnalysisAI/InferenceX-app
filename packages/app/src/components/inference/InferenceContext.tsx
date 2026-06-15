@@ -2,6 +2,7 @@
 
 import {
   type ReactNode,
+  type SetStateAction,
   createContext,
   useCallback,
   useContext,
@@ -57,6 +58,7 @@ import {
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
+import { resolveComparisonEntries } from './utils/comparisonEntry';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -416,7 +418,10 @@ export function InferenceProvider({
     [setSelectedGPUs, clearPresetOnChange],
   );
   const setSelectedDatesAndClear = useCallback(
-    (v: string[]) => {
+    // Accept a React state updater (value OR function) so callers adding several
+    // dates/runs in quick succession can use the functional form and avoid the
+    // stale-closure race where each click overwrites the last.
+    (v: SetStateAction<string[]>) => {
       setSelectedDates(v);
       clearPresetOnChange();
     },
@@ -564,11 +569,7 @@ export function InferenceProvider({
   );
 
   const allDateIds = useMemo(() => {
-    const dates: string[] = [];
-    if (selectedDateRange.startDate && selectedDateRange.endDate) {
-      dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
-    }
-    dates.push(...selectedDates);
+    const dates = resolveComparisonEntries(selectedDates, selectedDateRange);
     const allIds = new Set<string>();
     selectedGPUs.forEach((gpu) => {
       dates.forEach((date) => allIds.add(`${date}_${gpu}`));

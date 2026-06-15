@@ -39,6 +39,12 @@ import type {
   ScatterGraphProps,
 } from '@/components/inference/types';
 import {
+  buildRunNumbering,
+  comparisonEntryLabel,
+  comparisonEntrySortValue,
+  resolveComparisonEntries,
+} from '@/components/inference/utils/comparisonEntry';
+import {
   generateGPUGraphTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
@@ -55,16 +61,24 @@ const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 // both dimensions of the GPU comparison view are legible on the chart,
 // not only the legend. Falls back to the raw hwKey if the config
 // lookup misses (legacy data).
-function labelTextFor(pts: InferenceData[]): string {
+function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
   const hwKey = String(pts[0].hwKey);
-  const date = String(pts[0].date);
   const cfg = getHardwareConfig(hwKey);
   const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
-  return `${hwLabel} • ${date}`;
+  return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
 const GPUGraph = React.memo(
-  ({ chartId, modelLabel, data, xLabel, yLabel, chartDefinition, caption }: ScatterGraphProps) => {
+  ({
+    chartId,
+    modelLabel,
+    data,
+    xLabel,
+    yLabel,
+    chartDefinition,
+    caption,
+    runNumbering: providedRunNumbering,
+  }: ScatterGraphProps) => {
     const {
       hardwareConfig,
       selectedPrecisions,
@@ -72,6 +86,7 @@ const GPUGraph = React.memo(
       selectedGPUs,
       selectedDateRange,
       selectedDates,
+      setSelectedDates,
       toggleActiveDate,
       removeActiveDate,
       activeDates,
@@ -94,20 +109,47 @@ const GPUGraph = React.memo(
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
 
-    // Shared date+GPU pairs
+    // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates
+    // and/or specific-run entries); a same-day range endpoint is dropped when that
+    // date also has run entries (resolveComparisonEntries), then sorted earliest →
+    // latest so a day's runs read #1 → #N.
     const gpuDatePairs = useMemo(() => {
-      const dates: string[] = [];
-      if (selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0) {
-        dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
-      }
-      dates.push(...selectedDates);
-      const deduplicated = [...new Set(dates)];
-      deduplicated.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      const deduplicated = resolveComparisonEntries(selectedDates, selectedDateRange);
+      deduplicated.sort((a, b) => {
+        const [ta, ia] = comparisonEntrySortValue(a);
+        const [tb, ib] = comparisonEntrySortValue(b);
+        return ta - tb || ia - ib;
+      });
       const sortedGPUs = [...selectedGPUs].toSorted(
         (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
       );
       return { dates: deduplicated, sortedGPUs };
     }, [selectedDateRange, selectedDates, selectedGPUs]);
+
+    // Run numbers for legend/line labels. Prefer the stable numbering passed by
+    // the parent (shared with the changelog, so labels match it and removed runs
+    // leave a gap); fall back to gap-free numbering of the on-chart series.
+    const runNumbering = useMemo(
+      () => providedRunNumbering ?? buildRunNumbering(gpuDatePairs.dates),
+      [providedRunNumbering, gpuDatePairs.dates],
+    );
+
+    // Removing a series from the legend should also drop it from the comparison
+    // selection so the config changelog stays in sync (two-way binding). Legend
+    // ids are `${entry}_${gpu}`; strip the gpu suffix to recover the entry. Range
+    // endpoints aren't individual selections, so those fall back to a visibility hide.
+    const handleLegendRemove = useCallback(
+      (id: string) => {
+        const gpu = selectedGPUs.find((g) => id.endsWith(`_${g}`));
+        const entry = gpu ? id.slice(0, id.length - gpu.length - 1) : id;
+        if (selectedDates.includes(entry)) {
+          setSelectedDates((prev) => prev.filter((e) => e !== entry));
+        } else {
+          removeActiveDate(id);
+        }
+      },
+      [selectedGPUs, selectedDates, setSelectedDates, removeActiveDate],
+    );
 
     const graphIdentifiers = useMemo(() => {
       const ids: string[] = [];
@@ -391,7 +433,7 @@ const GPUGraph = React.memo(
                 pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
                 pts.at(-1)!,
               ];
-              const labelText = labelTextFor(pts);
+              const labelText = labelTextFor(pts, runNumbering);
               let placedLabel = false;
               for (const pt of candidates) {
                 const px = xScale(pt.x);
@@ -431,7 +473,7 @@ const GPUGraph = React.memo(
               lineLabels.push({
                 key,
                 graphId,
-                label: labelTextFor(pts),
+                label: labelTextFor(pts, runNumbering),
                 color: getRooflineColor(key),
                 x: xScale(pt.x),
                 y: yScale(pt.y),
@@ -596,7 +638,14 @@ const GPUGraph = React.memo(
           });
         },
       }),
-      [showLineLabels, rooflines, isRooflineVisible, getRooflineColor, chartDefinition.chartType],
+      [
+        showLineLabels,
+        rooflines,
+        isRooflineVisible,
+        getRooflineColor,
+        chartDefinition.chartType,
+        runNumbering,
+      ],
     );
 
     // Dismiss tooltip when pinned point's combo is hidden
@@ -782,13 +831,13 @@ const GPUGraph = React.memo(
             disableActiveSort={true}
             onItemHover={handleLegendHover}
             onItemHoverEnd={handleLegendHoverEnd}
-            onItemRemove={removeActiveDate}
+            onItemRemove={handleLegendRemove}
             legendItems={allGraphs
               .filter(({ id }) => idsWithData.has(id))
               .map(({ date, color, hwKey, id }) => ({
-                name: `${hwKey} ${date}`,
+                name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
                 hw: id,
-                label: date,
+                label: comparisonEntryLabel(date, runNumbering),
                 color,
                 title: getDisplayLabel(getHardwareConfig(hwKey)),
                 isActive: activeDates.has(id),

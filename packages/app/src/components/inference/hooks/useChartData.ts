@@ -13,6 +13,10 @@ import type {
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { filterDataByCostLimit } from '@/components/inference/utils';
+import {
+  parseComparisonEntry,
+  resolveComparisonEntries,
+} from '@/components/inference/utils/comparisonEntry';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import {
   GPU_ALIAS_TO_CANONICAL,
@@ -31,12 +35,11 @@ export function buildComparisonDates(
   selectedRunDate: string | undefined,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
-  const dates: string[] = [];
-  if (selectedDateRange.startDate && selectedDateRange.endDate) {
-    dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
-  }
-  dates.push(...selectedDates);
-  return [...new Set(dates.filter((d) => d !== selectedRunDate))];
+  // Range endpoints + individually-added dates/runs (redundant same-day range
+  // endpoints dropped), minus the main run date which the primary query covers.
+  return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
+    (d) => d !== selectedRunDate,
+  );
 }
 
 /** Filter data by GPU key, resolving aliases to canonical keys. */
@@ -116,10 +119,16 @@ export function useChartData(
     [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
   );
 
+  // Each comparison entry is either a plain date (latest run that day, exact-date
+  // query) or a specific run encoded as `date~r<id>~<i>of<n>` (exact-run query) so
+  // multiple same-day runs can be compared as distinct series.
   const comparisonQueries = useQueries({
-    queries: comparisonDates.map((date) =>
-      benchmarkQueryOptions(selectedModel, date, enabled, true),
-    ),
+    queries: comparisonDates.map((entry) => {
+      const parsed = parseComparisonEntry(entry);
+      return parsed.runId
+        ? benchmarkQueryOptions(selectedModel, '', enabled, false, parsed.runId, true)
+        : benchmarkQueryOptions(selectedModel, entry, enabled, true);
+    }),
   });
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
