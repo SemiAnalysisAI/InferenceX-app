@@ -9,7 +9,7 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   'dynamo-sglang': { label: 'Dynamo SGLang' },
   'dynamo-trt': { label: 'Dynamo TRT' },
   'dynamo-vllm': { label: 'Dynamo vLLM' },
-  'mooncake-atom': { label: 'Mooncake ATOM¹' },
+  'mooncake-atom': { label: 'ATOMesh¹' },
   'mori-sglang': { label: 'MoRI SGLang' },
   sglang: { label: 'SGLang' },
   trt: { label: 'TRT' },
