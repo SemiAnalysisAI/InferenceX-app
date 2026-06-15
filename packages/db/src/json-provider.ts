@@ -19,6 +19,7 @@ import type {
   AvailabilityRow,
   ChangelogRow,
   DateConfigRow,
+  RunConfigRow,
   WorkflowRunRow,
 } from './queries/workflow-info.js';
 
@@ -409,6 +410,32 @@ export function getLatestBenchmarks(
   });
 }
 
+/** In-memory mirror of {@link import('./queries/benchmarks.js').getBenchmarksForRun}. */
+export function getBenchmarksForRun(
+  modelKey: string | string[],
+  githubRunId: string | number,
+): BenchmarkRow[] {
+  const s = getStore();
+  const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
+  const run = s.latestRuns.get(Number(githubRunId));
+  if (!run) return [];
+
+  const seen = new Map<string, RawBenchmarkResult>();
+  for (const br of s.benchmarks) {
+    if (br.error !== null && br.error !== undefined) continue;
+    if (br.workflow_run_id !== run.id) continue;
+    const c = s.configs.get(br.config_id);
+    if (!c || !modelKeys.has(c.model)) continue;
+    const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}`;
+    if (!seen.has(key)) seen.set(key, br);
+  }
+
+  return [...seen.values()].map((br) => {
+    const c = s.configs.get(br.config_id)!;
+    return toBenchmarkRow(br, c, run);
+  });
+}
+
 export function getAllBenchmarksForHistory(
   modelKey: string | string[],
   isl: number,
@@ -610,6 +637,42 @@ export function getDateConfigs(date: string): DateConfigRow[] {
       model: c.model,
       isl: br.isl,
       osl: br.osl,
+      precision: c.precision,
+      hardware: c.hardware,
+      framework: c.framework,
+      spec_method: c.spec_method,
+      disagg: c.disagg,
+    });
+  }
+
+  return rows;
+}
+
+export function getRunConfigsByDate(date: string): RunConfigRow[] {
+  const s = getStore();
+  const dateStr = toDateString(date);
+
+  const seen = new Set<string>();
+  const rows: RunConfigRow[] = [];
+
+  for (const br of s.benchmarks) {
+    if (br.error !== null && br.error !== undefined) continue;
+    if (toDateString(br.date) !== dateStr) continue;
+    const wr = s.latestRunsById.get(br.workflow_run_id);
+    if (!wr) continue;
+    const c = s.configs.get(br.config_id);
+    if (!c) continue;
+
+    const key = `${wr.github_run_id}|${c.model}|${c.precision}|${c.hardware}|${c.framework}|${c.spec_method}|${c.disagg}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    rows.push({
+      github_run_id: wr.github_run_id,
+      run_started_at: wr.run_started_at ?? wr.created_at,
+      html_url: wr.html_url,
+      head_sha: wr.head_sha,
+      model: c.model,
       precision: c.precision,
       hardware: c.hardware,
       framework: c.framework,

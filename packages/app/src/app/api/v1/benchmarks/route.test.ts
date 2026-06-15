@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { mockGetLatestBenchmarks, mockGetDb } = vi.hoisted(() => ({
+const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockGetDb } = vi.hoisted(() => ({
   mockGetLatestBenchmarks: vi.fn(),
+  mockGetBenchmarksForRun: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
 }));
 
@@ -13,6 +14,7 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 
 vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getLatestBenchmarks: mockGetLatestBenchmarks,
+  getBenchmarksForRun: mockGetBenchmarksForRun,
 }));
 
 vi.mock('@/lib/api-cache', () => ({
@@ -123,6 +125,28 @@ describe('GET /api/v1/benchmarks', () => {
       undefined,
       undefined,
     );
+  });
+
+  it('routes exactRun=true + runId to the exact-run query', async () => {
+    const runRows = [{ id: 1, hardware: 'mi300x' }];
+    mockGetBenchmarksForRun.mockResolvedValueOnce(runRows);
+
+    const res = await GET(
+      req('/api/v1/benchmarks?model=DeepSeek-R1-0528&runId=27489075807&exactRun=true'),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(runRows);
+    expect(mockGetBenchmarksForRun).toHaveBeenCalledWith('mock-sql', ['dsr1'], '27489075807');
+    expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+  });
+
+  it('ignores exactRun without a runId (falls back to latest)', async () => {
+    mockGetLatestBenchmarks.mockResolvedValueOnce([]);
+
+    const res = await GET(req('/api/v1/benchmarks?model=DeepSeek-R1-0528&exactRun=true'));
+    expect(res.status).toBe(200);
+    expect(mockGetBenchmarksForRun).not.toHaveBeenCalled();
+    expect(mockGetLatestBenchmarks).toHaveBeenCalled();
   });
 
   it('returns 500 when query throws', async () => {

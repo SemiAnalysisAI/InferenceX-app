@@ -11,12 +11,20 @@ describe('benchmarkQueryOptions', () => {
       '2026-03-01',
       'latest',
       'all',
+      'asof',
     ]);
   });
 
   it('builds exact query key when exact=true', () => {
     const opts = benchmarkQueryOptions('DeepSeek-R1-0528', '2026-03-01', true, true);
-    expect(opts.queryKey).toEqual(['benchmarks', 'DeepSeek-R1-0528', '2026-03-01', 'exact', 'all']);
+    expect(opts.queryKey).toEqual([
+      'benchmarks',
+      'DeepSeek-R1-0528',
+      '2026-03-01',
+      'exact',
+      'all',
+      'asof',
+    ]);
   });
 
   it('includes the runId in the query key for the as-of-run view', () => {
@@ -33,7 +41,19 @@ describe('benchmarkQueryOptions', () => {
       '2026-03-01',
       'latest',
       '27489075807',
+      'asof',
     ]);
+  });
+
+  it('marks the key as an exact-run query when exactRun=true', () => {
+    const opts = benchmarkQueryOptions('m', '', true, false, '27489075807', true);
+    expect(opts.queryKey).toEqual(['benchmarks', 'm', '', 'latest', '27489075807', 'run']);
+  });
+
+  it('produces distinct keys for as-of vs exact-run with the same runId', () => {
+    const asof = benchmarkQueryOptions('m', '2026-03-01', true, false, '100', false);
+    const exact = benchmarkQueryOptions('m', '2026-03-01', true, false, '100', true);
+    expect(asof.queryKey).not.toEqual(exact.queryKey);
   });
 
   it('produces distinct keys for different runIds (no cache collision)', () => {

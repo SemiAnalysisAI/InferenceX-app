@@ -8,13 +8,22 @@ export function benchmarkQueryOptions(
   date: string,
   enabled = true,
   exact?: boolean,
-  /** GitHub run id for the "as of run" view (main chart only). */
+  /** GitHub run id for the "as of run" view (main chart) or the exact-run comparison. */
   runId?: string,
+  /** When true with a runId, fetch exactly that run's results (GPU comparison). */
+  exactRun?: boolean,
 ) {
   return {
-    queryKey: ['benchmarks', model, date, exact ? 'exact' : 'latest', runId ?? 'all'] as const,
+    queryKey: [
+      'benchmarks',
+      model,
+      date,
+      exact ? 'exact' : 'latest',
+      runId ?? 'all',
+      exactRun ? 'run' : 'asof',
+    ] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchBenchmarks(model, date, exact, signal, runId),
+      fetchBenchmarks(model, date, exact, signal, runId, exactRun),
     enabled: enabled && Boolean(model),
   };
 }

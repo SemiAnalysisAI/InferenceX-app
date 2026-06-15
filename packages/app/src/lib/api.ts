@@ -74,10 +74,29 @@ export interface DateConfigRow {
   disagg: boolean;
 }
 
+/**
+ * Per-(run, config) coverage for a date — which workflow runs produced benchmark
+ * data for which configs. Data-driven, so a run that shipped data without a
+ * changelog entry still appears (used to enumerate every run on a date).
+ */
+export interface RunConfigRow {
+  github_run_id: number;
+  run_started_at: string | null;
+  html_url: string | null;
+  head_sha: string | null;
+  model: string;
+  precision: string;
+  hardware: string;
+  framework: string;
+  spec_method: string;
+  disagg: boolean;
+}
+
 export interface WorkflowInfoResponse {
   runs: WorkflowRunRow[];
   changelogs: ChangelogRow[];
   configs: DateConfigRow[];
+  runConfigs: RunConfigRow[];
 }
 
 export interface ReliabilityRow {
@@ -127,11 +146,14 @@ export function fetchBenchmarks(
   exact?: boolean,
   signal?: AbortSignal,
   runId?: string,
+  /** When true with a runId, fetch exactly that run's results (GPU comparison). */
+  exactRun?: boolean,
 ) {
   const params = new URLSearchParams({ model });
   if (date) params.set('date', date);
   if (exact) params.set('exact', 'true');
   if (runId) params.set('runId', runId);
+  if (exactRun) params.set('exactRun', 'true');
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks?${params}`, signal);
 }
 

@@ -171,6 +171,57 @@ export async function getLatestBenchmarks(
 }
 
 /**
+ * Fetch the benchmark results produced by ONE specific workflow run (by GitHub
+ * run id). Unlike {@link getLatestBenchmarks}, this returns exactly what that run
+ * measured — used by the GPU comparison view to plot individual same-day runs as
+ * distinct series (e.g. comparing a day-zero sweep against a same-day re-sweep).
+ * Returns an empty array if the run produced no results for the model.
+ */
+export async function getBenchmarksForRun(
+  sql: DbClient,
+  modelKey: string | string[],
+  githubRunId: string | number,
+): Promise<BenchmarkRow[]> {
+  const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
+  const rows = await sql`
+    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
+      c.hardware,
+      c.framework,
+      c.model,
+      c.precision,
+      c.spec_method,
+      c.disagg,
+      c.is_multinode,
+      c.prefill_tp,
+      c.prefill_ep,
+      c.prefill_dp_attention,
+      c.prefill_num_workers,
+      c.decode_tp,
+      c.decode_ep,
+      c.decode_dp_attention,
+      c.decode_num_workers,
+      c.num_prefill_gpu,
+      c.num_decode_gpu,
+      br.isl,
+      br.osl,
+      br.conc,
+      br.image,
+      br.metrics,
+      br.workers,
+      br.date::text,
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
+    FROM benchmark_results br
+    JOIN configs c ON c.id = br.config_id
+    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE c.model = ANY(${modelKeys})
+      AND br.error IS NULL
+      AND wr.github_run_id = ${Number(githubRunId)}
+    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
+  `;
+  return rows as unknown as BenchmarkRow[];
+}
+
+/**
  * Fetch ALL benchmark results for a model + sequence across ALL dates.
  * No DISTINCT ON — returns every successful result, one per (config, conc, date).
  * Used by Historical Trends and Performance Over Time features.
