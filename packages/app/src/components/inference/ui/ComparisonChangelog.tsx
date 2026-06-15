@@ -16,6 +16,36 @@ import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { getHardwareConfig } from '@/lib/constants';
 import { getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 
+/** Git Commit and Workflow Run external links for a run, each shown when known. */
+function renderRunLinks(headRef?: string, runUrl?: string) {
+  return (
+    <>
+      {headRef && (
+        <a
+          href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${headRef}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm hover:underline text-foreground underline"
+        >
+          Git Commit
+          <ExternalLinkIcon />
+        </a>
+      )}
+      {runUrl && (
+        <a
+          href={updateRepoUrl(runUrl)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm hover:underline text-foreground underline"
+        >
+          Workflow Run
+          <ExternalLinkIcon />
+        </a>
+      )}
+    </>
+  );
+}
+
 /** One changelog entry's description. The GPU and run # are shown in the entry title. */
 function renderDescription(
   entry: { config_keys: string[]; description: string },
@@ -262,28 +292,7 @@ export default function ComparisonChangelog({
                           {gpuLabel ? ` ${gpuLabel}` : ''} #{idx + 1}
                         </span>
                         <span className="text-muted-foreground">&mdash;</span>
-                        {run.headRef && (
-                          <a
-                            href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${run.headRef}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm hover:underline text-foreground underline"
-                          >
-                            Git Commit
-                            <ExternalLinkIcon />
-                          </a>
-                        )}
-                        {run.runUrl && (
-                          <a
-                            href={updateRepoUrl(run.runUrl)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm hover:underline text-foreground underline"
-                          >
-                            Workflow Run
-                            <ExternalLinkIcon />
-                          </a>
-                        )}
+                        {renderRunLinks(run.headRef, run.runUrl)}
                         {onChart ? (
                           <button
                             type="button"
@@ -328,7 +337,11 @@ export default function ComparisonChangelog({
                 });
               }
 
-              // Single (or no) matching run → one block keyed by the date.
+              // Single (or no) matching run → one block keyed by the date. Link to
+              // the run that produced this config's data so a date with unrelated
+              // same-day runs never borrows another run's commit/run links. No
+              // matching run (e.g. a pinned endpoint) → no links.
+              const { headRef, runUrl } = runs[0] ?? {};
               const dateGpuLabel = gpuLabelsFor(item.entries);
               return (
                 <div key={item.date} className="flex flex-col gap-1">
@@ -337,31 +350,10 @@ export default function ComparisonChangelog({
                       {item.date}
                       {dateGpuLabel ? ` ${dateGpuLabel}` : ''}
                     </span>
-                    {item.entries.length > 0 && (
+                    {item.entries.length > 0 && (headRef || runUrl) && (
                       <>
                         <span className="text-muted-foreground">&mdash;</span>
-                        {item.headRef && (
-                          <a
-                            href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${item.headRef}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm hover:underline text-foreground underline"
-                          >
-                            Git Commit
-                            <ExternalLinkIcon />
-                          </a>
-                        )}
-                        {item.runUrl && (
-                          <a
-                            href={updateRepoUrl(item.runUrl)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm hover:underline text-foreground underline"
-                          >
-                            Workflow Run
-                            <ExternalLinkIcon />
-                          </a>
-                        )}
+                        {renderRunLinks(headRef, runUrl)}
                       </>
                     )}
                     {datesOnChart.has(item.date) ? (

@@ -88,6 +88,8 @@ describe('dataRunsForDate', () => {
   });
 
   it('carries run url and head sha through', () => {
+    // The single-run changelog block links off these per-run fields (#408), so a
+    // date with unrelated same-day runs cannot borrow another run's commit/run links.
     const rows = [
       rc({
         github_run_id: 7,

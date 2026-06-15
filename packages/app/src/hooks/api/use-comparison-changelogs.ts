@@ -26,8 +26,6 @@ export interface ComparisonRun {
 
 export interface ComparisonChangelog {
   date: string;
-  headRef?: string;
-  runUrl?: string;
   /** All of the date's changelog entries (flattened across runs). */
   entries: ComparisonChangelogEntry[];
   /** Individual runs on this date, in chronological order (earliest first). */
@@ -117,8 +115,6 @@ export function useComparisonChangelogs(
 
       results.push({
         date: datesToQuery[i],
-        headRef: data.changelogs.at(-1)?.head_ref,
-        runUrl: data.runs.at(-1)?.html_url ?? undefined,
         entries: data.changelogs.map((c: ChangelogRow) => ({
           config_keys: c.config_keys,
           description: c.description,
