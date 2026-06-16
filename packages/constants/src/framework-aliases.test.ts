@@ -8,12 +8,12 @@ import {
 } from './framework-aliases';
 
 describe('FRAMEWORK_LABELS', () => {
-  it('labels the canonical mooncake-atom framework "Mooncake ATOM¹"', () => {
-    expect(FRAMEWORK_LABELS['mooncake-atom']).toBe('Mooncake ATOM¹');
+  it('labels the canonical mooncake-atom framework "ATOMesh¹"', () => {
+    expect(FRAMEWORK_LABELS['mooncake-atom']).toBe('ATOMesh¹');
   });
 
   it('labels the atom-disagg alias with its canonical label', () => {
-    expect(FRAMEWORK_LABELS['atom-disagg']).toBe('Mooncake ATOM¹');
+    expect(FRAMEWORK_LABELS['atom-disagg']).toBe('ATOMesh¹');
   });
 });
 
