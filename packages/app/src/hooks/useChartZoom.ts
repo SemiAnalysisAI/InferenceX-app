@@ -181,8 +181,25 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
       // store zoom behavior in ref
       zoomRef.current = zoom;
 
-      // restore previous zoom transform
-      svg.call(zoom.transform as any, zoomTransformRef.current);
+      // Restore the previous zoom transform — but only when there is actually
+      // a zoom to restore. `zoom.transform` dispatches start/zoom/end events
+      // synchronously, and the chart's zoom handler answers with a full
+      // axes + grid + every-layer re-render. Charts call setupZoom right after
+      // drawing at base scales, so replaying an identity transform repeats all
+      // of that work to render the exact same pixels — on every rebuild.
+      //
+      // At identity nothing needs to move: attaching the behavior above
+      // already initialized the node's internal `__zoom` state (d3-zoom
+      // preserves an existing transform or defaults to identity), so internal
+      // state and drawn state agree. The node-state check is defensive: if the
+      // node somehow disagrees with our ref (it shouldn't — the `zoom.store`
+      // listener keeps them in sync), fall through to the replay.
+      const stored = zoomTransformRef.current;
+      const nodeTransform = d3.zoomTransform(svg.node()!);
+      const isIdentity = (t: d3.ZoomTransform) => t.k === 1 && t.x === 0 && t.y === 0;
+      if (!isIdentity(stored) || !isIdentity(nodeTransform)) {
+        svg.call(zoom.transform as any, stored);
+      }
 
       // double-click to reset zoom
       svg.on('dblclick.zoom', () => {
