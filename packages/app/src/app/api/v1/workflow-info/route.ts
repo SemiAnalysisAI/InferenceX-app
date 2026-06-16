@@ -5,6 +5,7 @@ import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import {
   getChangelogByDate,
   getDateConfigs,
+  getRunConfigsByDate,
   getWorkflowRunsByDate,
 } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
@@ -19,15 +20,17 @@ const getCachedWorkflowInfo = cachedQuery(async (date: string) => {
       runs: jsonProvider.getWorkflowRunsByDate(date),
       changelogs: jsonProvider.getChangelogByDate(date),
       configs: jsonProvider.getDateConfigs(date),
+      runConfigs: jsonProvider.getRunConfigsByDate(date),
     };
   }
   const sql = getDb();
-  const [runs, changelogs, configs] = await Promise.all([
+  const [runs, changelogs, configs, runConfigs] = await Promise.all([
     getWorkflowRunsByDate(sql, date),
     getChangelogByDate(sql, date),
     getDateConfigs(sql, date),
+    getRunConfigsByDate(sql, date),
   ]);
-  return { runs, changelogs, configs };
+  return { runs, changelogs, configs, runConfigs };
 }, 'workflow-info');
 
 export async function GET(request: NextRequest) {

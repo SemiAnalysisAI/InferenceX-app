@@ -19,6 +19,7 @@ import type {
   AvailabilityRow,
   ChangelogRow,
   DateConfigRow,
+  RunConfigRow,
   WorkflowRunRow,
 } from './queries/workflow-info.js';
 
@@ -328,14 +329,44 @@ const STRIP_HISTORY_KEYS = new Set([
   'mean_itl',
 ]);
 
+/**
+ * Comparator for DISTINCT ON (config, conc, isl, osl) selection: latest calendar
+ * day first, then — for sweeps on the same day — the latest workflow run first by
+ * `run_started_at` (NULLS LAST). Mirrors the SQL date-filtered query and the
+ * `latest_benchmarks` view (migration 003): a calendar day alone ties two same-day
+ * sweeps, so without this an older run's points can shadow a same-day re-sweep.
+ * `run_started_at` is an ISO-8601 string, so localeCompare orders it chronologically.
+ * Exported so the same-day tiebreak is unit-tested in parity with the SQL.
+ */
+export function compareBenchmarkRecency(
+  aDate: string,
+  bDate: string,
+  aStarted: string | null,
+  bStarted: string | null,
+): number {
+  const dateCmp = bDate.localeCompare(aDate);
+  if (dateCmp !== 0) return dateCmp;
+  if (aStarted === bStarted) return 0;
+  if (aStarted === null) return 1;
+  if (bStarted === null) return -1;
+  return bStarted.localeCompare(aStarted);
+}
+
 export function getLatestBenchmarks(
   modelKey: string | string[],
   date?: string,
   exact?: boolean,
+  asOfRunId?: string,
 ): BenchmarkRow[] {
   const s = getStore();
   const dateStr = date ? toDateString(date) : undefined;
   const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
+
+  // "As of run" cutoff (main chart only): the selected run's start time. Mirrors the
+  // SQL runFilter — results from runs that started after this are excluded. Null/unknown
+  // means no cutoff (a no-op, matching the SQL COALESCE-to-infinity behavior).
+  const asOfStartedAt =
+    !exact && asOfRunId ? (s.latestRuns.get(Number(asOfRunId))?.run_started_at ?? null) : null;
 
   // Filter to successful benchmarks for this model with a valid latest workflow run
   const candidates = s.benchmarks.filter((br) => {
@@ -343,6 +374,12 @@ export function getLatestBenchmarks(
     const c = s.configs.get(br.config_id);
     if (!c || !modelKeys.has(c.model)) return false;
     if (!s.latestRunsById.has(br.workflow_run_id)) return false;
+    if (asOfStartedAt) {
+      // Keep NULL run_started_at (old history) so it never blanks out; drop runs
+      // that started after the selected one.
+      const started = s.latestRunsById.get(br.workflow_run_id)?.run_started_at ?? null;
+      if (started !== null && started > asOfStartedAt) return false;
+    }
     if (dateStr) {
       const brDate = toDateString(br.date);
       return exact ? brDate === dateStr : brDate <= dateStr;
@@ -350,10 +387,17 @@ export function getLatestBenchmarks(
     return true;
   });
 
-  // DISTINCT ON (config_id, conc, isl, osl) — keep the one with the latest date
+  // DISTINCT ON (config_id, conc, isl, osl) — keep the one with the latest date,
+  // tiebreaking same-day runs by run_started_at so the latest sweep wins.
   const seen = new Map<string, RawBenchmarkResult>();
-  // Sort by date DESC so first-seen wins
-  candidates.sort((a, b) => toDateString(b.date).localeCompare(toDateString(a.date)));
+  candidates.sort((a, b) =>
+    compareBenchmarkRecency(
+      toDateString(a.date),
+      toDateString(b.date),
+      s.latestRunsById.get(a.workflow_run_id)?.run_started_at ?? null,
+      s.latestRunsById.get(b.workflow_run_id)?.run_started_at ?? null,
+    ),
+  );
   for (const br of candidates) {
     const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}`;
     if (!seen.has(key)) seen.set(key, br);
@@ -363,6 +407,32 @@ export function getLatestBenchmarks(
     const c = s.configs.get(br.config_id)!;
     const wr = s.latestRunsById.get(br.workflow_run_id)!;
     return toBenchmarkRow(br, c, wr);
+  });
+}
+
+/** In-memory mirror of {@link import('./queries/benchmarks.js').getBenchmarksForRun}. */
+export function getBenchmarksForRun(
+  modelKey: string | string[],
+  githubRunId: string | number,
+): BenchmarkRow[] {
+  const s = getStore();
+  const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
+  const run = s.latestRuns.get(Number(githubRunId));
+  if (!run) return [];
+
+  const seen = new Map<string, RawBenchmarkResult>();
+  for (const br of s.benchmarks) {
+    if (br.error !== null && br.error !== undefined) continue;
+    if (br.workflow_run_id !== run.id) continue;
+    const c = s.configs.get(br.config_id);
+    if (!c || !modelKeys.has(c.model)) continue;
+    const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}`;
+    if (!seen.has(key)) seen.set(key, br);
+  }
+
+  return [...seen.values()].map((br) => {
+    const c = s.configs.get(br.config_id)!;
+    return toBenchmarkRow(br, c, run);
   });
 }
 
@@ -567,6 +637,42 @@ export function getDateConfigs(date: string): DateConfigRow[] {
       model: c.model,
       isl: br.isl,
       osl: br.osl,
+      precision: c.precision,
+      hardware: c.hardware,
+      framework: c.framework,
+      spec_method: c.spec_method,
+      disagg: c.disagg,
+    });
+  }
+
+  return rows;
+}
+
+export function getRunConfigsByDate(date: string): RunConfigRow[] {
+  const s = getStore();
+  const dateStr = toDateString(date);
+
+  const seen = new Set<string>();
+  const rows: RunConfigRow[] = [];
+
+  for (const br of s.benchmarks) {
+    if (br.error !== null && br.error !== undefined) continue;
+    if (toDateString(br.date) !== dateStr) continue;
+    const wr = s.latestRunsById.get(br.workflow_run_id);
+    if (!wr) continue;
+    const c = s.configs.get(br.config_id);
+    if (!c) continue;
+
+    const key = `${wr.github_run_id}|${c.model}|${c.precision}|${c.hardware}|${c.framework}|${c.spec_method}|${c.disagg}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    rows.push({
+      github_run_id: wr.github_run_id,
+      run_started_at: wr.run_started_at ?? wr.created_at,
+      html_url: wr.html_url,
+      head_sha: wr.head_sha,
+      model: c.model,
       precision: c.precision,
       hardware: c.hardware,
       framework: c.framework,

@@ -113,6 +113,7 @@ export interface ModelArchitecture {
  * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
  * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
+ * - https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/config.json
  */
 export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   [Model.DeepSeek_R1]: {
@@ -335,6 +336,39 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     releaseDate: '2025-10-25',
     developer: 'MiniMax',
     sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2',
+  },
+  [Model.MiniMax_M3]: {
+    model: Model.MiniMax_M3,
+    totalParams: 428,
+    activeParams: 23,
+    architectureType: 'moe',
+    // MiniMax Sparse Attention (MSA) is built on a GQA projection layout
+    // (64 Q / 4 KV heads) with sparse KV selection layered on top. Render it as
+    // a static attention block, not the standard GQA Q/K/V drill-down — same
+    // treatment as the M2.5 entry.
+    attentionType: 'GQA',
+    attentionExpandable: false,
+    numLayers: 60,
+    hiddenSize: 6144,
+    numHeads: 64,
+    numKVHeads: 4,
+    headDim: 128,
+    vocabSize: 200064,
+    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
+    numExperts: 129, // 128 routed + 1 shared
+    activeExperts: 4,
+    hasSharedExpert: true,
+    contextWindow: 1048576, // 1M
+    features: [
+      'MiniMax Sparse Attention (MSA)',
+      'GQA with QK Norm',
+      'Partial RoPE (rotary factor 0.5)',
+      'SwiGLU FFN',
+      'Native Multimodality (text/image/video)',
+      'MoE (128 routed + 1 shared experts, 4 active)',
+    ],
+    developer: 'MiniMax',
+    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M3',
   },
 };
 
