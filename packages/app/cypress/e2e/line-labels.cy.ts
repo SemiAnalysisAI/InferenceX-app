@@ -63,6 +63,53 @@ describe('Line Labels Toggle', () => {
     });
   });
 
+  it('line labels stay in the foreground after zooming', () => {
+    // Regression guard: the foreground raise must run on every render (in the
+    // shared renderer), not rely on a zoom-transform replay re-firing onZoom.
+    // Ensure labels are on (a previous test may have left them on).
+    cy.get('#scatter-line-labels').then(($el) => {
+      if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
+    });
+    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
+
+    // The chart requires Shift for wheel zoom (so bare scroll doesn't hijack
+    // the page). Dispatch a few shift+wheel events over the plot to zoom in.
+    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+      const svg = $svg[0];
+      const r = svg.getBoundingClientRect();
+      for (let i = 0; i < 3; i++) {
+        svg.dispatchEvent(
+          new WheelEvent('wheel', {
+            deltaY: -240,
+            clientX: r.x + r.width / 2,
+            clientY: r.y + 150,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }
+    });
+    cy.wait(300);
+
+    cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {
+      const svg = $svg[0];
+      const dots = svg.querySelectorAll('.dot-group');
+      const labels = svg.querySelectorAll('g.line-label');
+      expect(labels.length, 'line labels still exist after zoom').to.be.greaterThan(0);
+      const lastDot = dots.item(dots.length - 1)!;
+      const firstLabel = labels.item(0)!;
+      expect(
+        lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'line label still follows the scatter points after zoom (foreground)',
+      ).to.be.greaterThan(0);
+    });
+
+    // Reset zoom so later tests start from the base view.
+    cy.get('[data-testid="scatter-graph"] svg').dblclick();
+    cy.wait(300);
+  });
+
   it('toggling Line Labels off removes label elements', () => {
     cy.get('#scatter-line-labels').click();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');

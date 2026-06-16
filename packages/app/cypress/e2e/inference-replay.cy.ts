@@ -7,6 +7,18 @@ const openReplayDialog = () => {
   cy.get('[data-testid="export-mp4-button"]').first().click();
 };
 
+const setReplayScrubber = (v: number) =>
+  cy.get('[data-testid="replay-scrubber"]').then(($el) => {
+    const el = $el[0] as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')!.set!;
+    setter.call(el, String(v));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+const replayYAxisLastTick = () =>
+  cy.get('[data-testid="replay-panel-chart-0"] svg g.y-axis text').last().invoke('text');
+
 describe('Inference Replay', () => {
   before(() => {
     cy.window().then((win) => {
@@ -122,6 +134,65 @@ describe('Inference Replay', () => {
               expect(afterD).not.to.equal(beforeD);
             });
         });
+    });
+  });
+
+  it('renders line labels in the foreground during replay', () => {
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
+      // Enable line labels inside the replay panel (scoped — the parent chart
+      // renders the same control behind the dialog).
+      cy.get('[data-testid="replay-panel-chart-0"]').within(() => {
+        cy.get('[data-testid="scatter-line-labels"]').then(($el) => {
+          if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
+        });
+      });
+      cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label', { timeout: 6000 }).should(
+        'have.length.greaterThan',
+        0,
+      );
+      // The shared-renderer foreground raise must apply to the replay chart too.
+      cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
+        const svg = $svg[0];
+        const dots = svg.querySelectorAll('.dot-group');
+        const labels = svg.querySelectorAll('g.line-label');
+        if (dots.length === 0 || labels.length === 0) return;
+        const lastDot = dots.item(dots.length - 1)!;
+        const firstLabel = labels.item(0)!;
+        expect(
+          lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+          'replay line label follows the scatter points (foreground)',
+        ).to.be.greaterThan(0);
+      });
+    });
+  });
+
+  it('Fixed axes toggle fixes the axes to the whole run; toggling off refits per frame', () => {
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="replay-scrubber"]').length === 0) {
+        cy.log('Replay history fixture has < 2 dates; skipping fixed-axes check');
+        return;
+      }
+      // Fixed axes is the default — the axis extent at the first frame already
+      // covers the whole run, so it matches the last frame's extent.
+      cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
+      setReplayScrubber(0);
+      cy.wait(300);
+      replayYAxisLastTick().then((fixedAtStart) => {
+        // Turn fixed axes off → the first frame refits to just that frame's
+        // (smaller) frontier, so the extent changes.
+        cy.get('[data-testid="replay-fixed-axes"]').click();
+        setReplayScrubber(0);
+        cy.wait(300);
+        replayYAxisLastTick().then((dynamicAtStart) => {
+          expect(
+            dynamicAtStart,
+            'per-frame axis extent at the first frame differs from the whole-run fixed extent',
+          ).not.to.equal(fixedAtStart);
+        });
+        // Restore the default.
+        cy.get('[data-testid="replay-fixed-axes"]').click();
+      });
     });
   });
 
