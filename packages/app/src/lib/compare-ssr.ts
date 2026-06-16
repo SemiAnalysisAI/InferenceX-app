@@ -68,6 +68,7 @@ export const KNOWN_MODELS = new Set([
   'Qwen-3.5-397B-A17B',
   'Kimi-K2.5',
   'MiniMax-M2.5',
+  'MiniMax-M3',
   'GLM-5',
   'DeepSeek-V4-Pro',
 ]);

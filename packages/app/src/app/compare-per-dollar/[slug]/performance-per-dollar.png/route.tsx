@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { ImageResponse } from 'next/og';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
@@ -92,6 +95,16 @@ function pointsPath(points: Point[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
 
+let logoSrcPromise: Promise<string | null> | undefined;
+function getLogoSrc(): Promise<string | null> {
+  if (!logoSrcPromise) {
+    logoSrcPromise = readFile(join(process.cwd(), 'public/brand/logo-color.png'))
+      .then((buf) => `data:image/png;base64,${buf.toString('base64')}`)
+      .catch(() => null);
+  }
+  return logoSrcPromise;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
@@ -102,7 +115,10 @@ export async function GET(
     return new Response('Not found', { status: 404 });
   }
 
-  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
+  const [rows, logoSrc] = await Promise.all([
+    getCachedBenchmarks(parsed.model.dbKeys),
+    getLogoSrc(),
+  ]);
   const { sequence, precision } = pickPairDefaults(rows, parsed.a, parsed.b);
   const { ssrRows, interactivityRange } = computeCompareTableData(
     rows,
@@ -326,6 +342,19 @@ export async function GET(
                 />
               ))}
             </svg>
+            {logoSrc && (
+              <img
+                src={logoSrc}
+                alt=""
+                height={144 * R}
+                style={{
+                  position: 'absolute',
+                  left: CHART.left + CHART.width / 2 - 168 * R,
+                  top: CHART.top + CHART.height / 2 - 72 * R,
+                  opacity: 0.12,
+                }}
+              />
+            )}
             {yAxis.ticks.map((tick) => (
               <div
                 key={`y-label-${tick}`}

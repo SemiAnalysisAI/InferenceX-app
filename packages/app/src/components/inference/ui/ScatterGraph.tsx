@@ -12,6 +12,7 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, getPrecisionLabel, type Precision } from '@/lib/data-mappings';
+import { matchKnownConfigIssues } from '@/lib/known-issues';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -63,6 +64,11 @@ import {
   PARETO_LABEL_COLORS,
   buildGradientColorMap,
 } from '@/components/inference/utils/paretoLabels';
+import {
+  type KnownIssueAnnotation,
+  measureLegendRightInset,
+  renderKnownIssueAnnotations,
+} from '@/components/inference/utils/knownIssueAnnotations';
 
 // X-shape path for overlay (unofficial) data points
 const X_SIZE = 5;
@@ -113,6 +119,7 @@ const lineLabelText = (hwKey: string, precision: string, includePrecision: boole
 const ScatterGraph = React.memo(
   ({
     chartId,
+    modelLabel,
     data,
     xLabel,
     yLabel,
@@ -348,6 +355,35 @@ const ScatterGraph = React.memo(
       if (!overlayData?.data) return [];
       return overlayData.data.filter((p) => selectedPrecisions.includes(p.precision));
     }, [overlayData, selectedPrecisions]);
+
+    // Warning annotations for visible series (official + unofficial overlay)
+    // with known upstream issues. Drawn as an SVG layer (box + arrow to the
+    // affected line) so PNG exports carry the warning.
+    const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
+      const visibleOverlayPoints = processedOverlayData.filter((p) =>
+        activeOverlayHwTypes.has(p.hwKey as string),
+      );
+      const visiblePoints = [...filteredData, ...visibleOverlayPoints];
+      return matchKnownConfigIssues(modelLabel, visiblePoints).map((issue) => ({
+        issue,
+        label: parseHwKeyToLabel(issue.hwKey).label,
+        color: getCssColor(resolveColor(issue.hwKey)),
+        points: visiblePoints
+          .filter(
+            (p) =>
+              String(p.hwKey) === issue.hwKey &&
+              (!issue.precisions || issue.precisions.includes(p.precision)),
+          )
+          .map((p) => ({ x: p.x, y: p.y })),
+      }));
+    }, [
+      modelLabel,
+      filteredData,
+      processedOverlayData,
+      activeOverlayHwTypes,
+      resolveColor,
+      getCssColor,
+    ]);
 
     // Combined data for D3 scale domain (includes overlay so scales fit both datasets)
     const chartScaleData = useMemo(() => {
@@ -1779,6 +1815,44 @@ const ScatterGraph = React.memo(
         },
       };
 
+      // ── Known-issue annotations: warning box + arrow to the affected line ──
+      const drawKnownIssues = (
+        ctx: RenderContext,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+      ) => {
+        renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
+          chartId,
+          width: ctx.width,
+          height: ctx.height,
+          xScale,
+          yScale,
+          annotations: knownIssueAnnotations,
+          rightInset: measureLegendRightInset(
+            chartId,
+            ctx.layout.svg.node(),
+            ctx.layout.margin.left,
+            ctx.width,
+          ),
+          background: getCssColor('--background'),
+          foreground: getCssColor('--foreground'),
+          mutedForeground: getCssColor('--muted-foreground'),
+          onLinkClick: (a) =>
+            track('inference_known_issue_clicked', {
+              hwKey: a.issue.hwKey,
+              issue: a.issue.issueRef,
+            }),
+        });
+      };
+      const knownIssueLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'known-issues',
+        render: (_zoomGroup, ctx) =>
+          drawKnownIssues(ctx, ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale),
+        onZoom: (_zoomGroup, ctx) =>
+          drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
+      };
+
       // ── Last layer: keep line labels in the foreground ──
       // Line labels are created inside the rooflines layer, which must render
       // *before* the dot groups so the roofline paths sit behind the points.
@@ -1805,9 +1879,13 @@ const ScatterGraph = React.memo(
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
       result.push(speedOverlayLayer);
+      result.push(knownIssueLayer);
+      // Keep the foreground line-label raise last so labels read above the
+      // known-issue annotations and every other layer.
       result.push(lineLabelForegroundLayer);
       return result;
     }, [
+      knownIssueAnnotations,
       rooflines,
       allPointLabelsByKey,
       showGradientLabels,

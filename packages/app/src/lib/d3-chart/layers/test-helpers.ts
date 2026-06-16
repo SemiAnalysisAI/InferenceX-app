@@ -46,32 +46,32 @@ export interface MockSelection<Datum = unknown> {
   /** @internal */ _parent?: MockElement;
   /** @internal */ _selector?: string;
 
-  attr(
+  attr: (
     name: string,
     value: string | number | ((d: Datum, i: number) => string | number),
-  ): MockSelection<Datum>;
-  style(
+  ) => MockSelection<Datum>;
+  style: (
     name: string,
     value: string | number | ((d: Datum, i: number) => string | number),
-  ): MockSelection<Datum>;
-  text(value: string | ((d: Datum, i: number) => string)): MockSelection<Datum>;
-  selectAll<D = Datum>(selector: string): MockSelection<D>;
-  select(selector: string): MockSelection<Datum>;
-  data<D>(data: D[], keyFn?: (d: D) => string): MockSelection<D>;
-  join(tag: string): MockSelection<Datum>;
-  enter(): MockSelection<Datum>;
-  exit(): MockSelection<Datum>;
-  append(tag: string): MockSelection<Datum>;
-  remove(): MockSelection<Datum>;
-  merge(other: MockSelection<Datum>): MockSelection<Datum>;
-  each(fn: (this: unknown, d: Datum, i: number) => void): MockSelection<Datum>;
-  datum<D>(d: D): MockSelection<D>;
-  empty(): boolean;
-  nodes(): MockElement[];
-  node(): MockElement | null;
-  size(): number;
-  transition(): MockSelection<Datum>;
-  duration(ms: number): MockSelection<Datum>;
+  ) => MockSelection<Datum>;
+  text: (value: string | ((d: Datum, i: number) => string)) => MockSelection<Datum>;
+  selectAll: <D = Datum>(selector: string) => MockSelection<D>;
+  select: (selector: string) => MockSelection<Datum>;
+  data: <D>(data: D[], keyFn?: (d: D) => string) => MockSelection<D>;
+  join: (tag: string) => MockSelection<Datum>;
+  enter: () => MockSelection<Datum>;
+  exit: () => MockSelection<Datum>;
+  append: (tag: string) => MockSelection<Datum>;
+  remove: () => MockSelection<Datum>;
+  merge: (other: MockSelection<Datum>) => MockSelection<Datum>;
+  each: (fn: (this: unknown, d: Datum, i: number) => void) => MockSelection<Datum>;
+  datum: <D>(d: D) => MockSelection<D>;
+  empty: () => boolean;
+  nodes: () => MockElement[];
+  node: () => MockElement | null;
+  size: () => number;
+  transition: () => MockSelection<Datum>;
+  duration: (ms: number) => MockSelection<Datum>;
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────

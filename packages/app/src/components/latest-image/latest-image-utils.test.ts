@@ -9,8 +9,10 @@ import {
   isOutdated,
 } from './latest-image-utils';
 
-const lightnessOf = (s: string) => Number(s.match(/oklch\(([\d.]+)/u)?.[1] ?? Number.NaN);
-const alphaOf = (s: string) => Number(s.match(/\/ ([\d.]+)\)/u)?.[1] ?? Number.NaN);
+const lightnessOf = (s: string) =>
+  Number(s.match(/oklch\((?<lightness>[\d.]+)/u)?.groups?.lightness ?? Number.NaN);
+const alphaOf = (s: string) =>
+  Number(s.match(/\/ (?<alpha>[\d.]+)\)/u)?.groups?.alpha ?? Number.NaN);
 
 describe('daysSince', () => {
   it('returns 0 for today', () => {

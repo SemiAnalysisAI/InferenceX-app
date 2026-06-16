@@ -59,13 +59,40 @@ export async function getLatestBenchmarks(
   modelKey: string | string[],
   date?: string,
   exact?: boolean,
+  /**
+   * GitHub run id to view the chart "as of" — restricts results to runs that
+   * started no later than this one, so selecting an earlier same-day run shows
+   * the state of the data at that point in time (later runs don't render yet).
+   * No-op when this is the latest run (the filter then includes everything).
+   * Only applied on the date-filtered (non-`exact`) path used by the main chart.
+   */
+  asOfRunId?: string,
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   if (date) {
     // Date-filtered: use base table with DISTINCT ON (the view only has the absolute latest)
     // exact=true: only return data from this exact date (for GPU comparison)
     // exact=false (default): return latest data as of this date (for main chart)
+    // Same-day tiebreak by wr.run_started_at (latest sweep wins), mirroring the
+    // latest_benchmarks view (migration 003). br.date is a calendar day, so two
+    // sweeps on the same day tie on date alone and Postgres would otherwise pick
+    // an arbitrary one — leaving an older run's points shadowing a same-day re-sweep.
     const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
+    // "As of run" filter (main chart only): keep results whose run started no later
+    // than the selected run. run_started_at is an absolute timestamp, so this also
+    // naturally includes all earlier-date runs. NULLs (pre-migration-003 runs that
+    // lack the timestamp) are kept so old history doesn't blank out; COALESCE to
+    // infinity makes an unknown asOfRunId a no-op rather than excluding everything.
+    const runFilter =
+      !exact && asOfRunId
+        ? sql`AND (
+            wr.run_started_at IS NULL
+            OR wr.run_started_at <= COALESCE(
+              (SELECT lwr.run_started_at FROM latest_workflow_runs lwr WHERE lwr.github_run_id = ${Number(asOfRunId)}),
+              'infinity'::timestamptz
+            )
+          )`
+        : sql``;
     const rows = await sql`
       SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
         c.hardware,
@@ -99,7 +126,9 @@ export async function getLatestBenchmarks(
       WHERE c.model = ANY(${modelKeys})
         AND br.error IS NULL
         AND ${dateFilter}
-      ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
+        ${runFilter}
+      ORDER BY br.config_id, br.conc, br.isl, br.osl,
+               br.date DESC, wr.run_started_at DESC NULLS LAST
     `;
     return rows as unknown as BenchmarkRow[];
   }
@@ -137,6 +166,57 @@ export async function getLatestBenchmarks(
     JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
     WHERE c.model = ANY(${modelKeys})
     ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
+  `;
+  return rows as unknown as BenchmarkRow[];
+}
+
+/**
+ * Fetch the benchmark results produced by ONE specific workflow run (by GitHub
+ * run id). Unlike {@link getLatestBenchmarks}, this returns exactly what that run
+ * measured — used by the GPU comparison view to plot individual same-day runs as
+ * distinct series (e.g. comparing a day-zero sweep against a same-day re-sweep).
+ * Returns an empty array if the run produced no results for the model.
+ */
+export async function getBenchmarksForRun(
+  sql: DbClient,
+  modelKey: string | string[],
+  githubRunId: string | number,
+): Promise<BenchmarkRow[]> {
+  const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
+  const rows = await sql`
+    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
+      c.hardware,
+      c.framework,
+      c.model,
+      c.precision,
+      c.spec_method,
+      c.disagg,
+      c.is_multinode,
+      c.prefill_tp,
+      c.prefill_ep,
+      c.prefill_dp_attention,
+      c.prefill_num_workers,
+      c.decode_tp,
+      c.decode_ep,
+      c.decode_dp_attention,
+      c.decode_num_workers,
+      c.num_prefill_gpu,
+      c.num_decode_gpu,
+      br.isl,
+      br.osl,
+      br.conc,
+      br.image,
+      br.metrics,
+      br.workers,
+      br.date::text,
+      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
+    FROM benchmark_results br
+    JOIN configs c ON c.id = br.config_id
+    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE c.model = ANY(${modelKeys})
+      AND br.error IS NULL
+      AND wr.github_run_id = ${Number(githubRunId)}
+    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
   `;
   return rows as unknown as BenchmarkRow[];
 }

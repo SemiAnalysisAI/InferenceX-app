@@ -9,7 +9,7 @@ function render(data: object): string {
 }
 
 function scriptBody(html: string): string {
-  const match = html.match(/<script[^>]*>([\s\S]*?)<\/script[^>]*>/iu);
+  const match = html.match(/<script[^>]*>(?<body>[\s\S]*?)<\/script[^>]*>/iu);
   if (!match) throw new Error(`no <script> in: ${html}`);
   return match[1];
 }

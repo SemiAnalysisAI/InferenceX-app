@@ -13,6 +13,10 @@ import type {
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { filterDataByCostLimit } from '@/components/inference/utils';
+import {
+  parseComparisonEntry,
+  resolveComparisonEntries,
+} from '@/components/inference/utils/comparisonEntry';
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import {
   GPU_ALIAS_TO_CANONICAL,
@@ -31,12 +35,11 @@ export function buildComparisonDates(
   selectedRunDate: string | undefined,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
-  const dates: string[] = [];
-  if (selectedDateRange.startDate && selectedDateRange.endDate) {
-    dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
-  }
-  dates.push(...selectedDates);
-  return [...new Set(dates.filter((d) => d !== selectedRunDate))];
+  // Range endpoints + individually-added dates/runs (redundant same-day range
+  // endpoints dropped), minus the main run date which the primary query covers.
+  return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
+    (d) => d !== selectedRunDate,
+  );
 }
 
 /** Filter data by GPU key, resolving aliases to canonical keys. */
@@ -85,12 +88,22 @@ export function useChartData(
   latestAvailableDate?: string,
   /** When set, only series for these two registry GPU keys are shown (compare pages). */
   compareGpuPair?: readonly [string, string] | null,
+  /**
+   * GitHub run id for the "as of run" view. Set only when an earlier-than-latest
+   * run is selected; the chart then shows the data as it stood at that run.
+   */
+  asOfRunId?: string,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
   // materialized view instead of firing a redundant second fetch with identical data.
-  const queryDate =
-    selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
+  //
+  // The '' shortcut hits the materialized view, which has no run-level filter, so it
+  // is only valid for the latest run. When an earlier run is selected (asOfRunId set)
+  // we must query the date-filtered path so the run cutoff applies.
+  const queryDate = asOfRunId
+    ? (selectedRunDate ?? '')
+    : selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
       ? ''
       : selectedRunDate;
 
@@ -98,7 +111,7 @@ export function useChartData(
     data: allRows,
     isLoading: queryLoading,
     error: queryError,
-  } = useBenchmarks(selectedModel, queryDate, enabled);
+  } = useBenchmarks(selectedModel, queryDate, enabled, asOfRunId);
 
   // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(
@@ -106,10 +119,16 @@ export function useChartData(
     [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
   );
 
+  // Each comparison entry is either a plain date (latest run that day, exact-date
+  // query) or a specific run encoded as `date~r<id>~<i>of<n>` (exact-run query) so
+  // multiple same-day runs can be compared as distinct series.
   const comparisonQueries = useQueries({
-    queries: comparisonDates.map((date) =>
-      benchmarkQueryOptions(selectedModel, date, enabled, true),
-    ),
+    queries: comparisonDates.map((entry) => {
+      const parsed = parseComparisonEntry(entry);
+      return parsed.runId
+        ? benchmarkQueryOptions(selectedModel, '', enabled, false, parsed.runId, true)
+        : benchmarkQueryOptions(selectedModel, entry, enabled, true);
+    }),
   });
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);

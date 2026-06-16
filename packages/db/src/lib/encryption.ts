@@ -11,8 +11,8 @@ const wrapped = managedNonce(gcm);
 export type CipherKey = Uint8Array & { readonly __brand: 'CipherKey' };
 
 export interface Cipher {
-  encrypt(plaintext: string, aad?: Uint8Array): string;
-  decrypt(ciphertextB64: string, aad?: Uint8Array): string;
+  encrypt: (plaintext: string, aad?: Uint8Array) => string;
+  decrypt: (ciphertextB64: string, aad?: Uint8Array) => string;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
