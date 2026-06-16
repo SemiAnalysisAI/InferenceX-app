@@ -16,8 +16,18 @@ const setReplayScrubber = (v: number) =>
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-const replayYAxisLastTick = () =>
-  cy.get('[data-testid="replay-panel-chart-0"] svg g.y-axis text').last().invoke('text');
+// Combined "<last-x-tick>|<last-y-tick>" signature so a change in EITHER axis is
+// detected. The run can grow in x, y, or both between frames, so asserting on
+// the y-axis alone would falsely fail when only x expands.
+const replayAxisExtent = () =>
+  cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
+    const svg = $svg[0];
+    const lastTick = (sel: string) => {
+      const els = [...svg.querySelectorAll(sel)];
+      return els.length > 0 ? (els.at(-1)!.textContent ?? '').trim() : '';
+    };
+    return `${lastTick('g.x-axis text')}|${lastTick('g.y-axis text')}`;
+  });
 
 describe('Inference Replay', () => {
   before(() => {
@@ -167,31 +177,41 @@ describe('Inference Replay', () => {
     });
   });
 
-  it('Fixed axes toggle fixes the axes to the whole run; toggling off refits per frame', () => {
+  it('Fixed axes stay constant across frames; toggling off refits per frame', () => {
     cy.get('body').then(($body) => {
       if ($body.find('[data-testid="replay-scrubber"]').length === 0) {
         cy.log('Replay history fixture has < 2 dates; skipping fixed-axes check');
         return;
       }
-      // Fixed axes is the default — the axis extent at the first frame already
-      // covers the whole run, so it matches the last frame's extent.
+      // Fixed axes is the default — the extent is the whole-run box, so the first
+      // and last frame share the same axes (this is the feature's core invariant,
+      // independent of which axis the frontier grows along).
       cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
       setReplayScrubber(0);
       cy.wait(300);
-      replayYAxisLastTick().then((fixedAtStart) => {
-        // Turn fixed axes off → the first frame refits to just that frame's
-        // (smaller) frontier, so the extent changes.
-        cy.get('[data-testid="replay-fixed-axes"]').click();
-        setReplayScrubber(0);
+      replayAxisExtent().then((fixedAtStart) => {
+        setReplayScrubber(1_000_000); // clamps to the scrubber max → last frame
         cy.wait(300);
-        replayYAxisLastTick().then((dynamicAtStart) => {
-          expect(
-            dynamicAtStart,
-            'per-frame axis extent at the first frame differs from the whole-run fixed extent',
-          ).not.to.equal(fixedAtStart);
+        replayAxisExtent().then((fixedAtEnd) => {
+          expect(fixedAtEnd, 'fixed axes are identical at the first and last frame').to.equal(
+            fixedAtStart,
+          );
+
+          // Turn fixed axes off → the first frame refits to just that frame's
+          // (smaller) frontier, so the extent differs from the whole-run box in
+          // at least one axis (compared as an x|y pair, not y alone).
+          cy.get('[data-testid="replay-fixed-axes"]').click();
+          setReplayScrubber(0);
+          cy.wait(300);
+          replayAxisExtent().then((dynamicAtStart) => {
+            expect(
+              dynamicAtStart,
+              'per-frame axes at the first frame differ from the whole-run fixed extent',
+            ).not.to.equal(fixedAtStart);
+          });
+          // Restore the default.
+          cy.get('[data-testid="replay-fixed-axes"]').click();
         });
-        // Restore the default.
-        cy.get('[data-testid="replay-fixed-axes"]').click();
       });
     });
   });
