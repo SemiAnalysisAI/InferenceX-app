@@ -187,12 +187,15 @@ export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
   if (entry.framework) {
+    // Resolve legacy/aliased framework names (e.g. atom-disagg → mooncake-atom) so chart
+    // point keys match the canonical keys built by buildAvailabilityHwKey for the GPU filter.
+    const fw = resolveFrameworkAlias(entry.framework);
     // Try framework as-is first, then disagg variant if it exists
-    const candidateDirect = `${normalizedHwName}_${entry.framework}`;
+    const candidateDirect = `${normalizedHwName}_${fw}`;
     if (isKnownGpu(candidateDirect)) {
       normalizedHwName = candidateDirect;
     } else if (entry.disagg) {
-      const candidateDisagg = `${normalizedHwName}_${entry.framework}-disagg`;
+      const candidateDisagg = `${normalizedHwName}_${fw}-disagg`;
       normalizedHwName = isKnownGpu(candidateDisagg) ? candidateDisagg : candidateDirect;
     } else {
       normalizedHwName = candidateDirect;

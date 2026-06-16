@@ -933,6 +933,20 @@ describe('getHardwareKey', () => {
   it('handles hw with no dashes', () => {
     expect(getHardwareKey(entry({ hw: 'h100', framework: '' }))).toBe('h100');
   });
+
+  it('resolves aliased frameworks to canonical keys (atom-disagg → mooncake-atom)', () => {
+    // Must match the canonical key buildAvailabilityHwKey builds for the GPU filter,
+    // otherwise disagg ATOMesh points are filtered out of the chart.
+    expect(getHardwareKey(entry({ hw: 'mi355x', framework: 'atom-disagg', disagg: true }))).toBe(
+      'mi355x_mooncake-atom',
+    );
+  });
+
+  it('keeps the non-aliased atom framework distinct from atom-disagg', () => {
+    expect(getHardwareKey(entry({ hw: 'mi355x', framework: 'atom', disagg: true }))).toBe(
+      'mi355x_atom',
+    );
+  });
 });
 
 // ===========================================================================
