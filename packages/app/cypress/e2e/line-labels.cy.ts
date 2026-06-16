@@ -104,10 +104,8 @@ describe('Line Labels Toggle', () => {
         'line label still follows the scatter points after zoom (foreground)',
       ).to.be.greaterThan(0);
     });
-
-    // Reset zoom so later tests start from the base view.
-    cy.get('[data-testid="scatter-graph"] svg').dblclick();
-    cy.wait(300);
+    // No zoom reset needed: the next test toggles labels off (zoom-agnostic) and
+    // the later tests re-visit the page fresh.
   });
 
   it('toggling Line Labels off removes label elements', () => {
