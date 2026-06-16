@@ -1326,11 +1326,6 @@ const ScatterGraph = React.memo(
             const LABEL_W = 120;
 
             if (isInteractivity) {
-              // Re-run greedy placement with zoomed scales
-              const placed: { x: number; y: number }[] = [];
-              const collides = (cx: number, cy: number) =>
-                placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
-
               // Deduplicate by group key — one curve per hw, or per (hw, precision)
               // when multiple precisions are shown (mirrors the static render).
               const bestByGroup = new Map<string, [string, InferenceData[]]>();
@@ -1346,70 +1341,60 @@ const ScatterGraph = React.memo(
               const visibleEntries = [...bestByGroup.values()].toSorted(
                 ([, a], [, b]) => newYScale(a[0].y) - newYScale(b[0].y),
               );
-
-              const zoomResults = new Map<string, { x: number; y: number; vis: boolean }>();
-              for (const [key, pts] of visibleEntries) {
-                const candidates = [
-                  pts[Math.min(1, pts.length - 1)],
-                  pts[Math.floor(pts.length / 2)],
-                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
-                  pts.at(-1)!,
-                ];
-                let found = false;
-                for (const pt of candidates) {
-                  const px = newXScale(pt.x);
-                  const py = newYScale(pt.y);
-                  if (!collides(px, py)) {
-                    zoomResults.set(key, { x: px, y: py, vis: true });
-                    placed.push({ x: px, y: py });
-                    found = true;
-                    break;
-                  }
-                }
-                if (!found) {
-                  zoomResults.set(key, {
-                    x: newXScale(pts[0].x),
-                    y: newYScale(pts[0].y),
-                    vis: false,
-                  });
-                }
-              }
-
-              // Overlay (unofficial) rooflines: same greedy placement against
-              // the same `placed` array so they stay non-overlapping with the
-              // official labels post-zoom.
               const overlayVisible = Object.entries(overlayRooflines)
                 .filter(
                   ([, group]) => activeOverlayHwTypes.has(group.hwKey) && group.points.length >= 2,
                 )
                 .toSorted(([, a], [, b]) => newYScale(a.points[0].y) - newYScale(b.points[0].y));
-              for (const [ovKey, group] of overlayVisible) {
-                const labelKey = `overlay-${ovKey}`;
-                const pts = group.points;
-                const candidates = [
-                  pts[Math.min(1, pts.length - 1)],
-                  pts[Math.floor(pts.length / 2)],
-                  pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
-                  pts.at(-1)!,
-                ];
-                let found = false;
-                for (const pt of candidates) {
-                  const px = newXScale(pt.x);
-                  const py = newYScale(pt.y);
-                  if (!collides(px, py)) {
-                    zoomResults.set(labelKey, { x: px, y: py, vis: true });
-                    placed.push({ x: px, y: py });
-                    found = true;
-                    break;
+
+              const zoomResults = new Map<string, { x: number; y: number; vis: boolean }>();
+
+              if (pinLineLabels) {
+                // Pinned (replay): keep each label on its stored data-space anchor
+                // under the zoomed scales instead of re-running greedy placement, so
+                // a zoom mid-replay preserves the same positional affinity as the
+                // render path. Always visible — positional stability is the goal.
+                const anchors = lineLabelAnchorRef.current;
+                const pinTo = (key: string, pts: InferenceData[]) => {
+                  const anchorX = anchors.get(key);
+                  const pt = anchorX === undefined ? pts.at(-1)! : pointNearestX(pts, anchorX);
+                  zoomResults.set(key, { x: newXScale(pt.x), y: newYScale(pt.y), vis: true });
+                };
+                for (const [key, pts] of visibleEntries) pinTo(key, pts);
+                for (const [ovKey, group] of overlayVisible)
+                  pinTo(`overlay-${ovKey}`, group.points);
+              } else {
+                // Re-run greedy placement with zoomed scales (static chart). Overlay
+                // rooflines share the same `placed` array so they stay non-
+                // overlapping with the official labels post-zoom.
+                const placed: { x: number; y: number }[] = [];
+                const collides = (cx: number, cy: number) =>
+                  placed.some((p) => Math.abs(p.y - cy) < LABEL_H && Math.abs(p.x - cx) < LABEL_W);
+                const greedyPlace = (key: string, pts: InferenceData[]) => {
+                  const candidates = [
+                    pts[Math.min(1, pts.length - 1)],
+                    pts[Math.floor(pts.length / 2)],
+                    pts[Math.max(0, Math.floor((pts.length * 2) / 3))],
+                    pts.at(-1)!,
+                  ];
+                  for (const pt of candidates) {
+                    const px = newXScale(pt.x);
+                    const py = newYScale(pt.y);
+                    if (!collides(px, py)) {
+                      zoomResults.set(key, { x: px, y: py, vis: true });
+                      placed.push({ x: px, y: py });
+                      return;
+                    }
                   }
-                }
-                if (!found) {
-                  zoomResults.set(labelKey, {
+                  zoomResults.set(key, {
                     x: newXScale(pts[0].x),
                     y: newYScale(pts[0].y),
                     vis: false,
                   });
-                }
+                };
+                for (const [key, pts] of visibleEntries) greedyPlace(key, pts);
+                for (const [ovKey, group] of overlayVisible)
+                  greedyPlace(`overlay-${ovKey}`, group.points);
               }
 
               zoomGroup.selectAll<SVGGElement, unknown>('.line-label').each(function () {
@@ -1453,7 +1438,10 @@ const ScatterGraph = React.memo(
                   y: newYScale(pt.y),
                 });
               }
-              if (zoomLabels.length > 1) {
+              // Skip the vertical de-overlap nudge while pinned (replay): the
+              // endpoints already move smoothly with the lines, and nudging
+              // reshuffles positions frame-to-frame (mirrors the render path).
+              if (zoomLabels.length > 1 && !pinLineLabels) {
                 const yRange = newYScale.range();
                 const top = Math.min(yRange[0], yRange[1]) + LABEL_H;
                 const bottom = Math.max(yRange[0], yRange[1]) - LABEL_H;
@@ -1853,36 +1841,10 @@ const ScatterGraph = React.memo(
           drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
       };
 
-      // ── Last layer: keep line labels in the foreground ──
-      // Line labels are created inside the rooflines layer, which must render
-      // *before* the dot groups so the roofline paths sit behind the points.
-      // That ordering would otherwise leave the labels painted under the scatter
-      // points and the overlay marks. Re-raise every `.line-label` to the end of
-      // the zoomGroup after all other layers have rendered (and on each zoom) so
-      // they always read as foreground. `.raise()` only reorders z-index — label
-      // x/y placement (and the hide-on-collision / vertical-nudge de-overlap in
-      // the rooflines layer) is untouched, so labels still never overlap one
-      // another. Mirrors GPUGraph, whose line-label layer is already rendered
-      // last. Selects overlay line labels (key `overlay-*`) too, so unofficial
-      // run overlays get the same foreground treatment.
-      const lineLabelForegroundLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'line-label-foreground',
-        render: (zoomGroup) => {
-          zoomGroup.selectAll('.line-label').raise();
-        },
-        onZoom: (zoomGroup) => {
-          zoomGroup.selectAll('.line-label').raise();
-        },
-      };
-
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
       result.push(speedOverlayLayer);
       result.push(knownIssueLayer);
-      // Keep the foreground line-label raise last so labels read above the
-      // known-issue annotations and every other layer.
-      result.push(lineLabelForegroundLayer);
       return result;
     }, [
       knownIssueAnnotations,
