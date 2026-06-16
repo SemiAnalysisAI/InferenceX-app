@@ -80,7 +80,11 @@ describe('Line Labels Toggle', () => {
   });
 
   it('appends the precision to each line label when multiple precisions are selected', () => {
-    cy.visit('/inference?i_linelabel=1&i_prec=fp4,fp8', {
+    // Pair the FP4+FP8 selection with a model that has both precisions in the
+    // fixtures. The default model (DeepSeek-V4-Pro) only has FP4, so
+    // `effectivePrecisions` would drop FP8 and the test couldn't observe the
+    // dual-precision labeling behavior.
+    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_linelabel=1&i_prec=fp4,fp8', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

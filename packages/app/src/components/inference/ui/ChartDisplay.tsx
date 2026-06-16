@@ -1,7 +1,8 @@
 'use client';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 import dynamic from 'next/dynamic';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
@@ -14,6 +15,11 @@ import type {
   TrendDataPoint,
 } from '@/components/inference/types';
 import { processOverlayChartData } from '@/components/inference/utils';
+import {
+  isRunComparisonEntry,
+  makeRunComparisonEntry,
+} from '@/components/inference/utils/comparisonEntry';
+import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
@@ -164,6 +170,58 @@ export default function ChartDisplay() {
     loading: changelogsLoading,
     totalDatesQueried,
   } = useComparisonChangelogs(selectedGPUs, selectedDateRange, dateRangeAvailableDates);
+
+  const modelDbKeys = useMemo(
+    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
+    [selectedModel],
+  );
+
+  // Stable run numbering shared by the changelog and the chart legend: each of a
+  // date's runs gets a fixed 1-based number (by start time) regardless of which
+  // are on the chart, so the two surfaces always show the same #N for a run and a
+  // removed run leaves a matching gap. Built from the same data-run enumeration
+  // the changelog uses.
+  const runNumbering = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of changelogs) {
+      dataRunsForDate(c.runConfigs, { modelDbKeys, selectedGPUs, selectedPrecisions }).forEach(
+        (run, idx) => {
+          map.set(makeRunComparisonEntry(c.date, run.runId), idx + 1);
+        },
+      );
+    }
+    return map;
+  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions]);
+
+  // Expand a plain-date selection into one entry per run once that date's runs are
+  // known. Picking a date that has multiple runs shows each run as its own series
+  // (matching the changelog, which renders a block per run) instead of a single
+  // merged "latest" line with no changelog row — keeping the legend and changelog
+  // in sync. Idempotent: after expansion no expandable plain date remains.
+  useEffect(() => {
+    const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
+    const scope = { modelDbKeys, selectedGPUs, selectedPrecisions };
+    setSelectedDates((prev) => {
+      let changed = false;
+      const out: string[] = [];
+      for (const entry of prev) {
+        if (isRunComparisonEntry(entry)) {
+          out.push(entry);
+          continue;
+        }
+        const rc = runConfigsByDate.get(entry);
+        const runs = rc ? dataRunsForDate(rc, scope) : [];
+        if (runs.length > 1) {
+          changed = true;
+          for (const run of runs) out.push(makeRunComparisonEntry(entry, run.runId));
+        } else {
+          out.push(entry);
+        }
+      }
+      if (!changed) return prev;
+      return [...new Set(out)];
+    });
+  }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedDates, setSelectedDates]);
 
   const [viewModes, setViewModes] = useState<Record<number, InferenceViewMode>>({});
   const replayHandlesRef = useRef<Record<number, ReplayLauncherHandle | null>>({});
@@ -342,7 +400,7 @@ export default function ChartDisplay() {
         <Card key={`skeleton-${index}`}>
           <Skeleton className="h-7 w-2/4 mb-1" />
           <Skeleton className="h-5 w-3/4 mb-2" />
-          <Skeleton className="h-[600px] w-full" />
+          <Skeleton className="h-150 w-full" />
         </Card>
       ))
     : effectiveGraphs.length === 0
@@ -546,9 +604,9 @@ export default function ChartDisplay() {
                       );
                     }
 
-                    return selectedDateRange.startDate &&
-                      selectedDateRange.endDate &&
-                      selectedGPUs.length > 0 ? (
+                    return selectedGPUs.length > 0 &&
+                      ((selectedDateRange.startDate && selectedDateRange.endDate) ||
+                        selectedDates.length > 0) ? (
                       <GPUGraph
                         chartId={`chart-${graphIndex}`}
                         modelLabel={graph.model}
@@ -561,6 +619,7 @@ export default function ChartDisplay() {
                         }`}
                         chartDefinition={graph.chartDefinition}
                         caption={chartCaption}
+                        runNumbering={runNumbering}
                       />
                     ) : (
                       <div className="relative">
@@ -583,10 +642,11 @@ export default function ChartDisplay() {
                           }
                         />
                         {selectedGPUs.length > 0 &&
-                          (!selectedDateRange.startDate || !selectedDateRange.endDate) && (
+                          (!selectedDateRange.startDate || !selectedDateRange.endDate) &&
+                          selectedDates.length === 0 && (
                             <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
                               <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-                                Select a date range to view GPU comparison
+                                Select a date range or add a run to view GPU comparison
                               </p>
                             </div>
                           )}
@@ -637,21 +697,21 @@ export default function ChartDisplay() {
                 changelogs={changelogs}
                 selectedGPUs={selectedGPUs}
                 selectedPrecisions={selectedPrecisions}
+                modelDbKeys={modelDbKeys}
                 loading={changelogsLoading}
                 totalDatesQueried={totalDatesQueried}
                 selectedDates={selectedDates}
                 selectedDateRange={selectedDateRange}
                 onAddDate={(date) => {
-                  if (!selectedDates.includes(date)) {
-                    setSelectedDates([...selectedDates, date]);
-                  }
+                  // Functional updater: adding several runs in quick succession must
+                  // each build on the latest state, not the value captured at render.
+                  setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
                 }}
                 onRemoveDate={(date) => {
-                  setSelectedDates(selectedDates.filter((d) => d !== date));
+                  setSelectedDates((prev) => prev.filter((d) => d !== date));
                 }}
                 onAddAllDates={(dates) => {
-                  const merged = [...new Set([...selectedDates, ...dates])];
-                  setSelectedDates(merged);
+                  setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
                 }}
                 firstAvailableDate={dateRangeAvailableDates[0]}
               />

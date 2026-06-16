@@ -23,6 +23,12 @@ export interface AlternatingLayerSpec {
   count: number;
   /** Color key for visual distinction */
   colorKey: 'attention' | 'ffn' | 'norm' | 'router' | 'expert';
+  /**
+   * Sliding-window size (in tokens) for this layer type, when it includes a
+   * local sliding-window attention branch. Rendered as `window=N` in the
+   * diagram. Omit for layer types that use full / non-windowed attention.
+   */
+  slidingWindow?: number;
 }
 
 /**
@@ -64,12 +70,22 @@ export interface ModelArchitecture {
   /** Intermediate dimension of the dense FFN layers (differs from MoE expert FFN dim) */
   denseFFNDim?: number;
   /**
+   * Number of leading MoE layers that use hash routing (token-id → fixed experts)
+   * instead of the learned gate. Rendered as a separate stacked prefix block.
+   */
+  hashRoutedLayers?: number;
+  /**
    * Alternating layer type pattern (e.g., gpt-oss uses sliding_attention/full_attention).
    * Each entry describes one category of layer and how many of that type exist.
    */
   alternatingLayers?: AlternatingLayerSpec[];
   /** Sliding window size in tokens (for models using sliding/local attention) */
   slidingWindow?: number;
+  /**
+   * Number of parallel residual streams for hyper-connections (mHC). When > 1,
+   * residual merges render as "mHC ×N" mixer nodes instead of a plain "+" add.
+   */
+  hyperConnections?: number;
   /** Context window size (in tokens) */
   contextWindow?: number;
   /** Special architectural features */
@@ -93,9 +109,11 @@ export interface ModelArchitecture {
  * - https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct
  * - https://huggingface.co/deepseek-ai/DeepSeek-R1-0528
  * - https://github.com/deepseek-ai/DeepSeek-V3
+ * - https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro (config.json, inference/model.py, DeepSeek_V4.pdf)
  * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
  * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
  * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
+ * - https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/config.json
  */
 export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   [Model.DeepSeek_R1]: {
@@ -123,6 +141,72 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     releaseDate: '2025-05-28',
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-R1-0528',
+  },
+  [Model.DeepSeek_V4_Pro]: {
+    model: Model.DeepSeek_V4_Pro,
+    totalParams: 1600, // 1.6T
+    activeParams: 49,
+    architectureType: 'moe',
+    attentionType: 'Hybrid',
+    // Hybrid CSA/HCA is a bespoke compressed-attention stack, not the standard
+    // Q/K/V GQA layout — render it as static blocks, not the GQA drill-down.
+    attentionExpandable: false,
+    numLayers: 61,
+    hiddenSize: 7168,
+    numHeads: 128,
+    // Shared single-latent KV (MLA-lineage MQA): num_key_value_heads = 1.
+    numKVHeads: 1,
+    headDim: 512,
+    vocabSize: 129280,
+    ffnDim: 3072, // moe_intermediate_size
+    numExperts: 385, // 384 routed + 1 shared
+    activeExperts: 6,
+    hasSharedExpert: true,
+    // First 3 layers use hash-routed MoE (shown as a separate prefix block); the
+    // remaining 58 learned-router layers interleave two compressed-attention
+    // variants. Every layer also carries a 128-token sliding-window branch plus a
+    // learnable attention sink. Counts below are the learned-router layers:
+    // 29 HCA + 29 CSA + 3 hash-routed = 61 (the extra MTP block is SWA-only).
+    hashRoutedLayers: 3,
+    alternatingLayers: [
+      {
+        label: 'Heavily Compressed Attention',
+        description:
+          'HCA (learned-router layers): the KV of every 128 tokens is consolidated into a single entry and attended densely, alongside a 128-token sliding window of uncompressed KV and a learnable attention sink.',
+        count: 29,
+        colorKey: 'attention',
+        slidingWindow: 128,
+      },
+      {
+        label: 'Compressed Sparse Attention',
+        description:
+          'CSA (learned-router layers): the KV of every 4 tokens is compressed to one entry, then a lightning indexer selects the top-1024 compressed blocks for sparse attention, alongside a 128-token sliding window and a learnable attention sink.',
+        count: 29,
+        colorKey: 'attention',
+        slidingWindow: 128,
+      },
+    ],
+    slidingWindow: 128,
+    hyperConnections: 4, // mHC: 4 parallel residual streams (hc_mult)
+    contextWindow: 1048576, // 1M
+    features: [
+      'Hybrid CSA + HCA Attention',
+      'Sliding window (128 tokens)',
+      'Attention Sink',
+      'MLA-style Shared-KV MQA',
+      'Lightning Indexer (sparse top-k)',
+      'Manifold-Constrained Hyper-Connections (mHC)',
+      'sqrt-softplus Routing',
+      'Auxiliary-loss-free Load Balancing',
+      'Hash Routing (first 3 layers)',
+      'Multi-Token Prediction',
+      'YaRN RoPE (1M context)',
+      'FP4 Experts + FP8 Mixed Precision',
+      'Muon Optimizer',
+    ],
+    releaseDate: '2026-06-08',
+    developer: 'DeepSeek',
+    sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro',
   },
   [Model.Llama3_3_70B]: {
     model: Model.Llama3_3_70B,
@@ -182,6 +266,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
         description: 'GQA with 128-token sliding window and learnable attention sink tokens',
         count: 18,
         colorKey: 'attention',
+        slidingWindow: 128,
       },
       {
         label: 'Causal Grouped Query Attention',
@@ -251,6 +336,39 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     releaseDate: '2025-10-25',
     developer: 'MiniMax',
     sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2',
+  },
+  [Model.MiniMax_M3]: {
+    model: Model.MiniMax_M3,
+    totalParams: 428,
+    activeParams: 23,
+    architectureType: 'moe',
+    // MiniMax Sparse Attention (MSA) is built on a GQA projection layout
+    // (64 Q / 4 KV heads) with sparse KV selection layered on top. Render it as
+    // a static attention block, not the standard GQA Q/K/V drill-down — same
+    // treatment as the M2.5 entry.
+    attentionType: 'GQA',
+    attentionExpandable: false,
+    numLayers: 60,
+    hiddenSize: 6144,
+    numHeads: 64,
+    numKVHeads: 4,
+    headDim: 128,
+    vocabSize: 200064,
+    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
+    numExperts: 129, // 128 routed + 1 shared
+    activeExperts: 4,
+    hasSharedExpert: true,
+    contextWindow: 1048576, // 1M
+    features: [
+      'MiniMax Sparse Attention (MSA)',
+      'GQA with QK Norm',
+      'Partial RoPE (rotary factor 0.5)',
+      'SwiGLU FFN',
+      'Native Multimodality (text/image/video)',
+      'MoE (128 routed + 1 shared experts, 4 active)',
+    ],
+    developer: 'MiniMax',
+    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M3',
   },
 };
 
@@ -483,6 +601,70 @@ export function getFFNSubBlocks(
       {
         name: 'Down Projection',
         detail: hiddenSize ? `\u2192 ${hiddenSize.toLocaleString()}` : undefined,
+        type: 'projection',
+      },
+    ],
+  };
+}
+
+/**
+ * Hybrid attention sub-blocks (DeepSeek V4-style CSA / HCA layers).
+ *
+ * Unlike a standard GQA layer, every hybrid attention layer fuses two KV
+ * sources for each query: a local sliding-window branch (recent uncompressed
+ * tokens) and a compressed-KV branch, combined by a shared-KV MQA with a
+ * learnable attention sink. The compressed branch depends on the layer type —
+ * CSA runs a lightning indexer (sparse top-k) over lightly compressed KV, while
+ * HCA attends densely over heavily compressed KV. Rendering this as a flow makes
+ * the sliding-window attention an explicit, visible block rather than a one-line
+ * `window=N` annotation.
+ */
+export function getHybridAttentionSubBlocks(
+  arch: ModelArchitecture,
+  spec: AlternatingLayerSpec,
+): SubBlockFlow {
+  const win = spec.slidingWindow ?? arch.slidingWindow;
+  const isSparse = /sparse/iu.test(spec.label);
+
+  // Both branches are KV *sources* whose selected indices are unioned and fed to
+  // a single shared-KV MQA softmax — they are not two attentions merged after
+  // the fact. The local branch contributes the recent sliding-window tokens; the
+  // compressed branch contributes selected long-range tokens. CSA lightly
+  // compresses (1/4) then sparsely selects via the learned lightning indexer;
+  // HCA compresses heavily (1/128) and keeps the few resulting entries.
+  const localPath: ArchSubBlock[] = [
+    {
+      name: 'Sliding Window',
+      detail: win ? `last ${win} tokens` : 'local KV',
+      type: 'attention',
+    },
+  ];
+
+  const compressedPath: ArchSubBlock[] = isSparse
+    ? [
+        { name: 'Token Compression', detail: '1 entry / 4 tokens', type: 'operation' },
+        { name: 'Lightning Indexer', detail: 'sparse top-1024', type: 'attention' },
+      ]
+    : [{ name: 'Heavy Compression', detail: '1 entry / 128 tokens', type: 'attention' }];
+
+  return {
+    layout: 'parallel',
+    leftLabel: 'Local',
+    rightLabel: 'Compressed',
+    leftPath: localPath,
+    rightPath: compressedPath,
+    // The union of both branches' indices is consumed by one MQA softmax that
+    // carries a per-head learnable attention sink (a softmax-denominator bias,
+    // not literal sink tokens) — hence the sink lives on the MQA block here.
+    mergeBlocks: [
+      {
+        name: 'Shared-KV MQA + Sink',
+        detail: arch.numHeads ? `${arch.numHeads} heads · ${arch.numKVHeads ?? 1} KV` : undefined,
+        type: 'attention',
+      },
+      {
+        name: 'Output Projection',
+        detail: arch.hiddenSize ? `→ ${arch.hiddenSize.toLocaleString()}` : undefined,
         type: 'projection',
       },
     ],

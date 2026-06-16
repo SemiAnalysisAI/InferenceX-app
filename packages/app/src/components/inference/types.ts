@@ -481,6 +481,14 @@ export interface ScatterGraphProps {
    * playback).
    */
   niceAxes?: boolean;
+  /**
+   * Stable run numbering (entry string `date~rRunId` → 1-based number) shared with
+   * the comparison changelog so legend labels match it exactly. Numbers index ALL
+   * of a date's runs (not just the ones on the chart), so a removed run leaves a
+   * gap that lines up with the changelog's still-listed "Add to chart" run. When
+   * omitted, GPUGraph falls back to gap-free numbering of the on-chart series.
+   */
+  runNumbering?: Map<string, number>;
 }
 /**
  * @file types.ts
@@ -639,7 +647,8 @@ export interface InferenceChartContextType {
   setSelectedGPUs: (gpus: string[]) => void;
   availableGPUs: { value: string; label: string }[];
   selectedDates: string[];
-  setSelectedDates: (dates: string[]) => void;
+  /** Accepts a value or a state-updater fn (for safe rapid successive adds). */
+  setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   selectedDateRange: { startDate: string; endDate: string };
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
   userCosts: Record<string, number | undefined> | null;

@@ -18,6 +18,7 @@ import {
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
+  getHybridAttentionSubBlocks,
   getModelArchitecture,
 } from '@/lib/model-architectures';
 
@@ -106,6 +107,9 @@ function renderDiagram(
   const subBlockH = 34;
   const subArrowH = 12;
   const subPadY = 10;
+  // Gap between a block and its drill-down flow so the dashed expansion rect
+  // reads as separate from the block above it (not overlapping its border).
+  const drillGap = 8;
 
   // Architecture flags
   const isMoE = arch.architectureType === 'moe';
@@ -133,6 +137,11 @@ function renderDiagram(
   const denseAttnExpanded = isAttnExpandable && expandedBlocks.has('denseAttention');
   const denseFFNExpanded = expandedBlocks.has('denseFFN');
 
+  // Hash-routed MoE prefix block (DeepSeek V4: first N layers route by token id).
+  const hasHashBlock = isMoE && (arch.hashRoutedLayers ?? 0) > 0;
+  const hashBlockExpanded = hasHashBlock && expandedBlocks.has('hashBlock');
+  const hashExpertsExpanded = hasHashBlock && expandedBlocks.has('hashExperts');
+
   // Alternating block expand states (for models with alternating attention like gpt-oss)
   const altBlockExpanded = [
     hasAlternatingLayers && expandedBlocks.has('altBlock0'),
@@ -142,6 +151,21 @@ function renderDiagram(
     hasAlternatingLayers && expandedBlocks.has('altExperts0'),
     hasAlternatingLayers && expandedBlocks.has('altExperts1'),
   ];
+
+  // Hybrid models (DeepSeek V4) expose an expandable attention drill-down inside
+  // each alternating block, revealing the sliding-window branch as an explicit
+  // block alongside the compressed branch. gpt-oss (AlternatingSinkGQA) keeps a
+  // static attention block.
+  const altAttnExpandable = hasAlternatingLayers && arch.attentionType === 'Hybrid';
+  const altAttnExpanded = [
+    altAttnExpandable && expandedBlocks.has('altAttention0'),
+    altAttnExpandable && expandedBlocks.has('altAttention1'),
+  ];
+  const altAttnFlow: (SubBlockFlow | null)[] = altAttnExpandable
+    ? [0, 1].map((i) =>
+        alternatingSpecs[i] ? getHybridAttentionSubBlocks(arch, alternatingSpecs[i]) : null,
+      )
+    : [null, null];
 
   // Calculate flow height for either sequential or parallel layouts
   function getFlowHeight(flow: SubBlockFlow, hasLabel: boolean): number {
@@ -201,6 +225,11 @@ function renderDiagram(
     altExpertsExpanded[0] ? getFlowHeight(ffnFlow, true) : 0,
     altExpertsExpanded[1] ? getFlowHeight(ffnFlow, true) : 0,
   ];
+  const altAttnExpandedH = [
+    altAttnExpanded[0] && altAttnFlow[0] ? getFlowHeight(altAttnFlow[0], false) : 0,
+    altAttnExpanded[1] && altAttnFlow[1] ? getFlowHeight(altAttnFlow[1], false) : 0,
+  ];
+  const hashExpertsExpandedH = hashExpertsExpanded ? getFlowHeight(ffnFlow, true) : 0;
 
   // Compute vertical positions
   let y = pad.top;
@@ -236,6 +265,7 @@ function renderDiagram(
       denseAttnY = y;
       y += blockH;
 
+      if (denseAttnExpanded) y += drillGap;
       denseAttnExpandedStartY = y;
       if (denseAttnExpanded) {
         y += denseAttnExpandedH;
@@ -268,11 +298,63 @@ function renderDiagram(
     y += arrowH;
   }
 
+  // === HASH-ROUTED MoE PREFIX BLOCK (DeepSeek V4: first N layers use hash routing) ===
+  let hashTxStart = 0;
+  let hashNorm1Y = 0;
+  let hashAttnY = 0;
+  let hashMerge1Y = 0;
+  let hashNorm2Y = 0;
+  let hashExpertY = 0;
+  let hashFFNExpandedStartY = 0;
+  let hashMerge2Y = 0;
+  let hashTxEnd = 0;
+
+  if (hasHashBlock) {
+    hashTxStart = y;
+    if (hashBlockExpanded) {
+      y += 14;
+
+      hashNorm1Y = y;
+      y += smallH + arrowH;
+
+      hashAttnY = y;
+      y += blockH;
+
+      y += 4;
+      hashMerge1Y = y + mergeGap / 2;
+      y += mergeGap;
+
+      y += arrowH;
+      hashNorm2Y = y;
+      y += smallH + arrowH;
+
+      // Hash Router + Expert grid (drawExpertGrid lays out router above eY)
+      y += blockH + arrowH;
+      hashExpertY = y;
+      y += expertGridH;
+
+      hashFFNExpandedStartY = y;
+      if (hashExpertsExpanded) {
+        y += hashExpertsExpandedH;
+      }
+
+      hashMerge2Y = y + mergeGap / 2;
+      y += mergeGap;
+
+      y += 14;
+    } else {
+      y += collapsedTxH;
+    }
+    hashTxEnd = y;
+    y += arrowH;
+  }
+
   // === ALTERNATING TRANSFORMER BLOCKS (for models like gpt-oss with alternating attention) ===
   const altBlockStart = [0, 0];
   const altBlockEnd = [0, 0];
   const altNorm1Y = [0, 0];
   const altAttnY = [0, 0];
+  const altAttnExpandedStartY = [0, 0];
   const altMerge1Y = [0, 0];
   const altNorm2Y = [0, 0];
   const altRouterY = [0, 0];
@@ -310,6 +392,13 @@ function renderDiagram(
 
         altAttnY[bi] = y;
         y += blockH;
+
+        // Expanded hybrid-attention sub-blocks (sliding window + compressed)
+        if (altAttnExpanded[bi]) y += drillGap;
+        altAttnExpandedStartY[bi] = y;
+        if (altAttnExpanded[bi]) {
+          y += altAttnExpandedH[bi];
+        }
 
         y += 4;
         altMerge1Y[bi] = y + mergeGap / 2;
@@ -361,6 +450,7 @@ function renderDiagram(
     y += blockH;
 
     // Expanded attention sub-blocks (only for non-MLA, non-AlternatingSinkGQA)
+    if (attnExpanded) y += drillGap;
     attnExpandedStartY = y;
     if (attnExpanded) {
       y += attnExpandedH;
@@ -466,34 +556,85 @@ function renderDiagram(
       .attr('marker-end', 'url(#arch-arrow)');
   }
 
+  // Draw a +, −, or × glyph from geometric strokes, perfectly centered at
+  // (gx, gy). Rendering these as lines instead of <text> sidesteps font
+  // baseline drift, which left the symbol sitting slightly low inside the
+  // merge / expand circles regardless of dy tuning.
+  function drawCircleGlyph(gx: number, gy: number, color: string, symbol: string) {
+    const arm = 5;
+    const seg = (x1: number, y1: number, x2: number, y2: number) =>
+      g
+        .append('line')
+        .attr('x1', x1)
+        .attr('y1', y1)
+        .attr('x2', x2)
+        .attr('y2', y2)
+        .attr('stroke', color)
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round')
+        .style('pointer-events', 'none');
+    if (symbol === '×') {
+      seg(gx - arm, gy - arm, gx + arm, gy + arm);
+      seg(gx - arm, gy + arm, gx + arm, gy - arm);
+    } else {
+      seg(gx - arm, gy, gx + arm, gy); // horizontal arm (+ and −)
+      if (symbol !== '−') seg(gx, gy - arm, gx, gy + arm); // vertical arm (+ only)
+    }
+  }
+
+  // Models with hyper-connections (mHC) replace the plain residual add with a
+  // multi-stream mixer; when present, residual merges render as an "mHC ×N" pill
+  // instead of a "+" circle. N = number of parallel residual streams.
+  const hcStreams = arch.hyperConnections ?? 0;
+  const isHyperConn = hcStreams > 1;
+
   function drawResidualBypass(branchY: number, mergeY: number) {
+    // Tap the residual from the input stream ABOVE the norm (in the arrow gap)
+    // so the horizontal connector doesn't run across the RMSNorm block.
+    const tapY = branchY - arrowH / 2;
+    // Keep the node's vertical half-height = circleR so the spine arrows (drawn
+    // by callers to mergeY ± circleR) still meet its top/bottom edges.
+    const nodeHalfW = isHyperConn ? 25 : circleR;
     bgG
       .append('path')
       .attr(
         'd',
-        `M ${cx} ${branchY} L ${residLeftX} ${branchY} L ${residLeftX} ${mergeY} L ${cx - circleR} ${mergeY}`,
+        `M ${cx} ${tapY} L ${residLeftX} ${tapY} L ${residLeftX} ${mergeY} L ${cx - nodeHalfW} ${mergeY}`,
       )
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1.5)
       .attr('opacity', 0.6);
-    g.append('circle')
-      .attr('cx', cx)
-      .attr('cy', mergeY)
-      .attr('r', circleR)
-      .attr('fill', bgSubtle)
-      .attr('stroke', mutedFg)
-      .attr('stroke-width', 1.5);
-    g.append('text')
-      .attr('x', cx)
-      .attr('y', mergeY)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('fill', fg)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .attr('font-family', 'inherit')
-      .text('+');
+    if (isHyperConn) {
+      g.append('rect')
+        .attr('x', cx - nodeHalfW)
+        .attr('y', mergeY - circleR)
+        .attr('width', nodeHalfW * 2)
+        .attr('height', circleR * 2)
+        .attr('rx', circleR)
+        .attr('fill', bgSubtle)
+        .attr('stroke', mutedFg)
+        .attr('stroke-width', 1.5);
+      g.append('text')
+        .attr('x', cx)
+        .attr('y', mergeY)
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.35em')
+        .attr('fill', fg)
+        .attr('font-size', '8.5px')
+        .attr('font-weight', 700)
+        .attr('font-family', 'inherit')
+        .text(`mHC ×${hcStreams}`);
+    } else {
+      g.append('circle')
+        .attr('cx', cx)
+        .attr('cy', mergeY)
+        .attr('r', circleR)
+        .attr('fill', bgSubtle)
+        .attr('stroke', mutedFg)
+        .attr('stroke-width', 1.5);
+      drawCircleGlyph(cx, mergeY, fg, '+');
+    }
   }
 
   function drawBlock(
@@ -520,7 +661,7 @@ function renderDiagram(
       .attr('x', x + w / 2)
       .attr('y', by + h / 2 - (subText ? 7 : 0))
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '13px')
       .attr('font-weight', 600)
@@ -532,7 +673,7 @@ function renderDiagram(
         .attr('x', x + w / 2)
         .attr('y', by + h / 2 + 10)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-family', 'inherit')
@@ -566,7 +707,7 @@ function renderDiagram(
       .attr('x', x + w / 2 - 8)
       .attr('y', by + h / 2 - (subText ? 7 : 0))
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '13px')
       .attr('font-weight', 600)
@@ -579,7 +720,7 @@ function renderDiagram(
         .attr('x', x + w / 2 - 8)
         .attr('y', by + h / 2 + 10)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-family', 'inherit')
@@ -599,16 +740,7 @@ function renderDiagram(
       .attr('stroke-width', 1)
       .style('pointer-events', 'none');
 
-    g.append('text')
-      .attr('x', iconX)
-      .attr('y', iconY)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('fill', c.stroke)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .style('pointer-events', 'none')
-      .text(isBlockExpanded ? '\u2212' : '+');
+    drawCircleGlyph(iconX, iconY, c.stroke, isBlockExpanded ? '\u2212' : '+');
 
     g.append('rect')
       .attr('x', x)
@@ -649,7 +781,7 @@ function renderDiagram(
       .attr('x', bx + subBw / 2)
       .attr('y', by + subBlockH / 2 - (block.detail ? 5 : 0))
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', fontSize.name)
       .attr('font-weight', 500)
@@ -661,7 +793,7 @@ function renderDiagram(
         .attr('x', bx + subBw / 2)
         .attr('y', by + subBlockH / 2 + 8)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', fontSize.detail)
         .attr('font-family', 'inherit')
@@ -698,7 +830,7 @@ function renderDiagram(
         .attr('x', x + w / 2)
         .attr('y', sy + 8)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '10px')
         .attr('font-weight', 600)
@@ -723,7 +855,7 @@ function renderDiagram(
           .attr('x', leftCx)
           .attr('y', sy + 6)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', '9px')
           .attr('font-weight', 600)
@@ -735,7 +867,7 @@ function renderDiagram(
           .attr('x', rightCx)
           .attr('y', sy + 6)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', '9px')
           .attr('font-weight', 600)
@@ -752,6 +884,16 @@ function renderDiagram(
     const parallelStartY = sy;
     const colFontSize = { name: '10px', detail: '8px' };
 
+    const maxRows = Math.max(flow.leftPath.length, flow.rightPath.length);
+    const rowsH = (n: number) => n * subBlockH + Math.max(0, n - 1) * subArrowH;
+    const colAreaH = rowsH(maxRows);
+    // Vertically center each column within the shared column area so an unequal
+    // split (e.g. 1 local vs 2 compressed) reads as an intentional branch merge
+    // rather than leaving the shorter column's connector dangling as a long
+    // unattached line beside the taller column.
+    const leftStartY = parallelStartY + (colAreaH - rowsH(flow.leftPath.length)) / 2;
+    const rightStartY = parallelStartY + (colAreaH - rowsH(flow.rightPath.length)) / 2;
+
     g.append('line')
       .attr('x1', mergeCx)
       .attr('y1', splitTopY)
@@ -761,10 +903,7 @@ function renderDiagram(
       .attr('stroke-width', 1);
 
     g.append('path')
-      .attr(
-        'd',
-        `M ${mergeCx} ${splitMidY} L ${leftCx} ${splitMidY} L ${leftCx} ${parallelStartY - 2}`,
-      )
+      .attr('d', `M ${mergeCx} ${splitMidY} L ${leftCx} ${splitMidY} L ${leftCx} ${leftStartY - 2}`)
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1)
@@ -773,14 +912,14 @@ function renderDiagram(
     g.append('path')
       .attr(
         'd',
-        `M ${mergeCx} ${splitMidY} L ${rightCx} ${splitMidY} L ${rightCx} ${parallelStartY - 2}`,
+        `M ${mergeCx} ${splitMidY} L ${rightCx} ${splitMidY} L ${rightCx} ${rightStartY - 2}`,
       )
       .attr('fill', 'none')
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1)
       .attr('marker-end', 'url(#arch-arrow-sub)');
 
-    let lsy = parallelStartY;
+    let lsy = leftStartY;
     for (let i = 0; i < flow.leftPath.length; i++) {
       drawSingleSubBlock(flow.leftPath[i], leftX, lsy, colW, colFontSize);
       lsy += subBlockH;
@@ -798,7 +937,7 @@ function renderDiagram(
     }
     const leftEndY = lsy;
 
-    let rsy = parallelStartY;
+    let rsy = rightStartY;
     for (let i = 0; i < flow.rightPath.length; i++) {
       drawSingleSubBlock(flow.rightPath[i], rightX, rsy, colW, colFontSize);
       rsy += subBlockH;
@@ -816,9 +955,7 @@ function renderDiagram(
     }
     const rightEndY = rsy;
 
-    const maxRows = Math.max(flow.leftPath.length, flow.rightPath.length);
-    const mergeStartY =
-      parallelStartY + maxRows * subBlockH + Math.max(0, maxRows - 1) * subArrowH + subArrowH + 4;
+    const mergeStartY = parallelStartY + colAreaH + subArrowH + 4;
 
     const subInnerXLocal = x + 16;
     const subInnerWLocal = w - 40;
@@ -887,16 +1024,7 @@ function renderDiagram(
           .attr('fill', bgSubtle)
           .attr('stroke', mutedFg)
           .attr('stroke-width', 1.5);
-        g.append('text')
-          .attr('x', mergeCx)
-          .attr('y', circleCy)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('fill', fg)
-          .attr('font-size', '14px')
-          .attr('font-weight', 700)
-          .attr('font-family', 'inherit')
-          .text(block.circleSymbol);
+        drawCircleGlyph(mergeCx, circleCy, fg, block.circleSymbol);
       } else {
         drawSingleSubBlock(block, subInnerXLocal, msy, subInnerWLocal);
       }
@@ -963,7 +1091,7 @@ function renderDiagram(
             .attr('x', lcx)
             .attr('y', sy + 6)
             .attr('text-anchor', 'middle')
-            .attr('dominant-baseline', 'central')
+            .attr('dy', '0.35em')
             .attr('fill', mutedFg)
             .attr('font-size', '9px')
             .attr('font-weight', 600)
@@ -1227,7 +1355,7 @@ function renderDiagram(
       .attr('x', x + w / 2 - 8)
       .attr('y', by + h / 2 - 8)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', fg)
       .attr('font-size', '13px')
       .attr('font-weight', 600)
@@ -1239,7 +1367,7 @@ function renderDiagram(
       .attr('x', x + w / 2 - 8)
       .attr('y', by + h / 2 + 10)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', mutedFg)
       .attr('font-size', '11px')
       .attr('font-family', 'inherit')
@@ -1256,16 +1384,7 @@ function renderDiagram(
       .attr('stroke', borderColor)
       .attr('stroke-width', 1)
       .style('pointer-events', 'none');
-    g.append('text')
-      .attr('x', iconX)
-      .attr('y', iconY)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('fill', mutedFg)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .style('pointer-events', 'none')
-      .text('+');
+    drawCircleGlyph(iconX, iconY, mutedFg, '+');
 
     g.append('rect')
       .attr('x', x)
@@ -1318,9 +1437,27 @@ function renderDiagram(
     .filter(Boolean)
     .join('  \u00B7  ');
   drawBlock(pad.left, embedY, bw, blockH, 'embedding', 'Token Embedding', embedSub || undefined);
+
+  // A block's incoming arrow should land on its first RMSNorm when the block is
+  // expanded (so there's a continuous line into the norm, through the container
+  // border), or on the block's top when collapsed.
+  const denseEntryY = denseTxExpanded ? denseNorm1Y : denseTxStart;
+  const hashEntryY = hashBlockExpanded ? hashNorm1Y : hashTxStart;
+  const altEntryY = [
+    altBlockExpanded[0] ? altNorm1Y[0] : altBlockStart[0],
+    altBlockExpanded[1] ? altNorm1Y[1] : altBlockStart[1],
+  ];
+  const mainEntryY = txExpanded ? norm1Y : txStart;
+
   drawArrow(
     embedY + blockH,
-    hasDenseLayers ? denseTxStart : hasAlternatingLayers ? altBlockStart[0] : txStart,
+    hasDenseLayers
+      ? denseEntryY
+      : hasHashBlock
+        ? hashEntryY
+        : hasAlternatingLayers
+          ? altEntryY[0]
+          : mainEntryY,
   );
 
   // === DENSE TRANSFORMER BLOCK (for MoE models with initial dense layers) ===
@@ -1354,7 +1491,7 @@ function renderDiagram(
         .attr('x', width - pad.right - denseBadgeW / 2 - 4)
         .attr('y', denseTxStart)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '11px')
         .attr('font-weight', 600)
@@ -1448,7 +1585,10 @@ function renderDiagram(
     }
 
     // Arrow from dense block to next block
-    drawArrow(denseTxEnd, hasAlternatingLayers ? altBlockStart[0] : txStart);
+    drawArrow(
+      denseTxEnd,
+      hasHashBlock ? hashEntryY : hasAlternatingLayers ? altEntryY[0] : mainEntryY,
+    );
   }
 
   // Compute labels
@@ -1466,11 +1606,15 @@ function renderDiagram(
     n2Y: number,
     m2Y: number,
     expertBlockId: string,
+    routerLabel = 'MoE Router',
+    routerSubOverride?: string,
   ) {
     const routedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
-    const routerSub = `Top-${arch.activeExperts} of ${routedCount} routed${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+    const routerSub =
+      routerSubOverride ??
+      `Top-${arch.activeExperts} of ${routedCount} routed${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
     const rY = n2Y + smallH + arrowH;
-    drawBlock(innerX, rY, innerW, blockH, 'router', 'MoE Router', routerSub);
+    drawBlock(innerX, rY, innerW, blockH, 'router', routerLabel, routerSub);
     drawArrow(rY + blockH, rY + blockH + arrowH);
 
     const ec = getColor('expert', isDark);
@@ -1512,7 +1656,7 @@ function renderDiagram(
         .attr('x', ex + expertSize / 2)
         .attr('y', ey + expertSize / 2)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', isActive ? fg : mutedFg)
         .attr('font-size', '9px')
         .attr('font-weight', isActive ? 600 : 400)
@@ -1527,7 +1671,7 @@ function renderDiagram(
         .attr('x', ex + expertSize / 2)
         .attr('y', ey + expertSize / 2)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '14px')
         .attr('font-weight', 700)
@@ -1549,7 +1693,7 @@ function renderDiagram(
         .attr('x', ex + expertSize / 2)
         .attr('y', ey + expertSize / 2)
         .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .attr('dy', '0.35em')
         .attr('fill', mutedFg)
         .attr('font-size', '9px')
         .attr('font-weight', 600)
@@ -1568,16 +1712,7 @@ function renderDiagram(
       .attr('stroke', ec.stroke)
       .attr('stroke-width', 1)
       .style('pointer-events', 'none');
-    g.append('text')
-      .attr('x', expIconX)
-      .attr('y', expIconY)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('fill', ec.stroke)
-      .attr('font-size', '14px')
-      .attr('font-weight', 700)
-      .style('pointer-events', 'none')
-      .text(isExpExpanded ? '\u2212' : '+');
+    drawCircleGlyph(expIconX, expIconY, ec.stroke, isExpExpanded ? '\u2212' : '+');
 
     g.append('rect')
       .attr('x', innerX)
@@ -1599,6 +1734,114 @@ function renderDiagram(
     const expertBottom = isExpExpanded ? expandedStartY + expandedH : eY + expertGridH;
     drawArrow(expertBottom, m2Y - circleR);
     drawResidualBypass(n2Y, m2Y);
+  }
+
+  // === HASH-ROUTED MoE PREFIX BLOCK (DeepSeek V4: first N layers route by token id) ===
+  if (hasHashBlock) {
+    if (hashBlockExpanded) {
+      // Container
+      g.append('rect')
+        .attr('x', pad.left - 4)
+        .attr('y', hashTxStart)
+        .attr('width', bw + 8)
+        .attr('height', hashTxEnd - hashTxStart)
+        .attr('rx', 10)
+        .attr('fill', 'none')
+        .attr('stroke', borderColor)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '6,3');
+
+      // Collapse badge
+      const hashBadge = `− ×${arch.hashRoutedLayers} layers`;
+      const hashBadgeW = hashBadge.length * 7 + 16;
+      g.append('rect')
+        .attr('x', width - pad.right - hashBadgeW - 4)
+        .attr('y', hashTxStart - 11)
+        .attr('width', hashBadgeW)
+        .attr('height', 22)
+        .attr('rx', 11)
+        .attr('fill', bgSubtle)
+        .attr('stroke', borderColor)
+        .attr('stroke-width', 1);
+      g.append('text')
+        .attr('x', width - pad.right - hashBadgeW / 2 - 4)
+        .attr('y', hashTxStart)
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.35em')
+        .attr('fill', mutedFg)
+        .attr('font-size', '11px')
+        .attr('font-weight', 600)
+        .attr('font-family', 'inherit')
+        .text(hashBadge);
+      g.append('rect')
+        .attr('x', width - pad.right - hashBadgeW - 4)
+        .attr('y', hashTxStart - 11)
+        .attr('width', hashBadgeW)
+        .attr('height', 22)
+        .attr('rx', 11)
+        .attr('fill', 'transparent')
+        .style('cursor', 'pointer')
+        .attr('data-testid', 'collapse-hashBlock')
+        .on('click', () => onBlockClick('hashBlock'));
+
+      // RMSNorm 1
+      drawBlock(innerX, hashNorm1Y, innerW, smallH, 'norm', 'RMSNorm');
+      drawArrow(hashNorm1Y + smallH, hashAttnY);
+
+      // Attention — static hybrid block (same attention stack as the rest)
+      const hashHeadSub = [
+        arch.numHeads ? `${arch.numHeads} heads` : null,
+        arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
+      ]
+        .filter(Boolean)
+        .join('  ·  ');
+      drawBlock(
+        innerX,
+        hashAttnY,
+        innerW,
+        blockH,
+        'attention',
+        attnLabel,
+        hashHeadSub || undefined,
+      );
+
+      drawArrow(hashAttnY + blockH + 4, hashMerge1Y - circleR);
+      drawResidualBypass(hashNorm1Y, hashMerge1Y);
+      drawArrow(hashMerge1Y + circleR, hashNorm2Y);
+
+      // RMSNorm 2
+      drawBlock(innerX, hashNorm2Y, innerW, smallH, 'norm', 'RMSNorm');
+      drawArrow(hashNorm2Y + smallH, hashNorm2Y + smallH + arrowH);
+
+      // Hash Router + Expert grid (token-id → fixed experts, not a learned gate)
+      const hashRoutedCount = arch.hasSharedExpert ? (arch.numExperts || 0) - 1 : arch.numExperts;
+      const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${arch.hasSharedExpert ? ' + 1 shared' : ''}`;
+      drawExpertGrid(
+        hashExpertY,
+        hashExpertsExpanded,
+        hashExpertsExpandedH,
+        hashFFNExpandedStartY,
+        hashNorm2Y,
+        hashMerge2Y,
+        'hashExperts',
+        'Hash Router',
+        hashRouterSub,
+      );
+    } else {
+      const hashSub = `×${arch.hashRoutedLayers} first layers · token-id → experts`;
+      drawCollapsedTransformerBlock(
+        pad.left,
+        hashTxStart,
+        bw,
+        collapsedTxH,
+        'Hash-Routed MoE',
+        hashSub,
+        'hashBlock',
+      );
+    }
+
+    // Arrow from the hash block to the first alternating block (or main transformer)
+    drawArrow(hashTxEnd, hasAlternatingLayers ? altEntryY[0] : mainEntryY);
   }
 
   // === ALTERNATING TRANSFORMER BLOCKS (gpt-oss style) ===
@@ -1639,7 +1882,7 @@ function renderDiagram(
           .attr('x', width - pad.right - badgeW / 2 - 4)
           .attr('y', altBlockStart[bi])
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', '11px')
           .attr('font-weight', 600)
@@ -1660,20 +1903,44 @@ function renderDiagram(
         drawBlock(innerX, altNorm1Y[bi], innerW, smallH, 'norm', 'RMSNorm');
         drawArrow(altNorm1Y[bi] + smallH, altAttnY[bi]);
 
-        // Attention (non-expandable — AlternatingSinkGQA)
+        // Attention — expandable hybrid drill-down (DeepSeek V4 CSA/HCA) or a
+        // static block (gpt-oss AlternatingSinkGQA).
         const headSub = [
           arch.numHeads ? `${arch.numHeads} heads` : null,
           arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
         ]
           .filter(Boolean)
           .join('  \u00B7  ');
-        const attnSub =
-          bi === 0 && arch.slidingWindow
-            ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${arch.slidingWindow}`
-            : headSub || undefined;
-        drawBlock(innerX, altAttnY[bi], innerW, blockH, 'attention', spec.label, attnSub);
+        // Sliding-window note is per layer-type: a hybrid model (e.g. DeepSeek
+        // V4) carries the window on every attention variant, whereas gpt-oss
+        // only puts it on its sliding block. Drive it off the spec, not bi.
+        const specWindow = spec.slidingWindow;
+        const attnSub = specWindow
+          ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${specWindow}`
+          : headSub || undefined;
+        if (altAttnExpandable) {
+          drawExpandableBlock(
+            innerX,
+            altAttnY[bi],
+            innerW,
+            blockH,
+            'attention',
+            spec.label,
+            attnSub,
+            altAttnExpanded[bi],
+            `altAttention${bi}`,
+          );
+          const flow = altAttnFlow[bi];
+          if (altAttnExpanded[bi] && flow) {
+            drawFlow(flow, altAttnExpandedStartY[bi], innerX, innerW);
+          }
+        } else {
+          drawBlock(innerX, altAttnY[bi], innerW, blockH, 'attention', spec.label, attnSub);
+        }
 
-        const aBottom = altAttnY[bi] + blockH + 4;
+        const aBottom = altAttnExpanded[bi]
+          ? altAttnExpandedStartY[bi] + altAttnExpandedH[bi] + 4
+          : altAttnY[bi] + blockH + 4;
         drawArrow(aBottom, altMerge1Y[bi] - circleR);
         drawResidualBypass(altNorm1Y[bi], altMerge1Y[bi]);
         drawArrow(altMerge1Y[bi] + circleR, altNorm2Y[bi]);
@@ -1709,7 +1976,7 @@ function renderDiagram(
       // Draw alternating indicator between the two blocks
       if (bi === 0) {
         // Arrow from block 0 end through indicator to block 1 start (drawn first, behind text)
-        drawArrow(altBlockEnd[0] + 2, altBlockStart[1]);
+        drawArrow(altBlockEnd[0] + 2, altEntryY[1]);
 
         // Opaque background rect behind the label so it doesn't overlap the arrow
         const cardBg = isDark ? '#131416' : '#eaebec';
@@ -1731,7 +1998,7 @@ function renderDiagram(
           .attr('x', cx)
           .attr('y', altIndicatorY)
           .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
+          .attr('dy', '0.35em')
           .attr('fill', mutedFg)
           .attr('font-size', `${labelFontSize}px`)
           .attr('font-weight', 500)
@@ -1772,7 +2039,7 @@ function renderDiagram(
       .attr('x', width - pad.right - badgeW / 2 - 4)
       .attr('y', txStart)
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
+      .attr('dy', '0.35em')
       .attr('fill', mutedFg)
       .attr('font-size', '11px')
       .attr('font-weight', 600)
@@ -1909,7 +2176,7 @@ function renderDiagram(
     },
     {
       label: 'Attention',
-      value: hasAlternatingLayers ? 'Sink/Full GQA' : arch.attentionType,
+      value: arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType,
     },
     {
       label: 'Context',
@@ -1919,7 +2186,9 @@ function renderDiagram(
       ? [
           {
             label: 'Experts',
-            value: `${arch.activeExperts}/${arch.numExperts}`,
+            // Active per token = routed top-k + the always-on shared expert, so
+            // show "6+1/385" (not "6/385"): the shared expert is active too.
+            value: `${arch.activeExperts}${arch.hasSharedExpert ? '+1' : ''}/${arch.numExperts}`,
           },
         ]
       : []),
@@ -2092,6 +2361,42 @@ export default function ModelArchitectureDiagram({
       >
         <div ref={containerRef} className="px-4 pb-4">
           <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
+          {/* The drill-down only renders while its parent block is expanded, so gate
+              the caption on the parent too — collapsing the parent leaves the child
+              id in expandedBlocks (state is restored on re-expand), and the caption
+              must not outlive the drawing it explains. */}
+          {arch.attentionType === 'Hybrid' &&
+            [0, 1].some(
+              (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
+            ) && (
+              <p
+                className="mt-2 text-[11px] leading-snug text-muted-foreground"
+                data-testid="hybrid-attention-note"
+              >
+                <span className="font-medium text-foreground">Local</span> and{' '}
+                <span className="font-medium text-foreground">Compressed</span> are two KV sources,
+                not two separate attentions: each query attends in a{' '}
+                <span className="font-medium text-foreground">single softmax</span> to the union of
+                sliding-window + selected compressed keys, with a learnable per-head attention sink.
+              </p>
+            )}
+          {(arch.hyperConnections ?? 0) > 1 &&
+            ['altBlock0', 'altBlock1', 'hashBlock', 'transformer', 'denseTransformer'].some((id) =>
+              expandedBlocks.has(id),
+            ) && (
+              <p
+                className="mt-2 text-[11px] leading-snug text-muted-foreground"
+                data-testid="mhc-note"
+              >
+                <span className="font-medium text-foreground">
+                  Hyper-Connections (mHC ×{arch.hyperConnections})
+                </span>{' '}
+                replace each residual with {arch.hyperConnections} parallel streams combined by
+                learned, Sinkhorn-normalized weights — read ({arch.hyperConnections}→1), output, and
+                a {arch.hyperConnections}×{arch.hyperConnections} stream mix — shown as the mHC ×
+                {arch.hyperConnections} nodes.
+              </p>
+            )}
           {arch.features && arch.features.length > 0 && (
             <div className="mt-3 pt-3 border-t border-border/50">
               <div className="flex flex-wrap gap-1.5 items-center">

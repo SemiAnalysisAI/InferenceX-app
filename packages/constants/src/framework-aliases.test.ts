@@ -2,13 +2,28 @@ import { describe, expect, it } from 'vitest';
 
 import {
   FRAMEWORK_ALIASES,
+  FRAMEWORK_LABELS,
   resolveFrameworkAlias,
   resolveFrameworkAliasesInString,
 } from './framework-aliases';
 
+describe('FRAMEWORK_LABELS', () => {
+  it('labels the canonical mooncake-atom framework "Mooncake ATOM¹"', () => {
+    expect(FRAMEWORK_LABELS['mooncake-atom']).toBe('Mooncake ATOM¹');
+  });
+
+  it('labels the atom-disagg alias with its canonical label', () => {
+    expect(FRAMEWORK_LABELS['atom-disagg']).toBe('Mooncake ATOM¹');
+  });
+});
+
 describe('FRAMEWORK_ALIASES', () => {
   it('maps sglang-disagg to mori-sglang with disagg=true', () => {
     expect(FRAMEWORK_ALIASES['sglang-disagg']).toEqual({ canonical: 'mori-sglang', disagg: true });
+  });
+
+  it('maps atom-disagg to mooncake-atom with disagg=true', () => {
+    expect(FRAMEWORK_ALIASES['atom-disagg']).toEqual({ canonical: 'mooncake-atom', disagg: true });
   });
 
   it('maps trtllm to trt', () => {
@@ -27,6 +42,10 @@ describe('resolveFrameworkAlias', () => {
 
   it('resolves dynamo-trtllm to dynamo-trt', () => {
     expect(resolveFrameworkAlias('dynamo-trtllm')).toBe('dynamo-trt');
+  });
+
+  it('resolves atom-disagg to mooncake-atom', () => {
+    expect(resolveFrameworkAlias('atom-disagg')).toBe('mooncake-atom');
   });
 
   it('is case-insensitive', () => {
@@ -51,6 +70,12 @@ describe('resolveFrameworkAliasesInString', () => {
   it('replaces dynamo-trtllm in a config key', () => {
     expect(resolveFrameworkAliasesInString('gptoss-fp8-gb200-dynamo-trtllm')).toBe(
       'gptoss-fp8-gb200-dynamo-trt',
+    );
+  });
+
+  it('replaces atom-disagg in a config key', () => {
+    expect(resolveFrameworkAliasesInString('dsv4-fp4-mi355x-atom-disagg')).toBe(
+      'dsv4-fp4-mi355x-mooncake-atom',
     );
   });
 
