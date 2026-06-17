@@ -324,9 +324,11 @@ function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
   const label = meta?.label ?? key.toUpperCase();
   const props: { name: string; value: string | number }[] = [{ name: 'Category', value: 'GPU' }];
   if (meta) {
-    props.push({ name: 'Vendor', value: meta.vendor });
-    props.push({ name: 'Architecture', value: meta.arch });
-    props.push({ name: 'TDP (W)', value: meta.tdp });
+    props.push(
+      { name: 'Vendor', value: meta.vendor },
+      { name: 'Architecture', value: meta.arch },
+      { name: 'TDP (W)', value: meta.tdp },
+    );
   }
   if (summary.bestThroughputPerGpu !== null) {
     props.push({

@@ -1839,8 +1839,7 @@ const ScatterGraph = React.memo(
 
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(speedOverlayLayer);
-      result.push(knownIssueLayer);
+      result.push(speedOverlayLayer, knownIssueLayer);
       return result;
     }, [
       knownIssueAnnotations,
