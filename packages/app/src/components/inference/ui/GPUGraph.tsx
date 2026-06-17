@@ -53,7 +53,7 @@ import {
   measureLegendRightInset,
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
-import { matchKnownConfigIssues } from '@/lib/known-issues';
+import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -275,11 +275,7 @@ const GPUGraph = React.memo(
             label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
             color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
             points: filteredData
-              .filter(
-                (p) =>
-                  String(p.hwKey) === issue.hwKey &&
-                  (!issue.precisions || issue.precisions.includes(p.precision)),
-              )
+              .filter((p) => pointMatchesIssue(issue, p))
               .map((p) => ({ x: p.x, y: p.y })),
           };
         }),

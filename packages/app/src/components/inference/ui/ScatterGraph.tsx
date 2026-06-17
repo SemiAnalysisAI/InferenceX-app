@@ -12,7 +12,7 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, getPrecisionLabel, type Precision } from '@/lib/data-mappings';
-import { matchKnownConfigIssues } from '@/lib/known-issues';
+import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -369,11 +369,7 @@ const ScatterGraph = React.memo(
         label: parseHwKeyToLabel(issue.hwKey).label,
         color: getCssColor(resolveColor(issue.hwKey)),
         points: visiblePoints
-          .filter(
-            (p) =>
-              String(p.hwKey) === issue.hwKey &&
-              (!issue.precisions || issue.precisions.includes(p.precision)),
-          )
+          .filter((p) => pointMatchesIssue(issue, p))
           .map((p) => ({ x: p.x, y: p.y })),
       }));
     }, [
