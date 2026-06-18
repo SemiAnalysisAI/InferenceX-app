@@ -37,6 +37,7 @@ import {
   SEQUENCE_OPTIONS,
 } from '@/lib/data-mappings';
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
+import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -149,17 +150,23 @@ export function GlobalFilterProvider({
     return Sequence.EightK_OneK;
   });
 
-  const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() => {
-    if (initialPrecisions && initialPrecisions.length > 0) {
-      const valid = initialPrecisions.filter((p) =>
-        (PRECISION_OPTIONS as readonly string[]).includes(p),
-      );
-      if (valid.length > 0) return valid;
-    }
-    return [Precision.FP4];
-  });
+  const initialValidPrecisions = useMemo(
+    () =>
+      (initialPrecisions ?? []).filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p)),
+    [initialPrecisions],
+  );
+  const [selectedPrecisions, setSelectedPrecisionsRaw] = useState<string[]>(() =>
+    initialValidPrecisions.length > 0 ? initialValidPrecisions : [Precision.FP4],
+  );
+  // Whether the precision was chosen explicitly (seeded prop, URL `i_prec`,
+  // preset, or manual toggle). Until then we auto-pick the densest precision
+  // for the current model/sequence so FP8-heavy models don't open barren.
+  const [precisionExplicit, setPrecisionExplicit] = useState<boolean>(
+    () => initialValidPrecisions.length > 0,
+  );
   const setSelectedPrecisions = useCallback((precisions: string[]) => {
     setSelectedPrecisionsRaw(precisions);
+    setPrecisionExplicit(true);
   }, []);
 
   // ── Run date / run ID ─────────────────────────────────────────────────────
@@ -198,7 +205,10 @@ export function GlobalFilterProvider({
       const precs = urlPrec
         .split(',')
         .filter((p) => (PRECISION_OPTIONS as readonly string[]).includes(p));
-      if (precs.length > 0) setSelectedPrecisionsRaw(precs);
+      if (precs.length > 0) {
+        setSelectedPrecisionsRaw(precs);
+        setPrecisionExplicit(true);
+      }
     }
     applyIfMatches('g_rundate', RUNDATE_RE, setSelectedRunDateBase);
     applyIfMatches('g_runid', RUNID_RE, setSelectedRunId);
@@ -294,12 +304,44 @@ export function GlobalFilterProvider({
     return merged.length > 0 ? merged : ['fp4'];
   }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
 
-  // Synchronously validated precisions
-  const effectivePrecisions = useMemo(() => {
-    const valid = selectedPrecisions.filter((p) => availablePrecisions.includes(p));
-    if (valid.length > 0) return valid;
-    return availablePrecisions.length > 0 ? [availablePrecisions[0]] : selectedPrecisions;
-  }, [selectedPrecisions, availablePrecisions]);
+  // Curve count per precision (distinct hw/framework/spec/disagg series) for the
+  // selected model + sequence — drives the auto default toward the densest one.
+  const precisionCurveCounts = useMemo(
+    () =>
+      countCurvesByPrecision(
+        modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence),
+      ),
+    [modelRows, effectiveSequence],
+  );
+
+  // Precisions present in a loaded unofficial run for the current model + sequence.
+  const unofficialPrecisionsForSelection = useMemo(
+    () =>
+      unofficialAvailable
+        .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
+        .flatMap((a) => a.precisions),
+    [unofficialAvailable, selectedModel, effectiveSequence],
+  );
+
+  // Synchronously validated precisions. When the user hasn't explicitly chosen a
+  // precision, auto-pick the densest (see resolveEffectivePrecisions).
+  const effectivePrecisions = useMemo(
+    () =>
+      resolveEffectivePrecisions({
+        selectedPrecisions,
+        availablePrecisions,
+        curveCounts: precisionCurveCounts,
+        unofficialPrecisions: unofficialPrecisionsForSelection,
+        explicit: precisionExplicit,
+      }),
+    [
+      selectedPrecisions,
+      availablePrecisions,
+      precisionCurveCounts,
+      unofficialPrecisionsForSelection,
+      precisionExplicit,
+    ],
+  );
 
   // Dates available for selected model + sequence + precisions
   const availableDates = useMemo(() => {
@@ -397,7 +439,9 @@ export function GlobalFilterProvider({
       g_rundate: selectedRunDate,
       g_runid: selectedRunId,
       i_seq: effectiveSequence,
-      i_prec: effectivePrecisions.join(','),
+      // Only pin the precision in the URL once chosen explicitly; in auto mode
+      // leave it out so the link keeps following the per-model densest default.
+      i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
   }, [
     selectedModel,
@@ -405,6 +449,7 @@ export function GlobalFilterProvider({
     selectedRunId,
     effectiveSequence,
     effectivePrecisions,
+    precisionExplicit,
     setUrlParams,
   ]);
 

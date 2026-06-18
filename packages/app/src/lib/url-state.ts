@@ -64,7 +64,10 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_rundate: '',
   g_runid: '',
   i_seq: '8k/1k',
-  i_prec: 'fp4',
+  // No strippable default: precision is only written to the URL once chosen
+  // explicitly, so an explicit FP4 selection must survive (not be stripped as a
+  // "default") or it would silently revert to the per-model auto default on reload.
+  i_prec: '',
   i_metric: 'y_tpPerGpu',
   i_xmetric: 'p99_ttft',
   i_e2e_xmetric: '',
