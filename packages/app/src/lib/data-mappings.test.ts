@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  FALLBACK_DEFAULT_PRECISIONS,
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
+  getModelDefaultPrecisions,
   getModelLabel,
   getSequenceLabel,
   getPrecisionLabel,
@@ -230,6 +232,28 @@ describe('getPrecisionLabel', () => {
   it('falls back to the precision value for unknown precision', () => {
     const result = getPrecisionLabel('fp32' as Precision);
     expect(result).toBe('fp32');
+  });
+});
+
+// ===========================================================================
+// getModelDefaultPrecisions
+// ===========================================================================
+describe('getModelDefaultPrecisions', () => {
+  it('returns [fp4, fp8] for MiniMax M3 (day-zero rollout has only 1 FP4 row vs many FP8 rows)', () => {
+    expect(getModelDefaultPrecisions(Model.MiniMax_M3)).toEqual(['fp4', 'fp8']);
+  });
+
+  it('falls back to FP4 for models without an explicit override', () => {
+    expect(getModelDefaultPrecisions(Model.DeepSeek_V4_Pro)).toEqual(FALLBACK_DEFAULT_PRECISIONS);
+    expect(getModelDefaultPrecisions(Model.DeepSeek_R1)).toEqual(FALLBACK_DEFAULT_PRECISIONS);
+    expect(getModelDefaultPrecisions(Model.GLM_5)).toEqual(FALLBACK_DEFAULT_PRECISIONS);
+    expect(getModelDefaultPrecisions(Model.Qwen3_5)).toEqual(FALLBACK_DEFAULT_PRECISIONS);
+  });
+
+  it('returns the FP4 fallback for null / undefined / unknown model strings', () => {
+    expect(getModelDefaultPrecisions(null)).toEqual(FALLBACK_DEFAULT_PRECISIONS);
+    expect(getModelDefaultPrecisions(undefined)).toEqual(FALLBACK_DEFAULT_PRECISIONS);
+    expect(getModelDefaultPrecisions('Not-A-Model')).toEqual(FALLBACK_DEFAULT_PRECISIONS);
   });
 });
 

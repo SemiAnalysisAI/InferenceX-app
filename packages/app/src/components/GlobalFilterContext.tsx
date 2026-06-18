@@ -29,9 +29,9 @@ import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import {
+  getModelDefaultPrecisions,
   Model,
   MODEL_OPTIONS,
-  Precision,
   PRECISION_OPTIONS,
   Sequence,
   SEQUENCE_OPTIONS,
@@ -140,7 +140,7 @@ export function GlobalFilterProvider({
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
 
   // ── Core filter state ─────────────────────────────────────────────────────
-  const [selectedModel, setSelectedModel] = useState<Model>(
+  const [selectedModel, setSelectedModelRaw] = useState<Model>(
     () => initialModel ?? Model.DeepSeek_V4_Pro,
   );
 
@@ -156,10 +156,22 @@ export function GlobalFilterProvider({
       );
       if (valid.length > 0) return valid;
     }
-    return [Precision.FP4];
+    return [...getModelDefaultPrecisions(initialModel ?? Model.DeepSeek_V4_Pro)];
   });
   const setSelectedPrecisions = useCallback((precisions: string[]) => {
     setSelectedPrecisionsRaw(precisions);
+  }, []);
+
+  // Re-seed precisions to the new model's defaults whenever the selected model
+  // changes via the public setter. Without this, switching from DeepSeek V4 Pro
+  // (FP4-heavy) to MiniMax M3 (FP8-heavy) leaves the chart near-empty because
+  // M3 day-zero shipped only 1 FP4 row vs 23 FP8 rows per sequence. Callers
+  // that want a specific precision selection (URL hydration via `i_prec`,
+  // preset application) write to `setSelectedPrecisions` immediately after —
+  // those writes batch with this one and win.
+  const setSelectedModel = useCallback((model: Model) => {
+    setSelectedModelRaw(model);
+    setSelectedPrecisionsRaw([...getModelDefaultPrecisions(model)]);
   }, []);
 
   // ── Run date / run ID ─────────────────────────────────────────────────────

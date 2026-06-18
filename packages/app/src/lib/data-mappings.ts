@@ -44,6 +44,13 @@ interface ModelConfig {
   prefix: string;
   category: CategoryTag;
   /**
+   * Initial precision selection used when this model becomes selected and no
+   * URL `i_prec` override is present. Falls back to `[Precision.FP4]` when
+   * undefined. Set for models where FP4 alone leaves an almost-empty chart
+   * because the bulk of points are at FP8 (e.g. MiniMax M3 day-zero).
+   */
+  defaultPrecisions?: readonly string[];
+  /**
    * Data-driven exclusion rules for this model (see `exclusion.ts`). Each spec
    * partitions matching config keys into comparability groups that can't share
    * a graph with each other. Absent/empty = no exclusion.
@@ -85,6 +92,10 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
     category: 'default',
+    // M3 day-zero rollout shipped FP8 across most GPUs and only a single FP4
+    // datapoint — landing on the default `[fp4]` leaves the chart near-empty.
+    // Seed both so M3 renders meaningful data the moment it's selected.
+    defaultPrecisions: ['fp4', 'fp8'],
   },
   [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 671B', prefix: 'dsr1', category: 'default' },
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
@@ -132,6 +143,20 @@ export function getModelCategory(model: Model): CategoryTag {
 
 export function getModelLabel(model: Model): string {
   return MODEL_CONFIG[model]?.label ?? model;
+}
+
+/**
+ * Initial precision selection to seed for a model. Falls back to FP4 — the
+ * conservative single-precision default that's available for almost every
+ * (model, sequence) pair — when the model has no explicit override.
+ */
+export const FALLBACK_DEFAULT_PRECISIONS: readonly string[] = ['fp4'];
+
+export function getModelDefaultPrecisions(
+  model: Model | string | null | undefined,
+): readonly string[] {
+  if (!model) return FALLBACK_DEFAULT_PRECISIONS;
+  return MODEL_CONFIG[model as Model]?.defaultPrecisions ?? FALLBACK_DEFAULT_PRECISIONS;
 }
 
 /**
