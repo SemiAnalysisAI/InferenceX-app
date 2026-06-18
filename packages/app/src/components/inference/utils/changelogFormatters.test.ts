@@ -17,6 +17,13 @@ describe('formatConfigKeys', () => {
     expect(result).toContain('FP8');
   });
 
+  it('renders M3 mtp as EAGLE (not MTP)', () => {
+    const result = formatConfigKeys('minimaxm3-fp8-h100-vllm-mtp');
+    expect(result).toContain('H100');
+    expect(result).toContain('EAGLE');
+    expect(result).not.toContain('MTP');
+  });
+
   it('formats compound framework names', () => {
     const result = formatConfigKeys('gptoss-fp4-b200-dynamo-sglang');
     expect(result).toContain('B200');

@@ -466,7 +466,10 @@ export default function ChartDisplay() {
                       ...visibleData,
                       ...visibleOverlayRows,
                     ]).map((issue) =>
-                      knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                      knownIssueCsvNote(
+                        issue,
+                        getDisplayLabel(getHardwareConfig(issue.hwKey, graph.model)),
+                      ),
                     );
                     exportToCsv(
                       `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,

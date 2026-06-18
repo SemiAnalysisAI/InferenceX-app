@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   FRAMEWORK_ALIASES,
   FRAMEWORK_LABELS,
+  MODEL_SPEC_METHOD_LABELS,
   resolveFrameworkAlias,
   resolveFrameworkAliasesInString,
+  resolveFrameworkPartLabel,
 } from './framework-aliases';
 
 describe('FRAMEWORK_LABELS', () => {
@@ -14,6 +16,34 @@ describe('FRAMEWORK_LABELS', () => {
 
   it('labels the atom-disagg alias with its canonical label', () => {
     expect(FRAMEWORK_LABELS['atom-disagg']).toBe('ATOMesh¹');
+  });
+});
+
+describe('MODEL_SPEC_METHOD_LABELS', () => {
+  it('maps MiniMax-M3 mtp to "M3 EAGLE"', () => {
+    expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3']?.mtp).toBe('M3 EAGLE');
+  });
+});
+
+describe('resolveFrameworkPartLabel', () => {
+  it('renders M3 mtp as "M3 EAGLE"', () => {
+    expect(resolveFrameworkPartLabel('MiniMax-M3', 'mtp')).toBe('M3 EAGLE');
+  });
+
+  it('keeps the generic MTP label for other models', () => {
+    expect(resolveFrameworkPartLabel('DeepSeek-R1-0528', 'mtp')).toBe('MTP');
+  });
+
+  it('keeps the generic MTP label when no model is provided', () => {
+    expect(resolveFrameworkPartLabel(undefined, 'mtp')).toBe('MTP');
+  });
+
+  it('falls back to FRAMEWORK_LABELS for non-overridden parts even for M3', () => {
+    expect(resolveFrameworkPartLabel('MiniMax-M3', 'vllm')).toBe('vLLM');
+  });
+
+  it('uppercases unknown tokens', () => {
+    expect(resolveFrameworkPartLabel('MiniMax-M3', 'foo')).toBe('FOO');
   });
 });
 

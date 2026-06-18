@@ -51,8 +51,8 @@ export default function InferenceTable({
     () => [
       {
         header: 'GPU',
-        cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey)),
-        sortValue: (row) => getDisplayLabel(getHardwareConfig(row.hwKey)),
+        cell: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
+        sortValue: (row) => getDisplayLabel(getHardwareConfig(row.hwKey, row.model)),
         className: 'font-medium whitespace-nowrap',
       },
       {

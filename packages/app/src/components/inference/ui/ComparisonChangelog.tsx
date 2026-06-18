@@ -6,6 +6,8 @@ import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+
 import type { ComparisonChangelog as ComparisonChangelogType } from '@/hooks/api/use-comparison-changelogs';
 import {
   configKeyMatchesHwKey,
@@ -208,6 +210,10 @@ export default function ComparisonChangelog({
     track('inference_comparison_changelog_toggled', { expanded: newState });
   };
 
+  // All modelDbKeys for a comparison map to one display model, so [0] suffices
+  // for per-model suffix overrides (e.g. M3 MTP → EAGLE).
+  const displayModel = DB_MODEL_TO_DISPLAY[modelDbKeys[0]] ?? modelDbKeys[0];
+
   /** Display labels of the selected GPUs that a set of changelog entries touches. */
   const gpuLabelsFor = (entries: { config_keys: string[] }[]): string => {
     if (selectedGPUs.length <= 1) return '';
@@ -215,7 +221,7 @@ export default function ComparisonChangelog({
       .filter((gpu) =>
         entries.some((e) => e.config_keys.some((k) => configKeyMatchesHwKey(k, gpu))),
       )
-      .map((gpu) => getDisplayLabel(getHardwareConfig(gpu)))
+      .map((gpu) => getDisplayLabel(getHardwareConfig(gpu, displayModel)))
       .join(', ');
   };
 

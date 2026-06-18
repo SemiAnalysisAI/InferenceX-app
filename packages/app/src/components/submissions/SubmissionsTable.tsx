@@ -3,6 +3,11 @@
 import { ChevronDown, ChevronRight, GitCompare, Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import {
+  DB_MODEL_TO_DISPLAY,
+  resolveFrameworkPartLabel,
+} from '@semianalysisai/inferencex-constants';
+
 import { track } from '@/lib/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions-types';
@@ -302,7 +307,7 @@ function SubmissionRow({
         <td className="px-3 py-2 uppercase">{row.precision}</td>
         <td className="px-3 py-2 uppercase">
           {row.spec_method && row.spec_method !== 'none' ? (
-            row.spec_method
+            resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
           ) : (
             <span className="text-muted-foreground">—</span>
           )}
@@ -368,7 +373,9 @@ function SubmissionRow({
                   label="Spec Method:"
                   tip="Speculative decoding method (e.g. MTP, Eagle)"
                 >
-                  {row.spec_method || 'none'}
+                  {row.spec_method && row.spec_method !== 'none'
+                    ? resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
+                    : 'none'}
                 </DetailItem>
                 <DetailItem
                   label="Disaggregated:"

@@ -63,7 +63,7 @@ const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 // lookup misses (legacy data).
 function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
   const hwKey = String(pts[0].hwKey);
-  const cfg = getHardwareConfig(hwKey);
+  const cfg = getHardwareConfig(hwKey, pts[0].model);
   const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
   return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
@@ -266,7 +266,7 @@ const GPUGraph = React.memo(
     const knownIssueAnnotations = useMemo(
       (): KnownIssueAnnotation[] =>
         matchKnownConfigIssues(modelLabel, filteredData).map((issue) => {
-          const cfg = getHardwareConfig(issue.hwKey);
+          const cfg = getHardwareConfig(issue.hwKey, modelLabel);
           const colorEntry = allGraphs.find(
             (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
           );
@@ -835,7 +835,7 @@ const GPUGraph = React.memo(
                 hw: id,
                 label: comparisonEntryLabel(date, runNumbering),
                 color,
-                title: getDisplayLabel(getHardwareConfig(hwKey)),
+                title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
                 isActive: activeDates.has(id),
                 onClick: () => {
                   toggleActiveDate(id);

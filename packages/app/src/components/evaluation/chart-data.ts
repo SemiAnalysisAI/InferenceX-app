@@ -1,4 +1,7 @@
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import {
+  DISPLAY_MODEL_TO_DB,
+  resolveFrameworkPartLabel,
+} from '@semianalysisai/inferencex-constants';
 
 import type { EvalChangelogEntry, EvaluationChartData } from '@/components/evaluation/types';
 import type { EvalRow } from '@/lib/api';
@@ -54,10 +57,13 @@ function buildConfigLabel(
   conc: number | null,
   params: EvalLabelParams,
   showPrecision: boolean,
+  model?: string,
 ): string {
   const headerSuffixes: string[] = [];
   if (framework && framework !== '1k8k') headerSuffixes.push(getFrameworkLabel(framework));
-  if (specMethod && specMethod !== 'none') headerSuffixes.push(getFrameworkLabel(specMethod));
+  // M3's `mtp` spec token renders as "EAGLE"; every other model keeps "MTP".
+  if (specMethod && specMethod !== 'none')
+    headerSuffixes.push(resolveFrameworkPartLabel(model, specMethod));
 
   const detailSuffixes: string[] = [];
   if (precision && showPrecision) detailSuffixes.push(precision.toUpperCase());
@@ -128,7 +134,7 @@ export function buildEvaluationChartRows(
         return null;
       }
 
-      const hwConfig = getHardwareConfig(hwKey);
+      const hwConfig = getHardwareConfig(hwKey, selectedModel);
       const hwLabel = hwConfig.label;
 
       return {
@@ -154,6 +160,7 @@ export function buildEvaluationChartRows(
             prefillNw: item.prefill_num_workers,
           },
           showPrecision,
+          selectedModel,
         ),
         score,
         scoreError: item.metrics.em_strict_se ?? item.metrics.score_se ?? 0,
@@ -290,7 +297,7 @@ export function buildEvalChangelogEntries(
     })
     .map((item) => {
       const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
-      const hwConfig = getHardwareConfig(hwKey);
+      const hwConfig = getHardwareConfig(hwKey, selectedModel);
       const hwLabel = hwConfig.label;
       // Changelog labels historically omit TP/EP; keep that behavior while
       // still surfacing the disagg marker.
@@ -308,6 +315,7 @@ export function buildEvalChangelogEntries(
             decodeDpa: item.decode_dp_attention,
           },
           showPrecision,
+          selectedModel,
         ),
       };
     });

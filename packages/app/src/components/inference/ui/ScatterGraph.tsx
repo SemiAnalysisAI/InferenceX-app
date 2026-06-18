@@ -102,17 +102,23 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
-// Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth
-const parseHwKeyToLabel = (hwKey: string): { name: string; label: string } => {
-  const config = getHardwareConfig(hwKey);
+// Derive a readable label from a hwKey using the HARDWARE_CONFIG source of truth.
+// `model` (display name) enables per-model suffix overrides (e.g. M3 MTP → EAGLE).
+const parseHwKeyToLabel = (hwKey: string, model?: string): { name: string; label: string } => {
+  const config = getHardwareConfig(hwKey, model);
   return { name: config.label, label: getDisplayLabel(config) };
 };
 
 // Line-label text for a curve. When more than one precision is shown, each curve
 // is its own line, so append the precision (e.g. "B200 (vLLM) FP8") to keep the
 // FP4 and FP8 curves of the same hardware distinguishable.
-const lineLabelText = (hwKey: string, precision: string, includePrecision: boolean): string => {
-  const base = parseHwKeyToLabel(hwKey).label;
+const lineLabelText = (
+  hwKey: string,
+  precision: string,
+  includePrecision: boolean,
+  model?: string,
+): string => {
+  const base = parseHwKeyToLabel(hwKey, model).label;
   return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
 };
 
@@ -366,7 +372,7 @@ const ScatterGraph = React.memo(
       const visiblePoints = [...filteredData, ...visibleOverlayPoints];
       return matchKnownConfigIssues(modelLabel, visiblePoints).map((issue) => ({
         issue,
-        label: parseHwKeyToLabel(issue.hwKey).label,
+        label: parseHwKeyToLabel(issue.hwKey, modelLabel).label,
         color: getCssColor(resolveColor(issue.hwKey)),
         points: visiblePoints
           .filter((p) => pointMatchesIssue(issue, p))
@@ -1065,7 +1071,7 @@ const ScatterGraph = React.memo(
                 placeLabel(
                   entry.key,
                   entry.hw,
-                  lineLabelText(entry.hw, entry.precision, multiPrecision),
+                  lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
                   getCssColor(resolveColor(entry.hw)),
                   entry.points,
                 );
@@ -1079,7 +1085,7 @@ const ScatterGraph = React.memo(
                   lineLabels.push({
                     key: entry.key,
                     hw: entry.hw,
-                    label: lineLabelText(entry.hw, entry.precision, multiPrecision),
+                    label: lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
                     color: getCssColor(resolveColor(entry.hw)),
                     x: xScale(entry.points[0].x),
                     y: yScale(entry.points[0].y),
@@ -1101,7 +1107,7 @@ const ScatterGraph = React.memo(
                 const info = unofficialRunInfos[runIndex];
                 const base = info
                   ? `✕ ${info.branch || `run ${info.id}`}`
-                  : parseHwKeyToLabel(hwKey).label;
+                  : parseHwKeyToLabel(hwKey, modelLabel).label;
                 return multiPrecision
                   ? `${base} ${getPrecisionLabel(precision as Precision)}`
                   : base;
@@ -1144,7 +1150,7 @@ const ScatterGraph = React.memo(
                 lineLabels.push({
                   key: entry.key,
                   hw: entry.hw,
-                  label: lineLabelText(entry.hw, entry.precision, multiPrecision),
+                  label: lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
                   color: getCssColor(resolveColor(entry.hw)),
                   x: xScale(pt.x),
                   y: yScale(pt.y),
@@ -1158,7 +1164,7 @@ const ScatterGraph = React.memo(
                 const info = unofficialRunInfos[group.runIndex];
                 const branchOrHw = info
                   ? `✕ ${info.branch || `run ${info.id}`}`
-                  : parseHwKeyToLabel(group.hwKey).label;
+                  : parseHwKeyToLabel(group.hwKey, modelLabel).label;
                 const labelText = multiPrecision
                   ? `${branchOrHw} ${getPrecisionLabel((group.points[0]?.precision ?? '') as Precision)}`
                   : branchOrHw;

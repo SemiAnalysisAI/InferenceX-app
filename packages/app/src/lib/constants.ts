@@ -1,4 +1,4 @@
-import { FRAMEWORK_LABELS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
 /** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
 export const TABLEAU_10 = [
@@ -59,8 +59,11 @@ const UNKNOWN_HARDWARE: HardwareEntry = {
 /**
  * Build a hardware config entry from a key like "h100_dynamo-trt_mtp".
  * Derives all display fields from GPU_KEYS/GPU_VENDORS + FRAMEWORK_LABELS.
+ *
+ * `model` (frontend display name) enables per-model suffix overrides — e.g. M3's
+ * `mtp` token renders as "EAGLE" rather than the generic "MTP".
  */
-function buildHardwareEntry(hwKey: string): HardwareEntry | null {
+function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null {
   const base = hwKey.split('_')[0];
   const reg = HW_REGISTRY[base];
   if (!reg) return null;
@@ -68,7 +71,7 @@ function buildHardwareEntry(hwKey: string): HardwareEntry | null {
   const parts = hwKey.split('_').slice(1);
   const label = reg.label;
   const gpuName = base.toUpperCase(); // always raw uppercase for gpu string
-  const partLabels = parts.map((p) => FRAMEWORK_LABELS[p] ?? p.toUpperCase());
+  const partLabels = parts.map((p) => resolveFrameworkPartLabel(model, p));
 
   return {
     name: hwKey.replaceAll('_', '-'),
@@ -132,14 +135,18 @@ const hwCache = new Map<string, HardwareEntry>();
 /**
  * Get hardware config for a GPU key, building it dynamically from shared GPU constants + FRAMEWORK_LABELS.
  * Returns UNKNOWN_HARDWARE for unrecognized base GPUs.
+ *
+ * Pass `model` (frontend display name) to apply per-model suffix overrides
+ * (e.g. M3 `mtp` → "EAGLE"). Omitting it preserves the generic labels.
  */
-export function getHardwareConfig(hwKey: string): HardwareEntry {
-  const cached = hwCache.get(hwKey);
+export function getHardwareConfig(hwKey: string, model?: string): HardwareEntry {
+  const cacheKey = model ? `${model}|${hwKey}` : hwKey;
+  const cached = hwCache.get(cacheKey);
   if (cached) return cached;
 
-  const entry = buildHardwareEntry(hwKey);
+  const entry = buildHardwareEntry(hwKey, model);
   if (entry) {
-    hwCache.set(hwKey, entry);
+    hwCache.set(cacheKey, entry);
     return entry;
   }
 

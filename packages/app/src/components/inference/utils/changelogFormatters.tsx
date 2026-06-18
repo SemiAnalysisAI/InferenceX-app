@@ -1,4 +1,7 @@
-import { resolveFrameworkAliasesInString } from '@semianalysisai/inferencex-constants';
+import {
+  resolveFrameworkAliasesInString,
+  resolveFrameworkPartLabel,
+} from '@semianalysisai/inferencex-constants';
 
 import { type Precision, MODEL_PREFIX_MAPPING, getPrecisionLabel } from '@/lib/data-mappings';
 import { getFrameworkLabel } from '@/lib/utils';
@@ -45,6 +48,8 @@ export function formatConfigKeys(key: string) {
   const isMtp = framework.endsWith('-mtp');
   const baseFramework = isMtp ? framework.slice(0, -4) : framework;
   const baseLabel = getFrameworkLabel(baseFramework);
-  const frameworkLabel = isMtp ? `${baseLabel}, MTP` : baseLabel;
+  // M3's `mtp` spec token renders as "EAGLE"; every other model keeps "MTP".
+  const mtpLabel = resolveFrameworkPartLabel(MODEL_PREFIX_MAPPING[model], 'mtp');
+  const frameworkLabel = isMtp ? `${baseLabel}, ${mtpLabel}` : baseLabel;
   return `${gpu.toUpperCase()} (${frameworkLabel}) ${MODEL_PREFIX_MAPPING[model]} ${getPrecisionLabel(precision as Precision)}`;
 }

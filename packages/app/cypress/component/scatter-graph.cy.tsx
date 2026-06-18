@@ -246,4 +246,89 @@ describe('ScatterGraph', () => {
       .find('text')
       .should('contain.text', 'feature-branch');
   });
+
+  it('renders M3 mtp rooflines with the EAGLE label (official + overlay)', () => {
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const officialData = [
+      createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 8, y: 240, precision: Precision.FP4 }),
+      createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 16, y: 200, precision: Precision.FP4 }),
+      createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 32, y: 150, precision: Precision.FP4 }),
+    ];
+    // Overlay roofline with no run metadata, so its line label falls back to the
+    // hw label — exercising the overlay path's model-aware suffix resolution.
+    const runUrl = 'https://github.com/x/y/actions/runs/999';
+    const overlayData = {
+      data: [
+        createMockInferenceData({
+          hwKey: 'b200_vllm_mtp',
+          x: 8,
+          y: 320,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+        createMockInferenceData({
+          hwKey: 'b200_vllm_mtp',
+          x: 16,
+          y: 280,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+        createMockInferenceData({
+          hwKey: 'b200_vllm_mtp',
+          x: 32,
+          y: 220,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ],
+      hardwareConfig: hwConfig,
+      label: '',
+      runUrl,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-m3-eagle"
+          modelLabel="MiniMax-M3"
+          data={officialData}
+          xLabel="Concurrency"
+          yLabel="Throughput / GPU (tok/s)"
+          chartDefinition={interactivityChartDef}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['h100_vllm_mtp']),
+          hwTypesWithData: new Set(['h100_vllm_mtp']),
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['b200_vllm_mtp']),
+          allOverlayHwTypes: new Set(['b200_vllm_mtp']),
+          runIndexByUrl: { [runUrl]: 0, '999': 0 },
+          // Intentionally empty so the overlay label falls back to the hw label.
+          unofficialRunInfos: [],
+        },
+      },
+    );
+
+    // Official roofline label reads "EAGLE", not the generic "MTP".
+    cy.get('#test-scatter-m3-eagle svg .line-label')
+      .filter('[data-line-key]:not([data-line-key^="overlay-"])')
+      .find('text')
+      .should('contain.text', 'EAGLE');
+    // Overlay roofline (no run metadata → hw-label fallback) also reads "EAGLE".
+    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
+      .find('text')
+      .should('contain.text', 'EAGLE');
+    // No label should show the generic MTP token for M3.
+    cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
+  });
 });

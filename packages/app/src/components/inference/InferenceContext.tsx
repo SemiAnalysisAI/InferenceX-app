@@ -311,9 +311,9 @@ export function InferenceProvider({
       .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map((hw) => ({
         value: hw,
-        label: getDisplayLabel(getHardwareConfig(hw)),
+        label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions]);
+  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
 
   // --- Tracked config functions ---
   const buildTrackedConfigId = useCallback((point: InferenceData): string => {

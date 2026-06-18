@@ -106,7 +106,7 @@ export function UnofficialChartDisplay() {
         hardwareConfig: Object.fromEntries(
           Object.entries(dataForChart.gpus || {}).map(([k, v]) => [
             k,
-            { ...getHardwareConfig(k), ...v },
+            { ...getHardwareConfig(k, selectedModel), ...v },
           ]),
         ),
       };
