@@ -1,5 +1,7 @@
 import { HW_REGISTRY, resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
+import { getPrecisionLabel, type Precision } from './data-mappings';
+
 /** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
 export const TABLEAU_10 = [
   '#4e79a7',
@@ -32,6 +34,24 @@ export function getGpuSpecs(hwKey: string): GpuSpecs {
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
   return { power: entry.power, costh: entry.costh, costn: entry.costn, costr: entry.costr };
+}
+
+// FP4 → NVFP4/MXFP4 by vendor; FP8 stays generic (E4M3 vs MXFP8 is ambiguous in the DB).
+export function getPrecisionDisplayLabel(precision: string, hwKey: string): string {
+  const base = hwKey.split(/[-_]/u)[0];
+  const vendor = HW_REGISTRY[base]?.vendor;
+  const fp4 = vendor === 'NVIDIA' ? 'NVFP4' : vendor === 'AMD' ? 'MXFP4' : 'FP4';
+  switch (precision) {
+    case 'fp4': {
+      return fp4;
+    }
+    case 'fp4fp8': {
+      return `${fp4}+FP8`;
+    }
+    default: {
+      return getPrecisionLabel(precision as Precision);
+    }
+  }
 }
 
 /** Build the vendor prefix string for the `gpu` tooltip field. */

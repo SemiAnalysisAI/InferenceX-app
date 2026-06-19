@@ -10,8 +10,8 @@ import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getChartWatermark, getPrecisionLabel, type Precision } from '@/lib/data-mappings';
+import { getHardwareConfig, getModelSortIndex, getPrecisionDisplayLabel } from '@/lib/constants';
+import { getChartWatermark, PRECISION_OPTIONS } from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -110,7 +110,7 @@ const parseHwKeyToLabel = (hwKey: string, model?: string): { name: string; label
 };
 
 // Line-label text for a curve. When more than one precision is shown, each curve
-// is its own line, so append the precision (e.g. "B200 (vLLM) FP8") to keep the
+// is its own line, so append the precision (e.g. "B200 (vLLM) NVFP4") to keep the
 // FP4 and FP8 curves of the same hardware distinguishable.
 const lineLabelText = (
   hwKey: string,
@@ -119,7 +119,7 @@ const lineLabelText = (
   model?: string,
 ): string => {
   const base = parseHwKeyToLabel(hwKey, model).label;
-  return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
+  return includePrecision ? `${base} ${getPrecisionDisplayLabel(precision, hwKey)}` : base;
 };
 
 const ScatterGraph = React.memo(
@@ -356,6 +356,20 @@ const ScatterGraph = React.memo(
           ),
       [groupedData, selectedPrecisions, effectiveActiveHwTypes],
     );
+
+    const precisionsPerHw = useMemo(() => {
+      const map = new Map<string, Set<string>>();
+      for (const p of filteredData) {
+        const hw = p.hwKey as string;
+        let set = map.get(hw);
+        if (!set) {
+          set = new Set();
+          map.set(hw, set);
+        }
+        set.add(p.precision);
+      }
+      return map;
+    }, [filteredData]);
 
     const processedOverlayData = useMemo(() => {
       if (!overlayData?.data) return [];
@@ -1109,7 +1123,7 @@ const ScatterGraph = React.memo(
                   ? `✕ ${info.branch || `run ${info.id}`}`
                   : parseHwKeyToLabel(hwKey, modelLabel).label;
                 return multiPrecision
-                  ? `${base} ${getPrecisionLabel(precision as Precision)}`
+                  ? `${base} ${getPrecisionDisplayLabel(precision, hwKey)}`
                   : base;
               };
               const sortedOverlay = Object.entries(overlayRooflines)
@@ -1166,7 +1180,7 @@ const ScatterGraph = React.memo(
                   ? `✕ ${info.branch || `run ${info.id}`}`
                   : parseHwKeyToLabel(group.hwKey, modelLabel).label;
                 const labelText = multiPrecision
-                  ? `${branchOrHw} ${getPrecisionLabel((group.points[0]?.precision ?? '') as Precision)}`
+                  ? `${branchOrHw} ${getPrecisionDisplayLabel(group.points[0]?.precision ?? '', group.hwKey)}`
                   : branchOrHw;
                 const labelKey = `overlay-${ovKey}`;
                 const pt = group.points.at(-1)!;
@@ -2062,16 +2076,30 @@ const ScatterGraph = React.memo(
               ...(overlayData && unofficialRunInfos.length > 0
                 ? unofficialRunInfos
                     .map((info, idx) => {
-                      const hasPoints = overlayData.data.some(
-                        (d) =>
+                      const runPrecs = new Set<string>();
+                      let sampleHwKey = '';
+                      for (const d of overlayData.data) {
+                        if (
                           overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
-                          selectedPrecisions.includes(d.precision),
-                      );
-                      if (!hasPoints) return null;
+                          selectedPrecisions.includes(d.precision)
+                        ) {
+                          runPrecs.add(d.precision);
+                          if (!sampleHwKey && d.hwKey) sampleHwKey = d.hwKey as string;
+                        }
+                      }
+                      if (runPrecs.size === 0) return null;
                       const branch = info.branch || `run ${info.id}`;
+                      const precSuffix = ` · ${[...runPrecs]
+                        .toSorted(
+                          (a, b) =>
+                            (PRECISION_OPTIONS as readonly string[]).indexOf(a) -
+                            (PRECISION_OPTIONS as readonly string[]).indexOf(b),
+                        )
+                        .map((p) => getPrecisionDisplayLabel(p, sampleHwKey))
+                        .join(' / ')}`;
                       return {
                         name: `✕ unofficial-run-${info.id}`,
-                        label: `✕ ${branch}`,
+                        label: `✕ ${branch}${precSuffix}`,
                         color: overlayRunColor(idx),
                         title: `UNOFFICIAL: ${branch}`,
                         isHighlighted: true,
@@ -2105,24 +2133,38 @@ const ScatterGraph = React.memo(
                 .toSorted(
                   ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                 )
-                .map(([key, hwConfig]: [string, any]) => ({
-                  name: hwConfig.name,
-                  label: getDisplayLabel(hwConfig),
-                  color: resolveColor(key),
-                  title: hwConfig.gpu,
-                  isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
-                  hw: key,
-                  isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
-                  onClick: showAllHardwareTypes
-                    ? () => {}
-                    : () => {
-                        handleToggleHwType(key);
-                        track('latency_hw_type_toggled', { hw: key });
-                      },
-                  tooltip: changelog
-                    ? formatChangelogDescription(changelog.entries[0].description)
-                    : null,
-                })),
+                .map(([key, hwConfig]: [string, any]) => {
+                  const baseLabel = getDisplayLabel(hwConfig);
+                  const precs = precisionsPerHw.get(key);
+                  const precSuffix = precs
+                    ? ` · ${[...precs]
+                        .toSorted(
+                          (a, b) =>
+                            (PRECISION_OPTIONS as readonly string[]).indexOf(a) -
+                            (PRECISION_OPTIONS as readonly string[]).indexOf(b),
+                        )
+                        .map((p) => getPrecisionDisplayLabel(p, key))
+                        .join(' / ')}`
+                    : '';
+                  return {
+                    name: hwConfig.name,
+                    label: `${baseLabel}${precSuffix}`,
+                    color: resolveColor(key),
+                    title: hwConfig.gpu,
+                    isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
+                    hw: key,
+                    isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
+                    onClick: showAllHardwareTypes
+                      ? () => {}
+                      : () => {
+                          handleToggleHwType(key);
+                          track('latency_hw_type_toggled', { hw: key });
+                        },
+                    tooltip: changelog
+                      ? formatChangelogDescription(changelog.entries[0].description)
+                      : null,
+                  };
+                }),
             ]}
             disableActiveSort={false}
             isLegendExpanded={isLegendExpanded}

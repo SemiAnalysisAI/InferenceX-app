@@ -8,6 +8,7 @@ import {
   getGpuSpecs,
   getHardwareConfig,
   getModelSortIndex,
+  getPrecisionDisplayLabel,
   hardwareKeyMatchesAnyBase,
   hardwareKeyMatchesBase,
   isKnownGpu,
@@ -257,5 +258,48 @@ describe('getModelSortIndex', () => {
 
   it('returns a high index for empty string', () => {
     expect(getModelSortIndex('')).toBeGreaterThanOrEqual(9);
+  });
+});
+
+// ===========================================================================
+// getPrecisionDisplayLabel
+// ===========================================================================
+describe('getPrecisionDisplayLabel', () => {
+  it('returns NVFP4 for fp4 on NVIDIA hardware', () => {
+    expect(getPrecisionDisplayLabel('fp4', 'b300_vllm')).toBe('NVFP4');
+    expect(getPrecisionDisplayLabel('fp4', 'h100')).toBe('NVFP4');
+    expect(getPrecisionDisplayLabel('fp4', 'gb200_dynamo-trt_mtp')).toBe('NVFP4');
+  });
+
+  it('returns MXFP4 for fp4 on AMD hardware', () => {
+    expect(getPrecisionDisplayLabel('fp4', 'mi355x_vllm')).toBe('MXFP4');
+    expect(getPrecisionDisplayLabel('fp4', 'mi300x')).toBe('MXFP4');
+    expect(getPrecisionDisplayLabel('fp4', 'mi325x_atom')).toBe('MXFP4');
+  });
+
+  it('returns generic FP4 for unknown vendor', () => {
+    expect(getPrecisionDisplayLabel('fp4', 'unknown_x')).toBe('FP4');
+    expect(getPrecisionDisplayLabel('fp4', '')).toBe('FP4');
+  });
+
+  it('returns vendor-prefixed fp4fp8 labels', () => {
+    expect(getPrecisionDisplayLabel('fp4fp8', 'b200_vllm')).toBe('NVFP4+FP8');
+    expect(getPrecisionDisplayLabel('fp4fp8', 'mi355x')).toBe('MXFP4+FP8');
+    expect(getPrecisionDisplayLabel('fp4fp8', 'unknown')).toBe('FP4+FP8');
+  });
+
+  it('returns generic FP8 regardless of vendor', () => {
+    expect(getPrecisionDisplayLabel('fp8', 'b300_vllm')).toBe('FP8');
+    expect(getPrecisionDisplayLabel('fp8', 'mi355x_atom')).toBe('FP8');
+    expect(getPrecisionDisplayLabel('fp8', 'unknown')).toBe('FP8');
+  });
+
+  it('returns BF16 and INT4 unchanged', () => {
+    expect(getPrecisionDisplayLabel('bf16', 'h100_vllm')).toBe('BF16');
+    expect(getPrecisionDisplayLabel('int4', 'mi300x')).toBe('INT4');
+  });
+
+  it('falls back gracefully for unknown precision strings', () => {
+    expect(getPrecisionDisplayLabel('fp16', 'h100')).toBe('fp16');
   });
 });
