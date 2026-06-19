@@ -359,7 +359,8 @@ const ScatterGraph = React.memo(
 
     const precisionsPerHw = useMemo(() => {
       const map = new Map<string, Set<string>>();
-      for (const p of filteredData) {
+      for (const p of data) {
+        if (!selectedPrecisions.includes(p.precision)) continue;
         const hw = p.hwKey as string;
         let set = map.get(hw);
         if (!set) {
@@ -369,7 +370,7 @@ const ScatterGraph = React.memo(
         set.add(p.precision);
       }
       return map;
-    }, [filteredData]);
+    }, [data, selectedPrecisions]);
 
     const processedOverlayData = useMemo(() => {
       if (!overlayData?.data) return [];
