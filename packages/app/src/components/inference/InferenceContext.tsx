@@ -157,7 +157,17 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  const [showPointLabels, setShowPointLabels] = useState(() => getUrlParam('i_label') === '1');
+  const [showPointLabels, setShowPointLabels] = useState(() => {
+    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels
+    // explicitly so the share link's intent survives future default changes.
+    if (getUrlParam('i_nolabel') === '1') return false;
+    if (getUrlParam('i_label') === '1') return true;
+    // Old share links set `?i_advlabel=1` while keeping the labels default
+    // (shown). Mirror the toggle's auto-enable side-effect on load so those
+    // links still render advanced labels under the new default-off behavior.
+    if (getUrlParam('i_advlabel') === '1') return true;
+    return false;
+  });
   const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
   const [useAdvancedLabels, setUseAdvancedLabels] = useState(
     () => getUrlParam('i_advlabel') === '1',

@@ -277,6 +277,7 @@ Historical Trends and TCO Calculator share the inference tab's URL path (`/infer
 | `i_dend`        | InferenceProvider   | `''`                              |
 | `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal)  |
 | `i_label`       | InferenceProvider   | `''` (truthy = show point labels) |
+| `i_nolabel`     | InferenceProvider   | `''` (legacy, read-only)          |
 | `i_hc`          | InferenceProvider   | `''`                              |
 | `i_log`         | InferenceProvider   | `''`                              |
 | `i_legend`      | InferenceProvider   | `''`                              |

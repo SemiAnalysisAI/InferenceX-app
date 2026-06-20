@@ -168,6 +168,40 @@ describe('Line Labels Toggle', () => {
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
   });
 
+  it('legacy URL param i_nolabel=1 keeps point labels hidden on load', () => {
+    cy.visit('/inference?i_nolabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+  });
+
+  it('legacy URL param i_advlabel=1 auto-enables Labels so advanced labels render', () => {
+    cy.visit('/inference?i_advlabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    // Labels toggle is auto-enabled by the URL hydration so the advanced
+    // (parallelism) point labels actually render.
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+  });
+
+  it('legacy URL combo i_advlabel=1&i_nolabel=1 keeps point labels hidden (i_nolabel wins)', () => {
+    cy.visit('/inference?i_advlabel=1&i_nolabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+  });
+
   it('appends the precision to each line label when multiple precisions are selected', () => {
     // Pair the FP4+FP8 selection with a model that has both precisions in the
     // fixtures. The default model (DeepSeek-V4-Pro) only has FP4, so
