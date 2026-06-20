@@ -645,8 +645,8 @@ export interface InferenceChartContextType {
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
   setHideNonOptimal: (hide: boolean) => void;
-  hidePointLabels: boolean;
-  setHidePointLabels: (hide: boolean) => void;
+  showPointLabels: boolean;
+  setShowPointLabels: (show: boolean) => void;
   highContrast: boolean;
   setHighContrast: (highContrast: boolean) => void;
   logScale: boolean;

@@ -92,8 +92,8 @@ const GPUGraph = React.memo(
       activeDates,
       hideNonOptimal,
       setHideNonOptimal,
-      hidePointLabels,
-      setHidePointLabels,
+      showPointLabels,
+      setShowPointLabels,
       logScale,
       setLogScale,
       isLegendExpanded,
@@ -754,7 +754,7 @@ const GPUGraph = React.memo(
             data: filteredData,
             config: {
               getColor,
-              hideLabels: hidePointLabels,
+              hideLabels: !showPointLabels,
               getLabelText: (d) => (useAdvancedLabels ? getPointLabel(d) : String(d.tp)),
               foreground: 'var(--foreground)',
               dataAttrs: {
@@ -876,12 +876,12 @@ const GPUGraph = React.memo(
                 },
               },
               {
-                id: 'gpu-hide-point-labels',
-                label: 'Hide Labels',
-                checked: hidePointLabels,
+                id: 'gpu-point-labels',
+                label: 'Labels',
+                checked: showPointLabels,
                 onCheckedChange: (c) => {
-                  setHidePointLabels(c);
-                  track('interactivity_hide_point_labels_toggled', { enabled: c });
+                  setShowPointLabels(c);
+                  track('interactivity_point_labels_toggled', { enabled: c });
                 },
               },
               {
@@ -891,6 +891,9 @@ const GPUGraph = React.memo(
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
                   track('interactivity_advanced_labels_toggled', { enabled: c });
+                  // Parallelism labels are point labels; turning them on is
+                  // pointless if labels are hidden, so auto-enable Labels.
+                  if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
               {

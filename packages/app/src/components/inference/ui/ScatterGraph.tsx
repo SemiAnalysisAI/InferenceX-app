@@ -152,8 +152,8 @@ const ScatterGraph = React.memo(
       selectedRunId,
       hideNonOptimal,
       setHideNonOptimal,
-      hidePointLabels,
-      setHidePointLabels,
+      showPointLabels,
+      setShowPointLabels,
       selectAllHwTypes,
       highContrast,
       setHighContrast,
@@ -1486,7 +1486,7 @@ const ScatterGraph = React.memo(
             getCssColor(resolveColor(d.hwKey as string)),
           getOpacity: (d) => (isPointVisible(d) ? 1 : 0),
           getPointerEvents: (d) => (isPointVisible(d) ? 'auto' : 'none'),
-          hideLabels: hidePointLabels || showGradientLabels,
+          hideLabels: !showPointLabels || showGradientLabels,
           getLabelText: (d) => (useAdvancedLabels ? getPointLabel(d) : String(d.tp)),
           foreground: 'var(--foreground)',
           dataAttrs: {
@@ -1585,7 +1585,7 @@ const ScatterGraph = React.memo(
                 );
 
               // Labels
-              const showLabels = !hidePointLabels && !showGradientLabels;
+              const showLabels = showPointLabels && !showGradientLabels;
               overlayPoints.each(function (d) {
                 d3.select(this)
                   .selectAll<SVGTextElement, boolean>('.overlay-label')
@@ -1864,7 +1864,7 @@ const ScatterGraph = React.memo(
       resolveColor,
       pointsData,
       isPointVisible,
-      hidePointLabels,
+      showPointLabels,
       useAdvancedLabels,
       buildPointConfigId,
       overlayData,
@@ -2154,12 +2154,12 @@ const ScatterGraph = React.memo(
                 },
               },
               {
-                id: 'scatter-hide-point-labels',
-                label: 'Hide Labels',
-                checked: hidePointLabels,
+                id: 'scatter-point-labels',
+                label: 'Labels',
+                checked: showPointLabels,
                 onCheckedChange: (checked: boolean) => {
-                  setHidePointLabels(checked);
-                  track('latency_hide_point_labels_toggled', { enabled: checked });
+                  setShowPointLabels(checked);
+                  track('latency_point_labels_toggled', { enabled: checked });
                 },
               },
               {
@@ -2178,6 +2178,9 @@ const ScatterGraph = React.memo(
                 onCheckedChange: (checked: boolean) => {
                   setUseAdvancedLabels(checked);
                   track('latency_advanced_labels_toggled', { enabled: checked });
+                  // Parallelism labels are point labels; turning them on is
+                  // pointless if labels are hidden, so auto-enable Labels.
+                  if (checked && !showPointLabels) setShowPointLabels(true);
                   if (checked && !showGradientLabels) {
                     window.dispatchEvent(
                       new CustomEvent(GRADIENT_NUDGE_EVENT, {
