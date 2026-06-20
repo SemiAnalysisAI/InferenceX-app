@@ -936,7 +936,7 @@ describe('getHardwareKey', () => {
 
   it('resolves aliased frameworks to canonical keys (atom-disagg → mooncake-atom)', () => {
     // Must match the canonical key buildAvailabilityHwKey builds for the GPU filter,
-    // otherwise disagg ATOMesh points are filtered out of the chart.
+    // otherwise disagg Mooncake ATOMesh points are filtered out of the chart.
     expect(getHardwareKey(entry({ hw: 'mi355x', framework: 'atom-disagg', disagg: true }))).toBe(
       'mi355x_mooncake-atom',
     );

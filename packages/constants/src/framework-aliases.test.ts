@@ -10,12 +10,12 @@ import {
 } from './framework-aliases';
 
 describe('FRAMEWORK_LABELS', () => {
-  it('labels the canonical mooncake-atom framework "ATOMesh¹"', () => {
-    expect(FRAMEWORK_LABELS['mooncake-atom']).toBe('ATOMesh¹');
+  it('labels the canonical mooncake-atom framework "Mooncake ATOMesh¹"', () => {
+    expect(FRAMEWORK_LABELS['mooncake-atom']).toBe('Mooncake ATOMesh¹');
   });
 
   it('labels the atom-disagg alias with its canonical label', () => {
-    expect(FRAMEWORK_LABELS['atom-disagg']).toBe('ATOMesh¹');
+    expect(FRAMEWORK_LABELS['atom-disagg']).toBe('Mooncake ATOMesh¹');
   });
 });
 
