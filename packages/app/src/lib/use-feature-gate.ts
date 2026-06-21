@@ -16,9 +16,9 @@ const UNLOCK_SEQUENCE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
  * (FEATURE_GATE_UNLOCKED_EVENT / FEATURE_GATE_LOCKED_EVENT) so all
  * consumers flip together without each owning a keyboard listener.
  *
- * Used by tab-nav (GATED_TABS), gpu-power, submissions, feedback,
- * and any chart surface that should be visible only to insiders
- * until the underlying data is stable.
+ * Used by tab-nav (GATED_TABS), gpu-power, feedback, and any chart
+ * surface that should be visible only to insiders until the underlying
+ * data is stable.
  */
 /**
  * Re-lock the feature gate from any client surface. Owns the localStorage write
