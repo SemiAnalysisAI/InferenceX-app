@@ -122,7 +122,7 @@ export function transformBenchmarkRows(rows: BenchmarkRow[]): {
     entry.hwKey = hwKey;
 
     if (!hwConfigCache.has(hwKey)) {
-      const hwConfig = getHardwareConfig(hwKey);
+      const hwConfig = getHardwareConfig(hwKey, entry.model);
       hwConfigCache.set(hwKey, hwConfig);
       if (hwConfig) gpuConfig[hwKey] = { ...hwConfig, name: hwKey };
     }

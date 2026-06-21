@@ -201,6 +201,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       renderGroup.selectAll('.dot-group').raise();
       renderGroup.selectAll('.point').raise();
 
+      // Line labels (built in the rooflines layer, which renders before the dots
+      // so paths sit behind points) must sit above the points too. Raise them
+      // after the dot raise so the final z-order is rooflines < points <
+      // line-labels on every render. `.raise()` only reorders DOM, so per-label
+      // de-overlap placement is untouched. No-op for charts without line labels.
+      renderGroup.selectAll('.line-label').raise();
+
       // ── Tooltip ──
       if (tooltipConfig) {
         if (tooltipConfig.proximityHover && tooltipConfig.getDataX) {
@@ -441,11 +448,27 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 );
               }
 
+              // Keep line labels above the points after the per-layer zoom
+              // updates re-touch the DOM (mirrors the full-render raise above).
+              renderGroup.selectAll('.line-label').raise();
+
               // User callback
               zoomConfig.onZoom?.(event, zoomCtx);
             },
           },
         );
+
+        // setupZoom only replays the stored transform (re-emitting a zoom
+        // event over the freshly drawn base-scale DOM) when it is non-identity.
+        // The identity replay used to dismiss a pinned tooltip as a side
+        // effect of that emit — keep that behavior when the replay is skipped,
+        // since the chart under the tooltip was just rebuilt.
+        const restored = zoomTransformRef.current;
+        if (restored.k === 1 && restored.x === 0 && restored.y === 0 && isPinned()) {
+          dismissTooltip(true);
+          tooltip.style('opacity', 0).style('display', 'none').style('pointer-events', 'none');
+          renderGroup.select('.ruler-group').style('display', 'none');
+        }
       }
 
       // ── Animate from old positions to new positions ──

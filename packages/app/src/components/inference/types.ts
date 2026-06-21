@@ -481,6 +481,32 @@ export interface ScatterGraphProps {
    * playback).
    */
   niceAxes?: boolean;
+  /**
+   * Pin each line label to a stable anchor along its roofline so it tracks the
+   * line smoothly instead of re-running the per-frame greedy placement (which
+   * makes labels teleport between candidate positions as the lines animate).
+   * Defaults to false. The replay panel passes true so labels keep a positional
+   * "affinity" across frames. Trades the static chart's per-frame de-overlap for
+   * positional stability — appropriate while the chart is animating.
+   */
+  pinLineLabels?: boolean;
+  /**
+   * Fixed x/y data extents `[min, max]` to base the axes on, instead of fitting
+   * to the currently rendered points. The normal domain padding (and log /
+   * zero-baseline handling) is still applied on top. Replay passes the whole
+   * run's extent so the axes stay constant across the animation and you can see
+   * the frontier expand toward them over time.
+   */
+  xExtentOverride?: [number, number];
+  yExtentOverride?: [number, number];
+  /**
+   * Stable run numbering (entry string `date~rRunId` → 1-based number) shared with
+   * the comparison changelog so legend labels match it exactly. Numbers index ALL
+   * of a date's runs (not just the ones on the chart), so a removed run leaves a
+   * gap that lines up with the changelog's still-listed "Add to chart" run. When
+   * omitted, GPUGraph falls back to gap-free numbering of the on-chart series.
+   */
+  runNumbering?: Map<string, number>;
 }
 /**
  * @file types.ts
@@ -619,8 +645,8 @@ export interface InferenceChartContextType {
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
   setHideNonOptimal: (hide: boolean) => void;
-  hidePointLabels: boolean;
-  setHidePointLabels: (hide: boolean) => void;
+  showPointLabels: boolean;
+  setShowPointLabels: (show: boolean) => void;
   highContrast: boolean;
   setHighContrast: (highContrast: boolean) => void;
   logScale: boolean;
@@ -639,7 +665,8 @@ export interface InferenceChartContextType {
   setSelectedGPUs: (gpus: string[]) => void;
   availableGPUs: { value: string; label: string }[];
   selectedDates: string[];
-  setSelectedDates: (dates: string[]) => void;
+  /** Accepts a value or a state-updater fn (for safe rapid successive adds). */
+  setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   selectedDateRange: { startDate: string; endDate: string };
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
   userCosts: Record<string, number | undefined> | null;

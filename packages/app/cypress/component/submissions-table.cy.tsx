@@ -32,16 +32,34 @@ describe('SubmissionsTable — Spec Method column', () => {
     cy.contains('th', 'Spec Method').should('be.visible');
   });
 
-  it('renders spec_method values uppercased and shows an em-dash for "none"', () => {
+  it('renders canonical spec_method labels and shows an em-dash for "none"', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    // CSS uppercases the value; the DOM text remains lowercase.
-    cy.contains('td', 'mtp').should('be.visible').and('have.class', 'uppercase');
-    cy.contains('td', 'eagle').should('be.visible').and('have.class', 'uppercase');
+    // The cell renders the canonical spec-method label (MTP/EAGLE) for the model.
+    cy.contains('td', 'MTP').should('be.visible').and('have.class', 'uppercase');
+    cy.contains('td', 'EAGLE').should('be.visible').and('have.class', 'uppercase');
     // The "none" row renders an em-dash placeholder instead of literal "none".
     // Hardware text is rendered uppercase via .toUpperCase().
     cy.contains('tbody tr', 'MI355X').within(() => {
       cy.contains('—').should('be.visible');
     });
+  });
+
+  it('renders M3 mtp as EAGLE, not MTP', () => {
+    cy.mount(
+      <SubmissionsTable
+        data={[
+          {
+            ...baseRow,
+            model: 'minimaxm3',
+            hardware: 'b200',
+            spec_method: 'mtp',
+            date: '2026-05-10',
+          },
+        ]}
+      />,
+    );
+    cy.contains('td', 'EAGLE').should('be.visible');
+    cy.contains('td', 'MTP').should('not.exist');
   });
 
   it('sorts by spec_method when the header is clicked', () => {

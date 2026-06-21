@@ -87,9 +87,19 @@ export function updateRooflinesOnZoom<T extends { x: number; y: number }>(
 
   Object.entries(rooflines).forEach(([key, points]) => {
     if (points.length < 2) return;
-    const selection = zoomGroup.select<SVGPathElement>(`.roofline-${key}`);
+    // Keys can contain characters that are invalid in a CSS selector (e.g. `~`
+    // from run-comparison series ids), so escape before selecting by class.
+    const selection = zoomGroup.select<SVGPathElement>(`.${cssEscapeToken(`roofline-${key}`)}`);
     if (!selection.empty()) {
       selection.attr('d', lineGenerator(points) as string);
     }
   });
+}
+
+/** Escape a class token for safe use in a CSS selector. */
+function cssEscapeToken(token: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(token);
+  // Fallback (non-DOM environments): escape everything outside the CSS-safe set.
+  // The token always starts with "roofline-", so a leading digit is never escaped.
+  return token.replaceAll(/[^a-zA-Z0-9_-]/gu, (c) => `\\${c}`);
 }

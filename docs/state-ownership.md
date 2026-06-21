@@ -73,7 +73,7 @@ Depends on: `GlobalFilterProvider` (reads all filter state and availability, inc
 
 - `selectedYAxisMetric` (`i_metric`), `selectedXAxisMetric` (`i_xmetric`), `selectedE2eXAxisMetric` (`i_e2e_xmetric`)
 - `scaleType` — `auto | linear | log` (`i_scale`)
-- `hideNonOptimal` (`i_optimal`), `hidePointLabels` (`i_nolabel`), `logScale` (`i_log`)
+- `hideNonOptimal` (`i_optimal`), `showPointLabels` (`i_label`), `logScale` (`i_log`)
 - `highContrast` (`i_hc`), `isLegendExpanded` (`i_legend`)
 - `useAdvancedLabels` (`i_advlabel`), `showGradientLabels` (`i_gradlabel`)
 - `colorShuffleSeed` — no URL param; ephemeral
@@ -260,34 +260,35 @@ Historical Trends and TCO Calculator share the inference tab's URL path (`/infer
 
 ### Full parameter list
 
-| Param           | Owner               | Default                          |
-| --------------- | ------------------- | -------------------------------- |
-| `g_model`       | GlobalFilterContext | `DeepSeek-R1-0528`               |
-| `g_rundate`     | GlobalFilterContext | `''`                             |
-| `g_runid`       | GlobalFilterContext | `''`                             |
-| `i_seq`         | GlobalFilterContext | `8k/1k`                          |
-| `i_prec`        | GlobalFilterContext | `fp4`                            |
-| `i_metric`      | InferenceProvider   | `y_tpPerGpu`                     |
-| `i_xmetric`     | InferenceProvider   | `p99_ttft`                       |
-| `i_e2e_xmetric` | InferenceProvider   | `''`                             |
-| `i_scale`       | InferenceProvider   | `auto`                           |
-| `i_gpus`        | InferenceProvider   | `''`                             |
-| `i_dates`       | InferenceProvider   | `''`                             |
-| `i_dstart`      | InferenceProvider   | `''`                             |
-| `i_dend`        | InferenceProvider   | `''`                             |
-| `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal) |
-| `i_nolabel`     | InferenceProvider   | `''`                             |
-| `i_hc`          | InferenceProvider   | `''`                             |
-| `i_log`         | InferenceProvider   | `''`                             |
-| `i_legend`      | InferenceProvider   | `''`                             |
-| `i_advlabel`    | InferenceProvider   | `''`                             |
-| `i_gradlabel`   | InferenceProvider   | `''`                             |
-| `e_rundate`     | EvaluationProvider  | `''`                             |
-| `e_bench`       | EvaluationProvider  | `''`                             |
-| `e_hc`          | EvaluationProvider  | `''`                             |
-| `e_labels`      | EvaluationProvider  | `''`                             |
-| `e_legend`      | EvaluationProvider  | `''`                             |
-| `r_range`       | ReliabilityProvider | `last-3-months`                  |
-| `r_pct`         | ReliabilityProvider | `''`                             |
-| `r_hc`          | ReliabilityProvider | `''`                             |
-| `r_legend`      | ReliabilityProvider | `''`                             |
+| Param           | Owner               | Default                           |
+| --------------- | ------------------- | --------------------------------- |
+| `g_model`       | GlobalFilterContext | `DeepSeek-R1-0528`                |
+| `g_rundate`     | GlobalFilterContext | `''`                              |
+| `g_runid`       | GlobalFilterContext | `''`                              |
+| `i_seq`         | GlobalFilterContext | `8k/1k`                           |
+| `i_prec`        | GlobalFilterContext | `fp4`                             |
+| `i_metric`      | InferenceProvider   | `y_tpPerGpu`                      |
+| `i_xmetric`     | InferenceProvider   | `p99_ttft`                        |
+| `i_e2e_xmetric` | InferenceProvider   | `''`                              |
+| `i_scale`       | InferenceProvider   | `auto`                            |
+| `i_gpus`        | InferenceProvider   | `''`                              |
+| `i_dates`       | InferenceProvider   | `''`                              |
+| `i_dstart`      | InferenceProvider   | `''`                              |
+| `i_dend`        | InferenceProvider   | `''`                              |
+| `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal)  |
+| `i_label`       | InferenceProvider   | `''` (truthy = show point labels) |
+| `i_nolabel`     | InferenceProvider   | `''` (legacy, read-only)          |
+| `i_hc`          | InferenceProvider   | `''`                              |
+| `i_log`         | InferenceProvider   | `''`                              |
+| `i_legend`      | InferenceProvider   | `''`                              |
+| `i_advlabel`    | InferenceProvider   | `''`                              |
+| `i_gradlabel`   | InferenceProvider   | `''`                              |
+| `e_rundate`     | EvaluationProvider  | `''`                              |
+| `e_bench`       | EvaluationProvider  | `''`                              |
+| `e_hc`          | EvaluationProvider  | `''`                              |
+| `e_labels`      | EvaluationProvider  | `''`                              |
+| `e_legend`      | EvaluationProvider  | `''`                              |
+| `r_range`       | ReliabilityProvider | `last-3-months`                   |
+| `r_pct`         | ReliabilityProvider | `''`                              |
+| `r_hc`          | ReliabilityProvider | `''`                              |
+| `r_legend`      | ReliabilityProvider | `''`                              |

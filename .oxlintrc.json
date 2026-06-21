@@ -40,6 +40,7 @@
     "unicorn/no-null": "off",
     "unicorn/no-useless-undefined": "off",
     "unicorn/numeric-separators-style": "off",
+    "unicorn/prefer-export-from": "off",
     "unicorn/prefer-global-this": "off",
     "unicorn/prefer-top-level-await": "off"
   }

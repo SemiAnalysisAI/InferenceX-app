@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { generateHighContrastColors } from '@/lib/chart-utils';
 import { getChartThemeColors } from '@/lib/chart-rendering';
@@ -87,8 +87,27 @@ export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsRe
   // get base theme colors
   const [themeColors, setThemeColors] = useState<ThemeColors>(() => getChartThemeColors());
 
-  // update theme colors on next tick
+  // Re-read theme colors when the resolved theme actually changes.
+  //
+  // The first defined `resolvedTheme` is skipped on purpose: next-themes applies
+  // the theme class to <html> in a blocking inline script before hydration, so
+  // the synchronous useState read above already saw the correct computed styles.
+  // Re-setting state here would only change the `themeColors` object identity,
+  // which invalidates `getCssColor` and forces every consuming chart through a
+  // full (and visually identical) D3 rebuild right after mount.
+  //
+  // The setTimeout(0) on real theme switches is load-bearing: the class flip on
+  // <html> must be applied/recomputed before we trigger consumers to re-resolve
+  // CSS variables.
+  const appliedThemeRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!resolvedTheme) return; // next-themes not mounted yet
+    if (appliedThemeRef.current === null) {
+      appliedThemeRef.current = resolvedTheme;
+      return;
+    }
+    if (appliedThemeRef.current === resolvedTheme) return;
+    appliedThemeRef.current = resolvedTheme;
     const timeoutId = setTimeout(() => {
       setThemeColors(getChartThemeColors());
     }, 0);

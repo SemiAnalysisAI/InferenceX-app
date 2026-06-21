@@ -2,6 +2,7 @@
 
 import {
   type ReactNode,
+  type SetStateAction,
   createContext,
   useCallback,
   useContext,
@@ -57,6 +58,7 @@ import {
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
+import { resolveComparisonEntries } from './utils/comparisonEntry';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -155,7 +157,17 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  const [hidePointLabels, setHidePointLabels] = useState(() => getUrlParam('i_nolabel') === '1');
+  const [showPointLabels, setShowPointLabels] = useState(() => {
+    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels
+    // explicitly so the share link's intent survives future default changes.
+    if (getUrlParam('i_nolabel') === '1') return false;
+    if (getUrlParam('i_label') === '1') return true;
+    // Old share links set `?i_advlabel=1` while keeping the labels default
+    // (shown). Mirror the toggle's auto-enable side-effect on load so those
+    // links still render advanced labels under the new default-off behavior.
+    if (getUrlParam('i_advlabel') === '1') return true;
+    return false;
+  });
   const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
   const [useAdvancedLabels, setUseAdvancedLabels] = useState(
     () => getUrlParam('i_advlabel') === '1',
@@ -163,7 +175,7 @@ export function InferenceProvider({
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
   );
-  const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
+  const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') !== '0');
   const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
   const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
     () => getUrlParam('i_mc') === '1',
@@ -202,6 +214,43 @@ export function InferenceProvider({
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
+  // Runs available for the current model selection, and which one is selected.
+  // Computed here (above useChartData) so the chart can query "as of" the selected
+  // run. Re-exposed on the context value below.
+  const modelPrefixes = useMemo(
+    () =>
+      Object.entries(MODEL_PREFIX_MAPPING)
+        .filter(([, model]) => model === selectedModel)
+        .map(([prefix]) => prefix),
+    [selectedModel],
+  );
+
+  const filteredAvailableRuns = useMemo(
+    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
+    [availableRuns, modelPrefixes, effectivePrecisions],
+  );
+
+  const effectiveSelectedRunId = useMemo(() => {
+    if (!filteredAvailableRuns) return selectedRunId;
+    const filteredRunIds = Object.keys(filteredAvailableRuns);
+    if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
+    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
+  }, [filteredAvailableRuns, selectedRunId]);
+
+  // The latest run for this model on the selected date. GitHub run ids increase
+  // monotonically with time, so the lexicographically-greatest id is the newest run.
+  const latestRunIdForModel = useMemo(() => {
+    const ids = filteredAvailableRuns ? Object.keys(filteredAvailableRuns) : [];
+    return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
+  }, [filteredAvailableRuns]);
+
+  // Only constrain the query when an earlier-than-latest run is selected; otherwise
+  // the chart shows the full latest view (and reuses the materialized-view fast path).
+  const asOfRunId =
+    effectiveSelectedRunId && latestRunIdForModel && effectiveSelectedRunId !== latestRunIdForModel
+      ? effectiveSelectedRunId
+      : undefined;
+
   const {
     graphs,
     loading: chartDataLoading,
@@ -223,6 +272,7 @@ export function InferenceProvider({
     isActive,
     latestDate,
     compareGpuPair ?? null,
+    asOfRunId,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -271,9 +321,9 @@ export function InferenceProvider({
       .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
       .map((hw) => ({
         value: hw,
-        label: getDisplayLabel(getHardwareConfig(hw)),
+        label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions]);
+  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
 
   // --- Tracked config functions ---
   const buildTrackedConfigId = useCallback((point: InferenceData): string => {
@@ -378,7 +428,10 @@ export function InferenceProvider({
     [setSelectedGPUs, clearPresetOnChange],
   );
   const setSelectedDatesAndClear = useCallback(
-    (v: string[]) => {
+    // Accept a React state updater (value OR function) so callers adding several
+    // dates/runs in quick succession can use the functional form and avoid the
+    // stale-closure race where each click overwrites the last.
+    (v: SetStateAction<string[]>) => {
       setSelectedDates(v);
       clearPresetOnChange();
     },
@@ -526,11 +579,7 @@ export function InferenceProvider({
   );
 
   const allDateIds = useMemo(() => {
-    const dates: string[] = [];
-    if (selectedDateRange.startDate && selectedDateRange.endDate) {
-      dates.push(selectedDateRange.startDate, selectedDateRange.endDate);
-    }
-    dates.push(...selectedDates);
+    const dates = resolveComparisonEntries(selectedDates, selectedDateRange);
     const allIds = new Set<string>();
     selectedGPUs.forEach((gpu) => {
       dates.forEach((date) => allIds.add(`${date}_${gpu}`));
@@ -699,14 +748,6 @@ export function InferenceProvider({
       setUserPowers((prev) => (prev === null ? prev : null));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
 
-  const modelPrefixes = useMemo(
-    () =>
-      Object.entries(MODEL_PREFIX_MAPPING)
-        .filter(([, model]) => model === selectedModel)
-        .map(([prefix]) => prefix),
-    [selectedModel],
-  );
-
   // ── Debounced GPU selection tracking ─────────────────────────────────────
   // Fire after 3s of no changes so we capture the "settled" selection.
   // Skip the first render (initial data load) to avoid noise.
@@ -790,7 +831,7 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
-      i_nolabel: hidePointLabels ? '1' : '',
+      i_label: showPointLabels ? '1' : '',
       i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
       i_xmetric: selectedXAxisMetric || '',
@@ -799,7 +840,7 @@ export function InferenceProvider({
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
-      i_linelabel: showLineLabels ? '1' : '',
+      i_linelabel: showLineLabels ? '' : '0',
       i_speed: showSpeedOverlay ? '1' : '',
       i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
@@ -813,7 +854,7 @@ export function InferenceProvider({
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
-      hidePointLabels,
+      showPointLabels,
       highContrast,
       logScale,
       isLegendExpanded,
@@ -922,19 +963,9 @@ export function InferenceProvider({
   }, [applyPreset]);
 
   // ── Filtered runs ─────────────────────────────────────────────────────────
-
-  const filteredAvailableRuns = useMemo(
-    () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
-    [availableRuns, modelPrefixes, effectivePrecisions],
-  );
-
-  const effectiveSelectedRunId = useMemo(() => {
-    if (!filteredAvailableRuns) return selectedRunId;
-    const filteredRunIds = Object.keys(filteredAvailableRuns);
-    if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
-  }, [filteredAvailableRuns, selectedRunId]);
-
+  // filteredAvailableRuns / effectiveSelectedRunId are computed above the data
+  // fetch (so the chart can query "as of" the selected run).
+  //
   // NOTE: We intentionally do NOT sync effectiveSelectedRunId back to
   // GlobalFilterContext (setSelectedRunId). That would cause a full tree
   // re-render on every precision change because filteredAvailableRuns
@@ -968,8 +999,8 @@ export function InferenceProvider({
       setIsLegendExpanded,
       hideNonOptimal,
       setHideNonOptimal,
-      hidePointLabels,
-      setHidePointLabels,
+      showPointLabels,
+      setShowPointLabels,
       highContrast,
       setHighContrast,
       logScale,
@@ -1068,7 +1099,7 @@ export function InferenceProvider({
       availableSequences,
       availableModels,
       hideNonOptimal,
-      hidePointLabels,
+      showPointLabels,
       highContrast,
       logScale,
       isLegendExpanded,

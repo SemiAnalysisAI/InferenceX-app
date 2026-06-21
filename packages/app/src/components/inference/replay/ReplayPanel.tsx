@@ -10,6 +10,8 @@ import { useInference } from '@/components/inference/InferenceContext';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -21,7 +23,7 @@ import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
-import { buildReplayTimeline } from './buildReplayTimeline';
+import { buildReplayTimeline, computeFullRunDomain } from './buildReplayTimeline';
 import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
 import { buildFrameData, dateAtFraction, shouldCommitFraction, spanMs } from './replayFrameData';
 import { useReducedMotion } from './useReducedMotion';
@@ -63,7 +65,7 @@ export default function ReplayPanel({
   xLabel,
 }: ReplayPanelProps) {
   const inference = useInference();
-  const { selectedModel, selectedSequence } = inference;
+  const { selectedModel, selectedSequence, activeHwTypes } = inference;
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
   const history = useBenchmarkHistory(selectedModel, isl, osl);
@@ -89,6 +91,15 @@ export default function ReplayPanel({
     effectiveX,
     inference.selectedPrecisions,
   ]);
+
+  // Fixed axes for the whole run: take the extent across every step (not just
+  // the current frame) for the active hardware, so the axes stay put and the
+  // frontier visibly expands toward them over time instead of the chart
+  // refitting each frame. Recomputed when the legend's hw filter changes.
+  const fixedExtent = useMemo(
+    () => (timeline ? computeFullRunDomain(timeline, (hw) => activeHwTypes.has(hw)) : null),
+    [timeline, activeHwTypes],
+  );
 
   // Track the SVG's position inside our relative wrapper so the date overlay
   // can anchor its bottom-right to the chart plot's top-right (the wrapper
@@ -161,6 +172,10 @@ export default function ReplayPanel({
   const [fraction, setFraction] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  // Fixed axes (default) freeze the coordinate space to the whole run so the
+  // frontier visibly expands over time; turning this off lets the axes refit to
+  // each frame's points.
+  const [fixedAxes, setFixedAxes] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -496,6 +511,9 @@ export default function ReplayPanel({
           chartDefinition={chartDefinition}
           transitionDuration={0}
           niceAxes={false}
+          pinLineLabels
+          xExtentOverride={fixedAxes ? fixedExtent?.x : undefined}
+          yExtentOverride={fixedAxes ? fixedExtent?.y : undefined}
         />
         <div
           className="absolute -translate-y-full pointer-events-none text-2xl font-bold tabular-nums opacity-85 leading-none pb-1"
@@ -564,6 +582,24 @@ export default function ReplayPanel({
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="replay-fixed-axes"
+            data-testid="replay-fixed-axes"
+            checked={fixedAxes}
+            onCheckedChange={(checked) => {
+              setFixedAxes(checked);
+              track('inference_replay_fixed_axes_toggled', { enabled: checked });
+            }}
+          />
+          <Label
+            htmlFor="replay-fixed-axes"
+            className="text-xs text-muted-foreground hover:text-foreground cursor-pointer whitespace-nowrap"
+            title="Keep the axes fixed across the whole run so you can see the frontier improve over time, or let them refit to each frame."
+          >
+            Fixed axes
+          </Label>
+        </div>
         <Button
           size="sm"
           variant="default"

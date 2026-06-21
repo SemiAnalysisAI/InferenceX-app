@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+
 import {
   validateSpec,
   type AiChartBarPoint,
@@ -120,7 +122,7 @@ function buildBenchmarkBarData(
     const value = getNestedYValue(closest, yFieldPath);
     if (value <= 0) continue;
 
-    const config = getHardwareConfig(hwKey);
+    const config = getHardwareConfig(hwKey, closest.model);
     bars.push({
       hwKey,
       label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
@@ -178,7 +180,7 @@ function buildEvalBarData(
     const score = row.metrics.gsm8k ?? row.metrics.accuracy ?? Object.values(row.metrics)[0] ?? 0;
     if (score <= 0) continue;
 
-    const config = getHardwareConfig(hwKey);
+    const config = getHardwareConfig(hwKey, DB_MODEL_TO_DISPLAY[row.model]);
     bars.push({
       hwKey,
       label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hwKey,
@@ -222,7 +224,7 @@ function buildReliabilityBarData(
   for (const [hw, { success, total }] of agg) {
     if (total === 0) continue;
     const rate = (success / total) * 100;
-    const config = getHardwareConfig(hw);
+    const config = getHardwareConfig(hw, DB_MODEL_TO_DISPLAY[spec.model]);
     bars.push({
       hwKey: hw,
       label: config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : hw,
@@ -334,7 +336,7 @@ function buildRadarData(
 
   const items: AiRadarItem[] = [];
   for (const [hwKey, rawVals] of rawMatrix) {
-    const config = getHardwareConfig(hwKey);
+    const config = getHardwareConfig(hwKey, groups.get(hwKey)?.model);
     const normalized = rawVals.map((v, i) => {
       if (v <= 0 || !isFinite(mins[i]) || maxs[i] === mins[i]) return null;
       const norm = (v - mins[i]) / (maxs[i] - mins[i]);

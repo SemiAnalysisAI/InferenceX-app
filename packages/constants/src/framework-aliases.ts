@@ -9,7 +9,7 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   'dynamo-sglang': { label: 'Dynamo SGLang' },
   'dynamo-trt': { label: 'Dynamo TRT' },
   'dynamo-vllm': { label: 'Dynamo vLLM' },
-  'mooncake-atom': { label: 'Mooncake ATOM¹' },
+  'mooncake-atom': { label: 'Mooncake ATOMesh¹' },
   'mori-sglang': { label: 'MoRI SGLang' },
   sglang: { label: 'SGLang' },
   trt: { label: 'TRT' },
@@ -47,6 +47,31 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
   ),
   mtp: 'MTP',
 };
+
+/**
+ * Per-model display overrides for hwKey suffix parts (framework / spec_method
+ * tokens), keyed by frontend display model name → token → label.
+ *
+ * M3's speculative-decoding runs are ingested under the generic `mtp` token but
+ * actually use EAGLE, so for MiniMax-M3 the suffix reads "EAGLE" while every
+ * other model keeps the generic "MTP" label.
+ */
+export const MODEL_SPEC_METHOD_LABELS: Record<string, Record<string, string>> = {
+  'MiniMax-M3': { mtp: 'M3 EAGLE' },
+};
+
+/**
+ * Resolve a single hwKey suffix part (framework or spec_method token) to its
+ * display label, applying any per-model override before the generic
+ * FRAMEWORK_LABELS map. `model` is the frontend display model name.
+ */
+export function resolveFrameworkPartLabel(model: string | undefined, part: string): string {
+  return (
+    (model ? MODEL_SPEC_METHOD_LABELS[model]?.[part] : undefined) ??
+    FRAMEWORK_LABELS[part] ??
+    part.toUpperCase()
+  );
+}
 
 /**
  * Resolve a framework name to its canonical form.

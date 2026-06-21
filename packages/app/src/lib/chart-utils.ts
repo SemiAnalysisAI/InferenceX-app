@@ -47,6 +47,18 @@ const PREFERRED_MAX = 4;
 const BAN_MAX = 10;
 
 /**
+ * Palette cache. iwanthue's force-vector clustering costs tens of
+ * milliseconds per call (quality 50 × 5 attempts) and shows up as main-thread
+ * time on every render that recomputes high-contrast colors. The output is
+ * fully deterministic (seeded RNG) and — crucially — independent of the key
+ * *names*: a vendor group's palette depends only on the item count, vendor
+ * zone/ban mode, theme seed, and lightness bounds. Identical requests across
+ * renders, charts, and tabs therefore share one entry. Key space is tiny
+ * (vendors × themes × counts × 3 modes), so no eviction is needed.
+ */
+const PALETTE_CACHE = new Map<string, string[]>();
+
+/**
  * Generates high-contrast colors using iwanthue (k-means in CIELab space).
  *
  * Tiered strategy per vendor:
@@ -90,31 +102,40 @@ export const generateHighContrastColors = (
     const usePreferred = preferred && count <= PREFERRED_MAX;
     const useBan = !usePreferred && isBanned && count <= BAN_MAX;
 
-    const palette = iwanthue(count, {
-      colorSpace: usePreferred
-        ? {
-            hmin: preferred.hmin,
-            hmax: preferred.hmax,
-            cmin: preferred.cmin ?? 30,
-            cmax: 100,
-            lmin: Math.max(lmin, preferred.lmin ?? 0),
-            lmax,
-          }
-        : { hmin: 0, hmax: 360, cmin: 30, cmax: 100, lmin, lmax },
-      ...(useBan &&
-        isBanned && {
-          colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
-            // Enforce lightness bounds — force-vector can drift outside colorSpace
-            if (lab[0] < lmin || lab[0] > lmax) return false;
-            const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;
-            return !isBanned(hue);
-          },
-        }),
-      seed: `${vendor}-${theme}`,
-      clustering: 'force-vector',
-      quality: 50,
-      attempts: 5,
-    });
+    // Everything iwanthue's output depends on (the ban filter and preferred
+    // zone are functions of vendor; the seed is vendor+theme).
+    const mode = usePreferred ? 'pref' : useBan ? 'ban' : 'open';
+    const cacheKey = `${vendor}|${theme}|${count}|${mode}|${lmin}|${lmax}`;
+
+    let palette = PALETTE_CACHE.get(cacheKey);
+    if (!palette) {
+      palette = iwanthue(count, {
+        colorSpace: usePreferred
+          ? {
+              hmin: preferred.hmin,
+              hmax: preferred.hmax,
+              cmin: preferred.cmin ?? 30,
+              cmax: 100,
+              lmin: Math.max(lmin, preferred.lmin ?? 0),
+              lmax,
+            }
+          : { hmin: 0, hmax: 360, cmin: 30, cmax: 100, lmin, lmax },
+        ...(useBan &&
+          isBanned && {
+            colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
+              // Enforce lightness bounds — force-vector can drift outside colorSpace
+              if (lab[0] < lmin || lab[0] > lmax) return false;
+              const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;
+              return !isBanned(hue);
+            },
+          }),
+        seed: `${vendor}-${theme}`,
+        clustering: 'force-vector',
+        quality: 50,
+        attempts: 5,
+      });
+      PALETTE_CACHE.set(cacheKey, palette);
+    }
 
     vendorKeys.sort();
     vendorKeys.forEach((key, i) => {
@@ -166,12 +187,15 @@ export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
   if (entry.framework) {
+    // Resolve legacy/aliased framework names (e.g. atom-disagg → mooncake-atom) so chart
+    // point keys match the canonical keys built by buildAvailabilityHwKey for the GPU filter.
+    const fw = resolveFrameworkAlias(entry.framework);
     // Try framework as-is first, then disagg variant if it exists
-    const candidateDirect = `${normalizedHwName}_${entry.framework}`;
+    const candidateDirect = `${normalizedHwName}_${fw}`;
     if (isKnownGpu(candidateDirect)) {
       normalizedHwName = candidateDirect;
     } else if (entry.disagg) {
-      const candidateDisagg = `${normalizedHwName}_${entry.framework}-disagg`;
+      const candidateDisagg = `${normalizedHwName}_${fw}-disagg`;
       normalizedHwName = isKnownGpu(candidateDisagg) ? candidateDisagg : candidateDirect;
     } else {
       normalizedHwName = candidateDirect;

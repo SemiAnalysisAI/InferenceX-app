@@ -31,10 +31,12 @@ export interface CompareModelSlug {
 }
 
 // Order matches the master /compare and /compare-per-dollar index display:
-// DeepSeek V4 Pro → R1 → Kimi → GLM → MiniMax → Qwen → gpt-oss → Llama 70B.
-// Per product spec — flagship Chinese-developed models first, smaller open
-// US-developed models at the bottom. Qwen sits between MiniMax and gpt-oss to
-// keep the Chinese-lab cluster contiguous before the US transition.
+// DeepSeek V4 Pro → R1 → Kimi → GLM → MiniMax M3 → MiniMax M2 → Qwen →
+// gpt-oss → Llama 70B. Per product spec — flagship Chinese-developed models
+// first, smaller open US-developed models at the bottom. Qwen sits between
+// MiniMax and gpt-oss to keep the Chinese-lab cluster contiguous before the
+// US transition. The two MiniMax entries stay adjacent with the newer M3
+// flagship leading the older M2 series.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'deepseek-v4',
@@ -51,15 +53,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'kimi-k26',
     displayName: 'Kimi-K2.5',
-    // Both K2.5 and K2.6 point releases share an architecture (mirroring
+    // K2.5, K2.6, and K2.7-Code point releases share an architecture (mirroring
     // DISPLAY_MODEL_TO_DB in packages/constants/src/models.ts). The slug uses
-    // the newer version name; the dbKey list pulls data from both DB buckets
-    // so the slug is populated today and stays populated when K2.6 data lands.
-    dbKeys: ['kimik2.6', 'kimik2.5'],
-    // Slug groups two point releases sharing one architecture — the header
-    // surfaces both versions so the URL doesn't read as "only K2.6". Param
+    // the K2.6 version name for URL stability; the dbKey list pulls data from
+    // all three DB buckets so the slug stays populated across point releases.
+    dbKeys: ['kimik2.7-code', 'kimik2.6', 'kimik2.5'],
+    // Slug groups three point releases sharing one architecture — the header
+    // surfaces every version so the URL doesn't read as "only K2.6". Param
     // count appended so the label conveys model scale alongside the version.
-    label: 'Kimi K2.5/K2.6 1T',
+    label: 'Kimi K2.5/K2.6/K2.7-Code 1T',
   },
   {
     slug: 'glm-5-1',
@@ -68,6 +70,15 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // uses the newer version name but the data pull covers both DB buckets.
     dbKeys: ['glm5.1', 'glm5'],
     label: 'GLM 5/5.1',
+  },
+  {
+    slug: 'minimax-m3',
+    displayName: 'MiniMax-M3',
+    // M3 is a new 428B architecture (MiniMax Sparse Attention), not a point
+    // release of the M2 series, so it gets its own slug and dbKey rather than
+    // joining the minimax-m27 group.
+    dbKeys: ['minimaxm3'],
+    label: 'MiniMax M3 428B',
   },
   {
     slug: 'minimax-m27',

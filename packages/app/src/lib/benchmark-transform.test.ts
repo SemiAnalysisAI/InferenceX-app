@@ -302,6 +302,26 @@ describe('transformBenchmarkRows', () => {
     const hwKeys = Object.keys(hardwareConfig);
     expect(hwKeys.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('labels M3 mtp configs with the "M3 EAGLE" suffix', () => {
+    const rows = [
+      makeRow({ model: 'minimaxm3', hardware: 'h100', framework: 'vllm', spec_method: 'mtp' }),
+    ];
+    const { hardwareConfig } = transformBenchmarkRows(rows);
+    const entry = hardwareConfig['h100_vllm_mtp'];
+    expect(entry).toBeDefined();
+    expect(entry.suffix).toBe('(vLLM, M3 EAGLE)');
+  });
+
+  it('keeps the generic MTP suffix for non-M3 mtp configs', () => {
+    const rows = [
+      makeRow({ model: 'dsr1', hardware: 'h200', framework: 'sglang', spec_method: 'mtp' }),
+    ];
+    const { hardwareConfig } = transformBenchmarkRows(rows);
+    const entry = hardwareConfig['h200_sglang_mtp'];
+    expect(entry).toBeDefined();
+    expect(entry.suffix).toBe('(SGLang, MTP)');
+  });
 });
 
 // ---------------------------------------------------------------------------
