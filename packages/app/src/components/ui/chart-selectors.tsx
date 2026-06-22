@@ -18,13 +18,16 @@ import {
   groupByCategory,
 } from '@/lib/data-mappings';
 
-function DeprecatedSectionTitle({ reason }: { reason: string }) {
+function CategorySectionTitle({ label, reason }: { label: string; reason: string }) {
   return (
     <span className="flex items-center gap-1">
-      Deprecated
+      {label}
       <TooltipRoot>
         <TooltipTrigger asChild>
-          <Info className="size-3 text-muted-foreground cursor-help" />
+          <Info
+            className="size-3 text-muted-foreground cursor-help"
+            data-testid={`selector-category-${label.toLowerCase().replaceAll(' ', '-')}-info`}
+          />
         </TooltipTrigger>
         <TooltipContent side="top" collisionPadding={10}>
           <span>{reason}</span>
@@ -74,11 +77,33 @@ export function ModelSelector({
           },
         ]
       : []),
+    ...(groups.maintenance.length > 0
+      ? [
+          {
+            id: 'maintenance',
+            header: (
+              <CategorySectionTitle
+                label="Maintenance Mode"
+                reason="Updated at a lower priority because these models are still relevant."
+              />
+            ),
+            options: groups.maintenance.map((model) => ({
+              value: model,
+              label: getModelLabel(model as Model),
+            })),
+          },
+        ]
+      : []),
     ...(groups.deprecated.length > 0
       ? [
           {
             id: 'deprecated',
-            header: <DeprecatedSectionTitle reason="Model is no longer actively benchmarked." />,
+            header: (
+              <CategorySectionTitle
+                label="Deprecated"
+                reason="Model is no longer actively benchmarked."
+              />
+            ),
             options: groups.deprecated.map((model) => ({
               value: model,
               label: getModelLabel(model as Model),
@@ -155,7 +180,10 @@ export function SequenceSelector({
           {
             id: 'deprecated',
             header: (
-              <DeprecatedSectionTitle reason="CI capacity was reallocated to agentic coding and multi-turn chat scenarios." />
+              <CategorySectionTitle
+                label="Deprecated"
+                reason="CI capacity was reallocated to agentic coding and multi-turn chat scenarios."
+              />
             ),
             options: groups.deprecated.map((seq) => ({
               value: seq,

@@ -8,6 +8,7 @@ import {
   getPrecisionLabel,
   getEvalBenchmarkLabel,
   isModelDeprecated,
+  isModelMaintenance,
   isSequenceDeprecated,
   Model,
   Sequence,
@@ -161,6 +162,20 @@ describe('isModelDeprecated', () => {
 
   it('returns false for non-deprecated model GptOss', () => {
     expect(isModelDeprecated(Model.GptOss)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// isModelMaintenance
+// ===========================================================================
+describe('isModelMaintenance', () => {
+  it('returns true for the DeepSeek R1 maintenance-mode family', () => {
+    expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
+  });
+
+  it('keeps deprecated and default models out of maintenance mode', () => {
+    expect(isModelMaintenance(Model.Llama3_3_70B)).toBe(false);
+    expect(isModelMaintenance(Model.MiniMax_M2_5)).toBe(false);
   });
 });
 

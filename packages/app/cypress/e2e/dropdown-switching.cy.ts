@@ -44,6 +44,15 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-slot="select-content"]').should('not.exist');
   });
 
+  it('separates maintenance-mode models from deprecated models', () => {
+    cy.get('[data-testid="model-selector"]').click();
+
+    cy.contains('Maintenance Mode').scrollIntoView().should('be.visible');
+    cy.contains('[role="option"]', 'DeepSeek R1 0528 671B').scrollIntoView().should('be.visible');
+    cy.contains('Deprecated').scrollIntoView().should('be.visible');
+    cy.contains('[role="option"]', 'Llama 3.3 70B Instruct').scrollIntoView().should('be.visible');
+  });
+
   it('Escape closes the Y-axis SearchableSelect dropdown', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click();
     cy.get('[data-testid="yaxis-metric-selector"]').should('have.attr', 'aria-expanded', 'true');

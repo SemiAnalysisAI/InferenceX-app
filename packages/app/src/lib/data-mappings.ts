@@ -13,7 +13,7 @@ export enum Model {
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
 
-export type CategoryTag = 'default' | 'experimental' | 'deprecated' | 'hidden';
+export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
 
 /**
  * Partition a list of values by their category using a classifier function.
@@ -25,6 +25,7 @@ export function groupByCategory<T>(
   const groups: Record<CategoryTag, T[]> = {
     default: [],
     experimental: [],
+    maintenance: [],
     deprecated: [],
     hidden: [],
   };
@@ -86,7 +87,11 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'minimaxm3',
     category: 'default',
   },
-  [Model.DeepSeek_R1]: { label: 'DeepSeek R1 0528 671B', prefix: 'dsr1', category: 'default' },
+  [Model.DeepSeek_R1]: {
+    label: 'DeepSeek R1 0528 671B',
+    prefix: 'dsr1',
+    category: 'maintenance',
+  },
   [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'default' },
@@ -114,6 +119,7 @@ export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
 );
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
+export const MAINTENANCE_MODELS: ReadonlySet<Model> = modelsByCategory('maintenance');
 export const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');
 export const EXPERIMENTAL_MODELS: ReadonlySet<Model> = modelsByCategory('experimental');
 
@@ -122,6 +128,9 @@ export function isModelDefault(model: Model): boolean {
 }
 export function isModelDeprecated(model: Model): boolean {
   return DEPRECATED_MODELS.has(model);
+}
+export function isModelMaintenance(model: Model): boolean {
+  return MAINTENANCE_MODELS.has(model);
 }
 export function isModelExperimental(model: Model): boolean {
   return EXPERIMENTAL_MODELS.has(model);
