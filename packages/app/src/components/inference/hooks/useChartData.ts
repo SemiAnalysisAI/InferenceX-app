@@ -28,7 +28,7 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import {
   applyQuickFilters,
-  availableFrameworkFamilies,
+  computeAvailableQuickFilters,
   EMPTY_QUICK_FILTERS,
   type QuickFilters,
 } from '@/components/inference/utils/quickFilters';
@@ -220,12 +220,14 @@ export function useChartData(
     return config;
   }, [rawHardwareConfig]);
 
-  // Framework families present for the current model / sequence / precision.
-  // Derived from the full transformed point set (BEFORE quick filters) so the
-  // framework pills reflect what exists and don't vanish when one is selected.
-  const availableFrameworks = useMemo(
+  // Quick-filter values that have data for the current model / sequence /
+  // precision. Derived from the full transformed point set (BEFORE quick
+  // filters) so the pills reflect what exists and don't churn as the user
+  // selects — drives which framework pills show and which vendor/agg/spec
+  // options are disabled.
+  const availableQuickFilters = useMemo(
     () =>
-      availableFrameworkFamilies(
+      computeAvailableQuickFilters(
         chartData.flat().filter((d) => selectedPrecisions.includes(d.precision)),
       ),
     [chartData, selectedPrecisions],
@@ -396,5 +398,5 @@ export function useChartData(
     quickFilters,
   ]);
 
-  return { graphs, loading, error, hardwareConfig, availableFrameworks };
+  return { graphs, loading, error, hardwareConfig, availableQuickFilters };
 }

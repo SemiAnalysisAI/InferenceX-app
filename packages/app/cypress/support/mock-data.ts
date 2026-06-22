@@ -196,7 +196,7 @@ export function createMockInferenceContext(
     scaleType: 'auto',
     setScaleType: namedStub('setScaleType'),
     quickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
-    availableFrameworks: [],
+    availableQuickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
     setQuickFilterVendors: namedStub('setQuickFilterVendors'),
     setQuickFilterFrameworks: namedStub('setQuickFilterFrameworks'),
     setQuickFilterDisagg: namedStub('setQuickFilterDisagg'),

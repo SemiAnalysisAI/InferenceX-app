@@ -75,7 +75,7 @@ function baseInferenceState() {
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
     quickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
-    availableFrameworks: [],
+    availableQuickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
     availableRuns: null,
     selectedRunId: '',
     hideNonOptimal: false,

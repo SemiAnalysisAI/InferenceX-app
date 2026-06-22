@@ -141,7 +141,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     scaleType,
     setScaleType,
     quickFilters,
-    availableFrameworks,
+    availableQuickFilters,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDisagg,
@@ -283,29 +283,40 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     });
   };
 
-  // Quick-filter pill groups. The Framework group is data-driven — only engine
-  // families present for the current model are offered, so it's omitted entirely
-  // when none resolve (e.g. while data loads).
+  // Quick-filter pill groups. Each option carries an `available` flag (has data
+  // for the current model); the render disables unavailable options unless they
+  // are currently selected, so a selection can always be toggled back off. The
+  // Framework group is data-driven — only families present (or selected) are
+  // offered, so it's omitted entirely when none resolve (e.g. while data loads).
+  const fwSelected = quickFilters.frameworks;
+  const frameworkOptions = FRAMEWORK_FAMILIES.filter(
+    (f) => availableQuickFilters.frameworks.includes(f.key) || fwSelected.includes(f.key),
+  ).map((f) => ({
+    value: f.key,
+    label: f.label,
+    available: availableQuickFilters.frameworks.includes(f.key),
+  }));
   const quickFilterGroups: {
     key: 'vendor' | 'framework' | 'disagg' | 'spec';
     label: string;
-    options: readonly { value: string; label: string }[];
+    options: readonly { value: string; label: string; available: boolean }[];
     selected: readonly string[];
   }[] = [
     {
       key: 'vendor',
       label: 'Vendor',
-      options: QUICK_FILTER_VENDORS,
+      options: QUICK_FILTER_VENDORS.map((o) => ({
+        ...o,
+        available: availableQuickFilters.vendors.includes(o.value),
+      })),
       selected: quickFilters.vendors,
     },
-    ...(availableFrameworks.length > 0
+    ...(frameworkOptions.length > 0
       ? [
           {
             key: 'framework' as const,
             label: 'Framework',
-            options: FRAMEWORK_FAMILIES.filter((f) => availableFrameworks.includes(f.key)).map(
-              (f) => ({ value: f.key, label: f.label }),
-            ),
+            options: frameworkOptions,
             selected: quickFilters.frameworks,
           },
         ]
@@ -313,13 +324,19 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     {
       key: 'disagg',
       label: 'Aggregation',
-      options: QUICK_FILTER_DISAGG,
+      options: QUICK_FILTER_DISAGG.map((o) => ({
+        ...o,
+        available: availableQuickFilters.disagg.includes(o.value),
+      })),
       selected: quickFilters.disagg,
     },
     {
       key: 'spec',
       label: 'Spec Decoding',
-      options: QUICK_FILTER_SPEC,
+      options: QUICK_FILTER_SPEC.map((o) => ({
+        ...o,
+        available: availableQuickFilters.spec.includes(o.value),
+      })),
       selected: quickFilters.spec,
     },
   ];
@@ -483,6 +500,9 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   <div className="flex flex-wrap gap-1">
                     {group.options.map((option) => {
                       const active = (group.selected as readonly string[]).includes(option.value);
+                      // Disable options with no data, but keep a selected one
+                      // clickable so it can always be toggled back off.
+                      const disabled = !option.available && !active;
                       return (
                         <Button
                           key={option.value}
@@ -490,6 +510,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                           size="sm"
                           variant={active ? 'default' : 'outline'}
                           aria-pressed={active}
+                          disabled={disabled}
+                          title={disabled ? 'No data for the current selection' : undefined}
                           className="h-7 rounded-full px-3 text-xs"
                           data-testid={`quick-filter-${group.key}-${option.value}`}
                           onClick={() => handleQuickFilterToggle(group.key, option.value)}

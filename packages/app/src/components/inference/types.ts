@@ -613,6 +613,13 @@ export interface QuickFilters {
 }
 
 /**
+ * The quick-filter values that actually have data for the current model /
+ * sequence / precision. Drives which pills are shown (frameworks) or disabled
+ * (vendor / agg / spec). Same shape as {@link QuickFilters}.
+ */
+export type AvailableQuickFilters = QuickFilters;
+
+/**
  * Defines the shape of the context object provided by `InferenceChartContext`.
  * @interface InferenceChartContextType
  * @property {Set<string>} activeHwTypes - A set of currently active hardware types for filtering.
@@ -661,8 +668,8 @@ export interface InferenceChartContextType {
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
   /** Coarse vendor / framework / agg-disagg / mtp-stp filters applied to the chart point set. */
   quickFilters: QuickFilters;
-  /** Framework families ('vllm' | 'sglang' | 'trt' | 'atom') present for the current model. */
-  availableFrameworks: string[];
+  /** Quick-filter values that have data for the current model (drives pill enable/disable). */
+  availableQuickFilters: AvailableQuickFilters;
   setQuickFilterVendors: (vendors: string[]) => void;
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDisagg: (modes: DisaggMode[]) => void;

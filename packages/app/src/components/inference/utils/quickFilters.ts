@@ -1,13 +1,17 @@
 import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import type {
+  AvailableQuickFilters,
   DisaggMode,
   InferenceData,
   QuickFilters,
   SpecMode,
 } from '@/components/inference/types';
 
-export type { DisaggMode, QuickFilters, SpecMode };
+export type { AvailableQuickFilters, DisaggMode, QuickFilters, SpecMode };
+
+/** Vendor display order for the quick-filter pills. */
+const VENDOR_ORDER = ['NVIDIA', 'AMD'];
 
 /**
  * Quick filters let users narrow the chart to any combination of GPU vendor,
@@ -58,16 +62,42 @@ export function frameworkFamily(framework: string | undefined): string | undefin
 }
 
 /**
- * Collect the framework families present in a point list, in display order.
- * Used to render only the framework pills that exist for the current model.
+ * Compute, in a single pass, which quick-filter values actually have data in a
+ * point list. Used to render only existing framework pills and to disable
+ * vendor / aggregation / spec options that would yield an empty chart. Each
+ * category is returned in display order.
  */
-export function availableFrameworkFamilies(points: Iterable<InferenceData>): string[] {
-  const present = new Set<string>();
+export function computeAvailableQuickFilters(
+  points: Iterable<InferenceData>,
+): AvailableQuickFilters {
+  const vendors = new Set<string>();
+  const frameworks = new Set<string>();
+  let hasAgg = false;
+  let hasDisagg = false;
+  let hasMtp = false;
+  let hasStp = false;
   for (const p of points) {
+    const vendor = pointVendor(String(p.hwKey));
+    if (vendor) vendors.add(vendor);
     const fam = frameworkFamily(p.framework);
-    if (fam) present.add(fam);
+    if (fam) frameworks.add(fam);
+    if (p.disagg) hasDisagg = true;
+    else hasAgg = true;
+    if (pointIsMtp(p)) hasMtp = true;
+    else hasStp = true;
   }
-  return FRAMEWORK_FAMILY_ORDER.filter((f) => present.has(f));
+  const disagg: DisaggMode[] = [];
+  if (hasAgg) disagg.push('agg');
+  if (hasDisagg) disagg.push('disagg');
+  const spec: SpecMode[] = [];
+  if (hasMtp) spec.push('mtp');
+  if (hasStp) spec.push('stp');
+  return {
+    vendors: VENDOR_ORDER.filter((v) => vendors.has(v)),
+    frameworks: FRAMEWORK_FAMILY_ORDER.filter((f) => frameworks.has(f)),
+    disagg,
+    spec,
+  };
 }
 
 /** True when at least one category constrains the point set. */

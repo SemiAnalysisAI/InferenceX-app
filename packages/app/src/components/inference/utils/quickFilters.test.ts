@@ -5,7 +5,7 @@ import type { InferenceData } from '@/components/inference/types';
 import {
   EMPTY_QUICK_FILTERS,
   applyQuickFilters,
-  availableFrameworkFamilies,
+  computeAvailableQuickFilters,
   frameworkFamily,
   matchesQuickFilters,
   pointVendor,
@@ -50,16 +50,50 @@ describe('frameworkFamily', () => {
   });
 });
 
-describe('availableFrameworkFamilies', () => {
-  it('returns present families in display order, deduped', () => {
+describe('computeAvailableQuickFilters', () => {
+  it('reports present values per category in display order', () => {
     const points = [
-      point({ framework: 'mooncake-atom' }),
-      point({ framework: 'dynamo-trt' }),
-      point({ framework: 'vllm' }),
-      point({ framework: 'vllm' }),
-      point({ framework: 'mystery-engine' }),
+      point({ hwKey: 'h100_vllm', framework: 'vllm', disagg: false, spec_decoding: 'none' }),
+      point({
+        hwKey: 'gb200_dynamo-trt',
+        framework: 'dynamo-trt',
+        disagg: true,
+        spec_decoding: 'mtp',
+      }),
+      point({
+        hwKey: 'mi355x_atom',
+        framework: 'mooncake-atom',
+        disagg: false,
+        spec_decoding: 'none',
+      }),
     ];
-    expect(availableFrameworkFamilies(points)).toEqual(['vllm', 'trt', 'atom']);
+    expect(computeAvailableQuickFilters(points)).toEqual({
+      vendors: ['NVIDIA', 'AMD'],
+      frameworks: ['vllm', 'trt', 'atom'],
+      disagg: ['agg', 'disagg'],
+      spec: ['mtp', 'stp'],
+    });
+  });
+
+  it('omits categories/values with no data', () => {
+    const points = [
+      point({ hwKey: 'h100_vllm', framework: 'vllm', disagg: false, spec_decoding: 'none' }),
+    ];
+    expect(computeAvailableQuickFilters(points)).toEqual({
+      vendors: ['NVIDIA'],
+      frameworks: ['vllm'],
+      disagg: ['agg'],
+      spec: ['stp'],
+    });
+  });
+
+  it('returns all-empty for an empty point set', () => {
+    expect(computeAvailableQuickFilters([])).toEqual({
+      vendors: [],
+      frameworks: [],
+      disagg: [],
+      spec: [],
+    });
   });
 });
 
