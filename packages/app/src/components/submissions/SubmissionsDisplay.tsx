@@ -1,11 +1,8 @@
 'use client';
 
-import { Lock } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
@@ -13,7 +10,6 @@ import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/seg
 import { exportToCsv } from '@/lib/csv-export';
 import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
-import { relockFeatureGate } from '@/lib/use-feature-gate';
 
 import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
 import SubmissionsTable from './SubmissionsTable';
@@ -27,7 +23,6 @@ const SUBMISSIONS_CHART_MODE_OPTIONS: SegmentedToggleOption<ChartMode>[] = [
 ];
 
 export default function SubmissionsDisplay() {
-  const router = useRouter();
   const { data, isLoading, error } = useSubmissions();
   const [chartMode, setChartMode] = useState<ChartMode>('weekly');
 
@@ -73,20 +68,6 @@ export default function SubmissionsDisplay() {
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs text-muted-foreground"
-                onClick={() => {
-                  relockFeatureGate();
-                  track('submissions_relocked');
-                  router.push('/inference');
-                }}
-                title="Re-lock feature gate"
-              >
-                <Lock className="size-3" />
-                Re-lock feature gate
-              </Button>
               <ChartShareActions />
             </div>
           </div>
