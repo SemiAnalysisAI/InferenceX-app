@@ -65,6 +65,11 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/inference?unofficialruns=12345',
     );
+    cy.get('[data-testid="tab-trigger-submissions"]').should(
+      'have.attr',
+      'href',
+      '/submissions?unofficialruns=12345',
+    );
     cy.get('[data-testid="tab-trigger-historical"]').should(
       'have.attr',
       'href',
@@ -104,22 +109,26 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-inference"]').should('exist');
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('exist');
+    cy.get('[data-testid="tab-trigger-submissions"]').should('exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-feedback"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
   });
 
-  it('renders the Hidden trigger when unlocked; popover reveals all 4 gated links', () => {
+  it('renders the Hidden trigger when unlocked; popover reveals gated links', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible').and('contain.text', 'Hidden');
     // Gated links are inside the closed popover, so they're not yet in the DOM.
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-submissions"]').should('have.attr', 'href', '/submissions');
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
     cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('have.attr', 'href', '/gpu-metrics');
-    cy.get('[data-testid="tab-trigger-submissions"]').should('have.attr', 'href', '/submissions');
+    cy.get('[data-testid="tab-hidden-popover"]')
+      .find('[data-testid="tab-trigger-submissions"]')
+      .should('not.exist');
     cy.get('[data-testid="tab-trigger-feedback"]').should('have.attr', 'href', '/feedback');
   });
 
