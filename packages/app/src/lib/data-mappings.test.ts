@@ -151,6 +151,10 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.Llama3_3_70B)).toBe(true);
   });
 
+  it('returns true for deprecated model MiniMax_M2_5 (superseded by M3)', () => {
+    expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
+  });
+
   it('returns false for non-deprecated model DeepSeek_R1', () => {
     expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
   });
