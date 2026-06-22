@@ -13,6 +13,17 @@ allowBuilds:
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true
 
+# Security pins for advisories not fixable via pnpm overrides:
+# - vite and @babel/core only appear as peer deps (vitest; styled-jsx / babel plugins),
+#   and pnpm overrides don't apply to peers, so they are pinned to patched versions as
+#   direct devDependencies in the root package.json instead.
+# - js-yaml's only patched release (4.x) drops safeLoad/safeDump, which gray-matter
+#   (build-time blog frontmatter parsing of our own posts) still calls, so it cannot be
+#   upgraded. The advisory is build-time only with trusted input, so it is ignored here.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-h67p-54hq-rp68
+
 overrides:
   dompurify@<3.4.9: '>=3.4.9'
   esbuild@>=0.27.3 <0.28.1: '>=0.28.1'
@@ -20,3 +31,5 @@ overrides:
   hono@<4.12.21: '>=4.12.21'
   postcss@<8.5.10: '>=8.5.10'
   qs@>=6.11.1 <=6.15.1: '>=6.15.2'
+  undici@<6.27.0: '>=6.27.0 <7'
+  undici@>=7.0.0 <7.28.0: '>=7.28.0 <8'
