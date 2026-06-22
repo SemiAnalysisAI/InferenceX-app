@@ -82,7 +82,7 @@ describe('Chart Selectors', () => {
         pointerType: 'mouse',
       });
 
-      cy.contains('Updated at a lower priority because these models are still relevant.').should(
+      cy.contains('Updated at a lower priority because these models are irrelevant.').should(
         'be.visible',
       );
     });

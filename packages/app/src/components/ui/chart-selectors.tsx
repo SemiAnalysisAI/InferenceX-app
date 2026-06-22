@@ -84,7 +84,7 @@ export function ModelSelector({
             header: (
               <CategorySectionTitle
                 label="Maintenance Mode"
-                reason="Updated at a lower priority because these models are still relevant."
+                reason="Updated at a lower priority because these models are irrelevant."
               />
             ),
             options: groups.maintenance.map((model) => ({
