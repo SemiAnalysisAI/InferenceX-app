@@ -4,13 +4,15 @@ import { track } from '@/lib/analytics';
 import {
   ArrowLeftToLine,
   ArrowRightToLine,
+  ChevronDown,
+  ChevronRight,
   Circle,
   Diamond,
   Square,
   Triangle,
   X,
 } from 'lucide-react';
-import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { SHAPE_ORDER, type ShapeKey, getShapeKeyForPrecision } from '@/lib/chart-rendering';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
@@ -36,6 +38,7 @@ export interface LegendSwitchConfig {
   label: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  advanced?: boolean;
 }
 
 export interface LegendActionConfig {
@@ -69,6 +72,7 @@ export interface ChartLegendProps {
   onItemHover?: (id: string) => void;
   onItemHoverEnd?: () => void;
   onItemRemove?: (name: string) => void;
+  onAdvancedExpandedChange?: (expanded: boolean) => void;
 }
 
 export default function ChartLegend({
@@ -88,12 +92,15 @@ export default function ChartLegend({
   onItemHover,
   onItemHoverEnd,
   onItemRemove,
+  onAdvancedExpandedChange,
 }: ChartLegendProps) {
   const isSidebar = variant === 'sidebar';
   const [hasLongText, setHasLongText] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
+  const advancedControlsId = useId();
 
   const effectiveExpanded = isLegendExpanded;
   const activeCount = useMemo(
@@ -252,15 +259,13 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  const switchElements =
-    switches && switches.length > 0 ? (
-      <div
-        className={cn(
-          grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2',
-          'no-export',
-        )}
-      >
-        {switches.map((sw) => (
+  const standardSwitches = switches?.filter((sw) => !sw.advanced) ?? [];
+  const advancedSwitches = switches?.filter((sw) => sw.advanced) ?? [];
+
+  const renderSwitches = (items: LegendSwitchConfig[]) =>
+    items.length > 0 ? (
+      <div className={cn(grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2')}>
+        {items.map((sw) => (
           <div key={sw.id} className="mt-2 flex items-center gap-2">
             <Switch
               id={sw.id}
@@ -276,6 +281,41 @@ export default function ChartLegend({
             </Label>
           </div>
         ))}
+      </div>
+    ) : null;
+
+  const switchElements =
+    switches && switches.length > 0 ? (
+      <div className="w-full no-export">
+        {renderSwitches(standardSwitches)}
+        {advancedSwitches.length > 0 && (
+          <div className="mt-2">
+            <button
+              type="button"
+              data-testid="legend-advanced-toggle"
+              aria-expanded={isAdvancedExpanded}
+              aria-controls={advancedControlsId}
+              onClick={() => {
+                const expanded = !isAdvancedExpanded;
+                setIsAdvancedExpanded(expanded);
+                onAdvancedExpandedChange?.(expanded);
+              }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {isAdvancedExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              Advanced
+            </button>
+            {isAdvancedExpanded && (
+              <div
+                id={advancedControlsId}
+                data-testid="legend-advanced-controls"
+                className="ml-1 pl-3 border-l border-border"
+              >
+                {renderSwitches(advancedSwitches)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     ) : null;
 

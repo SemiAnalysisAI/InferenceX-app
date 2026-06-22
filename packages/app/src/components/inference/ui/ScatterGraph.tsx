@@ -2431,6 +2431,7 @@ const ScatterGraph = React.memo(
               {
                 id: 'scatter-speed-overlay',
                 label: 'Bus / Race Car',
+                advanced: true,
                 checked: showSpeedOverlay,
                 onCheckedChange: (checked: boolean) => {
                   setShowSpeedOverlay(checked);
@@ -2440,6 +2441,7 @@ const ScatterGraph = React.memo(
               {
                 id: 'scatter-minecraft-overlay',
                 label: 'Donkey / Elytra',
+                advanced: true,
                 checked: showMinecraftOverlay,
                 onCheckedChange: (checked: boolean) => {
                   setShowMinecraftOverlay(checked);
@@ -2447,6 +2449,9 @@ const ScatterGraph = React.memo(
                 },
               },
             ]}
+            onAdvancedExpandedChange={(expanded) => {
+              track('latency_advanced_controls_toggled', { expanded });
+            }}
             actions={
               effectiveOfficialHwTypes.size < hwTypesWithData.size ||
               activeOverlayHwTypes.size < allOverlayHwTypes.size

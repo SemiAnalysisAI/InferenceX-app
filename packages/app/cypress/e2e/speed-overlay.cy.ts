@@ -1,3 +1,6 @@
+const advancedToggle = () =>
+  cy.contains('figure', 'vs. Interactivity').find('[data-testid="legend-advanced-toggle"]');
+
 describe('Bus / Race Car Speed Overlay', () => {
   before(() => {
     cy.visit('/inference', {
@@ -9,7 +12,12 @@ describe('Bus / Race Car Speed Overlay', () => {
     cy.get('.sidebar-legend').first().should('be.visible');
   });
 
-  it('toggle exists in the legend and is off by default', () => {
+  it('toggle is hidden in the collapsed Advanced drawer and is off by default', () => {
+    advancedToggle().should('be.visible').and('have.attr', 'aria-expanded', 'false');
+    cy.get('#scatter-speed-overlay').should('not.exist');
+
+    advancedToggle().click();
+    advancedToggle().should('have.attr', 'aria-expanded', 'true');
     cy.get('#scatter-speed-overlay').should('exist');
     cy.get('label[for="scatter-speed-overlay"]').should('contain.text', 'Bus / Race Car');
     cy.get('#scatter-speed-overlay').should('have.attr', 'data-state', 'unchecked');
@@ -59,6 +67,7 @@ describe('Bus / Race Car Speed Overlay', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    advancedToggle().click();
     cy.get('#scatter-speed-overlay').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="speed-overlay-bus"]').should('exist');
     cy.get('[data-testid="speed-overlay-car"]').should('exist');
@@ -76,7 +85,11 @@ describe('Donkey / Elytra Minecraft Overlay', () => {
     cy.get('.sidebar-legend').first().should('be.visible');
   });
 
-  it('toggle exists in the legend and is independent of the bus/car toggle', () => {
+  it('toggle is hidden in the Advanced drawer and is independent of the bus/car toggle', () => {
+    advancedToggle().should('have.attr', 'aria-expanded', 'false');
+    cy.get('#scatter-minecraft-overlay').should('not.exist');
+
+    advancedToggle().click();
     cy.get('#scatter-minecraft-overlay').should('exist');
     cy.get('label[for="scatter-minecraft-overlay"]').should('contain.text', 'Donkey / Elytra');
     cy.get('#scatter-minecraft-overlay').should('have.attr', 'data-state', 'unchecked');
@@ -133,6 +146,7 @@ describe('Donkey / Elytra Minecraft Overlay', () => {
       },
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    advancedToggle().click();
     cy.get('#scatter-minecraft-overlay').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="speed-overlay-minecraft-slow"]').should('exist');
     cy.get('[data-testid="speed-overlay-minecraft-fast"]').should('exist');
