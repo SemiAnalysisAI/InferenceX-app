@@ -72,6 +72,12 @@ export function LandingPage() {
               full logs and artifacts are publicly viewable. Click any point on a chart to jump
               straight to the run that produced it. All reproducible, auditable, and open source.
             </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              <span className="font-semibold text-foreground">
+                1,000+ new benchmark datapoints added per week on average.
+              </span>{' '}
+              Browse every new model, GPU, framework, and configuration as it lands.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
               <div className="rounded-md border border-border bg-card p-3">
                 <div className="text-sm font-semibold text-foreground">Public Actions runs</div>
@@ -96,12 +102,21 @@ export function LandingPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3 text-sm">
+              <Link
+                href="/submissions"
+                data-testid="landing-submissions-link"
+                onClick={() => track('landing_submissions_clicked')}
+                className="inline-flex items-center gap-1.5 rounded-md bg-brand text-primary-foreground hover:bg-brand/90 px-3 py-1.5 transition-colors font-medium"
+              >
+                Browse submissions
+                <ArrowRight className="size-3.5" />
+              </Link>
               <a
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track('landing_reproducibility_actions_clicked')}
-                className="inline-flex items-center gap-1.5 rounded-md bg-brand text-primary-foreground hover:bg-brand/90 px-3 py-1.5 transition-colors font-medium"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
                 View benchmark runs on GitHub Actions
                 <ArrowRight className="size-3.5" />

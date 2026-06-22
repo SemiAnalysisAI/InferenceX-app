@@ -76,4 +76,9 @@ describe('First-load navigation', () => {
     cy.contains('a', 'Open Dashboard').click();
     cy.location('pathname').should('eq', '/inference');
   });
+
+  it('navigates to submissions from the landing CTA', () => {
+    cy.get('[data-testid="landing-submissions-link"]').click();
+    cy.location('pathname').should('eq', '/submissions');
+  });
 });
