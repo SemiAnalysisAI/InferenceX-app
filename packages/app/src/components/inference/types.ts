@@ -594,6 +594,21 @@ export interface RunInfo {
   changelog?: ChangelogMetadata;
 }
 
+/** Aggregation mode for the quick filters: aggregated vs disaggregated serving. */
+export type DisaggMode = 'agg' | 'disagg';
+/** Speculative-decoding mode for the quick filters: MTP vs standard token prediction. */
+export type SpecMode = 'mtp' | 'stp';
+
+/**
+ * Coarse vendor / aggregation / spec-decoding filters applied to the chart point
+ * set. Empty array within a category = no constraint. See `utils/quickFilters.ts`.
+ */
+export interface QuickFilters {
+  vendors: string[];
+  disagg: DisaggMode[];
+  spec: SpecMode[];
+}
+
 /**
  * Defines the shape of the context object provided by `InferenceChartContext`.
  * @interface InferenceChartContextType
@@ -641,6 +656,11 @@ export interface InferenceChartContextType {
   setSelectedE2eXAxisMetric: (metric: string | null) => void;
   scaleType: 'auto' | 'linear' | 'log';
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
+  /** Coarse vendor / agg-disagg / mtp-stp filters applied to the chart point set. */
+  quickFilters: QuickFilters;
+  setQuickFilterVendors: (vendors: string[]) => void;
+  setQuickFilterDisagg: (modes: DisaggMode[]) => void;
+  setQuickFilterSpec: (modes: SpecMode[]) => void;
   setIsLegendExpanded: (metric: boolean) => void;
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;

@@ -49,4 +49,14 @@ describe('Inference Chart', () => {
   it('shows the sidebar legend for GPU types', () => {
     cy.get('.sidebar-legend').should('be.visible');
   });
+
+  it('renders quick filters and toggles a vendor pill', () => {
+    cy.get('[data-testid="quick-filters"]').should('exist');
+    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
+      .should('have.attr', 'aria-pressed', 'false')
+      .click()
+      .should('have.attr', 'aria-pressed', 'true')
+      .click()
+      .should('have.attr', 'aria-pressed', 'false');
+  });
 });

@@ -74,6 +74,7 @@ function baseInferenceState() {
     hwTypesWithData: new Set(['h100', 'b200']),
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
+    quickFilters: { vendors: [], disagg: [], spec: [] },
     availableRuns: null,
     selectedRunId: '',
     hideNonOptimal: false,
@@ -357,6 +358,37 @@ describe('ScatterGraph toggle decoration', () => {
 
     expect(container.querySelectorAll('.unofficial-overlay-pt')).toHaveLength(2);
     expect(rebuildCount()).toBe(buildsAfterMount);
+    unmount();
+  });
+
+  it('applies quick filters to unofficial-run overlay markers', () => {
+    const overlayPoints = [point('h100', 'fp8', 30, 300, 2), point('h100', 'fp8', 35, 350, 4)].map(
+      (p) => ({ ...p, run_url: 'https://github.com/o/r/actions/runs/123' }),
+    );
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['h100']),
+      allOverlayHwTypes: new Set(['h100']),
+      runIndexByUrl: { 'https://github.com/o/r/actions/runs/123': 0 },
+      unofficialRunInfos: [
+        { id: '123', branch: 'test-branch', url: 'https://github.com/o/r/actions/runs/123' },
+      ],
+    };
+    // Overlay points are all NVIDIA (h100); an AMD-only quick filter must hide them,
+    // exactly as it would the official points.
+    inferenceState.current = {
+      ...baseInferenceState(),
+      quickFilters: { vendors: ['AMD'], disagg: [], spec: [] },
+    };
+    const { container, unmount } = mountChart({
+      overlayData: {
+        data: overlayPoints,
+        hardwareConfig: HARDWARE_CONFIG,
+      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
+    });
+
+    expect(container.querySelectorAll('.unofficial-overlay-pt')).toHaveLength(0);
     unmount();
   });
 });

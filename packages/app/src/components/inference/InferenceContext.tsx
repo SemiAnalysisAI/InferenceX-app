@@ -59,6 +59,7 @@ import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
+import type { DisaggMode, QuickFilters, SpecMode } from './utils/quickFilters';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -151,6 +152,25 @@ export function InferenceProvider({
   );
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
+  );
+
+  // ── Quick filters (vendor / agg-disagg / mtp-stp) ───────────────────────────
+  // Coarse pre-filters applied to the point set. Empty = no constraint.
+  const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>(() => {
+    const v = getUrlParam('i_vendor');
+    return v ? v.split(',').filter(Boolean) : [];
+  });
+  const [quickFilterDisagg, setQuickFilterDisagg] = useState<DisaggMode[]>(() => {
+    const v = getUrlParam('i_disagg');
+    return v ? (v.split(',').filter(Boolean) as DisaggMode[]) : [];
+  });
+  const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>(() => {
+    const v = getUrlParam('i_spec');
+    return v ? (v.split(',').filter(Boolean) as SpecMode[]) : [];
+  });
+  const quickFilters = useMemo<QuickFilters>(
+    () => ({ vendors: quickFilterVendors, disagg: quickFilterDisagg, spec: quickFilterSpec }),
+    [quickFilterVendors, quickFilterDisagg, quickFilterSpec],
   );
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
@@ -273,6 +293,7 @@ export function InferenceProvider({
     latestDate,
     compareGpuPair ?? null,
     asOfRunId,
+    quickFilters,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -844,6 +865,9 @@ export function InferenceProvider({
       i_speed: showSpeedOverlay ? '1' : '',
       i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
+      i_vendor: quickFilterVendors.join(','),
+      i_disagg: quickFilterDisagg.join(','),
+      i_spec: quickFilterSpec.join(','),
     },
     [
       selectedYAxisMetric,
@@ -864,6 +888,9 @@ export function InferenceProvider({
       showSpeedOverlay,
       showMinecraftOverlay,
       iActiveStr,
+      quickFilterVendors,
+      quickFilterDisagg,
+      quickFilterSpec,
     ],
   );
 
@@ -1011,6 +1038,10 @@ export function InferenceProvider({
       setSelectedE2eXAxisMetric,
       scaleType,
       setScaleType,
+      quickFilters,
+      setQuickFilterVendors,
+      setQuickFilterDisagg,
+      setQuickFilterSpec,
       loading,
       error,
       workflowInfo,
@@ -1081,6 +1112,7 @@ export function InferenceProvider({
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       scaleType,
+      quickFilters,
       selectedGPUs,
       selectedDates,
       selectedDateRange,

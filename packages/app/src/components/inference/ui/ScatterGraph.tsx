@@ -70,6 +70,7 @@ import {
   measureLegendRightInset,
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
+import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 
 // X-shape path for overlay (unofficial) data points
 const X_SIZE = 5;
@@ -209,6 +210,7 @@ const ScatterGraph = React.memo(
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
+      quickFilters,
     } = useInference();
 
     const {
@@ -396,8 +398,12 @@ const ScatterGraph = React.memo(
       // precision changes — it feeds the `layers` memo, and a new identity
       // there forces a full chart rebuild.
       if (!overlayData?.data) return EMPTY_OVERLAY_DATA;
-      return overlayData.data.filter((p) => selectedPrecisions.includes(p.precision));
-    }, [overlayData, selectedPrecisions]);
+      // Mirror the official path's quick filters (vendor / agg-disagg / mtp-stp)
+      // so overlay points obey the same coarse filters the user picked.
+      return overlayData.data.filter(
+        (p) => selectedPrecisions.includes(p.precision) && matchesQuickFilters(p, quickFilters),
+      );
+    }, [overlayData, selectedPrecisions, quickFilters]);
 
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the

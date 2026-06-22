@@ -26,6 +26,11 @@ import {
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import {
+  applyQuickFilters,
+  EMPTY_QUICK_FILTERS,
+  type QuickFilters,
+} from '@/components/inference/utils/quickFilters';
 
 /** Build deduplicated comparison dates, excluding the main run date. */
 export function buildComparisonDates(
@@ -93,6 +98,11 @@ export function useChartData(
    * run is selected; the chart then shows the data as it stood at that run.
    */
   asOfRunId?: string,
+  /**
+   * Coarse vendor / aggregation / spec-decoding filters applied to every point
+   * (also applied to overlay points in ScatterGraph so both paths stay in sync).
+   */
+  quickFilters: QuickFilters = EMPTY_QUICK_FILTERS,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -308,6 +318,10 @@ export function useChartData(
         // Filter by selected GPUs if any
         filteredData = filterByGPU(filteredData, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
 
+        // Quick filters (vendor / agg-disagg / mtp-stp) — coarse pre-filter that
+        // also prunes the legend and rooflines since they derive from this set.
+        filteredData = applyQuickFilters(filteredData, quickFilters);
+
         if (compareGpuPair) {
           filteredData = filteredData.filter((d) =>
             hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair),
@@ -367,6 +381,7 @@ export function useChartData(
     userPowers,
     stableChartDefinitions,
     compareGpuPair,
+    quickFilters,
   ]);
 
   return { graphs, loading, error, hardwareConfig };
