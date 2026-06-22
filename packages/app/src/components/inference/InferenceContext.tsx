@@ -59,7 +59,12 @@ import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
-import type { DisaggMode, QuickFilters, SpecMode } from './utils/quickFilters';
+import {
+  EMPTY_QUICK_FILTERS,
+  type DisaggMode,
+  type QuickFilters,
+  type SpecMode,
+} from './utils/quickFilters';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -181,6 +186,10 @@ export function InferenceProvider({
     }),
     [quickFilterVendors, quickFilterFrameworks, quickFilterDisagg, quickFilterSpec],
   );
+  // The Historical Trends tab hides the quick-filter pills (hideGpuComparison), so
+  // don't silently narrow its chart with selections carried in via share links or
+  // the inference tab — there would be no pill to clear them.
+  const dataQuickFilters = activeTab === 'historical' ? EMPTY_QUICK_FILTERS : quickFilters;
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
   });
@@ -303,7 +312,7 @@ export function InferenceProvider({
     latestDate,
     compareGpuPair ?? null,
     asOfRunId,
-    quickFilters,
+    dataQuickFilters,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters

@@ -152,6 +152,17 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), stpFilter)).toBe(true);
   });
 
+  it('treats non-standard spec methods (e.g. eagle) as neither MTP nor STP', () => {
+    const eagle = point({ hwKey: 'h200_trt_eagle', spec_decoding: 'eagle' });
+    expect(matchesQuickFilters(eagle, filters({ spec: ['mtp'] }))).toBe(false);
+    expect(matchesQuickFilters(eagle, filters({ spec: ['stp'] }))).toBe(false);
+    // Excluded under either spec selection, but unconstrained when spec is empty.
+    expect(matchesQuickFilters(eagle, filters({ spec: ['mtp', 'stp'] }))).toBe(false);
+    expect(matchesQuickFilters(eagle, EMPTY_QUICK_FILTERS)).toBe(true);
+    // An eagle-only point contributes to neither spec pill.
+    expect(computeAvailableQuickFilters([eagle]).spec).toEqual([]);
+  });
+
   it('ANDs categories together', () => {
     const f = filters({ vendors: ['AMD'], disagg: ['disagg'], spec: ['stp'] });
     expect(

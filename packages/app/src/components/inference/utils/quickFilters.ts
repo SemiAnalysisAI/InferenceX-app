@@ -83,8 +83,9 @@ export function computeAvailableQuickFilters(
     if (fam) frameworks.add(fam);
     if (p.disagg) hasDisagg = true;
     else hasAgg = true;
-    if (pointIsMtp(p)) hasMtp = true;
-    else hasStp = true;
+    const specMode = pointSpecMode(p);
+    if (specMode === 'mtp') hasMtp = true;
+    else if (specMode === 'stp') hasStp = true;
   }
   const disagg: DisaggMode[] = [];
   if (hasAgg) disagg.push('agg');
@@ -117,6 +118,19 @@ function pointIsMtp(point: InferenceData): boolean {
   return point.spec_decoding === 'mtp' || String(point.hwKey).endsWith('_mtp');
 }
 
+/**
+ * Classify a point for the spec-decoding filter, or `null` when it is neither
+ * plain MTP nor standard decoding. STP means *standard* (no speculative method),
+ * which the DB marks `none` (and the hwKey carries no spec suffix). Other methods
+ * such as EAGLE are neither MTP nor STP, so they must not fall through to STP.
+ */
+function pointSpecMode(point: InferenceData): SpecMode | null {
+  if (pointIsMtp(point)) return 'mtp';
+  const s = point.spec_decoding;
+  if (s === 'none' || s === '' || s === undefined || s === null) return 'stp';
+  return null;
+}
+
 /** Whether a single data point satisfies every active quick-filter category. */
 export function matchesQuickFilters(point: InferenceData, f: QuickFilters): boolean {
   if (f.vendors.length > 0) {
@@ -132,8 +146,8 @@ export function matchesQuickFilters(point: InferenceData, f: QuickFilters): bool
     if (!f.disagg.includes(mode)) return false;
   }
   if (f.spec.length > 0) {
-    const mode: SpecMode = pointIsMtp(point) ? 'mtp' : 'stp';
-    if (!f.spec.includes(mode)) return false;
+    const mode = pointSpecMode(point);
+    if (!mode || !f.spec.includes(mode)) return false;
   }
   return true;
 }
