@@ -26,6 +26,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition, DisaggMode, SpecMode } from '@/components/inference/types';
+import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import type { Model, Sequence } from '@/lib/data-mappings';
 
 /**
@@ -140,7 +141,9 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     scaleType,
     setScaleType,
     quickFilters,
+    availableFrameworks,
     setQuickFilterVendors,
+    setQuickFilterFrameworks,
     setQuickFilterDisagg,
     setQuickFilterSpec,
   } = useInference();
@@ -242,22 +245,26 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     });
   };
 
-  const handleQuickFilterToggle = (category: 'vendor' | 'disagg' | 'spec', value: string) => {
+  const handleQuickFilterToggle = (
+    category: 'vendor' | 'framework' | 'disagg' | 'spec',
+    value: string,
+  ) => {
+    const wasActive =
+      category === 'vendor'
+        ? quickFilters.vendors.includes(value)
+        : category === 'framework'
+          ? quickFilters.frameworks.includes(value)
+          : category === 'disagg'
+            ? quickFilters.disagg.includes(value as DisaggMode)
+            : quickFilters.spec.includes(value as SpecMode);
     if (category === 'vendor') setQuickFilterVendors(toggleValue(quickFilters.vendors, value));
+    else if (category === 'framework')
+      setQuickFilterFrameworks(toggleValue(quickFilters.frameworks, value));
     else if (category === 'disagg')
       setQuickFilterDisagg(toggleValue(quickFilters.disagg, value as DisaggMode));
     else setQuickFilterSpec(toggleValue(quickFilters.spec, value as SpecMode));
-    track('inference_quick_filter_toggled', {
-      category,
-      value,
-      // Active reflects the state *before* this toggle, so a currently-active
-      // value is being turned off.
-      active: !(category === 'vendor'
-        ? quickFilters.vendors.includes(value)
-        : category === 'disagg'
-          ? quickFilters.disagg.includes(value as DisaggMode)
-          : quickFilters.spec.includes(value as SpecMode)),
-    });
+    // `active` is the state *after* this toggle.
+    track('inference_quick_filter_toggled', { category, value, active: !wasActive });
   };
 
   const isInputMetric = (() => {
@@ -275,6 +282,47 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
       endDate: range.endDate,
     });
   };
+
+  // Quick-filter pill groups. The Framework group is data-driven — only engine
+  // families present for the current model are offered, so it's omitted entirely
+  // when none resolve (e.g. while data loads).
+  const quickFilterGroups: {
+    key: 'vendor' | 'framework' | 'disagg' | 'spec';
+    label: string;
+    options: readonly { value: string; label: string }[];
+    selected: readonly string[];
+  }[] = [
+    {
+      key: 'vendor',
+      label: 'Vendor',
+      options: QUICK_FILTER_VENDORS,
+      selected: quickFilters.vendors,
+    },
+    ...(availableFrameworks.length > 0
+      ? [
+          {
+            key: 'framework' as const,
+            label: 'Framework',
+            options: FRAMEWORK_FAMILIES.filter((f) => availableFrameworks.includes(f.key)).map(
+              (f) => ({ value: f.key, label: f.label }),
+            ),
+            selected: quickFilters.frameworks,
+          },
+        ]
+      : []),
+    {
+      key: 'disagg',
+      label: 'Aggregation',
+      options: QUICK_FILTER_DISAGG,
+      selected: quickFilters.disagg,
+    },
+    {
+      key: 'spec',
+      label: 'Spec Decoding',
+      options: QUICK_FILTER_SPEC,
+      selected: quickFilters.spec,
+    },
+  ];
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -426,31 +474,10 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             <LabelWithTooltip
               htmlFor="quick-filters"
               label="Quick Filters"
-              tooltip="Narrow the chart to any combination of GPU vendor, aggregation mode (aggregated vs disaggregated serving), and speculative decoding (MTP vs standard). Selecting none in a group shows all."
+              tooltip="Narrow the chart to any combination of GPU vendor, serving framework, aggregation mode (aggregated vs disaggregated serving), and speculative decoding (MTP vs standard). Selecting none in a group shows all."
             />
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              {(
-                [
-                  {
-                    key: 'vendor',
-                    label: 'Vendor',
-                    options: QUICK_FILTER_VENDORS,
-                    selected: quickFilters.vendors,
-                  },
-                  {
-                    key: 'disagg',
-                    label: 'Aggregation',
-                    options: QUICK_FILTER_DISAGG,
-                    selected: quickFilters.disagg,
-                  },
-                  {
-                    key: 'spec',
-                    label: 'Spec Decoding',
-                    options: QUICK_FILTER_SPEC,
-                    selected: quickFilters.spec,
-                  },
-                ] as const
-              ).map((group) => (
+              {quickFilterGroups.map((group) => (
                 <div key={group.key} className="flex items-center gap-1.5">
                   <span className="text-xs font-medium text-muted-foreground">{group.label}:</span>
                   <div className="flex flex-wrap gap-1">

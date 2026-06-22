@@ -600,11 +600,14 @@ export type DisaggMode = 'agg' | 'disagg';
 export type SpecMode = 'mtp' | 'stp';
 
 /**
- * Coarse vendor / aggregation / spec-decoding filters applied to the chart point
- * set. Empty array within a category = no constraint. See `utils/quickFilters.ts`.
+ * Coarse vendor / framework / aggregation / spec-decoding filters applied to the
+ * chart point set. Empty array within a category = no constraint. Framework
+ * values are engine-family keys ('vllm' | 'sglang' | 'trt' | 'atom'). See
+ * `utils/quickFilters.ts`.
  */
 export interface QuickFilters {
   vendors: string[];
+  frameworks: string[];
   disagg: DisaggMode[];
   spec: SpecMode[];
 }
@@ -656,9 +659,12 @@ export interface InferenceChartContextType {
   setSelectedE2eXAxisMetric: (metric: string | null) => void;
   scaleType: 'auto' | 'linear' | 'log';
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
-  /** Coarse vendor / agg-disagg / mtp-stp filters applied to the chart point set. */
+  /** Coarse vendor / framework / agg-disagg / mtp-stp filters applied to the chart point set. */
   quickFilters: QuickFilters;
+  /** Framework families ('vllm' | 'sglang' | 'trt' | 'atom') present for the current model. */
+  availableFrameworks: string[];
   setQuickFilterVendors: (vendors: string[]) => void;
+  setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDisagg: (modes: DisaggMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
   setIsLegendExpanded: (metric: boolean) => void;

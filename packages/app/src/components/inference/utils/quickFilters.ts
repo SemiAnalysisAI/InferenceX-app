@@ -11,21 +11,70 @@ export type { DisaggMode, QuickFilters, SpecMode };
 
 /**
  * Quick filters let users narrow the chart to any combination of GPU vendor,
- * aggregation mode, and speculative-decoding method without touching the legend
- * or GPU-config selectors. They are coarse pre-filters applied to the point set
- * (official + unofficial-run overlay), so the legend, rooflines, and Pareto all
- * reflect only the matching configs.
+ * serving framework, aggregation mode, and speculative-decoding method without
+ * touching the legend or GPU-config selectors. They are coarse pre-filters
+ * applied to the point set (official + unofficial-run overlay), so the legend,
+ * rooflines, and Pareto all reflect only the matching configs.
  *
  * Empty array within a category = no constraint (show everything). Values within
  * a category are OR'd; categories are AND'd.
  */
 
 /** Referentially stable "no filters" value for defaults and resets. */
-export const EMPTY_QUICK_FILTERS: QuickFilters = { vendors: [], disagg: [], spec: [] };
+export const EMPTY_QUICK_FILTERS: QuickFilters = {
+  vendors: [],
+  frameworks: [],
+  disagg: [],
+  spec: [],
+};
+
+/**
+ * Serving-framework families surfaced as quick filters, in display order. Each
+ * family groups its base + variant engines (e.g. TRT covers `trt`, `trtllm`,
+ * `dynamo-trt`). Labels render exactly as the GPUs/engines are branded.
+ */
+export const FRAMEWORK_FAMILIES = [
+  { key: 'vllm', label: 'vLLM' },
+  { key: 'sglang', label: 'SGLang' },
+  { key: 'trt', label: 'TRT' },
+  { key: 'atom', label: 'ATOM' },
+] as const;
+
+const FRAMEWORK_FAMILY_ORDER = FRAMEWORK_FAMILIES.map((f) => f.key);
+
+/**
+ * Map a raw framework string (e.g. `dynamo-trt`, `mori-sglang`, `mooncake-atom`)
+ * to its engine family, or undefined when it matches no known family.
+ */
+export function frameworkFamily(framework: string | undefined): string | undefined {
+  if (!framework) return undefined;
+  const f = framework.toLowerCase();
+  // The family substrings are mutually exclusive, so order is irrelevant.
+  if (f.includes('vllm')) return 'vllm';
+  if (f.includes('sglang')) return 'sglang';
+  if (f.includes('trt')) return 'trt';
+  if (f.includes('atom')) return 'atom';
+  return undefined;
+}
+
+/**
+ * Collect the framework families present in a point list, in display order.
+ * Used to render only the framework pills that exist for the current model.
+ */
+export function availableFrameworkFamilies(points: Iterable<InferenceData>): string[] {
+  const present = new Set<string>();
+  for (const p of points) {
+    const fam = frameworkFamily(p.framework);
+    if (fam) present.add(fam);
+  }
+  return FRAMEWORK_FAMILY_ORDER.filter((f) => present.has(f));
+}
 
 /** True when at least one category constrains the point set. */
 export function quickFiltersActive(f: QuickFilters): boolean {
-  return f.vendors.length > 0 || f.disagg.length > 0 || f.spec.length > 0;
+  return (
+    f.vendors.length > 0 || f.frameworks.length > 0 || f.disagg.length > 0 || f.spec.length > 0
+  );
 }
 
 /** Resolve a point's GPU vendor from the base GPU in its hardware key. */
@@ -43,6 +92,10 @@ export function matchesQuickFilters(point: InferenceData, f: QuickFilters): bool
   if (f.vendors.length > 0) {
     const vendor = pointVendor(String(point.hwKey));
     if (!vendor || !f.vendors.includes(vendor)) return false;
+  }
+  if (f.frameworks.length > 0) {
+    const fam = frameworkFamily(point.framework);
+    if (!fam || !f.frameworks.includes(fam)) return false;
   }
   if (f.disagg.length > 0) {
     const mode: DisaggMode = point.disagg ? 'disagg' : 'agg';

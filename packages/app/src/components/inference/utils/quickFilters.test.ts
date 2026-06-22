@@ -5,6 +5,8 @@ import type { InferenceData } from '@/components/inference/types';
 import {
   EMPTY_QUICK_FILTERS,
   applyQuickFilters,
+  availableFrameworkFamilies,
+  frameworkFamily,
   matchesQuickFilters,
   pointVendor,
   quickFiltersActive,
@@ -29,10 +31,43 @@ describe('pointVendor', () => {
   });
 });
 
+describe('frameworkFamily', () => {
+  it('maps base and variant engines to their family', () => {
+    expect(frameworkFamily('vllm')).toBe('vllm');
+    expect(frameworkFamily('dynamo-vllm')).toBe('vllm');
+    expect(frameworkFamily('sglang')).toBe('sglang');
+    expect(frameworkFamily('mori-sglang')).toBe('sglang');
+    expect(frameworkFamily('trt')).toBe('trt');
+    expect(frameworkFamily('trtllm')).toBe('trt');
+    expect(frameworkFamily('dynamo-trt')).toBe('trt');
+    expect(frameworkFamily('atom')).toBe('atom');
+    expect(frameworkFamily('mooncake-atom')).toBe('atom');
+  });
+
+  it('returns undefined for unknown or missing frameworks', () => {
+    expect(frameworkFamily('mystery-engine')).toBeUndefined();
+    expect(frameworkFamily(undefined)).toBeUndefined();
+  });
+});
+
+describe('availableFrameworkFamilies', () => {
+  it('returns present families in display order, deduped', () => {
+    const points = [
+      point({ framework: 'mooncake-atom' }),
+      point({ framework: 'dynamo-trt' }),
+      point({ framework: 'vllm' }),
+      point({ framework: 'vllm' }),
+      point({ framework: 'mystery-engine' }),
+    ];
+    expect(availableFrameworkFamilies(points)).toEqual(['vllm', 'trt', 'atom']);
+  });
+});
+
 describe('quickFiltersActive', () => {
   it('is false only when every category is empty', () => {
     expect(quickFiltersActive(EMPTY_QUICK_FILTERS)).toBe(false);
     expect(quickFiltersActive(filters({ vendors: ['AMD'] }))).toBe(true);
+    expect(quickFiltersActive(filters({ frameworks: ['vllm'] }))).toBe(true);
     expect(quickFiltersActive(filters({ disagg: ['disagg'] }))).toBe(true);
     expect(quickFiltersActive(filters({ spec: ['mtp'] }))).toBe(true);
   });
@@ -53,6 +88,14 @@ describe('matchesQuickFilters', () => {
     const f = filters({ vendors: ['NVIDIA', 'AMD'] });
     expect(matchesQuickFilters(point({ hwKey: 'h100' }), f)).toBe(true);
     expect(matchesQuickFilters(point({ hwKey: 'mi355x' }), f)).toBe(true);
+  });
+
+  it('filters by framework family', () => {
+    const f = filters({ frameworks: ['trt'] });
+    expect(matchesQuickFilters(point({ framework: 'dynamo-trt' }), f)).toBe(true);
+    expect(matchesQuickFilters(point({ framework: 'trtllm' }), f)).toBe(true);
+    expect(matchesQuickFilters(point({ framework: 'vllm' }), f)).toBe(false);
+    expect(matchesQuickFilters(point({ framework: undefined }), f)).toBe(false);
   });
 
   it('filters by aggregation mode using the disagg flag', () => {

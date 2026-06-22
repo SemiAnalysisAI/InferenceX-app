@@ -160,6 +160,10 @@ export function InferenceProvider({
     const v = getUrlParam('i_vendor');
     return v ? v.split(',').filter(Boolean) : [];
   });
+  const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>(() => {
+    const v = getUrlParam('i_fw');
+    return v ? v.split(',').filter(Boolean) : [];
+  });
   const [quickFilterDisagg, setQuickFilterDisagg] = useState<DisaggMode[]>(() => {
     const v = getUrlParam('i_disagg');
     return v ? (v.split(',').filter(Boolean) as DisaggMode[]) : [];
@@ -169,8 +173,13 @@ export function InferenceProvider({
     return v ? (v.split(',').filter(Boolean) as SpecMode[]) : [];
   });
   const quickFilters = useMemo<QuickFilters>(
-    () => ({ vendors: quickFilterVendors, disagg: quickFilterDisagg, spec: quickFilterSpec }),
-    [quickFilterVendors, quickFilterDisagg, quickFilterSpec],
+    () => ({
+      vendors: quickFilterVendors,
+      frameworks: quickFilterFrameworks,
+      disagg: quickFilterDisagg,
+      spec: quickFilterSpec,
+    }),
+    [quickFilterVendors, quickFilterFrameworks, quickFilterDisagg, quickFilterSpec],
   );
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
@@ -276,6 +285,7 @@ export function InferenceProvider({
     loading: chartDataLoading,
     error: chartDataError,
     hardwareConfig,
+    availableFrameworks,
   } = useChartData(
     selectedModel,
     effectiveSequence,
@@ -866,6 +876,7 @@ export function InferenceProvider({
       i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
+      i_fw: quickFilterFrameworks.join(','),
       i_disagg: quickFilterDisagg.join(','),
       i_spec: quickFilterSpec.join(','),
     },
@@ -889,6 +900,7 @@ export function InferenceProvider({
       showMinecraftOverlay,
       iActiveStr,
       quickFilterVendors,
+      quickFilterFrameworks,
       quickFilterDisagg,
       quickFilterSpec,
     ],
@@ -1039,7 +1051,9 @@ export function InferenceProvider({
       scaleType,
       setScaleType,
       quickFilters,
+      availableFrameworks,
       setQuickFilterVendors,
+      setQuickFilterFrameworks,
       setQuickFilterDisagg,
       setQuickFilterSpec,
       loading,
@@ -1113,6 +1127,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       scaleType,
       quickFilters,
+      availableFrameworks,
       selectedGPUs,
       selectedDates,
       selectedDateRange,

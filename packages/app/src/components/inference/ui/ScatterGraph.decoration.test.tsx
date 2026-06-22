@@ -74,7 +74,8 @@ function baseInferenceState() {
     hwTypesWithData: new Set(['h100', 'b200']),
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
-    quickFilters: { vendors: [], disagg: [], spec: [] },
+    quickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },
+    availableFrameworks: [],
     availableRuns: null,
     selectedRunId: '',
     hideNonOptimal: false,
@@ -379,7 +380,7 @@ describe('ScatterGraph toggle decoration', () => {
     // exactly as it would the official points.
     inferenceState.current = {
       ...baseInferenceState(),
-      quickFilters: { vendors: ['AMD'], disagg: [], spec: [] },
+      quickFilters: { vendors: ['AMD'], frameworks: [], disagg: [], spec: [] },
     };
     const { container, unmount } = mountChart({
       overlayData: {
