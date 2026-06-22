@@ -105,7 +105,10 @@ export function LandingPage() {
               <Link
                 href="/submissions"
                 data-testid="landing-submissions-link"
-                onClick={() => track('landing_submissions_clicked')}
+                onClick={(e) => {
+                  track('landing_submissions_clicked');
+                  navigateInApp(e, router, '/submissions');
+                }}
                 className="inline-flex items-center gap-1.5 rounded-md bg-brand text-primary-foreground hover:bg-brand/90 px-3 py-1.5 transition-colors font-medium"
               >
                 Browse submissions
