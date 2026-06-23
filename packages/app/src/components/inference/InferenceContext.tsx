@@ -159,24 +159,33 @@ export function InferenceProvider({
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
 
-  // ── Quick filters (vendor / agg-disagg / mtp-stp) ───────────────────────────
+  // ── Quick filters (vendor / framework / agg-disagg / mtp-stp) ────────────────
   // Coarse pre-filters applied to the point set. Empty = no constraint.
-  const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>(() => {
-    const v = getUrlParam('i_vendor');
-    return v ? v.split(',').filter(Boolean) : [];
-  });
-  const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>(() => {
-    const v = getUrlParam('i_fw');
-    return v ? v.split(',').filter(Boolean) : [];
-  });
-  const [quickFilterDisagg, setQuickFilterDisagg] = useState<DisaggMode[]>(() => {
-    const v = getUrlParam('i_disagg');
-    return v ? (v.split(',').filter(Boolean) as DisaggMode[]) : [];
-  });
-  const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>(() => {
-    const v = getUrlParam('i_spec');
-    return v ? (v.split(',').filter(Boolean) as SpecMode[]) : [];
-  });
+  //
+  // Initialized empty rather than from the URL so the first client render matches
+  // SSR (which has no query string). Reading the params in these initializers would
+  // desync the pills' aria-pressed/disabled between server and client; React does
+  // not patch hydration mismatches, so a shared link would leave the pills frozen
+  // inactive/disabled even while the chart filters. The URL selections are applied
+  // just below, after mount.
+  const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
+  const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
+  const [quickFilterDisagg, setQuickFilterDisagg] = useState<DisaggMode[]>([]);
+  const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
+  useEffect(() => {
+    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec') => {
+      const v = getUrlParam(key);
+      return v ? v.split(',').filter(Boolean) : [];
+    };
+    const vendors = parse('i_vendor');
+    const frameworks = parse('i_fw');
+    const disagg = parse('i_disagg') as DisaggMode[];
+    const spec = parse('i_spec') as SpecMode[];
+    if (vendors.length > 0) setQuickFilterVendors(vendors);
+    if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
+    if (disagg.length > 0) setQuickFilterDisagg(disagg);
+    if (spec.length > 0) setQuickFilterSpec(spec);
+  }, [getUrlParam]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
       vendors: quickFilterVendors,
