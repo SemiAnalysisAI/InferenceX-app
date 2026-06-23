@@ -528,3 +528,33 @@
   animation: star-glow 2s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* Trusted-by logo strip: infinite horizontal marquee.
+   The strip renders the logo set twice; translating the inner row by -50%
+   slides the first copy off-screen exactly as the second copy moves into
+   its place, producing a seamless loop. Each set carries pr-5 so the
+   trailing gap is baked into the 50% math. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 50s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover,
+.animate-marquee:focus-within {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
