@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useFeatureGate } from '@/lib/use-feature-gate';
+import { cn } from '@/lib/utils';
 
 import { useInference } from '@/components/inference/InferenceContext';
 import {
@@ -512,7 +513,12 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                           aria-pressed={active}
                           disabled={disabled}
                           title={disabled ? 'No data for the current selection' : undefined}
-                          className="h-7 rounded-full px-3 text-xs"
+                          // Active pills use the brand color (blue in light, amber in dark)
+                          // rather than the amber primary fill.
+                          className={cn(
+                            'h-7 rounded-full px-3 text-xs',
+                            active && 'bg-brand hover:bg-brand/90',
+                          )}
                           data-testid={`quick-filter-${group.key}-${option.value}`}
                           onClick={() => handleQuickFilterToggle(group.key, option.value)}
                         >
