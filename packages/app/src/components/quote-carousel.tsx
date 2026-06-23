@@ -66,7 +66,7 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   return shuffleArray(entries);
 }
 
-function QuoteBlock({ quote }: { quote: CarouselQuote }) {
+function QuoteBlock({ quote, moreHref }: { quote: CarouselQuote; moreHref?: string }) {
   return (
     <blockquote className="w-full">
       <p className="text-sm lg:text-base leading-relaxed text-muted-foreground italic">
@@ -91,6 +91,15 @@ function QuoteBlock({ quote }: { quote: CarouselQuote }) {
           )}
           <span className="block text-muted-foreground text-xs">{quote.title}</span>
         </div>
+        {moreHref && (
+          <Link
+            href={moreHref}
+            className="ml-auto shrink-0 whitespace-nowrap text-xs font-bold text-brand hover:underline"
+            onClick={() => track('quote_carousel_see_more_clicked')}
+          >
+            See more supporters &rarr;
+          </Link>
+        )}
       </footer>
     </blockquote>
   );
@@ -198,23 +207,11 @@ export function QuoteCarousel({
               }`}
               aria-hidden={!isActive}
             >
-              <QuoteBlock quote={e.quote} />
+              <QuoteBlock quote={e.quote} moreHref={moreHref} />
             </div>
           );
         })}
       </div>
-
-      {moreHref && (
-        <div className="flex justify-end">
-          <Link
-            href={moreHref}
-            className="text-xs font-bold text-brand hover:underline"
-            onClick={() => track('quote_carousel_see_more_clicked')}
-          >
-            See more supporters &rarr;
-          </Link>
-        </div>
-      )}
     </div>
   );
 }
