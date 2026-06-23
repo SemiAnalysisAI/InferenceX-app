@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  HW_REGISTRY,
+  SITE_NAME,
+  SITE_URL,
+  SUPPORTERS_LINE,
+} from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
@@ -42,10 +47,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
   const url = `${SITE_URL}/compare-per-dollar/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
-  // Description weaves the user-named SEO terms — "performance per dollar",
-  // "performance normalized by cost", "dollars per million tokens" — without
-  // keyword-stuffing.
-  const description = `${parsed.model.label} cost per million tokens on ${gpuLabel}. Performance normalized by owning-hyperscaler TCO — see which GPU delivers more inference dollars-per-token at every interactivity level.`;
+  // Description leads with the searched GPU pair + model, then the trust
+  // signals (verified/reproducible, what InferenceX is, named supporters)
+  // before weaving the per-dollar SEO terms ("performance per dollar", "cost
+  // per million tokens", "TCO-normalized") without keyword-stuffing.
+  const description = `${gpuLabel} performance per dollar on ${parsed.model.label}: verified, reproducible cost-per-million-token results from InferenceX, the independent open-source benchmark by SemiAnalysis, normalized by hyperscaler TCO. ${SUPPORTERS_LINE} See which GPU is cheaper at every interactivity level.`;
   return {
     title: `${fullLabel} — Performance per Dollar`,
     description,

@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  HW_REGISTRY,
+  SITE_NAME,
+  SITE_URL,
+  SUPPORTERS_LINE,
+} from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
@@ -41,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
   const url = `${SITE_URL}/compare/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
-  const description = `Head-to-head GPU inference benchmark comparison for ${parsed.model.label}: ${gpuLabel}. Latency, throughput, and cost across LLM workloads.`;
+  const description = `${gpuLabel} inference benchmark on ${parsed.model.label}: verified, reproducible head-to-head results from InferenceX, the independent open-source GPU benchmark by SemiAnalysis. ${SUPPORTERS_LINE} Compare latency, throughput & cost.`;
   return {
     title: `${fullLabel} Inference Benchmark`,
     description,

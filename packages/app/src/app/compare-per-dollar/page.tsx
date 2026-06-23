@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 
-import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  HW_REGISTRY,
+  SITE_NAME,
+  SITE_URL,
+  SUPPORTERS_LINE,
+} from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
@@ -11,8 +16,7 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION =
-  'GPU performance per dollar — head-to-head cost per million tokens across every model and hardware pair we benchmark. Performance normalized by owning-hyperscaler TCO for DeepSeek V4 Pro 1.6T, DeepSeek R1, Kimi K2.5/K2.6/K2.7-Code 1T, MiniMax M3 428B, GLM 5/5.1, Qwen 3.5 397B-A17B, and more. Pick the cheapest SKU for your workload.';
+const DESCRIPTION = `Which GPU delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
   title: 'GPU Performance per Dollar',

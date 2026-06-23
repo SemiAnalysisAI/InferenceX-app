@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import {
+  HW_REGISTRY,
+  SITE_NAME,
+  SITE_URL,
+  SUPPORTERS_LINE,
+} from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
@@ -12,8 +17,7 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION =
-  'Browse head-to-head GPU inference benchmark comparisons across every model and hardware pair we test. Latency, throughput, and cost for DeepSeek V4 Pro 1.6T, DeepSeek R1, Kimi K2.5/K2.6/K2.7-Code 1T, MiniMax M3 428B, GLM 5/5.1, Qwen 3.5 397B-A17B, and more.';
+const DESCRIPTION = `InferenceX is the independent, open-source GPU inference benchmark from SemiAnalysis, with verified, reproducible nightly results. ${SUPPORTERS_LINE} Compare latency, throughput & cost head-to-head across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
   title: 'GPU Comparisons',
