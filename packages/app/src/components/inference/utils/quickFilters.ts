@@ -83,9 +83,8 @@ export function computeAvailableQuickFilters(
     if (fam) frameworks.add(fam);
     if (p.disagg) hasDisagg = true;
     else hasAgg = true;
-    const specMode = pointSpecMode(p);
-    if (specMode === 'mtp') hasMtp = true;
-    else if (specMode === 'stp') hasStp = true;
+    if (pointSpecMode(p) === 'mtp') hasMtp = true;
+    else hasStp = true;
   }
   const disagg: DisaggMode[] = [];
   if (hasAgg) disagg.push('agg');
@@ -113,22 +112,19 @@ export function pointVendor(hwKey: string): string | undefined {
   return GPU_VENDORS[hwKey.split('_')[0]];
 }
 
-/** A point uses MTP when its spec_decoding is 'mtp' (mirrored by the `_mtp` hwKey suffix). */
-function pointIsMtp(point: InferenceData): boolean {
-  return point.spec_decoding === 'mtp' || String(point.hwKey).endsWith('_mtp');
-}
-
 /**
- * Classify a point for the spec-decoding filter, or `null` when it is neither
- * plain MTP nor standard decoding. STP means *standard* (no speculative method),
- * which the DB marks `none` (and the hwKey carries no spec suffix). Other methods
- * such as EAGLE are neither MTP nor STP, so they must not fall through to STP.
+ * Classify a point for the spec-decoding filter. STP means *standard* decoding,
+ * which the DB marks `none` (no spec suffix on the hwKey). Any other value means a
+ * speculative method is active, so it groups under MTP (the "spec decoding on" pill).
+ * Keying STP off `none` — rather than treating everything that isn't `mtp` as STP —
+ * keeps non-standard methods (e.g. EAGLE) out of the standard bucket.
  */
-function pointSpecMode(point: InferenceData): SpecMode | null {
-  if (pointIsMtp(point)) return 'mtp';
+function pointSpecMode(point: InferenceData): SpecMode {
   const s = point.spec_decoding;
-  if (s === 'none' || s === '' || s === undefined || s === null) return 'stp';
-  return null;
+  const isStandard =
+    (s === 'none' || s === '' || s === undefined || s === null) &&
+    !String(point.hwKey).endsWith('_mtp');
+  return isStandard ? 'stp' : 'mtp';
 }
 
 /** Whether a single data point satisfies every active quick-filter category. */
@@ -145,10 +141,7 @@ export function matchesQuickFilters(point: InferenceData, f: QuickFilters): bool
     const mode: DisaggMode = point.disagg ? 'disagg' : 'agg';
     if (!f.disagg.includes(mode)) return false;
   }
-  if (f.spec.length > 0) {
-    const mode = pointSpecMode(point);
-    if (!mode || !f.spec.includes(mode)) return false;
-  }
+  if (f.spec.length > 0 && !f.spec.includes(pointSpecMode(point))) return false;
   return true;
 }
 

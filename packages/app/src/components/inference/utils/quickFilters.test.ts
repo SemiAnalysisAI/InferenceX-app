@@ -152,15 +152,13 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), stpFilter)).toBe(true);
   });
 
-  it('treats non-standard spec methods (e.g. eagle) as neither MTP nor STP', () => {
+  it('treats non-standard spec methods (e.g. eagle) as spec-on (MTP), never STP', () => {
     const eagle = point({ hwKey: 'h200_trt_eagle', spec_decoding: 'eagle' });
-    expect(matchesQuickFilters(eagle, filters({ spec: ['mtp'] }))).toBe(false);
+    // Standard (STP) means `none` only — a speculative method groups under MTP.
     expect(matchesQuickFilters(eagle, filters({ spec: ['stp'] }))).toBe(false);
-    // Excluded under either spec selection, but unconstrained when spec is empty.
-    expect(matchesQuickFilters(eagle, filters({ spec: ['mtp', 'stp'] }))).toBe(false);
+    expect(matchesQuickFilters(eagle, filters({ spec: ['mtp'] }))).toBe(true);
     expect(matchesQuickFilters(eagle, EMPTY_QUICK_FILTERS)).toBe(true);
-    // An eagle-only point contributes to neither spec pill.
-    expect(computeAvailableQuickFilters([eagle]).spec).toEqual([]);
+    expect(computeAvailableQuickFilters([eagle]).spec).toEqual(['mtp']);
   });
 
   it('ANDs categories together', () => {
