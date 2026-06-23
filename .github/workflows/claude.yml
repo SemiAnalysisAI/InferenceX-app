@@ -10,10 +10,15 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review]
 
+# Single source of truth for the models. Bumping either is a one-line change.
+env:
+  CLAUDE_MODEL: claude-opus-4-8
+  CLAUDE_ROUTER_MODEL: claude-haiku-4-5
+
 jobs:
-  # @claude (Playwright MCP) or @claude chrome (Chrome DevTools MCP).
-  # @claude review routes to the review job below, not this one.
-  # Implements features end-to-end: code + browser verification + tests.
+  # @claude <anything>. A Haiku router classifies the request and provisions only
+  # the environment it needs (browser/dev-server installed on demand), then a single
+  # adaptive agent runs. @claude review routes to the review job below, not this one.
   implement:
     name: Claude (implement)
     if: >-
@@ -42,23 +47,72 @@ jobs:
       actions: read
 
     steps:
-      - name: Detect mode
-        id: detect
+      # Decide the run shape from the request text. Explicit keywords win deterministically;
+      # otherwise Haiku classifies. Any failure falls back to the lean path (no browser/dev
+      # server), which the agent can still self-provision on demand.
+      - name: Route task
+        id: route
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ROUTER_MODEL: ${{ env.CLAUDE_ROUTER_MODEL }}
           BODY: ${{ github.event.comment.body || github.event.issue.body || '' }}
           TITLE: ${{ github.event.issue.title || '' }}
         run: |
           set -euo pipefail
-          if printf '%s\n%s' "$BODY" "$TITLE" | grep -q '@claude chrome'; then
-            MODE=chrome
-            TRIGGER='@claude chrome'
-          else
-            MODE=frontend
-            TRIGGER='@claude'
+
+          TEXT="$(printf '%s\n%s' "${TITLE:-}" "${BODY:-}")"
+
+          emit() {
+            {
+              echo "browser=$1"
+              echo "dev_server=$2"
+              echo "profile=$3"
+            } >> "$GITHUB_OUTPUT"
+            echo "Routed: profile=$3 browser=$1 dev_server=$2 (source: $4)"
+          }
+
+          # 1. Explicit overrides — no API call.
+          if printf '%s' "$TEXT" | grep -qi '@claude chrome'; then
+            emit chrome true ui "explicit @claude chrome"; exit 0
           fi
-          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-          echo "trigger=$TRIGGER" >> "$GITHUB_OUTPUT"
-          echo "Detected mode: $MODE (trigger=$TRIGGER)"
+          if printf '%s' "$TEXT" | grep -qi '@claude frontend'; then
+            emit playwright true ui "explicit @claude frontend"; exit 0
+          fi
+          if printf '%s' "$TEXT" | grep -qiE '@claude (general|lite)'; then
+            emit none false code "explicit @claude general"; exit 0
+          fi
+
+          # 2. Classify with Haiku. Lean fallback on any problem.
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            emit none false code "no ANTHROPIC_API_KEY"; exit 0
+          fi
+
+          SYSTEM='You are a routing classifier for an automated engineering bot on InferenceX, a Next.js dashboard for ML inference benchmarks. Given a GitHub issue/comment, decide the execution environment. Respond with ONLY a compact JSON object and nothing else: {"profile":"ui|code|docs|question","browser":"playwright|chrome|none"}. Guidance: UI / chart / D3 / React component / styling / .tsx / visual work -> profile=ui, browser=playwright (use browser=chrome ONLY if the user explicitly asks for Chrome DevTools / network / console debugging). Backend / DB / ETL / ingest / scripts / lib / API-route logic -> profile=code, browser=none. Docs / markdown / blog content / config / CI workflow files -> profile=docs, browser=none. A pure question or code explanation needing no file change -> profile=question, browser=none. When unsure between ui and code, choose code.'
+
+          REQ="$(jq -n --arg m "${ROUTER_MODEL:-claude-haiku-4-5}" --arg s "$SYSTEM" --arg u "$TEXT" \
+            '{model:$m, max_tokens:300, system:$s, messages:[{role:"user", content:$u}]}' 2>/dev/null || true)"
+          if [ -z "$REQ" ]; then
+            emit none false code "request build failed"; exit 0
+          fi
+
+          RESP="$(curl -sS --max-time 60 https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$REQ" 2>/dev/null || true)"
+
+          OUT="$(printf '%s' "$RESP" | jq -r '.content[0].text // empty' 2>/dev/null || true)"
+          CLEAN="$(printf '%s' "$OUT" | sed 's/```json//g; s/```//g')"
+          PROFILE="$(printf '%s' "$CLEAN" | jq -r '.profile // empty' 2>/dev/null || true)"
+          BROWSER="$(printf '%s' "$CLEAN" | jq -r '.browser // empty' 2>/dev/null || true)"
+
+          case "$PROFILE" in ui|code|docs|question) ;; *) PROFILE=code ;; esac
+          case "$BROWSER" in playwright|chrome|none) ;; *) BROWSER=none ;; esac
+          # Dev server is provisioned iff a browser is — you can't verify in a browser
+          # without the app running, and non-browser tasks don't need it.
+          if [ "$BROWSER" = "none" ]; then DEVSERVER=false; else DEVSERVER=true; fi
+
+          emit "$BROWSER" "$DEVSERVER" "$PROFILE" "haiku"
 
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -75,8 +129,9 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
-      - name: Cache Playwright browsers
-        if: steps.detect.outputs.mode == 'frontend'
+      # Always restore the browser/binary caches (a restore is a near-noop). This makes
+      # any on-demand `playwright install` / `cypress install` below a fast cache hit.
+      - name: Restore Playwright cache
         id: playwright-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -85,19 +140,26 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
+      - name: Restore Cypress cache
+        id: cypress-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            cypress-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers and dependencies
-        if: steps.detect.outputs.mode == 'frontend' && steps.playwright-cache.outputs.cache-hit != 'true'
+      # --- On-demand setup, gated on the router decision ---
+
+      - name: Install Playwright browser
+        if: steps.route.outputs.browser == 'playwright'
         run: npx -y playwright install --with-deps chromium
 
-      - name: Install Playwright system dependencies
-        if: steps.detect.outputs.mode == 'frontend' && steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx -y playwright install-deps chromium
-
       - name: Verify Chrome is available
-        if: steps.detect.outputs.mode == 'chrome'
+        if: steps.route.outputs.browser == 'chrome'
         run: |
           set -euo pipefail
           if command -v google-chrome >/dev/null 2>&1; then
@@ -110,21 +172,13 @@ jobs:
             exit 1
           fi
 
-      - name: Cache Cypress binary
-        id: cypress-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            cypress-${{ runner.os }}-
-
       - name: Install Cypress binary
-        if: steps.cypress-cache.outputs.cache-hit != 'true'
+        if: steps.route.outputs.profile == 'ui' && steps.cypress-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @semianalysisai/inferencex-app exec cypress install
 
       - name: Start dev server
         id: devserver
+        if: steps.route.outputs.dev_server == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -155,124 +209,47 @@ jobs:
           kill "$DEV_PID" 2>/dev/null || true
           exit 0
 
-      - name: Compose Playwright prompt + tools
-        if: steps.detect.outputs.mode == 'frontend'
+      # Build the agent prompt + MCP/tool set from the router decision. One adaptive
+      # prompt: a dynamic routing header selects which profile rules apply; the browser
+      # MCP wired matches the decision (Playwright by default, Chrome on request).
+      - name: Compose prompt + tools
+        id: compose
+        env:
+          BROWSER: ${{ steps.route.outputs.browser }}
+          PROFILE: ${{ steps.route.outputs.profile }}
+          DEV_SERVER_UP: ${{ steps.devserver.outputs.up }}
+          DEV_SERVER_LOG: ${{ steps.devserver.outputs.log }}
         run: |
+          set -euo pipefail
+          BROWSER="${BROWSER:-none}"
+          PROFILE="${PROFILE:-code}"
+          DEV="${DEV_SERVER_UP:-not started}"
+          LOG="${DEV_SERVER_LOG:-/tmp/next-dev.log}"
+
+          # Chrome is the only non-default MCP; everything else gets Playwright (wired even
+          # for browser=none so the agent can install a browser on demand and drive it).
+          if [ "$BROWSER" = "chrome" ]; then
+            WIRED=chrome
+            MCP_CONFIG='{"mcpServers":{"fetch":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-fetch@latest"]},"chrome":{"command":"npx","args":["-y","chrome-devtools-mcp@latest","--headless=true","--isolated=true"]}}}'
+            CLAUDE_TOOLS='Write,Edit,Read,Glob,Grep,WebFetch,mcp__github__*,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__*,mcp__fetch__*,mcp__chrome__*,Bash'
+          else
+            WIRED=playwright
+            MCP_CONFIG='{"mcpServers":{"fetch":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-fetch@latest"]},"playwright":{"command":"npx","args":["-y","@playwright/mcp@latest","--headless","--caps=vision"]}}}'
+            CLAUDE_TOOLS='Write,Edit,Read,Glob,Grep,WebFetch,mcp__github__*,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__*,mcp__fetch__*,mcp__playwright__*,Bash'
+          fi
           {
-            echo 'PROMPT_BODY<<__CLAUDE_EOF__'
-            cat <<'INNER_EOF'
-            You are a Frontend agent for the InferenceX dashboard.
-
-            ## Ground truth — READ FIRST
-            Architecture, conventions, and tab structure live in the repo, not this prompt. Before writing code, read:
-            1. `AGENTS.md` (root) — project overview, tab list, mandatory unofficial-run support, analytics convention, "add a new model/GPU" workflows.
-            2. `docs/index.md` — index into subsystem deep-dives (architecture, d3-charts, data-pipeline, pitfalls, testing, state-ownership, gpu-specs, tco-calculator, adding-entities, blog).
-            3. Open the actual files you intend to touch (`rg`, `ls`). If any doc disagrees with code, trust the code and call out the drift.
-
-            This prompt is runtime context. Do not assume any file path from it without verifying.
-
-            ## Browser tool: Playwright MCP (server name "playwright")
-            - DOM interactions, screenshots, and **coordinate-based** mouse wheel + drag (needed for D3 zoom/pan).
-            - App runs at http://localhost:3000.
-            - For docs or external URLs, use WebFetch instead.
-
-            ## Definition of done — NON-NEGOTIABLE
-            - Feature verified end-to-end via Playwright MCP in a real browser session, with screenshots saved as evidence.
-            - Charts MUST render real data. If you see "No data available" or "Please change the model, sequence, precision, date range or GPU", the task is NOT complete — keep debugging.
-            - If you touched inference or evaluation, the unofficial-run overlay path is verified too. AGENTS.md §"Unofficial Run Support" lists the exact code paths and the `?unofficialrun=<id>` URL pattern; do not skip it.
-            - New interactive elements have a `track()` call per AGENTS.md §"Analytics Requirement" (`[section]_[action]` naming).
-            - Tests added per `docs/testing.md`. Missing or low-quality tests are blocking.
-            - `pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:e2e` all green before commit.
-
-            ## Dev server status (best-effort start happened before this prompt)
-            - DEV_SERVER_UP=${DEV_SERVER_UP:-unknown}
-            - DEV_SERVER_LOG=${DEV_SERVER_LOG:-/tmp/next-dev.log}
-            - DEV_SERVER_PID=${DEV_SERVER_PID:-unknown}
-
-            If DEV_SERVER_UP is not "true":
-            1. `tail -n 200 "$DEV_SERVER_LOG"` and fix the underlying issue in the repo.
-            2. Restart: `pnpm run dev > /tmp/next-dev.log 2>&1 &`
-            3. Confirm reachable: `curl -sSf http://localhost:3000 >/dev/null`
-
-            ## Workflow
-            1. Read AGENTS.md and the relevant `docs/*.md` for the feature area.
-            2. Implement, keeping changes scoped to the request — no drive-by refactors.
-            3. Add or update tests (unit tests colocated as `<module>.test.ts`, E2E tests in `packages/app/cypress/e2e/`).
-            4. Run typecheck, lint, unit, E2E.
-            5. Verify in Playwright MCP: take screenshots, check console for errors, confirm real data. For inference/evaluation, also verify with `?unofficialrun=<github-actions-run-id>` appended to the URL.
-            6. Commit and push — pushing triggers a Vercel preview automatically.
-
-            ## Reminder
-            Pushing a commit triggers a Vercel preview deployment. If local and Vercel diverge, the Vercel preview is the final verification target.
-          INNER_EOF
-            echo '__CLAUDE_EOF__'
-          } >> "$GITHUB_ENV"
-          {
-            echo 'MCP_CONFIG={"mcpServers":{"fetch":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-fetch@latest"]},"playwright":{"command":"npx","args":["-y","@playwright/mcp@latest","--headless","--caps=vision"]}}}'
-            echo 'CLAUDE_TOOLS=Write,Edit,Read,Glob,Grep,WebFetch,mcp__github__*,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__*,mcp__fetch__*,mcp__playwright__*,Bash'
+            echo "MCP_CONFIG=$MCP_CONFIG"
+            echo "CLAUDE_TOOLS=$CLAUDE_TOOLS"
           } >> "$GITHUB_ENV"
 
-      - name: Compose Chrome prompt + tools
-        if: steps.detect.outputs.mode == 'chrome'
-        run: |
+          # Body lives in .github/claude/implement-prompt.md (already checked out) so this
+          # YAML stays free of embedded prose; only the dynamic routing header is built here.
           {
-            echo 'PROMPT_BODY<<__CLAUDE_EOF__'
-            cat <<'INNER_EOF'
-            You are a Frontend agent for the InferenceX dashboard.
-
-            ## Ground truth — READ FIRST
-            Architecture, conventions, and tab structure live in the repo, not this prompt. Before writing code, read:
-            1. `AGENTS.md` (root) — project overview, tab list, mandatory unofficial-run support, analytics convention, "add a new model/GPU" workflows.
-            2. `docs/index.md` — index into subsystem deep-dives (architecture, d3-charts, data-pipeline, pitfalls, testing, state-ownership, gpu-specs, tco-calculator, adding-entities, blog).
-            3. Open the actual files you intend to touch (`rg`, `ls`). If any doc disagrees with code, trust the code and call out the drift.
-
-            This prompt is runtime context. Do not assume any file path from it without verifying.
-
-            ## Browser tool: Chrome DevTools MCP (server name "chrome")
-            Chrome MCP is **uid-driven**:
-            1. Always call `mcp__chrome__take_snapshot` BEFORE clicking, filling, or hovering. The snapshot is an accessibility-tree dump that assigns each element a `uid`. UIDs change after navigation or major rerenders — re-snapshot if a uid fails.
-            2. Use uids from the latest snapshot with `mcp__chrome__click` / `fill` / `hover` / `upload_file`. Use `press_key` for keyboard shortcuts.
-            3. Screenshot for verification: `mcp__chrome__take_screenshot` after page load and after every key interaction. `fullPage: true` for layout debugging.
-            4. After interactions, debug with `list_console_messages`, `get_console_message`, `list_network_requests`, `get_network_request`, and `evaluate_script` for runtime DOM checks.
-            5. Navigation: `new_page` / `navigate_page`. Use `wait_for` with key text before interacting.
-            6. Zoom/pan: Chrome MCP has no coordinate wheel tool. Verify chart state via screenshots and via `evaluate_script` dispatching synthetic events on the chart container's uid. If synthetic events don't drive the D3 zoom, document the limitation and verify data renders + no console errors.
-
-            App runs at http://localhost:3000. For docs or external URLs, use WebFetch.
-
-            ## Definition of done — NON-NEGOTIABLE
-            - Feature verified end-to-end via Chrome MCP in a real browser session: take_snapshot + take_screenshot evidence, no blocking console errors.
-            - Charts MUST render real data. If you see "No data available" or "Please change the model, sequence, precision, date range or GPU", the task is NOT complete — keep debugging.
-            - If you touched inference or evaluation, the unofficial-run overlay path is verified too. AGENTS.md §"Unofficial Run Support" lists the exact code paths and the `?unofficialrun=<id>` URL pattern; do not skip it.
-            - New interactive elements have a `track()` call per AGENTS.md §"Analytics Requirement" (`[section]_[action]` naming).
-            - Tests added per `docs/testing.md`. Missing or low-quality tests are blocking.
-            - `pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:e2e` all green before commit.
-
-            ## Dev server status (best-effort start happened before this prompt)
-            - DEV_SERVER_UP=${DEV_SERVER_UP:-unknown}
-            - DEV_SERVER_LOG=${DEV_SERVER_LOG:-/tmp/next-dev.log}
-            - DEV_SERVER_PID=${DEV_SERVER_PID:-unknown}
-
-            If DEV_SERVER_UP is not "true":
-            1. `tail -n 200 "$DEV_SERVER_LOG"` and fix the underlying issue in the repo.
-            2. Restart: `pnpm run dev > /tmp/next-dev.log 2>&1 &`
-            3. Confirm reachable: `curl -sSf http://localhost:3000 >/dev/null`
-
-            ## Workflow
-            1. Read AGENTS.md and the relevant `docs/*.md` for the feature area.
-            2. Implement, keeping changes scoped to the request — no drive-by refactors.
-            3. Add or update tests (unit tests colocated as `<module>.test.ts`, E2E tests in `packages/app/cypress/e2e/`).
-            4. Run typecheck, lint, unit, E2E.
-            5. Verify in Chrome MCP: take_snapshot + take_screenshot, check console + network, confirm real data. For inference/evaluation, also verify with `?unofficialrun=<github-actions-run-id>` appended to the URL.
-            6. Commit and push — pushing triggers a Vercel preview automatically.
-
-            ## Reminder
-            Pushing a commit triggers a Vercel preview deployment. If local and Vercel diverge, the Vercel preview is the final verification target.
-          INNER_EOF
-            echo '__CLAUDE_EOF__'
-          } >> "$GITHUB_ENV"
-          {
-            echo 'MCP_CONFIG={"mcpServers":{"fetch":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-fetch@latest"]},"chrome":{"command":"npx","args":["-y","chrome-devtools-mcp@latest","--headless=true","--isolated=true"]}}}'
-            echo 'CLAUDE_TOOLS=Write,Edit,Read,Glob,Grep,WebFetch,mcp__github__*,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__*,mcp__fetch__*,mcp__chrome__*,Bash'
+            echo 'PROMPT_BODY<<__CLAUDE_PROMPT_EOF__'
+            printf '## Routing (decided by the task router for this run)\n- profile: %s\n- browser MCP wired: %s (use mcp__%s__* tools when browser verification is needed)\n- dev server: %s (log: %s)\n\nApply the "%s" rules under "Task profiles" below.\n\n' \
+              "$PROFILE" "$WIRED" "$WIRED" "$DEV" "$LOG" "$PROFILE"
+            cat "${GITHUB_WORKSPACE}/.github/claude/implement-prompt.md"
+            echo '__CLAUDE_PROMPT_EOF__'
           } >> "$GITHUB_ENV"
 
       - name: Run Claude Code
@@ -290,7 +267,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: ${{ steps.detect.outputs.trigger }}
+          trigger_phrase: '@claude'
           track_progress: true
           allowed_bots: ''
 
@@ -298,7 +275,7 @@ jobs:
             actions: read
 
           claude_args: |
-            --model 'claude-opus-4-8'
+            --model "${{ env.CLAUDE_MODEL }}"
             --mcp-config '${{ env.MCP_CONFIG }}'
             --allowedTools "${{ env.CLAUDE_TOOLS }}"
 
@@ -339,7 +316,7 @@ jobs:
           allowed_bots: ''
 
           claude_args: |
-            --model 'claude-opus-4-8'
+            --model "${{ env.CLAUDE_MODEL }}"
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
 
           prompt: |

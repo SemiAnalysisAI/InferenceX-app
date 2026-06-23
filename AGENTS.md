@@ -262,8 +262,10 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 
 ### `@claude` (`.github/workflows/claude.yml`)
 
-All Claude AI workflows are dispatched from a single trigger word `@claude`. The next word selects the mode:
+All Claude AI workflows are dispatched from the trigger word `@claude` in an issue or comment. There are two jobs: **implement** (`@claude …`) and **review** (`@claude review`).
 
-- `@claude` (or `@claude <anything>`) — implementation with Playwright MCP. Triggered by mentioning in issues/comments. Full code implementation + browser testing. Creates `claude/issue-{N}-*` branches. Must verify charts render real data (no "No data available").
-- `@claude chrome` — implementation with Chrome DevTools MCP instead of Playwright. Preferred when you need deeper debugging (network requests, console messages, JS evaluation).
+- `@claude <anything>` — implementation. A lightweight Haiku **router** reads the request and provisions only what it needs, then a single adaptive agent runs. The router picks a **profile** (`ui` / `code` / `docs` / `question`) and a browser (`playwright` / `chrome` / `none`); the dev server, Playwright browser, and Cypress binary are installed **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast and skip the UI-verification ceremony. The agent prompt scopes its definition-of-done to the profile (UI work still must render real data — no "No data available" — verify the `?unofficialrun=` overlay path, add `track()` + tests, and pass `pnpm test:e2e`). Creates `claude/issue-{N}-*` branches.
+  - **Explicit overrides** (skip the router): `@claude chrome <task>` forces the Chrome DevTools MCP (deeper network/console/JS debugging); `@claude frontend <task>` forces the full Playwright + dev-server UI environment; `@claude general <task>` (or `lite`) forces the lean no-browser path. If the router ever guesses wrong, re-run with the override.
 - `@claude review` — code review only. Also auto-runs on PR open/sync. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
+
+The model is set once via the workflow-level `CLAUDE_MODEL` env (`claude-opus-4-8`); the router uses `CLAUDE_ROUTER_MODEL` (`claude-haiku-4-5`).
