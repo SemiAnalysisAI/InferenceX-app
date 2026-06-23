@@ -47,9 +47,14 @@ export interface BenchmarkRow {
 /**
  * Fetch the latest benchmark results for one or more model DB keys across ALL sequences,
  * up to a given date. Multiple keys support point-release grouping — e.g. passing
- * `['glm5', 'glm5.1']` unions both buckets under the one display. Returns the most recent
- * result per (config, concurrency, isl, osl) — so every GPU/framework + sequence combo
- * that has been benchmarked appears, with the newest data winning.
+ * `['glm5', 'glm5.1']` unions both buckets under the one display.
+ *
+ * Selection unit is the LINE, not the point: for each line
+ * `(config_id, benchmark_type, isl, osl)` we pick the single newest workflow run that
+ * produced data for it (newest date, then latest sweep, then highest run id) and return
+ * EVERY concurrency that one run measured — and nothing from any other run. A partial
+ * re-sweep therefore truncates the line to its own concurrencies rather than stitching the
+ * skipped ones from an older run. This guarantees a line never mixes runs/dates.
  *
  * The frontend filters by sequence client-side. This eliminates API round-trips when
  * switching sequences — the data is already cached by React Query.
@@ -70,13 +75,8 @@ export async function getLatestBenchmarks(
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   if (date) {
-    // Date-filtered: use base table with DISTINCT ON (the view only has the absolute latest)
-    // exact=true: only return data from this exact date (for GPU comparison)
-    // exact=false (default): return latest data as of this date (for main chart)
-    // Same-day tiebreak by wr.run_started_at (latest sweep wins), mirroring the
-    // latest_benchmarks view (migration 003). br.date is a calendar day, so two
-    // sweeps on the same day tie on date alone and Postgres would otherwise pick
-    // an arbitrary one — leaving an older run's points shadowing a same-day re-sweep.
+    // Date-filtered: use the base table (the view only has the absolute latest).
+    // exact=true: only this exact date (GPU comparison); exact=false (default): as of this date.
     const dateFilter = exact ? sql`br.date = ${date}::date` : sql`br.date <= ${date}::date`;
     // "As of run" filter (main chart only): keep results whose run started no later
     // than the selected run. run_started_at is an absolute timestamp, so this also
@@ -93,8 +93,28 @@ export async function getLatestBenchmarks(
             )
           )`
         : sql``;
+    // winners: the single newest run per LINE (config_id, benchmark_type, isl, osl) under the
+    // date/run cutoff. br.date is a calendar day, so two same-day sweeps tie on date — break
+    // by wr.run_started_at (latest sweep wins), then br.workflow_run_id so exactly one run wins
+    // even when run_started_at is equal/null. The outer join then pulls EVERY concurrency that
+    // winning run measured for the line, so the line is built from one run only (no carry-forward
+    // of concurrencies a partial re-sweep skipped).
     const rows = await sql`
-      SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
+      WITH winners AS (
+        SELECT DISTINCT ON (br.config_id, br.benchmark_type, br.isl, br.osl)
+          br.config_id, br.benchmark_type, br.isl, br.osl,
+          br.workflow_run_id AS winning_run_id
+        FROM benchmark_results br
+        JOIN configs c ON c.id = br.config_id
+        JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+        WHERE c.model = ANY(${modelKeys})
+          AND br.error IS NULL
+          AND ${dateFilter}
+          ${runFilter}
+        ORDER BY br.config_id, br.benchmark_type, br.isl, br.osl,
+                 br.date DESC, wr.run_started_at DESC NULLS LAST, br.workflow_run_id DESC
+      )
+      SELECT
         c.hardware,
         c.framework,
         c.model,
@@ -123,12 +143,14 @@ export async function getLatestBenchmarks(
       FROM benchmark_results br
       JOIN configs c ON c.id = br.config_id
       JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-      WHERE c.model = ANY(${modelKeys})
-        AND br.error IS NULL
-        AND ${dateFilter}
-        ${runFilter}
-      ORDER BY br.config_id, br.conc, br.isl, br.osl,
-               br.date DESC, wr.run_started_at DESC NULLS LAST
+      JOIN winners w
+        ON w.config_id = br.config_id
+        AND w.benchmark_type = br.benchmark_type
+        AND w.isl IS NOT DISTINCT FROM br.isl
+        AND w.osl IS NOT DISTINCT FROM br.osl
+        AND w.winning_run_id = br.workflow_run_id
+      WHERE br.error IS NULL
+      ORDER BY br.config_id, br.conc, br.isl, br.osl
     `;
     return rows as unknown as BenchmarkRow[];
   }
