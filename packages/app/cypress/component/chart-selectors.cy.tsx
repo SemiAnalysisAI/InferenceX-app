@@ -15,7 +15,13 @@ function ModelSelectorHarness() {
       <ModelSelector
         value={value}
         onChange={setValue}
-        availableModels={[Model.DeepSeek_R1, Model.Qwen3_5, Model.MiniMax_M2_5, Model.Llama3_3_70B]}
+        availableModels={[
+          Model.DeepSeek_R1,
+          Model.GptOss,
+          Model.Qwen3_5,
+          Model.MiniMax_M2_5,
+          Model.Llama3_3_70B,
+        ]}
         data-testid="model-selector"
       />
     </TooltipProvider>
@@ -72,6 +78,7 @@ describe('Chart Selectors', () => {
 
       cy.contains('Maintenance Mode').should('be.visible');
       cy.contains('[role="option"]', 'DeepSeek R1 0528 671B').should('be.visible');
+      cy.contains('[role="option"]', 'gpt-oss 120B').should('be.visible');
       cy.contains('Deprecated').should('be.visible');
       cy.contains('[role="option"]', 'Llama 3.3 70B Instruct').should('be.visible');
     });

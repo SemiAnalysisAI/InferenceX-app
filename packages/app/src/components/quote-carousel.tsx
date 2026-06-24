@@ -184,37 +184,40 @@ export function QuoteCarousel({
         ))}
       </div>
 
-      {/* All quotes stacked in same grid cell — tallest sets height */}
-      <div className="grid items-center">
-        {entries.map((e, i) => {
-          const isActive = i === activeIndex;
-          return (
-            <div
-              key={e.org}
-              className={`col-start-1 row-start-1 ${
-                isActive
-                  ? `transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`
-                  : 'opacity-0 invisible pointer-events-none'
-              }`}
-              aria-hidden={!isActive}
-            >
-              <QuoteBlock quote={e.quote} />
-            </div>
-          );
-        })}
-      </div>
+      {/* Fading quote stack (left) + constant link pinned to the footer baseline (right).
+          items-end keeps every quote's footer on the same bottom line so the link,
+          which lives outside the fading stack, stays aligned with it. */}
+      <div className="flex items-end gap-4">
+        {/* All quotes stacked in same grid cell — tallest sets height */}
+        <div className="grid items-end min-w-0 flex-1">
+          {entries.map((e, i) => {
+            const isActive = i === activeIndex;
+            return (
+              <div
+                key={e.org}
+                className={`col-start-1 row-start-1 ${
+                  isActive
+                    ? `transition-opacity duration-300 ease-in-out ${fading ? 'opacity-0' : 'opacity-100'}`
+                    : 'opacity-0 invisible pointer-events-none'
+                }`}
+                aria-hidden={!isActive}
+              >
+                <QuoteBlock quote={e.quote} />
+              </div>
+            );
+          })}
+        </div>
 
-      {moreHref && (
-        <div className="flex justify-end">
+        {moreHref && (
           <Link
             href={moreHref}
-            className="text-xs font-bold text-brand hover:underline"
+            className="shrink-0 whitespace-nowrap text-xs font-bold text-brand hover:underline"
             onClick={() => track('quote_carousel_see_more_clicked')}
           >
             See more supporters &rarr;
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

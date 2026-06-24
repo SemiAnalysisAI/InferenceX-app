@@ -330,12 +330,11 @@ const STRIP_HISTORY_KEYS = new Set([
 ]);
 
 /**
- * Comparator for DISTINCT ON (config, conc, isl, osl) selection: latest calendar
- * day first, then — for sweeps on the same day — the latest workflow run first by
- * `run_started_at` (NULLS LAST). Mirrors the SQL date-filtered query and the
- * `latest_benchmarks` view (migration 003): a calendar day alone ties two same-day
- * sweeps, so without this an older run's points can shadow a same-day re-sweep.
- * `run_started_at` is an ISO-8601 string, so localeCompare orders it chronologically.
+ * Run-recency comparator used to pick the newest run per line: latest calendar day first,
+ * then — for sweeps on the same day — the latest workflow run first by `run_started_at`
+ * (NULLS LAST). Mirrors the `br.date DESC, wr.run_started_at DESC NULLS LAST` portion of the
+ * SQL ORDER BY; callers apply a `workflow_run_id` DESC final tiebreak on top so exactly one
+ * run wins. `run_started_at` is an ISO-8601 string, so localeCompare orders it chronologically.
  * Exported so the same-day tiebreak is unit-tested in parity with the SQL.
  */
 export function compareBenchmarkRecency(
@@ -351,6 +350,10 @@ export function compareBenchmarkRecency(
   if (bStarted === null) return -1;
   return bStarted.localeCompare(aStarted);
 }
+
+/** Chart-line identity: one config + sequence. All concurrencies of a line come from one run. */
+const lineKey = (br: RawBenchmarkResult): string =>
+  `${br.config_id}:${br.benchmark_type}:${br.isl}:${br.osl}`;
 
 export function getLatestBenchmarks(
   modelKey: string | string[],
@@ -387,27 +390,32 @@ export function getLatestBenchmarks(
     return true;
   });
 
-  // DISTINCT ON (config_id, conc, isl, osl) — keep the one with the latest date,
-  // tiebreaking same-day runs by run_started_at so the latest sweep wins.
-  const seen = new Map<string, RawBenchmarkResult>();
-  candidates.sort((a, b) =>
-    compareBenchmarkRecency(
+  // Single run per LINE (config_id, benchmark_type, isl, osl): pick the newest run that
+  // produced data for the line, then keep EVERY concurrency that one run measured. Sort by
+  // recency (date, then run_started_at) with a final workflow_run_id DESC tiebreak so exactly
+  // one run wins even when run_started_at is equal/null — matching the SQL ORDER BY.
+  candidates.sort((a, b) => {
+    const recency = compareBenchmarkRecency(
       toDateString(a.date),
       toDateString(b.date),
       s.latestRunsById.get(a.workflow_run_id)?.run_started_at ?? null,
       s.latestRunsById.get(b.workflow_run_id)?.run_started_at ?? null,
-    ),
-  );
+    );
+    return recency === 0 ? b.workflow_run_id - a.workflow_run_id : recency;
+  });
+  const winningRun = new Map<string, number>();
   for (const br of candidates) {
-    const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}`;
-    if (!seen.has(key)) seen.set(key, br);
+    const key = lineKey(br);
+    if (!winningRun.has(key)) winningRun.set(key, br.workflow_run_id);
   }
 
-  return [...seen.values()].map((br) => {
-    const c = s.configs.get(br.config_id)!;
-    const wr = s.latestRunsById.get(br.workflow_run_id)!;
-    return toBenchmarkRow(br, c, wr);
-  });
+  return candidates
+    .filter((br) => winningRun.get(lineKey(br)) === br.workflow_run_id)
+    .map((br) => {
+      const c = s.configs.get(br.config_id)!;
+      const wr = s.latestRunsById.get(br.workflow_run_id)!;
+      return toBenchmarkRow(br, c, wr);
+    });
 }
 
 /** In-memory mirror of {@link import('./queries/benchmarks.js').getBenchmarksForRun}. */
