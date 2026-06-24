@@ -165,6 +165,7 @@ jobs:
             cypress-${{ runner.os }}-
 
       - name: Install dependencies
+        if: steps.route.outputs.profile != 'review'
         run: pnpm install --frozen-lockfile
 
       # --- On-demand setup, gated on the router decision ---
@@ -285,9 +286,11 @@ jobs:
             echo '__CLAUDE_PROMPT_EOF__'
           } >> "$GITHUB_ENV"
 
+      # No `if: always()` — if setup genuinely failed, skip rather than launch the agent
+      # with an empty prompt/config. The best-effort dev-server step is continue-on-error,
+      # so a dev server that didn't come up does not block this step.
       - name: Run Claude Code
         id: claude
-        if: ${{ always() }}
         uses: anthropics/claude-code-action@d5726de019ec4498aa667642bc3a80fca83aa102 # v1.0.148
         env:
           GH_TOKEN: ${{ secrets.PAT }}
@@ -329,8 +332,10 @@ jobs:
       pull-requests: write
       actions: read
       id-token: write
+    # Same group as the implement job so a comment-triggered review and an auto-review
+    # on the same PR serialize instead of overlapping with duplicate feedback.
     concurrency:
-      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      group: claude-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: false
     steps:
       - name: Checkout repository
