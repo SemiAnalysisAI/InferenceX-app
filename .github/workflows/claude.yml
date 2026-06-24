@@ -115,8 +115,14 @@ jobs:
 
           case "$PROFILE" in ui|code|docs|question|review) ;; *) PROFILE=code ;; esac
           case "$BROWSER" in playwright|chrome|none) ;; *) BROWSER=none ;; esac
-          # Review needs no app or browser; force the lean shape regardless of the browser field.
-          if [ "$PROFILE" = "review" ]; then BROWSER=none; fi
+          # Keep browser coherent with profile so the provisioned setup matches the prompt's
+          # definition-of-done. A ui task must get a browser (default Playwright if the
+          # classifier omitted it or returned none); every non-ui profile gets none, so it
+          # never pre-provisions a browser/dev server it won't use.
+          case "$PROFILE" in
+            ui) [ "$BROWSER" = "none" ] && BROWSER=playwright || true ;;
+            *) BROWSER=none ;;
+          esac
           # Dev server is provisioned iff a browser is — you can't verify in a browser
           # without the app running, and non-browser tasks don't need it.
           if [ "$BROWSER" = "none" ]; then DEVSERVER=false; else DEVSERVER=true; fi
