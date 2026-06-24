@@ -169,8 +169,9 @@ describe('isModelDeprecated', () => {
 // isModelMaintenance
 // ===========================================================================
 describe('isModelMaintenance', () => {
-  it('returns true for the DeepSeek R1 maintenance-mode family', () => {
+  it('returns true for maintenance-mode models', () => {
     expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
+    expect(isModelMaintenance(Model.GptOss)).toBe(true);
   });
 
   it('keeps deprecated and default models out of maintenance mode', () => {
