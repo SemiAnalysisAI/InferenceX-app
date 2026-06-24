@@ -16,12 +16,11 @@ env:
   CLAUDE_ROUTER_MODEL: claude-haiku-4-5
 
 jobs:
-  # @claude <anything> in an issue/comment. A Haiku router classifies the request —
-  # including review asks — and provisions only the environment it needs (browser/dev
-  # server installed on demand), then runs the matching prompt. The review job below
-  # handles only the automatic on-PR-open/sync review (no comment to route).
-  implement:
-    name: Claude (implement)
+  # A Haiku classifier turns any `@claude` mention into a routing decision. It only runs
+  # on issue/comment events (not pull_request) and emits `profile` / `browser` / `dev_server`
+  # as job outputs, which gate the `implement` and `review` jobs below.
+  route:
+    name: Claude (route)
     if: >-
       ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment')
       && contains(github.event.comment.body || '', '@claude')
@@ -31,30 +30,14 @@ jobs:
       && (contains(github.event.issue.body || '', '@claude') || contains(github.event.issue.title || '', '@claude'))
       && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.issue.author_association))
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.PAT }}
-      VERCEL_GIT_COMMIT_REF: claude/${{ github.ref_name }}
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: '1'
-      DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
-      DATABASE_DRIVER: neon
-      DATABASE_SSL: 'true'
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: read
-      id-token: write
-    # Serialize @claude runs on the same issue/PR so back-to-back comments (incl. reviews)
-    # don't clobber each other — matches the protection the standalone review job had.
-    concurrency:
-      group: claude-${{ github.event.pull_request.number || github.event.issue.number }}
-      cancel-in-progress: false
-
+    outputs:
+      profile: ${{ steps.route.outputs.profile }}
+      browser: ${{ steps.route.outputs.browser }}
+      dev_server: ${{ steps.route.outputs.dev_server }}
     steps:
-      # Decide the run shape from the request text. Explicit keywords win deterministically;
-      # otherwise Haiku classifies. Any failure falls back to the lean path (no browser/dev
-      # server), which the agent can still self-provision on demand.
-      - name: Route task
+      # Explicit keywords win deterministically; otherwise Haiku classifies. Any failure
+      # falls back to the lean path (profile=code, no browser/dev server).
+      - name: Classify task
         id: route
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -129,6 +112,33 @@ jobs:
 
           emit "$BROWSER" "$DEVSERVER" "$PROFILE" "haiku"
 
+  # Implementation for every non-review profile. Provisions only what the route decision
+  # calls for (browser/dev-server/Cypress on demand), then runs the adaptive agent.
+  implement:
+    name: Claude (implement)
+    needs: route
+    if: contains(fromJson('["ui", "code", "docs", "question"]'), needs.route.outputs.profile)
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.PAT }}
+      VERCEL_GIT_COMMIT_REF: claude/${{ github.ref_name }}
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: '1'
+      DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+      DATABASE_DRIVER: neon
+      DATABASE_SSL: 'true'
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
+    # Serialize @claude runs on the same issue/PR (incl. reviews — shared group with the
+    # review job) so back-to-back triggers don't clobber each other.
+    concurrency:
+      group: claude-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
+
+    steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -165,17 +175,16 @@ jobs:
             cypress-${{ runner.os }}-
 
       - name: Install dependencies
-        if: steps.route.outputs.profile != 'review'
         run: pnpm install --frozen-lockfile
 
-      # --- On-demand setup, gated on the router decision ---
+      # --- On-demand setup, gated on the route decision ---
 
       - name: Install Playwright browser
-        if: steps.route.outputs.browser == 'playwright'
+        if: needs.route.outputs.browser == 'playwright'
         run: npx -y playwright install --with-deps chromium
 
       - name: Verify Chrome is available
-        if: steps.route.outputs.browser == 'chrome'
+        if: needs.route.outputs.browser == 'chrome'
         run: |
           set -euo pipefail
           if command -v google-chrome >/dev/null 2>&1; then
@@ -189,12 +198,12 @@ jobs:
           fi
 
       - name: Install Cypress binary
-        if: steps.route.outputs.profile == 'ui' && steps.cypress-cache.outputs.cache-hit != 'true'
+        if: needs.route.outputs.profile == 'ui' && steps.cypress-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @semianalysisai/inferencex-app exec cypress install
 
       - name: Start dev server
         id: devserver
-        if: steps.route.outputs.dev_server == 'true'
+        if: needs.route.outputs.dev_server == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -225,40 +234,22 @@ jobs:
           kill "$DEV_PID" 2>/dev/null || true
           exit 0
 
-      # Build the agent prompt + MCP/tool set from the router decision. One adaptive
-      # prompt: a dynamic routing header selects which profile rules apply; the browser
-      # MCP wired matches the decision (Playwright by default, Chrome on request).
+      # Build the agent prompt + MCP/tool set from the route decision. One adaptive prompt:
+      # a dynamic routing header selects which profile rules apply; the browser MCP wired
+      # matches the decision (Playwright by default, Chrome on request).
       - name: Compose prompt + tools
         id: compose
         env:
-          BROWSER: ${{ steps.route.outputs.browser }}
-          PROFILE: ${{ steps.route.outputs.profile }}
+          BROWSER: ${{ needs.route.outputs.browser }}
+          PROFILE: ${{ needs.route.outputs.profile }}
           DEV_SERVER_UP: ${{ steps.devserver.outputs.up }}
           DEV_SERVER_LOG: ${{ steps.devserver.outputs.log }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
         run: |
           set -euo pipefail
           BROWSER="${BROWSER:-none}"
           PROFILE="${PROFILE:-code}"
           DEV="${DEV_SERVER_UP:-not started}"
           LOG="${DEV_SERVER_LOG:-/tmp/next-dev.log}"
-
-          # Review profile: dedicated review prompt + narrow gh-only tools, no browser MCP.
-          # Shares .github/claude/review-prompt.md with the auto-on-PR review job below.
-          if [ "$PROFILE" = "review" ]; then
-            {
-              echo 'MCP_CONFIG={"mcpServers":{}}'
-              echo 'CLAUDE_TOOLS=mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)'
-            } >> "$GITHUB_ENV"
-            {
-              echo 'PROMPT_BODY<<__CLAUDE_PROMPT_EOF__'
-              printf 'REPO: %s\nPR NUMBER: %s\n\n' "${REPO:-}" "${PR_NUMBER:-}"
-              cat "${GITHUB_WORKSPACE}/.github/claude/review-prompt.md"
-              echo '__CLAUDE_PROMPT_EOF__'
-            } >> "$GITHUB_ENV"
-            exit 0
-          fi
 
           # Chrome is the only non-default MCP; everything else gets Playwright (wired even
           # for browser=none so the agent can install a browser on demand and drive it).
@@ -317,56 +308,165 @@ jobs:
 
           prompt: ${{ env.PROMPT_BODY }}
 
-  # Automatic review on PR open/sync/ready. Comment-triggered reviews (@claude review,
-  # or any review-phrased ask) are classified by the router in the implement job above
-  # and share this job's prompt (.github/claude/review-prompt.md). Review-only: narrow tools.
+  # Verifying, read-only review. Runs automatically on PR open/sync/ready, and on any
+  # review-phrased comment the router classifies as `review`. Checks out the PR, starts a
+  # local dev server, and drives Playwright on http://localhost:3000 to confirm the changed
+  # behavior actually works — plus the static diff review. Never pushes.
   review:
     name: Claude (review)
+    needs: route
     if: >-
-      github.event_name == 'pull_request'
+      !cancelled()
+      && (
+      (github.event_name == 'pull_request'
       && !github.event.pull_request.draft
-      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association)
+      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association))
+      ||
+      (needs.route.result == 'success'
+      && needs.route.outputs.profile == 'review'
+      && (github.event.issue.pull_request || github.event.pull_request)) )
     runs-on: ubuntu-latest
+    env:
+      DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+      DATABASE_DRIVER: neon
+      DATABASE_SSL: 'true'
     permissions:
       contents: read
       pull-requests: write
       actions: read
       id-token: write
-    # Same group as the implement job so a comment-triggered review and an auto-review
-    # on the same PR serialize instead of overlapping with duplicate feedback.
     concurrency:
       group: claude-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: false
+
     steps:
-      - name: Checkout repository
+      # Check out the PR's merged-with-base state — the same thing a pull_request run sees,
+      # resolved from the PR number for comment triggers too.
+      - name: Checkout PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
           fetch-depth: 0
 
-      # Same review prompt the router's `review` profile uses — single source of truth.
-      - name: Compose review prompt
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Restore Playwright cache
+        id: playwright-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Restore Cypress cache
+        id: cypress-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            cypress-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: npx -y playwright install --with-deps chromium
+
+      - name: Install Cypress binary
+        if: steps.cypress-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @semianalysisai/inferencex-app exec cypress install
+
+      - name: Start dev server
+        id: devserver
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          LOG=/tmp/next-dev.log
+          echo "log=$LOG" >> "$GITHUB_OUTPUT"
+
+          pnpm run dev > "$LOG" 2>&1 &
+          DEV_PID=$!
+          echo "pid=$DEV_PID" >> "$GITHUB_OUTPUT"
+
+          for i in {1..60}; do
+            if curl -sSf http://localhost:3000 >/dev/null; then
+              echo "Dev server is up"
+              echo "up=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if ! kill -0 "$DEV_PID" 2>/dev/null; then
+              echo "Dev server process exited early"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Dev server failed to start (best effort; continuing)."
+          echo "up=false" >> "$GITHUB_OUTPUT"
+          tail -n 200 "$LOG" || true
+          kill "$DEV_PID" 2>/dev/null || true
+          exit 0
+
+      - name: Compose review prompt + tools
+        id: compose
         env:
+          DEV_SERVER_UP: ${{ steps.devserver.outputs.up }}
+          DEV_SERVER_LOG: ${{ steps.devserver.outputs.log }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
         run: |
           set -euo pipefail
+          DEV="${DEV_SERVER_UP:-not started}"
+          LOG="${DEV_SERVER_LOG:-/tmp/next-dev.log}"
+
+          # Playwright MCP for runtime verification + fetch; gh + inline-comment for posting.
+          # No Write/Edit — a review must not modify the code; Bash runs the suite/dev server.
+          {
+            echo 'MCP_CONFIG={"mcpServers":{"fetch":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-fetch@latest"]},"playwright":{"command":"npx","args":["-y","@playwright/mcp@latest","--headless","--caps=vision"]}}}'
+            echo 'CLAUDE_TOOLS=Read,Glob,Grep,Bash,WebFetch,mcp__github__*,mcp__github_inline_comment__create_inline_comment,mcp__github_ci__*,mcp__fetch__*,mcp__playwright__*'
+          } >> "$GITHUB_ENV"
+
           {
             echo 'PROMPT_BODY<<__CLAUDE_PROMPT_EOF__'
-            printf 'REPO: %s\nPR NUMBER: %s\n\n' "${REPO:-}" "${PR_NUMBER:-}"
+            printf 'REPO: %s\nPR NUMBER: %s\ndev server: %s (log: %s)\n\n' "${REPO:-}" "${PR_NUMBER:-}" "$DEV" "$LOG"
             cat "${GITHUB_WORKSPACE}/.github/claude/review-prompt.md"
             echo '__CLAUDE_PROMPT_EOF__'
           } >> "$GITHUB_ENV"
 
-      - name: PR Review with Claude
+      - name: Run Claude Code
+        id: claude
         uses: anthropics/claude-code-action@d5726de019ec4498aa667642bc3a80fca83aa102 # v1.0.148
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASH_DEFAULT_TIMEOUT_MS: '1800000'
+          BASH_MAX_TIMEOUT_MS: '3600000'
+          DEV_SERVER_UP: ${{ steps.devserver.outputs.up }}
+          DEV_SERVER_PID: ${{ steps.devserver.outputs.pid }}
+          DEV_SERVER_LOG: ${{ steps.devserver.outputs.log }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           trigger_phrase: '@claude review'
           track_progress: true
           allowed_bots: ''
 
+          additional_permissions: |
+            actions: read
+
           claude_args: |
             --model "${{ env.CLAUDE_MODEL }}"
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --mcp-config '${{ env.MCP_CONFIG }}'
+            --allowedTools "${{ env.CLAUDE_TOOLS }}"
 
           prompt: ${{ env.PROMPT_BODY }}
