@@ -29,7 +29,14 @@ jobs:
       (github.event_name == 'issues'
       && (contains(github.event.issue.body || '', '@claude') || contains(github.event.issue.title || '', '@claude'))
       && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.issue.author_association))
+      ||
+      (github.event_name == 'pull_request'
+      && !github.event.pull_request.draft
+      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association))
     runs-on: ubuntu-latest
+    # No repo write/PR access needed — this job only calls the Anthropic API.
+    permissions:
+      contents: read
     outputs:
       profile: ${{ steps.route.outputs.profile }}
       browser: ${{ steps.route.outputs.browser }}
@@ -57,6 +64,13 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             echo "Routed: profile=$3 browser=$1 dev_server=$2 (source: $4)"
           }
+
+          # Automatic PR review: pull_request events carry no comment to classify, so they
+          # always route to the review job. (route runs here too — not just on comments — so
+          # the downstream review job gates on plain success(), never a skipped dependency.)
+          if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+            emit none false review "auto PR review"; exit 0
+          fi
 
           # 1. Explicit overrides — no API call.
           if printf '%s' "$TEXT" | grep -qi '@claude review'; then
@@ -315,16 +329,14 @@ jobs:
   review:
     name: Claude (review)
     needs: route
+    # route runs on every review-relevant event (incl. pull_request) and enforces the
+    # author/draft gate, so this is plain success()-gated: run when route said "review"
+    # and there's a PR to review.
     if: >-
-      !cancelled()
-      && (
-      (github.event_name == 'pull_request'
-      && !github.event.pull_request.draft
-      && contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR", "BOT"]'), github.event.pull_request.author_association))
-      ||
-      (needs.route.result == 'success'
-      && needs.route.outputs.profile == 'review'
-      && (github.event.issue.pull_request || github.event.pull_request)) )
+      needs.route.outputs.profile == 'review'
+      && (github.event_name == 'pull_request'
+      || github.event.issue.pull_request
+      || github.event.pull_request)
     runs-on: ubuntu-latest
     env:
       DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
@@ -347,6 +359,9 @@ jobs:
         with:
           ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
           fetch-depth: 0
+          # This is untrusted PR code that we then run; don't leave the token in .git/config
+          # for it to read. The agent uses GH_TOKEN/github_token, not git credentials.
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
