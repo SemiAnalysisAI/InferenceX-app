@@ -33,7 +33,7 @@ describe('buildCsv', () => {
   });
 
   it('inserts notes as comment lines between the preamble and the header', () => {
-    const note = 'WARNING: GB300 NVL72 (Dynamo TRT, MTP) — accuracy issues reported';
+    const note = 'WARNING: GB300 NVL72 (Dynamo TRTLLM, MTP) — accuracy issues reported';
     const result = buildCsv(['A'], [['1']], [note]);
     const lines = result.split('\n');
 

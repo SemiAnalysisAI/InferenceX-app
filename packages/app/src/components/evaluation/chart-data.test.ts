@@ -108,7 +108,7 @@ describe('buildEvaluationChartRows', () => {
       '2026-03-01',
     );
 
-    expect(result[0].configLabel).toBe('H200 (Dynamo TRT, MTP)\nFP4 C128 T8 E1');
+    expect(result[0].configLabel).toBe('H200 (Dynamo TRTLLM, MTP)\nFP4 C128 T8 E1');
   });
 
   it('renders DPA flags distinguishing prefill/decode sides', () => {
@@ -147,9 +147,9 @@ describe('buildEvaluationChartRows', () => {
 
     const labels = rows.map((r) => r.configLabel).toSorted();
     expect(labels).toEqual([
-      'H200 (Dynamo TRT)\nC128 P(8/1/T/0) D(8/1/F/0)',
-      'H200 (Dynamo TRT)\nC256 P(8/1/F/0) D(8/1/T/0)',
-      'H200 (Dynamo TRT)\nC512 P(8/1/T/0) D(8/1/T/0)',
+      'H200 (Dynamo TRTLLM)\nC128 P(8/1/T/0) D(8/1/F/0)',
+      'H200 (Dynamo TRTLLM)\nC256 P(8/1/F/0) D(8/1/T/0)',
+      'H200 (Dynamo TRTLLM)\nC512 P(8/1/T/0) D(8/1/T/0)',
       'H200 (SGLang)\nC128 T8 E1 DPA',
     ]);
   });
@@ -266,7 +266,7 @@ describe('buildEvalChangelogEntries', () => {
     expect(result).toEqual([
       {
         benchmark: 'gsm8k',
-        configs: ['H200 (Dynamo TRT)\nC128', 'H200 (SGLang)\nC64'],
+        configs: ['H200 (Dynamo TRTLLM)\nC128', 'H200 (SGLang)\nC64'],
       },
       {
         benchmark: 'mmlu',

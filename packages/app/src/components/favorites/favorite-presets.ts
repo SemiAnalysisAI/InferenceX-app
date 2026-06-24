@@ -198,7 +198,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   {
     id: 'gb200-vs-b200',
     title: 'GB200 NVL72 vs B200 — Multi vs Single Node',
-    description: 'GB200 NVL72 Dynamo TRT vs B200 Dynamo TRT on DeepSeek R1 (8k/1k) at FP4.',
+    description: 'GB200 NVL72 Dynamo TRTLLM vs B200 Dynamo TRTLLM on DeepSeek R1 (8k/1k) at FP4.',
     tags: ['DeepSeek', 'GB200', 'B200', 'Dynamo', 'FP4', 'NVL72'],
     category: 'comparison',
     config: {
@@ -214,7 +214,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     id: 'b200-vs-h200',
     title: 'B200 vs H200 — Blackwell vs Hopper',
     description:
-      'Blackwell B200 vs Hopper H200 Dynamo TRT throughput per GPU on DeepSeek R1 (8k/1k) at FP8.',
+      'Blackwell B200 vs Hopper H200 Dynamo TRTLLM throughput per GPU on DeepSeek R1 (8k/1k) at FP8.',
     tags: ['DeepSeek', 'B200', 'H200', 'Dynamo', 'FP8'],
     category: 'comparison',
     config: {
@@ -259,9 +259,9 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   // 5 — Disagg cross-vendor
   {
     id: 'disagg-b200-vs-mi355x',
-    title: 'Disagg B200 SGLang vs MI355X vs B200 TRT',
+    title: 'Disagg B200 SGLang vs MI355X vs B200 TRTLLM',
     description:
-      'Disaggregated B200 Dynamo SGLang vs MI355X MoRI SGLang vs B200 Dynamo TRT on DeepSeek R1 (8k/1k) at FP8.',
+      'Disaggregated B200 Dynamo SGLang vs MI355X MoRI SGLang vs B200 Dynamo TRTLLM on DeepSeek R1 (8k/1k) at FP8.',
     tags: ['DeepSeek', 'B200', 'MI355X', 'Dynamo', 'MoRI', 'FP8', 'Disagg'],
     category: 'comparison',
     config: {

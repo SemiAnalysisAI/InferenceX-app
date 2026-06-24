@@ -37,10 +37,10 @@ describe('formatConfigKeys', () => {
     expect(result).toContain('FP8');
   });
 
-  it('formats TRT framework', () => {
+  it('formats TRTLLM framework', () => {
     const result = formatConfigKeys('dsr1-fp4-b200-trt');
     expect(result).toContain('B200');
-    expect(result).toContain('TRT');
+    expect(result).toContain('TRTLLM');
     expect(result).toContain('FP4');
   });
 });

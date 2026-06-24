@@ -50,8 +50,8 @@ export function createMockHardwareConfig(): HardwareConfig {
     b200_trt: {
       name: 'b200-trt',
       label: 'B200',
-      suffix: '(TRT)',
-      gpu: "NVIDIA 'Blackwell' B200 TRT",
+      suffix: '(TRTLLM)',
+      gpu: "NVIDIA 'Blackwell' B200 TRTLLM",
     },
     mi300x: {
       name: 'mi300x',
@@ -105,7 +105,7 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
     x: 100,
     y: 45.2,
     hwKey: 'b200_trt',
-    hw: "NVIDIA 'Blackwell' B200 TRT",
+    hw: "NVIDIA 'Blackwell' B200 TRTLLM",
     model: Model.DeepSeek_R1,
     framework: 'trt',
     precision: Precision.FP4,
@@ -273,7 +273,7 @@ export function createMockEvaluationChartData(
     configId: 1,
     hwKey: 'b200_trt' as any,
     hardware: 'b200',
-    configLabel: 'B200 (TRT)',
+    configLabel: 'B200 (TRTLLM)',
     score: 87.5,
     scoreError: 1.2,
     minScore: 85,

@@ -49,7 +49,7 @@ const mockHardwareConfig: HardwareConfig = {
   b200: {
     name: 'b200',
     label: 'B200',
-    suffix: '(TRT)',
+    suffix: '(TRTLLM)',
     gpu: 'B200',
     color: 'blue',
     power: 1000,

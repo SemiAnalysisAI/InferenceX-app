@@ -738,7 +738,7 @@ function ThroughputCalculatorInner() {
                       >
                         <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
                           <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate cost per decode GPU or per prefill GPU,
+                          SGLang, Dynamo TRTLLM) calculate cost per decode GPU or per prefill GPU,
                           rather than per total GPU count. This makes direct cost comparison with
                           aggregated configs not an apples-to-apples comparison.
                         </p>
@@ -752,7 +752,7 @@ function ThroughputCalculatorInner() {
                       >
                         <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
                           <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI
-                          SGLang, Dynamo TRT) calculate throughput per decode GPU or per prefill
+                          SGLang, Dynamo TRTLLM) calculate throughput per decode GPU or per prefill
                           GPU, rather than per total GPU count. This makes direct throughput
                           comparison with aggregated configs not an apples-to-apples comparison.
                         </p>

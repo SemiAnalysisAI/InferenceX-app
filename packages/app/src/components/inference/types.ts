@@ -755,7 +755,7 @@ export interface TrackedConfig {
   precision: string;
   tp: number;
   conc: number;
-  /** Display label e.g. "B200 (TRT) — TP4 conc=8 FP4" */
+  /** Display label e.g. "B200 (TRTLLM) — TP4 conc=8 FP4" */
   label: string;
   /** Assigned color from d3.schemeTableau10 */
   color: string;

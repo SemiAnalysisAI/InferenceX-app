@@ -34,13 +34,13 @@ export const EMPTY_QUICK_FILTERS: QuickFilters = {
 
 /**
  * Serving-framework families surfaced as quick filters, in display order. Each
- * family groups its base + variant engines (e.g. TRT covers `trt`, `trtllm`,
+ * family groups its base + variant engines (e.g. TRTLLM covers `trt`, `trtllm`,
  * `dynamo-trt`). Labels render exactly as the GPUs/engines are branded.
  */
 export const FRAMEWORK_FAMILIES = [
   { key: 'vllm', label: 'vLLM' },
   { key: 'sglang', label: 'SGLang' },
-  { key: 'trt', label: 'TRT' },
+  { key: 'trt', label: 'TRTLLM' },
   { key: 'atom', label: 'ATOM' },
 ] as const;
 

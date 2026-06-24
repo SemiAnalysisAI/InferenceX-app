@@ -125,7 +125,7 @@ describe('getHardwareConfig', () => {
   it('handles GB200 NVL72 label vs gpu name divergence', () => {
     const config = getHardwareConfig('gb200_dynamo-trt');
     expect(config.label).toBe('GB200 NVL72');
-    expect(config.gpu).toBe("NVIDIA 'Blackwell' GB200 Dynamo TRT");
+    expect(config.gpu).toBe("NVIDIA 'Blackwell' GB200 Dynamo TRTLLM");
   });
 
   it('returns unknown config when base GPU is not recognised', () => {

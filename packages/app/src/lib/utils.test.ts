@@ -543,8 +543,8 @@ describe('filterRunsByModel', () => {
 // getFrameworkLabel
 // ===========================================================================
 describe('getFrameworkLabel', () => {
-  it('maps "trt" to "TRT"', () => {
-    expect(getFrameworkLabel('trt')).toBe('TRT');
+  it('maps "trt" to "TRTLLM"', () => {
+    expect(getFrameworkLabel('trt')).toBe('TRTLLM');
   });
 
   it('maps "vllm" to "vLLM"', () => {
@@ -559,12 +559,12 @@ describe('getFrameworkLabel', () => {
     expect(getFrameworkLabel('dynamo-sglang')).toBe('Dynamo SGLang');
   });
 
-  it('maps "dynamo-trtllm" to "Dynamo TRT"', () => {
-    expect(getFrameworkLabel('dynamo-trtllm')).toBe('Dynamo TRT');
+  it('maps "dynamo-trtllm" to "Dynamo TRTLLM"', () => {
+    expect(getFrameworkLabel('dynamo-trtllm')).toBe('Dynamo TRTLLM');
   });
 
-  it('maps "dynamo-trt" to "Dynamo TRT"', () => {
-    expect(getFrameworkLabel('dynamo-trt')).toBe('Dynamo TRT');
+  it('maps "dynamo-trt" to "Dynamo TRTLLM"', () => {
+    expect(getFrameworkLabel('dynamo-trt')).toBe('Dynamo TRTLLM');
   });
 
   it('maps "mori-sglang" to "MoRI SGLang"', () => {
@@ -618,9 +618,9 @@ describe('getHardwareLabel', () => {
     expect(getHardwareLabel(entry)).toBe('H100');
   });
 
-  it('appends framework suffix (TRT)', () => {
+  it('appends framework suffix (TRTLLM)', () => {
     const entry = aggEntry({ hw: 'h100', framework: 'trt' });
-    expect(getHardwareLabel(entry)).toBe('H100 (TRT)');
+    expect(getHardwareLabel(entry)).toBe('H100 (TRTLLM)');
   });
 
   it('appends framework suffix (vLLM)', () => {
@@ -634,7 +634,7 @@ describe('getHardwareLabel', () => {
 
   it('appends framework and mtp suffixes together', () => {
     const entry = aggEntry({ hw: 'h100', framework: 'trt', mtp: 'on' });
-    expect(getHardwareLabel(entry)).toBe('H100 (TRT, MTP)');
+    expect(getHardwareLabel(entry)).toBe('H100 (TRTLLM, MTP)');
   });
 
   it('appends spec_decoding suffix when not "none"', () => {
@@ -659,12 +659,12 @@ describe('getHardwareLabel', () => {
 
   it('handles all suffixes combined', () => {
     const entry = aggEntry({ hw: 'b200', framework: 'trt', mtp: 'on', spec_decoding: 'eagle' });
-    expect(getHardwareLabel(entry)).toBe('B200 (TRT, MTP, EAGLE)');
+    expect(getHardwareLabel(entry)).toBe('B200 (TRTLLM, MTP, EAGLE)');
   });
 
   it('combines framework and spec_decoding in suffix', () => {
     const entry = aggEntry({ hw: 'h100', framework: 'trt', spec_decoding: 'eagle' });
-    expect(getHardwareLabel(entry)).toBe('H100 (TRT, EAGLE)');
+    expect(getHardwareLabel(entry)).toBe('H100 (TRTLLM, EAGLE)');
   });
 
   it('uppercases the base hw part (b200-nvl)', () => {
@@ -693,8 +693,8 @@ describe('getDisplayLabel', () => {
   });
 
   it('combines label with complex suffix', () => {
-    expect(getDisplayLabel({ label: 'B200', suffix: '(Dynamo TRT, MTP)' })).toBe(
-      'B200 (Dynamo TRT, MTP)',
+    expect(getDisplayLabel({ label: 'B200', suffix: '(Dynamo TRTLLM, MTP)' })).toBe(
+      'B200 (Dynamo TRTLLM, MTP)',
     );
   });
 });

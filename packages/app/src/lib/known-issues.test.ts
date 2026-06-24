@@ -174,8 +174,8 @@ describe('matchKnownConfigIssues', () => {
 
 describe('knownIssueCsvNote', () => {
   it('includes the config label, filing date, issue ref, and URL', () => {
-    const note = knownIssueCsvNote(gb300Issue, 'GB300 NVL72 (Dynamo TRT, MTP)');
-    expect(note).toContain('WARNING: GB300 NVL72 (Dynamo TRT, MTP)');
+    const note = knownIssueCsvNote(gb300Issue, 'GB300 NVL72 (Dynamo TRTLLM, MTP)');
+    expect(note).toContain('WARNING: GB300 NVL72 (Dynamo TRTLLM, MTP)');
     expect(note).toContain('filed since Apr 21, 2026');
     expect(note).toContain('NVIDIA/srt-slurm#51');
     expect(note).toContain('https://github.com/NVIDIA/srt-slurm/issues/51');

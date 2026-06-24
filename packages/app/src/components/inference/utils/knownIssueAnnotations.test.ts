@@ -15,7 +15,7 @@ let defs: d3.Selection<SVGDefsElement, unknown, null, undefined>;
 
 const gb300Annotation: KnownIssueAnnotation = {
   issue: KNOWN_CONFIG_ISSUES[0],
-  label: 'GB300 NVL72 (Dynamo TRT, MTP)',
+  label: 'GB300 NVL72 (Dynamo TRTLLM, MTP)',
   color: 'rgb(118, 185, 0)',
   points: [
     { x: 100, y: 300 },
@@ -70,7 +70,7 @@ describe('renderKnownIssueAnnotations', () => {
 
     expect(boxes[0].getAttribute('href')).toBe('https://github.com/NVIDIA/srt-slurm/issues/51');
     expect(boxes[0].getAttribute('target')).toBe('_blank');
-    expect(boxes[0].textContent).toContain('GB300 NVL72 (Dynamo TRT, MTP)');
+    expect(boxes[0].textContent).toContain('GB300 NVL72 (Dynamo TRTLLM, MTP)');
     expect(boxes[0].textContent).toContain('Accuracy issues — filed since Apr 21, 2026');
     expect(boxes[0].textContent).toContain('NVIDIA/srt-slurm#51');
 

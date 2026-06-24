@@ -297,7 +297,7 @@ export function CurrentImageContent() {
               <LabelWithTooltip
                 htmlFor="image-node-type-select"
                 label="Node Type"
-                tooltip="Single node = vLLM/SGLang/TRT. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools."
+                tooltip="Single node = vLLM/SGLang/TRTLLM. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools."
               />
               <Select
                 value={selectedNodeType}

@@ -12,7 +12,7 @@ import type { KnownConfigIssue } from '@/lib/known-issues';
 
 export interface KnownIssueAnnotation {
   issue: KnownConfigIssue;
-  /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRT, MTP)" */
+  /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRTLLM, MTP)" */
   label: string;
   /** Resolved stroke color of the affected series */
   color: string;

@@ -41,7 +41,7 @@ describe('EvalBarChartD3', () => {
   it('renders SVG with chart elements when data is provided', () => {
     const mockData = [
       createMockEvaluationChartData({
-        configLabel: 'B200 (TRT)\nTP8 FP4',
+        configLabel: 'B200 (TRTLLM)\nTP8 FP4',
         hwKey: 'b200_trt' as any,
         score: 0.875,
         scoreError: 0.012,
@@ -87,7 +87,7 @@ describe('EvalBarChartD3', () => {
   it('renders legend items for each configuration', () => {
     const mockData = [
       createMockEvaluationChartData({
-        configLabel: 'B200 (TRT)\nTP8 FP4',
+        configLabel: 'B200 (TRTLLM)\nTP8 FP4',
         hwKey: 'b200_trt' as any,
       }),
       createMockEvaluationChartData({

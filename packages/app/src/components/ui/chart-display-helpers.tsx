@@ -66,7 +66,7 @@ function DisaggCaveat({
     >
       <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
         <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo
-        TRT) calculate {calculationNoun} per decode GPU or per prefill GPU, rather than per total
+        TRTLLM) calculate {calculationNoun} per decode GPU or per prefill GPU, rather than per total
         GPU count. This makes direct {comparisonNoun} comparison with aggregated configs not an
         apples-to-apples comparison.
       </p>
