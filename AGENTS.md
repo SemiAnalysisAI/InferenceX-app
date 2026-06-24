@@ -262,10 +262,14 @@ Detailed design rationale (the "why" and "how", not the "what") lives in [docs/]
 
 ### `@claude` (`.github/workflows/claude.yml`)
 
-All Claude AI workflows are dispatched from the trigger word `@claude` in an issue or comment. There are two jobs: **implement** (`@claude …`) and **review** (`@claude review`).
+Any `@claude` mention in an issue or comment goes to the **implement** job, where a lightweight Haiku **router** reads the request and provisions only what it needs, then runs the matching prompt. A second **review** job exists solely for the automatic review on PR open/sync (no comment to route).
 
-- `@claude <anything>` — implementation. A lightweight Haiku **router** reads the request and provisions only what it needs, then a single adaptive agent runs. The router picks a **profile** (`ui` / `code` / `docs` / `question`) and a browser (`playwright` / `chrome` / `none`); the dev server, Playwright browser, and Cypress binary are installed **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast and skip the UI-verification ceremony. The agent prompt scopes its definition-of-done to the profile (UI work still must render real data — no "No data available" — verify the `?unofficialrun=` overlay path, add `track()` + tests, and pass `pnpm test:e2e`). Creates `claude/issue-{N}-*` branches.
-  - **Explicit overrides** (skip the router): `@claude chrome <task>` forces the Chrome DevTools MCP (deeper network/console/JS debugging); `@claude frontend <task>` forces the full Playwright + dev-server UI environment; `@claude general <task>` (or `lite`) forces the lean no-browser path. If the router ever guesses wrong, re-run with the override.
-- `@claude review` — code review only. Also auto-runs on PR open/sync. Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs.
+- `@claude <anything>` — the router picks a **profile** (`ui` / `code` / `docs` / `question` / `review`) and a browser (`playwright` / `chrome` / `none`). The dev server, Playwright browser, and Cypress binary install **on demand** only for browser/UI work, so docs/DB/backend/question/review tasks stay fast and skip the UI-verification ceremony.
+  - `ui` — full browser verification: render real data (no "No data available"), check the `?unofficialrun=` overlay path, add `track()` + tests, pass `pnpm test:e2e`.
+  - `code` / `docs` / `question` — scoped checks only (no browser/e2e unless the change turns out to be user-visible).
+  - `review` — uses the shared review prompt (`.github/claude/review-prompt.md`) + the narrow review toolset (inline comments + `gh pr` commands), no app build. So a review-phrased ask in **any** wording (e.g. "@claude take a look at this PR") gets the real review behavior, not just the exact phrase `@claude review`.
+  - Implementation tasks create `claude/issue-{N}-*` branches.
+  - **Explicit overrides** (skip the classifier): `@claude review` → review; `@claude chrome` → Chrome DevTools MCP; `@claude frontend` → full Playwright + dev server; `@claude general` (or `lite`) → lean no-browser. If the router guesses wrong, re-run with the override.
+- **Auto-review** runs on every PR open/sync/ready (the `review` job). Flags: bugs, security, breaking changes, missing tests (🔴 BLOCKING), low-quality tests (🔴 BLOCKING). Ignores: style, naming, docs. It shares the same prompt file as the router's `review` profile.
 
 The model is set once via the workflow-level `CLAUDE_MODEL` env (`claude-opus-4-8`); the router uses `CLAUDE_ROUTER_MODEL` (`claude-haiku-4-5`).
