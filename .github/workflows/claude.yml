@@ -51,6 +51,7 @@ jobs:
           ROUTER_MODEL: ${{ env.CLAUDE_ROUTER_MODEL }}
           BODY: ${{ github.event.comment.body || github.event.issue.body || '' }}
           TITLE: ${{ github.event.issue.title || '' }}
+          IS_PR: ${{ github.event_name == 'pull_request' || github.event.issue.pull_request != null || github.event.pull_request != null }}
         run: |
           set -euo pipefail
 
@@ -74,7 +75,12 @@ jobs:
 
           # 1. Explicit overrides — no API call.
           if printf '%s' "$TEXT" | grep -qi '@claude review'; then
-            emit none false review "explicit @claude review"; exit 0
+            if [ "${IS_PR:-false}" = "true" ]; then
+              emit none false review "explicit @claude review"
+            else
+              emit none false question "review requested with no PR context — answering instead"
+            fi
+            exit 0
           fi
           if printf '%s' "$TEXT" | grep -qi '@claude chrome'; then
             emit chrome true ui "explicit @claude chrome"; exit 0
@@ -111,6 +117,9 @@ jobs:
           BROWSER="$(printf '%s' "$CLEAN" | jq -r '.browser // empty' 2>/dev/null || true)"
 
           case "$PROFILE" in ui|code|docs|question|review) ;; *) PROFILE=code ;; esac
+          # A review needs a PR to review; if the classifier picked review on a non-PR
+          # issue, answer the request instead so the implement job still responds.
+          if [ "$PROFILE" = "review" ] && [ "${IS_PR:-false}" != "true" ]; then PROFILE=question; fi
           case "$BROWSER" in playwright|chrome|none) ;; *) BROWSER=none ;; esac
           # Keep browser coherent with profile so the provisioned setup matches the prompt's
           # definition-of-done. A ui task must get a browser (default Playwright if the
