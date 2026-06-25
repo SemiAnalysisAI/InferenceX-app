@@ -111,27 +111,43 @@ describe('Landing page performance', () => {
 
   it('preloads only the default font and initially visible supporter logo', () => {
     cy.request('/').then((response) => {
-      // Next emits resource preloads as a `Link` response header when `/` renders
-      // dynamically (the dev server), but inlines them as <link rel="preload">
-      // tags in the document <head> when `/` is statically prerendered — which is
-      // how CI builds the page (`pnpm build` with E2E_FIXTURES=1). Collect from
-      // whichever source is present so the assertion holds in both render modes.
+      // Next emits resource preloads as a `Link` response header (when `/` renders
+      // dynamically) and/or as inlined <link rel="preload"> tags in the document
+      // <head> (when `/` is statically prerendered) — and a production build can
+      // surface the same resource in BOTH places at once. Collect a deduplicated
+      // set of preloaded URLs per `as` type, keyed by URL, so the assertion holds
+      // in every render mode and never double-counts a resource listed twice.
       const linkHeader = String(response.headers.link ?? '');
       const body = String(response.body ?? '');
-      const bodyPreloads = body.match(/<link\b[^>]*\brel="preload"[^>]*>/gu) ?? [];
 
-      const fontPreloads = [
-        ...(linkHeader.match(/rel=preload; as="font"/gu) ?? []),
-        ...bodyPreloads.filter((tag) => /\bas="font"/u.test(tag)),
-      ];
-      const logoPreloads = [
-        ...(linkHeader.match(/<\/logos\/[^>]+>; rel=preload; as="image"/gu) ?? []),
-        ...bodyPreloads.filter((tag) => /\bas="image"/u.test(tag) && /href="\/logos\//u.test(tag)),
-      ];
+      const fonts = new Set<string>();
+      const logos = new Set<string>();
+      const add = (as: string | undefined, url: string | undefined) => {
+        if (!url) return;
+        if (as === 'font') fonts.add(url);
+        else if (as === 'image' && url.startsWith('/logos/')) logos.add(url);
+      };
 
-      expect(fontPreloads).to.have.length(1);
-      expect(logoPreloads).to.have.length(1);
-      expect(`${linkHeader}${body}`).to.contain('/logos/openai.svg');
+      // `Link` header entries: <url>; rel=preload; as="font"|"image"; ...
+      for (const entry of linkHeader.split(',')) {
+        if (!/\brel=preload\b/u.test(entry)) continue;
+        add(
+          entry.match(/\bas="(?<as>[^"]+)"/u)?.groups?.as,
+          entry.match(/<(?<url>[^>]+)>/u)?.groups?.url,
+        );
+      }
+
+      // Inlined <link rel="preload"> tags.
+      for (const tag of body.match(/<link\b[^>]*\brel="preload"[^>]*>/gu) ?? []) {
+        add(
+          tag.match(/\bas="(?<as>[^"]+)"/u)?.groups?.as,
+          tag.match(/\bhref="(?<href>[^"]+)"/u)?.groups?.href,
+        );
+      }
+
+      expect([...fonts]).to.have.length(1);
+      expect([...logos]).to.have.length(1);
+      expect([...logos][0]).to.eq('/logos/openai.svg');
     });
   });
 
