@@ -43,6 +43,7 @@ const monocraft = localFont({
   src: './fonts/Monocraft.woff2',
   variable: '--font-minecraft',
   display: 'swap',
+  preload: false,
 });
 
 export const metadata: Metadata = {

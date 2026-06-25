@@ -100,4 +100,28 @@ describe('Landing page performance', () => {
       expect(loadedPattern).to.eq(false);
     });
   });
+
+  it('loads Minecraft assets only after the theme is activated', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'dark');
+        win.localStorage.setItem('minecraft-music', 'false');
+      },
+    });
+
+    cy.get('html').should('have.class', 'dark');
+    cy.window().then((win) => {
+      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
+      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
+      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
+    });
+
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('html').should('have.class', 'minecraft');
+    cy.window().should((win) => {
+      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
+      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(true);
+      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(true);
+    });
+  });
 });
