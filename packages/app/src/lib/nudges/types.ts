@@ -123,6 +123,11 @@ export interface NudgeDefinition {
   priority: number;
   /** Which NudgeEngine instance manages this nudge. */
   scope: 'dashboard' | 'landing' | 'evaluation';
+  /**
+   * Render an immediate banner in the server response so hydration cannot
+   * insert it above existing content and cause a layout shift.
+   */
+  renderOnInitialLoad?: boolean;
 
   // Scheduling (time-bound campaigns)
   schedule?: {

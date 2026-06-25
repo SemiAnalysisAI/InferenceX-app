@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
 import { FEEDBACK_SUBMITTED_EVENT } from '@/components/feedback-modal';
+import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
 // Keep the ~210-line FeedbackForm out of the landing/dashboard initial JS.
 const FeedbackForm = dynamic(
@@ -298,9 +299,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
-    storageKey: 'inferencex-minimax-m3-banner-dismissed',
+    storageKey: LANDING_BANNER_STORAGE_KEY,
     priority: 60,
     scope: 'landing',
+    renderOnInitialLoad: true,
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',

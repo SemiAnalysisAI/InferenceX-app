@@ -79,4 +79,18 @@ describe('NUDGE_REGISTRY integrity', () => {
       expect(nudge.content.testId).toBeTruthy();
     }
   });
+
+  it('only server-renders deterministic immediate banners', () => {
+    const initialNudges = NUDGE_REGISTRY.filter((nudge) => nudge.renderOnInitialLoad);
+
+    expect(initialNudges).toHaveLength(1);
+    for (const nudge of initialNudges) {
+      const triggers = Array.isArray(nudge.trigger) ? nudge.trigger : [nudge.trigger];
+      expect(nudge.type).toBe('banner');
+      expect(triggers.some((trigger) => trigger.type === 'immediate')).toBe(true);
+      expect(nudge.conditions).toBeUndefined();
+      expect(nudge.permanentSuppressKey).toBeUndefined();
+      expect(nudge.schedule).toBeUndefined();
+    }
+  });
 });

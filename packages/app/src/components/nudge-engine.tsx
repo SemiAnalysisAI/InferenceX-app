@@ -14,6 +14,7 @@ import {
 import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
 import type { NudgeDefinition, NudgeTrigger } from '@/lib/nudges/types';
+import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { Button } from '@/components/ui/button';
 
@@ -53,7 +54,17 @@ interface NudgeEngineProps {
 export function NudgeEngine({ scope }: NudgeEngineProps) {
   const scopeNudges = useMemo(() => NUDGE_REGISTRY.filter((n) => n.scope === scope), [scope]);
 
-  const [activeBannerId, setActiveBannerId] = useState<string | null>(null);
+  const [activeBannerId, setActiveBannerId] = useState<string | null>(() => {
+    const initialBanner = scopeNudges
+      .filter((nudge) => {
+        if (nudge.type !== 'banner' || !nudge.renderOnInitialLoad) return false;
+        if (!isWithinSchedule(nudge.schedule)) return false;
+        const triggers = Array.isArray(nudge.trigger) ? nudge.trigger : [nudge.trigger];
+        return triggers.some((trigger) => trigger.type === 'immediate');
+      })
+      .toSorted((a, b) => b.priority - a.priority)[0];
+    return initialBanner?.id ?? null;
+  });
   const [activeOverlayId, setActiveOverlayId] = useState<string | null>(null);
   const bannerShownRef = useRef(false);
   const overlayShownRef = useRef(false);
@@ -86,6 +97,9 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (!activeBanner) return;
     trackNudgeEvent(activeBanner, 'dismissed');
     markDismissed(activeBanner.storageKey, activeBanner.dismissal);
+    if (activeBanner.renderOnInitialLoad) {
+      document.documentElement.setAttribute(LANDING_BANNER_DISMISSED_ATTRIBUTE, '');
+    }
     sessionDismissedRef.current.add(activeBanner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
@@ -109,6 +123,9 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     // `bannerShownRef`/`activeBannerId` set — the slot is still occupied.
     if (!dismissesOnAction(activeBanner)) return;
     markDismissed(activeBanner.storageKey, activeBanner.dismissal);
+    if (activeBanner.renderOnInitialLoad) {
+      document.documentElement.setAttribute(LANDING_BANNER_DISMISSED_ATTRIBUTE, '');
+    }
     sessionDismissedRef.current.add(activeBanner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
@@ -137,6 +154,12 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   // -------------------------------------------------------------------------
 
   useEffect(() => {
+    if (activeBanner && !isEligible(activeBanner)) {
+      setActiveBannerId(null);
+      bannerShownRef.current = false;
+      return;
+    }
+
     const cleanups: (() => void)[] = [];
     const sorted = [...scopeNudges].toSorted((a, b) => b.priority - a.priority);
 
@@ -462,7 +485,10 @@ function BannerRenderer({
   };
 
   return (
-    <section className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4">
+    <section
+      className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4"
+      data-initial-banner={def.renderOnInitialLoad ? '' : undefined}
+    >
       <a
         href={content.href ?? '#'}
         onClick={handleClick}
