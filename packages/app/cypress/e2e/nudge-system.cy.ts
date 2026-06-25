@@ -48,7 +48,9 @@ describe('Landing nudges — modals', () => {
     });
     // Banner (inline) and modal (overlay) occupy independent slots
     cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.get('[data-testid="launch-modal"]')
+      .should('be.visible')
+      .and('match', 'div[role="dialog"][aria-modal="false"]');
     // Only one overlay at a time — star modal should not appear
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
   });

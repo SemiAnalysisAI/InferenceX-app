@@ -358,7 +358,7 @@ function ModalRenderer({
   const centered = content.centered;
 
   const dialog = (
-    <aside
+    <div
       data-testid={content.testId}
       role="dialog"
       aria-modal={centered ? 'true' : 'false'}
@@ -417,7 +417,7 @@ function ModalRenderer({
           </div>
         </div>
       )}
-    </aside>
+    </div>
   );
 
   if (centered) {

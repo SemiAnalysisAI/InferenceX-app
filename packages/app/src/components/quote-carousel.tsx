@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -30,15 +30,6 @@ export interface QuoteCarouselProps {
   intervalMs?: number;
 }
 
-function shuffleArray<T>(arr: T[]): T[] {
-  const shuffled = [...arr];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 interface CompanyEntry {
   org: string;
   quote: CarouselQuote;
@@ -53,17 +44,17 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   }
   const entries = [...byCompany.entries()].map(([org, pool]) => ({
     org,
-    quote: pool[Math.floor(Math.random() * pool.length)],
+    quote: pool[0],
   }));
   if (order?.length) {
     const orderSet = new Set(order);
     const pinned = order
       .map((c) => entries.find((e) => e.org === c))
       .filter(Boolean) as CompanyEntry[];
-    const rest = shuffleArray(entries.filter((e) => !orderSet.has(e.org)));
+    const rest = entries.filter((e) => !orderSet.has(e.org));
     return [...pinned, ...rest];
   }
-  return shuffleArray(entries);
+  return entries;
 }
 
 function QuoteBlock({ quote }: { quote: CarouselQuote }) {
@@ -104,17 +95,13 @@ export function QuoteCarousel({
 }: QuoteCarouselProps) {
   const { order, labels = {} } = overrides;
 
-  const [entries, setEntries] = useState<CompanyEntry[]>([]);
+  // Keep the first render deterministic so SSR reserves the carousel's full height before hydration.
+  const entries = useMemo(() => buildCompanyQuotes(quotes, order), [quotes, order]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hovering = useRef(false);
-
-  // Build shuffled org order on mount (client only)
-  useEffect(() => {
-    setEntries(buildCompanyQuotes(quotes, order));
-  }, [quotes, order]);
 
   const advance = useCallback(() => {
     if (hovering.current) return;
@@ -155,8 +142,6 @@ export function QuoteCarousel({
     },
     [advance, intervalMs, entries, activeIndex],
   );
-
-  if (entries.length === 0) return null;
 
   return (
     <div
