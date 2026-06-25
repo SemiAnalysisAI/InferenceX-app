@@ -35,7 +35,7 @@ import {
 
 const dm_sans = DM_Sans({
   subsets: ['latin'],
-  display: 'swap',
+  display: 'optional',
   variable: '--font-dm-sans',
 });
 
@@ -43,6 +43,7 @@ const monocraft = localFont({
   src: './fonts/Monocraft.woff2',
   variable: '--font-minecraft',
   display: 'swap',
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -192,8 +193,6 @@ export default async function RootLayout({
           fetchPriority="high"
           media="(min-width: 640px)"
         />
-        <link rel="preconnect" href="https://us-assets.i.posthog.com" />
-        <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
       </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <style

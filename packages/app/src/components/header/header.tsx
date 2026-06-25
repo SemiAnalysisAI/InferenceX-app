@@ -112,7 +112,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 width={64}
                 height={27}
                 className="inline h-auto lg:w-20"
-                priority
               />
             </span>
           </Link>

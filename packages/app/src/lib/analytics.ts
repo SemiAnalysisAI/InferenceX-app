@@ -1,19 +1,31 @@
+interface AnalyticsClient {
+  capture: (eventName: string, properties?: Record<string, unknown>) => void;
+}
+
+interface PendingEvent {
+  eventName: string;
+  properties?: Record<string, unknown>;
+}
+
+const pendingEvents: PendingEvent[] = [];
+let analyticsClient: AnalyticsClient | null = null;
+
+export function registerAnalyticsClient(client: AnalyticsClient): void {
+  analyticsClient = client;
+  for (const event of pendingEvents.splice(0)) {
+    client.capture(event.eventName, event.properties);
+  }
+}
+
 /**
- * Track an analytics event via PostHog.
- * Drop-in replacement for the old `import { track } from '@vercel/analytics'`.
- *
- * PostHog is lazy-loaded — the first call triggers the dynamic import,
- * subsequent calls resolve instantly from the module cache.
- *
- * @param eventName - Event name following [section]_[action] convention
- * @param properties - Optional event properties
+ * Track an analytics event via PostHog. Events emitted before PostHog finishes
+ * its deferred initialization are queued and flushed in order.
  */
 export function track(eventName: string, properties?: Record<string, unknown>): void {
-  if (typeof window !== 'undefined') {
-    import('posthog-js')
-      .then(({ default: posthog }) => {
-        posthog.capture(eventName, properties);
-      })
-      .catch(() => {});
+  if (typeof window === 'undefined') return;
+  if (analyticsClient) {
+    analyticsClient.capture(eventName, properties);
+    return;
   }
+  pendingEvents.push({ eventName, properties });
 }

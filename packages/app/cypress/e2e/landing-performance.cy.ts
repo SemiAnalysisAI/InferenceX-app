@@ -94,10 +94,45 @@ describe('Landing page performance', () => {
 
     cy.get('.circuit-bg').should('have.css', 'display', 'none');
     cy.window().then((win) => {
-      const loadedPattern = win.performance
-        .getEntriesByType('resource')
-        .some((entry) => entry.name.includes('/brand/left-pattern-full.svg'));
-      expect(loadedPattern).to.eq(false);
+      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
+      expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
+        false,
+      );
+      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
+      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
+      expect(resourceNames.some((name) => name.includes('/logos/huggingface.svg'))).to.eq(false);
+      expect(
+        resourceNames.some(
+          (name) => name.includes('/brand/logo-color.webp') && name.includes('w=128'),
+        ),
+      ).to.eq(false);
+    });
+  });
+
+  it('preloads only the default font and initially visible supporter logo', () => {
+    cy.request('/').then((response) => {
+      const linkHeader = String(response.headers.link ?? '');
+      const fontPreloads = linkHeader.match(/rel=preload; as="font"/gu) ?? [];
+      const logoPreloads = linkHeader.match(/<\/logos\/[^>]+>; rel=preload; as="image"/gu) ?? [];
+      expect(fontPreloads).to.have.length(1);
+      expect(logoPreloads).to.have.length(1);
+      expect(linkHeader).to.contain('</logos/openai.svg>; rel=preload; as="image"');
+    });
+  });
+
+  it('loads Minecraft assets after the theme is activated', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'dark');
+        win.localStorage.setItem('minecraft-music', 'false');
+      },
+    });
+
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('html').should('have.class', 'minecraft');
+    cy.window().should((win) => {
+      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
+      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(true);
     });
   });
 });

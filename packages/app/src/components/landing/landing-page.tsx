@@ -1,28 +1,17 @@
-'use client';
-
 import { ArrowRight, BarChart3, ShieldCheck, Sparkles } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { IntroSection } from '@/components/intro-section';
+import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
-import { track } from '@/lib/analytics';
-import { navigateInApp } from '@/lib/client-navigation';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
 export function LandingPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    track('landing_page_viewed');
-  }, []);
-
   return (
     <main className="relative">
+      <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
         <IntroSection />
@@ -44,17 +33,15 @@ export function LandingPage() {
               gpt-oss, Llama, Qwen, and other models.
             </p>
             <div className="mt-auto">
-              <Link
+              <LandingTrackedLink
                 href="/inference"
-                onClick={(e) => {
-                  track('landing_full_dashboard_clicked');
-                  navigateInApp(e, router, '/inference');
-                }}
+                analyticsEvent="landing_full_dashboard_clicked"
+                appNavigation
                 className="inline-flex items-center justify-center gap-2 rounded-md text-sm sm:text-base font-medium h-12 px-8 bg-brand text-primary-foreground hover:bg-brand/90 transition-colors"
               >
                 Open Dashboard
                 <ArrowRight className="size-4" />
-              </Link>
+              </LandingTrackedLink>
             </div>
           </Card>
 
@@ -102,35 +89,33 @@ export function LandingPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3 text-sm">
-              <Link
+              <LandingTrackedLink
                 href="/submissions"
                 data-testid="landing-submissions-link"
-                onClick={(e) => {
-                  track('landing_submissions_clicked');
-                  navigateInApp(e, router, '/submissions');
-                }}
+                analyticsEvent="landing_submissions_clicked"
+                appNavigation
                 className="inline-flex items-center gap-1.5 rounded-md bg-brand text-primary-foreground hover:bg-brand/90 px-3 py-1.5 transition-colors font-medium"
               >
                 Browse submissions
                 <ArrowRight className="size-3.5" />
-              </Link>
-              <a
+              </LandingTrackedLink>
+              <LandingTrackedLink
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => track('landing_reproducibility_actions_clicked')}
+                analyticsEvent="landing_reproducibility_actions_clicked"
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
                 View benchmark runs on GitHub Actions
                 <ArrowRight className="size-3.5" />
-              </a>
-              <Link
+              </LandingTrackedLink>
+              <LandingTrackedLink
                 href="/about#reproducibility"
-                onClick={() => track('landing_reproducibility_about_clicked')}
+                analyticsEvent="landing_reproducibility_about_clicked"
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
                 How it works
-              </Link>
+              </LandingTrackedLink>
             </div>
           </Card>
 

@@ -57,14 +57,18 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   return entries;
 }
 
-function QuoteBlock({ quote }: { quote: CarouselQuote }) {
+function QuoteBlock({ quote, renderLogo }: { quote: CarouselQuote; renderLogo: boolean }) {
   return (
     <blockquote className="w-full">
       <p className="text-sm lg:text-base leading-relaxed text-muted-foreground italic">
         &ldquo;{highlightBrand(quote.text)}&rdquo;
       </p>
       <footer className="mt-3 flex items-center gap-3">
-        <CompanyLogo org={quote.org} logo={quote.logo} />
+        {renderLogo ? (
+          <CompanyLogo org={quote.org} logo={quote.logo} />
+        ) : (
+          <div aria-hidden="true" className="size-10 shrink-0" />
+        )}
         <div className="h-12 w-0.5 bg-brand" />
         <div className="text-sm">
           {quote.link ? (
@@ -183,7 +187,7 @@ export function QuoteCarousel({
               }`}
               aria-hidden={!isActive}
             >
-              <QuoteBlock quote={e.quote} />
+              <QuoteBlock quote={e.quote} renderLogo={isActive} />
             </div>
           );
         })}
@@ -193,6 +197,7 @@ export function QuoteCarousel({
         <div className="flex justify-end" data-testid="quote-carousel-more-row">
           <Link
             href={moreHref}
+            prefetch={false}
             className="text-xs font-bold text-brand hover:underline"
             onClick={() => track('quote_carousel_see_more_clicked')}
           >
