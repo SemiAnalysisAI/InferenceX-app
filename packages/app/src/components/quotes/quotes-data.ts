@@ -341,6 +341,14 @@ export const QUOTES: Quote[] = [
     logo: 'embeddedllm.webp',
     link: 'https://www.linkedin.com/in/tanpinsiang',
   },
+  {
+    text: "Vendor-neutral, continuously updated benchmarking is essential as models and inference stacks co-evolve. MiniMax M3 was built with both frontier capability and real-world deployment efficiency in mind, and the day-one vLLM support from the community reflects the collaborative spirit we're proud to be part of. InferenceX provides the kind of transparent, reproducible data the ecosystem needs.",
+    name: 'Ryan Lee',
+    title: 'Head of DevRel, MiniMax',
+    org: 'MiniMax',
+    logo: 'minimax.svg',
+    link: 'https://x.com/RyanLeeMiniMax',
+  },
 ];
 
 /** Orgs featured in the landing page carousel. */
@@ -367,6 +375,7 @@ export const CAROUSEL_ORGS = [
   'UC San Diego',
   'Red Hat',
   'White House',
+  'MiniMax',
 ] as const;
 
 /** Display label overrides for carousel orgs. */
