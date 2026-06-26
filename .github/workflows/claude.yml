@@ -37,6 +37,11 @@ jobs:
     # No repo write/PR access needed — this job only calls the Anthropic API.
     permissions:
       contents: read
+    # Latest event wins: cancel an in-flight route for the same PR/issue when a newer
+    # event arrives, so rapid pushes don't fan out into parallel downstream reviews.
+    concurrency:
+      group: claude-route-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
     outputs:
       profile: ${{ steps.route.outputs.profile }}
       browser: ${{ steps.route.outputs.browser }}
@@ -361,12 +366,28 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      # Check out the PR's merged-with-base state — the same thing a pull_request run sees,
-      # resolved from the PR number for comment triggers too.
+      # Resolve the PR's immutable head commit SHA and pin the checkout to it. Avoids the
+      # TOCTOU on the mutable refs/pull/N/merge ref (a force-push between routing and
+      # checkout can't swap the code we run) and the missing-merge-ref failure on conflicted PRs.
+      - name: Resolve PR head SHA
+        id: prsha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          SHA="${EVENT_SHA:-}"
+          if [ -z "$SHA" ]; then
+            SHA="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .head.sha)"
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Pinned PR #${PR_NUMBER} head sha: $SHA"
+
       - name: Checkout PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
+          ref: ${{ steps.prsha.outputs.sha }}
           fetch-depth: 0
           # This is untrusted PR code that we then run; don't leave the token in .git/config
           # for it to read. The agent uses GH_TOKEN/github_token, not git credentials.
@@ -390,24 +411,11 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
-      - name: Restore Cypress cache
-        id: cypress-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            cypress-${{ runner.os }}-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browser
         run: npx -y playwright install --with-deps chromium
-
-      - name: Install Cypress binary
-        if: steps.cypress-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @semianalysisai/inferencex-app exec cypress install
 
       - name: Start dev server
         id: devserver
