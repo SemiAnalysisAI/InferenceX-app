@@ -151,12 +151,12 @@ describe('createUnofficialWatermark', () => {
     const pattern = defs.select('#unofficial-pattern-test');
     expect(pattern.empty()).toBe(false);
     expect(pattern.attr('patternUnits')).toBe('userSpaceOnUse');
-    expect(pattern.attr('width')).toBe('200');
-    expect(pattern.attr('height')).toBe('200');
+    expect(pattern.attr('width')).toBe('460');
+    expect(pattern.attr('height')).toBe('260');
     expect(pattern.attr('patternTransform')).toBe('rotate(-45)');
   });
 
-  it('creates "UNOFFICIAL" labels with the expected styling', () => {
+  it('creates two-line unofficial warning labels with the expected styling', () => {
     const { svg, defs } = makeSvg();
     createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
@@ -164,11 +164,19 @@ describe('createUnofficialWatermark', () => {
     expect(texts.size()).toBe(3);
     texts.each(function () {
       const t = d3.select(this);
-      expect(t.text()).toBe('UNOFFICIAL');
       expect(t.attr('fill')).toBe('#dc2626');
-      expect(t.attr('font-size')).toBe('24px');
+      expect(t.attr('font-size')).toBe('20px');
       expect(t.attr('font-weight')).toBe('bold');
-      expect(t.attr('opacity')).toBe('0.15');
+      expect(t.attr('opacity')).toBe('0.25');
+      expect(
+        t
+          .selectAll<SVGTSpanElement, unknown>('tspan')
+          .nodes()
+          .map((line) => line.textContent),
+      ).toEqual([
+        'UNOFFICIAL RESULTS, DO NOT TRUST',
+        'May contain hacks, or not fully passing evals',
+      ]);
     });
   });
 
@@ -181,9 +189,9 @@ describe('createUnofficialWatermark', () => {
       .nodes()
       .map((n) => ({ x: n.getAttribute('x'), y: n.getAttribute('y') }));
     expect(positions).toEqual([
-      { x: '100', y: '50' }, // row 1 centered
-      { x: '0', y: '150' }, // row 2 left seam
-      { x: '200', y: '150' }, // row 2 right seam
+      { x: '230', y: '65' }, // row 1 centered
+      { x: '0', y: '195' }, // row 2 left seam
+      { x: '460', y: '195' }, // row 2 right seam
     ]);
   });
 
@@ -200,14 +208,32 @@ describe('createUnofficialWatermark', () => {
     expect(Number(rect.attr('height'))).toBe(innerHeight);
   });
 
-  it('inserts the rect before other children (first-child)', () => {
+  it('inserts one large background image behind the warning pattern', () => {
+    const { svg, defs } = makeSvg();
+    createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
+
+    const images = svg.selectAll<SVGImageElement, unknown>('.unofficial-watermark-image');
+    expect(images.size()).toBe(1);
+
+    const image = d3.select(images.node()!);
+    expect(image.attr('href')).toBe('/decorative/kanye-west.png');
+    expect(image.attr('preserveAspectRatio')).toBe('xMidYMid meet');
+    expect(image.attr('opacity')).toBe('0.22');
+    expect(image.attr('pointer-events')).toBe('none');
+    expect(Number(image.attr('x'))).toBe(margin.left);
+    expect(Number(image.attr('y'))).toBe(margin.top);
+    expect(Number(image.attr('width'))).toBe(innerWidth);
+    expect(Number(image.attr('height'))).toBe(innerHeight);
+  });
+
+  it('inserts the image and warning rect behind the chart content', () => {
     const { svg, defs } = makeSvg();
     // Add a dummy child before calling watermark
     svg.append('g').attr('class', 'pre-existing');
     createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
-    // The watermark rect should be inserted before defs (first child)
-    const firstChild = svg.select(':first-child');
-    expect(firstChild.attr('class')).toBe('watermark-rect');
+    const children = svg.node()!.children;
+    expect(children[0].getAttribute('class')).toBe('unofficial-watermark-image');
+    expect(children[1].getAttribute('class')).toBe('watermark-rect');
   });
 });

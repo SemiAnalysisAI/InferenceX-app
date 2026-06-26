@@ -205,6 +205,7 @@ describe('setupChartStructure', () => {
 
       const svg = d3.select(svgEl);
       expect(svg.select('.watermark-rect').empty()).toBe(false);
+      expect(svg.selectAll('.unofficial-watermark-image').size()).toBe(1);
       expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(false);
     });
 
@@ -215,6 +216,7 @@ describe('setupChartStructure', () => {
 
       const svg = d3.select(svgEl);
       expect(svg.select('.watermark-rect').empty()).toBe(true);
+      expect(svg.select('.unofficial-watermark-image').empty()).toBe(true);
       expect(svg.select('#logo-pattern-test-chart').empty()).toBe(true);
       expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(true);
     });
@@ -411,6 +413,25 @@ describe('setupChartStructure', () => {
       expect(Number(rect.attr('width'))).toBe(innerW);
       expect(Number(rect.attr('height'))).toBe(innerH);
     });
+
+    it('updates the unofficial background image dimensions on resize', () => {
+      const svgEl = makeSvgEl();
+      setupChartStructure(svgEl, defaultConfig({ watermark: 'unofficial' }));
+      const cfg = defaultConfig({
+        watermark: 'unofficial',
+        containerWidth: 1200,
+        containerHeight: 900,
+      });
+      setupChartStructure(svgEl, cfg);
+
+      const image = d3.select(svgEl).select('.unofficial-watermark-image');
+      const innerW = cfg.containerWidth - cfg.margin.left - cfg.margin.right;
+      const innerH = cfg.containerHeight - cfg.margin.top - cfg.margin.bottom;
+      expect(Number(image.attr('x'))).toBe(cfg.margin.left);
+      expect(Number(image.attr('y'))).toBe(cfg.margin.top);
+      expect(Number(image.attr('width'))).toBe(innerW);
+      expect(Number(image.attr('height'))).toBe(innerH);
+    });
   });
 
   describe('watermark switching on update', () => {
@@ -432,6 +453,7 @@ describe('setupChartStructure', () => {
       const svg = d3.select(svgEl);
       expect(svg.select('#logo-pattern-test-chart').empty()).toBe(true);
       expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(false);
+      expect(svg.selectAll('.unofficial-watermark-image').size()).toBe(1);
     });
 
     it('switches from "unofficial" to "none" on second call', () => {
@@ -442,6 +464,7 @@ describe('setupChartStructure', () => {
       const svg = d3.select(svgEl);
       expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(true);
       expect(svg.select('.watermark-rect').empty()).toBe(true);
+      expect(svg.select('.unofficial-watermark-image').empty()).toBe(true);
     });
 
     it('switches from "unofficial" to "logo" on second call', () => {
@@ -452,6 +475,7 @@ describe('setupChartStructure', () => {
       const svg = d3.select(svgEl);
       expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(true);
       expect(svg.select('#logo-pattern-test-chart').empty()).toBe(false);
+      expect(svg.select('.unofficial-watermark-image').empty()).toBe(true);
     });
   });
 

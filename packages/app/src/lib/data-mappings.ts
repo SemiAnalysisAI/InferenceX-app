@@ -160,7 +160,7 @@ export function hasExclusion(model: Model | string | null | undefined): boolean 
 
 /**
  * Pick the chart watermark for a given run state. Unofficial-run charts get
- * the red "UNOFFICIAL" banner; everything else gets the logo.
+ * the red unofficial-run warning; everything else gets the logo.
  */
 export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
   return isUnofficialRun ? 'unofficial' : 'logo';

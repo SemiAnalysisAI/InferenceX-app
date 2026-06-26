@@ -1,7 +1,11 @@
 import * as d3 from 'd3';
 
 import type { ChartLayout, ChartSetupConfig } from './types';
-import { createLogoWatermark, createUnofficialWatermark } from './watermark';
+import {
+  createLogoWatermark,
+  createUnofficialWatermark,
+  positionUnofficialWatermarkImage,
+} from './watermark';
 
 /**
  * Creates or updates the structural SVG skeleton for a chart.
@@ -155,13 +159,15 @@ export function setupChartStructure(
   const unofficialPatternId = `unofficial-pattern-${chartId}`;
   const hasLogo = !defs.select(`#${logoPatternId}`).empty();
   const hasUnofficial = !defs.select(`#${unofficialPatternId}`).empty();
+  const hasUnofficialImage = !svg.select('.unofficial-watermark-image').empty();
   const needsSwitch =
-    (watermark === 'unofficial' && !hasUnofficial) ||
+    (watermark === 'unofficial' && (!hasUnofficial || !hasUnofficialImage)) ||
     (watermark === 'logo' && !hasLogo) ||
-    (watermark === 'none' && (hasLogo || hasUnofficial));
+    (watermark === 'none' && (hasLogo || hasUnofficial || hasUnofficialImage));
 
   if (needsSwitch) {
     svg.select('.watermark-rect').remove();
+    svg.select('.unofficial-watermark-image').remove();
     defs.select(`#${logoPatternId}`).remove();
     defs.select(`#${unofficialPatternId}`).remove();
     if (watermark === 'logo') {
@@ -197,6 +203,8 @@ export function setupChartStructure(
           .attr('x', margin.left + (width - logoSize) / 2)
           .attr('y', margin.top + (height - logoSize) / 2);
       }
+    } else if (watermark === 'unofficial') {
+      positionUnofficialWatermarkImage(svg, width, height, margin);
     }
   }
 
