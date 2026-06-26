@@ -57,18 +57,27 @@ function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyE
   return entries;
 }
 
-function QuoteBlock({ quote }: { quote: CarouselQuote }) {
+// Warm a logo into the browser cache so it paints instantly when its quote
+// becomes active. Called on hover/focus of an org button — i.e. only on user
+// intent, so the initial page load still fetches just the visible logo.
+function prefetchLogo(logo?: string) {
+  if (!logo || typeof window === 'undefined') return;
+  const img = new window.Image();
+  img.src = `/logos/${logo}`;
+}
+
+function QuoteBlock({ quote, renderLogo }: { quote: CarouselQuote; renderLogo: boolean }) {
   return (
     <blockquote className="w-full">
       <p className="text-sm lg:text-base leading-relaxed text-muted-foreground italic">
         &ldquo;{highlightBrand(quote.text)}&rdquo;
       </p>
       <footer className="mt-3 flex items-center gap-3">
-        {/* Every logo is rendered (not just the active one) so all images are
-            fetched + decoded up front — switching companies shows the logo
-            instantly instead of waiting on a fresh network request. Inactive
-            blocks are invisible and same-height, so this is layout-neutral. */}
-        <CompanyLogo org={quote.org} logo={quote.logo} />
+        {renderLogo ? (
+          <CompanyLogo org={quote.org} logo={quote.logo} />
+        ) : (
+          <div aria-hidden="true" className="size-10 shrink-0" />
+        )}
         <div className="h-12 w-0.5 bg-brand" />
         <div className="text-sm">
           {quote.link ? (
@@ -172,6 +181,8 @@ export function QuoteCarousel({
             key={e.org}
             type="button"
             onClick={() => goTo(i)}
+            onMouseEnter={() => prefetchLogo(e.quote.logo)}
+            onFocus={() => prefetchLogo(e.quote.logo)}
             className={`text-xs font-semibold tracking-wide uppercase transition-colors duration-200 ${
               i === activeIndex ? 'text-foreground' : 'text-[#808488] hover:text-muted-foreground'
             }`}
@@ -195,7 +206,7 @@ export function QuoteCarousel({
               }`}
               aria-hidden={!isActive}
             >
-              <QuoteBlock quote={e.quote} />
+              <QuoteBlock quote={e.quote} renderLogo={isActive} />
             </div>
           );
         })}
