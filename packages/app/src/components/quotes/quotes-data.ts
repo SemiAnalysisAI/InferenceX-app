@@ -353,6 +353,7 @@ export const QUOTES: Quote[] = [
 
 /** Orgs featured in the landing page carousel. */
 export const CAROUSEL_ORGS = [
+  'MiniMax',
   'OpenAI',
   'Microsoft',
   'Together AI',
@@ -375,7 +376,6 @@ export const CAROUSEL_ORGS = [
   'UC San Diego',
   'Red Hat',
   'White House',
-  'MiniMax',
 ] as const;
 
 /** Display label overrides for carousel orgs. */

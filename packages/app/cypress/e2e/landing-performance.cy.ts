@@ -151,7 +151,9 @@ describe('Landing page performance', () => {
 
       expect([...fonts]).to.have.length(1);
       expect([...logos]).to.have.length(1);
-      expect([...logos][0]).to.eq('/logos/openai.svg');
+      // MiniMax is pinned first in the carousel order, so it's the initially
+      // visible supporter the server renders (index 0) and preloads.
+      expect([...logos][0]).to.eq('/logos/minimax.svg');
     });
   });
 

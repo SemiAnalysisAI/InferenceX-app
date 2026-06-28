@@ -8,7 +8,7 @@ import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quot
 const carouselQuotes = QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org));
 
 const CAROUSEL_OVERRIDES = {
-  order: ['OpenAI'] as string[],
+  order: ['MiniMax'] as string[],
   labels: CAROUSEL_LABELS,
 };
 
