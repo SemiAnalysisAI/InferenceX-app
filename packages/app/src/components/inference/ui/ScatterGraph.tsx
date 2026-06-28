@@ -7,6 +7,10 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
+import {
+  labelOpacityForActiveState,
+  labelOpacityForHover,
+} from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -676,9 +680,7 @@ const ScatterGraph = React.memo(
           .transition('legend-hover')
           .duration(150)
           .style('opacity', function () {
-            const hw = (this as SVGGElement).dataset.hwKey;
-            if (!hw) return 0;
-            return hw === hwKey ? 1 : 0;
+            return labelOpacityForHover((this as SVGGElement).dataset, hwKey);
           });
       },
       [isPointVisible, isRooflineVisible],
@@ -705,12 +707,11 @@ const ScatterGraph = React.memo(
         .transition('legend-hover')
         .duration(150)
         .style('opacity', function () {
-          const hw = (this as SVGGElement).dataset.hwKey;
-          const prec = (this as SVGGElement).dataset.precision;
-          if (!hw) return 0;
-          // Line labels have no precision attr — always visible if hw is active
-          if (!prec) return effectiveActiveHwTypes.has(hw) ? 1 : 0;
-          return effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(prec) ? 1 : 0;
+          return labelOpacityForActiveState(
+            (this as SVGGElement).dataset,
+            effectiveActiveHwTypes,
+            selectedPrecisions,
+          );
         });
     }, [isPointVisible, isRooflineVisible, effectiveActiveHwTypes, selectedPrecisions]);
 
@@ -1312,6 +1313,11 @@ const ScatterGraph = React.memo(
             )
             .attr('data-line-key', (d) => d.key)
             .attr('data-hw-key', (d) => d.hw)
+            // Persist the per-label visibility decision (one label per hw group;
+            // de-duplicated / collision-hidden curves are `false`) so the
+            // visibility-sync effects below don't re-show hidden duplicates that
+            // share the same `data-hw-key`. See GH #470.
+            .attr('data-visible', (d) => (d.visible ? '1' : '0'))
             .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
             .style('opacity', (d) => (d.visible ? 1 : 0))
             .each(function (d) {
@@ -2124,13 +2130,11 @@ const ScatterGraph = React.memo(
       zoomGroup
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
         .style('opacity', function () {
-          const hw = (this as SVGGElement).dataset.hwKey;
-          const precision = (this as SVGGElement).dataset.precision;
-          if (!hw) return 0;
-          if (!precision) return ir.effectiveActiveHwTypes.has(hw) ? 1 : 0;
-          return ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision)
-            ? 1
-            : 0;
+          return labelOpacityForActiveState(
+            (this as SVGGElement).dataset,
+            ir.effectiveActiveHwTypes,
+            ir.selectedPrecisions,
+          );
         });
 
       // Label placement (greedy collision layout) depends on the visible set,
