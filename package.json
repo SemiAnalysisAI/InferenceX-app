@@ -41,7 +41,7 @@
     "admin:db:verify": "pnpm --filter *db db:verify"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.6",
+    "@babel/core": "^8.0.1",
     "audit-ci": "^7.1.0",
     "is-ci": "^4.1.0",
     "lefthook": "^2.1.9",
