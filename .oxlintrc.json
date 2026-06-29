@@ -35,6 +35,7 @@
     "sort-vars": "off",
     "oxc/approx-constant": "off",
     "unicorn/filename-case": "off",
+    "unicorn/max-nested-calls": "off",
     "unicorn/no-array-callback-reference": "off",
     "unicorn/no-nested-ternary": "off",
     "unicorn/no-null": "off",
@@ -42,6 +43,7 @@
     "unicorn/numeric-separators-style": "off",
     "unicorn/prefer-export-from": "off",
     "unicorn/prefer-global-this": "off",
+    "unicorn/prefer-number-coercion": "off",
     "unicorn/prefer-top-level-await": "off"
   }
 }
