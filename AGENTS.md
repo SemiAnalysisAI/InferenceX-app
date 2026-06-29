@@ -223,11 +223,11 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit each step separately so failures are easy to bisect.
 
-1. **Bump versions**: `pnpm taze -I -r latest` (interactive, all workspaces). Approve what you want, skip what you don't.
+1. **Bump versions**: `pnpm taze -I -r latest` (interactive, all workspaces). Approve what you want, skip what you don't. **Never let taze write the `pnpm-workspace.yaml` `overrides` block.** taze will propose bumping those entries, but the overrides are security pins driven **solely by `pnpm security`** (step 3) — bumping them here would float them off the lowest-patched-version rule. In interactive mode, deselect them; for a non-interactive `taze -w`, restore them afterward with `git checkout <base-branch> -- pnpm-workspace.yaml` (taze only touches the `overrides` in that file, so this leaves `packages`/`catalog`/`allowBuilds` intact).
 2. **Resolve install errors**:
    - `ERR_PNPM_IGNORED_BUILDS` after a pnpm major bump means new `allowBuilds` entries in `pnpm-workspace.yaml` were left as placeholder strings — set them to `true` (or `false` if you don't want the build script to run).
    - pnpm 11 moved `pnpm.overrides` from `package.json` to `pnpm-workspace.yaml`. Overrides left in `package.json` are silently ignored. Migrate them.
-3. **Audit security**: `pnpm security` (runs `pnpm audit && audit-ci`). For each remaining vulnerability, add a targeted override in `pnpm-workspace.yaml`:
+3. **Audit security**: `pnpm security` (runs `pnpm audit && audit-ci`). This is the **only** step that edits the `pnpm-workspace.yaml` `overrides` block (step 1's bump must leave it untouched). For each remaining vulnerability, add a targeted override in `pnpm-workspace.yaml`:
 
    ```yaml
    overrides:
