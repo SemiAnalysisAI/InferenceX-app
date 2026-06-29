@@ -349,11 +349,20 @@ export const QUOTES: Quote[] = [
     logo: 'minimax.svg',
     link: 'https://x.com/RyanLeeMiniMax',
   },
+  {
+    text: 'At Moonshot AI, we are dedicated to supporting the open-source ecosystem by advancing frontier open models. As the Kimi K2 series evolves, we are glad to see its performance tracked in InferenceX™’s open and reproducible benchmarks. InferenceX™ helps the community better understand industry-level performance and encourages the ecosystem to keep improving and optimizing.',
+    name: 'Moonshot AI',
+    title: '',
+    org: 'Moonshot AI',
+    logo: 'moonshot-ai.svg',
+    link: 'https://www.moonshot.ai/',
+  },
 ];
 
 /** Orgs featured in the landing page carousel. */
 export const CAROUSEL_ORGS = [
   'MiniMax',
+  'Moonshot AI',
   'OpenAI',
   'Microsoft',
   'Together AI',
