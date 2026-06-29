@@ -1,11 +1,23 @@
 'use client';
 
+import { Fragment } from 'react';
+
 import { Card } from '@/components/ui/card';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { track } from '@/lib/analytics';
 
 import { CompanyLogo, highlightBrand } from './quote-utils';
 import { QUOTES } from './quotes-data';
+
+/** Stable anchor id for an org's quote (first occurrence wins). */
+function orgAnchorId(org: string): string {
+  const slug = org
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, '-')
+    .replaceAll(/^-|-$/gu, '');
+  return `quote-${slug}`;
+}
 
 /** Deduplicated logos from all quote orgs. */
 const orgLogos: { org: string; logo: string }[] = [];
@@ -17,7 +29,20 @@ for (const q of QUOTES) {
   }
 }
 
+/** Index of the first quote for each org — only that card gets the anchor id. */
+const firstQuoteIndexForOrg: Record<string, number> = {};
+QUOTES.forEach((q, i) => {
+  if (!(q.org in firstQuoteIndexForOrg)) firstQuoteIndexForOrg[q.org] = i;
+});
+
+function scrollToOrg(org: string) {
+  document
+    .querySelector(`#${orgAnchorId(org)}`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function QuoteCard({
+  id,
   text,
   name,
   title,
@@ -25,6 +50,7 @@ function QuoteCard({
   logo,
   link,
 }: {
+  id?: string;
   text: string;
   name: string;
   title: string;
@@ -33,7 +59,7 @@ function QuoteCard({
   link?: string;
 }) {
   const content = (
-    <blockquote className="space-y-4">
+    <blockquote id={id} className="space-y-4 scroll-mt-24">
       <p className="text-base lg:text-lg leading-relaxed text-muted-foreground italic">
         &ldquo;{highlightBrand(text)}&rdquo;
       </p>
@@ -79,29 +105,44 @@ export function QuotesContent() {
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               {orgLogos.map(({ org, logo }) => (
-                <div key={org} className="flex items-center justify-center h-10 px-3" title={org}>
+                <button
+                  key={org}
+                  type="button"
+                  onClick={() => {
+                    track('quotes_logo_clicked', { org });
+                    scrollToOrg(org);
+                  }}
+                  className="group flex items-center justify-center h-10 px-3 cursor-pointer rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  title={`Jump to ${org}’s quote`}
+                  aria-label={`Jump to ${org}’s quote`}
+                >
                   <img
                     src={`/logos/${logo}`}
                     alt={org}
                     width={96}
                     height={40}
-                    className="h-8 max-w-24 object-contain grayscale opacity-70 dark:invert"
+                    className="h-8 max-w-24 object-contain grayscale opacity-70 transition-opacity group-hover:opacity-100 dark:invert"
                   />
-                </div>
+                </button>
               ))}
             </div>
             <div className="mt-6 pt-6 border-t border-border/40">
               <div className="flex flex-col gap-10 md:gap-12">
-                {QUOTES.map((quote) => (
-                  <QuoteCard
-                    key={quote.name}
-                    text={quote.text}
-                    name={quote.name}
-                    title={quote.title}
-                    org={quote.org}
-                    logo={quote.logo}
-                    link={quote.link}
-                  />
+                {QUOTES.map((quote, i) => (
+                  <Fragment key={`${quote.org}-${quote.name}`}>
+                    {i > 0 && <hr className="border-t border-border/40" aria-hidden="true" />}
+                    <QuoteCard
+                      id={
+                        firstQuoteIndexForOrg[quote.org] === i ? orgAnchorId(quote.org) : undefined
+                      }
+                      text={quote.text}
+                      name={quote.name}
+                      title={quote.title}
+                      org={quote.org}
+                      logo={quote.logo}
+                      link={quote.link}
+                    />
+                  </Fragment>
                 ))}
               </div>
             </div>
