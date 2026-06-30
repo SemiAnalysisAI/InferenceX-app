@@ -357,12 +357,21 @@ export const QUOTES: Quote[] = [
     logo: 'moonshot-ai.svg',
     link: 'https://www.moonshot.ai/',
   },
+  {
+    text: "Qwen has always been about putting capable models into the hands of as many developers as possible, and real-world inference efficiency is what makes that scale. InferenceX™ brings rigorous, vendor-neutral measurement to exactly the questions that matter: how models like Qwen3.5 actually perform across accelerators. Independent, reproducible benchmarks on real hardware give the community the clarity it needs to deploy with confidence, and we're glad to see that level of transparency driving the inference ecosystem forward.",
+    name: 'Alibaba Qwen',
+    title: '',
+    org: 'Alibaba Qwen',
+    logo: 'qwen.webp',
+    link: 'https://qwen.ai',
+  },
 ];
 
 /** Orgs featured in the landing page carousel. */
 export const CAROUSEL_ORGS = [
   'MiniMax',
   'Moonshot AI',
+  'Alibaba Qwen',
   'OpenAI',
   'Microsoft',
   'Together AI',
