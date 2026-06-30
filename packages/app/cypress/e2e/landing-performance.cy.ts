@@ -100,9 +100,9 @@ describe('Landing page performance', () => {
       );
       expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
       expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
-      // The carousel only renders the active quote's logo, so a mobile load fetches
-      // at most the server-rendered logo plus the random starting quote's logo after
-      // hydration — never the full supporter set.
+      // The carousel only renders the active quote's logo, and it always starts on
+      // the first (MiniMax) quote, so a mobile load fetches at most that one logo —
+      // never the full supporter set.
       const carouselLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(carouselLogos.size).to.be.lessThan(3);
       expect(

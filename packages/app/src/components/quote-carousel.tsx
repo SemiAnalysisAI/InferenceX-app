@@ -116,14 +116,6 @@ export function QuoteCarousel({
   const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hovering = useRef(false);
 
-  // Pick a random starting quote after hydration. This only changes which stacked
-  // quote is opaque, so it never shifts layout (no CLS), and SSR stays deterministic
-  // (server always renders index 0) so the crawled HTML is stable. Sequential rotation
-  // then continues from the random offset, varying the appearance order each load.
-  useEffect(() => {
-    if (entries.length > 1) setActiveIndex(Math.floor(Math.random() * entries.length));
-  }, [entries.length]);
-
   const advance = useCallback(() => {
     if (hovering.current) return;
     if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
