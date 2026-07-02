@@ -33,6 +33,7 @@
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.3",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.9",

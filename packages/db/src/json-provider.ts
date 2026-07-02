@@ -279,8 +279,16 @@ function toBenchmarkRow(
   c: RawConfig,
   wr: RawWorkflowRun,
   metrics?: Record<string, number>,
+  /**
+   * Whether to include the `image` column. The history query (getAllBenchmarksForHistory)
+   * does NOT select `br.image` in SQL, so its mirror must omit it too — otherwise the JSON
+   * data mode returns an `image` field the live DB mode never does. Every other benchmark
+   * query DOES select image, so this defaults to true. (Caught by the parity harness in
+   * queries/__tests__/parity.test.ts.)
+   */
+  includeImage = true,
 ): BenchmarkRow {
-  return {
+  const row: BenchmarkRow = {
     hardware: c.hardware,
     framework: c.framework,
     model: c.model,
@@ -310,6 +318,9 @@ function toBenchmarkRow(
     date: toDateString(br.date),
     run_url: buildRunUrl(wr),
   };
+  // SQL's history SELECT omits br.image entirely; drop it so the shape matches exactly.
+  if (!includeImage) delete (row as { image?: string | null }).image;
+  return row;
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +463,9 @@ export function getAllBenchmarksForHistory(
   const s = getStore();
   const modelKeys = new Set(Array.isArray(modelKey) ? modelKey : [modelKey]);
 
-  const results: BenchmarkRow[] = [];
+  // Keep config_id alongside each row so the sort can match the SQL ORDER BY exactly
+  // (config_id is not a field on BenchmarkRow, so it's tracked here, not on the row).
+  const results: { row: BenchmarkRow; configId: number }[] = [];
   for (const br of s.benchmarks) {
     if (br.error !== null && br.error !== undefined) continue;
     if (br.isl !== isl || br.osl !== osl) continue;
@@ -466,17 +479,21 @@ export function getAllBenchmarksForHistory(
     for (const [k, v] of Object.entries(br.metrics)) {
       if (!STRIP_HISTORY_KEYS.has(k)) filtered[k] = v;
     }
-    results.push(toBenchmarkRow(br, c, wr, filtered));
+    results.push({ row: toBenchmarkRow(br, c, wr, filtered, false), configId: br.config_id });
   }
 
+  // Mirror SQL: ORDER BY br.date, c.id, br.conc. The c.id tiebreak matters when two
+  // configs of the same model produced this sequence on the same date — without it the
+  // JSON path interleaves rows by conc across configs while SQL groups by config first.
+  // (Caught by the parity harness in queries/__tests__/parity.test.ts.)
   results.sort((a, b) => {
-    const dateCmp = a.date.localeCompare(b.date);
+    const dateCmp = a.row.date.localeCompare(b.row.date);
     if (dateCmp !== 0) return dateCmp;
-    // Secondary sort: mimic ORDER BY c.id, br.conc
-    return a.conc - b.conc;
+    if (a.configId !== b.configId) return a.configId - b.configId;
+    return a.row.conc - b.row.conc;
   });
 
-  return results;
+  return results.map((r) => r.row);
 }
 
 export function getAvailabilityData(): AvailabilityRow[] {
@@ -702,7 +719,12 @@ export function getServerLog(benchmarkResultId: number): string | null {
     console.log('json-provider: loading server_logs.json (this may take a moment)...');
     const raw = loadTable<RawServerLog>(s.dumpDir, 'server_logs.json');
     s.serverLogs = new Map<number, string>();
-    for (const sl of raw) s.serverLogs.set(sl.id, sl.server_log);
+    // Postgres bigserial `server_logs.id` serializes to a STRING in the dump (postgres.js
+    // keeps 64-bit ids as strings). The lookup below uses a numeric id coming from
+    // benchmarkServerLogMap (which Number()-coerces server_log_id), so the map MUST be
+    // keyed numerically too — otherwise every getServerLog() misses and returns null.
+    // Parity harness (queries/__tests__/parity.test.ts) caught this against server-logs.ts.
+    for (const sl of raw) s.serverLogs.set(Number(sl.id), sl.server_log);
     console.log(`json-provider: loaded ${s.serverLogs.size} server logs`);
   }
 
