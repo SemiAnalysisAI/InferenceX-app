@@ -60,7 +60,7 @@ jobs:
 
       - name: Run migrations
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
         run: pnpm admin:db:migrate --yes
 
       - name: Download artifacts from InferenceX run
@@ -119,7 +119,7 @@ jobs:
 
       - name: Ingest results to DB
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           INGEST_RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
           INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || inputs.run-attempt }}
@@ -130,12 +130,12 @@ jobs:
 
       - name: Apply run overrides
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
         run: pnpm admin:db:apply-overrides --yes
 
       - name: Verify database
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
         run: pnpm admin:db:verify
 
       - name: Invalidate Vercel cache
