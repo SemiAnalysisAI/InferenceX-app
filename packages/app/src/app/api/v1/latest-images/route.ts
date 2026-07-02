@@ -1,22 +1,11 @@
-import { NextResponse } from 'next/server';
-
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import { getLatestImages } from '@semianalysisai/inferencex-db/queries/latest-images';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { createCachedRoute } from '@/lib/create-cached-route';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedLatestImages = cachedQuery(() => getLatestImages(getDb()), 'latest-images', {
-  blobOnly: true,
+export const GET = createCachedRoute(() => getLatestImages(getDb()), 'latest-images', {
+  resource: 'latest images',
+  cacheOptions: { blobOnly: true },
 });
-
-export async function GET() {
-  try {
-    const rows = await getCachedLatestImages();
-    return cachedJson(rows);
-  } catch (error) {
-    console.error('Error fetching latest images:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}

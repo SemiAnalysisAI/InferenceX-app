@@ -79,3 +79,33 @@ export async function getSubmissionVolume(sql: DbClient): Promise<SubmissionVolu
   `;
   return rows as unknown as SubmissionVolumeRow[];
 }
+
+// ── User feedback ─────────────────────────────────────────────────────────────
+
+/** Rows returned by getFeedbackList — ciphertext-only; plaintext decrypted client-side. */
+export interface FeedbackListRow {
+  id: string;
+  created_at: string;
+  doing_well_ciphertext: string | null;
+  doing_poorly_ciphertext: string | null;
+  want_to_see_ciphertext: string | null;
+  user_agent_ciphertext: string | null;
+  page_path_ciphertext: string | null;
+}
+
+/** Return all user_feedback rows, newest first, ciphertext columns only. */
+export async function getFeedbackList(sql: DbClient): Promise<FeedbackListRow[]> {
+  const rows = await sql`
+    select
+      id::text as id,
+      created_at,
+      doing_well_ciphertext,
+      doing_poorly_ciphertext,
+      want_to_see_ciphertext,
+      user_agent_ciphertext,
+      page_path_ciphertext
+    from user_feedback
+    order by created_at desc
+  `;
+  return rows as unknown as FeedbackListRow[];
+}

@@ -1,3 +1,9 @@
+// NOTE: This route intentionally does NOT use cachedQuery/cachedJson.
+// cachedQuery uses unstable_cache with a 'db' tag — data only refreshes when
+// purgeAll() is called (manual admin operation). Framework release data comes
+// from GitHub, not the DB, and should auto-refresh on a time cadence (1 h TTL
+// via Next.js fetch revalidate). Migrating to cachedQuery would silently break
+// the TTL semantics: releases would never refresh until an admin cache-bust.
 import { NextResponse } from 'next/server';
 
 interface GitHubRelease {

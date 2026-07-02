@@ -1,26 +1,23 @@
-import { NextResponse } from 'next/server';
-
 import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import { getReliabilityStats } from '@semianalysisai/inferencex-db/queries/reliability';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/api-cache';
+import { createCachedRoute } from '@/lib/create-cached-route';
 import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedReliability = cachedQuery(() => {
-  if (JSON_MODE) return Promise.resolve(jsonProvider.getReliabilityStats());
-  return getReliabilityStats(getDb());
-}, 'reliability');
+const _handle = createCachedRoute(
+  () => {
+    if (JSON_MODE) return Promise.resolve(jsonProvider.getReliabilityStats());
+    return getReliabilityStats(getDb());
+  },
+  'reliability',
+  { resource: 'reliability stats' },
+);
 
-export async function GET() {
-  if (FIXTURES_MODE) return cachedJson(loadFixture('reliability'));
-  try {
-    const rows = await getCachedReliability();
-    return cachedJson(rows);
-  } catch (error) {
-    console.error('Error fetching reliability stats:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+export function GET(): Promise<Response> {
+  if (FIXTURES_MODE) return Promise.resolve(cachedJson(loadFixture('reliability')));
+  return _handle();
 }
