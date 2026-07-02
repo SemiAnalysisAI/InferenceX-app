@@ -25,6 +25,11 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('mi300x-amd')).toBe('mi300x');
   });
 
+  it('strips a v3 scope prefix (cluster:…)', () => {
+    expect(hwToGpuKey('cluster:b300-nv')).toBe('b300');
+    expect(hwToGpuKey('cluster:h200')).toBe('h200');
+  });
+
   it('strips -amds suffix', () => {
     expect(hwToGpuKey('mi355x-amds')).toBe('mi355x');
   });

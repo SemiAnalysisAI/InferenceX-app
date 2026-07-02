@@ -22,7 +22,11 @@ export { GPU_KEYS };
  *   stripped base is not in `GPU_KEYS`.
  */
 export function hwToGpuKey(hw: string): string | null {
-  const base = hw.toLowerCase().split('-')[0];
+  // v3 agentic artifacts scope the hw id (`cluster:b300-nv`) — drop everything
+  // up to the last `:` first. Then take the first segment before `-` as the
+  // canonical key; that subsumes all the prior explicit suffix strips
+  // (-nv, -amds, -dgxc-slurm, -p1, -cw, …).
+  const base = hw.toLowerCase().split(':').pop()!.split('-')[0];
   return GPU_KEYS.has(base) ? base : null;
 }
 
@@ -138,7 +142,7 @@ export function resolveModelKey(row: Record<string, any>): string | null {
  */
 export function normalizeFramework(
   fw: string,
-  disaggField: any,
+  disaggField: unknown,
 ): { framework: string; disagg: boolean } {
   const lower = fw.toLowerCase();
   const alias = FRAMEWORK_ALIASES[lower];
@@ -171,7 +175,7 @@ export function normalizePrecision(raw: string): string {
  * @param spec - Raw `spec_decoding` value from the artifact.
  * @returns Lowercase method name, or `'none'` if absent/empty.
  */
-export function normalizeSpecMethod(spec: any): string {
+export function normalizeSpecMethod(spec: unknown): string {
   if (!spec || spec === '') return 'none';
   return String(spec).toLowerCase();
 }
@@ -183,7 +187,7 @@ export function normalizeSpecMethod(spec: any): string {
  * @param v - Value to coerce (any type).
  * @returns `true` if the value is one of the recognized truthy forms, `false` otherwise.
  */
-export function parseBool(v: any): boolean {
+export function parseBool(v: unknown): boolean {
   return v === true || v === 'true' || v === 'True';
 }
 
@@ -194,7 +198,7 @@ export function parseBool(v: any): boolean {
  * @param v - Value to parse (number, string, null, or undefined).
  * @returns The parsed number, or `undefined` if the input is null/undefined/NaN.
  */
-export function parseNum(v: any): number | undefined {
+export function parseNum(v: unknown): number | undefined {
   if (v === null || v === undefined) return undefined;
   const n = typeof v === 'string' ? parseFloat(v) : Number(v);
   return isNaN(n) ? undefined : n;
@@ -207,11 +211,13 @@ export function parseNum(v: any): number | undefined {
  * @param v - Value to parse (number, string, null, or undefined).
  * @returns The parsed integer, or `undefined` if the input is null/undefined/NaN.
  */
-export function parseInt2(v: any): number | undefined {
+export function parseInt2(v: unknown): number | undefined {
   if (v === null || v === undefined) return undefined;
   const n = typeof v === 'string' ? parseInt(v, 10) : Math.round(Number(v));
   return isNaN(n) ? undefined : n;
 }
+
+const ISL_OSL_PATTERN = /[_-](?<isl>\d+)k(?<osl>\d+)k[_\-.]/iu;
 
 /**
  * Extract ISL (input sequence length) and OSL (output sequence length) in tokens
@@ -225,7 +231,7 @@ export function parseInt2(v: any): number | undefined {
  * @returns An object with `isl` and `osl` in tokens, or `null` if no match is found.
  */
 export function parseIslOsl(name: string): { isl: number; osl: number } | null {
-  const m = name.match(/[_-](?<isl>\d+)k(?<osl>\d+)k[_\-.]/iu);
+  const m = name.match(ISL_OSL_PATTERN);
   if (!m) return null;
   return { isl: parseInt(m[1], 10) * 1024, osl: parseInt(m[2], 10) * 1024 };
 }

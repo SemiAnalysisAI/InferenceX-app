@@ -56,3 +56,20 @@ export function islOslToSequence(isl: number, osl: number): string | null {
   };
   return map[`${isl}_${osl}`] ?? null;
 }
+
+/**
+ * Map a benchmark/availability row to its sequence (scenario) string.
+ * - `agentic_traces` rows map to `'agentic-traces'` regardless of isl/osl.
+ * - Other rows (today: `single_turn`) fall back to `islOslToSequence`.
+ * Returns `null` for rows that can't be classified (e.g. `single_turn` with
+ * unmapped isl/osl values).
+ */
+export function rowToSequence(row: {
+  isl: number | null;
+  osl: number | null;
+  benchmark_type: string;
+}): string | null {
+  if (row.benchmark_type === 'agentic_traces') return 'agentic-traces';
+  if (row.isl === null || row.osl === null) return null;
+  return islOslToSequence(row.isl, row.osl);
+}
