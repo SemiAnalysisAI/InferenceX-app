@@ -1,7 +1,37 @@
 import { describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection.js';
-import { getConversation, listConversations, listDatasets } from './datasets.js';
+import { escapeLikePattern, getConversation, listConversations, listDatasets } from './datasets.js';
+
+describe('escapeLikePattern', () => {
+  it('leaves plain text unchanged', () => {
+    expect(escapeLikePattern('agent')).toBe('agent');
+  });
+
+  it('escapes % so it is treated as a literal percent, not a wildcard', () => {
+    expect(escapeLikePattern('%')).toBe(String.raw`\%`);
+    expect(escapeLikePattern('50%off')).toBe(String.raw`50\%off`);
+  });
+
+  it('escapes _ so it is treated as a literal underscore, not a wildcard', () => {
+    expect(escapeLikePattern('_')).toBe(String.raw`\_`);
+    expect(escapeLikePattern('conv_id')).toBe(String.raw`conv\_id`);
+  });
+
+  it('escapes backslash first to avoid double-escaping', () => {
+    expect(escapeLikePattern('\\')).toBe(String.raw`\\`);
+    // A backslash followed by % must become \\\% in the escaped output.
+    expect(escapeLikePattern(String.raw`\%`)).toBe(String.raw`\\\%`);
+  });
+
+  it('handles mixed metacharacters', () => {
+    expect(escapeLikePattern('50%_off')).toBe(String.raw`50\%\_off`);
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(escapeLikePattern('')).toBe('');
+  });
+});
 
 /**
  * Mock DbClient: returns canned result sets in call order. Each call to the

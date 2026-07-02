@@ -541,6 +541,23 @@ describe('dataset mirrors', () => {
     expect(jp.listDatasets()[0]?.ingested_at).toBe('2026-06-20 00:00:00+00');
   });
 
+  it('listConversations: search for literal "%" matches no rows (wildcard semantics do not apply)', () => {
+    // The SQL path now escapes LIKE metacharacters via escapeLikePattern before
+    // embedding into the ILIKE pattern. The json-provider mirror uses
+    // .toLowerCase().includes() which already treats input literally. Both paths
+    // must agree: a search for "%" finds only conv_ids that contain a literal
+    // percent character — none of the fixture conv_ids do.
+    const result = jp.listConversations('ds-new', { search: '%' });
+    expect(result?.total).toBe(0);
+    expect(result?.items).toHaveLength(0);
+  });
+
+  it('listConversations: search for literal "_" matches no rows', () => {
+    // Similarly, "_" must not act as a single-character wildcard.
+    const result = jp.listConversations('ds-new', { search: '_' });
+    expect(result?.total).toBe(0);
+  });
+
   it('listConversations applies case-insensitive search, sort, and pagination', () => {
     // Default sort = tokens (total_in desc): alpha(300), plain(200), AGENT-beta(100).
     const all = jp.listConversations('ds-new');

@@ -107,6 +107,27 @@ export interface ListConversationsOpts {
 const MAX_LIMIT = 200;
 
 /**
+ * Escape Postgres LIKE metacharacters in a user-supplied search string so that
+ * the pattern performs a literal substring match, not a wildcard match.
+ *
+ * Postgres LIKE special characters are: % (any sequence), _ (any single char),
+ * and \ (the default escape character). We escape \ first so our own escape
+ * sequences are not double-escaped, then % and _.
+ *
+ * postgres.js parameterization already prevents SQL injection; this escaping
+ * fixes wildcard-semantics only (e.g. searching for literal '%' must not match
+ * every row).
+ *
+ * @example escapeLikePattern('50%_off') === '50\\%\\_off'
+ */
+export function escapeLikePattern(raw: string): string {
+  return raw
+    .replaceAll('\\', String.raw`\\`)
+    .replaceAll('%', String.raw`\%`)
+    .replaceAll('_', String.raw`\_`);
+}
+
+/**
  * Paginated conversation list for a dataset (by slug). Returns counts only —
  * the per-conversation `structure` blob is fetched separately by
  * getConversation so the list stays light.
@@ -125,7 +146,9 @@ export async function listConversations(
   const limit = Math.min(MAX_LIMIT, Math.max(1, opts.limit ?? 50));
   const offset = Math.max(0, opts.offset ?? 0);
   const search = opts.search?.trim();
-  const like = search ? `%${search}%` : null;
+  // Escape LIKE metacharacters so user input is treated as a literal substring.
+  // Backslash is escaped first to prevent double-escaping our own escape sequences.
+  const like = search ? `%${escapeLikePattern(search)}%` : null;
 
   const totalRows = (await sql`
     select count(*)::int as n

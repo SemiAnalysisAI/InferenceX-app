@@ -34,6 +34,13 @@ const getCachedConversations = cachedQuery(
   'dataset-conversations',
 );
 
+// Maximum search string length accepted. Longer strings are rejected with 400
+// rather than being forwarded to the DB: an ILIKE on an unindexed conv_id column
+// with a very long pattern (or many stacked wildcards) can exhaust Neon's
+// statement timeout and return a 500. 100 chars is generous for any real
+// conversation-id prefix while keeping the attack surface small.
+const MAX_SEARCH_LENGTH = 100;
+
 /**
  * GET /api/v1/datasets/[slug]/conversations?search=&limit=&offset=&sort=
  * Paginated conversation list (counts only, no flamegraph structure).
@@ -41,7 +48,14 @@ const getCachedConversations = cachedQuery(
 export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const sp = request.nextUrl.searchParams;
-  const search = sp.get('search') ?? '';
+  const rawSearch = sp.get('search') ?? '';
+  const search = rawSearch.trim();
+
+  // Reject search strings that exceed the length cap before touching the DB.
+  if (search.length > MAX_SEARCH_LENGTH) {
+    return NextResponse.json({ error: 'search too long' }, { status: 400 });
+  }
+
   const limit = Math.min(200, Math.max(1, Number(sp.get('limit')) || 50));
   const offset = Math.max(0, Number(sp.get('offset')) || 0);
   const sortParam = sp.get('sort') ?? 'tokens';
