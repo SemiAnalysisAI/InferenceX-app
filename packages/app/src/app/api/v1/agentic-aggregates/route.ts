@@ -1,6 +1,7 @@
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getAgenticAggregates,
+  STATS_VERSION,
   type AgenticAggregateMap,
 } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';
 
@@ -13,9 +14,17 @@ export const dynamic = 'force-dynamic';
 // blobOnly: response stays small (a few numbers per id), but generating it
 // parses ~5-10 MB of decompressed JSONL + JSON per id. Cache so the
 // "Aggregates" toggle stays snappy.
+//
+// Key derived from STATS_VERSION (governs the `aggregate_stats` payload). The
+// blob cache is write-once with no post-backfill purge, so deriving the key
+// from the constant is what rolls the namespace on a version bump — a
+// hand-written string would pin the route to stale blob hits forever.
+/** Version-derived blob-cache key namespace (exported for the key-derivation test). */
+export const CACHE_KEY_PREFIX = `agentic-aggregates-v${STATS_VERSION}`;
+
 const getCachedAgenticAggregates = cachedQuery(
   (ids: number[]): Promise<AgenticAggregateMap> => getAgenticAggregates(getDb(), ids),
-  'agentic-aggregates',
+  CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
 

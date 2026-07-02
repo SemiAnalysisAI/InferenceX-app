@@ -1,3 +1,4 @@
+import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getTraceHistograms,
@@ -14,9 +15,17 @@ export const dynamic = 'force-dynamic';
 // unstable_cache limit (each point carries one int per request, ~500-1000+
 // requests for agentic), which manifests as a 500 from the route. Blob
 // storage lets us cache the larger response without losing the warm-cache hit.
+//
+// Key derived from REQUEST_TIMELINE_VERSION: the histograms are read out of the
+// `request_timeline` payload (getTraceHistograms keys its fast path off that
+// constant). The blob cache is write-once with no post-backfill purge, so the
+// version-derived key is what rolls the namespace on a bump — the previously
+// unversioned key would serve stale histograms forever.
+export const CACHE_KEY_PREFIX = `trace-histograms-v${REQUEST_TIMELINE_VERSION}`;
+
 const getCachedTraceHistograms = cachedQuery(
   (ids: number[]): Promise<TraceHistogramMap> => getTraceHistograms(getDb(), ids),
-  'trace-histograms',
+  CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
 

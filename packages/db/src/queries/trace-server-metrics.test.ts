@@ -92,8 +92,12 @@ describe('getTraceServerMetrics', () => {
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
-    expect(calls).toHaveLength(2);
+    // 3 calls: meta read, blob read, then the fire-and-forget chart_series
+    // write-back that self-heals the stale precomputed series.
+    expect(calls).toHaveLength(3);
     expect(calls[1]).toContain('server_metrics_json_gz as blob');
+    expect(calls[2]).toContain('update agentic_trace_replay set chart_series');
+    expect(calls[2]).toContain('::jsonb where id');
   });
 
   it('returns null without a blob and does not issue a second query', async () => {
