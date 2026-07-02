@@ -21,7 +21,6 @@
  *     original source sweep run, so public links point at the real benchmark run.
  */
 
-import { execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -29,6 +28,12 @@ import path from 'path';
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
+import {
+  dedupeArtifactsByLogicalName,
+  downloadArtifact,
+  fetchRunAttempt,
+  listRunArtifacts,
+} from './lib/github-artifacts';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { isRunAttemptPurged } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
@@ -45,6 +50,9 @@ import {
   bulkUpsertAvailability,
   insertServerLog,
 } from './etl/benchmark-ingest';
+import { insertTraceReplay } from './etl/trace-replay-ingest';
+import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
+import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 import { mapEvalSamples } from './etl/eval-samples-mapper';
@@ -95,48 +103,20 @@ if (isDownloadMode) {
   console.log(`  Repo:   ${REPO}`);
   console.log(`\n--- Downloading artifacts to ${artifactsDir} ---`);
 
-  const artifactListJson = execSync(
-    `gh api "repos/${REPO}/actions/runs/${runIdStr}/artifacts" --paginate --jq '.artifacts[]'`,
-    { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
-  );
+  // Retried configs produce artifacts on multiple runners — keep only the
+  // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
+  // so a failed attempt's empty metrics can't overwrite the good one via
+  // ON CONFLICT DO UPDATE.
+  const byLogical = dedupeArtifactsByLogicalName(listRunArtifacts(REPO, runIdStr));
 
-  const allArtifacts: { name: string; archive_download_url: string; created_at: string }[] = [];
-  for (const line of artifactListJson.trim().split('\n')) {
-    if (!line) continue;
-    try {
-      const parsed = JSON.parse(line);
-      allArtifacts.push(parsed);
-    } catch {}
+  for (const artifact of byLogical.values()) {
+    console.log(`  ${artifact.name}`);
+    downloadArtifact(artifact, artifactsDir);
   }
 
-  const byName = new Map<string, (typeof allArtifacts)[0]>();
-  for (const a of allArtifacts) {
-    const existing = byName.get(a.name);
-    if (!existing || a.created_at > existing.created_at) {
-      byName.set(a.name, a);
-    }
-  }
+  console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
 
-  for (const [name, artifact] of byName) {
-    console.log(`  ${name}`);
-    const zipPath = path.join(artifactsDir, 'artifact.zip');
-    execSync(`gh api "${artifact.archive_download_url}" > "${zipPath}"`, {
-      stdio: ['pipe', 'pipe', 'inherit'],
-    });
-    const destDir = path.join(artifactsDir, name);
-    fs.mkdirSync(destDir, { recursive: true });
-    execSync(`unzip -oq "${zipPath}" -d "${destDir}"`, { stdio: 'inherit' });
-    fs.unlinkSync(zipPath);
-  }
-
-  console.log(`\n  Downloaded ${byName.size} artifact(s)`);
-
-  // Fetch run attempt from API
-  const attemptStr = execSync(
-    `gh api "repos/${REPO}/actions/runs/${runIdStr}" --jq '.run_attempt'`,
-    { encoding: 'utf8' },
-  ).trim();
-  runAttemptNum = parseInt(attemptStr || '1', 10);
+  runAttemptNum = fetchRunAttempt(REPO, runIdStr);
 } else {
   // CI mode — read from env vars
   for (const key of [
@@ -193,6 +173,14 @@ const ARTIFACT_NAMES = {
   evals: 'eval_results_all',
   changelog: 'changelog-metadata',
 } as const;
+
+/**
+ * Strip the `bmk_` and/or `agentic_` prefixes from an artifact directory name
+ * so the bare suffix becomes a shared key between `bmk_agentic_<suffix>` and
+ * its sibling `agentic_<suffix>` artifact.
+ */
+const stripBmkAndAgenticPrefix = (s: string): string =>
+  s.replace(/^bmk_/u, '').replace(/^agentic_/u, '');
 
 function readJson(filePath: string): unknown {
   try {
@@ -294,13 +282,14 @@ async function main(): Promise<void> {
 
   const availRows: {
     model: string;
-    isl: number;
-    osl: number;
+    isl: number | null;
+    osl: number | null;
     precision: string;
     hardware: string;
     framework: string;
     specMethod: string;
     disagg: boolean;
+    benchmarkType: string;
   }[] = [];
 
   let totalNewBmk = 0,
@@ -311,6 +300,11 @@ async function main(): Promise<void> {
   let totalSamples = 0;
   let totalSampleFiles = 0;
   let totalChangelogs = 0;
+  let totalTraceReplayLinked = 0;
+  const datasetSlugs = new Set<string>();
+  // Dataset slugs referenced by this run's agentic rows but absent from the
+  // `datasets` table — timeline→dataset deep links 404 until they're ingested.
+  const missingDatasets = new Set<string>();
 
   // ── Check for evals-only flag in changelog ────────────────────────────
   const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
@@ -355,14 +349,30 @@ async function main(): Promise<void> {
     if (fs.existsSync(artifactsDir)) {
       for (const d of fs.readdirSync(artifactsDir)) {
         if (!d.startsWith('server_logs_')) continue;
-        const logPath = path.join(artifactsDir, d, 'server.log');
-        if (!fs.existsSync(logPath)) continue;
+        // feat-agentx-v1.0 harness nests the log under `results/server.log`;
+        // older runs keep it at the artifact root. Check both.
+        const logPath = [
+          path.join(artifactsDir, d, 'server.log'),
+          path.join(artifactsDir, d, 'results', 'server.log'),
+        ].find((p) => fs.existsSync(p));
+        if (!logPath) continue;
         const configKey = d.replace(/^server_logs_/u, '');
         serverLogPaths.set(configKey, logPath);
       }
     }
     if (serverLogPaths.size > 0) {
       console.log(`  Found ${serverLogPaths.size} server log artifact(s)`);
+    }
+
+    // Sibling aiperf artifacts: each `bmk_agentic_<suffix>` is paired with an
+    // `agentic_<suffix>` dir holding `profile_export.jsonl` and
+    // `server_metrics_export.csv`. The harness emits these under either a
+    // `trace_replay/` subdir (older layout) or `aiperf_artifacts/` (current).
+    // Older non-aiperf agentic runs don't ship this sibling. Key on the bare
+    // suffix so both names map to the same Map entry.
+    const traceReplayPaths = discoverTraceReplayArtifacts(artifactsDir);
+    if (traceReplayPaths.size > 0) {
+      console.log(`  Found ${traceReplayPaths.size} trace_replay sibling artifact(s)`);
     }
 
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
@@ -375,6 +385,12 @@ async function main(): Promise<void> {
       const rawRows: Record<string, any>[] = Array.isArray(data)
         ? data
         : [data as Record<string, any>];
+
+      for (const rawRow of rawRows) {
+        if (!rawRow || typeof rawRow !== 'object') continue;
+        const datasetSlug = datasetSlugFromBenchmarkRow(rawRow);
+        if (datasetSlug) datasetSlugs.add(datasetSlug);
+      }
 
       const rows = rawRows
         .filter((r) => typeof r === 'object' && r !== null)
@@ -415,13 +431,21 @@ async function main(): Promise<void> {
               framework: r.config.framework,
               specMethod: r.config.specMethod,
               disagg: r.config.disagg,
+              benchmarkType: r.benchmarkType,
             });
           }
 
           const parentDir = path.basename(path.dirname(file));
           if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
+            // Single-turn artifacts are `bmk_<key>` paired with
+            // `server_logs_<key>`. Agentic artifacts are `bmk_agentic_<key>`
+            // but the server log is still `server_logs_<key>` (no `agentic_`
+            // prefix), so fall back to the fully-stripped suffix — otherwise
+            // agentic rows never get their server log (and KV-pool size) linked.
             const configKey = parentDir.replace(/^bmk_/u, '');
-            const logPath = serverLogPaths.get(configKey);
+            const logPath =
+              serverLogPaths.get(configKey) ??
+              serverLogPaths.get(stripBmkAndAgenticPrefix(parentDir));
             if (logPath) {
               try {
                 const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
@@ -431,12 +455,49 @@ async function main(): Promise<void> {
               }
             }
           }
+
+          // Trace-replay sibling lookup for agentic points only. The aiperf
+          // harness emits `agentic_<suffix>/trace_replay/...` next to the
+          // `bmk_agentic_<suffix>` artifact we just ingested.
+          if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
+            const suffix = stripBmkAndAgenticPrefix(parentDir);
+            const concMatch = path.basename(file).match(/_conc(?<conc>\d+)\.json$/u);
+            const trace =
+              (concMatch?.groups?.conc
+                ? traceReplayPaths.get(`${suffix}|${concMatch.groups.conc}`)
+                : undefined) ?? traceReplayPaths.get(suffix);
+            if (trace) {
+              try {
+                const profile = trace.profileJsonl ? fs.readFileSync(trace.profileJsonl) : null;
+                const metrics = trace.serverMetricsCsv
+                  ? fs.readFileSync(trace.serverMetricsCsv)
+                  : null;
+                const metricsJson = trace.serverMetricsJson
+                  ? fs.readFileSync(trace.serverMetricsJson)
+                  : null;
+                await insertTraceReplay(sql, insertedIds, profile, metrics, metricsJson, {
+                  framework: toInsert[0]?.config.framework,
+                  disagg: toInsert[0]?.config.disagg,
+                });
+                totalTraceReplayLinked += insertedIds.length;
+              } catch (error: any) {
+                tracker.recordDbError(`trace_replay for ${suffix}`, error);
+              }
+            } else {
+              tracker.skips.traceReplayMissing++;
+            }
+          }
         } catch (error: any) {
           tracker.recordDbError(path.basename(file), error);
         }
       }
     }
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
+    if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
+      console.log(
+        `  Trace replay: ${totalTraceReplayLinked} rows linked, ${tracker.skips.traceReplayMissing} agentic point(s) missing sibling artifact`,
+      );
+    }
 
     if (availRows.length > 0) {
       try {
@@ -444,6 +505,30 @@ async function main(): Promise<void> {
         console.log(`  Availability: ${availRows.length} row(s) upserted`);
       } catch (error: any) {
         tracker.recordDbError('availability', error);
+      }
+    }
+
+    if (datasetSlugs.size > 1) {
+      throw new Error(
+        `Conflicting dataset provenance in workflow run ${runId}: ${[...datasetSlugs].toSorted().join(', ')}`,
+      );
+    }
+    const [datasetSlug] = datasetSlugs;
+    if (datasetSlug) {
+      await sql`
+        insert into run_datasets (workflow_run_id, dataset_slug)
+        values (${workflowRunId}, ${datasetSlug})
+        on conflict (workflow_run_id) do update
+        set dataset_slug = excluded.dataset_slug
+      `;
+      console.log(`  Dataset: linked workflow run to ${datasetSlug}`);
+      const [known] = await sql`select 1 as ok from datasets where slug = ${datasetSlug}`;
+      if (!known) {
+        missingDatasets.add(datasetSlug);
+        console.warn(
+          `  ⚠ Dataset ${datasetSlug} is not in the datasets table — request-timeline deep links ` +
+            `will 404 until it is ingested (packages/db/src/ingest-weka-dataset.ts)`,
+        );
       }
     }
   }
@@ -654,11 +739,17 @@ async function main(): Promise<void> {
 
   const { skips, unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
   const totalSkips =
-    skips.badZip + skips.unmappedModel + skips.unmappedHw + skips.noIslOsl + skips.dbError;
+    skips.badZip +
+    skips.unmappedModel +
+    skips.unmappedHw +
+    skips.noIslOsl +
+    skips.failedRun +
+    skips.dbError;
   if (totalSkips > 0) {
     console.log(`\n  Skipped: ${totalSkips} rows`);
     const skipLines: [string, number][] = [
       ['no isl/osl (old format)', skips.noIslOsl],
+      ['failed run (0 successful)', skips.failedRun],
       ['unmapped model', skips.unmappedModel],
       ['unmapped hw', skips.unmappedHw],
       ['bad/empty zip', skips.badZip],
@@ -690,7 +781,10 @@ async function main(): Promise<void> {
   const unmappedOutPath = process.env.UNMAPPED_ENTITIES_OUTPUT;
   if (
     unmappedOutPath &&
-    (unmappedModels.size > 0 || unmappedHws.size > 0 || unmappedPrecisions.size > 0)
+    (unmappedModels.size > 0 ||
+      unmappedHws.size > 0 ||
+      unmappedPrecisions.size > 0 ||
+      missingDatasets.size > 0)
   ) {
     fs.writeFileSync(
       unmappedOutPath,
@@ -698,6 +792,7 @@ async function main(): Promise<void> {
         models: [...unmappedModels],
         hardware: [...unmappedHws],
         precisions: [...unmappedPrecisions],
+        datasets: [...missingDatasets],
       }),
     );
   }

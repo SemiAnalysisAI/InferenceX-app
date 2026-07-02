@@ -457,6 +457,9 @@ async function mapWorkflowDir(
       unmappedModel: local.skips.unmappedModel,
       unmappedHw: local.skips.unmappedHw,
       noIslOsl: local.skips.noIslOsl,
+      failedRun: local.skips.failedRun,
+      // GCS backup doesn't ingest aiperf trace files; counter stays 0.
+      traceReplayMissing: local.skips.traceReplayMissing,
     },
     localUnmappedModels: new Set(local.unmappedModels),
     localUnmappedHws: new Set(local.unmappedHws),
@@ -621,13 +624,14 @@ async function main(): Promise<void> {
     // Upsert availability rows only for successfully resolved configs
     const availRows: {
       model: string;
-      isl: number;
-      osl: number;
+      isl: number | null;
+      osl: number | null;
       precision: string;
       hardware: string;
       framework: string;
       specMethod: string;
       disagg: boolean;
+      benchmarkType: string;
     }[] = [];
     for (const r of allInserted) {
       availRows.push({
@@ -639,6 +643,7 @@ async function main(): Promise<void> {
         framework: r.config.framework,
         specMethod: r.config.specMethod,
         disagg: r.config.disagg,
+        benchmarkType: r.benchmarkType,
       });
     }
     if (availRows.length > 0) {

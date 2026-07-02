@@ -7,8 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { getLatestBenchmarks as GetLatestBenchmarks } from './json-provider.js';
 
 /**
- * A chart line is one config + sequence (config_id, benchmark_type, isl, osl) plotted across
- * concurrencies, and it must come from a SINGLE workflow run. getLatestBenchmarks picks the
+ * A chart line is one config + sequence + offload mode
+ * (config_id, benchmark_type, isl, osl, offload_mode) plotted across concurrencies, and it must
+ * come from a SINGLE workflow run. getLatestBenchmarks picks the
  * newest run per line (date, then run_started_at, then workflow_run_id) and returns EVERY
  * concurrency that one run measured — never stitching skipped concurrencies from an older run.
  *
@@ -62,6 +63,7 @@ const result = (
   tpot: number,
   isl = 1024,
   osl = 1024,
+  offloadMode = 'off',
 ) => ({
   id: nextResultId++,
   workflow_run_id: runDbId,
@@ -71,6 +73,7 @@ const result = (
   isl,
   osl,
   conc,
+  offload_mode: offloadMode,
   image: null,
   metrics: { median_tpot: tpot },
   error: null,
@@ -105,6 +108,10 @@ beforeAll(async () => {
       // config 1, seq (8192,1024): only run A measured it (run B skipped this sequence).
       result(10, 1, OLD, 1, 0.2, 8192, 1024),
       result(10, 1, OLD, 8, 0.3, 8192, 1024),
+      // Offload mode is an independent line dimension. A newer off-mode run must not hide
+      // the older on-mode line for the same config and sequence.
+      result(10, 1, OLD, 4, 0.25, 4096, 4096, 'on'),
+      result(11, 1, NEW, 4, 0.2, 4096, 4096, 'off'),
       // config 2, seq (1024,1024): two same-day runs with identical run_started_at.
       result(20, 2, NEW, 1, 0.5),
       result(20, 2, NEW, 8, 0.6),
@@ -154,6 +161,21 @@ describe('getLatestBenchmarks — one run per line', () => {
     expect(seq).toEqual([
       { conc: 1, runUrl: 'https://github.com/x/runs/100/attempts/1' },
       { conc: 8, runUrl: 'https://github.com/x/runs/100/attempts/1' },
+    ]);
+  });
+
+  it('selects winning runs independently for each offload mode', () => {
+    const rows = getLatestBenchmarks('testm', NEW, false).filter(
+      (r) => r.isl === 4096 && r.osl === 4096,
+    );
+
+    expect(
+      rows
+        .map((r) => ({ offloadMode: r.offload_mode, runUrl: r.run_url }))
+        .toSorted((a, b) => a.offloadMode.localeCompare(b.offloadMode)),
+    ).toEqual([
+      { offloadMode: 'off', runUrl: 'https://github.com/x/runs/101/attempts/1' },
+      { offloadMode: 'on', runUrl: 'https://github.com/x/runs/100/attempts/1' },
     ]);
   });
 

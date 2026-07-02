@@ -72,6 +72,8 @@ interface RawBenchmarkResult {
   isl: number;
   osl: number;
   conc: number;
+  /** Added by the AgentX schema; older dumps omit it and are treated as off. */
+  offload_mode?: string;
   image: string | null;
   metrics: Record<string, number>;
   /** Added in migration 006; older dumps omit this field — surfaced as undefined. */
@@ -281,6 +283,7 @@ function toBenchmarkRow(
   metrics?: Record<string, number>,
 ): BenchmarkRow {
   return {
+    id: br.id,
     hardware: c.hardware,
     framework: c.framework,
     model: c.model,
@@ -298,6 +301,8 @@ function toBenchmarkRow(
     decode_num_workers: c.decode_num_workers,
     num_prefill_gpu: c.num_prefill_gpu,
     num_decode_gpu: c.num_decode_gpu,
+    benchmark_type: br.benchmark_type ?? 'single_turn',
+    offload_mode: (br as { offload_mode?: string }).offload_mode ?? 'off',
     isl: br.isl,
     osl: br.osl,
     conc: br.conc,
@@ -351,9 +356,9 @@ export function compareBenchmarkRecency(
   return bStarted.localeCompare(aStarted);
 }
 
-/** Chart-line identity: one config + sequence. All concurrencies of a line come from one run. */
+/** Chart-line identity: one config + sequence + offload mode. All concurrencies of a line come from one run. */
 const lineKey = (br: RawBenchmarkResult): string =>
-  `${br.config_id}:${br.benchmark_type}:${br.isl}:${br.osl}`;
+  `${br.config_id}:${br.benchmark_type}:${br.isl}:${br.osl}:${br.offload_mode ?? 'off'}`;
 
 export function getLatestBenchmarks(
   modelKey: string | string[],
@@ -390,7 +395,7 @@ export function getLatestBenchmarks(
     return true;
   });
 
-  // Single run per LINE (config_id, benchmark_type, isl, osl): pick the newest run that
+  // Single run per LINE (config_id, benchmark_type, isl, osl, offload_mode): pick the newest run that
   // produced data for the line, then keep EVERY concurrency that one run measured. Sort by
   // recency (date, then run_started_at) with a final workflow_run_id DESC tiebreak so exactly
   // one run wins even when run_started_at is equal/null — matching the SQL ORDER BY.
@@ -499,7 +504,11 @@ export function getAvailabilityData(): AvailabilityRow[] {
   for (const a of s.availability) {
     const key = `${a.model}|${a.hardware}|${a.framework}|${a.precision}|${a.isl}|${a.osl}|${toDateString(a.date)}`;
     if (validKeys.has(key)) {
-      rows.push({ ...a, date: toDateString(a.date) });
+      rows.push({
+        ...a,
+        benchmark_type: (a as { benchmark_type?: string }).benchmark_type ?? 'single_turn',
+        date: toDateString(a.date),
+      });
     }
   }
 
