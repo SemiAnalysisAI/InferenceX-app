@@ -4,7 +4,7 @@
  *
  * The ingest path now computes the timeline inline, but existing rows
  * (and rows whose computation logic has since changed) still need this
- * pass. Run after applying migration 010 and any time the version bumps.
+ * pass. Run after the agentic schema migration and any time the version bumps.
  *
  * Usage:
  *   pnpm --filter @semianalysisai/inferencex-db db:backfill-request-timeline

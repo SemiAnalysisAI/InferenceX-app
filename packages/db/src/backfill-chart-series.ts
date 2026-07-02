@@ -4,7 +4,7 @@
  *
  * The ingest path now computes the time-series inline, but existing rows
  * (and rows whose computation logic has since changed) still need this
- * pass. Run after applying migration 009 and any time `CHART_SERIES_VERSION`
+ * pass. Run after the agentic schema migration and any time `CHART_SERIES_VERSION`
  * bumps.
  *
  * Strategy:

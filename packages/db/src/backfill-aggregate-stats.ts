@@ -3,8 +3,7 @@
  * or were computed by an older `STATS_VERSION`.
  *
  * The ingest path now computes stats inline, but existing rows (and rows
- * whose computation logic has since changed) still need this pass. Run after
- * applying migration 008 and any time `STATS_VERSION` bumps.
+ * whose computation logic has since changed) still need this pass. Run after the agentic schema migration and any time `STATS_VERSION` bumps.
  *
  * Strategy:
  *   - Stream rows one at a time (server_metrics_json_gz can be hundreds of
