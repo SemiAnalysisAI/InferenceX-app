@@ -28,6 +28,7 @@
     "no-undef": "off",
     "no-underscore-dangle": "off",
     "no-useless-undefined": "off",
+    "require-unicode-regexp": "off",
     "no-warning-comments": "off",
     "prefer-destructuring": "off",
     "sort-imports": "off",
