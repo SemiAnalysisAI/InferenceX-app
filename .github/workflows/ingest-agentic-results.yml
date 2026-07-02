@@ -45,6 +45,7 @@ jobs:
       contents: read
     steps:
       - name: Wait for source run to finish
+        if: github.event_name != 'workflow_dispatch'
         run: sleep 300
 
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
