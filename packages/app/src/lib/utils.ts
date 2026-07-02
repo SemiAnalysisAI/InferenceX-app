@@ -5,6 +5,7 @@ import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inferenc
 import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
 import { getGpuSpecs } from './constants';
+import { costPerMillionTokens, joulesPerToken, tokensPerHourInMillions } from './derived-metrics';
 /**
  * Combines Tailwind CSS classes and other class values into a single string.
  * This utility helps in conditionally applying classes and merging them efficiently,
@@ -67,8 +68,8 @@ export function calculateCostsForGpus(
     }
     if (userCostPerHour !== undefined) {
       const tputPerGpu = item.tpPerGpu.y;
-      const tokensPerHour = (tputPerGpu * 3600) / 1000000;
-      const costPerMillion = userCostPerHour / tokensPerHour;
+      // No divisor guard here (historical): zero throughput yields Infinity/NaN.
+      const costPerMillion = costPerMillionTokens(userCostPerHour, tputPerGpu);
       const costRounded = parseFloat(costPerMillion.toFixed(3));
 
       // Return the data with costUser property and updated y value
@@ -183,12 +184,15 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
     // Get output throughput - either from outputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), output tokens dominate, typically ~87.5% of total
     const outputTputPerGpu = item.outputTputPerGpu?.y ?? item.tpPerGpu.y * 0.875;
-    const outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000;
+    const outputTokensPerHour = tokensPerHourInMillions(outputTputPerGpu);
 
     // Calculate output cost per million tokens for each cost type
-    const costhOutput = outputTokensPerHour > 0 ? specs.costh / outputTokensPerHour : 0;
-    const costnOutput = outputTokensPerHour > 0 ? specs.costn / outputTokensPerHour : 0;
-    const costrOutput = outputTokensPerHour > 0 ? specs.costr / outputTokensPerHour : 0;
+    const costhOutput =
+      outputTokensPerHour > 0 ? costPerMillionTokens(specs.costh, outputTputPerGpu) : 0;
+    const costnOutput =
+      outputTokensPerHour > 0 ? costPerMillionTokens(specs.costn, outputTputPerGpu) : 0;
+    const costrOutput =
+      outputTokensPerHour > 0 ? costPerMillionTokens(specs.costr, outputTputPerGpu) : 0;
 
     return {
       ...item,
@@ -311,7 +315,7 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
     const inputTputPerGpu = item.inputTputPerGpu?.y;
 
     // J/token = W / (tok/s) = (kW * 1000) / (tok/s)
-    const jTotal = hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0;
+    const jTotal = hardwarePower && tputPerGpu ? joulesPerToken(hardwarePower, tputPerGpu) : 0;
 
     const result: InferenceData = {
       ...item,
@@ -320,14 +324,14 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
 
     if (outputTputPerGpu) {
       result.jOutput = {
-        y: hardwarePower && outputTputPerGpu ? (hardwarePower * 1000) / outputTputPerGpu : 0,
+        y: hardwarePower && outputTputPerGpu ? joulesPerToken(hardwarePower, outputTputPerGpu) : 0,
         roof: false,
       };
     }
 
     if (inputTputPerGpu) {
       result.jInput = {
-        y: hardwarePower && inputTputPerGpu ? (hardwarePower * 1000) / inputTputPerGpu : 0,
+        y: hardwarePower && inputTputPerGpu ? joulesPerToken(hardwarePower, inputTputPerGpu) : 0,
         roof: false,
       };
     }
@@ -349,12 +353,12 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
     // Get input throughput - either from inputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), input tokens are typically ~12.5% of total
     const inputTputPerGpu = item.inputTputPerGpu?.y ?? item.tpPerGpu.y * 0.125;
-    const inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000;
+    const inputTokensPerHour = tokensPerHourInMillions(inputTputPerGpu);
 
     // Calculate input cost per million tokens for each cost type
-    const costhi = inputTokensPerHour > 0 ? specs.costh / inputTokensPerHour : 0;
-    const costni = inputTokensPerHour > 0 ? specs.costn / inputTokensPerHour : 0;
-    const costri = inputTokensPerHour > 0 ? specs.costr / inputTokensPerHour : 0;
+    const costhi = inputTokensPerHour > 0 ? costPerMillionTokens(specs.costh, inputTputPerGpu) : 0;
+    const costni = inputTokensPerHour > 0 ? costPerMillionTokens(specs.costn, inputTputPerGpu) : 0;
+    const costri = inputTokensPerHour > 0 ? costPerMillionTokens(specs.costr, inputTputPerGpu) : 0;
 
     return {
       ...item,

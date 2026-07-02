@@ -29,6 +29,7 @@ import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/t
 import { cachedQuery } from '@/lib/api-cache';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { getHardwareKey } from '@/lib/chart-utils';
+import { costPerMillionTokens, tokensPerMwFromPerGpu } from '@/lib/derived-metrics';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -120,9 +121,10 @@ export function summarize(rows: BenchmarkRow[], hw: string): PairSummary {
 // GPUDataPoint construction + interpolation pipeline
 // ---------------------------------------------------------------------------
 
-/** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
+/** Cost per million tokens. Guard on `costPerHour && tps > 0` is this site's
+ *  historical semantics (guards on cost being truthy too) — preserved. */
 const computeGpuCost = (costPerHour: number, tps: number) =>
-  costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
+  costPerHour && tps > 0 ? costPerMillionTokens(costPerHour, tps) : 0;
 
 export interface SsrInterpolatedRow {
   target: number;
@@ -154,6 +156,10 @@ function buildGpuDataPoints(
     const specs = getGpuSpecs(hwKey);
     const power = specs.power;
 
+    // TODO(derived-metrics): energy fields (jTotal/jOutput/jInput via
+    // joulesPerToken(power, tput)) can now be added trivially here from the
+    // shared derived-metrics module — deferred to a separate pass since adding
+    // them to GPUDataPoint is a behaviour change (new fields on the shape).
     points.push({
       hwKey,
       interactivity: m.median_intvty ?? 0,
@@ -175,9 +181,9 @@ function buildGpuDataPoints(
       costhOutput: computeGpuCost(specs.costh, outputTput),
       costnOutput: computeGpuCost(specs.costn, outputTput),
       costrOutput: computeGpuCost(specs.costr, outputTput),
-      tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
-      inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
-      outputTpPerMw: power && power > 0 ? (outputTput * 1000) / power : 0,
+      tpPerMw: power && power > 0 ? tokensPerMwFromPerGpu(tput, power) : 0,
+      inputTpPerMw: power && power > 0 ? tokensPerMwFromPerGpu(inputTput, power) : 0,
+      outputTpPerMw: power && power > 0 ? tokensPerMwFromPerGpu(outputTput, power) : 0,
     });
   }
   return points;

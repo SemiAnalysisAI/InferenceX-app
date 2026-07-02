@@ -9,6 +9,12 @@ import iwanthue from 'iwanthue';
 
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import {
+  costPerMillionTokens,
+  joulesPerToken,
+  tokensPerHourInMillions,
+  tokensPerMwFromPerGpu,
+} from '@/lib/derived-metrics';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 
 // ---------------------------------------------------------------------------
@@ -296,9 +302,9 @@ export function createChartDataPoint(
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
   const inputTputPerGpu = entry.input_tput_per_gpu ?? 0;
 
-  const tokensPerHour = (tputPerGpu * 3600) / 1000000;
-  const outputTokensPerHour = (outputTputPerGpu * 3600) / 1000000;
-  const inputTokensPerHour = (inputTputPerGpu * 3600) / 1000000;
+  const tokensPerHour = tokensPerHourInMillions(tputPerGpu);
+  const outputTokensPerHour = tokensPerHourInMillions(outputTputPerGpu);
+  const inputTokensPerHour = tokensPerHourInMillions(inputTputPerGpu);
 
   return {
     // Spread all AggDataEntry fields (raw stats, metadata, etc.)
@@ -339,11 +345,11 @@ export function createChartDataPoint(
     tpPerGpu: { y: tputPerGpu, roof: false },
     ...(outputTputPerGpu ? { outputTputPerGpu: { y: outputTputPerGpu, roof: false } } : {}),
     ...(inputTputPerGpu ? { inputTputPerGpu: { y: inputTputPerGpu, roof: false } } : {}),
-    tpPerMw: { y: (tputPerGpu * 1000) / hardwarePower, roof: false },
+    tpPerMw: { y: tokensPerMwFromPerGpu(tputPerGpu, hardwarePower), roof: false },
     ...(inputTputPerGpu
       ? {
           inputTputPerMw: {
-            y: hardwarePower ? (inputTputPerGpu * 1000) / hardwarePower : 0,
+            y: hardwarePower ? tokensPerMwFromPerGpu(inputTputPerGpu, hardwarePower) : 0,
             roof: false,
           },
         }
@@ -351,64 +357,86 @@ export function createChartDataPoint(
     ...(outputTputPerGpu
       ? {
           outputTputPerMw: {
-            y: hardwarePower ? (outputTputPerGpu * 1000) / hardwarePower : 0,
+            y: hardwarePower ? tokensPerMwFromPerGpu(outputTputPerGpu, hardwarePower) : 0,
             roof: false,
           },
         }
       : {}),
 
-    // Cost fields (combined throughput)
+    // Cost fields (combined throughput). Guard on hardwarePower (not cost) is
+    // load-bearing — see derived-metrics.ts guard note.
     costh: {
-      y: hardwarePower && tokensPerHour ? specs.costh / tokensPerHour : 0,
+      y: hardwarePower && tokensPerHour ? costPerMillionTokens(specs.costh, tputPerGpu) : 0,
       roof: false,
     },
     costn: {
-      y: hardwarePower && tokensPerHour ? specs.costn / tokensPerHour : 0,
+      y: hardwarePower && tokensPerHour ? costPerMillionTokens(specs.costn, tputPerGpu) : 0,
       roof: false,
     },
     costr: {
-      y: hardwarePower && tokensPerHour ? specs.costr / tokensPerHour : 0,
+      y: hardwarePower && tokensPerHour ? costPerMillionTokens(specs.costr, tputPerGpu) : 0,
       roof: false,
     },
 
     // Cost per million output tokens
     costhOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costh / outputTokensPerHour : 0,
+      y:
+        hardwarePower && outputTokensPerHour
+          ? costPerMillionTokens(specs.costh, outputTputPerGpu)
+          : 0,
       roof: false,
     },
     costnOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costn / outputTokensPerHour : 0,
+      y:
+        hardwarePower && outputTokensPerHour
+          ? costPerMillionTokens(specs.costn, outputTputPerGpu)
+          : 0,
       roof: false,
     },
     costrOutput: {
-      y: hardwarePower && outputTokensPerHour ? specs.costr / outputTokensPerHour : 0,
+      y:
+        hardwarePower && outputTokensPerHour
+          ? costPerMillionTokens(specs.costr, outputTputPerGpu)
+          : 0,
       roof: false,
     },
 
     // Cost per million input tokens
     costhi: {
-      y: hardwarePower && inputTokensPerHour ? specs.costh / inputTokensPerHour : 0,
+      y:
+        hardwarePower && inputTokensPerHour
+          ? costPerMillionTokens(specs.costh, inputTputPerGpu)
+          : 0,
       roof: false,
     },
     costni: {
-      y: hardwarePower && inputTokensPerHour ? specs.costn / inputTokensPerHour : 0,
+      y:
+        hardwarePower && inputTokensPerHour
+          ? costPerMillionTokens(specs.costn, inputTputPerGpu)
+          : 0,
       roof: false,
     },
     costri: {
-      y: hardwarePower && inputTokensPerHour ? specs.costr / inputTokensPerHour : 0,
+      y:
+        hardwarePower && inputTokensPerHour
+          ? costPerMillionTokens(specs.costr, inputTputPerGpu)
+          : 0,
       roof: false,
     },
 
     // All-in provisioned Joules per token: J/token = W/GPU / tok/s/gpu
-    // hardwarePower is in kW, so multiply by 1000 to get watts
+    // hardwarePower is in kW; joulesPerToken converts kW→W internally.
     jTotal: {
-      y: hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
+      y: hardwarePower && tputPerGpu ? joulesPerToken(hardwarePower, tputPerGpu) : 0,
       roof: false,
     },
     ...(outputTputPerGpu
       ? {
           jOutput: {
-            y: hardwarePower && outputTputPerGpu ? (hardwarePower * 1000) / outputTputPerGpu : 0,
+            y:
+              hardwarePower && outputTputPerGpu
+                ? joulesPerToken(hardwarePower, outputTputPerGpu)
+                : 0,
             roof: false,
           },
         }
@@ -416,7 +444,8 @@ export function createChartDataPoint(
     ...(inputTputPerGpu
       ? {
           jInput: {
-            y: hardwarePower && inputTputPerGpu ? (hardwarePower * 1000) / inputTputPerGpu : 0,
+            y:
+              hardwarePower && inputTputPerGpu ? joulesPerToken(hardwarePower, inputTputPerGpu) : 0,
             roof: false,
           },
         }
