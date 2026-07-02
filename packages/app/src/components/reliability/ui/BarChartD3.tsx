@@ -4,9 +4,9 @@ import { track } from '@/lib/analytics';
 import { type ReactNode, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
-import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
+import { type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
@@ -14,7 +14,11 @@ import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-marg
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import ChartLegend from '@/components/ui/chart-legend';
+import { HorizontalBarChartCore } from '@/components/ui/horizontal-bar-chart-core';
+import {
+  compareByModelSortIndex,
+  resolveInsideLabelPlacement,
+} from '@/components/ui/horizontal-bar-chart-core.helpers';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
@@ -57,13 +61,14 @@ function positionLabelPairs(
 
   const apply = (sel: d3.Selection<SVGTextElement, ChartItem, SVGGElement, unknown>) => {
     sel.each(function (d) {
-      const barEnd = xScale(d.successRate);
-      const maxW = maxWidths.get(d.modelLabel) ?? 0;
-      const fitsInside = barEnd > maxW + 24;
-      const fill = fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
+      const placement = resolveInsideLabelPlacement(
+        xScale(d.successRate),
+        maxWidths.get(d.modelLabel) ?? 0,
+      );
+      const fill = placement.fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
       d3.select(this)
-        .attr('x', fitsInside ? barEnd - 10 : barEnd + 6)
-        .attr('text-anchor', fitsInside ? 'end' : 'start')
+        .attr('x', placement.x)
+        .attr('text-anchor', placement.textAnchor)
         .style('fill', fill)
         .attr('stroke', null);
     });
@@ -93,11 +98,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const sortedModels = useMemo(
     () =>
       [...filteredReliabilityData]
-        .toSorted(
-          (a, b) =>
-            getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
-            a.model.localeCompare(b.model),
-        )
+        .toSorted((a, b) => compareByModelSortIndex(a.model, b.model))
         .map((d) => d.model),
     [filteredReliabilityData],
   );
@@ -115,11 +116,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const legendItems = useMemo(
     () =>
       [...filteredReliabilityData]
-        .toSorted(
-          (a, b) =>
-            getModelSortIndex(a.model) - getModelSortIndex(b.model) ||
-            a.model.localeCompare(b.model),
-        )
+        .toSorted((a, b) => compareByModelSortIndex(a.model, b.model))
         .map((data) => ({
           name: data.model,
           label: getHardwareConfig(data.model).label,
@@ -135,11 +132,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
 
   // Sort chart data by model sort index (same as legend)
   const sortedChartData = useMemo(
-    () =>
-      [...chartData].toSorted(
-        (a, b) =>
-          getModelSortIndex(a.model) - getModelSortIndex(b.model) || a.model.localeCompare(b.model),
-      ),
+    () => [...chartData].toSorted((a, b) => compareByModelSortIndex(a.model, b.model)),
     [chartData],
   );
 
@@ -242,87 +235,78 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   ) : null;
 
   return (
-    <div className="relative">
-      <D3Chart<ChartItem>
-        chartId="reliability-chart"
-        data={sortedChartData}
-        height={dynamicHeight}
-        margin={chartMargin}
-        watermark="logo"
-        grabCursor
-        clipContent={false}
-        caption={caption}
-        noDataOverlay={emptyOverlay}
-        instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
-        xScale={{ type: 'linear', domain: [0, 100] }}
-        yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
-        xAxis={xAxisConfig}
-        yAxis={yAxisConfig}
-        layers={layers}
-        zoom={{
-          enabled: true,
-          axes: 'x',
-          scaleExtent: [0.1, 1],
-          rescaleX: (xScale, transform) =>
-            xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
-          customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
-        }}
-        tooltip={{
-          rulerType: 'vertical',
-          content: generateReliabilityTooltipContent,
-          getRulerX: () => hoveredBarXRef.current,
-          getRulerY: (d, ys) => {
-            const bandScale = ys as unknown as d3.ScaleBand<string>;
-            return (bandScale(d.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
+    <HorizontalBarChartCore<ChartItem>
+      chartId="reliability-chart"
+      data={sortedChartData}
+      height={dynamicHeight}
+      margin={chartMargin}
+      watermark="logo"
+      grabCursor
+      clipContent={false}
+      caption={caption}
+      noDataOverlay={emptyOverlay}
+      wrapRelative
+      instructions="Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details"
+      xScale={{ type: 'linear', domain: [0, 100] }}
+      yScale={{ type: 'band', domain: yDomain, padding: 0.15 }}
+      xAxis={xAxisConfig}
+      yAxis={yAxisConfig}
+      layers={layers}
+      zoom={{
+        enabled: true,
+        axes: 'x',
+        scaleExtent: [0.1, 1],
+        rescaleX: (xScale, transform) =>
+          xScale.copy().domain([0, 100 / transform.k]) as ContinuousScale,
+        customTransformStorage: (transform) => d3.zoomIdentity.scale(transform.k),
+      }}
+      tooltip={{
+        rulerType: 'vertical',
+        content: generateReliabilityTooltipContent,
+        getRulerX: () => hoveredBarXRef.current,
+        getRulerY: (d, ys) => {
+          const bandScale = ys as unknown as d3.ScaleBand<string>;
+          return (bandScale(d.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
+        },
+        onHoverStart: (sel) => {
+          hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
+          sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
+        },
+        onHoverEnd: (sel) => {
+          sel.attr('stroke', 'none');
+        },
+        attachToLayer: 0,
+      }}
+      legendItems={legendItems}
+      onItemRemove={removeModel}
+      isLegendExpanded={isLegendExpanded}
+      setIsLegendExpanded={setIsLegendExpanded}
+      legendExpandedEvent="reliability_legend_expanded"
+      switches={[
+        {
+          id: 'reliability-high-contrast',
+          label: 'High Contrast',
+          checked: highContrast,
+          onCheckedChange: (checked) => {
+            setHighContrast(checked);
+            track('reliability_high_contrast_toggled', { enabled: checked });
           },
-          onHoverStart: (sel) => {
-            hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
-            sel.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
-          },
-          onHoverEnd: (sel) => {
-            sel.attr('stroke', 'none');
-          },
-          attachToLayer: 0,
-        }}
-        legendElement={
-          <ChartLegend
-            variant="sidebar"
-            legendItems={legendItems}
-            onItemRemove={removeModel}
-            isLegendExpanded={isLegendExpanded}
-            onExpandedChange={(expanded) => {
-              setIsLegendExpanded(expanded);
-              track('reliability_legend_expanded', { expanded });
-            }}
-            switches={[
+        },
+      ]}
+      actions={
+        enabledModels.size < modelsWithData.size
+          ? [
               {
-                id: 'reliability-high-contrast',
-                label: 'High Contrast',
-                checked: highContrast,
-                onCheckedChange: (checked) => {
-                  setHighContrast(checked);
-                  track('reliability_high_contrast_toggled', { enabled: checked });
+                id: 'reliability-reset-filter',
+                label: 'Reset filter',
+                onClick: () => {
+                  selectAllModels();
+                  track('reliability_filter_reset');
                 },
               },
-            ]}
-            actions={
-              enabledModels.size < modelsWithData.size
-                ? [
-                    {
-                      id: 'reliability-reset-filter',
-                      label: 'Reset filter',
-                      onClick: () => {
-                        selectAllModels();
-                        track('reliability_filter_reset');
-                      },
-                    },
-                  ]
-                : []
-            }
-            enableTooltips={true}
-          />
-        }
-      />
-    </div>
+            ]
+          : []
+      }
+    />
   );
 }

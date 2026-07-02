@@ -4,8 +4,7 @@ import { track } from '@/lib/analytics';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { getModelSortIndex } from '@/lib/constants';
-import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3Chart';
+import { type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
@@ -20,7 +19,11 @@ import {
   getChartWatermark,
   getPrecisionLabel,
 } from '@/lib/data-mappings';
-import ChartLegend from '@/components/ui/chart-legend';
+import { HorizontalBarChartCore } from '@/components/ui/horizontal-bar-chart-core';
+import {
+  barCenterY,
+  compareByModelSortIndex,
+} from '@/components/ui/horizontal-bar-chart-core.helpers';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -242,10 +245,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         });
       }
     });
-    return [...configMap.values()].toSorted(
-      (a, b) =>
-        getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) || a.hwKey.localeCompare(b.hwKey),
-    );
+    return [...configMap.values()].toSorted((a, b) => compareByModelSortIndex(a.hwKey, b.hwKey));
   }, [unfilteredChartData]);
 
   const unofficialConfigurations = useMemo(() => {
@@ -260,9 +260,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     });
     return [...configMap.values()].toSorted(
       (a, b) =>
-        getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) ||
-        a.hwKey.localeCompare(b.hwKey) ||
-        a.configLabel.localeCompare(b.configLabel),
+        compareByModelSortIndex(a.hwKey, b.hwKey) || a.configLabel.localeCompare(b.configLabel),
     );
   }, [unofficialChartData]);
 
@@ -460,8 +458,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           // Horizontal error bars: swap x/y semantics
           // getCx = y center, getYMin = x left, getYMax = x right, capWidth = vertical cap height
           renderErrorBars(group, errorData, {
-            getCx: (d: EvaluationChartData) =>
-              (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
+            getCx: (d: EvaluationChartData) => barCenterY(yScale, d.configLabel),
             getYMin: (d: EvaluationChartData) => xScale(d.errorMin!),
             getYMax: (d: EvaluationChartData) => xScale(d.errorMax!),
             capWidth: yScale.bandwidth() / 3,
@@ -474,21 +471,21 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .select('.eb-stem')
             .attr('x1', (d) => xScale(d.errorMin!))
             .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel))
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel));
           const capH = yScale.bandwidth() / 6;
           bars
             .select('.eb-cap-top')
             .attr('x1', (d) => xScale(d.errorMin!))
             .attr('x2', (d) => xScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
           bars
             .select('.eb-cap-bot')
             .attr('x1', (d) => xScale(d.errorMax!))
             .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
         },
         onZoom: (group, ctx) => {
           const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
@@ -498,21 +495,21 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .select('.eb-stem')
             .attr('x1', (d) => newXScale(d.errorMin!))
             .attr('x2', (d) => newXScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel))
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel));
           const capH = yScale.bandwidth() / 6;
           bars
             .select('.eb-cap-top')
             .attr('x1', (d) => newXScale(d.errorMin!))
             .attr('x2', (d) => newXScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
           bars
             .select('.eb-cap-bot')
             .attr('x1', (d) => newXScale(d.errorMax!))
             .attr('x2', (d) => newXScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
         },
       },
       {
@@ -523,8 +520,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           const yScale = ys as d3.ScaleBand<string>;
           return renderPoints(group, chartData, {
             getCx: (d: EvaluationChartData) => xScale(d.score),
-            getCy: (d: EvaluationChartData) =>
-              (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
+            getCy: (d: EvaluationChartData) => barCenterY(yScale, d.configLabel),
             getColor: (d: EvaluationChartData) =>
               getCssColor(resolveColor(d.configLabel, d.hwKey as string)),
             getRadius: () => 6,
@@ -538,7 +534,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           updatePointsOnZoom<EvaluationChartData>(
             group,
             (d) => newXScale(d.score),
-            (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
+            (d) => barCenterY(yScale, d.configLabel),
           );
         },
       },
@@ -586,22 +582,22 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .select('.unofficial-eb-stem')
             .attr('x1', (d) => xScale(d.errorMin!))
             .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel))
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel));
 
           bars
             .select('.unofficial-eb-cap-top')
             .attr('x1', (d) => xScale(d.errorMin!))
             .attr('x2', (d) => xScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
 
           bars
             .select('.unofficial-eb-cap-bot')
             .attr('x1', (d) => xScale(d.errorMax!))
             .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
         },
         onZoom: (group, { newXScale, yScale: ys }) => {
           const xScale = newXScale as d3.ScaleLinear<number, number>;
@@ -613,22 +609,22 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .select('.unofficial-eb-stem')
             .attr('x1', (d) => xScale(d.errorMin!))
             .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel))
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel));
 
           bars
             .select('.unofficial-eb-cap-top')
             .attr('x1', (d) => xScale(d.errorMin!))
             .attr('x2', (d) => xScale(d.errorMin!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
 
           bars
             .select('.unofficial-eb-cap-bot')
             .attr('x1', (d) => xScale(d.errorMax!))
             .attr('x2', (d) => xScale(d.errorMax!))
-            .attr('y1', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 - capH)
-            .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
+            .attr('y1', (d) => barCenterY(yScale, d.configLabel) - capH)
+            .attr('y2', (d) => barCenterY(yScale, d.configLabel) + capH);
         },
       },
       {
@@ -646,8 +642,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .attr('class', 'score-label-group')
             .attr(
               'transform',
-              (d) =>
-                `translate(${xScale(d.score) + 12},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
+              (d) => `translate(${xScale(d.score) + 12},${barCenterY(yScale, d.configLabel)})`,
             );
           labelGroups
             .append('rect')
@@ -684,8 +679,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .selectAll<SVGGElement, EvaluationChartData>('.score-label-group')
             .attr(
               'transform',
-              (d) =>
-                `translate(${newXScale(d.score) + 12},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
+              (d) => `translate(${newXScale(d.score) + 12},${barCenterY(yScale, d.configLabel)})`,
             );
         },
       },
@@ -722,8 +716,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
 
           overlayPoints.attr(
             'transform',
-            (d) =>
-              `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
+            (d) => `translate(${xScale(d.score)},${barCenterY(yScale, d.configLabel)})`,
           );
           overlayPoints.style('filter', null);
 
@@ -796,8 +789,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             .selectAll<SVGGElement, EvaluationChartData>('.unofficial-eval-point')
             .attr(
               'transform',
-              (d) =>
-                `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
+              (d) => `translate(${xScale(d.score)},${barCenterY(yScale, d.configLabel)})`,
             );
         },
       },
@@ -855,8 +847,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   }
 
   return (
-    <D3Chart<EvaluationChartData>
-      ref={chartRef}
+    <HorizontalBarChartCore<EvaluationChartData>
+      chartRef={chartRef}
       chartId="evaluation-chart"
       data={chartData}
       height={chartHeight}
@@ -895,65 +887,54 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         rulerType: 'crosshair',
         content: generateEvaluationTooltipContent,
         getRulerX: (d, xs) => (xs as d3.ScaleLinear<number, number>)(d.score),
-        getRulerY: (d, ys) => {
-          const bs = ys as unknown as d3.ScaleBand<string>;
-          return (bs(d.configLabel) || 0) + bs.bandwidth() / 2;
-        },
+        getRulerY: (d, ys) => barCenterY(ys as unknown as d3.ScaleBand<string>, d.configLabel),
         onHoverStart: (sel) => sel.attr('r', 8),
         onHoverEnd: (sel) => sel.attr('r', 6),
         attachToLayer: 1,
       }}
-      legendElement={
-        <ChartLegend
-          variant="sidebar"
-          legendItems={legendItems}
-          onItemRemove={removeHardware}
-          isLegendExpanded={isLegendExpanded}
-          onExpandedChange={(expanded) => {
-            setIsLegendExpanded(expanded);
-            track('evaluation_legend_expanded', { expanded });
-          }}
-          switches={[
-            {
-              id: 'eval-show-labels',
-              label: 'Show Labels',
-              checked: showLabels,
-              onCheckedChange: (checked) => {
-                setShowLabels(checked);
-                track('evaluation_show_labels_toggled', { enabled: checked });
+      legendItems={legendItems}
+      onItemRemove={removeHardware}
+      isLegendExpanded={isLegendExpanded}
+      setIsLegendExpanded={setIsLegendExpanded}
+      legendExpandedEvent="evaluation_legend_expanded"
+      switches={[
+        {
+          id: 'eval-show-labels',
+          label: 'Show Labels',
+          checked: showLabels,
+          onCheckedChange: (checked) => {
+            setShowLabels(checked);
+            track('evaluation_show_labels_toggled', { enabled: checked });
+          },
+        },
+        {
+          id: 'eval-high-contrast',
+          label: 'High Contrast',
+          checked: highContrast,
+          onCheckedChange: (checked) => {
+            setHighContrast(checked);
+            track('evaluation_high_contrast_toggled', { enabled: checked });
+          },
+        },
+      ]}
+      actions={
+        effectiveOfficialHardware.size < hwTypesWithData.size ||
+        activeOverlayHwTypes.size < allOverlayHwTypes.size
+          ? [
+              {
+                id: 'eval-reset-filter',
+                label: 'Reset filter',
+                onClick: () => {
+                  selectAllHwTypes();
+                  setLocalOfficialOverride(null);
+                  resetOverlayHwTypes();
+                  track('evaluation_filter_reset');
+                },
               },
-            },
-            {
-              id: 'eval-high-contrast',
-              label: 'High Contrast',
-              checked: highContrast,
-              onCheckedChange: (checked) => {
-                setHighContrast(checked);
-                track('evaluation_high_contrast_toggled', { enabled: checked });
-              },
-            },
-          ]}
-          actions={
-            effectiveOfficialHardware.size < hwTypesWithData.size ||
-            activeOverlayHwTypes.size < allOverlayHwTypes.size
-              ? [
-                  {
-                    id: 'eval-reset-filter',
-                    label: 'Reset filter',
-                    onClick: () => {
-                      selectAllHwTypes();
-                      setLocalOfficialOverride(null);
-                      resetOverlayHwTypes();
-                      track('evaluation_filter_reset');
-                    },
-                  },
-                ]
-              : []
-          }
-          enableTooltips={true}
-          keyIndicators={parallelismKey}
-        />
+            ]
+          : []
       }
+      keyIndicators={parallelismKey}
     />
   );
 }
