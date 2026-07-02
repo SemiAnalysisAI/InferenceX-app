@@ -21,6 +21,10 @@ name: Ingest Agentic Benchmark Results
 # agentic-specific alerting (missing dataset slug).
 
 on:
+  push:
+    branches: [feat/agentx]
+    paths:
+      - .github/workflows/ingest-agentic-results.yml
   repository_dispatch:
     types: [ingest-agentic-results]
   workflow_dispatch:
@@ -36,7 +40,14 @@ on:
         type: string
 
 jobs:
+  register:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Registering ingest-agentic-results workflow for manual dispatch"
+
   ingest:
+    if: github.event_name != 'push'
     # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
     # far longer than a fixed-seq-len ingest.
     timeout-minutes: 60
