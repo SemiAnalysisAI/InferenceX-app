@@ -16,7 +16,6 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark, getPrecisionLabel, type Precision } from '@/lib/data-mappings';
-import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -28,7 +27,6 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
-import { useStableValue } from '@/hooks/useStableValue';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -44,18 +42,18 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import {
-  paretoFrontLowerLeft,
-  paretoFrontLowerRight,
-  paretoFrontUpperLeft,
-  paretoFrontUpperRight,
-} from '@/lib/chart-utils';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
   InferenceData,
   ScatterGraphProps,
 } from '@/components/inference/types';
+import {
+  useGroupedRooflines,
+  useOverlayRooflines,
+} from '@/components/inference/hooks/useGroupedRooflines';
+import { useScatterScales } from '@/components/inference/hooks/useChartScales';
+import { useKnownIssueAnnotations } from '@/components/inference/hooks/useKnownIssueAnnotations';
 import {
   generateOverlayTooltipContent,
   generateTooltipContent,
@@ -70,7 +68,6 @@ import {
   buildGradientColorMap,
 } from '@/components/inference/utils/paretoLabels';
 import {
-  type KnownIssueAnnotation,
   measureLegendRightInset,
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
@@ -110,24 +107,6 @@ const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
-
-// Scale configs are recomputed from the visible points on every render, but a
-// legend / precision toggle usually leaves the actual domain untouched (x-min
-// is pinned at 0; extremes are owned by a handful of points). Comparing by
-// value lets those toggles keep the previous config object, so the chart
-// render effect doesn't tear down and rebuild the SVG for identical scales.
-interface ScaleConfigValue {
-  type: 'log' | 'linear';
-  domain: [number, number];
-  nice: boolean;
-  _isLog?: boolean;
-}
-const isSameScaleConfig = (a: ScaleConfigValue, b: ScaleConfigValue): boolean =>
-  a.type === b.type &&
-  a.nice === b.nice &&
-  a._isLog === b._isLog &&
-  a.domain[0] === b.domain[0] &&
-  a.domain[1] === b.domain[1];
 
 // True when the node has a scheduled or running d3 transition with this name.
 // Reads d3-transition's per-node schedule store (`__transition`) because
@@ -313,43 +292,15 @@ const ScatterGraph = React.memo(
     }, [availableRuns, selectedRunId, selectedPrecisions]);
 
     // --- Data Processing ---
-    const groupedData = useMemo(
-      () =>
-        data.reduce(
-          (acc, point) => {
-            const key = `${point.hwKey}_${point.precision}`;
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(point);
-            return acc;
-          },
-          {} as Record<string, InferenceData[]>,
-        ),
-      [data],
-    );
-
-    const rooflines = useMemo(() => {
-      const result: Record<string, InferenceData[]> = {};
-      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as
-        | 'upper_right'
-        | 'upper_left'
-        | 'lower_left'
-        | 'lower_right'
-        | undefined;
-      for (const hw of Object.keys(groupedData)) {
-        const front =
-          dir === 'upper_right'
-            ? paretoFrontUpperRight(groupedData[hw])
-            : dir === 'upper_left'
-              ? paretoFrontUpperLeft(groupedData[hw])
-              : dir === 'lower_left'
-                ? paretoFrontLowerLeft(groupedData[hw])
-                : paretoFrontLowerRight(groupedData[hw]);
-        front.sort((a, b) => a.x - b.x);
-        result[hw] = front;
-      }
-      return result;
-    }, [groupedData, selectedYAxisMetric, chartDefinition]);
+    // Group by hw+precision and compute per-group Pareto rooflines (fronts
+    // sorted by x). Shared with the GPU + overlay paths via useGroupedRooflines.
+    const { groupedData, rooflines } = useGroupedRooflines({
+      data,
+      groupKeyFn: (point) => `${point.hwKey}_${point.precision}`,
+      selectedYAxisMetric,
+      chartDefinition,
+      sortByX: true,
+    });
 
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -412,69 +363,36 @@ const ScatterGraph = React.memo(
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the
     // affected line) so PNG exports carry the warning.
-    const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
-      const visibleOverlayPoints = processedOverlayData.filter((p) =>
-        activeOverlayHwTypes.has(p.hwKey as string),
-      );
-      const visiblePoints = [...filteredData, ...visibleOverlayPoints];
-      return matchKnownConfigIssues(modelLabel, visiblePoints).map((issue) => ({
-        issue,
-        label: parseHwKeyToLabel(issue.hwKey, modelLabel).label,
-        color: getCssColor(resolveColor(issue.hwKey)),
-        points: visiblePoints
-          .filter((p) => pointMatchesIssue(issue, p))
-          .map((p) => ({ x: p.x, y: p.y })),
-      }));
-    }, [
-      modelLabel,
-      filteredData,
-      processedOverlayData,
-      activeOverlayHwTypes,
-      resolveColor,
-      getCssColor,
-    ]);
+    const knownIssueAnnotations = useKnownIssueAnnotations(
+      {
+        modelLabel,
+        // Official visible points plus visible unofficial overlay points.
+        visiblePoints: [
+          ...filteredData,
+          ...processedOverlayData.filter((p) => activeOverlayHwTypes.has(p.hwKey as string)),
+        ],
+        labelFor: (issue) => parseHwKeyToLabel(issue.hwKey, modelLabel).label,
+        colorFor: (issue) => getCssColor(resolveColor(issue.hwKey)),
+      },
+      [
+        modelLabel,
+        filteredData,
+        processedOverlayData,
+        activeOverlayHwTypes,
+        resolveColor,
+        getCssColor,
+      ],
+    );
 
-    const overlayRooflines = useMemo(() => {
-      interface Entry {
-        hwKey: string;
-        runIndex: number;
-        points: InferenceData[];
-      }
-      if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
-      // Group by hwKey + precision + runIndex so overlay rooflines from different
-      // unofficial runs stay separate and can be styled with per-run hue shifts.
-      const grouped = processedOverlayData.reduce(
-        (acc, p) => {
-          const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
-          const key = `${p.hwKey}_${p.precision}_run${runIndex}`;
-          if (!acc[key]) acc[key] = { hwKey: String(p.hwKey), runIndex, points: [] };
-          acc[key].points.push(p);
-          return acc;
-        },
-        {} as Record<string, Entry>,
-      );
-      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as
-        | 'upper_right'
-        | 'upper_left'
-        | 'lower_left'
-        | 'lower_right'
-        | undefined;
-      const result: Record<string, Entry> = {};
-      for (const [key, group] of Object.entries(grouped)) {
-        const front =
-          dir === 'upper_right'
-            ? paretoFrontUpperRight(group.points)
-            : dir === 'upper_left'
-              ? paretoFrontUpperLeft(group.points)
-              : dir === 'lower_left'
-                ? paretoFrontLowerLeft(group.points)
-                : paretoFrontLowerRight(group.points);
-        front.sort((a, b) => a.x - b.x);
-        result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
-      }
-      return result;
-    }, [processedOverlayData, selectedYAxisMetric, chartDefinition, runIndexByUrl]);
+    // Overlay rooflines route through the SAME grouping + Pareto pipeline as the
+    // official path (group key adds the per-run index so different unofficial
+    // runs stay separate; result carries hwKey + runIndex for per-run styling).
+    const overlayRooflines = useOverlayRooflines({
+      overlayPoints: processedOverlayData,
+      selectedYAxisMetric,
+      chartDefinition,
+      runIndexByUrl,
+    });
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
@@ -525,58 +443,19 @@ const ScatterGraph = React.memo(
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
 
-    const xScaleConfigRaw = useMemo(() => {
-      const ext =
-        xExtentOverride ??
-        (visiblePoints.length > 0
-          ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
-          : ([0, 100] as [number, number]));
-
-      let useLog = false;
-      if (isInputTputMetric) {
-        const isTTFT =
-          xLabel.toLowerCase().includes('time to first token') ||
-          xLabel.toLowerCase().includes('ttft');
-        if (scaleType === 'log') useLog = ext[0] > 0;
-        else if (scaleType === 'linear') useLog = false;
-        else useLog = isTTFT && ext[0] > 0 && ext[1] / ext[0] > 10;
-      }
-
-      const domain: [number, number] = useLog ? [ext[0] * 0.9, ext[1] * 1.05] : [0, ext[1] * 1.05];
-      return {
-        type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
-        domain,
-        nice: niceAxes,
-        _isLog: useLog,
-      };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes, xExtentOverride]);
-    const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
-
-    const yScaleConfigRaw = useMemo(() => {
-      const ext =
-        yExtentOverride ??
-        (visiblePoints.length > 0
-          ? (d3.extent(visiblePoints, (d) => d.y) as [number, number])
-          : ([0, 100] as [number, number]));
-      const range = ext[1] - ext[0];
-      const useLog = !isInputTputMetric && logScale;
-
-      let yMin: number;
-      if (useLog) {
-        const dataMin = ext[0];
-        yMin =
-          dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
-      } else {
-        yMin = Math.max(0, ext[0] - range * 0.05);
-      }
-
-      return {
-        type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
-        domain: [yMin, ext[1] * 1.05] as [number, number],
-        nice: niceAxes,
-      };
-    }, [visiblePoints, isInputTputMetric, logScale, niceAxes, yExtentOverride]);
-    const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
+    // Auto-log scale-domain config (extent override, auto log-scale detection,
+    // nice axes), value-stabilised so identical domains keep object identity
+    // across toggles. Shared with GPUGraph via useChartScales.
+    const { xScaleConfig, yScaleConfig } = useScatterScales({
+      visiblePoints,
+      isInputTputMetric,
+      xLabel,
+      scaleType,
+      logScale,
+      niceAxes,
+      xExtentOverride,
+      yExtentOverride,
+    });
 
     // --- Axis configs ---
     const xAxisConfig = useMemo(

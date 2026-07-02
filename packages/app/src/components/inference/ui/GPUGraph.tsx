@@ -27,17 +27,10 @@ import {
   getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/chart-rendering';
-import {
-  paretoFrontLowerLeft,
-  paretoFrontLowerRight,
-  paretoFrontUpperLeft,
-  paretoFrontUpperRight,
-} from '@/lib/chart-utils';
-import type {
-  ChartDefinition,
-  InferenceData,
-  ScatterGraphProps,
-} from '@/components/inference/types';
+import type { InferenceData, ScatterGraphProps } from '@/components/inference/types';
+import { useGroupedRooflines } from '@/components/inference/hooks/useGroupedRooflines';
+import { useGpuScales } from '@/components/inference/hooks/useChartScales';
+import { useKnownIssueAnnotations } from '@/components/inference/hooks/useKnownIssueAnnotations';
 import {
   buildRunNumbering,
   comparisonEntryLabel,
@@ -49,11 +42,9 @@ import {
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
 import {
-  type KnownIssueAnnotation,
   measureLegendRightInset,
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
-import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
@@ -192,20 +183,20 @@ const GPUGraph = React.memo(
       return result;
     }, [gpuDatePairs, gpuDateColorMap, highContrast, resolveColor, getCssColor]);
 
-    const groupedData = useMemo(
-      () =>
-        data.reduce(
-          (acc, point) => {
-            if (!selectedPrecisions.includes(point.precision)) return acc;
-            const key = `${point.date}_${point.hwKey}_${point.precision}`;
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(point);
-            return acc;
-          },
-          {} as Record<string, InferenceData[]>,
-        ),
-      [data, selectedPrecisions],
-    );
+    // Group by date+hw+precision (folding the precision filter into the key
+    // function — non-selected precisions are dropped) and compute per-group
+    // Pareto rooflines. GPU comparison does NOT sort fronts by x afterwards.
+    const { groupedData, rooflines } = useGroupedRooflines({
+      data,
+      groupKeyFn: (point) =>
+        selectedPrecisions.includes(point.precision)
+          ? `${point.date}_${point.hwKey}_${point.precision}`
+          : null,
+      selectedYAxisMetric,
+      chartDefinition,
+      sortByX: false,
+      groupKeyDeps: [selectedPrecisions],
+    });
 
     // Track which date+GPU combos have actual data points
     const idsWithData = useMemo(() => {
@@ -217,28 +208,6 @@ const GPUGraph = React.memo(
       }
       return ids;
     }, [groupedData]);
-
-    const rooflines = useMemo(() => {
-      const result: Record<string, InferenceData[]> = {};
-      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as
-        | 'upper_right'
-        | 'upper_left'
-        | 'lower_left'
-        | 'lower_right'
-        | undefined;
-      for (const key of Object.keys(groupedData)) {
-        result[key] =
-          dir === 'upper_right'
-            ? paretoFrontUpperRight(groupedData[key])
-            : dir === 'upper_left'
-              ? paretoFrontUpperLeft(groupedData[key])
-              : dir === 'lower_left'
-                ? paretoFrontLowerLeft(groupedData[key])
-                : paretoFrontLowerRight(groupedData[key]);
-      }
-      return result;
-    }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -263,22 +232,23 @@ const GPUGraph = React.memo(
     // same treatment the scatter view gets, applied to the date-comparison view.
     // Lines here are colored per (gpu, date) pair, so take the first active
     // pair's color as the series swatch.
-    const knownIssueAnnotations = useMemo(
-      (): KnownIssueAnnotation[] =>
-        matchKnownConfigIssues(modelLabel, filteredData).map((issue) => {
+    const knownIssueAnnotations = useKnownIssueAnnotations(
+      {
+        modelLabel,
+        visiblePoints: filteredData,
+        // Lines here are colored per (gpu, date) pair, so take the first active
+        // pair's color as the series swatch; fall back to the hw-derived color.
+        labelFor: (issue) => {
           const cfg = getHardwareConfig(issue.hwKey, modelLabel);
+          return cfg ? getDisplayLabel(cfg) : issue.hwKey;
+        },
+        colorFor: (issue) => {
           const colorEntry = allGraphs.find(
             (entry) => entry.hwKey === issue.hwKey && activeDates.has(entry.id),
           );
-          return {
-            issue,
-            label: cfg ? getDisplayLabel(cfg) : issue.hwKey,
-            color: getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey)),
-            points: filteredData
-              .filter((p) => pointMatchesIssue(issue, p))
-              .map((p) => ({ x: p.x, y: p.y })),
-          };
-        }),
+          return getCssColor(colorEntry?.color ?? resolveColor(issue.hwKey));
+        },
+      },
       [modelLabel, filteredData, allGraphs, activeDates, resolveColor, getCssColor],
     );
 
@@ -319,27 +289,8 @@ const GPUGraph = React.memo(
         drawKnownIssues(ctx, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
     };
 
-    // Compute scale domains
-    const xExtent = useMemo(() => {
-      if (filteredData.length === 0) return [0, 100] as [number, number];
-      const ext = d3.extent(filteredData, (d) => d.x) as [number, number];
-      return [0, ext[1] * 1.05] as [number, number];
-    }, [filteredData]);
-
-    const yDomain = useMemo(() => {
-      if (filteredData.length === 0) return [0, 100] as [number, number];
-      const yExtent = d3.extent(filteredData, (d) => d.y) as [number, number];
-      const yRange = yExtent[1] - yExtent[0];
-      let yMin: number;
-      if (logScale) {
-        const dataMin = yExtent[0];
-        yMin =
-          dataMin <= 0 ? 0.1 : dataMin < 1 ? 10 ** Math.floor(Math.log10(dataMin)) : dataMin * 0.95;
-      } else {
-        yMin = Math.max(0, yExtent[0] - yRange * 0.05);
-      }
-      return [yMin, yExtent[1] * 1.05] as [number, number];
-    }, [filteredData, logScale]);
+    // Compute scale domains (shared with ScatterGraph via useChartScales)
+    const { xExtent, yDomain } = useGpuScales({ filteredData, logScale });
 
     // Color resolver for points/rooflines
     const getColor = useMemo(
