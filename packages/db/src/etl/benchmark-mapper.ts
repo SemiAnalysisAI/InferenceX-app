@@ -253,7 +253,7 @@ export function mapBenchmarkRow(
   // percentile, so we derive it from `*_itl` here rather than trust the artifact,
   // keeping every agentic row on one definition. `std` is excluded — the
   // reciprocal of a standard deviation is meaningless. Mirrored in the frontend
-  // overlay path (agenticAliases) and the one-time backfill-agentic-intvty script.
+  // overlay path (agenticAliases).
   if (isAgentic) {
     for (const k of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
       const itl = metrics[`${k}_itl`];

@@ -1,6 +1,6 @@
 /**
  * GitHub Actions artifact helpers shared by `ingest-ci-run.ts` (download
- * mode) and `backfill-agentic-server-logs.ts`. All calls shell out to the
+ * mode). All calls shell out to the
  * `gh` CLI, which picks up GITHUB_TOKEN from the environment.
  */
 

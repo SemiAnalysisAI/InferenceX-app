@@ -26,7 +26,7 @@ import type { BenchmarkRow } from '@/lib/api';
  * itl, overriding any artifact-supplied value: the harness definition of
  * `*_intvty` has drifted (some versions emit `p(1/ITL)`, which inverts percentile
  * order), so for a slow-tail selector interactivity must be `1/p(ITL)`. This
- * matches the ingest mapper + backfill-agentic-intvty for official rows; doing it
+ * matches the ingest mapper for official rows; doing it
  * here keeps overlay / `?unofficialrun=` rows (transformed live from raw
  * artifacts, never through the DB) on the same definition.
  */
