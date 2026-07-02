@@ -439,7 +439,7 @@ export function getBenchmarksForRun(
     if (br.workflow_run_id !== run.id) continue;
     const c = s.configs.get(br.config_id);
     if (!c || !modelKeys.has(c.model)) continue;
-    const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}`;
+    const key = `${br.config_id}:${br.conc}:${br.isl}:${br.osl}:${br.offload_mode ?? 'off'}`;
     if (!seen.has(key)) seen.set(key, br);
   }
 
