@@ -17,5 +17,5 @@
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],
-  "exclude": ["packages/*/node_modules", "packages/*/.next"]
+  "exclude": ["packages/*/node_modules", "packages/*/.next", "packages/*/scratch"]
 }
