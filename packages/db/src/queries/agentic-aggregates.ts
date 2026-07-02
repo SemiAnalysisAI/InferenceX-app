@@ -49,8 +49,11 @@ export { percentilesOf, type MetricPercentiles } from './agentic-shared';
  * they do for vllm runs.
  *
  * v4: add per-request normalized E2E percentiles at a fixed 400-token OSL.
+ *
+ * v5: reject osl <= 0 in extractTurn to exclude cancelled/empty-output turns
+ * whose decode-interval math would explode normalized E2E to thousands of seconds.
  */
-export const STATS_VERSION = 4;
+export const STATS_VERSION = 5;
 
 export interface AgenticAggregate {
   id: number;
