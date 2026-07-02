@@ -34,25 +34,21 @@ import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { PURGED_RUNS } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
-import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
+import { parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices, type GithubRunInfo } from './etl/workflow-run';
-import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import { mapBenchmarkRow } from './etl/benchmark-mapper';
+import { mapEvalRow, mapAggEvalRow } from './etl/eval-mapper';
+import { parseChangelogEntries, hasEvalsOnlyFlag } from './etl/changelog-ingest';
 import {
-  bulkIngestBenchmarkRows,
-  bulkIngestRunStats,
-  bulkUpsertAvailability,
-  insertServerLog,
-} from './etl/benchmark-ingest';
-import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
-import { ingestEvalRow } from './etl/eval-ingest';
-import { mapEvalSamples } from './etl/eval-samples-mapper';
-import { bulkIngestEvalSamples } from './etl/eval-samples-ingest';
-import {
-  parseChangelogEntries,
-  ingestChangelogEntries,
-  hasEvalsOnlyFlag,
-} from './etl/changelog-ingest';
+  categorizeArtifacts,
+  selectBenchmarkSources,
+  extractStatsRows,
+  writeMappedWorkflow,
+  type WorkflowMappedResult,
+  type MappedBenchmarkArtifact,
+  type MappedEvalRow,
+} from './etl/ingest-pipeline';
 import { readZipJson, readZipJsonMap, readZipText, readZipTextsMatching } from './etl/zip-reader';
 
 const GCS_DIR = path.join(import.meta.dirname, '..', '..', '..', 'gcs');
@@ -67,8 +63,12 @@ const sql = createAdminSql({
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ChangelogEntry = ReturnType<typeof parseChangelogEntries>[number];
-
+/**
+ * A phase-1 mapping result for a single workflow dir. Wraps the shared
+ * {@link WorkflowMappedResult} (benchmark/stats/eval/changelog rows consumed by
+ * `writeMappedWorkflow` in phase 2) with the GCS-specific workflow-run metadata
+ * and the per-dir skip/warning bookkeeping accumulated during mapping.
+ */
 interface WorkflowMapResult {
   dateDir: string;
   workflowDir: string;
@@ -78,17 +78,8 @@ interface WorkflowMapResult {
   headSha: string | undefined;
   createdAt: string;
   ghInfo: GithubRunInfo | null;
-  /** Per-ZIP benchmark rows, ready for configId lookup + bulk insert in phase 2. */
-  bmkZips: { zipFile: string; rows: BenchmarkParams[]; serverLogPath?: string }[];
-  statsRows: { hardware: string; nSuccess: number; total: number }[];
-  /**
-   * Each eval row carries the matching `samples_<task>_*.jsonl` text when the
-   * source ZIP includes it (per-config eval ZIPs do; agg ZIPs don't).
-   */
-  evalRows: { params: EvalParams; samplesText: string | null }[];
-  changelogs: { baseRef: string; headRef: string; entries: ChangelogEntry[] }[];
-  /** True when the changelog declares evals-only — benchmark/stats data is dropped. */
-  evalsOnly: boolean;
+  /** Mapped rows for the shared DB-write stage (`writeMappedWorkflow`). */
+  mapped: WorkflowMappedResult;
   /** Skip counts from mapping phase (dbError is tracked separately in phase 2). */
   localSkips: Omit<Skips, 'dbError'>;
   localUnmappedModels: Set<string>;
@@ -196,18 +187,18 @@ async function mapWorkflowDir(
   }
 
   // ── Classify artifact ZIPs ────────────────────────────────────────────────
+  // Uses the shared prefix dispatch (same vocabulary as the CI-run artifact
+  // dirs) so both ingest paths categorize identically.
   const zipFiles = fs.readdirSync(artifactsPath).filter((f) => f.endsWith('.zip'));
-  const bmkZipFiles = zipFiles.filter((f) => f.startsWith('bmk_'));
-  const resultZips = zipFiles.filter((f) => f.startsWith('results_'));
-  const statsZips = zipFiles.filter(
-    (f) => f.startsWith('run-stats_') || f.startsWith('run_stats_'),
-  );
-  const evalAggZips = zipFiles.filter((f) => f.startsWith('eval_results_all_'));
-  const evalZips = zipFiles.filter(
-    (f) => f.startsWith('eval_') && !f.startsWith('eval_results_all_'),
-  );
-  const changelogZips = zipFiles.filter((f) => f.startsWith('changelog-metadata_'));
-  const serverLogZips = zipFiles.filter((f) => f.startsWith('server_logs_'));
+  const {
+    benchmark: bmkZipFiles,
+    results: resultZips,
+    stats: statsZips,
+    evalAgg: evalAggZips,
+    eval: evalZips,
+    changelog: changelogZips,
+    serverLog: serverLogZips,
+  } = categorizeArtifacts(zipFiles);
 
   if (
     bmkZipFiles.length +
@@ -254,15 +245,23 @@ async function mapWorkflowDir(
     return tsA.localeCompare(tsB);
   });
 
-  // Skip compiled results_ ZIPs when individual bmk_ ZIPs exist.
-  // The compiled ZIPs aggregate all job artifacts (including carried-over ones
-  // from prior attempts) into a single array with no per-artifact timestamps,
-  // so duplicate rows for the same config can appear in arbitrary order and the
-  // wrong one can win the within-batch dedup. Individual bmk_ ZIPs are sorted
-  // by created_at above, guaranteeing the latest attempt's result wins.
-  const bmkSources = sortedBmkZips.length > 0 ? sortedBmkZips : resultZips;
+  // Prefer the created-at-sorted individual bmk_ ZIPs; fall back to the compiled
+  // results_ ZIPs only when no bmk_ ZIPs exist. The compiled ZIPs aggregate all
+  // job artifacts (including carried-over ones from prior attempts) into a single
+  // array with no per-artifact timestamps, so duplicate rows for the same config
+  // can appear in arbitrary order and the wrong one can win the within-batch
+  // dedup. The sorted bmk_ ZIPs guarantee the latest attempt's result wins.
+  const bmkSources = selectBenchmarkSources({
+    benchmark: sortedBmkZips,
+    results: resultZips,
+    stats: [],
+    evalAgg: [],
+    eval: [],
+    changelog: [],
+    serverLog: [],
+  });
 
-  const bmkZips: WorkflowMapResult['bmkZips'] = [];
+  const bmkArtifacts: MappedBenchmarkArtifact[] = [];
   for (const zipFile of bmkSources) {
     // bmk_ ZIPs can contain multiple JSON files (one per concurrency level).
     // Read all of them, not just the first, so every concurrency is ingested.
@@ -278,7 +277,7 @@ async function mapWorkflowDir(
       else if (typeof data === 'object' && data !== null) rawRows.push(data as Record<string, any>);
     }
     const snap = local.snapshot();
-    const rows: BenchmarkParams[] = [];
+    const rows: MappedBenchmarkArtifact['rows'] = [];
     for (const row of rawRows) {
       if (typeof row !== 'object' || row === null) {
         local.skips.badZip++;
@@ -300,17 +299,17 @@ async function mapWorkflowDir(
     }
     if (rows.length > 0) {
       // Match server log by config key (bmk_ files only — results_ compiled zips have no matching logs)
-      let serverLogPath: string | undefined;
+      let serverLogRef: string | undefined;
       if (zipFile.startsWith('bmk_')) {
         const bmkConfigKey = zipFile.replace(/^bmk_/u, '').replace(/_\d+_\d+\.zip$/u, '');
-        serverLogPath = serverLogPaths.get(bmkConfigKey);
+        serverLogRef = serverLogPaths.get(bmkConfigKey);
       }
-      bmkZips.push({ zipFile, rows, serverLogPath });
+      bmkArtifacts.push({ label: zipFile, rows, serverLogRef });
     }
   }
 
   // ── Map run_stats ZIPs ────────────────────────────────────────────────────
-  const statsRows: WorkflowMapResult['statsRows'] = [];
+  const statsRows: WorkflowMappedResult['statsRows'] = [];
   for (const zipFile of statsZips) {
     const data = readZipJson(path.join(artifactsPath, zipFile));
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -318,15 +317,11 @@ async function mapWorkflowDir(
       warnings.push(`  [WARN] ${dateDir}/${zipFile}: bad/empty zip — skipped`);
       continue;
     }
-    for (const [hwKey, stats] of Object.entries(data as Record<string, any>)) {
-      if (!GPU_KEYS.has(hwKey)) continue;
-      if (typeof stats?.n_success !== 'number' || typeof stats?.total !== 'number') continue;
-      statsRows.push({ hardware: hwKey, nSuccess: stats.n_success, total: stats.total });
-    }
+    statsRows.push(...extractStatsRows(data));
   }
 
   // ── Map individual eval ZIPs ──────────────────────────────────────────────
-  const evalRows: WorkflowMapResult['evalRows'] = [];
+  const evalRows: MappedEvalRow[] = [];
   for (const zipFile of evalZips) {
     const zipPath = path.join(artifactsPath, zipFile);
     const files = readZipJsonMap(zipPath);
@@ -379,7 +374,11 @@ async function mapWorkflowDir(
     }
 
     for (const params of mapped) {
-      evalRows.push({ params, samplesText: samplesByTask.get(params.task) ?? null });
+      evalRows.push({
+        params,
+        samplesText: samplesByTask.get(params.task) ?? null,
+        source: 'perConfig',
+      });
     }
   }
 
@@ -411,12 +410,12 @@ async function mapWorkflowDir(
         );
         continue;
       }
-      evalRows.push({ params: mapped, samplesText: null });
+      evalRows.push({ params: mapped, samplesText: null, source: 'agg' });
     }
   }
 
   // ── Parse changelog ZIPs ──────────────────────────────────────────────────
-  const changelogs: WorkflowMapResult['changelogs'] = [];
+  const changelogs: WorkflowMappedResult['changelogs'] = [];
   for (const zipFile of changelogZips) {
     const data = readZipJson(path.join(artifactsPath, zipFile)) as Record<string, any> | null;
     if (!data || typeof data !== 'object') {
@@ -434,7 +433,7 @@ async function mapWorkflowDir(
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
   if (evalsOnly) {
     console.log(
-      `  [${dateDir}] evals-only run ${githubRunId} — skipping ${bmkZips.length} benchmark ZIP(s) and ${statsRows.length} stats row(s)`,
+      `  [${dateDir}] evals-only run ${githubRunId} — skipping ${bmkArtifacts.length} benchmark ZIP(s) and ${statsRows.length} stats row(s)`,
     );
   }
 
@@ -447,11 +446,13 @@ async function mapWorkflowDir(
     headSha,
     createdAt,
     ghInfo,
-    bmkZips: evalsOnly ? [] : bmkZips,
-    statsRows: evalsOnly ? [] : statsRows,
-    evalRows,
-    changelogs,
-    evalsOnly,
+    mapped: {
+      bmkArtifacts: evalsOnly ? [] : bmkArtifacts,
+      statsRows: evalsOnly ? [] : statsRows,
+      evalRows,
+      changelogs,
+      evalsOnly,
+    },
     localSkips: {
       badZip: local.skips.badZip,
       unmappedModel: local.skips.unmappedModel,
@@ -553,6 +554,8 @@ async function main(): Promise<void> {
     totalChangelogs = 0;
 
   async function writeWorkflowResult(result: WorkflowMapResult): Promise<WriteResult> {
+    // Per-workflow report envelope. Mapping-phase skips/warnings are always
+    // carried through even when nothing is written (e.g. a purged run).
     const wr: WriteResult = {
       newBmk: 0,
       dupBmk: 0,
@@ -578,131 +581,31 @@ async function main(): Promise<void> {
     });
     if (workflowRunId === null) return wr;
 
-    const allInserted: (BenchmarkParams & { configId: number })[] = [];
-    for (const { zipFile, rows, serverLogPath } of result.bmkZips) {
-      const toInsert: (BenchmarkParams & { configId: number })[] = [];
-      for (const row of rows) {
-        try {
-          const configId = await getOrCreateConfig(row.config);
-          toInsert.push({ ...row, configId });
-        } catch (error: any) {
-          tracker.recordDbError(`config for ${zipFile}`, error);
-        }
-      }
-      if (toInsert.length > 0) {
-        try {
-          const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
-            sql,
-            toInsert,
-            workflowRunId,
-            result.dateDir,
-          );
-          wr.newBmk += newCount;
-          wr.dupBmk += dupCount;
+    const counts = await writeMappedWorkflow(
+      {
+        sql,
+        getOrCreateConfig,
+        tracker,
+        // Server logs are read lazily out of their ZIP (too large to hold in
+        // memory during phase 1). Strip null bytes -- some logs contain 0x00
+        // which PostgreSQL text columns reject.
+        readServerLog: (ref) => {
+          const serverLog = readZipText(ref, 'server.log');
+          return serverLog === null ? null : serverLog.replaceAll(' ', '');
+        },
+      },
+      result.mapped,
+      workflowRunId,
+      result.dateDir,
+    );
 
-          // Only track as inserted after successful bulk insert
-          allInserted.push(...toInsert);
-
-          // Attach server log (read lazily — too large to hold all in memory during phase 1)
-          if (serverLogPath && insertedIds.length > 0) {
-            const serverLog = readZipText(serverLogPath, 'server.log');
-            if (serverLog) {
-              // Strip null bytes — some logs contain 0x00 which PostgreSQL text columns reject
-              const clean = serverLog.replaceAll('\u0000', '');
-              await insertServerLog(sql, insertedIds, clean);
-            }
-          }
-        } catch (error: any) {
-          tracker.recordDbError(zipFile, error);
-        }
-      }
-    }
-
-    // Upsert availability rows only for successfully resolved configs
-    const availRows: {
-      model: string;
-      isl: number;
-      osl: number;
-      precision: string;
-      hardware: string;
-      framework: string;
-      specMethod: string;
-      disagg: boolean;
-    }[] = [];
-    for (const r of allInserted) {
-      availRows.push({
-        model: r.config.model,
-        isl: r.isl,
-        osl: r.osl,
-        precision: r.config.precision,
-        hardware: r.config.hardware,
-        framework: r.config.framework,
-        specMethod: r.config.specMethod,
-        disagg: r.config.disagg,
-      });
-    }
-    if (availRows.length > 0) {
-      try {
-        await bulkUpsertAvailability(sql, availRows, result.dateDir);
-      } catch (error: any) {
-        tracker.recordDbError('availability batch', error);
-      }
-    }
-
-    if (result.statsRows.length > 0) {
-      try {
-        const { newCount, dupCount } = await bulkIngestRunStats(
-          sql,
-          result.statsRows,
-          workflowRunId,
-          result.dateDir,
-        );
-        wr.newStats += newCount;
-        wr.dupStats += dupCount;
-      } catch (error: any) {
-        tracker.recordDbError('run_stats batch', error);
-      }
-    }
-
-    for (const { params, samplesText } of result.evalRows) {
-      try {
-        const { outcome, id: evalResultId } = await ingestEvalRow(
-          sql,
-          getOrCreateConfig,
-          params,
-          workflowRunId,
-          result.dateDir,
-        );
-        if (outcome === 'new') wr.evals++;
-
-        if (samplesText) {
-          const samples = mapEvalSamples(samplesText, tracker);
-          if (samples.length > 0) {
-            const { newCount } = await bulkIngestEvalSamples(sql, evalResultId, samples);
-            wr.evalSamples += newCount;
-          }
-        }
-      } catch (error: any) {
-        tracker.recordDbError('eval row', error);
-      }
-    }
-
-    for (const { baseRef, headRef, entries } of result.changelogs) {
-      try {
-        const inserted = await ingestChangelogEntries(
-          sql,
-          workflowRunId,
-          result.dateDir,
-          baseRef,
-          headRef,
-          entries,
-        );
-        wr.changelogs += inserted;
-      } catch (error: any) {
-        tracker.recordDbError('changelog', error);
-      }
-    }
-
+    wr.newBmk = counts.newBmk;
+    wr.dupBmk = counts.dupBmk;
+    wr.newStats = counts.newStats;
+    wr.dupStats = counts.dupStats;
+    wr.evals = counts.evals;
+    wr.evalSamples = counts.evalSamples;
+    wr.changelogs = counts.changelogs;
     return wr;
   }
 

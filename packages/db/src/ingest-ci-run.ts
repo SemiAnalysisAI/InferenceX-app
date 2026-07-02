@@ -26,8 +26,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
-
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import { isRunAttemptPurged } from './etl/run-overrides';
@@ -39,21 +37,17 @@ import {
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
 import { mapBenchmarkRow } from './etl/benchmark-mapper';
-import {
-  bulkIngestBenchmarkRows,
-  bulkIngestRunStats,
-  bulkUpsertAvailability,
-  insertServerLog,
-} from './etl/benchmark-ingest';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
-import { ingestEvalRow } from './etl/eval-ingest';
-import { mapEvalSamples } from './etl/eval-samples-mapper';
-import { bulkIngestEvalSamples } from './etl/eval-samples-ingest';
+import { parseChangelogEntries, hasEvalsOnlyFlag } from './etl/changelog-ingest';
 import {
-  parseChangelogEntries,
-  ingestChangelogEntries,
-  hasEvalsOnlyFlag,
-} from './etl/changelog-ingest';
+  categorizeArtifacts,
+  extractStatsRows,
+  writeMappedWorkflow,
+  type MappedBenchmarkArtifact,
+  type MappedEvalRow,
+  type ParsedChangelog,
+  type StatsRow,
+} from './etl/ingest-pipeline';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -292,34 +286,30 @@ async function main(): Promise<void> {
   }
   console.log(`  Workflow run DB id: ${workflowRunId}`);
 
-  const availRows: {
-    model: string;
-    isl: number;
-    osl: number;
-    precision: string;
-    hardware: string;
-    framework: string;
-    specMethod: string;
-    disagg: boolean;
-  }[] = [];
+  // ── Map artifacts to typed rows (no DB writes) ────────────────────────
+  //
+  // The CI run reads a flat, pre-downloaded/unzipped artifact directory. We
+  // classify its top-level entries with the shared `categorizeArtifacts`
+  // dispatch (the same prefix vocabulary the GCS backup applies to ZIP names),
+  // then map each category to typed rows and hand the whole workflow to the
+  // shared `writeMappedWorkflow` DB stage.
 
-  let totalNewBmk = 0,
-    totalDupBmk = 0;
-  let totalNewStats = 0,
-    totalDupStats = 0;
-  let totalEvals = 0;
-  let totalSamples = 0;
-  let totalSampleFiles = 0;
-  let totalChangelogs = 0;
+  const topLevelEntries = fs.existsSync(artifactsDir) ? fs.readdirSync(artifactsDir) : [];
+  const cats = categorizeArtifacts(topLevelEntries);
+
+  // Server logs: configKey → server.log path, read lazily at write time.
+  const serverLogPaths = new Map<string, string>();
+  for (const d of cats.serverLog) {
+    const logPath = path.join(artifactsDir, d, 'server.log');
+    if (!fs.existsSync(logPath)) continue;
+    const configKey = d.replace(/^server_logs_/u, '');
+    serverLogPaths.set(configKey, logPath);
+  }
 
   // ── Check for evals-only flag in changelog ────────────────────────────
   const changelogDir = path.join(artifactsDir, ARTIFACT_NAMES.changelog);
   const changelogFiles = findJsonFiles(changelogDir);
-  const parsedChangelogs: {
-    baseRef: string;
-    headRef: string;
-    entries: ReturnType<typeof parseChangelogEntries>;
-  }[] = [];
+  const parsedChangelogs: ParsedChangelog[] = [];
   for (const file of changelogFiles) {
     const data = readJson(file) as Record<string, any> | null;
     if (!data || typeof data !== 'object') continue;
@@ -334,9 +324,10 @@ async function main(): Promise<void> {
     console.log('\n  ⚠ evals-only run detected — skipping benchmark and stats ingest');
   }
 
-  // ── Ingest benchmark results ──────────────────────────────────────────
+  // ── Map benchmark results ─────────────────────────────────────────────
 
   console.log('\n--- Benchmark Results ---');
+  const bmkArtifacts: MappedBenchmarkArtifact[] = [];
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
@@ -351,16 +342,6 @@ async function main(): Promise<void> {
           .filter((d) => fs.statSync(d).isDirectory())
       : [];
 
-    const serverLogPaths = new Map<string, string>();
-    if (fs.existsSync(artifactsDir)) {
-      for (const d of fs.readdirSync(artifactsDir)) {
-        if (!d.startsWith('server_logs_')) continue;
-        const logPath = path.join(artifactsDir, d, 'server.log');
-        if (!fs.existsSync(logPath)) continue;
-        const configKey = d.replace(/^server_logs_/u, '');
-        serverLogPaths.set(configKey, logPath);
-      }
-    }
     if (serverLogPaths.size > 0) {
       console.log(`  Found ${serverLogPaths.size} server log artifact(s)`);
     }
@@ -383,109 +364,31 @@ async function main(): Promise<void> {
 
       if (rows.length === 0) continue;
 
-      const toInsert = [];
-      for (const row of rows) {
-        try {
-          const configId = await getOrCreateConfig(row.config);
-          toInsert.push({ ...row, configId });
-        } catch (error: any) {
-          tracker.recordDbError(`config for ${path.basename(file)}`, error);
-        }
+      // Match server log by config key (bmk_ subdirs only, matched on the
+      // parent dir name — top-level results_bmk files have no matching logs).
+      let serverLogRef: string | undefined;
+      const parentDir = path.basename(path.dirname(file));
+      if (parentDir.startsWith('bmk_')) {
+        const configKey = parentDir.replace(/^bmk_/u, '');
+        serverLogRef = serverLogPaths.get(configKey);
       }
 
-      if (toInsert.length > 0) {
-        try {
-          const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
-            sql,
-            toInsert,
-            workflowRunId,
-            date,
-          );
-          totalNewBmk += newCount;
-          totalDupBmk += dupCount;
-
-          // Build availability only after successful insert
-          for (const r of toInsert) {
-            availRows.push({
-              model: r.config.model,
-              isl: r.isl,
-              osl: r.osl,
-              precision: r.config.precision,
-              hardware: r.config.hardware,
-              framework: r.config.framework,
-              specMethod: r.config.specMethod,
-              disagg: r.config.disagg,
-            });
-          }
-
-          const parentDir = path.basename(path.dirname(file));
-          if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
-            const configKey = parentDir.replace(/^bmk_/u, '');
-            const logPath = serverLogPaths.get(configKey);
-            if (logPath) {
-              try {
-                const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
-                await insertServerLog(sql, insertedIds, serverLog);
-              } catch (error: any) {
-                tracker.recordDbError(`server_log for ${configKey}`, error);
-              }
-            }
-          }
-        } catch (error: any) {
-          tracker.recordDbError(path.basename(file), error);
-        }
-      }
-    }
-    console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
-
-    if (availRows.length > 0) {
-      try {
-        await bulkUpsertAvailability(sql, availRows, date);
-        console.log(`  Availability: ${availRows.length} row(s) upserted`);
-      } catch (error: any) {
-        tracker.recordDbError('availability', error);
-      }
+      bmkArtifacts.push({ label: path.basename(file), rows, serverLogRef });
     }
   }
 
-  // ── Ingest run stats ──────────────────────────────────────────────────
+  // ── Map run stats ─────────────────────────────────────────────────────
 
-  console.log('\n--- Run Stats ---');
-  if (evalsOnly) {
-    console.log('  Skipped (evals-only run)');
-  } else {
+  const statsRows: StatsRow[] = [];
+  if (!evalsOnly) {
     const statsDir = path.join(artifactsDir, ARTIFACT_NAMES.runStats);
     const statsFiles = findJsonFiles(statsDir);
-
-    const statsRows: { hardware: string; nSuccess: number; total: number }[] = [];
     for (const file of statsFiles) {
-      const data = readJson(file) as Record<string, any> | null;
-      if (!data || typeof data !== 'object' || Array.isArray(data)) continue;
-      for (const [hwKey, stats] of Object.entries(data)) {
-        if (!GPU_KEYS.has(hwKey)) continue;
-        if (typeof stats?.n_success !== 'number' || typeof stats?.total !== 'number') continue;
-        statsRows.push({ hardware: hwKey, nSuccess: stats.n_success, total: stats.total });
-      }
+      statsRows.push(...extractStatsRows(readJson(file)));
     }
-
-    if (statsRows.length > 0) {
-      try {
-        const { newCount, dupCount } = await bulkIngestRunStats(
-          sql,
-          statsRows,
-          workflowRunId,
-          date,
-        );
-        totalNewStats = newCount;
-        totalDupStats = dupCount;
-      } catch (error: any) {
-        tracker.recordDbError('run_stats', error);
-      }
-    }
-    console.log(`  Run stats: +${totalNewStats} new, ${totalDupStats} dup`);
   }
 
-  // ── Ingest eval results ───────────────────────────────────────────────
+  // ── Map eval results ──────────────────────────────────────────────────
   //
   // Two artifact shapes contribute to `eval_results`:
   //   1. `eval_results_all/agg_eval_all.json` — flat aggregate rows for every
@@ -499,34 +402,20 @@ async function main(): Promise<void> {
   // first inserts; the second hits the conflict path and just refreshes
   // `metrics`. Samples then attach to the resolved row id.
 
-  console.log('\n--- Eval Results ---');
+  const evalRows: MappedEvalRow[] = [];
+
   const evalDir = path.join(artifactsDir, ARTIFACT_NAMES.evals);
   const evalFiles = findJsonFiles(evalDir);
-
   for (const file of evalFiles) {
     const data = readJson(file);
     if (!Array.isArray(data)) continue;
-
     for (const row of data) {
       if (typeof row !== 'object' || row === null) continue;
       const mapped = mapAggEvalRow(row as Record<string, any>, tracker);
       if (!mapped) continue;
-
-      try {
-        const { outcome } = await ingestEvalRow(
-          sql,
-          getOrCreateConfig,
-          mapped,
-          workflowRunId,
-          date,
-        );
-        if (outcome === 'new') totalEvals++;
-      } catch (error: any) {
-        tracker.recordDbError('eval row', error);
-      }
+      evalRows.push({ params: mapped, samplesText: null, source: 'agg' });
     }
   }
-  console.log(`  Eval results (agg): +${totalEvals} new`);
 
   // Per-config eval dirs (`eval_*`) — same on-disk shape as the eval ZIPs
   // handled by `ingest-gcs-backup.ts`, but already unzipped. Each dir holds
@@ -542,10 +431,6 @@ async function main(): Promise<void> {
         )
         .map((d) => path.join(artifactsDir, d))
     : [];
-
-  if (perConfigEvalDirs.length > 0) {
-    console.log(`  Found ${perConfigEvalDirs.length} per-config eval dir(s)`);
-  }
 
   for (const dir of perConfigEvalDirs) {
     const files = fs.readdirSync(dir);
@@ -578,51 +463,68 @@ async function main(): Promise<void> {
     }
 
     for (const params of evalParamsList) {
-      try {
-        const { id: evalResultId } = await ingestEvalRow(
-          sql,
-          getOrCreateConfig,
-          params,
-          workflowRunId,
-          date,
-        );
-
-        const samplesText = samplesByTask.get(params.task);
-        if (!samplesText) continue;
-
-        const samples = mapEvalSamples(samplesText, tracker);
-        if (samples.length === 0) continue;
-
-        const { newCount } = await bulkIngestEvalSamples(sql, evalResultId, samples);
-        totalSamples += newCount;
-        totalSampleFiles++;
-      } catch (error: any) {
-        tracker.recordDbError(`samples for ${path.basename(dir)}`, error);
-      }
+      evalRows.push({
+        params,
+        samplesText: samplesByTask.get(params.task) ?? null,
+        source: 'perConfig',
+      });
     }
   }
+
+  // ── Write everything (shared DB stage) ────────────────────────────────
+
+  const counts = await writeMappedWorkflow(
+    {
+      sql,
+      getOrCreateConfig,
+      tracker,
+      // Strip null bytes — some logs contain 0x00 which PostgreSQL text columns reject.
+      readServerLog: (ref) => {
+        try {
+          return fs.readFileSync(ref, 'utf8').replaceAll('\u0000', '');
+        } catch {
+          return null;
+        }
+      },
+    },
+    { bmkArtifacts, statsRows, evalRows, changelogs: parsedChangelogs, evalsOnly },
+    workflowRunId,
+    date,
+  );
+
+  const totalNewBmk = counts.newBmk;
+  const totalDupBmk = counts.dupBmk;
+  const totalNewStats = counts.newStats;
+  const totalDupStats = counts.dupStats;
+  const totalEvals = counts.aggEvals;
+  const totalSamples = counts.evalSamples;
+  const totalSampleFiles = counts.evalSampleFiles;
+  const totalChangelogs = counts.changelogs;
+  // Availability is upserted once per successfully-inserted benchmark row.
+  const availUpserted = counts.availUpserted;
+
+  if (!evalsOnly) {
+    console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
+    if (availUpserted > 0) {
+      console.log(`  Availability: ${availUpserted} row(s) upserted`);
+    }
+  }
+
+  console.log('\n--- Run Stats ---');
+  if (evalsOnly) {
+    console.log('  Skipped (evals-only run)');
+  } else {
+    console.log(`  Run stats: +${totalNewStats} new, ${totalDupStats} dup`);
+  }
+
+  console.log('\n--- Eval Results ---');
+  console.log(`  Eval results (agg): +${totalEvals} new`);
   if (perConfigEvalDirs.length > 0) {
+    console.log(`  Found ${perConfigEvalDirs.length} per-config eval dir(s)`);
     console.log(`  Eval samples: +${totalSamples} new across ${totalSampleFiles} file(s)`);
   }
 
-  // ── Ingest changelog (already parsed above for evals-only check) ─────
-
   console.log('\n--- Changelog ---');
-  for (const { baseRef, headRef, entries } of parsedChangelogs) {
-    try {
-      const inserted = await ingestChangelogEntries(
-        sql,
-        workflowRunId,
-        date,
-        baseRef,
-        headRef,
-        entries,
-      );
-      totalChangelogs += inserted;
-    } catch (error: any) {
-      tracker.recordDbError('changelog', error);
-    }
-  }
   console.log(`  Changelog: +${totalChangelogs} new`);
 
   // ── Summary ───────────────────────────────────────────────────────────
