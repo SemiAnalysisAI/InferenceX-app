@@ -58,6 +58,7 @@ import { ingestEvalRow } from './etl/eval-ingest';
 import { mapEvalSamples } from './etl/eval-samples-mapper';
 import { bulkIngestEvalSamples } from './etl/eval-samples-ingest';
 import {
+  type ChangelogEntry,
   parseChangelogEntries,
   ingestChangelogEntries,
   hasEvalsOnlyFlag,
@@ -335,7 +336,7 @@ async function main(): Promise<void> {
   const parsedChangelogs: {
     baseRef: string;
     headRef: string;
-    entries: ReturnType<typeof parseChangelogEntries>;
+    entries: ChangelogEntry[];
   }[] = [];
   for (const file of changelogFiles) {
     const data = readJson(file) as Record<string, any> | null;
@@ -345,6 +346,29 @@ async function main(): Promise<void> {
     if (!baseRef || !headRef) continue;
     const entries = parseChangelogEntries(data.entries);
     if (entries.length > 0) parsedChangelogs.push({ baseRef, headRef, entries });
+  }
+  if (parsedChangelogs.length === 0) {
+    const headRef = workflowGhInfo?.headBranch ?? workflowGhInfo?.headSha ?? `run-${runIdStr}`;
+    const fallbackDescription =
+      workflowGhInfo?.headCommitMessage?.trim().split('\n')[0]?.trim() ||
+      workflowGhInfo?.name ||
+      `GitHub Actions run ${runIdStr}`;
+
+    parsedChangelogs.push({
+      baseRef: 'unknown',
+      headRef,
+      entries: [
+        {
+          configKeys: [],
+          description: fallbackDescription,
+          prLink: null,
+          evalsOnly: false,
+        },
+      ],
+    });
+    console.log(
+      `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
+    );
   }
   const evalsOnly = hasEvalsOnlyFlag(parsedChangelogs);
   if (evalsOnly) {

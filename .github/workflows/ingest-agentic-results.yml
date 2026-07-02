@@ -8,7 +8,8 @@ name: Ingest Agentic Benchmark Results
 #     -H "Accept: application/vnd.github+v3+json" \
 #     https://api.github.com/repos/SemiAnalysisAI/InferenceX-app/dispatches \
 #     -d '{"event_type": "ingest-agentic-results",
-#          "client_payload": {"run-id": "<run_id>", "run-attempt": "<attempt>"}}'
+#          "client_payload": {"run-id": "<run_id>", "run-attempt": "<attempt>",
+#                             "database-target": "production"}}'
 #
 # The ingest script (packages/db/src/ingest-ci-run.ts) auto-detects agentic
 # artifacts: benchmark rows land in benchmark_results (benchmark_type=
@@ -34,6 +35,15 @@ on:
         required: false
         default: '1'
         type: string
+      database-target:
+        description: Database/cache target for the ingest
+        required: false
+        default: production
+        type: choice
+        options:
+          - production
+          - dev
+          - agentx-v1
 
 jobs:
   ingest:
@@ -59,9 +69,45 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
 
-      - name: Run migrations
+      - name: Select ingest target
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
+          REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
+          DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
+          DATABASE_WRITE_URL_AGENTX_V1: ${{ secrets.DATABASE_AGENTX_V1_WRITE_URL }}
+        run: |
+          case "$REQUESTED_DATABASE_TARGET" in
+            production)
+              database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
+              cache_invalidate_url="https://inferencex.semianalysis.com/api/v1/invalidate"
+              ;;
+            dev)
+              database_write_url="$DATABASE_WRITE_URL_DEV"
+              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              ;;
+            agentx-v1)
+              database_write_url="$DATABASE_WRITE_URL_AGENTX_V1"
+              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              ;;
+            *)
+              echo "::error::Unsupported database-target: $REQUESTED_DATABASE_TARGET"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$database_write_url" ]; then
+            echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
+            exit 1
+          fi
+
+          echo "::add-mask::$database_write_url"
+          echo "DATABASE_WRITE_URL=$database_write_url" >> "$GITHUB_ENV"
+          echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET" >> "$GITHUB_ENV"
+          echo "CACHE_INVALIDATE_URL=$cache_invalidate_url" >> "$GITHUB_ENV"
+          echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
+          echo "Cache invalidate URL: $cache_invalidate_url"
+
+      - name: Run migrations
         run: pnpm admin:db:migrate --yes
 
       - name: Download artifacts from InferenceX run
@@ -120,7 +166,6 @@ jobs:
 
       - name: Ingest results to DB
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           INGEST_RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
           INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || inputs.run-attempt }}
@@ -130,20 +175,16 @@ jobs:
         run: pnpm admin:db:ingest:ci
 
       - name: Apply run overrides
-        env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
         run: pnpm admin:db:apply-overrides --yes
 
       - name: Verify database
-        env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV_WRITE_URL }}
         run: pnpm admin:db:verify
 
       - name: Invalidate Vercel cache
         env:
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: |
-          curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate" \
+          curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
             -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true
 
       - name: Check for unmapped entities
