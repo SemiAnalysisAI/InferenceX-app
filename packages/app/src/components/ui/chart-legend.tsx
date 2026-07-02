@@ -427,6 +427,7 @@ export default function ChartLegend({
         onHover={onItemHover}
         onHoverEnd={onItemHoverEnd}
         onRemove={effectiveRemove}
+        onShowPoints={item.onShowPoints}
         asFragment
         isLegendExpanded={effectiveExpanded}
         sidebarMode={isSidebar}
@@ -438,7 +439,9 @@ export default function ChartLegend({
         {enableTooltips ? (
           <TooltipRoot>
             <TooltipTrigger asChild>
-              <div className="w-fit">{legendItem}</div>
+              {/* Full width when the row carries a points-table icon so the
+                  ml-auto icon pins to a consistent right-edge column. */}
+              <div className={item.onShowPoints ? 'w-full' : 'w-fit'}>{legendItem}</div>
             </TooltipTrigger>
             {item.isHighlighted && item.tooltip && (
               <TooltipContent side="bottom" collisionPadding={10}>
@@ -521,6 +524,7 @@ export default function ChartLegend({
                         onHover={onItemHover}
                         onHoverEnd={onItemHoverEnd}
                         onRemove={effectiveRemove}
+                        onShowPoints={item.onShowPoints}
                         sidebarMode={isSidebar}
                         asFragment
                       />

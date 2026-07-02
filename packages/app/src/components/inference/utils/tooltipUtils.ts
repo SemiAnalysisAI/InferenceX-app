@@ -80,8 +80,9 @@ const tooltipLine = (label: string, value: string | number) =>
 const formatPct = (v: number | undefined): string | null =>
   v === undefined || v === null || Number.isNaN(v) ? null : `${(v * 100).toFixed(1)}%`;
 
-/** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped). */
-const fmt = (v: number): string => {
+/** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped).
+ *  Exported so the legend points table shows exactly the numbers the tooltip shows. */
+export const fmt = (v: number): string => {
   if (!Number.isFinite(v)) return String(v);
   const rounded = parseFloat(v.toFixed(3));
   if (Math.abs(rounded) >= 10000) return new Intl.NumberFormat('en-US').format(rounded);
