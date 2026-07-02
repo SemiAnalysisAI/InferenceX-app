@@ -24,6 +24,14 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
+// Placeholder for the public (non-null) `effectiveSequence` during the window
+// before availability has loaded. It must be a fixed-seq scenario — never
+// AgenticTraces — so the scenario selector doesn't flash "Agentic Traces" for a
+// fixed-seq-only model while the chart shows its loading skeleton. `8k/1k` is
+// the pre-agentic default for non-agentic models. Consumers that must not act on
+// an unresolved sequence gate on `sequenceResolved` instead.
+const PRE_AVAILABILITY_SEQUENCE = Sequence.EightK_OneK;
+
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -38,6 +46,7 @@ import {
 } from '@/lib/data-mappings';
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
+import { resolveEffectiveSequence } from '@/lib/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 interface RunInfo {
@@ -66,6 +75,15 @@ export interface GlobalFilterContextType {
 
   // Effective (validated) values
   effectiveSequence: Sequence;
+  /**
+   * Whether `effectiveSequence` reflects the selected model's real availability
+   * (DB or unofficial run) rather than the pre-load placeholder. False during
+   * the brief window before availability loads. Consumers that trigger data
+   * fetches or render sequence-dependent labels should gate on this so a
+   * fixed-seq-only model never fires an agentic fetch or flashes "Agentic
+   * Traces" before availability settles.
+   */
+  sequenceResolved: boolean;
   effectivePrecisions: string[];
 
   // Run date & run ID
@@ -288,11 +306,39 @@ export function GlobalFilterProvider({
     return merged.length > 0 ? merged : SEQUENCE_OPTIONS;
   }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
 
-  // Synchronously validated sequence
-  const effectiveSequence = useMemo(() => {
-    if (availableSequences.includes(selectedSequence)) return selectedSequence;
-    return availableSequences[0] ?? selectedSequence;
-  }, [availableSequences, selectedSequence]);
+  // Whether we actually know the selected model's sequences yet. Availability
+  // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run
+  // (`unofficialAvailable` for this model) — either source lets us resolve a
+  // trustworthy effectiveSequence. Until then `availableSequences` is the static
+  // SEQUENCE_OPTIONS fallback (which contains AgenticTraces), so resolving
+  // eagerly would fetch + label an agentic scenario for fixed-seq-only models,
+  // then snap once availability lands (flash + wasted request).
+  const availabilityLoaded = useMemo(
+    () =>
+      availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
+    [availabilityRows, unofficialAvailable, selectedModel],
+  );
+
+  // Synchronously validated sequence.
+  //
+  // `resolveEffectiveSequence` returns null while availability is still loading
+  // — we surface that as `sequenceResolved` so InferenceContext can gate the
+  // benchmark fetch until the real sequence is known (no agentic fetch fires for
+  // a fixed-seq-only model). For the non-null public `effectiveSequence` value
+  // we substitute a fixed-seq scenario (never AgenticTraces) during that window
+  // so the scenario selector never flashes "Agentic Traces"; the chart shows its
+  // normal loading skeleton until `sequenceResolved` flips true.
+  const resolvedSequence = useMemo(
+    () =>
+      resolveEffectiveSequence({
+        selectedSequence,
+        availableSequences,
+        availabilityLoaded,
+      }),
+    [selectedSequence, availableSequences, availabilityLoaded],
+  );
+  const sequenceResolved = resolvedSequence !== null;
+  const effectiveSequence = resolvedSequence ?? PRE_AVAILABILITY_SEQUENCE;
 
   // Precisions available for the selected model + sequence (DB ∪ unofficial run)
   const availablePrecisions = useMemo(() => {
@@ -439,7 +485,11 @@ export function GlobalFilterProvider({
       g_model: selectedModel,
       g_rundate: selectedRunDate,
       g_runid: selectedRunId,
-      i_seq: effectiveSequence,
+      // Don't pin the sequence to the URL until it's resolved from real
+      // availability — writing the pre-load placeholder (8k/1k) would clobber a
+      // shared `?i_seq=agentic-traces` link before the model's availability
+      // confirms it has agentic data.
+      i_seq: sequenceResolved ? effectiveSequence : undefined,
       // Only pin the precision in the URL once chosen explicitly; in auto mode
       // leave it out so the link keeps following the per-model densest default.
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
@@ -449,6 +499,7 @@ export function GlobalFilterProvider({
     selectedRunDate,
     selectedRunId,
     effectiveSequence,
+    sequenceResolved,
     effectivePrecisions,
     precisionExplicit,
     setUrlParams,
@@ -463,6 +514,7 @@ export function GlobalFilterProvider({
       selectedPrecisions,
       setSelectedPrecisions,
       effectiveSequence,
+      sequenceResolved,
       effectivePrecisions,
       selectedRunDate: effectiveRunDate,
       setSelectedRunDate: setSelectedRunDateManual,
@@ -485,6 +537,7 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       effectiveSequence,
+      sequenceResolved,
       effectivePrecisions,
       effectiveRunDate,
       setSelectedRunDateManual,

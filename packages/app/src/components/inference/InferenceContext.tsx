@@ -110,6 +110,7 @@ export function InferenceProvider({
     selectedModel,
     setSelectedModel,
     effectiveSequence,
+    sequenceResolved,
     setSelectedSequence,
     effectivePrecisions,
     setSelectedPrecisions,
@@ -414,7 +415,12 @@ export function InferenceProvider({
     userCosts,
     userPowers,
     effectiveRunDate,
-    isActive,
+    // Gate benchmark fetching on sequenceResolved: before availability loads we
+    // don't yet know the model's real sequence, and the selectedSequence default
+    // is AgenticTraces. Fetching now would fire the agentic data path for a
+    // fixed-seq-only model, then refetch once availability snaps the sequence.
+    // The chart's normal loading state covers this brief window.
+    isActive && sequenceResolved,
     latestDate,
     selectedPercentile,
     compareGpuPair ?? null,

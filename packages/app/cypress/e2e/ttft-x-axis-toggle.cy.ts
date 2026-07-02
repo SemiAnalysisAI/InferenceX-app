@@ -18,8 +18,117 @@ const interceptDerivedMetrics = () => {
   }).as('derivedAgenticMetrics');
 };
 
+// This spec exercises the agentic x-axis modes, which only exist when the
+// selected model resolves to the Agentic Traces scenario. The default e2e
+// fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, so
+// after the availability-gated effectiveSequence fix the bare-/inference default
+// correctly resolves to a fixed-seq scenario. We therefore inject agentic
+// availability + benchmark rows for the default model VIA SPEC-SCOPED INTERCEPTS
+// (not the shared fixtures) so this test — and only this test — sees the agentic
+// view. Scoping to intercepts keeps every other spec's default fixed-seq.
+const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro is the default model
+const AGENTIC_DATE = '2026-06-12';
+
+// Percentile ladder for one metric family (median/p75/p90/p95/p99/std).
+const percentileLadder = (prefix: string, base: number): Record<string, number> => ({
+  [`median_${prefix}`]: base,
+  [`p75_${prefix}`]: base * 1.2,
+  [`p90_${prefix}`]: base * 1.5,
+  [`p95_${prefix}`]: base * 1.7,
+  [`p99_${prefix}`]: base * 2.2,
+  [`std_${prefix}`]: base * 0.3,
+});
+
+const agenticMetrics = (conc: number): Record<string, number> => {
+  const scale = conc / 16;
+  const itl = 0.011 * scale;
+  return {
+    ...percentileLadder('ttft', 0.4 * scale),
+    ...percentileLadder('tpot', 0.012 * scale),
+    ...percentileLadder('itl', itl),
+    ...percentileLadder('e2el', 8 * scale),
+    median_intvty: 1 / itl,
+    p75_intvty: 1 / (itl * 1.2),
+    p90_intvty: 1 / (itl * 1.5),
+    p99_intvty: 1 / (itl * 2.2),
+    std_intvty: (1 / itl) * 0.1,
+    tput_per_gpu: 950 / Math.sqrt(scale),
+    output_tput_per_gpu: 210,
+    input_tput_per_gpu: 740,
+    total_tput_tps: 7600 * conc * 0.05,
+  };
+};
+
+const agenticGpus = [
+  { hardware: 'b200', framework: 'vllm', disagg: false },
+  { hardware: 'b300', framework: 'vllm', disagg: false },
+];
+
+// Availability: default model has BOTH agentic and fixed-seq, so the default
+// resolves to agentic (the product-intended, agentic-preferred behavior).
+const agenticAvailability = [
+  ...agenticGpus.map((g) => ({
+    model: DEFAULT_MODEL_DB_KEY,
+    isl: null,
+    osl: null,
+    precision: 'fp4',
+    hardware: g.hardware,
+    framework: g.framework,
+    spec_method: 'none',
+    disagg: g.disagg,
+    benchmark_type: 'agentic_traces',
+    date: AGENTIC_DATE,
+  })),
+  ...agenticGpus.map((g) => ({
+    model: DEFAULT_MODEL_DB_KEY,
+    isl: 8192,
+    osl: 1024,
+    precision: 'fp4',
+    hardware: g.hardware,
+    framework: g.framework,
+    spec_method: 'none',
+    disagg: g.disagg,
+    benchmark_type: 'single_turn',
+    date: AGENTIC_DATE,
+  })),
+];
+
+let benchIdCursor = 900000;
+const agenticBenchmarks = agenticGpus.flatMap((g) =>
+  [16, 64, 128].map((conc) => ({
+    id: benchIdCursor++,
+    hardware: g.hardware,
+    framework: g.framework,
+    model: DEFAULT_MODEL_DB_KEY,
+    precision: 'fp4',
+    spec_method: 'none',
+    disagg: g.disagg,
+    is_multinode: false,
+    prefill_tp: 8,
+    decode_tp: 8,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    isl: null,
+    osl: null,
+    conc,
+    offload_mode: 'off',
+    benchmark_type: 'agentic_traces',
+    image: 'vllm/vllm-openai:v0.9.0',
+    metrics: agenticMetrics(conc),
+    workers: null,
+    date: AGENTIC_DATE,
+    run_url: null,
+  })),
+);
+
+const interceptAgenticData = () => {
+  cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('benchmarks');
+};
+
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
+    interceptAgenticData();
     cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));

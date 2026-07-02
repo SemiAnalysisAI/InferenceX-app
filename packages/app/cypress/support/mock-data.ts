@@ -423,6 +423,9 @@ export function createMockGlobalFilterContext(
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_global'),
     effectiveSequence: Sequence.EightK_OneK,
+    // Mocks represent a settled state: availability is known and the sequence is
+    // resolved. Tests exercising the pre-availability window override this.
+    sequenceResolved: true,
     effectivePrecisions: [Precision.FP4],
     selectedRunDate: '2025-03-01',
     setSelectedRunDate: namedStub('setSelectedRunDate_global'),
