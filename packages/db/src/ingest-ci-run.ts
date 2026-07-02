@@ -74,6 +74,29 @@ let runAttemptNum: number;
 let REPO: string;
 let tempDir: string | null = null;
 
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined) return 'none';
+  if (bytes < 1024) return `${bytes} B`;
+  const kib = bytes / 1024;
+  if (kib < 1024) return `${kib.toFixed(1)} KiB`;
+  const mib = kib / 1024;
+  if (mib < 1024) return `${mib.toFixed(1)} MiB`;
+  return `${(mib / 1024).toFixed(1)} GiB`;
+}
+
+function elapsed(startMs: number): string {
+  return `${((Date.now() - startMs) / 1000).toFixed(1)}s`;
+}
+
+function fileSize(pathname: string | null | undefined): number | null {
+  if (!pathname) return null;
+  try {
+    return fs.statSync(pathname).size;
+  } catch {
+    return null;
+  }
+}
+
 if (isDownloadMode) {
   // --download <run-url-or-id> [repo]
   // Filter out '--' injected by pnpm arg passthrough
@@ -378,13 +401,22 @@ async function main(): Promise<void> {
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
-    for (const file of allBmkFiles) {
+    for (const [fileIndex, file] of allBmkFiles.entries()) {
+      const fileStart = Date.now();
+      const relativeFile = path.relative(artifactsDir, file);
+      console.log(
+        `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
+      );
       const data = readJson(file);
-      if (!data) continue;
+      if (!data) {
+        console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
+        continue;
+      }
 
       const rawRows: Record<string, any>[] = Array.isArray(data)
         ? data
         : [data as Record<string, any>];
+      console.log(`    raw rows: ${rawRows.length}`);
 
       for (const rawRow of rawRows) {
         if (!rawRow || typeof rawRow !== 'object') continue;
@@ -397,7 +429,11 @@ async function main(): Promise<void> {
         .map((r) => mapBenchmarkRow(r, tracker))
         .filter((r): r is NonNullable<typeof r> => r !== null);
 
-      if (rows.length === 0) continue;
+      console.log(`    mapped rows: ${rows.length}`);
+      if (rows.length === 0) {
+        console.log(`    skipped; no mappable rows (${elapsed(fileStart)})`);
+        continue;
+      }
 
       const toInsert = [];
       for (const row of rows) {
@@ -408,14 +444,20 @@ async function main(): Promise<void> {
           tracker.recordDbError(`config for ${path.basename(file)}`, error);
         }
       }
+      console.log(`    rows with resolved configs: ${toInsert.length}`);
 
       if (toInsert.length > 0) {
         try {
+          const insertStart = Date.now();
           const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
             sql,
             toInsert,
             workflowRunId,
             date,
+          );
+          console.log(
+            `    benchmark rows: +${newCount} new, ${dupCount} dup, ` +
+              `${insertedIds.length} id(s) (${elapsed(insertStart)})`,
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
@@ -448,8 +490,13 @@ async function main(): Promise<void> {
               serverLogPaths.get(stripBmkAndAgenticPrefix(parentDir));
             if (logPath) {
               try {
+                const serverLogStart = Date.now();
+                console.log(
+                  `    server_log ${path.basename(logPath)} (${formatBytes(fileSize(logPath))})`,
+                );
                 const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
                 await insertServerLog(sql, insertedIds, serverLog);
+                console.log(`    server_log linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
                 tracker.recordDbError(`server_log for ${configKey}`, error);
               }
@@ -468,6 +515,13 @@ async function main(): Promise<void> {
                 : undefined) ?? traceReplayPaths.get(suffix);
             if (trace) {
               try {
+                const traceStart = Date.now();
+                console.log(
+                  `    trace_replay ${suffix}: ` +
+                    `profile=${formatBytes(fileSize(trace.profileJsonl))}, ` +
+                    `server_csv=${formatBytes(fileSize(trace.serverMetricsCsv))}, ` +
+                    `server_json=${formatBytes(fileSize(trace.serverMetricsJson))}`,
+                );
                 const profile = trace.profileJsonl ? fs.readFileSync(trace.profileJsonl) : null;
                 const metrics = trace.serverMetricsCsv
                   ? fs.readFileSync(trace.serverMetricsCsv)
@@ -476,14 +530,19 @@ async function main(): Promise<void> {
                   ? fs.readFileSync(trace.serverMetricsJson)
                   : null;
                 await insertTraceReplay(sql, insertedIds, profile, metrics, metricsJson, {
-                  framework: toInsert[0]?.config.framework,
-                  disagg: toInsert[0]?.config.disagg,
+                  metricsContext: {
+                    framework: toInsert[0]?.config.framework,
+                    disagg: toInsert[0]?.config.disagg,
+                  },
+                  progressLabel: suffix,
                 });
                 totalTraceReplayLinked += insertedIds.length;
+                console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
               } catch (error: any) {
                 tracker.recordDbError(`trace_replay for ${suffix}`, error);
               }
             } else {
+              console.log(`    trace_replay ${suffix}: missing sibling artifact`);
               tracker.skips.traceReplayMissing++;
             }
           }
@@ -491,6 +550,7 @@ async function main(): Promise<void> {
           tracker.recordDbError(path.basename(file), error);
         }
       }
+      console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
     }
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {

@@ -19,6 +19,25 @@ import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
 
+export interface TraceReplayIngestOptions {
+  metricsContext?: ServerMetricsContext;
+  progressLabel?: string;
+}
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined) return 'none';
+  if (bytes < 1024) return `${bytes} B`;
+  const kib = bytes / 1024;
+  if (kib < 1024) return `${kib.toFixed(1)} KiB`;
+  const mib = kib / 1024;
+  if (mib < 1024) return `${mib.toFixed(1)} MiB`;
+  return `${(mib / 1024).toFixed(1)} GiB`;
+}
+
+function elapsed(startMs: number): string {
+  return `${((Date.now() - startMs) / 1000).toFixed(1)}s`;
+}
+
 /**
  * Persist the per-point trace files and link them to `benchmarkResultIds`.
  *
@@ -34,8 +53,8 @@ type Sql = ReturnType<typeof postgres>;
  * @param serverMetricsJson   Raw bytes of `server_metrics_export.json` —
  *                            per-scrape time-series of every Prometheus metric.
  *                            Optional, gzipped before storage (~42x ratio).
- * @param metricsContext      Canonical framework used to select the
- *                            orchestrator-specific metric-label adapter.
+ * @param options             Canonical framework/disagg context plus optional
+ *                            progress label for CI logs.
  */
 export async function insertTraceReplay(
   sql: Sql,
@@ -43,36 +62,65 @@ export async function insertTraceReplay(
   profileExportJsonl: Buffer | null,
   serverMetricsCsv: Buffer | null,
   serverMetricsJson: Buffer | null = null,
-  metricsContext: ServerMetricsContext = {},
+  options: TraceReplayIngestOptions = {},
 ): Promise<void> {
+  const { metricsContext = {}, progressLabel } = options;
+  const log = (message: string): void => {
+    if (progressLabel) console.log(`    trace_replay ${progressLabel}: ${message}`);
+  };
+
   if (benchmarkResultIds.length === 0) return;
   if (!profileExportJsonl && !serverMetricsCsv && !serverMetricsJson) return;
 
   // Only link rows that don't already point at a trace_replay row — keeps
   // re-ingest from inserting duplicate sibling blobs.
+  const linkStart = Date.now();
+  log(`checking ${benchmarkResultIds.length} benchmark row(s) for existing links`);
   const unlinked = await sql<{ id: number }[]>`
     select id from benchmark_results
     where id = any(${sql.array(benchmarkResultIds)}::bigint[])
       and trace_replay_id is null
   `;
-  if (unlinked.length === 0) return;
+  log(`found ${unlinked.length} unlinked row(s) (${elapsed(linkStart)})`);
+  if (unlinked.length === 0) {
+    log('skipping blob insert; all benchmark rows already linked');
+    return;
+  }
 
+  const gzipStart = Date.now();
+  log(
+    `compressing profile=${formatBytes(profileExportJsonl?.length)}, ` +
+      `server_csv=${formatBytes(serverMetricsCsv?.length)}, ` +
+      `server_json=${formatBytes(serverMetricsJson?.length)}`,
+  );
   const profileGz = profileExportJsonl ? gzipSync(profileExportJsonl) : null;
   const profileSize = profileExportJsonl ? profileExportJsonl.length : null;
   const csvSize = serverMetricsCsv ? serverMetricsCsv.length : null;
   const metricsJsonGz = serverMetricsJson ? gzipSync(serverMetricsJson) : null;
   const metricsJsonSize = serverMetricsJson ? serverMetricsJson.length : null;
+  log(
+    `compressed profile=${formatBytes(profileGz?.length)}, ` +
+      `server_json=${formatBytes(metricsJsonGz?.length)} (${elapsed(gzipStart)})`,
+  );
 
   // Pre-compute aggregate stats + chart-ready time-series + per-request
   // timeline so the detail page doesn't have to re-parse these blobs on
   // every request. Each helper tolerates a null blob and falls back to
   // a streaming parser for oversized server_metrics blobs.
+  const computeStart = Date.now();
+  log('computing aggregate stats, chart series, and request timeline');
   const [aggregateStats, chartSeries, requestTimeline] = await Promise.all([
     computeAggregateStats({ profileBlob: profileGz, serverBlob: metricsJsonGz }),
     computeChartSeries(metricsJsonGz, metricsContext),
     Promise.resolve(computeRequestTimeline(profileGz)),
   ]);
+  log(
+    `computed derived JSON: chart_windows=${chartSeries?.timeslicesCount ?? 0}, ` +
+      `timeline_requests=${requestTimeline?.requests.length ?? 0} (${elapsed(computeStart)})`,
+  );
 
+  const insertStart = Date.now();
+  log('inserting trace_replay blob row');
   const [{ id: traceReplayId }] = await sql<{ id: number }[]>`
     insert into agentic_trace_replay (
       profile_export_jsonl_gz,
@@ -98,12 +146,16 @@ export async function insertTraceReplay(
     )
     returning id
   `;
+  log(`inserted trace_replay_id=${traceReplayId} (${elapsed(insertStart)})`);
 
+  const updateStart = Date.now();
+  log(`linking trace_replay_id=${traceReplayId} to ${unlinked.length} benchmark row(s)`);
   await sql`
     update benchmark_results
     set trace_replay_id = ${traceReplayId}
     where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
   `;
+  log(`linked benchmark rows (${elapsed(updateStart)})`);
 
   // Derive lifetime GPU + CPU cache hit rates from chart_series. SGLang
   // runs don't populate these in the harness JSON; vLLM runs do but only
@@ -146,6 +198,7 @@ export async function insertTraceReplay(
         )
         where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
       `;
+      log('updated cache-hit metrics from chart series');
     }
   }
 }
