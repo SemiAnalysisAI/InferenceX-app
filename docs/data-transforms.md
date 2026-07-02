@@ -44,11 +44,17 @@ RenderableGraph[]  (consumed by ScatterGraph)
 1. Converts every row to `AggDataEntry` once (via `rowToAggDataEntry`).
 2. Calls `getHardwareKey(entry)` and writes the result back into `entry.hwKey`.
 3. Calls `getHardwareConfig(hwKey)` with a per-call cache to build the `HardwareConfig` map (hardware display metadata — label, color, GPU title).
-4. For each `ChartDefinition` in `inference-chart-config.json`, calls `createChartDataPoint` with that definition's `x`/`y` field keys to produce one `InferenceData` array per chart. The same `AggDataEntry` objects are reused across chart definitions — they are not re-created.
+4. For each `ChartDefinition` (derived from the metric registry by `components/inference/inference-chart-config.ts`), calls `createChartDataPoint` with that definition's `x`/`y` field keys to produce one `InferenceData` array per chart. The same `AggDataEntry` objects are reused across chart definitions — they are not re-created.
 
 Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 
-### Step 2: AggDataEntry to InferenceData (`lib/chart-utils.ts`)
+### Step 2: AggDataEntry to InferenceData (`lib/chart-point.ts`)
+
+> `lib/chart-utils.ts` is a thin barrel that re-exports these focused modules —
+> `chart-point.ts` (point creation, `getNestedYValue`, `Y_AXIS_METRICS`),
+> `hardware-keys.ts` (the hardware-key builders), `roofline.ts` (Pareto fronts +
+> `ROOFLINE_METRIC_FIELDS`), and `chart-colors.ts`. Existing `@/lib/chart-utils`
+> imports keep working; the canonical homes are the sibling modules named here.
 
 **`createChartDataPoint(date, entry, xKey, yKey, hwKey)`** — spreads `entry` first, then overrides with derived fields:
 
@@ -86,7 +92,7 @@ The hook runs a 5-step memoized pipeline:
 
 This is the most complex and bug-prone part of the pipeline. A bad hardware key produces either a missing legend entry, zeroed cost/energy metrics (because `getGpuSpecs` returns zeros), or a chart point that never matches the active hardware filter.
 
-**`getHardwareKey(entry)`** (`lib/chart-utils.ts`) — builds the canonical key:
+**`getHardwareKey(entry)`** (`lib/hardware-keys.ts`) — builds the canonical key:
 
 1. Base GPU: `entry.hw.split('-')[0]` strips any `-DP` / `-MN` variant suffix from the hardware field (e.g. `"h100-8"` → `"h100"`).
 2. Framework suffix: appends `_${entry.framework}`. The direct key (`h100_trt`) is tested via `isKnownGpu()` (checks whether the base GPU exists in `HW_REGISTRY`). If the direct key's base is unknown and `entry.disagg` is true, a `-disagg` variant is tried.
@@ -97,8 +103,8 @@ The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label,
 **Three variants exist for different data sources:**
 
 - `getHardwareKey(entry: AggDataEntry)` — for benchmark data (the normal path described above).
-- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/chart-utils.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the base GPU is not in `HW_REGISTRY`.
-- `buildAvailabilityHwKey(hardware, framework?, specMethod?, disagg?)` (`lib/chart-utils.ts`) — for availability rows. Follows the same disagg-variant logic as `getHardwareKey` but uses `resolveFrameworkAlias` to normalize framework aliases before lookup.
+- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/hardware-keys.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the base GPU is not in `HW_REGISTRY`.
+- `buildAvailabilityHwKey(hardware, framework?, specMethod?, disagg?)` (`lib/hardware-keys.ts`) — for availability rows. Follows the same disagg-variant logic as `getHardwareKey` but uses `resolveFrameworkAlias` to normalize framework aliases before lookup.
 
 **Alias remapping** (`lib/constants.ts`) — `GPU_KEY_ALIASES` maps a canonical key to one or more legacy keys (e.g. `gb200_dynamo-trtllm` was renamed to `gb200_dynamo-trt`). The inverse map `GPU_ALIAS_TO_CANONICAL` is used in `filterByGPU` to treat alias keys as their canonical equivalent when the user selects a GPU from the filter panel.
 
@@ -106,22 +112,52 @@ The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label,
 
 ## Chart Configuration
 
-`inference-chart-config.json` defines exactly two `ChartDefinition` objects:
+Every Y-axis metric is defined ONCE in the typed metric registry
+(`lib/metric-registry.ts`, `METRIC_REGISTRY`). The two `ChartDefinition` objects
+the components consume are DERIVED from it by
+`components/inference/inference-chart-config.ts`, and the `ChartDefinition` TYPE
+is generated from the registry's metric-key union in `lib/chart-types.ts`. There
+is no `inference-chart-config.json` anymore — the derivation reproduces the exact
+same flat shape (`chartDef.y_costh`, `chartDef.y_costh_label`,
+`chartDef.y_costh_roofline`, …) every reader and Cypress mock already used, so no
+consumer changed how it reads config. The golden oracle
+`lib/metric-registry.golden.test.ts` pins that derived output byte-for-byte.
+
+The two charts:
 
 | `chartType`     | Default x-axis  | x meaning                                                      |
 | --------------- | --------------- | -------------------------------------------------------------- |
 | `interactivity` | `median_intvty` | Interactivity (tok/s/user) — higher = more responsive per user |
 | `e2e`           | `median_e2el`   | End-to-end latency (s) — lower = faster                        |
 
-Both charts share the same Y-axis options. The `y` field is the default `AggDataEntry` key used for raw Y values; each `y_{metric}` field overrides this with a dotted path into the `InferenceData` derived fields (e.g. `"tpPerGpu.y"`).
+Chart-level fields (default `x` / `x_label` / `y` / `heading` and the
+`y_cost_limit` / `y_latency_limit` clamps) live in `CHART_AXIS_CONFIG` in the
+registry. Both charts share the same Y-axis metric universe.
 
-**Per-metric Y-axis schema** — for each metric key (e.g. `y_costh`), the config carries:
+**Per-metric registry entry** — each `METRIC_REGISTRY['y_<metric>']` carries:
 
-- `y_{metric}`: dotted path for the value (e.g. `"costh.y"`).
-- `y_{metric}_label`: Y-axis label string.
-- `y_{metric}_title`: dropdown/UI title string.
-- `y_{metric}_roofline`: Pareto direction (`upper_left`, `upper_right`, `lower_left`, `lower_right`). Roofline direction differs between chart types for the same metric because the x-axis polarity differs (interactivity: higher-is-better; E2EL: lower-is-better).
+- `path`: dotted accessor into `InferenceData` (e.g. `'costh.y'`); exposed to
+  readers as `chartDef['y_<metric>']`.
+- `label`: Y-axis / table-column label; exposed as `chartDef['y_<metric>_label']`.
+- `title`: dropdown / UI title; exposed as `chartDef['y_<metric>_title']`.
+- `roofline: { interactivity?, e2e? }`: Pareto direction per chart, exposed as
+  `chartDef['y_<metric>_roofline']`. It differs between chart types for the same
+  metric because the x-axis polarity differs (interactivity: higher-is-better;
+  E2EL: lower-is-better). A side left undefined (the measured-power metrics)
+  falls back to `lower_right` at render via `rooflineDirectionFor`.
+- `inYAxisMetrics` / `rooflineField` / `rooflineRequired`: drive the derived
+  `Y_AXIS_METRICS` (`lib/chart-point.ts`) and `ROOFLINE_METRIC_FIELDS`
+  (`lib/roofline.ts`) used by the roofline-marking passes.
 
-**Input-metric x-axis override** — when the selected Y metric's title contains `"input"`, the interactivity chart switches its x-axis to `p99_ttft` (or the user-overridden x metric). This is detected in `stableChartDefinitions` via `metricTitle.toLowerCase().includes('input')`. The config encodes the default override fields: `y_inputTputPerGpu_x: "p99_ttft"` and `y_inputTputPerGpu_x_label`.
+**Input-metric x-axis override** — input metrics are flagged explicitly with
+`isInputMetric: true` in the registry (replacing the former
+`metricTitle.toLowerCase().includes('input')` string sniff; `metricIsInputMetric`
+is the shared lookup). On the interactivity chart an input metric shows the
+X-Axis Metric / Scale controls and the dynamic "vs. TTFT" heading. The metric
+that additionally SWAPS the x-axis to `p99_ttft` (`y_inputTputPerGpu`) carries
+`xOverride` / `xOverrideLabel` / `interactivityHeading`, surfaced in the derived
+config as `y_inputTputPerGpu_x` / `_x_label` / `_heading`.
 
-**Limits** — both charts include `y_cost_limit: 5` (clamp cost-metric y-axis to $5/M tokens) and `y_latency_limit: 60` (filter x-axis outliers beyond 60s when TTFT is on x).
+**Limits** — both charts derive `y_cost_limit: 5` (clamp cost-metric y-axis to
+$5/M tokens) and `y_latency_limit: 60` (filter x-axis outliers beyond 60s when
+TTFT is on x) from `CHART_AXIS_CONFIG`.

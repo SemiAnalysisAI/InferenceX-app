@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
+import { metricIsInputMetric } from '@/lib/metric-registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,
@@ -491,11 +492,7 @@ export default function ChartDisplay() {
                           }{' '}
                           {(() => {
                             // For Input metrics with dynamic x-axis, use dynamic heading
-                            const metricTitle =
-                              (graph.chartDefinition[
-                                `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                              ] as string) || '';
-                            const isInputMetric = metricTitle.toLowerCase().includes('input');
+                            const isInputMetric = metricIsInputMetric(selectedYAxisMetric);
                             if (
                               graph.chartDefinition.chartType === 'interactivity' &&
                               isInputMetric &&

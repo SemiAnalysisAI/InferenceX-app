@@ -13,6 +13,9 @@
  */
 
 import type { HardwareEntry } from '@/lib/constants';
+// Type-only import (no runtime cycle): the flat per-metric fields of
+// `ChartDefinition` are generated from the registry's metric-key union.
+import type { MetricKey } from '@/lib/metric-registry';
 
 /**
  * Role of a single worker process in a multinode / disaggregated deployment.
@@ -293,123 +296,52 @@ export type YAxisMetricKey =
  */
 export type InferenceChartType = 'e2e' | 'interactivity';
 
-export interface ChartDefinition {
+/** The four Pareto-front directions a metric roofline can take. */
+export type RooflineDir = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+
+/**
+ * The flat per-metric fields a `ChartDefinition` carries for one metric key.
+ * All optional because the config only sets what a given metric/chart uses
+ * (e.g. only input metrics carry `_x` / `_x_label` / `_heading`; the measured-
+ * power metrics carry no `_roofline`). This is the shape every component reader
+ * and every Cypress mock already depends on — it is now GENERATED from the
+ * metric-key union rather than hand-listed for all ~26 metrics.
+ */
+type MetricFields<K extends string> = Partial<Record<K, string>> & {
+  [P in K as `${P}_label`]?: string;
+} & {
+  [P in K as `${P}_title`]?: string;
+} & {
+  [P in K as `${P}_roofline`]?: RooflineDir;
+} & {
+  [P in K as `${P}_x`]?: string;
+} & {
+  [P in K as `${P}_x_label`]?: string;
+} & {
+  [P in K as `${P}_heading`]?: string;
+};
+
+/** Chart-level fields shared by every chart definition (not metric-specific). */
+interface ChartDefinitionBase {
   chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;
   x_label: string;
   y: keyof AggDataEntry;
   y_label?: string;
-  y_tpPerGpu?: string;
-  y_tpPerGpu_label?: string;
-  y_tpPerGpu_title?: string;
-  y_tpPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTputPerGpu?: string;
-  y_outputTputPerGpu_label?: string;
-  y_outputTputPerGpu_title?: string;
-  y_outputTputPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTputPerGpu?: string;
-  y_inputTputPerGpu_label?: string;
-  y_inputTputPerGpu_title?: string;
-  y_inputTputPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTputPerGpu_x?: string;
-  y_inputTputPerGpu_x_label?: string;
-  y_inputTputPerGpu_heading?: string;
-  y_tpPerMw?: string;
-  y_tpPerMw_label?: string;
-  y_tpPerMw_title?: string;
-  y_tpPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_inputTputPerMw?: string;
-  y_inputTputPerMw_label?: string;
-  y_inputTputPerMw_title?: string;
-  y_inputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_outputTputPerMw?: string;
-  y_outputTputPerMw_label?: string;
-  y_outputTputPerMw_title?: string;
-  y_outputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costh?: string;
-  y_costh_label?: string;
-  y_costh_title?: string;
-  y_costh_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costn?: string;
-  y_costn_label?: string;
-  y_costn_title?: string;
-  y_costn_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costr?: string;
-  y_costr_label?: string;
-  y_costr_title?: string;
-  y_costr_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Cost per million output tokens
-  y_costhOutput?: string;
-  y_costhOutput_label?: string;
-  y_costhOutput_title?: string;
-  y_costhOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costnOutput?: string;
-  y_costnOutput_label?: string;
-  y_costnOutput_title?: string;
-  y_costnOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costrOutput?: string;
-  y_costrOutput_label?: string;
-  y_costrOutput_title?: string;
-  y_costrOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Cost per million input tokens
-  y_costhi?: string;
-  y_costhi_label?: string;
-  y_costhi_title?: string;
-  y_costhi_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costni?: string;
-  y_costni_label?: string;
-  y_costni_title?: string;
-  y_costni_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_costri?: string;
-  y_costri_label?: string;
-  y_costri_title?: string;
-  y_costri_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // All-in provisioned Joules per token
-  y_jTotal?: string;
-  y_jTotal_label?: string;
-  y_jTotal_title?: string;
-  y_jTotal_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_jOutput?: string;
-  y_jOutput_label?: string;
-  y_jOutput_title?: string;
-  y_jOutput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_jInput?: string;
-  y_jInput_label?: string;
-  y_jInput_title?: string;
-  y_jInput_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  // Measured power / energy from runner GPU telemetry
-  y_measuredAvgPower?: string;
-  y_measuredAvgPower_label?: string;
-  y_measuredAvgPower_title?: string;
-  // Not explicitly set in the config — ScatterGraph falls back to lower_right
-  // (matches "lower power at the same interactivity is more efficient").
-  // The field stays in the type for parity with the other y_* metrics and
-  // so a future config can override the default.
-  y_measuredAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredPrefillAvgPower?: string;
-  y_measuredPrefillAvgPower_label?: string;
-  y_measuredPrefillAvgPower_title?: string;
-  y_measuredPrefillAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredDecodeAvgPower?: string;
-  y_measuredDecodeAvgPower_label?: string;
-  y_measuredDecodeAvgPower_title?: string;
-  y_measuredDecodeAvgPower_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerOutputToken?: string;
-  y_measuredJPerOutputToken_label?: string;
-  y_measuredJPerOutputToken_title?: string;
-  y_measuredJPerOutputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerInputToken?: string;
-  y_measuredJPerInputToken_label?: string;
-  y_measuredJPerInputToken_title?: string;
-  y_measuredJPerInputToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
-  y_measuredJPerTotalToken?: string;
-  y_measuredJPerTotalToken_label?: string;
-  y_measuredJPerTotalToken_title?: string;
-  y_measuredJPerTotalToken_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_cost_limit?: number;
   y_latency_limit?: number;
 }
+
+/**
+ * Configuration + labels for a single chart, in the flat shape all consumers
+ * read (`chartDef.y_costh`, `chartDef.y_costh_label`, `chartDef.y_costh_roofline`,
+ * …). The per-metric fields are derived from the metric registry's key union
+ * (`MetricKey`), so adding a metric to the registry automatically extends this
+ * type — no hand-editing here. The actual runtime values are built by
+ * `@/components/inference/inference-chart-config` from the same registry.
+ */
+export type ChartDefinition = ChartDefinitionBase & MetricFields<MetricKey>;
 
 /**
  * Represents a graph that is ready to be rendered, containing its model, sequence,

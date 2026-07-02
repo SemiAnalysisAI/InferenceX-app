@@ -223,13 +223,49 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 ### Add/modify a metric
 
-1. Register in `src/lib/chart-utils.ts`: `Y_AXIS_METRICS`, `calculateRoofline`, `computeAllRooflines`, `markRooflinePoints`
-2. Add TS types: optional field in `InferenceData`, add to `YAxisMetricKey`, add `ChartDefinition` fields
-3. Add chart config: `src/components/inference/inference-chart-config.json`
-4. Add Y-axis dropdown: `ChartControls.tsx`
-5. Add subtitle/disclaimer in `ChartDisplay.tsx` if metric depends on assumed constants
-6. Add disagg caveat banner in `ChartDisplay.tsx` for per-GPU or per-MW metrics (animated amber `border-l-2` banner pattern)
-7. Expose in UI state: `InferenceContext.tsx`
+Metrics are defined ONCE in the registry at `src/lib/metric-registry.ts`
+(`METRIC_REGISTRY`). Everything that used to be hand-maintained in 5 places —
+the two flat chart-config objects, the `ChartDefinition` type's `y_<metric>*`
+fields, `Y_AXIS_METRICS`, and `ROOFLINE_METRIC_FIELDS` — is now DERIVED from that
+one entry. There is no more `inference-chart-config.json`; the flat config the
+components read is built by `src/components/inference/inference-chart-config.ts`
+from the registry, and the `ChartDefinition` type is generated from the registry
+key union in `src/lib/chart-types.ts`.
+
+To add a metric:
+
+1. **Registry entry** — add one `METRIC_REGISTRY['y_<name>']` object in
+   `src/lib/metric-registry.ts` with `path` (e.g. `'<field>.y'`), `label`,
+   `title`, and per-chart `roofline` directions (`{ interactivity, e2e }`; omit
+   a side to fall back to `lower_right` at render). Set `isInputMetric: true`
+   (+ `xOverride` / `xOverrideLabel` / `interactivityHeading`) only for input
+   metrics that swap the interactivity x-axis to TTFT. This entry alone supplies
+   the flat config fields, the `ChartDefinition` type, and (for roofline metrics)
+   `Y_AXIS_METRICS` + `ROOFLINE_METRIC_FIELDS`.
+2. **Roofline participation** — if the metric should be pre-marked on the Pareto
+   front (almost all are), set `inYAxisMetrics: true`, `rooflineField: '<field>'`
+   (the `{ y, roof }` key on `InferenceData`), and `rooflineRequired`
+   (`true` if the field is ALWAYS present, `false` if only created when the
+   source stat exists), then add `'y_<name>'` to the `ROOFLINE_METRIC_KEYS` tuple
+   in the same file (the module asserts the flag and the tuple agree at load).
+   Custom-user metrics computed at render time set `inYAxisMetrics: false`.
+3. **Data field** — add the optional `<field>?: { y: number; roof: boolean }` to
+   `InferenceData` and to `YAxisMetricKey` in `src/lib/chart-types.ts`, and
+   populate it in `createChartDataPoint` (`src/lib/chart-point.ts`) from the raw
+   `AggDataEntry` stat.
+4. **Dropdown** — add `'y_<name>'` to the appropriate group in `METRIC_GROUPS`
+   in `ChartControls.tsx` (this list owns the dropdown ORDER + grouping; the
+   option label is the registry `title`).
+5. Add subtitle/disclaimer in `ChartDisplay.tsx` if the metric depends on assumed
+   constants.
+6. Add a disagg caveat banner in `ChartDisplay.tsx` for per-GPU or per-MW metrics
+   (animated amber `border-l-2` banner pattern).
+7. No `InferenceContext.tsx` change is needed for a normal metric — the URL
+   `i_metric` param carries whatever key the dropdown selects.
+
+The golden oracle `src/lib/metric-registry.golden.test.ts` pins the resolved
+config for every metric; update its inline snapshot (`vitest -u`) when you
+intentionally add or change one.
 
 ### Add a new blog post
 

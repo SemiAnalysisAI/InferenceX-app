@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
 import { useInference } from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,

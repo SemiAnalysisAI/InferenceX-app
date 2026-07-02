@@ -4,7 +4,8 @@
  * For Pareto front calculations, see @/lib/chart-utils
  */
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
+import { metricIsInputMetric } from '@/lib/metric-registry';
 
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
@@ -82,9 +83,7 @@ export function processOverlayChartData(
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
   // Resolve x-axis field (must match useChartData logic)
-  const metricTitle =
-    (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-  const isInputMetric = metricTitle.toLowerCase().includes('input');
+  const isInputMetric = metricIsInputMetric(selectedYAxisMetric);
   let xAxisField: string = chartDef.x;
   // selectedXAxisMetric is already the effective metric for this chart type
   // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric)

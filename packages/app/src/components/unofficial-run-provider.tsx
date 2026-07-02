@@ -17,7 +17,7 @@ import { computeToggle } from '@/hooks/useTogglableSet';
 import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Model, Sequence } from '@/lib/data-mappings';
 

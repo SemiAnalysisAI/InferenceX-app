@@ -4,7 +4,7 @@
 
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
 import type {
   AggDataEntry,
   ChartDefinition,

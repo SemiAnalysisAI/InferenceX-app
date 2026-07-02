@@ -1,6 +1,7 @@
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
+import { metricIsInputMetric } from '@/lib/metric-registry';
 
 import type {
   AggDataEntry,
@@ -104,9 +105,7 @@ function resolveXAxisField(
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
 ): string {
-  const metricTitle =
-    (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-  const isInputMetric = metricTitle.toLowerCase().includes('input');
+  const isInputMetric = metricIsInputMetric(selectedYAxisMetric);
   const isTtftOverride =
     selectedXAxisMetric === 'p99_ttft' || selectedXAxisMetric === 'median_ttft';
 

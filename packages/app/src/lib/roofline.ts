@@ -11,6 +11,7 @@
 
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from '@/lib/chart-types';
 import { getNestedYValue, Y_AXIS_METRICS, type YAxisMetric } from '@/lib/chart-point';
+import { ROOFLINE_METRIC_FIELD_SPECS } from '@/lib/metric-registry';
 
 // ---------------------------------------------------------------------------
 // Pareto frontier variants
@@ -245,48 +246,26 @@ export function computeAllRooflines(
 }
 
 /**
- * Maps each `y_<field>` metric key in Y_AXIS_METRICS to the corresponding
- * `{ y, roof }` field on InferenceData, and records whether that field is
- * always present (required) or conditionally present (optional).
+ * Maps each roofline-bearing metric key to its `{ y, roof }` field on
+ * InferenceData, and whether that field is always present (required) or
+ * conditionally present (optional). DERIVED from the metric registry
+ * (`ROOFLINE_METRIC_FIELD_SPECS`) — one registry entry now supplies both the
+ * config field and this marking spec, so there is no second list to keep in
+ * sync (see `@/lib/metric-registry`).
  *
  * This drives both the roof reset pass and the roof marking pass in
- * markRooflinePoints, replacing the previous hand-written ~24 resets and the
- * per-metric if/else dispatch. `required: false` fields are only touched when
- * present on the point, exactly preserving the original
+ * markRooflinePoints. `required: false` fields are only touched when present on
+ * the point, exactly preserving the original
  * `if (newPoint.field) newPoint.field.roof = ...` optional-field semantics.
  *
- * The `'y'` entry in Y_AXIS_METRICS has no roofline field, so it is omitted.
+ * The `'y'` entry in Y_AXIS_METRICS has no roofline field, so it is not part of
+ * the registry's roofline set and is naturally omitted here.
  */
 const ROOFLINE_METRIC_FIELDS: readonly {
   metric: YAxisMetric;
   field: YAxisMetricKey;
   required: boolean;
-}[] = [
-  { metric: 'y_tpPerGpu', field: 'tpPerGpu', required: true },
-  { metric: 'y_outputTputPerGpu', field: 'outputTputPerGpu', required: false },
-  { metric: 'y_inputTputPerGpu', field: 'inputTputPerGpu', required: false },
-  { metric: 'y_tpPerMw', field: 'tpPerMw', required: true },
-  { metric: 'y_inputTputPerMw', field: 'inputTputPerMw', required: false },
-  { metric: 'y_outputTputPerMw', field: 'outputTputPerMw', required: false },
-  { metric: 'y_costh', field: 'costh', required: true },
-  { metric: 'y_costn', field: 'costn', required: true },
-  { metric: 'y_costr', field: 'costr', required: true },
-  { metric: 'y_costhOutput', field: 'costhOutput', required: false },
-  { metric: 'y_costnOutput', field: 'costnOutput', required: false },
-  { metric: 'y_costrOutput', field: 'costrOutput', required: false },
-  { metric: 'y_costhi', field: 'costhi', required: true },
-  { metric: 'y_costni', field: 'costni', required: true },
-  { metric: 'y_costri', field: 'costri', required: true },
-  { metric: 'y_jTotal', field: 'jTotal', required: false },
-  { metric: 'y_jOutput', field: 'jOutput', required: false },
-  { metric: 'y_jInput', field: 'jInput', required: false },
-  { metric: 'y_measuredAvgPower', field: 'measuredAvgPower', required: false },
-  { metric: 'y_measuredPrefillAvgPower', field: 'measuredPrefillAvgPower', required: false },
-  { metric: 'y_measuredDecodeAvgPower', field: 'measuredDecodeAvgPower', required: false },
-  { metric: 'y_measuredJPerOutputToken', field: 'measuredJPerOutputToken', required: false },
-  { metric: 'y_measuredJPerTotalToken', field: 'measuredJPerTotalToken', required: false },
-  { metric: 'y_measuredJPerInputToken', field: 'measuredJPerInputToken', required: false },
-];
+}[] = ROOFLINE_METRIC_FIELD_SPECS;
 
 /**
  * Marks data points as being "on the roofline".

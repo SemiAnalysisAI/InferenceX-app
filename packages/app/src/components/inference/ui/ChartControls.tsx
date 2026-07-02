@@ -25,7 +25,8 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
+import { metricIsInputMetric } from '@/lib/metric-registry';
 import type { ChartDefinition, DisaggMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import type { Model, Sequence } from '@/lib/data-mappings';
@@ -268,13 +269,9 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     track('inference_quick_filter_toggled', { category, value, active: !wasActive });
   };
 
-  const isInputMetric = (() => {
-    const chartDef = graphs[0]?.chartDefinition;
-    if (!chartDef) return false;
-    const titleKey = `${selectedYAxisMetric}_title` as keyof typeof chartDef;
-    const title = (chartDef[titleKey] as string) || '';
-    return title.toLowerCase().includes('input');
-  })();
+  // Gate the X-Axis controls on whether a chart is rendered AND the metric is an
+  // input metric (registry flag; formerly a title `.includes('input')` sniff).
+  const isInputMetric = graphs.length > 0 && metricIsInputMetric(selectedYAxisMetric);
 
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);

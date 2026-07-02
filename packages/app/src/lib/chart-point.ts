@@ -19,42 +19,18 @@ import {
   tokensPerHourInMillions,
   tokensPerMwFromPerGpu,
 } from '@/lib/derived-metrics';
+import { ROOFLINE_METRIC_KEYS, type RooflineMetricKey } from '@/lib/metric-registry';
 
 /**
- * Defines all possible Y-axis metrics that can be used for chart generation,
- * including base metrics and calculated roofline metrics.
+ * All possible Y-axis metrics for chart generation: the plain-throughput default
+ * `'y'` plus every roofline-bearing metric. DERIVED from the metric registry
+ * (`ROOFLINE_METRIC_KEYS`) so adding a metric there flows through here with no
+ * edit — see `@/lib/metric-registry`. Measured power/energy metrics are sourced
+ * from the runner's aggregate_power.py output; the rest are spec-sheet derived.
  */
-export const Y_AXIS_METRICS = [
-  'y',
-  'y_tpPerGpu',
-  'y_inputTputPerGpu',
-  'y_outputTputPerGpu',
-  'y_tpPerMw',
-  'y_inputTputPerMw',
-  'y_outputTputPerMw',
-  'y_costh',
-  'y_costn',
-  'y_costr',
-  'y_costhOutput',
-  'y_costnOutput',
-  'y_costrOutput',
-  'y_costhi',
-  'y_costni',
-  'y_costri',
-  'y_jTotal',
-  'y_jOutput',
-  'y_jInput',
-  // Measured power / energy (sourced from runner's aggregate_power.py output;
-  // distinct from the spec-sheet TDP-derived jTotal/jOutput/jInput above).
-  'y_measuredAvgPower',
-  'y_measuredPrefillAvgPower',
-  'y_measuredDecodeAvgPower',
-  'y_measuredJPerOutputToken',
-  'y_measuredJPerTotalToken',
-  'y_measuredJPerInputToken',
-] as const;
+export const Y_AXIS_METRICS = ['y', ...ROOFLINE_METRIC_KEYS] as const;
 
-export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
+export type YAxisMetric = 'y' | RooflineMetricKey;
 
 /**
  * Creates a single InferenceData point from an AggDataEntry.

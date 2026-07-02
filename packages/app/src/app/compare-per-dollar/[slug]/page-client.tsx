@@ -64,7 +64,7 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
 };
 
 /** y_costh = Cost per Million Total Tokens (Owning - Hyperscaler). Defined in
- *  packages/app/src/components/inference/inference-chart-config.json. */
+ *  packages/app/src/lib/metric-registry.ts. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 function toModel(value: string): Model | undefined {

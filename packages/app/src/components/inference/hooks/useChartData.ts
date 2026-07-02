@@ -3,7 +3,7 @@ import { useMemo, useRef } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import chartDefinitions from '@/components/inference/inference-chart-config';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -24,6 +24,7 @@ import {
   hardwareKeyMatchesAnyBase,
 } from '@/lib/constants';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+import { metricIsInputMetric } from '@/lib/metric-registry';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import {
@@ -245,9 +246,7 @@ export function useChartData(
         let xAxisField: keyof AggDataEntry = chartDef.x;
         let xAxisLabel = chartDef.x_label;
 
-        const metricTitle =
-          (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-        const isInputMetric = metricTitle.toLowerCase().includes('input');
+        const isInputMetric = metricIsInputMetric(selectedYAxisMetric);
 
         // Resolve the effective x-axis override per chart type
         const effectiveXMetric =
