@@ -4,23 +4,37 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 
 ## Provider Nesting
 
+Providers mount at two levels:
+
+**Root layout** (`packages/app/src/app/layout.tsx`) — wraps the entire app:
+
 ```
-QueryProvider
-  ThemeProvider
-    UnofficialRunProvider
-      GlobalFilterProvider          ← availability, model/sequence/precision/date/runId
-        InferenceProvider           ← GPU selection, comparison dates, chart UI, y-axis metric
-          inference tab
-          historical tab (no own provider — reads InferenceContext)
-        EvaluationProvider          ← benchmark, eval-specific date, hardware toggle
-          evaluation tab
-        ReliabilityProvider         ← date range, model toggle
-          reliability tab
-        calculator tab              ← no provider; local useState in ThroughputCalculatorDisplay
-        gpu-specs tab               ← no provider; static data
+PostHogProvider
+  QueryProvider
+    ThemeProvider
+      children (all routes)
 ```
 
-Source: `packages/app/src/components/page-content.tsx` lines 203–239.
+**Dashboard shell** (`packages/app/src/components/dashboard-shell.tsx`) — shared by every tab via `(dashboard)/layout.tsx`:
+
+```
+UnofficialRunProvider
+  GlobalFilterProvider          ← availability, model/sequence/precision/date/runId
+    {children}                  ← tab page.tsx content
+```
+
+**Per-tab pages** (each `(dashboard)/*/page.tsx`) — mount their own provider around their display component:
+
+```
+inference/page.tsx:    InferenceProvider (activeTab="inference")  → InferenceChartDisplay
+historical/page.tsx:   InferenceProvider (activeTab="historical") → HistoricalTrendsDisplay
+evaluation/page.tsx:   EvaluationProvider                        → EvaluationChartDisplay
+reliability/page.tsx:  ReliabilityProvider                       → ReliabilityChartDisplay
+calculator/page.tsx:   (no provider — local useState in ThroughputCalculatorDisplay)
+gpu-specs/page.tsx:    (no provider — static data)
+```
+
+`UnofficialRunProvider` and `GlobalFilterProvider` survive tab navigation because they live in the shared dashboard layout shell, not in the per-tab pages.
 
 ---
 
@@ -260,35 +274,47 @@ Historical Trends and TCO Calculator share the inference tab's URL path (`/infer
 
 ### Full parameter list
 
-| Param           | Owner               | Default                           |
-| --------------- | ------------------- | --------------------------------- |
-| `g_model`       | GlobalFilterContext | `DeepSeek-R1-0528`                |
-| `g_rundate`     | GlobalFilterContext | `''`                              |
-| `g_runid`       | GlobalFilterContext | `''`                              |
-| `i_seq`         | GlobalFilterContext | `8k/1k`                           |
-| `i_prec`        | GlobalFilterContext | `fp4`                             |
-| `i_metric`      | InferenceProvider   | `y_tpPerGpu`                      |
-| `i_xmetric`     | InferenceProvider   | `p99_ttft`                        |
-| `i_e2e_xmetric` | InferenceProvider   | `''`                              |
-| `i_scale`       | InferenceProvider   | `auto`                            |
-| `i_gpus`        | InferenceProvider   | `''`                              |
-| `i_dates`       | InferenceProvider   | `''`                              |
-| `i_dstart`      | InferenceProvider   | `''`                              |
-| `i_dend`        | InferenceProvider   | `''`                              |
-| `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal)  |
-| `i_label`       | InferenceProvider   | `''` (truthy = show point labels) |
-| `i_nolabel`     | InferenceProvider   | `''` (legacy, read-only)          |
-| `i_hc`          | InferenceProvider   | `''`                              |
-| `i_log`         | InferenceProvider   | `''`                              |
-| `i_legend`      | InferenceProvider   | `''`                              |
-| `i_advlabel`    | InferenceProvider   | `''`                              |
-| `i_gradlabel`   | InferenceProvider   | `''`                              |
-| `e_rundate`     | EvaluationProvider  | `''`                              |
-| `e_bench`       | EvaluationProvider  | `''`                              |
-| `e_hc`          | EvaluationProvider  | `''`                              |
-| `e_labels`      | EvaluationProvider  | `''`                              |
-| `e_legend`      | EvaluationProvider  | `''`                              |
-| `r_range`       | ReliabilityProvider | `last-3-months`                   |
-| `r_pct`         | ReliabilityProvider | `''`                              |
-| `r_hc`          | ReliabilityProvider | `''`                              |
-| `r_legend`      | ReliabilityProvider | `''`                              |
+Source of truth: `PARAM_DEFAULTS` in `packages/app/src/lib/url-state.ts`.
+
+| Param           | Owner               | Default                                       |
+| --------------- | ------------------- | --------------------------------------------- |
+| `g_model`       | GlobalFilterContext | `DeepSeek-V4-Pro`                             |
+| `g_rundate`     | GlobalFilterContext | `''`                                          |
+| `g_runid`       | GlobalFilterContext | `''`                                          |
+| `i_seq`         | GlobalFilterContext | `8k/1k`                                       |
+| `i_prec`        | GlobalFilterContext | `''` (no default; preserves explicit choices) |
+| `i_metric`      | InferenceProvider   | `y_tpPerGpu`                                  |
+| `i_xmetric`     | InferenceProvider   | `p99_ttft`                                    |
+| `i_e2e_xmetric` | InferenceProvider   | `''`                                          |
+| `i_scale`       | InferenceProvider   | `auto`                                        |
+| `i_gpus`        | InferenceProvider   | `''`                                          |
+| `i_dates`       | InferenceProvider   | `''`                                          |
+| `i_dstart`      | InferenceProvider   | `''`                                          |
+| `i_dend`        | InferenceProvider   | `''`                                          |
+| `i_optimal`     | InferenceProvider   | `''` (truthy = hide non-optimal)              |
+| `i_label`       | InferenceProvider   | `''` (truthy = show point labels)             |
+| `i_nolabel`     | InferenceProvider   | `''` (legacy, read-only)                      |
+| `i_hc`          | InferenceProvider   | `''`                                          |
+| `i_log`         | InferenceProvider   | `''`                                          |
+| `i_legend`      | InferenceProvider   | `''`                                          |
+| `i_advlabel`    | InferenceProvider   | `''`                                          |
+| `i_gradlabel`   | InferenceProvider   | `''`                                          |
+| `i_linelabel`   | InferenceProvider   | `''`                                          |
+| `i_speed`       | InferenceProvider   | `''`                                          |
+| `i_mc`          | InferenceProvider   | `''`                                          |
+| `i_active`      | InferenceProvider   | `''`                                          |
+| `i_vendor`      | InferenceProvider   | `''` (quick vendor filter)                    |
+| `i_fw`          | InferenceProvider   | `''` (quick framework filter)                 |
+| `i_disagg`      | InferenceProvider   | `''` (quick agg/disagg filter)                |
+| `i_spec`        | InferenceProvider   | `''` (quick spec-method filter)               |
+| `e_rundate`     | EvaluationProvider  | `''`                                          |
+| `e_bench`       | EvaluationProvider  | `''`                                          |
+| `e_hc`          | EvaluationProvider  | `''`                                          |
+| `e_labels`      | EvaluationProvider  | `''`                                          |
+| `e_legend`      | EvaluationProvider  | `''`                                          |
+| `e_active`      | EvaluationProvider  | `''`                                          |
+| `r_range`       | ReliabilityProvider | `last-3-months`                               |
+| `r_pct`         | ReliabilityProvider | `''`                                          |
+| `r_hc`          | ReliabilityProvider | `''`                                          |
+| `r_legend`      | ReliabilityProvider | `''`                                          |
+| `r_active`      | ReliabilityProvider | `''`                                          |

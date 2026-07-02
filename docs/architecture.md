@@ -8,13 +8,27 @@ API routes return raw DB rows with zero transformation, validation, or filtering
 - **Flexibility**: The frontend changes far more often than the data shape. Keeping transformation client-side means API routes never need updating for new chart metrics, filter logic, or display formats.
 - **Simplicity**: No DTOs, no mappers, no validation gatekeeping. The DB schema IS the API contract.
 
-## Hash-Based Tab Routing (Not Next.js Routes)
+## Filesystem Tab Routing (App Router)
 
-Tabs use `window.location.hash` instead of Next.js file-based routing because:
+Each tab is a Next.js App Router page under `packages/app/src/app/(dashboard)/`. The route group `(dashboard)` has a single `layout.tsx` that renders `DashboardShell` — which mounts `UnofficialRunProvider`, `TabNav`, and `GlobalFilterProvider` once for all tabs.
 
-- The entire app is a single dashboard page. Separate routes would mean separate page loads, losing React state (zoom positions, filter selections, legend toggles).
-- Hash changes don't trigger Next.js navigation, so context providers stay mounted. This is critical — rebuilding D3 charts from scratch on tab switch would cause visible jank.
-- Browser back/forward still works (hashchange event listener updates tab state).
+```
+app/(dashboard)/layout.tsx         ← DashboardShell (shared shell for every tab)
+app/(dashboard)/inference/page.tsx ← mounts InferenceProvider
+app/(dashboard)/evaluation/page.tsx
+app/(dashboard)/historical/page.tsx ← also mounts InferenceProvider (activeTab="historical")
+app/(dashboard)/calculator/page.tsx
+app/(dashboard)/reliability/page.tsx ← mounts ReliabilityProvider
+...
+```
+
+Tab metadata (title, description, canonical URL) is centralized in `packages/app/src/lib/tab-meta.ts` via `VALID_TABS`, `TAB_META`, and the `tabMetadata()` helper used as the `export const metadata` in each page.
+
+**Why a route group, not hash?** Hash changes do not trigger Next.js navigation, so providers stay mounted. But the refactored approach uses filesystem routes with layout-level providers to retain the same benefit: `UnofficialRunProvider` and `GlobalFilterProvider` mount once in `DashboardShell` and survive tab navigation (Next.js re-uses the layout shell without remounting it). Per-tab providers (`InferenceProvider`, `EvaluationProvider`, etc.) mount and unmount with their page, but they are lightweight: their state is initialised from URL params on mount, so navigating back to a tab restores state from the share URL rather than keeping stale in-memory state across tabs.
+
+**`inferencex:tab-change` custom event**: `TabNav` dispatches `window.dispatchEvent(new CustomEvent('inferencex:tab-change'))` on every tab click. Charts listen for this to cancel in-flight animations and reset zoom refs before the new route's component tree mounts.
+
+**Gated tabs**: Six tabs (`inference`, `evaluation`, `historical`, `calculator`, `gpu-specs`, `submissions`) are visible in the nav bar to all users. Four tabs (`ai-chart`, `gpu-metrics`, `current-inferencex-image`, `feedback`) are hidden behind a feature gate (`useFeatureGate()`) and accessible via a "Hidden" popover dropdown in the desktop nav.
 
 ## URL State Persistence
 
@@ -28,17 +42,22 @@ Chart filter state (model, sequence, metric, precisions, date range, GPU selecti
 
 ## Provider Nesting Order
 
+Providers are split across two mount points — the root layout and the shared dashboard layout shell — with per-tab providers mounting in each tab's own page:
+
 ```
-QueryProvider → ThemeProvider → UnofficialRunProvider → GlobalStateProvider
-  → GlobalFilterProvider → InferenceProvider → EvaluationProvider → ReliabilityProvider
+Root layout:      PostHogProvider → QueryProvider → ThemeProvider
+Dashboard shell:  UnofficialRunProvider → GlobalFilterProvider
+Per-tab page:     InferenceProvider | EvaluationProvider | ReliabilityProvider | (none)
 ```
 
 This isn't arbitrary. Each provider depends on the one above it:
 
-- `GlobalFilterProvider` needs React Query (`useAvailability()`, `useWorkflowInfo()`)
-- `InferenceProvider` needs global model/date selection; gated by `activeTab` to skip heavy work on non-inference tabs
-- Evaluation and Reliability need the hardware config from Inference context
-- TCO Calculator and Historical Trends reuse InferenceContext state (sequence, precisions) without their own providers — local `useState` is sufficient since they don't share state with other tabs
+- `QueryProvider` must wrap everything that calls React Query hooks
+- `ThemeProvider` wraps the whole tree so theme tokens are available everywhere
+- `GlobalFilterProvider` needs React Query (`useAvailability()`, `useWorkflowInfo()`) and lives in the dashboard shell so it survives tab navigation
+- `InferenceProvider` needs global model/date selection from `GlobalFilterProvider`; the `activeTab` prop gates heavy memoization work to avoid it running on the historical tab
+- `EvaluationProvider` and `ReliabilityProvider` are independent per-tab providers; Reliability does not consume `GlobalFilterProvider` at all
+- TCO Calculator and Historical Trends: calculator uses local `useState`; historical mounts `InferenceProvider` directly (shared state is sufficient since no additional cross-tab sharing is needed)
 
 ## Client-Side Caching (React Query — In-Memory Only)
 

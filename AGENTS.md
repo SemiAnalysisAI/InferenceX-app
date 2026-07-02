@@ -11,7 +11,7 @@ InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-back
 - **Styling**: Tailwind CSS 4 + shadcn/ui (Radix UI primitives)
 - **Charts**: D3.js — shared library at `src/lib/d3-chart/`, scatter/GPU/bar charts
 - **Data**: Neon DB → API routes (`/api/v1/*`) → React Query hooks → Context providers
-- **Deployment**: Vercel with daily cron-triggered rebuilds
+- **Deployment**: Vercel; scheduled tasks (cache refresh, DB backup) run as GitHub Actions workflows
 - **Analytics**: PostHog (`posthog-js`) via `@/lib/analytics` — recommended on all interactive elements (autocapture provides baseline coverage)
 
 ## Quick Start
@@ -43,10 +43,36 @@ packages/
 │       ├── hooks/api/    # React Query hooks (use-benchmarks, use-availability, etc.)
 │       └── lib/          # Utilities, constants, d3-chart/, chart-utils, blog, data-mappings
 ├── constants/            # Shared constants (GPU keys, model mappings, SEO)
-└── db/                   # DB layer, ETL, migrations, queries, ingest scripts
+├── db/                   # DB layer, ETL, migrations, queries, ingest scripts
+└── mcp/                  # Read-only MCP server exposing benchmark DB query tools
 ```
 
 **Path alias**: `@/*` → `packages/app/src/`
+
+## MCP Server
+
+`packages/mcp/` (`@semianalysisai/inferencex-mcp`) is a read-only [Model Context Protocol](https://modelcontextprotocol.io/) server that gives AI agents direct SQL access to the benchmark database. It connects to `DATABASE_READONLY_URL` (Neon PostgreSQL) and enforces a server-side blocklist that rejects any non-SELECT statements before they reach the wire.
+
+**Tools exposed** (all annotated `readOnlyHint: true`):
+
+| Tool                    | Purpose                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_overview`          | Full schema reference: tables, columns, enum values, metric keys, example SQL                                                                                                                                 |
+| `list_hardware`         | Distinct GPU hardware types with benchmark data                                                                                                                                                               |
+| `list_models`           | Distinct models with benchmark data                                                                                                                                                                           |
+| `list_configs`          | Distinct (hardware, framework, model, precision, spec_method, disagg) combos; filterable                                                                                                                      |
+| `get_latest_benchmarks` | Primary query tool — latest benchmark rows with config details and JSONB metrics; filterable by hardware, model, framework, precision, spec_method, disagg, isl, osl, conc, num_gpu; supports sort_by + limit |
+| `query_sql`             | Raw SELECT escape hatch for aggregations, GROUP BY, or custom joins; 5-second query timeout                                                                                                                   |
+
+**Running locally**: configure `.env` with `DATABASE_READONLY_URL`, then run:
+
+```bash
+pnpm mcp   # from packages/mcp/, or pnpm --filter @semianalysisai/inferencex-mcp mcp
+```
+
+The server speaks stdio (MCP stdio transport). It is pre-configured in `.mcp.json` at the repo root so Claude Code connects to it automatically via `pnpm --silent mcp`.
+
+**Deployment note**: The MCP server is a local development / agentic-use tool, not deployed to Vercel. There is no `/api/cron` route in the app (see `packages/app/vercel.json` — crons have been removed; scheduled duties run as GitHub Actions workflows).
 
 ## Data Architecture
 
@@ -101,7 +127,23 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 ## Tab Structure
 
-Order: `inference` → `evaluation` → `historical` → `calculator` → `reliability` → `gpu-specs` (defined in `page-content.tsx` `VALID_TABS`). Tab value = URL hash.
+Tabs are filesystem routes under `packages/app/src/app/(dashboard)/`, one `page.tsx` per tab. All 11 tabs are declared in `VALID_TABS` in `packages/app/src/lib/tab-meta.ts`. Metadata (title, SEO description, canonical URL) is co-located in `TAB_META` and applied via `tabMetadata()` in each page.
+
+| Tab key                    | Label (in nav)        | Description                                                      |
+| -------------------------- | --------------------- | ---------------------------------------------------------------- |
+| `inference`                | Inference Performance | Latency, throughput, TTFT across GPUs and providers              |
+| `evaluation`               | Accuracy Evals        | LLM eval scores and accuracy benchmarks across providers         |
+| `historical`               | Historical Trends     | Inference performance over time (uses InferenceProvider)         |
+| `calculator`               | TCO Calculator        | Throughput and total cost of ownership across GPU configs        |
+| `reliability`              | Provider Reliability  | Error rates and uptime tracking across GPU cloud providers       |
+| `gpu-specs`                | GPU Specs             | Detailed specs: memory bandwidth, FLOPS, interconnects           |
+| `ai-chart`                 | AI Chart (gated)      | Natural-language chart generation using AI                       |
+| `gpu-metrics`              | PowerX (gated)        | GPU power consumption and tokens-per-watt efficiency             |
+| `submissions`              | Submissions           | Benchmark submission history, activity trends, datapoint volumes |
+| `current-inferencex-image` | Images (gated)        | Docker image tags per model/GPU vs latest vLLM/SGLang releases   |
+| `feedback`                 | Feedback (gated)      | Internal: decrypt and review user-submitted feedback             |
+
+The first six tabs are always visible in the nav bar; the last four are gated behind `useFeatureGate()` and accessible via a "Hidden" dropdown.
 
 ## Unofficial Run Support — Mandatory for Inference / Evaluation Features
 
@@ -214,10 +256,12 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 ### Adding a new tab
 
-1. `page-content.tsx`: Add to `VALID_TABS`, add `TabsTrigger` (desktop), `SelectItem` (mobile), `TabsContent`
-2. Create a per-section context provider (see `InferenceContext.tsx`, `EvaluationContext.tsx` for patterns)
-3. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
-4. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
+1. Add the tab key to `VALID_TABS` and a `TAB_META` entry in `packages/app/src/lib/tab-meta.ts`
+2. Create `packages/app/src/app/(dashboard)/<tab>/page.tsx` with `export const metadata = tabMetadata('<tab>')` and a default export that mounts any required provider
+3. Add the tab to `VISIBLE_TABS` or `GATED_TABS` in `packages/app/src/components/tab-nav.tsx` (gated tabs appear under the "Hidden" popover)
+4. Create a per-section context provider if the tab has shared state (see `InferenceContext.tsx`, `EvaluationContext.tsx` for patterns)
+5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
+6. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
 
 ### Bumping dependencies
 
@@ -246,7 +290,7 @@ Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit e
 Detailed design rationale (the "why" and "how", not the "what") lives in [docs/](./docs/index.md):
 
 - **[Index](./docs/index.md)** — index of all docs **MUST ALWAYS READ IN CASE OF RELEVANT INFORMATION**
-- **[Architecture](./docs/architecture.md)** — Client-first design, hash routing, caching, color system
+- **[Architecture](./docs/architecture.md)** — Client-first design, filesystem tab routing, URL state, caching, color system
 - **[D3 Charts](./docs/d3-charts.md)** — 4-effect architecture, zoom refs, tooltip lifecycle
 - **[Data Pipeline](./docs/data-pipeline.md)** — DB schema reasoning, ETL design, spline interpolation
 - **[Pitfalls](./docs/pitfalls.md)** — Token type bugs, schema evolution, stale closures, zoom loss

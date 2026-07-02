@@ -22,7 +22,8 @@ The frontend fetches data from API routes backed by a Neon PostgreSQL read repli
 packages/
 ├── app/          # Next.js frontend
 ├── constants/    # Shared constants (GPU keys, model mappings)
-└── db/           # DB layer, ETL, migrations, queries, ingest scripts
+├── db/           # DB layer, ETL, migrations, queries, ingest scripts
+└── mcp/          # Read-only MCP server — benchmark DB query tools for AI agents (run via `pnpm mcp`, configured in .mcp.json)
 ```
 
 ## Prerequisites
