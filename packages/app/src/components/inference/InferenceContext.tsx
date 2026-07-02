@@ -12,7 +12,6 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 import {
   FAVORITE_PRESETS,
@@ -21,11 +20,7 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import type {
-  InferenceChartContextType,
-  InferenceData,
-  TrackedConfig,
-} from '@/components/inference/types';
+import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -42,8 +37,6 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
 import { getModelExclusion, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
 import {
   MtpEngineConflictToast,
@@ -55,16 +48,15 @@ import {
   effectiveLegendItems,
   resolveExclusionToggle,
 } from '@/lib/exclusion';
-import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
+import { filterRunsByModel } from '@/lib/utils';
 
 import { useChartData } from './hooks/useChartData';
+import { useFavoritePresetsState } from './hooks/useFavoritePresetsState';
+import { useGpuComparisonState } from './hooks/useGpuComparisonState';
+import { useQuickFiltersState } from './hooks/useQuickFiltersState';
+import { useTrackedConfigsState } from './hooks/useTrackedConfigsState';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
-import {
-  EMPTY_QUICK_FILTERS,
-  type DisaggMode,
-  type QuickFilters,
-  type SpecMode,
-} from './utils/quickFilters';
+import { EMPTY_QUICK_FILTERS } from './utils/quickFilters';
 
 /** @internal Exported for test provider wrapping only. */
 export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
@@ -125,27 +117,31 @@ export function InferenceProvider({
 
   const { getUrlParam } = useUrlState();
 
-  // ── GPU comparison state (owned by inference, not global) ─────────────────
-  const [selectedDates, setSelectedDates] = useState<string[]>(() => {
-    const urlDates = getUrlParam('i_dates');
-    return urlDates ? urlDates.split(',').filter(Boolean) : [];
+  // ── GPU / date comparison state (owned by inference, not global) ──────────
+  // Base state + availability-derived memos live in useGpuComparisonState; the
+  // preset-clearing setter wrappers and cross-cluster auto-clear effects stay
+  // below in this component.
+  const {
+    selectedGPUs,
+    setSelectedGPUs,
+    selectedDates,
+    setSelectedDates,
+    selectedDateRange,
+    setSelectedDateRange,
+    isCheckingAvailableDates,
+    showDateRangeDialog,
+    setShowDateRangeDialog,
+    availableGPUs,
+    dateRangeAvailableDates,
+  } = useGpuComparisonState({
+    availabilityRows,
+    availableDates,
+    selectedModel,
+    effectiveSequence,
+    effectivePrecisions,
   });
-  const [selectedDateRange, setSelectedDateRange] = useState<{
-    startDate: string;
-    endDate: string;
-  }>(() => {
-    const startDate = getUrlParam('i_dstart') || '';
-    const endDate = getUrlParam('i_dend') || '';
-    return startDate && endDate ? { startDate, endDate } : { startDate: '', endDate: '' };
-  });
-  const [isCheckingAvailableDates] = useState(false);
-  const [showDateRangeDialog, setShowDateRangeDialog] = useState(false);
 
   // ── Inference-specific filter state ─────────────────────────────────────────
-  const [selectedGPUs, setSelectedGPUs] = useState<string[]>(() => {
-    const urlGpus = getUrlParam('i_gpus');
-    return urlGpus ? urlGpus.split(',').filter(Boolean) : [];
-  });
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
     () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
   );
@@ -160,41 +156,19 @@ export function InferenceProvider({
   );
 
   // ── Quick filters (vendor / framework / agg-disagg / mtp-stp) ────────────────
-  // Coarse pre-filters applied to the point set. Empty = no constraint.
-  //
-  // Initialized empty rather than from the URL so the first client render matches
-  // SSR (which has no query string). Reading the params in these initializers would
-  // desync the pills' aria-pressed/disabled between server and client; React does
-  // not patch hydration mismatches, so a shared link would leave the pills frozen
-  // inactive/disabled even while the chart filters. The URL selections are applied
-  // just below, after mount.
-  const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
-  const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
-  const [quickFilterDisagg, setQuickFilterDisagg] = useState<DisaggMode[]>([]);
-  const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
-  useEffect(() => {
-    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec') => {
-      const v = getUrlParam(key);
-      return v ? v.split(',').filter(Boolean) : [];
-    };
-    const vendors = parse('i_vendor');
-    const frameworks = parse('i_fw');
-    const disagg = parse('i_disagg') as DisaggMode[];
-    const spec = parse('i_spec') as SpecMode[];
-    if (vendors.length > 0) setQuickFilterVendors(vendors);
-    if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
-    if (disagg.length > 0) setQuickFilterDisagg(disagg);
-    if (spec.length > 0) setQuickFilterSpec(spec);
-  }, [getUrlParam]);
-  const quickFilters = useMemo<QuickFilters>(
-    () => ({
-      vendors: quickFilterVendors,
-      frameworks: quickFilterFrameworks,
-      disagg: quickFilterDisagg,
-      spec: quickFilterSpec,
-    }),
-    [quickFilterVendors, quickFilterFrameworks, quickFilterDisagg, quickFilterSpec],
-  );
+  // Coarse pre-filters applied to the point set. State + URL hydration live in
+  // useQuickFiltersState; the historical-tab gate stays below.
+  const {
+    quickFilters,
+    quickFilterVendors,
+    quickFilterFrameworks,
+    quickFilterDisagg,
+    quickFilterSpec,
+    setQuickFilterVendors,
+    setQuickFilterFrameworks,
+    setQuickFilterDisagg,
+    setQuickFilterSpec,
+  } = useQuickFiltersState();
   // The Historical Trends tab hides the quick-filter pills (hideGpuComparison), so
   // don't silently narrow its chart with selections carried in via share links or
   // the inference tab — there would be no pill to clear them.
@@ -230,15 +204,25 @@ export function InferenceProvider({
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
-  // --- Tracked configs state ---
-  const [trackedConfigs, setTrackedConfigs] = useState<TrackedConfig[]>([]);
-
   // --- Favorite presets state ---
-  const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
-  const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  // Persists the preset's desired hw filter beyond pendingHwFilter consumption.
-  // Cleared when the user manually changes filters (clearing the preset).
-  const presetHwFilterRef = useRef<string[] | null>(null);
+  // State primitives + guard machinery live in useFavoritePresetsState. The
+  // applyPreset orchestration and its two effects (URL ?preset= loader, timeline
+  // range resolver) stay in this component — they drive setters from every
+  // cluster, so keeping them here avoids reintroducing the coupling as args.
+  const {
+    pendingHwFilter,
+    setPendingHwFilter,
+    activePresetId,
+    setActivePresetId,
+    presetHwFilterRef,
+    presetGuardRef,
+    urlPresetAppliedRef,
+    presetVersionRef,
+    pendingPresetVersionRef,
+    pendingTimelinePreset,
+    setPendingTimelinePreset,
+    clearPresetOnChange,
+  } = useFavoritePresetsState();
 
   // Pending legend-active selection restored from `i_active` URL param.
   // Consumed once when hwTypesWithData first populates (see effect below).
@@ -324,123 +308,25 @@ export function InferenceProvider({
     dataQuickFilters,
   );
 
-  // For GPU comparison date picker — use shared availability data from global filters
-  const dbModelKeys = useMemo<string[]>(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
-    [selectedModel],
-  );
-
-  const dateRangeAvailableDates = useMemo(() => {
-    if (selectedGPUs.length === 0) return availableDates;
-    if (!availabilityRows) return availableDates;
-    const rows = availabilityRows.filter((r) => {
-      if (!dbModelKeys.includes(r.model)) return false;
-      if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) return false;
-      if (!effectivePrecisions.includes(r.precision)) return false;
-      if (!r.hardware) return false;
-      const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
-      return selectedGPUs.includes(hwKey);
-    });
-    const dates = [...new Set(rows.map((r) => r.date))].toSorted();
-    return dates.length > 0 ? dates : availableDates;
-  }, [
-    availabilityRows,
-    dbModelKeys,
-    effectiveSequence,
-    effectivePrecisions,
-    selectedGPUs,
-    availableDates,
-  ]);
-
   // ── Derived state ─────────────────────────────────────────────────────────
+  // availableGPUs / dateRangeAvailableDates / dbModelKeys are computed in
+  // useGpuComparisonState (above) from availabilityRows + the current filters.
 
-  // GPU dropdown: only show configs that have data for current model + sequence + precision
-  const availableGPUs = useMemo(() => {
-    if (!availabilityRows) return [];
-    const hwKeys = new Set<string>();
-    for (const r of availabilityRows) {
-      if (!dbModelKeys.includes(r.model)) continue;
-      if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) continue;
-      if (!effectivePrecisions.includes(r.precision)) continue;
-      if (!r.hardware) continue;
-      const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
-      if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
-    }
-    return [...hwKeys]
-      .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
-      .map((hw) => ({
-        value: hw,
-        label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
-      }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
+  // --- Tracked configs (up to 6 pinned points + auto-clear on selector change) ---
+  const { trackedConfigs, addTrackedConfig, removeTrackedConfig, clearTrackedConfigs } =
+    useTrackedConfigsState({
+      hardwareConfig,
+      selectedModel,
+      effectiveSequence,
+      effectivePrecisions,
+      selectedYAxisMetric,
+    });
 
-  // --- Tracked config functions ---
-  const buildTrackedConfigId = useCallback((point: InferenceData): string => {
-    let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}`;
-    if (point.disagg) {
-      key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
-    }
-    return key;
-  }, []);
-
-  const addTrackedConfig = useCallback(
-    (point: InferenceData, chartType: string) => {
-      setTrackedConfigs((prev) => {
-        const id = buildTrackedConfigId(point);
-        if (prev.some((c) => c.id === id)) {
-          return prev.filter((c) => c.id !== id);
-        }
-        if (prev.length >= 6) return prev;
-
-        const hwConfig = hardwareConfig[point.hwKey];
-        const label = hwConfig
-          ? `${getDisplayLabel(hwConfig)} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`
-          : `${point.hwKey} — TP${point.tp} conc=${point.conc} ${point.precision.toUpperCase()}`;
-
-        const color = TABLEAU_10[prev.length % TABLEAU_10.length];
-        return [
-          ...prev,
-          {
-            id,
-            hwKey: point.hwKey as string,
-            precision: point.precision,
-            tp: point.tp,
-            conc: point.conc,
-            label,
-            color,
-            chartType,
-            disagg: point.disagg,
-            num_prefill_gpu: point.num_prefill_gpu,
-            num_decode_gpu: point.num_decode_gpu,
-          },
-        ];
-      });
-    },
-    [buildTrackedConfigId, hardwareConfig],
-  );
-
-  const removeTrackedConfig = useCallback((id: string) => {
-    setTrackedConfigs((prev) => prev.filter((c) => c.id !== id));
-  }, []);
-
-  const clearTrackedConfigs = useCallback(() => {
-    setTrackedConfigs([]);
-  }, []);
-
-  // Clear tracked configs whenever the top-level selectors change
-  useEffect(() => {
-    setTrackedConfigs((prev) => (prev.length > 0 ? [] : prev));
-  }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
-
-  // Ref guard: when true, filter changes don't clear the active preset.
-  // FavoritePresetsDropdown sets this while applying a preset so its own
-  // programmatic setter calls don't accidentally deactivate it.
-  const presetGuardRef = useRef(false);
-  const clearPresetOnChange = useCallback(() => {
-    if (presetGuardRef.current) return;
-    setActivePresetId((prev) => (prev === null ? prev : null));
-    presetHwFilterRef.current = null;
-  }, []);
+  // --- Preset-clearing setter wrappers ---
+  // Each wraps a base setter so a *user* change deactivates the active preset.
+  // clearPresetOnChange (from useFavoritePresetsState) no-ops while the guard is
+  // set (during a programmatic apply). Kept as individual useCallbacks so their
+  // identities stay stable across renders — the provider value memo depends on them.
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
       setSelectedModel(v);
@@ -927,13 +813,9 @@ export function InferenceProvider({
   // ── URL preset loading ───────────────────────────────────────────────────
   // Reads ?preset= from the URL on mount and applies it. This is the only
   // place preset URL params are consumed — the landing page links here.
-
-  const urlPresetAppliedRef = useRef(false);
-  const presetVersionRef = useRef(0);
-  const [pendingTimelinePreset, setPendingTimelinePreset] = useState<
-    FavoritePreset['config'] | null
-  >(null);
-  const pendingPresetVersionRef = useRef(0);
+  // The version/applied refs and pendingTimelinePreset state live in
+  // useFavoritePresetsState; applyPreset + the two effects below orchestrate
+  // across every state cluster and so stay in this component.
 
   // Once dateRangeAvailableDates resolves for a timeline preset, set the full range.
   useEffect(() => {
