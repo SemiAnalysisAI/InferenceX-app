@@ -1,12 +1,14 @@
 'use client';
 
 import { useInference } from '@/components/inference/InferenceContext';
+import { getPrecisionDisplayLabel } from '@/lib/constants';
 
 interface TooltipContentProps<TValue, _TName> {
   active?: boolean;
   payload?: {
     payload?: {
       hwKey?: string | number;
+      precision?: string;
       tp?: number;
       conc?: number;
       x?: TValue;
@@ -25,6 +27,9 @@ export default function ChartTooltip({ active, payload }: TooltipContentProps<nu
     return (
       <div className="bg-accent p-2 border rounded-sm">
         <p>{`GPU: ${hardwareConfig[pointPayload.hwKey as keyof typeof hardwareConfig].gpu}`}</p>
+        {pointPayload.precision && (
+          <p>{`Precision: ${getPrecisionDisplayLabel(pointPayload.precision, String(pointPayload.hwKey ?? ''))}`}</p>
+        )}
         <p>{`Total GPUs: ${pointPayload.tp}`}</p>
         {(pointPayload.ep !== null && pointPayload.ep !== undefined) ||
         (pointPayload.prefill_ep !== null && pointPayload.prefill_ep !== undefined) ? (
