@@ -17,10 +17,10 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[role="option"]').should('have.length.greaterThan', 0);
 
-    cy.get('[data-testid="sequence-selector"]').click();
+    cy.get('[data-testid="scenario-selector"]').click();
 
     cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'false');
-    cy.get('[data-testid="sequence-selector"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[role="option"]').should('have.length.greaterThan', 0);
   });
 

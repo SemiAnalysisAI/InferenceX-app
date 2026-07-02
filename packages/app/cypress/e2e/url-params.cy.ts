@@ -21,7 +21,7 @@ const visitWithErrorSpy = (path: string) => {
 };
 
 const assertNoHydrationMismatch = () => {
-  cy.get('[data-testid="sequence-selector"]').should('be.visible');
+  cy.get('[data-testid="scenario-selector"]').should('be.visible');
   cy.get('@consoleError').then((spy) => {
     const calls = (spy as unknown as { args: unknown[][] }).args;
     const hydration = calls.filter((args) =>
@@ -152,7 +152,7 @@ describe('URL Parameter Persistence', () => {
 
     it('/inference?i_seq=1k/1k seeds the sequence without a hydration error', () => {
       visitWithErrorSpy('/inference?i_seq=1k/1k');
-      cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       assertNoHydrationMismatch();
     });
 
@@ -160,13 +160,13 @@ describe('URL Parameter Persistence', () => {
       // Visit the canonical model-prefixed slug so the assertion is directly
       // about the rendered page, not about a bare-slug redirect interleaving.
       visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=1k/1k');
-      cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       assertNoHydrationMismatch();
     });
 
     it('/compare/[slug] with invalid ?i_seq=junk falls back to the seeded default', () => {
       visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=junk');
-      cy.get('[data-testid="sequence-selector"]')
+      cy.get('[data-testid="scenario-selector"]')
         .invoke('text')
         .should('not.contain', 'junk')
         .and('match', /[18]K . [18]K/u);
@@ -228,7 +228,7 @@ describe('URL Parameter Persistence', () => {
       // `effectivePrecisions` intersects the selection with available precisions
       // and the UI may render the fallback. dsr1 + fp8 + 1k/1k is supported.
       visitWithErrorSpy('/inference?i_seq=1k/1k&g_model=DeepSeek-R1-0528&i_prec=fp8');
-      cy.get('[data-testid="sequence-selector"]').should('contain.text', '1K / 1K');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek');
       cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
       assertNoHydrationMismatch();
@@ -236,8 +236,14 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('High contrast mode', () => {
-    it('page loads without high contrast by default', () => {
+    it('inference loads with high contrast on by default', () => {
       visitWithDismissedModal('/inference');
+      cy.get('[data-testid="scatter-graph"]').should('exist');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
+    });
+
+    it('i_hc=0 disables high contrast on load', () => {
+      visitWithDismissedModal('/inference?i_hc=0');
       cy.get('[data-testid="scatter-graph"]').should('exist');
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
     });
@@ -267,10 +273,12 @@ describe('URL Parameter Persistence', () => {
       cy.get('#eval-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
-    it('historical trends tab has high contrast switch off by default', () => {
+    it('historical trends tab shares the inference high-contrast default (on)', () => {
+      // Historical reads highContrast from the same InferenceContext as the
+      // scatter chart, so it inherits the default-on behavior.
       visitWithDismissedModal('/historical');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
-      cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
+      cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
     it('i_hc=1 enables historical trends high contrast', () => {

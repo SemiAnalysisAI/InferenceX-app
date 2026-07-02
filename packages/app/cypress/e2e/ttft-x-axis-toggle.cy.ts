@@ -1,46 +1,90 @@
-describe('TTFT X-Axis Toggle (E2E chart)', () => {
+const interceptDerivedMetrics = () => {
+  cy.intercept('GET', '/api/v1/derived-agentic-metrics*', (request) => {
+    const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
+    request.reply({
+      body: Object.fromEntries(
+        ids.map((id, index) => [
+          id,
+          {
+            id: Number(id),
+            normalized_session_time_s: 60 + index,
+            p90_prefill_tps_per_user: 100 + index,
+            p75_normalized_e2e_400_s: 8 + index,
+            p90_normalized_e2e_400_s: 12 + index,
+          },
+        ]),
+      ),
+    });
+  }).as('derivedAgenticMetrics');
+};
+
+describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    cy.visit('/inference', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
     });
-    cy.visit('/inference');
-    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 2);
+    cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
+    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
-  it('shows the x-axis dropdown in the e2e chart heading', () => {
-    cy.get('[data-testid="chart-figure"]')
-      .eq(1)
-      .find('h2 button')
-      .should('contain.text', 'vs.')
-      .and('contain.text', 'Latency');
+  it('shows Interactivity by default for the agentic view', () => {
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').should('be.visible');
+    cy.get('[data-testid="x-axis-mode-interactivity"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
-  it('opens popover with three x-axis options', () => {
-    cy.get('[data-testid="chart-figure"]').eq(1).find('h2 button').click();
-    cy.get('[data-slot="popover-content"]').within(() => {
-      cy.contains('End-to-end Latency').should('exist');
-      cy.contains('P99 TTFT').should('exist');
-      cy.contains('Median TTFT').should('exist');
-    });
+  it('switches the x-axis to TTFT and updates the heading', () => {
+    cy.get('[data-testid="x-axis-mode-ttft"]').click();
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  it('switches x-axis to P99 TTFT and updates the heading', () => {
-    cy.get('[data-slot="popover-content"]').contains('P99 TTFT').click();
-    cy.get('[data-testid="chart-figure"]').eq(1).find('h2').should('contain.text', 'P99 TTFT');
+  it('switches the x-axis to E2E Latency and updates the heading', () => {
+    cy.get('[data-testid="x-axis-mode-e2e"]').click();
+    cy.get('[data-testid="x-axis-mode-e2e"]').should('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
   });
 
-  it('switches x-axis to Median TTFT and updates the heading', () => {
-    cy.get('[data-testid="chart-figure"]').eq(1).find('h2 button').click();
-    cy.get('[data-slot="popover-content"]').contains('Median TTFT').click();
-    cy.get('[data-testid="chart-figure"]').eq(1).find('h2').should('contain.text', 'Median TTFT');
+  it('switches to request-level normalized E2E at 400 output tokens', () => {
+    interceptDerivedMetrics();
+    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').click();
+    cy.wait('@derivedAgenticMetrics');
+    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'P90 Normalized E2E @ 400 output tokens',
+    );
+    cy.get('[data-testid="chart-figure"] svg').should(
+      'contain.text',
+      'P90 Normalized E2E @ 400 output tokens (s)',
+    );
+
+    cy.get('[data-testid="percentile-selector"]').click();
+    cy.contains('[role="option"]', 'p75').click();
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'P75 Normalized E2E @ 400 output tokens',
+    );
   });
 
-  it('switches back to End-to-end Latency', () => {
-    cy.get('[data-testid="chart-figure"]').eq(1).find('h2 button').click();
-    cy.get('[data-slot="popover-content"]').contains('End-to-end Latency').click();
-    cy.get('[data-testid="chart-figure"]')
-      .eq(1)
-      .find('h2')
-      .should('contain.text', 'End-to-end Latency');
+  it('switches back to Interactivity', () => {
+    cy.get('[data-testid="x-axis-mode-interactivity"]').click();
+    cy.get('[data-testid="x-axis-mode-interactivity"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 });
