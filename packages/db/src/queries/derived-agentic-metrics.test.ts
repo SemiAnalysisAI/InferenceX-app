@@ -108,4 +108,45 @@ describe('computeDerivedFromBlob', () => {
     const out = computeDerivedFromBlob(turns.join('\n'));
     expect(out.p90_prefill_tps_per_user).toBeCloseTo(910, 6);
   });
+
+  it('excludes osl=0 (cancelled/empty-output) turns from normalized E2E', () => {
+    // Two normal turns + one cancelled turn (osl=0, latency=30s, ttft=1s).
+    //
+    // The cancelled turn must be excluded because observedDecodeIntervals collapses
+    // to max(0-1,1)=1, making itlMs=(30000-1000)/1=29000ms and normalizedMs explode
+    // to ~11 572 s — roughly 386× the real scale. (Pre-fix behavior for reference;
+    // this number is intentionally not asserted below to avoid enshrining the bug.)
+    //
+    // Normal turn A: isl=100, osl=50, ttft=500ms, latency=1000ms
+    //   observedDecodeIntervals = max(49,1) = 49
+    //   itlMs = (1000-500)/49
+    //   normalizedMs = 500 + 399*(500/49)
+    //
+    // Normal turn B: isl=200, osl=100, ttft=1000ms, latency=3000ms
+    //   observedDecodeIntervals = max(99,1) = 99
+    //   itlMs = (3000-1000)/99
+    //   normalizedMs = 1000 + 399*(2000/99)
+    const normA = (500 + (399 * 500) / 49) / 1000; // seconds
+    const normB = (1000 + (399 * 2000) / 99) / 1000; // seconds
+
+    const jsonl = [
+      rec('s1', 0, { isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 }),
+      rec('s1', 1, { isl: 200, osl: 100, ttft_ms: 1000, latency_ms: 3000 }),
+      // Cancelled / empty-output turn — osl=0 must be rejected by extractTurn.
+      rec('s2', 0, { isl: 150, osl: 0, ttft_ms: 1000, latency_ms: 30000 }),
+    ].join('\n');
+
+    const out = computeDerivedFromBlob(jsonl);
+
+    // Only the 2 normal turns contribute; osl=0 record is silently excluded.
+    expect(out.normalized_e2e_400?.n).toBe(2);
+
+    // p90 of [normA, normB] sorted ascending (normA < normB):
+    // pos = 1*0.9 = 0.9; result = normA + (normB - normA)*0.9
+    const expectedP90 = normA + (normB - normA) * 0.9;
+    expect(out.normalized_e2e_400?.p90).toBeCloseTo(expectedP90, 6);
+
+    // Sanity: p90 should be single-digit seconds, not thousands.
+    expect(out.normalized_e2e_400!.p90).toBeLessThan(20);
+  });
 });

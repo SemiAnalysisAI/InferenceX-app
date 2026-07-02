@@ -86,7 +86,7 @@ function extractTurn(rec: ProfileRecord): TurnFields | null {
   const isl = readNum(m.input_sequence_length);
   const osl = readNum(m.output_sequence_length);
   if (rl === undefined || tt === undefined || isl === undefined || osl === undefined) return null;
-  if (rl <= 0 || tt <= 0 || isl <= 0) return null;
+  if (rl <= 0 || tt <= 0 || isl <= 0 || osl <= 0) return null;
   return { request_latency_ms: rl, ttft_ms: tt, isl, osl };
 }
 
