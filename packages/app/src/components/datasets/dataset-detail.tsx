@@ -288,7 +288,11 @@ export function DatasetDetail({ slug }: { slug: string }) {
             <button
               type="button"
               disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              onClick={() => {
+                const next = Math.max(0, page - 1);
+                track('datasets_conversations_page_changed', { direction: 'prev', page: next });
+                setPage(next);
+              }}
               className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
               ← Prev
@@ -299,7 +303,11 @@ export function DatasetDetail({ slug }: { slug: string }) {
             <button
               type="button"
               disabled={page >= pageCount - 1}
-              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              onClick={() => {
+                const next = Math.min(pageCount - 1, page + 1);
+                track('datasets_conversations_page_changed', { direction: 'next', page: next });
+                setPage(next);
+              }}
               className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
               Next →

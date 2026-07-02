@@ -197,3 +197,114 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Overlay path — regression coverage for unofficial-run overlays with agentic
+// x-axis modes (finding #8 / AGENTS.md: chart features must have overlay tests).
+// The overlay behavior itself is verified correct by prior review; this suite
+// guards against regressions only and does NOT change overlay behavior.
+// ---------------------------------------------------------------------------
+
+// Build a minimal unofficial-run API response that contains one agentic
+// overlay benchmark row so the provider builds overlay chart data.
+const OVERLAY_RUN_ID = 99900000001;
+const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
+
+const overlayBenchmarkRow = {
+  id: 800000,
+  hardware: 'b200',
+  framework: 'vllm',
+  model: DEFAULT_MODEL_DB_KEY,
+  precision: 'fp4',
+  spec_method: 'none',
+  disagg: false,
+  is_multinode: false,
+  prefill_tp: 8,
+  decode_tp: 8,
+  num_prefill_gpu: 8,
+  num_decode_gpu: 8,
+  isl: null,
+  osl: null,
+  conc: 32,
+  offload_mode: 'off',
+  benchmark_type: 'agentic_traces',
+  image: 'vllm/vllm-openai:v0.9.0',
+  metrics: agenticMetrics(32),
+  workers: null,
+  date: AGENTIC_DATE,
+  run_url: OVERLAY_RUN_URL,
+};
+
+const interceptAgenticDataWithOverlay = () => {
+  interceptAgenticData();
+  cy.intercept('GET', '/api/unofficial-run*', {
+    body: {
+      runInfos: [
+        {
+          id: OVERLAY_RUN_ID,
+          name: 'Overlay regression fixture',
+          branch: 'test/overlay-regression',
+          sha: 'abc000',
+          createdAt: `${AGENTIC_DATE}T00:00:00Z`,
+          url: OVERLAY_RUN_URL,
+          conclusion: 'success',
+          status: 'completed',
+          isNonMainBranch: true,
+        },
+      ],
+      benchmarks: [overlayBenchmarkRow],
+      evaluations: [],
+    },
+  }).as('unofficialRun');
+};
+
+describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
+  before(() => {
+    interceptAgenticDataWithOverlay();
+    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.wait('@unofficialRun');
+    cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
+    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+  });
+
+  it('shows overlay (unofficial-run) watermark SVG when an overlay is loaded', () => {
+    // The unofficial-run pattern watermark appears when isUnofficialRun is true.
+    cy.get('[data-testid="inference-chart-display"] svg pattern[id^="unofficial-pattern-"]').should(
+      'exist',
+    );
+  });
+
+  it('switches to ttft x-axis mode and renders SVG with overlay points', () => {
+    cy.get('[data-testid="x-axis-mode-ttft"]').click();
+    cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
+    // Overlay points render as triangles or circles inside the chart SVG.
+    cy.get('[data-testid="inference-chart-display"] svg').should('exist');
+    cy.get('[data-testid="inference-chart-display"] svg').then(($svgs) => {
+      let total = 0;
+      $svgs.each((_i, svg) => {
+        total += svg.querySelectorAll('circle, polygon, path').length;
+      });
+      expect(total).to.be.greaterThan(0);
+    });
+  });
+
+  it('normalized-e2e mode shows suppression banner for unofficial-run overlays', () => {
+    interceptDerivedMetrics();
+    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').click();
+    cy.get('[data-testid="x-axis-mode-normalized-e2e"]').should(
+      'have.attr',
+      'aria-selected',
+      'true',
+    );
+    // The suppression message appears because isUnofficialRun is true and the
+    // mode is 'normalized-e2e' (documented in ChartDisplay.tsx ~line 640).
+    cy.contains(
+      'Normalized E2E requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    ).should('be.visible');
+  });
+});

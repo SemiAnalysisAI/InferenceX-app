@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Maximize2 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { track } from '@/lib/analytics';
 
 /**
  * Wraps a chart in a card with a header + expand button. Click the button to
@@ -32,7 +33,10 @@ export function ExpandableChart({
           <button
             type="button"
             aria-label="Expand chart"
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              track('agentic_chart_expanded', { title });
+              setOpen(true);
+            }}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <Maximize2 className="size-4" />

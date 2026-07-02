@@ -206,7 +206,12 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
         <button
           type="button"
           disabled={!prev}
-          onClick={() => prev && router.push(hrefFor(prev.id))}
+          onClick={() => {
+            if (prev) {
+              track('agentic_siblings_navigated', { direction: 'prev', targetId: prev.id });
+              router.push(hrefFor(prev.id));
+            }
+          }}
           className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/40 hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Previous point"
         >
@@ -219,7 +224,12 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               <button
                 key={s.id}
                 type="button"
-                onClick={() => !active && router.push(hrefFor(s.id))}
+                onClick={() => {
+                  if (!active) {
+                    track('agentic_siblings_navigated', { direction: 'chip', targetId: s.id });
+                    router.push(hrefFor(s.id));
+                  }
+                }}
                 className={`px-2 py-1 rounded-md text-xs border transition-colors ${
                   active
                     ? 'border-primary bg-primary text-primary-foreground font-medium'
@@ -235,7 +245,12 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
         <button
           type="button"
           disabled={!next}
-          onClick={() => next && router.push(hrefFor(next.id))}
+          onClick={() => {
+            if (next) {
+              track('agentic_siblings_navigated', { direction: 'next', targetId: next.id });
+              router.push(hrefFor(next.id));
+            }
+          }}
           className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/40 hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label="Next point"
         >
