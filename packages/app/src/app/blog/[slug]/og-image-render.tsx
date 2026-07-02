@@ -4,29 +4,18 @@
 import { ImageResponse } from 'next/og';
 
 import type { BlogPostMeta } from '@/lib/blog';
-import { loadImageAsDataUri, ogTitleFontSize, ogWrapSubtitle } from '@/lib/og-image-utils';
+import {
+  loadImageAsDataUri,
+  ogTitleFontSize,
+  ogWrapSubtitle,
+  TILE_GRID,
+} from '@/lib/og-image-utils';
 
 export const size = { width: 1200, height: 630 };
 
 const BLUE = '#0B86D1';
 const BG = '#131416';
 const PANEL_BG = '#0F1214';
-
-// Tile grid layout (row-major, 2 cols). rotate: degrees to apply at render time.
-const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
-  { file: 'teal-chevron.png', rotate: 180 }, // r0c0
-  { file: 'gold-diagonal.png' }, // r0c1
-  { file: 'teal-circuit.png' }, // r1c0
-  null, // r1c1
-  { file: 'gold-wavy.png' }, // r2c0
-  { file: 'teal-chip.png' }, // r2c1
-  { file: 'teal-chevron.png', rotate: 90 }, // r3c0
-  { file: 'teal-organic.png' }, // r3c1
-  null, // r4c0
-  { file: 'gold-circuit.png' }, // r4c1
-  { file: 'teal-circuit.png', rotate: 180 }, // r5c0
-  { file: 'teal-organic.png', rotate: 180 }, // r5c1
-];
 
 // Dedupe tile file loads — same file used multiple times only loads once.
 // loadImageAsDataUri already memoises per-path at module level, so concurrent

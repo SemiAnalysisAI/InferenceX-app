@@ -1,14 +1,12 @@
 /**
  * Compare OG image — same circuit tile sidebar layout as the blog OG.
  */
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-
 import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
 
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug, compareDisplayLabel, parseCompareSlug } from '@/lib/compare-slug';
+import { loadImageAsDataUri, TILE_GRID } from '@/lib/og-image-utils';
 
 export const alt = 'GPU inference benchmark comparison';
 export const size = { width: 1200, height: 630 };
@@ -18,22 +16,6 @@ const BLUE = '#0B86D1';
 const BG = '#131416';
 const PANEL_BG = '#0F1214';
 
-// Same tile grid as the blog OG so the two OG types read as a family.
-const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
-  { file: 'teal-chevron.png', rotate: 180 },
-  { file: 'gold-diagonal.png' },
-  { file: 'teal-circuit.png' },
-  null,
-  { file: 'gold-wavy.png' },
-  { file: 'teal-chip.png' },
-  { file: 'teal-chevron.png', rotate: 90 },
-  { file: 'teal-organic.png' },
-  null,
-  { file: 'gold-circuit.png' },
-  { file: 'teal-circuit.png', rotate: 180 },
-  { file: 'teal-organic.png', rotate: 180 },
-];
-
 export async function generateStaticParams() {
   // Mirror the SSR page's static params — only emit (model, pair) combos
   // with benchmark data on both sides so we don't generate OG images for
@@ -42,45 +24,23 @@ export async function generateStaticParams() {
   return slugs.map(({ modelSlug, a, b }) => ({ slug: canonicalCompareSlug(modelSlug, a, b) }));
 }
 
-// Read once at module load; a missing asset must not 500 every OG route.
-let logoSrcPromise: Promise<string | null> | undefined;
-function getLogoSrc(): Promise<string | null> {
-  if (!logoSrcPromise) {
-    logoSrcPromise = readFile(join(process.cwd(), 'public/brand/logo-color.png'))
-      .then((buf) => `data:image/png;base64,${buf.toString('base64')}`)
-      .catch(() => null);
-  }
-  return logoSrcPromise;
-}
-
-let tilesPromise: Promise<({ src: string; rotate?: number } | null)[]> | undefined;
-function getTiles(): Promise<({ src: string; rotate?: number } | null)[]> {
-  if (!tilesPromise) {
-    const uniqueFiles = [...new Set(TILE_GRID.filter(Boolean).map((t) => t!.file))];
-    tilesPromise = Promise.all(
-      uniqueFiles.map(async (f) => {
-        const src = await readFile(join(process.cwd(), 'public/brand/og-tiles', f))
-          .then((buf) => `data:image/png;base64,${buf.toString('base64')}`)
-          .catch(() => null);
-        return [f, src] as const;
-      }),
-    ).then((loaded) => {
-      const cache = Object.fromEntries(loaded);
-      return TILE_GRID.map((t) => {
-        if (!t) return null;
-        const src = cache[t.file];
-        return src ? { src, rotate: t.rotate } : null;
-      });
-    });
-  }
-  return tilesPromise;
+async function getTiles(): Promise<({ src: string; rotate?: number } | null)[]> {
+  const uniqueFiles = [...new Set(TILE_GRID.filter(Boolean).map((t) => t!.file))];
+  const loaded = await Promise.all(
+    uniqueFiles.map(async (f) => [f, await loadImageAsDataUri(`brand/og-tiles/${f}`)] as const),
+  );
+  const cache = Object.fromEntries(loaded);
+  return TILE_GRID.map((t) => (t ? { src: cache[t.file] as string, rotate: t.rotate } : null));
 }
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
-  const [logoSrc, tiles] = await Promise.all([getLogoSrc(), getTiles()]);
+  const [logoSrc, tiles] = await Promise.all([
+    loadImageAsDataUri('brand/logo-color.png'),
+    getTiles(),
+  ]);
 
   const title = compareDisplayLabel(parsed.a, parsed.b);
   const eyebrow = `${parsed.model.label} · Head-to-head GPU benchmark`;

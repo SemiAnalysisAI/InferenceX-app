@@ -48,6 +48,32 @@ export function loadImageAsDataUri(publicRelativePath: string): Promise<string |
 }
 
 // ---------------------------------------------------------------------------
+// Tile grid
+// ---------------------------------------------------------------------------
+
+/**
+ * Tile grid layout (row-major, 2 columns). Each element is either a tile spec
+ * with a filename and optional rotation (in degrees) or null for empty cells.
+ *
+ * This grid is used by both the compare and blog OG image renderers to create
+ * a consistent family appearance. Tile files are located in `public/brand/og-tiles/`.
+ */
+export const TILE_GRID: ({ file: string; rotate?: number } | null)[] = [
+  { file: 'teal-chevron.png', rotate: 180 },
+  { file: 'gold-diagonal.png' },
+  { file: 'teal-circuit.png' },
+  null,
+  { file: 'gold-wavy.png' },
+  { file: 'teal-chip.png' },
+  { file: 'teal-chevron.png', rotate: 90 },
+  { file: 'teal-organic.png' },
+  null,
+  { file: 'gold-circuit.png' },
+  { file: 'teal-circuit.png', rotate: 180 },
+  { file: 'teal-organic.png', rotate: 180 },
+];
+
+// ---------------------------------------------------------------------------
 // Axis-nicing helpers  (extracted verbatim from performance-per-dollar.png/route.tsx)
 // ---------------------------------------------------------------------------
 
