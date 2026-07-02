@@ -1,3 +1,4 @@
+import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getRequestTimeline,
@@ -10,9 +11,16 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
+// Key derived from REQUEST_TIMELINE_VERSION (governs the `request_timeline`
+// payload). The blob cache is write-once with no post-backfill purge, so the
+// version-derived key is what rolls the namespace on a bump — a hand-written
+// string would serve stale blob-cached timelines forever.
+/** Version-derived blob-cache key namespace (exported for the key-derivation test). */
+export const CACHE_KEY_PREFIX = `request-timeline-v${REQUEST_TIMELINE_VERSION}`;
+
 const getCachedRequestTimeline = cachedQuery(
   (id: number): Promise<RequestTimeline | null> => getRequestTimeline(getDb(), id),
-  'request-timeline',
+  CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
 

@@ -15,6 +15,7 @@ import {
 } from '../etl/compute-request-timeline';
 
 import type { DbClient } from '../connection.js';
+import { writeBackTraceReplayJsonb } from './agentic-shared';
 
 export type { RequestTimeline, RequestRecord } from '../etl/compute-request-timeline';
 
@@ -60,5 +61,16 @@ export async function getRequestTimeline(
     from agentic_trace_replay
     where id = ${row.trace_replay_id}
   `) as unknown as RawBlobRow[];
-  return computeRequestTimeline(blobRows[0]?.blob ?? null);
+  const timeline = computeRequestTimeline(blobRows[0]?.blob ?? null);
+
+  // Self-heal the stored request_timeline so the next request (and the
+  // trace-histograms route, which reads the same column) takes the fast path.
+  // Only write a complete recompute — `computeRequestTimeline` returns null for
+  // a missing/malformed blob, which we must not persist over good data.
+  // Fire-and-forget, best-effort (no-ops on a read-only replica).
+  if (timeline !== null) {
+    writeBackTraceReplayJsonb(sql, 'request_timeline', row.trace_replay_id, timeline);
+  }
+
+  return timeline;
 }

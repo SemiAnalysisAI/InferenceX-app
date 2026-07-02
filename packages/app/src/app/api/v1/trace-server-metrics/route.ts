@@ -1,3 +1,4 @@
+import { CHART_SERIES_VERSION } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getTraceServerMetrics,
@@ -10,9 +11,16 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
+// Key derived from CHART_SERIES_VERSION (governs the `chart_series` payload).
+// The blob cache is write-once with no post-backfill purge, so the
+// version-derived key is what rolls the namespace on a bump — a hand-written
+// string would serve stale blob-cached series forever.
+/** Version-derived blob-cache key namespace (exported for the key-derivation test). */
+export const CACHE_KEY_PREFIX = `trace-server-metrics-v${CHART_SERIES_VERSION}`;
+
 const getCachedTraceServerMetrics = cachedQuery(
   (id: number): Promise<TraceServerMetrics | null> => getTraceServerMetrics(getDb(), id),
-  'trace-server-metrics',
+  CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
 

@@ -23,37 +23,26 @@ import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
 
 import type { DbClient } from '../connection.js';
+import { computeDerivedFromBlob } from './derived-agentic-metrics';
 import {
+  extractIslOsl,
   fetchAggregateStatsRows,
   percentilesOf,
-  readNum,
+  STATS_VERSION,
+  writeBackTraceReplayJsonb,
   type MetricPercentiles,
 } from './agentic-shared';
 
-// Percentile math + envelope reader live in agentic-shared.ts; re-exported
-// here because etl/compute-aggregate-stats and the API layer import them
-// from this module.
-export { percentilesOf, type MetricPercentiles } from './agentic-shared';
-
-/**
- * Bump when the aggregate-stats computation algorithm changes — the backfill
- * script recomputes any row whose stored `aggregate_stats.version` is older.
- * Lives here (rather than in compute-aggregate-stats.ts) to avoid a circular
- * import: the compute helper depends on the extractors below.
- *
- * v2: aggregate vllm gauges/counters across all engine series (was reading
- * only series[0], which under-counted by Nx on multi-engine DP/PP deployments).
- *
- * v3: extract sglang:* metrics too — kv_cache_util + prefix_cache_hit_rate
- * populate for SGLang runs (qwen3.5/h100, mi355x sglang, etc.) the same way
- * they do for vllm runs.
- *
- * v4: add per-request normalized E2E percentiles at a fixed 400-token OSL.
- *
- * v5: reject osl <= 0 in extractTurn to exclude cancelled/empty-output turns
- * whose decode-interval math would explode normalized E2E to thousands of seconds.
- */
-export const STATS_VERSION = 5;
+// STATS_VERSION, the profile extractor `extractIslOsl`, and the percentile
+// math + envelope reader all live in agentic-shared.ts (the cycle-free leaf).
+// Re-exported here because etl/compute-aggregate-stats and the API layer
+// import them from this module.
+export {
+  extractIslOsl,
+  percentilesOf,
+  STATS_VERSION,
+  type MetricPercentiles,
+} from './agentic-shared';
 
 export interface AgenticAggregate {
   id: number;
@@ -75,36 +64,6 @@ export type AgenticAggregateMap = Record<number, AgenticAggregate>;
  */
 const PROFILE_CHUNK_SIZE = 8;
 const SERVER_CHUNK_SIZE = 1;
-
-interface ProfileRecord {
-  metadata?: { benchmark_phase?: string };
-  metrics?: {
-    input_sequence_length?: { value?: number } | number;
-    output_sequence_length?: { value?: number } | number;
-  };
-}
-
-/** Parse the profile_export.jsonl → per-request ISL + OSL arrays. */
-export function extractIslOsl(jsonl: string): { isl: number[]; osl: number[] } {
-  const isl: number[] = [];
-  const osl: number[] = [];
-  for (const line of jsonl.split('\n')) {
-    if (!line) continue;
-    let rec: ProfileRecord;
-    try {
-      rec = JSON.parse(line) as ProfileRecord;
-    } catch {
-      continue;
-    }
-    if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') continue;
-    const m = rec.metrics ?? {};
-    const i = readNum(m.input_sequence_length);
-    const o = readNum(m.output_sequence_length);
-    if (typeof i === 'number') isl.push(i);
-    if (typeof o === 'number') osl.push(o);
-  }
-  return { isl, osl };
-}
 
 interface TimeSlice {
   start_ns?: number;
@@ -322,17 +281,29 @@ export async function getAgenticAggregates(
     return result;
   }
 
+  // Accumulate a complete, version-stamped `aggregate_stats` bundle per id as
+  // the two passes recompute it, so we can self-heal the shared JSONB column
+  // afterward (see the write-back loop below). Only ids whose profile blob
+  // parsed cleanly get an entry — a null/malformed blob must never overwrite
+  // good stored data.
+  const pendingById = new Map<number, { traceReplayId: number; stats: FullAggregateStats }>();
+
   // ── Fallback Pass 1: profile_export blobs (cheap; large batches). ──────
   for (let i = 0; i < idsNeedingProfile.length; i += PROFILE_CHUNK_SIZE) {
     const chunk = idsNeedingProfile.slice(i, i + PROFILE_CHUNK_SIZE);
     const rows = (await sql`
       select
         br.id as benchmark_result_id,
+        atr.id as trace_replay_id,
         atr.profile_export_jsonl_gz as profile_blob
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
-    `) as { benchmark_result_id: number; profile_blob: Buffer | null }[];
+    `) as {
+      benchmark_result_id: number;
+      trace_replay_id: number;
+      profile_blob: Buffer | null;
+    }[];
     for (const row of rows) {
       const id = Number(row.benchmark_result_id);
       result[id] ??= blankAggregate(id);
@@ -340,8 +311,29 @@ export async function getAgenticAggregates(
         try {
           const jsonl = gunzipSync(row.profile_blob).toString('utf8');
           const { isl, osl } = extractIslOsl(jsonl);
-          result[id].isl = percentilesOf(isl);
-          result[id].osl = percentilesOf(osl);
+          const islPct = percentilesOf(isl);
+          const oslPct = percentilesOf(osl);
+          result[id].isl = islPct;
+          result[id].osl = oslPct;
+          // Recompute the profile-derived fields too (same jsonl, no extra
+          // read) so the self-healed bundle is a faithful full recompute — not
+          // a carry-forward of stale derived numbers stamped with a new
+          // version. Server-derived fields are filled in Pass 2 (or stay null
+          // when the server blob is absent, which is the correct complete value).
+          const derived = computeDerivedFromBlob(jsonl);
+          pendingById.set(id, {
+            traceReplayId: Number(row.trace_replay_id),
+            stats: {
+              version: STATS_VERSION,
+              isl: islPct,
+              osl: oslPct,
+              kvCacheUtil: null,
+              prefixCacheHitRate: null,
+              normalizedSessionTimeS: derived.normalized_session_time_s,
+              p90PrefillTpsPerUser: derived.p90_prefill_tps_per_user,
+              normalizedE2e400: derived.normalized_e2e_400,
+            },
+          });
         } catch {
           // ignore malformed blob
         }
@@ -385,11 +377,30 @@ export async function getAgenticAggregates(
         }
       }
       if (parsed) {
-        result[id].kvCacheUtil = percentilesOf(parsed.kvCacheUtil);
-        result[id].prefixCacheHitRate = percentilesOf(parsed.prefixCacheHitRate);
+        const kvPct = percentilesOf(parsed.kvCacheUtil);
+        const prefixPct = percentilesOf(parsed.prefixCacheHitRate);
+        result[id].kvCacheUtil = kvPct;
+        result[id].prefixCacheHitRate = prefixPct;
+        const pending = pendingById.get(id);
+        if (pending) {
+          pending.stats.kvCacheUtil = kvPct;
+          pending.stats.prefixCacheHitRate = prefixPct;
+        }
       }
     }
   }
+
+  // Self-heal the shared `aggregate_stats` column: persist the freshly
+  // recomputed, version-stamped bundle so the next request (this route AND the
+  // derived-agentic-metrics route, which read the same column) takes the fast
+  // path instead of re-decompressing these blobs. Only ids whose profile blob
+  // parsed cleanly are in `pendingById`, so a null/malformed recompute never
+  // clobbers good data. Fire-and-forget, best-effort (no-ops on a read-only
+  // replica) — never delays or fails the response.
+  for (const { traceReplayId, stats } of pendingById.values()) {
+    writeBackTraceReplayJsonb(sql, 'aggregate_stats', traceReplayId, stats);
+  }
+
   return result;
 }
 
@@ -402,6 +413,22 @@ interface AggregateStatsRow {
   prefixCacheHitRate: MetricPercentiles | null;
   normalizedSessionTimeS: number | null;
   p90PrefillTpsPerUser: number | null;
+}
+
+/**
+ * The complete `aggregate_stats` bundle we write back on the fallback path.
+ * Mirrors `AggregateStats` in etl/compute-aggregate-stats.ts (kept local to
+ * avoid an import cycle with that module, which depends on this one).
+ */
+interface FullAggregateStats {
+  version: number;
+  isl: MetricPercentiles | null;
+  osl: MetricPercentiles | null;
+  kvCacheUtil: MetricPercentiles | null;
+  prefixCacheHitRate: MetricPercentiles | null;
+  normalizedSessionTimeS: number | null;
+  p90PrefillTpsPerUser: number | null;
+  normalizedE2e400: MetricPercentiles | null;
 }
 
 function blankAggregate(id: number): AgenticAggregate {

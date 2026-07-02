@@ -20,6 +20,7 @@ import {
 } from '../etl/compute-chart-series';
 
 import type { DbClient } from '../connection.js';
+import { writeBackTraceReplayJsonb } from './agentic-shared';
 
 export type { TimeSeriesPoint, QueueDepthPoint } from '../etl/compute-chart-series';
 
@@ -207,5 +208,12 @@ export async function getTraceServerMetrics(
     disagg: row.disagg,
   });
   if (!series) return null;
+
+  // Self-heal the stored chart_series so the next request takes the fast path
+  // instead of re-decompressing this (tens-of-MB) blob. `series` is complete
+  // and stamped at CHART_SERIES_VERSION here; fire-and-forget and best-effort
+  // (no-ops on a read-only replica). trace_replay_id is non-null on this path.
+  writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
+
   return merge(meta, series, kvCachePoolTokens);
 }

@@ -1,3 +1,4 @@
+import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getDerivedAgenticMetrics,
@@ -13,12 +14,18 @@ export const dynamic = 'force-dynamic';
 // blobOnly: the response is one entry per id with two numbers, but the
 // derivation work parses thousands of JSONL records per blob — cache the
 // computed result so a chart-refresh hits the warm path.
-// Bumped to v3 for per-request normalized-E2E @ 400 output tokens.
-// Stale v1 cache entries return undefined for the new field and silently
-// blank the chart with "No data available".
+//
+// The cache key is derived from STATS_VERSION (the payload governs the derived
+// metrics read out of `aggregate_stats`). blobSet is write-once and nothing
+// purges post-backfill, so a hand-written version string would serve stale
+// data forever after a bump — deriving the key from the constant means a
+// STATS_VERSION bump automatically rolls the cache namespace.
+/** Version-derived blob-cache key namespace (exported for the key-derivation test). */
+export const CACHE_KEY_PREFIX = `derived-agentic-metrics-v${STATS_VERSION}`;
+
 const getCachedDerivedAgenticMetrics = cachedQuery(
   (ids: number[]): Promise<DerivedAgenticMetricMap> => getDerivedAgenticMetrics(getDb(), ids),
-  'derived-agentic-metrics-v3',
+  CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
 

@@ -23,13 +23,15 @@ import { gunzipSync } from 'node:zlib';
 import { NORMALIZED_E2E_OUTPUT_TOKENS } from '@semianalysisai/inferencex-constants';
 
 import type { DbClient } from '../connection.js';
-import { STATS_VERSION } from './agentic-aggregates';
 import {
+  extractIslOsl,
   fetchAggregateStatsRows,
   meanOf,
   percentilesOf,
   quantile,
   readNum,
+  STATS_VERSION,
+  writeBackTraceReplayJsonb,
   type MetricPercentiles,
 } from './agentic-shared';
 
@@ -47,6 +49,27 @@ export interface DerivedAgenticMetric {
 }
 
 export type DerivedAgenticMetricMap = Record<number, DerivedAgenticMetric>;
+
+/**
+ * The full `aggregate_stats` JSONB shape (mirrors `AggregateStats` in
+ * etl/compute-aggregate-stats.ts). Duplicated here rather than imported to keep
+ * this module off the etl import graph. When we self-heal from the profile blob
+ * alone, the server-derived fields (kvCacheUtil, prefixCacheHitRate) are carried
+ * forward untouched from the stale row — never re-reading the huge server blob.
+ * This mirrors the profile-only upgrade `backfill-aggregate-stats.ts` performs;
+ * the agentic-aggregates route (which does read the server blob) heals those
+ * server fields.
+ */
+interface StoredAggregateStats {
+  version: number;
+  isl: MetricPercentiles | null;
+  osl: MetricPercentiles | null;
+  kvCacheUtil: MetricPercentiles | null;
+  prefixCacheHitRate: MetricPercentiles | null;
+  normalizedSessionTimeS: number | null;
+  p90PrefillTpsPerUser: number | null;
+  normalizedE2e400: MetricPercentiles | null;
+}
 
 /**
  * JSONL blobs can be ~1-2 MB compressed (~5-10 MB raw) and Neon's serverless
@@ -205,14 +228,13 @@ export async function getDerivedAgenticMetrics(
   // ingest pipeline computes both metrics in the same pass that produces the
   // percentile bundles, so a single SQL round-trip covers most ids without
   // touching the gzipped profile blob.
-  const statsRows = await fetchAggregateStatsRows<{
-    version?: number;
-    normalizedSessionTimeS?: number | null;
-    p90PrefillTpsPerUser?: number | null;
-    normalizedE2e400?: MetricPercentiles | null;
-  }>(sql, benchmarkResultIds);
+  const statsRows = await fetchAggregateStatsRows<StoredAggregateStats>(sql, benchmarkResultIds);
 
   const idsNeedingBlob: number[] = [];
+  // Carry each stale/missing row's existing stats into the fallback so a
+  // self-heal preserves the server-derived fields (kvCacheUtil,
+  // prefixCacheHitRate) it can't recompute from the profile blob alone.
+  const staleStatsById = new Map<number, StoredAggregateStats | null>();
   for (const row of statsRows) {
     const id = Number(row.benchmark_result_id);
     if (row.stats && Number(row.stats.version) === STATS_VERSION) {
@@ -225,6 +247,7 @@ export async function getDerivedAgenticMetrics(
       };
     } else {
       idsNeedingBlob.push(id);
+      staleStatsById.set(id, row.stats ?? null);
     }
   }
 
@@ -233,33 +256,60 @@ export async function getDerivedAgenticMetrics(
   // Fallback: parse the profile blob directly. Used for rows whose
   // `aggregate_stats` is null or computed by an older STATS_VERSION; the
   // backfill script drains the population so this path should be rare.
-  const rows: { benchmark_result_id: number; blob: Buffer }[] = [];
+  // `trace_replay_id` + the (small) stale `aggregate_stats` come along on the
+  // same join — no extra round-trip — so we can self-heal after recompute.
+  const rows: {
+    benchmark_result_id: number;
+    trace_replay_id: number;
+    blob: Buffer;
+  }[] = [];
   for (let i = 0; i < idsNeedingBlob.length; i += QUERY_CHUNK_SIZE) {
     const chunk = idsNeedingBlob.slice(i, i + QUERY_CHUNK_SIZE);
     const chunkRows = (await sql`
       select
         br.id as benchmark_result_id,
+        atr.id as trace_replay_id,
         atr.profile_export_jsonl_gz as blob
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
         and atr.profile_export_jsonl_gz is not null
-    `) as { benchmark_result_id: number; blob: Buffer }[];
+    `) as { benchmark_result_id: number; trace_replay_id: number; blob: Buffer }[];
     rows.push(...chunkRows);
   }
 
   for (const row of rows) {
+    const id = Number(row.benchmark_result_id);
     try {
       const jsonl = gunzipSync(row.blob).toString('utf8');
       const { normalized_session_time_s, p90_prefill_tps_per_user, normalized_e2e_400 } =
         computeDerivedFromBlob(jsonl);
-      result[Number(row.benchmark_result_id)] = {
-        id: Number(row.benchmark_result_id),
+      result[id] = {
+        id,
         normalized_session_time_s,
         p90_prefill_tps_per_user,
         p75_normalized_e2e_400_s: normalized_e2e_400?.p75 ?? null,
         p90_normalized_e2e_400_s: normalized_e2e_400?.p90 ?? null,
       };
+
+      // Self-heal the shared `aggregate_stats` bundle. We only have the profile
+      // blob here, so recompute the profile-derived fields (isl/osl + the three
+      // derived metrics) and carry the stale row's server-derived fields
+      // forward untouched — the profile-only upgrade the backfill CLI also
+      // performs. Fire-and-forget, best-effort (no-ops on a read-only replica).
+      const { isl, osl } = extractIslOsl(jsonl);
+      const prior = staleStatsById.get(id) ?? null;
+      const merged: StoredAggregateStats = {
+        version: STATS_VERSION,
+        isl: percentilesOf(isl),
+        osl: percentilesOf(osl),
+        kvCacheUtil: prior?.kvCacheUtil ?? null,
+        prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
+        normalizedSessionTimeS: normalized_session_time_s,
+        p90PrefillTpsPerUser: p90_prefill_tps_per_user,
+        normalizedE2e400: normalized_e2e_400,
+      };
+      writeBackTraceReplayJsonb(sql, 'aggregate_stats', Number(row.trace_replay_id), merged);
     } catch {
       // Skip malformed blobs silently — frontend treats missing ids as "no data".
     }
