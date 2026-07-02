@@ -1,3 +1,4 @@
+import { type ExclusionSpec } from '@semianalysisai/inferencex-constants';
 import { computeToggle } from '@/hooks/useTogglableSet';
 
 /**
@@ -19,22 +20,7 @@ import { computeToggle } from '@/hooks/useTogglableSet';
  * share the upstream ROCm path → one group; vLLM is its own group.)
  */
 
-/** Data params defining one exclusion rule. */
-export interface ExclusionSpec {
-  /** Only hwKeys ending in this suffix participate in the rule (e.g. `_mtp`). */
-  suffix: string;
-  /**
-   * Engine-family prefixes stripped from the framework segment before grouping
-   * (e.g. `dynamo-`, `mori-`), so `h100_dynamo-vllm_mtp` resolves to `vllm`.
-   */
-  stripPrefixes?: string[];
-  /**
-   * Raw family → shared comparability-group id. Two families can co-exist on a
-   * graph iff they resolve to the same group; families omitted here are their
-   * own group. (e.g. `{ atom: 'sglang' }` — ATOM and SGLang are comparable.)
-   */
-  groupAliases?: Record<string, string>;
-}
+export type { ExclusionSpec };
 
 /** Compiled resolvers for a model's exclusion specs. */
 export interface Exclusion {
