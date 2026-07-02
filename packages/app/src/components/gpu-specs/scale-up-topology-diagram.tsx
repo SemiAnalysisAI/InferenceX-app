@@ -1,27 +1,23 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { track } from '@/lib/analytics';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import {
   getScaleUpTopologyConfig,
   type GpuSpec,
   type ScaleUpTopologyConfig,
 } from '@/lib/gpu-specs';
+import {
+  appendWatermarkedSvg,
+  getVendorColor,
+  linearPositions,
+  TopologyDialogShell,
+  useTopologyDialog,
+  type TopologyDialogHandle,
+} from '@/components/gpu-specs/topology-shared';
 
-export interface ScaleUpTopologyDiagramHandle {
-  openDialog: () => void;
-}
+export type ScaleUpTopologyDiagramHandle = TopologyDialogHandle;
 
 /**
  * Renders D3-based scale-up topology diagrams for GPU SKUs.
@@ -35,120 +31,47 @@ export const ScaleUpTopologyDiagram = forwardRef<
   ScaleUpTopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
 >(({ spec, allSpecs }, ref) => {
-  const [open, setOpen] = useState(false);
-  const [displayedIndex, setDisplayedIndex] = useState(0);
-  const displayedIndexRef = useRef(0);
-  displayedIndexRef.current = displayedIndex;
+  const state = useTopologyDialog(ref, {
+    spec,
+    allSpecs,
+    expandedEvent: 'gpu_specs_scaleup_topology_expanded',
+    navigatedEvent: 'gpu_specs_scaleup_topology_navigated',
+  });
+  const { displayedIndex, displayedSpec } = state;
 
   // Compact view always uses own spec
   const compactConfig = getScaleUpTopologyConfig(spec);
 
   // Dialog uses the displayed (navigable) spec
-  const displayedSpec = allSpecs[displayedIndex] ?? spec;
   const displayedConfig = getScaleUpTopologyConfig(displayedSpec);
 
-  const navigate = useCallback(
-    (direction: 'prev' | 'next') => {
-      const currentIdx = displayedIndexRef.current;
-      const newIdx =
-        direction === 'prev'
-          ? currentIdx > 0
-            ? currentIdx - 1
-            : allSpecs.length - 1
-          : currentIdx < allSpecs.length - 1
-            ? currentIdx + 1
-            : 0;
-      setDisplayedIndex(newIdx);
-      track('gpu_specs_scaleup_topology_navigated', {
-        gpu: allSpecs[newIdx].name,
-        direction,
-      });
-    },
-    [allSpecs],
-  );
-
-  useImperativeHandle(ref, () => ({
-    openDialog: () => {
-      const idx = allSpecs.findIndex((s) => s.name === spec.name);
-      setDisplayedIndex(Math.max(idx, 0));
-      setOpen(true);
-      track('gpu_specs_scaleup_topology_expanded', { gpu: spec.name });
-    },
-  }));
-
-  // Keyboard arrow navigation when dialog is open
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        navigate('prev');
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        navigate('next');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, navigate]);
-
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-2 mb-2">
-        <h4 className="text-sm font-semibold">{spec.name}</h4>
-        <span className="text-xs text-muted-foreground">
+    <TopologyDialogShell
+      state={state}
+      title={spec.name}
+      compactSubtitle={
+        <>
           {spec.scaleUpTopology} &middot; {compactConfig.techName}
-        </span>
-      </div>
-      <button
-        type="button"
-        className="cursor-pointer rounded-md hover:bg-muted/50 transition-colors p-1 -m-1"
-        onClick={() => {
-          const idx = allSpecs.findIndex((s) => s.name === spec.name);
-          setDisplayedIndex(Math.max(idx, 0));
-          setOpen(true);
-          track('gpu_specs_scaleup_topology_expanded', { gpu: spec.name });
-        }}
-        aria-label={`Expand ${spec.name} scale-up topology diagram`}
-      >
-        <ScaleUpTopologyD3 spec={spec} config={compactConfig} compact />
-        <p className="text-[10px] text-muted-foreground mt-1 text-center">Click to expand</p>
-      </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-4xl w-[95vw]">
-          <div className="flex items-center gap-2 pr-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('prev')}
-              aria-label="Previous GPU"
-              data-testid="scaleup-topology-nav-prev"
-            >
-              <ChevronLeft className="size-5" />
-            </Button>
-            <DialogHeader className="flex-1">
-              <DialogTitle>{displayedSpec.name} Scale-Up Topology</DialogTitle>
-              <DialogDescription>
-                {displayedSpec.scaleUpBandwidth} {displayedSpec.scaleUpTopology} &middot;{' '}
-                {displayedConfig.techName}
-                {displayedConfig.nodeCount > 1 &&
-                  ` · ${displayedConfig.nodeCount} nodes × ${displayedConfig.gpusPerNode} GPUs`}
-                <span className="ml-2 opacity-60">
-                  ({displayedIndex + 1} / {allSpecs.length})
-                </span>
-              </DialogDescription>
-            </DialogHeader>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('next')}
-              aria-label="Next GPU"
-              data-testid="scaleup-topology-nav-next"
-            >
-              <ChevronRight className="size-5" />
-            </Button>
-          </div>
+        </>
+      }
+      expandLabel={`Expand ${spec.name} scale-up topology diagram`}
+      compact={<ScaleUpTopologyD3 spec={spec} config={compactConfig} compact />}
+      testIdPrefix="scaleup-topology"
+      dialogClassName="max-w-4xl w-[95vw]"
+      dialogTitle={`${displayedSpec.name} Scale-Up Topology`}
+      dialogDescription={
+        <>
+          {displayedSpec.scaleUpBandwidth} {displayedSpec.scaleUpTopology} &middot;{' '}
+          {displayedConfig.techName}
+          {displayedConfig.nodeCount > 1 &&
+            ` · ${displayedConfig.nodeCount} nodes × ${displayedConfig.gpusPerNode} GPUs`}
+          <span className="ml-2 opacity-60">
+            ({displayedIndex + 1} / {allSpecs.length})
+          </span>
+        </>
+      }
+      dialogBody={
+        <>
           <div className="overflow-x-auto">
             <ScaleUpTopologyD3 spec={displayedSpec} config={displayedConfig} compact={false} />
           </div>
@@ -173,9 +96,9 @@ export const ScaleUpTopologyDiagram = forwardRef<
               </p>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </>
+      }
+    />
   );
 });
 
@@ -219,8 +142,7 @@ function renderSwitchedTopology(
   compact: boolean,
 ) {
   const { gpuCount, switchCount } = config;
-  const isNvidia = spec.vendor === 'nvidia';
-  const vendorColor = isNvidia ? '#76b900' : '#ed1c24';
+  const vendorColor = getVendorColor(spec);
   const fontSize = compact ? '8px' : '11px';
   const smallFont = compact ? '7px' : '9px';
 
@@ -248,44 +170,16 @@ function renderSwitchedTopology(
   const swStartX = padX + (contentW - swRowW) / 2;
   const gpuStartX = padX + (contentW - gpuRowW) / 2;
 
-  const swPositions = Array.from({ length: switchCount }, (_, i) => ({
-    x: swStartX + i * (swBoxW + swGap),
-    cx: swStartX + i * (swBoxW + swGap) + swBoxW / 2,
-  }));
-  const gpuPositions = Array.from({ length: gpuCount }, (_, i) => ({
-    x: gpuStartX + i * (gpuBoxW + gpuGap),
-    cx: gpuStartX + i * (gpuBoxW + gpuGap) + gpuBoxW / 2,
-  }));
+  const swPositions = linearPositions(switchCount, swStartX, swBoxW, swGap);
+  const gpuPositions = linearPositions(gpuCount, gpuStartX, gpuBoxW, gpuGap);
 
-  const svg = container
-    .append('svg')
-    .attr('viewBox', `0 0 ${totalW} ${viewBoxH}`)
-    .attr('class', compact ? 'w-full max-w-[500px]' : 'w-full min-w-[600px]')
-    .attr('role', 'img')
-    .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
-
-  // Add background logo watermark
-  const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
-  svg
-    .append('defs')
-    .append('pattern')
-    .attr('id', patternId)
-    .attr('patternUnits', 'userSpaceOnUse')
-    .attr('width', totalW)
-    .attr('height', viewBoxH)
-    .append('image')
-    .attr('href', '/brand/logo-color.webp')
-    .attr('width', totalW * 0.3)
-    .attr('height', viewBoxH * 0.3)
-    .attr('x', (totalW - totalW * 0.3) / 2)
-    .attr('y', (viewBoxH - viewBoxH * 0.3) / 2)
-    .attr('opacity', 0.1);
-
-  svg
-    .insert('rect', ':first-child')
-    .attr('width', totalW)
-    .attr('height', viewBoxH)
-    .attr('fill', `url(#${patternId})`);
+  const svg = appendWatermarkedSvg(container, {
+    width: totalW,
+    height: viewBoxH,
+    patternId: `logo-scaleup-sw-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`,
+    svgClass: compact ? 'w-full max-w-[500px]' : 'w-full min-w-[600px]',
+    ariaLabel: `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`,
+  });
 
   // Connections: each GPU → each NVSwitch
   const conns = svg.append('g').attr('class', 'connections');
@@ -407,38 +301,15 @@ function renderMeshTopology(
     }
   }
 
-  const svg = container
-    .append('svg')
-    .attr('viewBox', `0 0 ${totalW} ${totalH}`)
-    .attr(
-      'class',
-      compact ? 'w-full max-w-[300px] mx-auto' : 'w-full max-w-[400px] mx-auto min-w-[350px]',
-    )
-    .attr('role', 'img')
-    .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
-
-  // Add background logo watermark
-  const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
-  svg
-    .append('defs')
-    .append('pattern')
-    .attr('id', patternId)
-    .attr('patternUnits', 'userSpaceOnUse')
-    .attr('width', totalW)
-    .attr('height', totalH)
-    .append('image')
-    .attr('href', '/brand/logo-color.webp')
-    .attr('width', totalW * 0.3)
-    .attr('height', totalH * 0.3)
-    .attr('x', (totalW - totalW * 0.3) / 2)
-    .attr('y', (totalH - totalH * 0.3) / 2)
-    .attr('opacity', 0.1);
-
-  svg
-    .insert('rect', ':first-child')
-    .attr('width', totalW)
-    .attr('height', totalH)
-    .attr('fill', `url(#${patternId})`);
+  const svg = appendWatermarkedSvg(container, {
+    width: totalW,
+    height: totalH,
+    patternId: `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`,
+    svgClass: compact
+      ? 'w-full max-w-[300px] mx-auto'
+      : 'w-full max-w-[400px] mx-auto min-w-[350px]',
+    ariaLabel: `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`,
+  });
 
   // Mesh connections
   const meshConns = svg.append('g').attr('class', 'mesh-connections');
@@ -559,10 +430,7 @@ function renderSwitchedNvl72Topology(
   const gpuRowX = node1X + nodePad;
   const gpuY = nodeY + nodeLabelH + nodePad;
 
-  const gpuPositions = Array.from({ length: gpusPerNode }, (_, i) => ({
-    x: gpuRowX + i * (gpuBoxW + gpuGap),
-    cx: gpuRowX + i * (gpuBoxW + gpuGap) + gpuBoxW / 2,
-  }));
+  const gpuPositions = linearPositions(gpusPerNode, gpuRowX, gpuBoxW, gpuGap);
 
   // Abstracted nodes
   const absStartX = node1X + node1W + nodeGap;
@@ -578,35 +446,13 @@ function renderSwitchedNvl72Topology(
   const sw18X = sw2X + swBoxW + swGap + swDotsW + swGap;
   const swCenters = [sw1X + swBoxW / 2, sw2X + swBoxW / 2, sw18X + swBoxW / 2];
 
-  const svg = container
-    .append('svg')
-    .attr('viewBox', `0 0 ${totalW} ${viewBoxH}`)
-    .attr('class', compact ? 'w-full max-w-[500px]' : 'w-full min-w-[550px]')
-    .attr('role', 'img')
-    .attr('aria-label', `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`);
-
-  // Add background logo watermark
-  const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
-  svg
-    .append('defs')
-    .append('pattern')
-    .attr('id', patternId)
-    .attr('patternUnits', 'userSpaceOnUse')
-    .attr('width', totalW)
-    .attr('height', viewBoxH)
-    .append('image')
-    .attr('href', '/brand/logo-color.webp')
-    .attr('width', totalW * 0.3)
-    .attr('height', viewBoxH * 0.3)
-    .attr('x', (totalW - totalW * 0.3) / 2)
-    .attr('y', (viewBoxH - viewBoxH * 0.3) / 2)
-    .attr('opacity', 0.1);
-
-  svg
-    .insert('rect', ':first-child')
-    .attr('width', totalW)
-    .attr('height', viewBoxH)
-    .attr('fill', `url(#${patternId})`);
+  const svg = appendWatermarkedSvg(container, {
+    width: totalW,
+    height: viewBoxH,
+    patternId: `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`,
+    svgClass: compact ? 'w-full max-w-[500px]' : 'w-full min-w-[550px]',
+    ariaLabel: `${spec.name} ${spec.scaleUpTopology} scale-up topology diagram`,
+  });
 
   // Connections: each GPU → each visible NVSwitch
   const gpuSwConns = svg.append('g').attr('class', 'gpu-switch-connections');

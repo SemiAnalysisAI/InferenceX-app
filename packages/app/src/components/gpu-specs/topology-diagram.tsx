@@ -1,23 +1,19 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { track } from '@/lib/analytics';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { getTopologyConfig, type GpuSpec } from '@/lib/gpu-specs';
+import {
+  appendWatermarkedSvg,
+  getVendorColor,
+  linearPositions,
+  TopologyDialogShell,
+  useTopologyDialog,
+  type TopologyDialogHandle,
+} from '@/components/gpu-specs/topology-shared';
 
-export interface TopologyDiagramHandle {
-  openDialog: () => void;
-}
+export type TopologyDiagramHandle = TopologyDialogHandle;
 
 /**
  * Renders a D3-based scale-out topology diagram for a single GPU SKU.
@@ -31,140 +27,65 @@ export const TopologyDiagram = forwardRef<
   TopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
 >(({ spec, allSpecs }, ref) => {
-  const [open, setOpen] = useState(false);
-  const [displayedIndex, setDisplayedIndex] = useState(0);
-  const displayedIndexRef = useRef(0);
-  displayedIndexRef.current = displayedIndex;
+  const state = useTopologyDialog(ref, {
+    spec,
+    allSpecs,
+    expandedEvent: 'gpu_specs_topology_expanded',
+    navigatedEvent: 'gpu_specs_topology_navigated',
+  });
+  const { displayedIndex, displayedSpec } = state;
 
   // Compact view always uses own spec
   const compactConfig = getTopologyConfig(spec);
 
   // Dialog uses the displayed (navigable) spec
-  const displayedSpec = allSpecs[displayedIndex] ?? spec;
   const displayedConfig = getTopologyConfig(displayedSpec);
-
-  const navigate = useCallback(
-    (direction: 'prev' | 'next') => {
-      const currentIdx = displayedIndexRef.current;
-      const newIdx =
-        direction === 'prev'
-          ? currentIdx > 0
-            ? currentIdx - 1
-            : allSpecs.length - 1
-          : currentIdx < allSpecs.length - 1
-            ? currentIdx + 1
-            : 0;
-      setDisplayedIndex(newIdx);
-      track('gpu_specs_topology_navigated', {
-        gpu: allSpecs[newIdx].name,
-        direction,
-      });
-    },
-    [allSpecs],
-  );
-
-  useImperativeHandle(ref, () => ({
-    openDialog: () => {
-      const idx = allSpecs.findIndex((s) => s.name === spec.name);
-      setDisplayedIndex(Math.max(idx, 0));
-      setOpen(true);
-      track('gpu_specs_topology_expanded', { gpu: spec.name });
-    },
-  }));
-
-  // Keyboard arrow navigation when dialog is open
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        navigate('prev');
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        navigate('next');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, navigate]);
 
   if (!compactConfig) return null;
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-2 mb-2">
-        <h4 className="text-sm font-semibold">{spec.name}</h4>
-        <span className="text-xs text-muted-foreground">
+    <TopologyDialogShell
+      state={state}
+      title={spec.name}
+      compactSubtitle={
+        <>
           {spec.scaleOutTopology} &middot; {compactConfig.networkTech}
-        </span>
-      </div>
-      <button
-        type="button"
-        className="cursor-pointer rounded-md hover:bg-muted/50 transition-colors p-1 -m-1"
-        onClick={() => {
-          const idx = allSpecs.findIndex((s) => s.name === spec.name);
-          setDisplayedIndex(Math.max(idx, 0));
-          setOpen(true);
-          track('gpu_specs_topology_expanded', { gpu: spec.name });
-        }}
-        aria-label={`Expand ${spec.name} topology diagram`}
-      >
-        <TopologyD3 spec={spec} config={compactConfig} compact />
-        <p className="text-[10px] text-muted-foreground mt-1 text-center">Click to expand</p>
-      </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-5xl w-[95vw]">
-          <div className="flex items-center gap-2 pr-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('prev')}
-              aria-label="Previous GPU"
-              data-testid="topology-nav-prev"
-            >
-              <ChevronLeft className="size-5" />
-            </Button>
-            <DialogHeader className="flex-1">
-              <DialogTitle>{displayedSpec.name} Scale-Out Topology</DialogTitle>
-              <DialogDescription>
-                {displayedSpec.scaleOutTopology} &middot; {displayedConfig?.networkTech}
-                <span className="ml-2 opacity-60">
-                  ({displayedIndex + 1} / {allSpecs.length})
-                </span>
-              </DialogDescription>
-            </DialogHeader>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('next')}
-              aria-label="Next GPU"
-              data-testid="topology-nav-next"
-            >
-              <ChevronRight className="size-5" />
-            </Button>
-          </div>
-          {displayedConfig && (
-            <>
-              <div className="overflow-x-auto">
-                <TopologyD3 spec={displayedSpec} config={displayedConfig} compact={false} />
-              </div>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>
-                  <span className="font-medium">Leaf switch:</span> {displayedConfig.switchLabel}
-                </p>
-                <p>
-                  <span className="font-medium">Spine switch:</span> {displayedConfig.spineLabel}
-                </p>
-                <p>
-                  <span className="font-medium">NIC:</span> {displayedConfig.nicLabel}
-                </p>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        </>
+      }
+      expandLabel={`Expand ${spec.name} topology diagram`}
+      compact={<TopologyD3 spec={spec} config={compactConfig} compact />}
+      testIdPrefix="topology"
+      dialogClassName="max-w-5xl w-[95vw]"
+      dialogTitle={`${displayedSpec.name} Scale-Out Topology`}
+      dialogDescription={
+        <>
+          {displayedSpec.scaleOutTopology} &middot; {displayedConfig?.networkTech}
+          <span className="ml-2 opacity-60">
+            ({displayedIndex + 1} / {allSpecs.length})
+          </span>
+        </>
+      }
+      dialogBody={
+        displayedConfig && (
+          <>
+            <div className="overflow-x-auto">
+              <TopologyD3 spec={displayedSpec} config={displayedConfig} compact={false} />
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>
+                <span className="font-medium">Leaf switch:</span> {displayedConfig.switchLabel}
+              </p>
+              <p>
+                <span className="font-medium">Spine switch:</span> {displayedConfig.spineLabel}
+              </p>
+              <p>
+                <span className="font-medium">NIC:</span> {displayedConfig.nicLabel}
+              </p>
+            </div>
+          </>
+        )
+      }
+    />
   );
 });
 
@@ -232,8 +153,7 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
     const { railCount, gpuCount, nicCount, nicToLeaf, spineCount, serversPerPod, podCount } =
       config;
 
-    const isNvidia = spec.vendor === 'nvidia';
-    const vendorColor = isNvidia ? '#76b900' : '#ed1c24';
+    const vendorColor = getVendorColor(spec);
 
     const fontSize = compact ? '8px' : '10px';
     const smallFontSize = compact ? '7px' : '9px';
@@ -351,25 +271,10 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
     const gpuY = nicY + nicBoxH + nicGpuVertGap;
 
     // === Position arrays ===
-    const spinePositions = Array.from({ length: spineCount }, (_, i) => ({
-      x: spineStartX + i * (spineBoxW + spineGap),
-      cx: spineStartX + i * (spineBoxW + spineGap) + spineBoxW / 2,
-    }));
-
-    const leafPositions = Array.from({ length: railCount }, (_, i) => ({
-      x: leafStartX + i * (leafBoxW + leafGap),
-      cx: leafStartX + i * (leafBoxW + leafGap) + leafBoxW / 2,
-    }));
-
-    const gpuPositions = Array.from({ length: gpuCount }, (_, i) => ({
-      x: gpuRowX + i * (gpuBoxW + gpuGap),
-      cx: gpuRowX + i * (gpuBoxW + gpuGap) + gpuBoxW / 2,
-    }));
-
-    const nicPositions = Array.from({ length: nicCount }, (_, i) => ({
-      x: nicRowX + i * (nicBoxW + nicGap),
-      cx: nicRowX + i * (nicBoxW + nicGap) + nicBoxW / 2,
-    }));
+    const spinePositions = linearPositions(spineCount, spineStartX, spineBoxW, spineGap);
+    const leafPositions = linearPositions(railCount, leafStartX, leafBoxW, leafGap);
+    const gpuPositions = linearPositions(gpuCount, gpuRowX, gpuBoxW, gpuGap);
+    const nicPositions = linearPositions(nicCount, nicRowX, nicBoxW, nicGap);
 
     // Abstracted server positions
     const absStartX = s1X + s1W + serverGap;
@@ -400,35 +305,13 @@ function TopologyD3({ spec, config, compact }: TopologyD3Props) {
     const container = d3.select(containerRef.current);
     container.selectAll('*').remove();
 
-    const svg = container
-      .append('svg')
-      .attr('viewBox', `0 0 ${totalW} ${viewBoxH}`)
-      .attr('class', compact ? 'w-full max-w-[600px]' : 'w-full min-w-[700px]')
-      .attr('role', 'img')
-      .attr('aria-label', `${spec.name} ${spec.scaleOutTopology} scale-out topology diagram`);
-
-    // Add background logo watermark
-    const patternId = `logo-scaleout-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
-    svg
-      .append('defs')
-      .append('pattern')
-      .attr('id', patternId)
-      .attr('patternUnits', 'userSpaceOnUse')
-      .attr('width', totalW)
-      .attr('height', viewBoxH)
-      .append('image')
-      .attr('href', '/brand/logo-color.webp')
-      .attr('width', totalW * 0.3)
-      .attr('height', viewBoxH * 0.3)
-      .attr('x', (totalW - totalW * 0.3) / 2)
-      .attr('y', (viewBoxH - viewBoxH * 0.3) / 2)
-      .attr('opacity', 0.1);
-
-    svg
-      .insert('rect', ':first-child')
-      .attr('width', totalW)
-      .attr('height', viewBoxH)
-      .attr('fill', `url(#${patternId})`);
+    const svg = appendWatermarkedSvg(container, {
+      width: totalW,
+      height: viewBoxH,
+      patternId: `logo-scaleout-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`,
+      svgClass: compact ? 'w-full max-w-[600px]' : 'w-full min-w-[700px]',
+      ariaLabel: `${spec.name} ${spec.scaleOutTopology} scale-out topology diagram`,
+    });
 
     // === Connections (drawn first, behind boxes) ===
 
