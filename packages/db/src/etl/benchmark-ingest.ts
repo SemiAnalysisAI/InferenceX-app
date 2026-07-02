@@ -74,7 +74,13 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(workersJsons)}::jsonb[])
     on conflict (workflow_run_id, config_id, benchmark_type, isl, osl, conc, offload_mode)
     do update set
-      metrics = excluded.metrics,
+      -- Replace metrics with the fresh artifact values, but carry over
+      -- kv_cache_pool_tokens: it is derived from the server log at
+      -- insertServerLog time (not present in any artifact JSON), so a later
+      -- upsert from the aggregated results_bmk artifact would silently wipe it.
+      metrics = excluded.metrics || jsonb_strip_nulls(
+        jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
+      ),
       image = excluded.image,
       workers = excluded.workers
     returning (xmax = 0) as inserted, id
