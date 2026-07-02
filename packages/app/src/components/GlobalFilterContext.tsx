@@ -12,6 +12,8 @@ import {
   useState,
 } from 'react';
 
+import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+
 // useLayoutEffect warns during SSR; alias to useEffect on the server (no-op there anyway).
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -21,8 +23,6 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
-
-import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
 
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
@@ -100,7 +100,9 @@ function buildRunInfo(data: WorkflowInfoResponse): Record<string, RunInfo> {
   const runs: Record<string, RunInfo> = {};
   for (const run of data.runs) {
     const runId = String(run.github_run_id);
-    const runChangelogs = data.changelogs.filter((c) => c.workflow_run_id === run.github_run_id);
+    const runChangelogs = data.changelogs.filter(
+      (c) => String(c.workflow_run_id) === String(run.github_run_id),
+    );
     runs[runId] = {
       runId,
       runDate: run.created_at,
@@ -147,7 +149,11 @@ export function GlobalFilterProvider({
 
   const [selectedSequence, setSelectedSequence] = useState<Sequence>(() => {
     if (initialSequence) return initialSequence;
-    return Sequence.EightK_OneK;
+    const urlSeq = getUrlParam('i_seq');
+    if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
+    // Prefer Agentic Traces by default when the selected model has it; the
+    // effectiveSequence fallback below handles models without agentic data.
+    return Sequence.AgenticTraces;
   });
 
   const initialValidPrecisions = useMemo(
@@ -277,9 +283,7 @@ export function GlobalFilterProvider({
     if (!availabilityRows) {
       return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : SEQUENCE_OPTIONS;
     }
-    const dbSeqs = modelRows
-      .map((r) => islOslToSequence(r.isl, r.osl))
-      .filter((s): s is Sequence => s !== null);
+    const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
     const merged = [...new Set([...dbSeqs, ...unofficialSeqs])];
     return merged.length > 0 ? merged : SEQUENCE_OPTIONS;
   }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
@@ -298,7 +302,7 @@ export function GlobalFilterProvider({
     if (!availabilityRows) {
       return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
     }
-    const rows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
+    const rows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
     const dbPrecs = rows.map((r) => r.precision);
     const merged = [...new Set([...dbPrecs, ...unofficialPrecs])].toSorted();
     return merged.length > 0 ? merged : ['fp4'];
@@ -307,10 +311,7 @@ export function GlobalFilterProvider({
   // Curve count per precision (distinct hw/framework/spec/disagg series) for the
   // selected model + sequence — drives the auto default toward the densest one.
   const precisionCurveCounts = useMemo(
-    () =>
-      countCurvesByPrecision(
-        modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence),
-      ),
+    () => countCurvesByPrecision(modelRows.filter((r) => rowToSequence(r) === effectiveSequence)),
     [modelRows, effectiveSequence],
   );
 
@@ -346,7 +347,7 @@ export function GlobalFilterProvider({
   // Dates available for selected model + sequence + precisions
   const availableDates = useMemo(() => {
     if (!availabilityRows) return [];
-    const seqRows = modelRows.filter((r) => islOslToSequence(r.isl, r.osl) === effectiveSequence);
+    const seqRows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
     const rows = seqRows.filter((r) => effectivePrecisions.includes(r.precision));
     if (rows.length === 0) {
       return [...new Set(seqRows.map((r) => r.date))].toSorted();

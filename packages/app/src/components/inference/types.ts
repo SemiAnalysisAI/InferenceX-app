@@ -80,6 +80,8 @@ export interface WorkerPower {
  * @property {number} p99_e2el - 99th percentile of End-to-End Latency.
  */
 export interface AggDataEntry {
+  /** Stable per-point id from benchmark_results — for trace_replay lookups. */
+  id?: number;
   hw: string;
   mtp?: string;
   hwKey: string;
@@ -94,23 +96,43 @@ export interface AggDataEntry {
   mean_ttft: number;
   median_ttft: number;
   std_ttft: number;
+  p75_ttft: number;
+  p90_ttft: number;
+  p95_ttft: number;
   p99_ttft: number;
+  'p99.9_ttft': number;
   mean_tpot: number;
   mean_intvty: number;
   median_tpot: number;
   median_intvty: number;
   std_tpot: number;
   std_intvty: number;
+  p75_tpot: number;
+  p75_intvty: number;
+  p90_tpot: number;
+  p90_intvty: number;
+  p95_tpot: number;
+  p95_intvty: number;
   p99_tpot: number;
   p99_intvty: number;
+  'p99.9_tpot': number;
+  'p99.9_intvty': number;
   mean_itl: number;
   median_itl: number;
   std_itl: number;
+  p75_itl: number;
+  p90_itl: number;
+  p95_itl: number;
   p99_itl: number;
+  'p99.9_itl': number;
   mean_e2el: number;
   median_e2el: number;
   std_e2el: number;
+  p75_e2el: number;
+  p90_e2el: number;
+  p95_e2el: number;
   p99_e2el: number;
+  'p99.9_e2el': number;
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
   // Optional because historical runs predate the fields.
   avg_power_w?: number;
@@ -162,6 +184,29 @@ export interface AggDataEntry {
   actualDate?: string;
   /** URL to the GitHub Actions workflow run that produced this data point. */
   run_url?: string;
+  /** Benchmark scenario: `single_turn` (fixed-seq isl/osl) or `agentic_traces`. */
+  benchmark_type?: string;
+  /** ISL in tokens — null for agentic_traces. */
+  isl?: number | null;
+  /** OSL in tokens — null for agentic_traces. */
+  osl?: number | null;
+  // ── Agentic-only fields (populated from metrics JSONB for `agentic_traces` rows) ──
+  /** "on" | "off" — whether KV cache offload to CPU was enabled. */
+  offload_mode?: string;
+  /** Actual server-observed GPU prefix-cache hit rate (0..1). */
+  server_gpu_cache_hit_rate?: number;
+  /** Actual server-observed CPU prefix-cache hit rate (0..1). */
+  server_cpu_cache_hit_rate?: number;
+  /** Infinite-cache theoretical hit rate (0..1) computed from trace. */
+  theoretical_cache_hit_rate?: number;
+  /** Total requests attempted during the window. */
+  num_requests_total?: number;
+  /** Requests that completed successfully. */
+  num_requests_successful?: number;
+  /** Total prompt tokens served. */
+  total_prompt_tokens?: number;
+  /** Total generated (output) tokens. */
+  total_generation_tokens?: number;
 }
 
 /**
@@ -187,6 +232,17 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   x: number;
   y: number;
   hidden?: boolean;
+  /**
+   * Whether this point sits on the (e2e_latency, y-metric) Pareto frontier.
+   * Set by useChartData when `selectedXAxisMode !== 'e2e'`. The TTFT /
+   * interactivity / session-time / prefill-tps charts use this flag to
+   * restrict their roofline computation to e2e-Pareto winners — vendors
+   * can't benchmark-hack TTFT by tanking decode (or vice versa) and still
+   * appear on the frontier line — while keeping every point visible as
+   * scatter so the user can see where dominated configs actually sit.
+   * Undefined when the chart is in e2e mode (no remapping needed).
+   */
+  isOnE2eFrontier?: boolean;
 
   // Overridden fields with narrower types
   hwKey: string;
@@ -660,10 +716,33 @@ export interface InferenceChartContextType {
   workflowInfo: any;
   selectedYAxisMetric: string;
   setSelectedYAxisMetric: (metric: string) => void;
+  /** Latency percentile for the x-axis under agentic scenarios (median/p90/p99/p99.9). */
+  selectedPercentile: string;
+  setSelectedPercentile: (p: string) => void;
   selectedXAxisMetric: string | null;
   setSelectedXAxisMetric: (metric: string | null) => void;
   selectedE2eXAxisMetric: string | null;
   setSelectedE2eXAxisMetric: (metric: string | null) => void;
+  /**
+   * Which chart variant the user wants to see — the inference card shows one chart
+   * at a time, picked by the big buttons above the chart.
+   * - 'ttft'          → e2e chartType with x-axis forced to p90_ttft
+   * - 'e2e'           → e2e chartType with the chart-config default x-axis (median_e2el / p90_e2el)
+   * - 'normalized-e2e'→ agentic-only; x = per-request E2E normalized to 400 output tokens
+   * - 'interactivity' → interactivity chartType (x = median_intvty / p90_intvty)
+   * - 'session-time'  → agentic-only; x = mean-normalized session time (live-computed from trace blobs)
+   * - 'prefill-tps'   → agentic-only; x = mean of P90 prefill TPS/user per session
+   */
+  selectedXAxisMode:
+    | 'ttft'
+    | 'e2e'
+    | 'normalized-e2e'
+    | 'interactivity'
+    | 'session-time'
+    | 'prefill-tps';
+  setSelectedXAxisMode: (
+    mode: 'ttft' | 'e2e' | 'normalized-e2e' | 'interactivity' | 'session-time' | 'prefill-tps',
+  ) => void;
   scaleType: 'auto' | 'linear' | 'log';
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
   /** Coarse vendor / framework / agg-disagg / mtp-stp filters applied to the chart point set. */

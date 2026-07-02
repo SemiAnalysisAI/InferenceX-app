@@ -194,9 +194,7 @@ export function UnofficialChartDisplay() {
                           `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
                         ]
                       }{' '}
-                      {graph.chartDefinition[
-                        `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                      ] || graph.chartDefinition.heading}
+                      {graph.chartDefinition.heading}
                     </h2>
                     <p className="text-sm text-muted-foreground mb-2">
                       {graph.model} • {selectedPrecisions.join(', ')} • {graph.sequence}

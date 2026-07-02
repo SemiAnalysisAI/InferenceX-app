@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ShapeKey } from '@/lib/chart-rendering';
 
-import { renderScatterPoints, syncPointShape } from './scatter-points';
+import { computeTooltipPosition, renderScatterPoints, syncPointShape } from './scatter-points';
 
 interface TestPoint {
   hwKey: string;
@@ -161,5 +161,53 @@ describe('syncPointShape', () => {
     expect(after.attr('data-shape-key')).toBe('square');
     // Only one visible shape remains.
     expect(g.selectAll('.visible-shape').size()).toBe(1);
+  });
+});
+
+describe('computeTooltipPosition', () => {
+  it('keeps a tall pinned tooltip inside the visible viewport', () => {
+    const tooltipNode = document.createElement('div');
+    document.body.append(tooltipNode);
+    Object.defineProperty(tooltipNode, 'getBoundingClientRect', {
+      value: () => ({
+        width: 300,
+        height: 400,
+        left: 0,
+        top: 0,
+        right: 300,
+        bottom: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+
+    const container = document.createElement('div');
+    Object.defineProperties(container, {
+      clientWidth: { value: 800 },
+      clientHeight: { value: 600 },
+      getBoundingClientRect: {
+        value: () => ({
+          width: 800,
+          height: 600,
+          left: 100,
+          top: 600,
+          right: 900,
+          bottom: 1200,
+          x: 100,
+          y: 600,
+          toJSON: () => ({}),
+        }),
+      },
+    });
+    Object.defineProperties(document.documentElement, {
+      clientWidth: { configurable: true, value: 1280 },
+      clientHeight: { configurable: true, value: 720 },
+    });
+
+    expect(computeTooltipPosition(450, 100, d3.select(tooltipNode), container)).toEqual({
+      left: 560,
+      top: 316,
+    });
   });
 });

@@ -8,6 +8,8 @@ import type { WorkerPower } from '@/components/inference/types';
 import type { SubmissionsResponse } from './submissions-types';
 
 export interface BenchmarkRow {
+  /** Stable per-point id from benchmark_results; used for agentic detail lookups. */
+  id: number;
   hardware: string;
   framework: string;
   model: string;
@@ -25,9 +27,13 @@ export interface BenchmarkRow {
   decode_num_workers: number;
   num_prefill_gpu: number;
   num_decode_gpu: number;
-  isl: number;
-  osl: number;
+  benchmark_type: string;
+  // Null for agentic_traces rows; numeric for single_turn fixed-seq rows.
+  isl: number | null;
+  osl: number | null;
   conc: number;
+  /** KV-cache offload mode. Defaults to 'off' for fixed-sequence rows. */
+  offload_mode: string;
   image: string | null;
   metrics: Record<string, number>;
   /**
@@ -176,13 +182,14 @@ export function fetchWorkflowInfo(date: string, signal?: AbortSignal) {
 
 export interface AvailabilityRow {
   model: string;
-  isl: number;
-  osl: number;
+  isl: number | null;
+  osl: number | null;
   precision: string;
   hardware: string;
   framework: string;
   spec_method: string;
   disagg: boolean;
+  benchmark_type: string;
   date: string;
 }
 

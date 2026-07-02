@@ -15,10 +15,47 @@ import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
 import { getHardwareConfig } from '@/lib/constants';
 import type { BenchmarkRow } from '@/lib/api';
 
+/**
+ * Agentic trace-replay runs (`benchmark_type === 'agentic_traces'`) emit ttft/ttlt/itl
+ * but not the intvty/e2el/tpot keys the chart pipeline expects. Bridge them here:
+ *   e2el   ≡ ttlt   (time-to-last-token == end-to-end latency)
+ *   tpot   ≡ itl    (time-per-output-token == inter-token-latency for single-output)
+ *   intvty ≡ 1/itl  (tok/s from the user's perspective)
+ *
+ * e2el/tpot only fill gaps (existing fields win). `intvty` is ALWAYS derived from
+ * itl, overriding any artifact-supplied value: the harness definition of
+ * `*_intvty` has drifted (some versions emit `p(1/ITL)`, which inverts percentile
+ * order), so for a slow-tail selector interactivity must be `1/p(ITL)`. This
+ * matches the ingest mapper + backfill-agentic-intvty for official rows; doing it
+ * here keeps overlay / `?unofficialrun=` rows (transformed live from raw
+ * artifacts, never through the DB) on the same definition.
+ */
+function agenticAliases(m: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const suffix of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
+    const itl = m[`${suffix}_itl`];
+    const ttlt = m[`${suffix}_ttlt`];
+    if (m[`${suffix}_e2el`] === undefined && ttlt !== undefined) out[`${suffix}_e2el`] = ttlt;
+    if (m[`${suffix}_tpot`] === undefined && itl !== undefined) out[`${suffix}_tpot`] = itl;
+    if (itl !== undefined && itl > 0) out[`${suffix}_intvty`] = 1 / itl;
+  }
+  return out;
+}
+
 /** Convert a DB benchmark row to an AggDataEntry. */
 export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
-  const m = row.metrics;
+  const isAgentic = row.benchmark_type === 'agentic_traces';
+  const m = isAgentic ? { ...row.metrics, ...agenticAliases(row.metrics) } : row.metrics;
+  // Prefer the dedicated column (added in migration 004); fall back to the
+  // legacy stash inside `metrics` for any rows ingested before that column
+  // existed.
+  const rawMetrics = row.metrics as Record<string, unknown>;
+  const offloadMode =
+    row.offload_mode ??
+    (typeof rawMetrics.offload_mode === 'string' ? rawMetrics.offload_mode : undefined);
   return {
+    // Coerce: Postgres bigint comes through the SQL client as a string.
+    id: typeof row.id === 'number' ? row.id : Number(row.id),
     hw: row.hardware,
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
@@ -32,23 +69,43 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     mean_ttft: m.mean_ttft ?? 0,
     median_ttft: m.median_ttft ?? 0,
     std_ttft: m.std_ttft ?? 0,
+    p75_ttft: m.p75_ttft ?? 0,
+    p90_ttft: m.p90_ttft ?? 0,
+    p95_ttft: m.p95_ttft ?? 0,
     p99_ttft: m.p99_ttft ?? 0,
+    'p99.9_ttft': m['p99.9_ttft'] ?? 0,
     mean_tpot: m.mean_tpot ?? 0,
     median_tpot: m.median_tpot ?? 0,
     std_tpot: m.std_tpot ?? 0,
+    p75_tpot: m.p75_tpot ?? 0,
+    p90_tpot: m.p90_tpot ?? 0,
+    p95_tpot: m.p95_tpot ?? 0,
     p99_tpot: m.p99_tpot ?? 0,
+    'p99.9_tpot': m['p99.9_tpot'] ?? 0,
     mean_intvty: m.mean_intvty ?? 0,
     median_intvty: m.median_intvty ?? 0,
     std_intvty: m.std_intvty ?? 0,
+    p75_intvty: m.p75_intvty ?? 0,
+    p90_intvty: m.p90_intvty ?? 0,
+    p95_intvty: m.p95_intvty ?? 0,
     p99_intvty: m.p99_intvty ?? 0,
+    'p99.9_intvty': m['p99.9_intvty'] ?? 0,
     mean_itl: m.mean_itl ?? 0,
     median_itl: m.median_itl ?? 0,
     std_itl: m.std_itl ?? 0,
+    p75_itl: m.p75_itl ?? 0,
+    p90_itl: m.p90_itl ?? 0,
+    p95_itl: m.p95_itl ?? 0,
     p99_itl: m.p99_itl ?? 0,
+    'p99.9_itl': m['p99.9_itl'] ?? 0,
     mean_e2el: m.mean_e2el ?? 0,
     median_e2el: m.median_e2el ?? 0,
     std_e2el: m.std_e2el ?? 0,
+    p75_e2el: m.p75_e2el ?? 0,
+    p90_e2el: m.p90_e2el ?? 0,
+    p95_e2el: m.p95_e2el ?? 0,
     p99_e2el: m.p99_e2el ?? 0,
+    'p99.9_e2el': m['p99.9_e2el'] ?? 0,
     // Measured GPU telemetry (runner's aggregate_power.py). Left undefined for
     // rows predating the field so downstream chart code can distinguish
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
@@ -91,6 +148,17 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     date: row.date,
     actualDate: (row as any).actualDate ?? row.date,
     run_url: row.run_url ?? undefined,
+    benchmark_type: row.benchmark_type,
+    isl: row.isl,
+    osl: row.osl,
+    offload_mode: offloadMode,
+    server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+    server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
+    theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
+    num_requests_total: m.num_requests_total,
+    num_requests_successful: m.num_requests_successful,
+    total_prompt_tokens: m.total_prompt_tokens,
+    total_generation_tokens: m.total_generation_tokens,
   };
 }
 
@@ -101,12 +169,58 @@ interface PreparedEntry {
 }
 
 /**
+ * Rewrite a chart x-axis key to use a different latency percentile prefix
+ * (`median_` → `p99_` etc). Only touches keys that start with a known
+ * percentile prefix; leaves everything else alone.
+ */
+export function withPercentile(key: string, percentile: string): string {
+  return key.replace(/^(?:mean|median|p75|p90|p95|p99|p99\.9)_/u, `${percentile}_`);
+}
+
+// Replacement granularity for single-run scoping: the changelog config_key
+// tuple (model-precision-hardware-framework) plus benchmark_type, so an
+// agentic-only run never hides the same config's fixed-seq carry-forward.
+const runScopeKey = (r: BenchmarkRow): string =>
+  `${r.model}|${r.precision}|${r.hardware}|${r.framework}|${r.benchmark_type}`;
+
+/**
+ * Merge run-scoped benchmark rows with the normal latest-per-config rows.
+ *
+ * When the user picks a specific workflow run (to disambiguate two same-day
+ * sweeps of the same config), only the configs that run actually produced
+ * should be pinned to it — every other config must keep its normal
+ * carry-forward rows. Scoping the whole chart to the run (the old behavior)
+ * silently hid complementary configs that happened to land on the same date,
+ * e.g. selecting one of two same-day vLLM runs made the day's SGLang curve
+ * vanish because it lived in a different workflow run.
+ *
+ * Run rows win for every (model, precision, hardware, framework,
+ * benchmark_type) group they cover; base rows fill in the rest.
+ */
+export function mergeRunScopedRows(
+  runRows: BenchmarkRow[],
+  baseRows: BenchmarkRow[],
+): BenchmarkRow[] {
+  if (runRows.length === 0) return baseRows;
+  const claimed = new Set(runRows.map(runScopeKey));
+  return [...runRows, ...baseRows.filter((r) => !claimed.has(runScopeKey(r)))];
+}
+
+/**
  * Transform raw BenchmarkRow[] into chart-ready InferenceData[][] and HardwareConfig.
  * Returns one InferenceData[] per chart definition (e2e, interactivity).
  *
  * Converts rows to AggDataEntry once, then reuses for each chart definition.
+ *
+ * @param percentile Optional latency percentile for the chart x-axis
+ *   (default 'median'). Swaps `median_intvty`/`median_e2el` in the chart
+ *   definition for the chosen percentile — only agentic rows carry the
+ *   full set (median/p90/p99/p99.9) so this mainly affects that scenario.
  */
-export function transformBenchmarkRows(rows: BenchmarkRow[]): {
+export function transformBenchmarkRows(
+  rows: BenchmarkRow[],
+  percentile = 'median',
+): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
 } {
@@ -132,13 +246,14 @@ export function transformBenchmarkRows(rows: BenchmarkRow[]): {
 
   // Phase 2: Build chart data per chart definition (reusing prepared entries)
   const chartData = (chartDefinitions as ChartDefinition[]).map((chartDef) => {
+    const xKey = withPercentile(chartDef.x, percentile);
     const groupedByHw: Record<string, InferenceData[]> = {};
 
     for (const { entry, hwKey, date } of prepared) {
       const dataPoint = createChartDataPoint(
         date,
         entry,
-        chartDef.x as keyof AggDataEntry,
+        xKey as keyof AggDataEntry,
         chartDef.y as keyof AggDataEntry,
         hwKey,
       );

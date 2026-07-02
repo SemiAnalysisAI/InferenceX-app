@@ -1,6 +1,41 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+
+/**
+ * Renders the d3 tooltip element via React Portal to document.body so it
+ * escapes any parent stacking context (e.g. the chart Card's backdrop-filter
+ * creates one, trapping z-index inside it). Position is set as viewport
+ * coordinates by the d3 layer.
+ */
+function PortalTooltip({
+  tooltipRef,
+  pinned,
+}: {
+  tooltipRef: React.RefObject<HTMLDivElement | null>;
+  pinned: boolean;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const node = (
+    <div
+      ref={tooltipRef}
+      data-chart-tooltip
+      style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        opacity: pinned ? 1 : 0,
+        pointerEvents: pinned ? 'auto' : 'none',
+        display: pinned ? 'block' : 'none',
+        zIndex: 9999,
+      }}
+    />
+  );
+  if (!mounted || typeof document === 'undefined') return node;
+  return createPortal(node, document.body);
+}
 
 export interface D3ChartWrapperProps {
   chartId: string;
@@ -72,17 +107,11 @@ export function D3ChartWrapper({
                 }
               }}
             />
-            <div
-              ref={tooltipRef}
-              data-chart-tooltip
-              style={{
-                position: 'absolute',
-                opacity: pinnedPoint ? 1 : 0,
-                pointerEvents: pinnedPoint ? 'auto' : 'none',
-                display: pinnedPoint ? 'block' : 'none',
-                zIndex: 50,
-              }}
-            />
+            {/* Tooltip is portalled to <body> with position:fixed so it can
+                rise above sibling chart cards' stacking contexts. The d3 layer
+                writes viewport-coords into style.left/top — see
+                computeTooltipPosition. */}
+            <PortalTooltip tooltipRef={tooltipRef} pinned={Boolean(pinnedPoint)} />
             {noDataOverlay}
           </div>
           <p className="no-export text-xs text-muted-foreground text-center mt-2">{instructions}</p>

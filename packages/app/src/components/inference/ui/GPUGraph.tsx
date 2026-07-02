@@ -12,6 +12,7 @@ import { getChartWatermark } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -26,6 +27,7 @@ import {
   formatLargeNumber,
   getShapeKeyForPrecision,
   logTickFormat,
+  POINT_SIZE,
 } from '@/lib/chart-rendering';
 import {
   paretoFrontLowerLeft,
@@ -258,6 +260,20 @@ const GPUGraph = React.memo(
         );
       return pts;
     }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
+
+    // GPU comparison currently renders official DB-backed points only. Unofficial
+    // overlays have no benchmark_results id or persisted trace, so they cannot
+    // open the dedicated per-point charts route.
+    const agenticIds = useMemo(
+      () =>
+        filteredData.flatMap((point) =>
+          point.benchmark_type === 'agentic_traces' && typeof point.id === 'number'
+            ? [point.id]
+            : [],
+        ),
+      [filteredData],
+    );
+    const { data: traceAvailability } = useTraceAvailability(agenticIds);
 
     // Warning annotations for visible series with known upstream issues —
     // same treatment the scatter view gets, applied to the date-comparison view.
@@ -755,7 +771,11 @@ const GPUGraph = React.memo(
             config: {
               getColor,
               hideLabels: !showPointLabels,
-              getLabelText: (d) => (useAdvancedLabels ? getPointLabel(d) : String(d.tp)),
+              // Match ScatterGraph: append the concurrency (C=) to the
+              // parallelism/tp label so compare-mode points are annotated the
+              // same way as the single-run scatter chart.
+              getLabelText: (d) =>
+                useAdvancedLabels ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`,
               foreground: 'var(--foreground)',
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
@@ -794,6 +814,7 @@ const GPUGraph = React.memo(
               selectedYAxisMetric,
               hardwareConfig,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+              hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
@@ -807,6 +828,37 @@ const GPUGraph = React.memo(
               sel.select('.visible-shape') as any,
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
+          onPointClick: (d: InferenceData) => {
+            track('gpu_timeseries_data_point_clicked', {
+              id: d.id,
+              hw: String(d.hwKey),
+              x: d.x,
+              y: d.y,
+            });
+            const tooltipEl = chartRef.current?.getTooltipElement();
+            if (!tooltipEl) return;
+            const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
+            if (!viewBtn || typeof d.id !== 'number') return;
+            viewBtn.addEventListener('click', (event) => {
+              event.stopPropagation();
+              track('gpu_timeseries_view_charts_opened', {
+                id: d.id,
+                hwKey: String(d.hwKey),
+                conc: d.conc,
+              });
+            });
+            // Pinning updates D3Chart's React state. GPU comparison rebuilds
+            // several inline layer configs on that render, whose cleanup can
+            // briefly hide the otherwise-pinned portal tooltip. Restore its
+            // pinned visibility after that render settles.
+            requestAnimationFrame(() => {
+              const pinnedTooltip = chartRef.current?.getTooltipElement();
+              if (!pinnedTooltip || chartRef.current?.getPinnedPoint() !== d) return;
+              pinnedTooltip.style.opacity = '1';
+              pinnedTooltip.style.display = 'block';
+              pinnedTooltip.style.pointerEvents = 'auto';
+            });
+          },
           attachToLayer: 1,
         }}
         onRender={(ctx: RenderContext) => {
@@ -819,6 +871,28 @@ const GPUGraph = React.memo(
           }
           // Set foreground color on scatter point labels
           ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
+
+          // Offload halo: dashed ring on every point that used KV offload
+          // (mirrors ScatterGraph so compare mode shows the same CPU-offload
+          // indicator). The ring is a child of the dot-group, so it travels
+          // with the point on zoom/pan without a separate onZoom pass.
+          ctx.layout.zoomGroup
+            .selectAll<SVGGElement, InferenceData>('.dot-group')
+            .each(function (d) {
+              const showHalo = d.offload_mode === 'on';
+              d3.select(this)
+                .selectAll<SVGCircleElement, boolean>('.offload-halo')
+                .data(showHalo ? [true] : [])
+                .join('circle')
+                .attr('class', 'offload-halo')
+                .attr('r', POINT_SIZE + 4)
+                .attr('fill', 'none')
+                .attr('stroke', 'var(--foreground)')
+                .attr('stroke-width', 1.5)
+                .attr('stroke-dasharray', '3 2')
+                .attr('opacity', 0.9)
+                .attr('pointer-events', 'none');
+            });
         }}
         legendElement={
           <ChartLegend

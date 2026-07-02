@@ -2,10 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 
-import { rowToAggDataEntry, transformBenchmarkRows } from './benchmark-transform';
+import {
+  mergeRunScopedRows,
+  rowToAggDataEntry,
+  transformBenchmarkRows,
+} from './benchmark-transform';
 
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
+    id: 1,
     hardware: 'h200',
     framework: 'trt',
     model: 'dsr1',
@@ -23,6 +28,8 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
     decode_num_workers: 0,
     num_prefill_gpu: 8,
     num_decode_gpu: 8,
+    benchmark_type: 'single_turn',
+    offload_mode: 'off',
     isl: 1024,
     osl: 1024,
     conc: 64,
@@ -791,5 +798,91 @@ describe('transformBenchmarkRows — dp_attention narrowing', () => {
     const { chartData } = transformBenchmarkRows(rows);
     const point = chartData.flat()[0];
     expect(point.decode_dp_attention).toBe(true);
+  });
+});
+
+describe('mergeRunScopedRows', () => {
+  const vllmRun = (over: Partial<BenchmarkRow> = {}) =>
+    makeRow({ model: 'dsv4', hardware: 'b300', framework: 'vllm', precision: 'fp4', ...over });
+  const sglangBase = (over: Partial<BenchmarkRow> = {}) =>
+    makeRow({ model: 'dsv4', hardware: 'b300', framework: 'sglang', precision: 'fp4', ...over });
+
+  it('pins configs the run covers to the run rows, replacing base rows', () => {
+    const runRows = [vllmRun({ id: 10, conc: 32 }), vllmRun({ id: 11, conc: 64 })];
+    const baseRows = [vllmRun({ id: 90, conc: 32 }), vllmRun({ id: 91, conc: 128 })];
+    const merged = mergeRunScopedRows(runRows, baseRows);
+    // All vllm base rows dropped (incl. conc=128 the run didn't cover) — a
+    // partial-sweep run must fully own its config or the DISTINCT-ON mixing
+    // the scoping exists to prevent comes right back.
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 11]);
+  });
+
+  it('carries forward configs the run does not cover (the same-day other-framework curve)', () => {
+    const runRows = [vllmRun({ id: 10 })];
+    const baseRows = [
+      vllmRun({ id: 90 }),
+      sglangBase({ id: 91 }),
+      sglangBase({ id: 92, conc: 128 }),
+    ];
+    const merged = mergeRunScopedRows(runRows, baseRows);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91, 92]);
+  });
+
+  it('keeps base rows of other hardware / precision / model untouched', () => {
+    const runRows = [vllmRun({ id: 10 })];
+    const baseRows = [
+      vllmRun({ id: 90, hardware: 'b200' }),
+      vllmRun({ id: 91, precision: 'fp8' }),
+      vllmRun({ id: 92, model: 'kimik2.5' }),
+    ];
+    const merged = mergeRunScopedRows(runRows, baseRows);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 90, 91, 92]);
+  });
+
+  it('scopes per benchmark_type — an agentic run does not hide fixed-seq carry-forward', () => {
+    const runRows = [vllmRun({ id: 10, benchmark_type: 'agentic_traces' })];
+    const baseRows = [
+      vllmRun({ id: 90, benchmark_type: 'agentic_traces' }),
+      vllmRun({ id: 91, benchmark_type: 'single_turn' }),
+    ];
+    const merged = mergeRunScopedRows(runRows, baseRows);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91]);
+  });
+
+  it('returns base rows unchanged when the run produced nothing', () => {
+    const baseRows = [vllmRun({ id: 90 }), sglangBase({ id: 91 })];
+    expect(mergeRunScopedRows([], baseRows)).toBe(baseRows);
+  });
+});
+
+describe('rowToAggDataEntry — agentic interactivity invariant', () => {
+  // Agentic artifacts have shipped *_intvty under two definitions across harness
+  // versions (slow-tail 1/p(ITL) vs fast-tail p(1/ITL)). The chart's
+  // interactivity selector is slow-tail, so we always derive intvty = 1/itl and
+  // discard the artifact value. Mirrors the ingest mapper + backfill.
+  const agentic = (metrics: Record<string, number>) =>
+    rowToAggDataEntry(makeRow({ benchmark_type: 'agentic_traces', isl: null, osl: null, metrics }));
+
+  it('overrides an artifact-supplied (fast-tail) *_intvty with 1/*_itl', () => {
+    const entry = agentic({
+      p90_itl: 0.0893, // slow-tail 1/itl ≈ 11.198
+      p90_intvty: 23.91, // fast-tail contamination — must be discarded
+      p75_itl: 0.0692,
+      p75_intvty: 19, // must be discarded
+    });
+    expect(entry.p90_intvty).toBeCloseTo(1 / 0.0893, 6);
+    expect(entry.p75_intvty).toBeCloseTo(1 / 0.0692, 6);
+    expect(entry.p90_intvty).not.toBeCloseTo(23.91, 1);
+  });
+
+  it('derives intvty from itl when the artifact omits intvty entirely', () => {
+    const entry = agentic({ p90_itl: 0.1, p95_itl: 0.2 });
+    expect(entry.p90_intvty).toBeCloseTo(10, 6);
+    expect(entry.p95_intvty).toBeCloseTo(5, 6);
+  });
+
+  it('does not invert interactivity for single_turn rows', () => {
+    const entry = rowToAggDataEntry(makeRow({ metrics: { p90_itl: 0.05, p90_intvty: 999 } }));
+    expect(entry.p90_intvty).toBe(999);
   });
 });

@@ -5,17 +5,30 @@ import { Info } from 'lucide-react';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { track } from '@/lib/analytics';
 import { MultiSelect } from '@/components/ui/multi-select';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   type Model,
   type Precision,
   type Sequence,
+  type Percentile,
+  PERCENTILE_OPTIONS,
   getModelCategory,
   getModelLabel,
+  getPercentileLabel,
   getPrecisionLabel,
   getSequenceCategory,
   getSequenceLabel,
   groupByCategory,
+  sequenceKind,
 } from '@/lib/data-mappings';
 
 function CategorySectionTitle({ label, reason }: { label: string; reason: string }) {
@@ -224,6 +237,143 @@ export function SequenceSelector({
           showSelectionSummary={false}
         />
       </div>
+    </div>
+  );
+}
+
+interface ScenarioSelectorProps {
+  id?: string;
+  value: string;
+  onChange: (value: Sequence) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  availableSequences: string[];
+  'data-testid'?: string;
+}
+
+/**
+ * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
+ * agentic-trace rows rendered flat below. Label is "Scenario" (the ISL/OSL
+ * framing only applies to the fixed-seq subset).
+ */
+export function ScenarioSelector({
+  id = 'scenario-select',
+  value,
+  onChange,
+  open,
+  onOpenChange,
+  availableSequences,
+  'data-testid': testId,
+}: ScenarioSelectorProps) {
+  const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
+  const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
+  const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
+
+  return (
+    <div className="flex flex-col space-y-1.5 lg:col-span-1">
+      <LabelWithTooltip
+        htmlFor={id}
+        label="Scenario"
+        tooltip="Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). Agentic Traces replay real agentic workloads with variable inputs/outputs."
+      />
+      <Select
+        value={value}
+        onValueChange={(v) => {
+          track('selector_scenario_changed', { scenario: v });
+          onChange(v as Sequence);
+        }}
+        open={open}
+        onOpenChange={onOpenChange}
+      >
+        <SelectTrigger id={id} data-testid={testId} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {/* Agentic first — preferred default scenario when available. */}
+          {agentic.length > 0 && (
+            <SelectGroup>
+              <SelectLabel>Agentic</SelectLabel>
+              {agentic.map((seq) => (
+                <SelectItem key={seq} value={seq}>
+                  {getSequenceLabel(seq as Sequence)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          )}
+          {fixedSeq.length > 0 && (
+            <SelectGroup>
+              <SelectLabel>Fixed Sequence Length</SelectLabel>
+              {fixedGroups.default.map((seq) => (
+                <SelectItem key={seq} value={seq}>
+                  {getSequenceLabel(seq as Sequence)}
+                </SelectItem>
+              ))}
+              {fixedGroups.deprecated.length > 0 && (
+                <>
+                  <SelectLabel>
+                    <CategorySectionTitle
+                      label="Deprecated"
+                      reason="CI capacity was reallocated to agentic coding and multi-turn chat scenarios."
+                    />
+                  </SelectLabel>
+                  {fixedGroups.deprecated.map((seq) => (
+                    <SelectItem key={seq} value={seq}>
+                      {getSequenceLabel(seq as Sequence)}
+                    </SelectItem>
+                  ))}
+                </>
+              )}
+            </SelectGroup>
+          )}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+interface PercentileSelectorProps {
+  id?: string;
+  value: string;
+  onChange: (value: Percentile) => void;
+  'data-testid'?: string;
+}
+
+/**
+ * Latency percentile selector for agentic-trace charts. The selected value
+ * rewrites the chart x-axis metric from `median_*` to `{percentile}_*`, so
+ * picking p99 plots p99 e2e latency / interactivity instead of the median.
+ */
+export function PercentileSelector({
+  id = 'percentile-select',
+  value,
+  onChange,
+  'data-testid': testId,
+}: PercentileSelectorProps) {
+  return (
+    <div className="flex flex-col space-y-1.5 lg:col-span-1">
+      <LabelWithTooltip
+        htmlFor={id}
+        label="Latency Percentile"
+        tooltip="Percentile of the latency distribution used for the chart x-axis on agentic runs."
+      />
+      <Select
+        value={value}
+        onValueChange={(v) => {
+          track('selector_percentile_changed', { percentile: v });
+          onChange(v as Percentile);
+        }}
+      >
+        <SelectTrigger id={id} data-testid={testId} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {PERCENTILE_OPTIONS.map((p) => (
+            <SelectItem key={p} value={p}>
+              {getPercentileLabel(p)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

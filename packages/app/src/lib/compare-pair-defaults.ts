@@ -14,6 +14,7 @@ export function pickPairDefaults(
   const seenB = new Map<string, Set<string>>();
   for (const row of rows) {
     if (row.hardware !== a && row.hardware !== b) continue;
+    if (row.isl === null || row.osl === null) continue;
     const seq = islOslToSequence(row.isl, row.osl);
     if (!seq) continue;
     const key = `${seq}|${row.precision}`;
