@@ -218,7 +218,7 @@ export async function getBenchmarksForRun(
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   const rows = await sql`
-    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
+    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl, br.offload_mode)
       br.id,
       c.hardware,
       c.framework,
@@ -253,7 +253,7 @@ export async function getBenchmarksForRun(
     WHERE c.model = ANY(${modelKeys})
       AND br.error IS NULL
       AND wr.github_run_id = ${Number(githubRunId)}
-    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
+    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.offload_mode, br.date DESC
   `;
   return rows as unknown as BenchmarkRow[];
 }
