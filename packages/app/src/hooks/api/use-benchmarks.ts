@@ -28,6 +28,14 @@ export function benchmarkQueryOptions(
   };
 }
 
-export function useBenchmarks(model: string, date?: string, enabled = true, runId?: string) {
-  return useQuery(benchmarkQueryOptions(model, date ?? 'latest', enabled, undefined, runId));
+export function useBenchmarks(
+  model: string,
+  date?: string,
+  enabled = true,
+  runId?: string,
+  exactRun?: boolean,
+) {
+  return useQuery(
+    benchmarkQueryOptions(model, date ?? 'latest', enabled, undefined, runId, exactRun),
+  );
 }

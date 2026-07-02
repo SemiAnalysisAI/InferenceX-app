@@ -37,6 +37,12 @@ export function reconcileActiveSet<T>(
 interface UseChartStateConfig {
   /** URL parameter prefix (e.g., 'i_' for inference, 'r_' for reliability, 'e_' for evaluation) */
   urlPrefix: string;
+  /**
+   * Initial high-contrast value when the URL has no `<prefix>hc` param.
+   * Defaults to false; the inference chart opts in to true. A `<prefix>hc=0`
+   * URL param overrides it back off.
+   */
+  defaultHighContrast?: boolean;
 }
 
 /**
@@ -44,7 +50,7 @@ interface UseChartStateConfig {
  * Includes mobile-specific legend collapse behavior.
  */
 export function useChartUIState(config: UseChartStateConfig) {
-  const { urlPrefix } = config;
+  const { urlPrefix, defaultHighContrast = false } = config;
   const { getUrlParam } = useUrlState();
 
   const hcParam = `${urlPrefix}hc` as any;
@@ -52,7 +58,7 @@ export function useChartUIState(config: UseChartStateConfig) {
 
   // Initialize with safe defaults that match SSR output to avoid hydration mismatches.
   // URL-param values are applied in a mount effect so the state is only set client-side.
-  const [highContrast, setHighContrast] = useState(false);
+  const [highContrast, setHighContrast] = useState(defaultHighContrast);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const didInit = useRef(false);
 
@@ -60,7 +66,9 @@ export function useChartUIState(config: UseChartStateConfig) {
     if (didInit.current) return;
     didInit.current = true;
     const hcVal = getUrlParam(hcParam);
+    // Respect both overrides so the toggle round-trips regardless of the default.
     if (hcVal === '1') setHighContrast(true);
+    else if (hcVal === '0') setHighContrast(false);
     const legendVal = getUrlParam(legendParam);
     if (legendVal === '0') setIsLegendExpanded(false);
   }, [getUrlParam, hcParam, legendParam]);
