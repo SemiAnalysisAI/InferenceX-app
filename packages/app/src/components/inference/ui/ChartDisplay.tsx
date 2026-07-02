@@ -7,7 +7,11 @@ import { BarChart3, ChevronDown, Table2, X } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config';
 import { metricIsInputMetric } from '@/lib/metric-registry';
-import { useInference } from '@/components/inference/InferenceContext';
+import {
+  useInferenceComparison,
+  useInferenceCore,
+  useInferenceTracking,
+} from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,
   HardwareConfig,
@@ -146,25 +150,25 @@ export default function ChartDisplay() {
     selectedYAxisMetric,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
-    selectedGPUs,
     selectedPrecisions,
-    selectedDates,
-    setSelectedDates,
-    selectedDateRange,
-    dateRangeAvailableDates,
     selectedModel,
     selectedSequence,
     selectedRunDate,
     setIsLegendExpanded,
-    trackedConfigs,
-    removeTrackedConfig,
-    clearTrackedConfigs,
     logScale,
     activeHwTypes,
-    activeDates,
     setSelectedE2eXAxisMetric,
     compareGpuPair,
-  } = useInference();
+  } = useInferenceCore();
+  const {
+    selectedGPUs,
+    selectedDates,
+    setSelectedDates,
+    selectedDateRange,
+    dateRangeAvailableDates,
+    activeDates,
+  } = useInferenceComparison();
+  const { trackedConfigs, removeTrackedConfig, clearTrackedConfigs } = useInferenceTracking();
 
   const {
     changelogs,

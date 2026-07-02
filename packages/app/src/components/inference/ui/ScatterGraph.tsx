@@ -5,7 +5,7 @@ import * as d3 from 'd3';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceCore, useInferenceTracking } from '@/components/inference/InferenceContext';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import {
   labelOpacityForActiveState,
@@ -190,11 +190,9 @@ const ScatterGraph = React.memo(
       setShowSpeedOverlay,
       showMinecraftOverlay,
       setShowMinecraftOverlay,
-      trackedConfigs,
-      addTrackedConfig,
-      removeTrackedConfig,
       quickFilters,
-    } = useInference();
+    } = useInferenceCore();
+    const { trackedConfigs, addTrackedConfig, removeTrackedConfig } = useInferenceTracking();
 
     const {
       isUnofficialRun,

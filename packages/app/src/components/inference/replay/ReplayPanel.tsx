@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceCore } from '@/components/inference/InferenceContext';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,7 @@ export default function ReplayPanel({
   yLabel,
   xLabel,
 }: ReplayPanelProps) {
-  const inference = useInference();
+  const inference = useInferenceCore();
   const { selectedModel, selectedSequence, activeHwTypes } = inference;
 
   const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};

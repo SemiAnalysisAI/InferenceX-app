@@ -5,7 +5,7 @@ import * as d3 from 'd3';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTheme } from 'next-themes';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceComparison, useInferenceCore } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark } from '@/lib/data-mappings';
@@ -74,13 +74,6 @@ const GPUGraph = React.memo(
       hardwareConfig,
       selectedPrecisions,
       selectedYAxisMetric,
-      selectedGPUs,
-      selectedDateRange,
-      selectedDates,
-      setSelectedDates,
-      toggleActiveDate,
-      removeActiveDate,
-      activeDates,
       hideNonOptimal,
       setHideNonOptimal,
       showPointLabels,
@@ -93,10 +86,19 @@ const GPUGraph = React.memo(
       setUseAdvancedLabels,
       highContrast,
       setHighContrast,
-      selectAllActiveDates,
       showLineLabels,
       setShowLineLabels,
-    } = useInference();
+    } = useInferenceCore();
+    const {
+      selectedGPUs,
+      selectedDateRange,
+      selectedDates,
+      setSelectedDates,
+      toggleActiveDate,
+      removeActiveDate,
+      activeDates,
+      selectAllActiveDates,
+    } = useInferenceComparison();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
 

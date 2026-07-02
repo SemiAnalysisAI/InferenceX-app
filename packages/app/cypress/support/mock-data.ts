@@ -2,8 +2,10 @@ import type {
   AggDataEntry,
   ChartDefinition,
   HardwareConfig,
-  InferenceChartContextType,
+  InferenceComparisonContextType,
+  InferenceCoreContextType,
   InferenceData,
+  InferenceTrackingContextType,
 } from '@/components/inference/types';
 import type {
   EvaluationChartContextType,
@@ -16,7 +18,6 @@ import type {
 import type { GlobalFilterContextType } from '@/components/GlobalFilterContext';
 import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
-import React from 'react';
 
 /** cy.stub() with .as() alias — cast to any to work around Cypress type limitation. */
 function namedStub(alias: string) {
@@ -155,9 +156,19 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
 // Inference context
 // ---------------------------------------------------------------------------
 
+/**
+ * A single flat mock object satisfying all three split inference contexts. The
+ * provider tree in `mountWithProviders` feeds it to the core / comparison /
+ * tracking providers alike, so cypress specs keep passing one `inference`
+ * override object regardless of which sub-context the component under test reads.
+ */
+export type MockInferenceContext = InferenceCoreContextType &
+  InferenceComparisonContextType &
+  InferenceTrackingContextType;
+
 export function createMockInferenceContext(
-  overrides?: Partial<InferenceChartContextType>,
-): InferenceChartContextType {
+  overrides?: Partial<MockInferenceContext>,
+): MockInferenceContext {
   const hwConfig = createMockHardwareConfig();
   return {
     activeHwTypes: new Set(['h100', 'b200', 'b200_trt', 'mi300x', 'h200']),
@@ -252,10 +263,6 @@ export function createMockInferenceContext(
     addTrackedConfig: namedStub('addTrackedConfig'),
     removeTrackedConfig: namedStub('removeTrackedConfig'),
     clearTrackedConfigs: namedStub('clearTrackedConfigs'),
-    setHwFilter: namedStub('setHwFilter'),
-    activePresetId: null,
-    setActivePresetId: namedStub('setActivePresetId'),
-    presetGuardRef: { current: false } as React.RefObject<boolean>,
     compareGpuPair: null,
     ...overrides,
   };

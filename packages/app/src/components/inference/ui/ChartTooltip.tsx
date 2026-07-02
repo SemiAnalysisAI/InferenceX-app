@@ -1,6 +1,6 @@
 'use client';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceCore } from '@/components/inference/InferenceContext';
 
 interface TooltipContentProps<TValue, _TName> {
   active?: boolean;
@@ -19,7 +19,7 @@ interface TooltipContentProps<TValue, _TName> {
 }
 
 export default function ChartTooltip({ active, payload }: TooltipContentProps<number, string>) {
-  const { hardwareConfig } = useInference();
+  const { hardwareConfig } = useInferenceCore();
   const pointPayload = payload?.at(-1)?.payload;
   if (active && pointPayload) {
     return (

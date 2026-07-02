@@ -20,7 +20,12 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import type { InferenceChartContextType, InferenceData } from '@/components/inference/types';
+import type {
+  InferenceComparisonContextType,
+  InferenceCoreContextType,
+  InferenceData,
+  InferenceTrackingContextType,
+} from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -58,8 +63,23 @@ import { useTrackedConfigsState } from './hooks/useTrackedConfigsState';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
 import { EMPTY_QUICK_FILTERS } from './utils/quickFilters';
 
+// ── Split contexts ──────────────────────────────────────────────────────────
+// The monolithic InferenceContext (one value of ~90 fields) was split into three
+// narrow contexts so a change in one cluster doesn't re-render consumers of the
+// others. The public <InferenceProvider> below composes all three; consumers
+// read the narrowest hook they need (useInferenceCore / useInferenceComparison /
+// useInferenceTracking). See types.ts for the per-context field docs.
+
 /** @internal Exported for test provider wrapping only. */
-export const InferenceContext = createContext<InferenceChartContextType | undefined>(undefined);
+export const InferenceCoreContext = createContext<InferenceCoreContextType | undefined>(undefined);
+/** @internal Exported for test provider wrapping only. */
+export const InferenceComparisonContext = createContext<InferenceComparisonContextType | undefined>(
+  undefined,
+);
+/** @internal Exported for test provider wrapping only. */
+export const InferenceTrackingContext = createContext<InferenceTrackingContextType | undefined>(
+  undefined,
+);
 
 export function InferenceProvider({
   children,
@@ -917,9 +937,14 @@ export function InferenceProvider({
     setShowDateRangeDialog(false);
   };
 
-  // ── Context value ─────────────────────────────────────────────────────────
+  // ── Context values ────────────────────────────────────────────────────────
+  // Three independently-memoized values so a change in one cluster (e.g. a
+  // GPU/date comparison toggle) does not invalidate the others' identity and
+  // re-render their consumers. `activePresetId` / `setActivePresetId` /
+  // `setPendingHwFilter` / `presetGuardRef` are intentionally NOT exposed on any
+  // value — they have no external consumers and stay internal to the provider.
 
-  const value = useMemo(
+  const coreValue = useMemo<InferenceCoreContextType>(
     () => ({
       activeHwTypes,
       hwTypesWithData,
@@ -961,25 +986,11 @@ export function InferenceProvider({
       workflowInfo,
       selectedYAxisMetric,
       setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
-      selectedGPUs,
-      setSelectedGPUs: setSelectedGPUsAndClear,
-      availableGPUs,
-      selectedDates,
-      setSelectedDates: setSelectedDatesAndClear,
-      selectedDateRange,
-      setSelectedDateRange: setSelectedDateRangeAndClear,
-      activeDates,
-      setActiveDates,
-      toggleActiveDate,
-      removeActiveDate,
-      selectAllActiveDates,
       selectedRunDate,
       setSelectedRunDate,
       userCosts,
       setUserCosts,
       availableDates,
-      dateRangeAvailableDates,
-      isCheckingAvailableDates,
       availableRuns: filteredAvailableRuns,
       selectedRunId: effectiveSelectedRunId,
       setSelectedRunId,
@@ -998,14 +1009,6 @@ export function InferenceProvider({
       setShowSpeedOverlay,
       showMinecraftOverlay,
       setShowMinecraftOverlay,
-      trackedConfigs,
-      addTrackedConfig,
-      removeTrackedConfig,
-      clearTrackedConfigs,
-      setHwFilter: setPendingHwFilter,
-      activePresetId,
-      setActivePresetId,
-      presetGuardRef,
       compareGpuPair: compareGpuPair ?? null,
     }),
     [
@@ -1028,18 +1031,8 @@ export function InferenceProvider({
       scaleType,
       quickFilters,
       availableQuickFilters,
-      selectedGPUs,
-      selectedDates,
-      selectedDateRange,
-      activeDates,
-      toggleActiveDate,
-      removeActiveDate,
-      selectAllActiveDates,
       selectedRunDate,
       availableDates,
-      dateRangeAvailableDates,
-      isCheckingAvailableDates,
-      availableGPUs,
       filteredAvailableRuns,
       effectiveSelectedRunId,
       availablePrecisions,
@@ -1057,41 +1050,105 @@ export function InferenceProvider({
       showMinecraftOverlay,
       userCosts,
       userPowers,
-      trackedConfigs,
-      addTrackedConfig,
-      removeTrackedConfig,
-      clearTrackedConfigs,
-      activePresetId,
       compareGpuPair,
     ],
   );
 
+  const comparisonValue = useMemo<InferenceComparisonContextType>(
+    () => ({
+      selectedGPUs,
+      setSelectedGPUs: setSelectedGPUsAndClear,
+      availableGPUs,
+      selectedDates,
+      setSelectedDates: setSelectedDatesAndClear,
+      selectedDateRange,
+      setSelectedDateRange: setSelectedDateRangeAndClear,
+      activeDates,
+      toggleActiveDate,
+      removeActiveDate,
+      selectAllActiveDates,
+      dateRangeAvailableDates,
+      isCheckingAvailableDates,
+    }),
+    [
+      selectedGPUs,
+      availableGPUs,
+      selectedDates,
+      selectedDateRange,
+      activeDates,
+      toggleActiveDate,
+      removeActiveDate,
+      selectAllActiveDates,
+      dateRangeAvailableDates,
+      isCheckingAvailableDates,
+    ],
+  );
+
+  const trackingValue = useMemo<InferenceTrackingContextType>(
+    () => ({
+      trackedConfigs,
+      addTrackedConfig,
+      removeTrackedConfig,
+      clearTrackedConfigs,
+    }),
+    [trackedConfigs, addTrackedConfig, removeTrackedConfig, clearTrackedConfigs],
+  );
+
   return (
-    <InferenceContext.Provider value={value}>
-      {children}
-      <MtpEngineConflictToast detail={mtpConflict} onDismiss={dismissMtpConflict} />
-      <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Date Range Reset</DialogTitle>
-            <DialogDescription>
-              The GPU configs are not available in the selected date range. The date range will be
-              reset.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={handleDateRangeDialogOk}>OK</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </InferenceContext.Provider>
+    <InferenceCoreContext.Provider value={coreValue}>
+      <InferenceComparisonContext.Provider value={comparisonValue}>
+        <InferenceTrackingContext.Provider value={trackingValue}>
+          {children}
+          <MtpEngineConflictToast detail={mtpConflict} onDismiss={dismissMtpConflict} />
+          <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Date Range Reset</DialogTitle>
+                <DialogDescription>
+                  The GPU configs are not available in the selected date range. The date range will
+                  be reset.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={handleDateRangeDialogOk}>OK</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </InferenceTrackingContext.Provider>
+      </InferenceComparisonContext.Provider>
+    </InferenceCoreContext.Provider>
   );
 }
 
-export function useInference() {
-  const context = useContext(InferenceContext);
+/**
+ * Core inference chart state (data, model/axis selection, display toggles,
+ * HW-legend). Read by (nearly) every consumer.
+ */
+export function useInferenceCore() {
+  const context = useContext(InferenceCoreContext);
   if (context === undefined) {
-    throw new Error('useInference must be used within an InferenceProvider');
+    throw new Error('useInferenceCore must be used within an InferenceProvider');
+  }
+  return context;
+}
+
+/**
+ * GPU + date comparison selection. Read only by the comparison UI so a
+ * comparison toggle doesn't re-render the core rendering tree.
+ */
+export function useInferenceComparison() {
+  const context = useContext(InferenceComparisonContext);
+  if (context === undefined) {
+    throw new Error('useInferenceComparison must be used within an InferenceProvider');
+  }
+  return context;
+}
+
+/** Pinned tracked-config points (Performance-Over-Time drill-down). */
+export function useInferenceTracking() {
+  const context = useContext(InferenceTrackingContext);
+  if (context === undefined) {
+    throw new Error('useInferenceTracking must be used within an InferenceProvider');
   }
   return context;
 }

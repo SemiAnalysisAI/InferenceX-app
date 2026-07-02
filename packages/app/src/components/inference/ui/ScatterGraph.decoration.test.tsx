@@ -24,8 +24,12 @@ vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.mock('@/components/ui/chart-legend', () => ({ default: () => null }));
 
 const inferenceState = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+// ScatterGraph now reads two narrow hooks (core + tracking) instead of the old
+// monolithic useInference(). Both resolve to the same flat fixture object so the
+// existing baseInferenceState() fixture keeps driving the component unchanged.
 vi.mock('@/components/inference/InferenceContext', () => ({
-  useInference: () => inferenceState.current,
+  useInferenceCore: () => inferenceState.current,
+  useInferenceTracking: () => inferenceState.current,
 }));
 
 const overlayState = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));

@@ -3,7 +3,7 @@
 import { track } from '@/lib/analytics';
 import React, { useCallback, useMemo, useState } from 'react';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceCore } from '@/components/inference/InferenceContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -53,7 +53,7 @@ export default function HistoricalTrendsDisplay() {
     workflowInfo,
     highContrast,
     setHighContrast,
-  } = useInference();
+  } = useInferenceCore();
 
   // Check if interactivity chart data exists
   const hasInteractivityChart = graphs.some((g) => g.chartDefinition.chartType === 'interactivity');

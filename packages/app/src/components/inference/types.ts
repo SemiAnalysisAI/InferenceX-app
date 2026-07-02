@@ -231,29 +231,32 @@ export interface QuickFilters {
 export type AvailableQuickFilters = QuickFilters;
 
 /**
- * Defines the shape of the context object provided by `InferenceChartContext`.
- * @interface InferenceChartContextType
- * @property {Set<string>} activeHwTypes - A set of currently active hardware types for filtering.
- * @property {Set<string>} hwTypesWithData - A set of all hardware types present in the current dataset.
- * @property {(hw: string) => void} toggleHwType - Function to toggle the active state of a hardware type.
- * @property {HardwareConfig} hardwareConfig - The hardware configuration map.
- * @property {RenderableGraph[]} graphs - An array of graphs ready for rendering.
- * @property {string} selectedModel - The currently selected model.
- * @property {(model: string) => void} setSelectedModel - Function to set the selected model.
- * @property {string} selectedSequence - The currently selected sequence.
- * @property {(sequence: string) => void} setSelectedSequence - Function to set the selected sequence.
- * @property {string} selectedPrecision - The currently selected precision.
- * @property {(precision: string) => void} setSelectedPrecision - Function to set the selected precision.
- * @property {boolean} loading - Indicates if data is currently being loaded.
- * @property {string | null} error - Any error message encountered during data loading, or null if no error.
- * @property {WorkflowInfo | null} workflowInfo - Information about the workflow run, or null if not yet loaded.
+ * The inference chart context was historically a single provider whose value
+ * had ~90 fields, so any state change re-rendered every consumer. It is now
+ * split into three narrow contexts, each with its own {@link React.Context} and
+ * hook (see `InferenceContext.tsx`):
+ *
+ * - {@link InferenceCoreContextType} — data / model / axis / display / HW-legend
+ *   state read by (nearly) every consumer.
+ * - {@link InferenceComparisonContextType} — GPU + date comparison selection.
+ *   Read only by the handful of components that render the comparison UI, so a
+ *   GPU/date toggle no longer re-renders the core scatter/roofline consumers.
+ * - {@link InferenceTrackingContextType} — pinned "tracked config" points.
+ *
+ * The favorite-preset keys (`activePresetId`, `setActivePresetId`, `setHwFilter`,
+ * `presetGuardRef`) had zero external consumers and are now fully internal to
+ * the provider composition layer — they are not exposed on any public context.
  */
-export interface InferenceChartContextType {
+
+/**
+ * Core inference chart state: benchmark data, model/sequence/precision
+ * selection, axis metrics, display toggles, and the hardware-legend filter.
+ * Read by every consumer. Deliberately excludes GPU/date comparison selection
+ * (see {@link InferenceComparisonContextType}) so comparison changes don't
+ * re-render the core rendering tree.
+ */
+export interface InferenceCoreContextType {
   activeHwTypes: Set<string>;
-  toggleActiveDate: (date: string) => void;
-  removeActiveDate: (date: string) => void;
-  selectAllActiveDates: () => void;
-  activeDates: Set<string>;
   hwTypesWithData: Set<string>;
   toggleHwType: (hw: string) => void;
   removeHwType: (hw: string) => void;
@@ -305,21 +308,11 @@ export interface InferenceChartContextType {
   setShowSpeedOverlay: (showSpeedOverlay: boolean) => void;
   showMinecraftOverlay: boolean;
   setShowMinecraftOverlay: (showMinecraftOverlay: boolean) => void;
-  selectedGPUs: string[];
-  setSelectedGPUs: (gpus: string[]) => void;
-  availableGPUs: { value: string; label: string }[];
-  selectedDates: string[];
-  /** Accepts a value or a state-updater fn (for safe rapid successive adds). */
-  setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
-  selectedDateRange: { startDate: string; endDate: string };
-  setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
   userCosts: Record<string, number | undefined> | null;
   setUserCosts: (userCosts: Record<string, number | undefined> | null) => void;
   selectedRunDate: string;
   setSelectedRunDate: (date: string) => void;
   availableDates: string[];
-  dateRangeAvailableDates: string[];
-  isCheckingAvailableDates: boolean;
   availableRuns: Record<string, RunInfo> | null;
   selectedRunId: string;
   setSelectedRunId: (runId: string) => void;
@@ -328,16 +321,44 @@ export interface InferenceChartContextType {
   availableModels: string[];
   userPowers: Record<string, number | undefined> | null;
   setUserPowers: (userPowers: Record<string, number | undefined> | null) => void;
+  /** Compare pages only: slug GPU pair used to filter benchmark series. */
+  compareGpuPair: readonly [string, string] | null;
+}
+
+/**
+ * GPU + date comparison selection and the derived availability metadata that
+ * drives the comparison UI. Isolated from {@link InferenceCoreContextType} so a
+ * comparison toggle only re-renders the comparison consumers (ChartControls,
+ * ChartDisplay, GPUGraph, WorkflowInfoDisplay), not the core scatter/roofline
+ * rendering tree.
+ */
+export interface InferenceComparisonContextType {
+  selectedGPUs: string[];
+  setSelectedGPUs: (gpus: string[]) => void;
+  availableGPUs: { value: string; label: string }[];
+  selectedDates: string[];
+  /** Accepts a value or a state-updater fn (for safe rapid successive adds). */
+  setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
+  selectedDateRange: { startDate: string; endDate: string };
+  setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;
+  activeDates: Set<string>;
+  toggleActiveDate: (date: string) => void;
+  removeActiveDate: (date: string) => void;
+  selectAllActiveDates: () => void;
+  dateRangeAvailableDates: string[];
+  isCheckingAvailableDates: boolean;
+}
+
+/**
+ * Pinned "tracked config" points (up to 6) for the Performance-Over-Time
+ * drill-down. Split out so adding/removing a tracked config only re-renders the
+ * two consumers that render them (ChartDisplay, ScatterGraph).
+ */
+export interface InferenceTrackingContextType {
   trackedConfigs: TrackedConfig[];
   addTrackedConfig: (point: InferenceData, chartType: string) => void;
   removeTrackedConfig: (id: string) => void;
   clearTrackedConfigs: () => void;
-  setHwFilter: (filter: string[] | null) => void;
-  activePresetId: string | null;
-  setActivePresetId: (id: string | null) => void;
-  presetGuardRef: React.RefObject<boolean>;
-  /** Compare pages only: slug GPU pair used to filter benchmark series. */
-  compareGpuPair: readonly [string, string] | null;
 }
 export interface CalculateUserCostsRequest {
   model: string;

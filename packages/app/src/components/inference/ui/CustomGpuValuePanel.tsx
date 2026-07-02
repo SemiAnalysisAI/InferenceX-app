@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceCore } from '@/components/inference/InferenceContext';
 import {
   buildAppliedCustomGpuValues,
   buildDefaultCustomGpuValues,
@@ -131,7 +131,7 @@ const CustomGpuValuePanel = memo(
       selectedSequence,
       setUserCosts,
       setUserPowers,
-    } = useInference();
+    } = useInferenceCore();
 
     const config = PANEL_CONFIG[kind];
     const applyValues = kind === 'costs' ? setUserCosts : setUserPowers;

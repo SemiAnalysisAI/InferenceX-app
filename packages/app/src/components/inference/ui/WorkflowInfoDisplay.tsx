@@ -15,7 +15,7 @@ import {
 import { updateRepoUrl } from '@/lib/utils';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceComparison, useInferenceCore } from '@/components/inference/InferenceContext';
 import type { WorkflowInfo } from '@/components/inference/types';
 import {
   formatChangelogDescription,
@@ -60,8 +60,8 @@ export default function WorkflowInfoDisplay({
     availableRuns,
     selectedRunId,
     setSelectedRunId,
-    isCheckingAvailableDates,
-  } = useInference();
+  } = useInferenceCore();
+  const { isCheckingAvailableDates } = useInferenceComparison();
 
   const { effectivePrecisions } = useGlobalFilters();
 

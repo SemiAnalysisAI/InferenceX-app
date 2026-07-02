@@ -6,7 +6,7 @@ import { track } from '@/lib/analytics';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { cn } from '@/lib/utils';
 
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceComparison, useInferenceCore } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
   SequenceSelector,
@@ -128,13 +128,6 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     selectedYAxisMetric,
     setSelectedYAxisMetric,
     graphs,
-    selectedGPUs,
-    setSelectedGPUs,
-    availableGPUs,
-    selectedDateRange,
-    setSelectedDateRange,
-    dateRangeAvailableDates,
-    isCheckingAvailableDates,
     availablePrecisions,
     availableSequences,
     availableModels,
@@ -148,7 +141,16 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setQuickFilterFrameworks,
     setQuickFilterDisagg,
     setQuickFilterSpec,
-  } = useInference();
+  } = useInferenceCore();
+  const {
+    selectedGPUs,
+    setSelectedGPUs,
+    availableGPUs,
+    selectedDateRange,
+    setSelectedDateRange,
+    dateRangeAvailableDates,
+    isCheckingAvailableDates,
+  } = useInferenceComparison();
 
   // Y-axis metric options — built from static chart config JSON (no API dependency).
   // Hidden groups (Measured Energy) appear only after the ↑↑↓↓ feature gate unlocks.

@@ -1,7 +1,11 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { InferenceContext } from '@/components/inference/InferenceContext';
+import {
+  InferenceComparisonContext,
+  InferenceCoreContext,
+  InferenceTrackingContext,
+} from '@/components/inference/InferenceContext';
 import { EvaluationContext } from '@/components/evaluation/EvaluationContext';
 import { ReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import {
@@ -13,11 +17,11 @@ import {
   type UnofficialRunContextType,
 } from '@/components/unofficial-run-provider';
 
-import type { InferenceChartContextType } from '@/components/inference/types';
 import type { EvaluationChartContextType } from '@/components/evaluation/types';
 import type { ReliabilityChartContextType } from '@/components/reliability/types';
 
 import {
+  type MockInferenceContext,
   createMockInferenceContext,
   createMockEvaluationContext,
   createMockReliabilityContext,
@@ -26,7 +30,7 @@ import {
 } from './mock-data';
 
 export interface ProviderOverrides {
-  inference?: Partial<InferenceChartContextType>;
+  inference?: Partial<MockInferenceContext>;
   evaluation?: Partial<EvaluationChartContextType>;
   reliability?: Partial<ReliabilityChartContextType>;
   globalFilters?: Partial<GlobalFilterContextType>;
@@ -53,8 +57,19 @@ export function mountWithProviders(
   let tree = component;
 
   if (overrides.inference !== undefined) {
+    // One flat mock value satisfies all three split inference contexts; feed it
+    // to each provider so a component reading any sub-context resolves against
+    // the same override object.
     const value = createMockInferenceContext(overrides.inference);
-    tree = <InferenceContext.Provider value={value}>{tree}</InferenceContext.Provider>;
+    tree = (
+      <InferenceCoreContext.Provider value={value}>
+        <InferenceComparisonContext.Provider value={value}>
+          <InferenceTrackingContext.Provider value={value}>
+            {tree}
+          </InferenceTrackingContext.Provider>
+        </InferenceComparisonContext.Provider>
+      </InferenceCoreContext.Provider>
+    );
   }
 
   if (overrides.evaluation !== undefined) {

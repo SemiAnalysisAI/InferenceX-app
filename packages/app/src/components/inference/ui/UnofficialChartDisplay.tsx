@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from 'react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config';
-import { useInference } from '@/components/inference/InferenceContext';
+import { useInferenceCore } from '@/components/inference/InferenceContext';
 import type {
   ChartDefinition,
   HardwareConfig,
@@ -29,7 +29,7 @@ export function UnofficialChartDisplay() {
     selectedYAxisMetric,
     setSelectedModel,
     setSelectedSequence,
-  } = useInference();
+  } = useInferenceCore();
 
   // Auto-select a model/sequence that has data when unofficial run loads
   useEffect(() => {
