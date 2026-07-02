@@ -20,8 +20,9 @@ const sql = createAdminSql({
 async function reset(): Promise<void> {
   console.log('=== db:reset ===');
   console.log(
-    'This will DROP all tables (configs, workflow_runs, benchmark_results,\n' +
-      'server_logs, run_stats, eval_results, changelog_entries, availability, schema_migrations).\n' +
+    'This will DROP all tables (configs, workflow_runs, agentic_trace_replay,\n' +
+      'benchmark_results, server_logs, run_stats, eval_results, changelog_entries,\n' +
+      'availability, datasets, dataset_conversations, run_datasets, schema_migrations).\n' +
       'You must run db:migrate after this before ingesting data.\n',
   );
 
@@ -37,10 +38,15 @@ async function reset(): Promise<void> {
 
   await sql`DROP MATERIALIZED VIEW IF EXISTS latest_benchmarks`;
   await sql`DROP VIEW IF EXISTS latest_workflow_runs`;
+  // Child-before-parent order (CASCADE handles the rest, but keep it FK-safe).
   await sql`DROP TABLE IF EXISTS
+    ${sql(TABLE_NAMES.runDatasets)},
+    ${sql(TABLE_NAMES.datasetConversations)},
+    ${sql(TABLE_NAMES.datasets)},
     ${sql(TABLE_NAMES.changelogEntries)},
     ${sql(TABLE_NAMES.evalResults)},
     ${sql(TABLE_NAMES.benchmarkResults)},
+    ${sql(TABLE_NAMES.agenticTraceReplay)},
     ${sql(TABLE_NAMES.serverLogs)},
     ${sql(TABLE_NAMES.runStats)},
     ${sql(TABLE_NAMES.availability)},

@@ -1,5 +1,6 @@
 import { CHART_SERIES_VERSION } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import {
   getTraceServerMetrics,
   type TraceServerMetrics,
@@ -19,7 +20,10 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `trace-server-metrics-v${CHART_SERIES_VERSION}`;
 
 const getCachedTraceServerMetrics = cachedQuery(
-  (id: number): Promise<TraceServerMetrics | null> => getTraceServerMetrics(getDb(), id),
+  (id: number): Promise<TraceServerMetrics | null> => {
+    if (JSON_MODE) return jsonProvider.getTraceServerMetrics(id);
+    return getTraceServerMetrics(getDb(), id);
+  },
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

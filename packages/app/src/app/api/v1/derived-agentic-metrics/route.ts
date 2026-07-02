@@ -1,5 +1,6 @@
 import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import {
   getDerivedAgenticMetrics,
   type DerivedAgenticMetricMap,
@@ -24,7 +25,10 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `derived-agentic-metrics-v${STATS_VERSION}`;
 
 const getCachedDerivedAgenticMetrics = cachedQuery(
-  (ids: number[]): Promise<DerivedAgenticMetricMap> => getDerivedAgenticMetrics(getDb(), ids),
+  (ids: number[]): Promise<DerivedAgenticMetricMap> => {
+    if (JSON_MODE) return Promise.resolve(jsonProvider.getDerivedAgenticMetrics(ids));
+    return getDerivedAgenticMetrics(getDb(), ids);
+  },
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

@@ -1,5 +1,6 @@
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
 import {
   getTraceHistograms,
   type TraceHistogramMap,
@@ -24,7 +25,10 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `trace-histograms-v${REQUEST_TIMELINE_VERSION}`;
 
 const getCachedTraceHistograms = cachedQuery(
-  (ids: number[]): Promise<TraceHistogramMap> => getTraceHistograms(getDb(), ids),
+  (ids: number[]): Promise<TraceHistogramMap> => {
+    if (JSON_MODE) return Promise.resolve(jsonProvider.getTraceHistograms(ids));
+    return getTraceHistograms(getDb(), ids);
+  },
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

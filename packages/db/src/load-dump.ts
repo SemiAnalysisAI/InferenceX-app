@@ -22,19 +22,43 @@ import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1 });
 
-// Tables with serial/bigserial PKs that need sequence resets
+// Tables with serial/bigserial PKs that need sequence resets.
+// (datasets.id is text and run_datasets.workflow_run_id is a plain bigint FK —
+// neither owns a sequence, so they're intentionally omitted.)
 const SEQUENCES: { seq: string; table: string; col: string }[] = [
   { seq: 'configs_id_seq', table: TABLE_NAMES.configs, col: 'id' },
   { seq: 'server_logs_id_seq', table: TABLE_NAMES.serverLogs, col: 'id' },
   { seq: 'workflow_runs_id_seq', table: TABLE_NAMES.workflowRuns, col: 'id' },
+  { seq: 'agentic_trace_replay_id_seq', table: TABLE_NAMES.agenticTraceReplay, col: 'id' },
   { seq: 'benchmark_results_id_seq', table: TABLE_NAMES.benchmarkResults, col: 'id' },
   { seq: 'eval_results_id_seq', table: TABLE_NAMES.evalResults, col: 'id' },
   { seq: 'eval_samples_id_seq', table: TABLE_NAMES.evalSamples, col: 'id' },
   { seq: 'run_stats_id_seq', table: TABLE_NAMES.runStats, col: 'id' },
   { seq: 'changelog_entries_id_seq', table: TABLE_NAMES.changelogEntries, col: 'id' },
+  {
+    seq: 'dataset_conversations_id_seq',
+    table: TABLE_NAMES.datasetConversations,
+    col: 'id',
+  },
 ];
 
 const BATCH_SIZE = 500;
+
+/** The JSON shape Buffer.prototype.toJSON() emits (what dump-db writes for bytea). */
+interface BufferJson {
+  type: 'Buffer';
+  data: number[];
+}
+
+/** True for a `{ type: 'Buffer', data: number[] }` object (a serialized bytea). */
+function isBufferJson(val: unknown): val is BufferJson {
+  return (
+    typeof val === 'object' &&
+    val !== null &&
+    (val as { type?: unknown }).type === 'Buffer' &&
+    Array.isArray((val as { data?: unknown }).data)
+  );
+}
 
 /**
  * Stream-parse a JSON array file, yielding objects one at a time.
@@ -118,18 +142,36 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
   const flush = async () => {
     if (batch.length === 0 || !columns) return;
 
-    // Track which columns have plain-object values (JSONB) for casting
-    const jsonbCols = new Set<number>();
-    const values: unknown[][] = batch.map((row) =>
+    // Track which columns need a per-value cast. JSONB columns pass objects
+    // as-is under a `::jsonb` cast; BYTEA columns are reconstructed into a real
+    // Node Buffer under a `::bytea` cast. Casts are tracked per (row, col) —
+    // not per column — because a nullable blob/jsonb column can be null on some
+    // rows and populated on others within the same batch, and a NULL param
+    // needs no cast (Postgres would reject `NULL::bytea` from an untyped param
+    // only in edge cases, but more importantly the cast set must match the
+    // value actually bound for that cell).
+    const jsonbCells = new Set<string>();
+    const byteaCells = new Set<string>();
+    const values: unknown[][] = batch.map((row, rowIdx) =>
       columns!.map((col, colIdx) => {
         const val = row[col];
         if (val === null || val === undefined) return null;
         // Postgres text[] arrays: convert JSON ["a","b"] → Postgres {a,b} literal
         if (Array.isArray(val) && val.every((v) => typeof v === 'string'))
           return `{${(val as string[]).map((v) => `"${v.replaceAll('\\', String.raw`\\`).replaceAll('"', String.raw`\"`)}"`).join(',')}}`;
+        // BYTEA columns: dump-db.ts serialized the postgres.js Buffer via
+        // Buffer.prototype.toJSON() → {"type":"Buffer","data":[…]}. Rebuild the
+        // Buffer and bind it under a ::bytea cast so the blob round-trips
+        // byte-for-byte (agentic_trace_replay.*_gz / server_metrics_csv). Must
+        // be checked BEFORE the generic object→jsonb branch, or the blob would
+        // be mis-cast to jsonb and corrupt on insert.
+        if (isBufferJson(val)) {
+          byteaCells.add(`${rowIdx}:${colIdx}`);
+          return Buffer.from((val as BufferJson).data);
+        }
         // JSONB columns: pass objects as-is (sql.unsafe serializes them correctly with ::jsonb cast)
         if (typeof val === 'object') {
-          jsonbCols.add(colIdx);
+          jsonbCells.add(`${rowIdx}:${colIdx}`);
           return val;
         }
         return val as string | number | boolean;
@@ -143,7 +185,9 @@ async function loadTable(dumpDir: string, table: string): Promise<number> {
           `(${columns!
             .map((_col, j) => {
               const p = `$${i * columns!.length + j + 1}`;
-              return jsonbCols.has(j) ? `${p}::jsonb` : p;
+              if (byteaCells.has(`${i}:${j}`)) return `${p}::bytea`;
+              if (jsonbCells.has(`${i}:${j}`)) return `${p}::jsonb`;
+              return p;
             })
             .join(', ')})`,
       )

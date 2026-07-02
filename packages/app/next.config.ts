@@ -3,6 +3,12 @@ import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/allowed-dev-origins';
 
 const nextConfig: NextConfig = {
+  // Allow a second, isolated dev server (e.g. a dump-mode instance on another
+  // port) to run from the same project dir by pointing it at a separate build
+  // dir via NEXT_DIST_DIR. Defaults to '.next' so the primary server and all
+  // CI/prod builds are unaffected. Next.js's single-dev-server lock lives under
+  // distDir, so distinct dirs let the two coexist.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],

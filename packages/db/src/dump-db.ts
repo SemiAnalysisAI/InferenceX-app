@@ -18,7 +18,25 @@ const sql = createAdminSql({ noSsl: hasNoSslFlag(), readonly: true, max: 1 });
 
 const CURSOR_BATCH = 100;
 
-/** Stream a table to a JSON file using a cursor, writing row-by-row. */
+/**
+ * Stream a table to a JSON file using a cursor, writing row-by-row.
+ *
+ * BYTEA round-trip: postgres.js decodes a `bytea` column to a Node `Buffer`.
+ * `JSON.stringify(buffer)` invokes Buffer.prototype.toJSON(), which emits
+ * `{"type":"Buffer","data":[<byte>, …]}`. That's a lossless byte-array encoding
+ * (verified: JSON.parse → Buffer.from(obj.data) reproduces the exact bytes), so
+ * `agentic_trace_replay`'s blob columns (profile_export_jsonl_gz,
+ * server_metrics_csv, server_metrics_json_gz) survive the dump verbatim.
+ * load-dump.ts reconstructs the Buffer and casts it back to `::bytea`.
+ *
+ * Dump-size note: the byte-array encoding is ~4-6× the raw bytea size (each
+ * byte becomes 1-4 ASCII digits + a comma). For the big compressed blobs
+ * (server_metrics_json_gz can be ~17 MB compressed on high-conc TP+EP rows)
+ * the resulting agentic_trace_replay.json is the largest file in the dump — the
+ * same trade-off server_logs.json already makes. We keep all columns (no
+ * dropping) so dump mode has full parity with the DB, and json-provider
+ * lazy-loads this file only when a blob-backed route actually needs a fallback.
+ */
 async function streamTable(table: string, outPath: string): Promise<number> {
   const out = createWriteStream(outPath);
   out.write('[\n');
