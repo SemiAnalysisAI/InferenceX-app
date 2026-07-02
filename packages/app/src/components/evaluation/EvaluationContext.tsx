@@ -16,12 +16,7 @@ import { track } from '@/lib/analytics';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import {
-  useChartUIState,
-  useChartToggleSet,
-  useAutoInitializeToggleSet,
-  useUrlStateSync,
-} from '@/hooks/useChartContext';
+import { useChartUIState, useChartToggleGroup, useUrlStateSync } from '@/hooks/useChartContext';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
 import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
@@ -82,23 +77,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   });
 
   const [showLabels, setShowLabels] = useState<boolean>(() => getUrlParam('e_labels') === '1');
-
-  const {
-    activeSet: enabledHardware,
-    setActiveSet: setEnabledHardware,
-    toggle: toggleHwRaw,
-    selectAll: selectAllHwRaw,
-    remove: removeHwRaw,
-  } = useChartToggleSet();
-
-  // Pending legend-active selection restored from `e_active` URL param.
-  // Consumed once when hwTypesWithData first populates.
-  const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
-    const v = getUrlParam('e_active');
-    if (!v) return null;
-    const set = new Set(v.split(',').filter(Boolean));
-    return set.size > 0 ? set : null;
-  });
 
   const availableBenchmarks = useMemo(() => {
     const tasks = new Set([
@@ -177,8 +155,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return [...hwSet].toSorted();
   }, [rawData]);
 
-  useAutoInitializeToggleSet(availableHardware, enabledHardware, setEnabledHardware);
-
   const availablePrecisions = useMemo(() => {
     const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel];
     if (!dbModelKeys || dbModelKeys.length === 0) return globalAvailablePrecisions;
@@ -215,13 +191,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions],
   );
 
-  const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
-
-  const chartData = useMemo(
-    () => aggregateEvaluationChartRows(unfilteredChartData, effectiveEnabledHardware),
-    [unfilteredChartData, effectiveEnabledHardware],
-  );
-
   const unofficialHardwareWithData = useMemo(
     () => new Set(unfilteredUnofficialChartData.map((data) => String(data.hwKey))),
     [unfilteredUnofficialChartData],
@@ -256,27 +225,25 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [unfilteredChartData],
   );
 
-  useEffect(() => {
-    if (hwTypesWithData.size === 0) return;
-    if (pendingActiveHardware) {
-      const restored = new Set([...pendingActiveHardware].filter((k) => hwTypesWithData.has(k)));
-      setEnabledHardware(restored.size > 0 ? restored : hwTypesWithData);
-      setPendingActiveHardware(null);
-      return;
-    }
-    setEnabledHardware(hwTypesWithData);
-  }, [selectedModel, hwTypesWithData]);
+  const {
+    activeSet: enabledHardware,
+    toggle: toggleHardware,
+    selectAll: selectAllHwTypes,
+    remove: removeHardware,
+    activeStr: eActiveStr,
+  } = useChartToggleGroup({
+    urlPrefix: 'e_',
+    itemsWithData: hwTypesWithData,
+    autoInitializeItems: availableHardware,
+    resetDeps: [selectedModel],
+  });
 
-  const selectAllHwTypes = useCallback(
-    () => selectAllHwRaw(hwTypesWithData),
-    [selectAllHwRaw, hwTypesWithData],
-  );
+  const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
 
-  const toggleHardware = useCallback(
-    (hwKey: string) => toggleHwRaw(hwKey, hwTypesWithData),
-    [toggleHwRaw, hwTypesWithData],
+  const chartData = useMemo(
+    () => aggregateEvaluationChartRows(unfilteredChartData, effectiveEnabledHardware),
+    [unfilteredChartData, effectiveEnabledHardware],
   );
-  const removeHardware = useCallback((hwKey: string) => removeHwRaw(hwKey), [removeHwRaw]);
 
   const handleSetSelectedModel = useCallback(
     (model: string | undefined) => {
@@ -304,22 +271,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     }, 3000);
     return () => clearTimeout(timer);
   }, [enabledHardware]);
-
-  // Serialize the legend-active set, omitting when it equals all hwTypesWithData.
-  const eActiveStr = useMemo(() => {
-    if (enabledHardware.size === 0) return '';
-    if (enabledHardware.size === hwTypesWithData.size) {
-      let same = true;
-      for (const k of enabledHardware) {
-        if (!hwTypesWithData.has(k)) {
-          same = false;
-          break;
-        }
-      }
-      if (same) return '';
-    }
-    return [...enabledHardware].toSorted().join(',');
-  }, [enabledHardware, hwTypesWithData]);
 
   useUrlStateSync(
     {

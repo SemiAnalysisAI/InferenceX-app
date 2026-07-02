@@ -109,6 +109,137 @@ export function useChartToggleSet<T extends string = string>() {
 }
 
 /**
+ * Parse a comma-separated legend-active URL param (`e_active` / `r_active`) into
+ * a Set. Returns `null` when the param is absent or yields no items, matching the
+ * "no pending restore" sentinel the tab contexts use.
+ */
+export function parseActiveParam(raw: string | undefined): Set<string> | null {
+  if (!raw) return null;
+  const set = new Set(raw.split(',').filter(Boolean));
+  return set.size > 0 ? set : null;
+}
+
+/**
+ * Serialize a legend-active set for the URL, omitting (returning '') when it is
+ * empty or exactly equals `itemsWithData` (the default "everything visible"
+ * state). Keeps share URLs short and stable.
+ */
+export function serializeActiveSet(active: Set<string>, itemsWithData: Set<string>): string {
+  if (active.size === 0) return '';
+  if (active.size === itemsWithData.size) {
+    let same = true;
+    for (const k of active) {
+      if (!itemsWithData.has(k)) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return '';
+  }
+  return [...active].toSorted().join(',');
+}
+
+/**
+ * Composes the legend toggle-set wiring shared by the per-tab chart contexts
+ * (Evaluation `e_`, Reliability `r_`). Bundles:
+ *
+ * - the underlying togglable set (`useChartToggleSet`),
+ * - an optional auto-initialize pass (`autoInitializeItems`) that seeds the set
+ *   from a broader available-items list — registered BEFORE the restore effect
+ *   so the whichever-runs-last-wins ordering matches the pre-refactor contexts,
+ * - the once-consumed "pending active from URL" restore that fires when
+ *   `itemsWithData` first populates (falling back to all items),
+ * - `toggle` / `selectAll` bound to the current `itemsWithData`,
+ * - the memoized serialized `activeStr` for URL sync.
+ *
+ * Each context still owns its own derived `itemsWithData` and context value —
+ * only the identical toggle/restore/serialize boilerplate lives here.
+ */
+export function useChartToggleGroup(config: {
+  /** URL parameter prefix, e.g. `'e_'` or `'r_'`. Reads `${urlPrefix}active`. */
+  urlPrefix: string;
+  /** Set of item keys that currently have data (drives restore + serialize). */
+  itemsWithData: Set<string>;
+  /**
+   * Optional broader available-items list used to seed the set the first time it
+   * is empty (delegates to `useAutoInitializeToggleSet`). This can differ from
+   * `itemsWithData` (e.g. Reliability's `availableModels` falls back to all-time
+   * keys while `itemsWithData` only has current-range keys). Registered before
+   * the restore effect, so on the first populated commit the restore effect's
+   * plain setState wins — preserving the original A-then-B effect order.
+   *
+   * Pass a referentially-stable array (e.g. a `useMemo` result) — it feeds
+   * `useAutoInitializeToggleSet`'s effect deps.
+   */
+  autoInitializeItems?: string[];
+  /**
+   * Extra deps that, when changed, should re-run the pending/default restore
+   * effect alongside `itemsWithData` (e.g. the selected model). Matches the
+   * original contexts, whose restore effect depended on `[selectedModel, ...]`
+   * / `[dateRange, ...]`.
+   */
+  resetDeps?: readonly unknown[];
+}) {
+  const { urlPrefix, itemsWithData, autoInitializeItems, resetDeps = [] } = config;
+  const { getUrlParam } = useUrlState();
+
+  const {
+    activeSet,
+    setActiveSet,
+    toggle: toggleRaw,
+    selectAll: selectAllRaw,
+    remove,
+  } = useChartToggleSet();
+
+  // Auto-init registered first (matches the pre-refactor order where
+  // useAutoInitializeToggleSet ran before the legend-restore effect). Passing an
+  // empty array is a no-op (guard requires length > 0), so contexts without an
+  // auto-init step can omit it.
+  useAutoInitializeToggleSet(autoInitializeItems ?? [], activeSet, setActiveSet);
+
+  // Pending legend-active selection restored from the `${prefix}active` URL param.
+  // Consumed once when itemsWithData first populates.
+  const [pendingActive, setPendingActive] = useState<Set<string> | null>(() =>
+    parseActiveParam(getUrlParam(`${urlPrefix}active` as any)),
+  );
+
+  useEffect(() => {
+    if (itemsWithData.size === 0) return;
+    if (pendingActive) {
+      const restored = new Set([...pendingActive].filter((k) => itemsWithData.has(k)));
+      setActiveSet(restored.size > 0 ? restored : itemsWithData);
+      setPendingActive(null);
+      return;
+    }
+    setActiveSet(itemsWithData);
+    // itemsWithData is the trigger; pendingActive/setActiveSet are stable-enough
+    // reads. resetDeps mirrors each context's original restore-effect deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsWithData, ...resetDeps]);
+
+  const toggle = useCallback(
+    (item: string) => toggleRaw(item, itemsWithData),
+    [toggleRaw, itemsWithData],
+  );
+
+  const selectAll = useCallback(() => selectAllRaw(itemsWithData), [selectAllRaw, itemsWithData]);
+
+  const activeStr = useMemo(
+    () => serializeActiveSet(activeSet, itemsWithData),
+    [activeSet, itemsWithData],
+  );
+
+  return {
+    activeSet,
+    setActiveSet,
+    toggle,
+    selectAll,
+    remove,
+    activeStr,
+  };
+}
+
+/**
  * Automatically initializes a togglable set when available items change.
  * Prevents unnecessary reinitialization when the set is already populated.
  */

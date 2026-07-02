@@ -1,21 +1,8 @@
 'use client';
 
-import {
-  type ReactNode,
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type ReactNode, createContext, useContext, useMemo, useState } from 'react';
 
-import {
-  useChartUIState,
-  useChartToggleSet,
-  useAutoInitializeToggleSet,
-  useUrlStateSync,
-} from '@/hooks/useChartContext';
+import { useChartUIState, useChartToggleGroup, useUrlStateSync } from '@/hooks/useChartContext';
 import { useReliability } from '@/hooks/api/use-reliability';
 import { useUrlState } from '@/hooks/useUrlState';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
@@ -83,23 +70,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     () => getUrlParam('r_pct') === '1',
   );
 
-  const {
-    activeSet: enabledModels,
-    setActiveSet: setEnabledModels,
-    toggle: toggleModelRaw,
-    selectAll: selectAllModelsRaw,
-    remove: removeModelRaw,
-  } = useChartToggleSet();
-
-  // Pending legend-active selection restored from `r_active` URL param.
-  // Consumed once when modelsWithData first populates.
-  const [pendingActiveModels, setPendingActiveModels] = useState<Set<string> | null>(() => {
-    const v = getUrlParam('r_active');
-    if (!v) return null;
-    const set = new Set(v.split(',').filter(Boolean));
-    return set.size > 0 ? set : null;
-  });
-
   const dateRangeSuccessRateData = useMemo(
     () => (rawRows ? aggregateByDateRange(rawRows) : {}),
     [rawRows],
@@ -109,8 +79,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     const rangeData = dateRangeSuccessRateData[dateRange] ?? dateRangeSuccessRateData['all-time'];
     return rangeData ? Object.keys(rangeData) : [];
   }, [dateRangeSuccessRateData, dateRange]);
-
-  useAutoInitializeToggleSet(availableModels, enabledModels, setEnabledModels);
 
   const filteredReliabilityData = useMemo(() => {
     const selectedRangeData = dateRangeSuccessRateData[dateRange];
@@ -124,6 +92,24 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
       }),
     );
   }, [dateRangeSuccessRateData, dateRange]);
+
+  const modelsWithData = useMemo(
+    () => new Set(filteredReliabilityData.map((d) => d.model)),
+    [filteredReliabilityData],
+  );
+
+  const {
+    activeSet: enabledModels,
+    toggle: toggleModel,
+    selectAll: selectAllModels,
+    remove: removeModel,
+    activeStr: rActiveStr,
+  } = useChartToggleGroup({
+    urlPrefix: 'r_',
+    itemsWithData: modelsWithData,
+    autoInitializeItems: availableModels,
+    resetDeps: [dateRange],
+  });
 
   const chartData = useMemo(
     () =>
@@ -140,49 +126,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
         })),
     [filteredReliabilityData, enabledModels],
   );
-
-  const modelsWithData = useMemo(
-    () => new Set(filteredReliabilityData.map((d) => d.model)),
-    [filteredReliabilityData],
-  );
-
-  const toggleModel = useCallback(
-    (model: string) => toggleModelRaw(model, modelsWithData),
-    [toggleModelRaw, modelsWithData],
-  );
-  const removeModel = useCallback((model: string) => removeModelRaw(model), [removeModelRaw]);
-
-  useEffect(() => {
-    if (modelsWithData.size === 0) return;
-    if (pendingActiveModels) {
-      const restored = new Set([...pendingActiveModels].filter((k) => modelsWithData.has(k)));
-      setEnabledModels(restored.size > 0 ? restored : modelsWithData);
-      setPendingActiveModels(null);
-      return;
-    }
-    setEnabledModels(modelsWithData);
-  }, [dateRange, modelsWithData]);
-
-  const selectAllModels = useCallback(
-    () => selectAllModelsRaw(modelsWithData),
-    [selectAllModelsRaw, modelsWithData],
-  );
-
-  // Serialize the legend-active set, omitting when it equals all modelsWithData.
-  const rActiveStr = useMemo(() => {
-    if (enabledModels.size === 0) return '';
-    if (enabledModels.size === modelsWithData.size) {
-      let same = true;
-      for (const k of enabledModels) {
-        if (!modelsWithData.has(k)) {
-          same = false;
-          break;
-        }
-      }
-      if (same) return '';
-    }
-    return [...enabledModels].toSorted().join(',');
-  }, [enabledModels, modelsWithData]);
 
   useUrlStateSync(
     {
