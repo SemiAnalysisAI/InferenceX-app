@@ -21,10 +21,6 @@ name: Ingest Agentic Benchmark Results
 # agentic-specific alerting (missing dataset slug).
 
 on:
-  push:
-    branches: [feat/agentx]
-    paths:
-      - .github/workflows/ingest-agentic-results.yml
   repository_dispatch:
     types: [ingest-agentic-results]
   workflow_dispatch:
@@ -40,14 +36,7 @@ on:
         type: string
 
 jobs:
-  register:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Registering ingest-agentic-results workflow for manual dispatch"
-
   ingest:
-    if: github.event_name != 'push'
     # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
     # far longer than a fixed-seq-len ingest.
     timeout-minutes: 60
@@ -71,7 +60,7 @@ jobs:
 
       - name: Run migrations
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
         run: pnpm admin:db:migrate --yes
 
       - name: Download artifacts from InferenceX run
@@ -130,7 +119,7 @@ jobs:
 
       - name: Ingest results to DB
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           INGEST_RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
           INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || inputs.run-attempt }}
@@ -141,12 +130,12 @@ jobs:
 
       - name: Apply run overrides
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
         run: pnpm admin:db:apply-overrides --yes
 
       - name: Verify database
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_DEV }}
         run: pnpm admin:db:verify
 
       - name: Invalidate Vercel cache
