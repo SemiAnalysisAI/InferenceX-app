@@ -170,7 +170,7 @@ export function InferenceProvider({
   // value (if any) in a post-mount effect — keeps server + client first render
   // identical and avoids "didn't match" hydration warnings when the URL holds
   // a non-default mode.
-  const [selectedXAxisMode, setSelectedXAxisMode] = useState<XAxisMode>('ttft');
+  const [selectedXAxisMode, setSelectedXAxisMode] = useState<XAxisMode>('interactivity');
   const xAxisModeFromUrlRef = useRef(false);
   useEffect(() => {
     if (xAxisModeFromUrlRef.current) return;
