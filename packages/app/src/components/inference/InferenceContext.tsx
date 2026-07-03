@@ -249,6 +249,11 @@ export function InferenceProvider({
     if (getUrlParam('i_nolabel') === '1') return false;
     if (getUrlParam('i_label') === '0') return false;
     if (getUrlParam('i_label') === '1') return true;
+    // Advanced (parallelism) labels are a richer form of point label; a share
+    // link that requests them must auto-enable point labels so they actually
+    // render (mirrors the runtime toggle coupling in ScatterGraph). A later
+    // explicit i_nolabel=1 still wins — it is checked first above.
+    if (getUrlParam('i_advlabel') === '1') return true;
     // Default off: per-point labels (TP + concurrency) clutter the chart; the
     // per-line hardware labels (on by default) are the primary annotation.
     return false;

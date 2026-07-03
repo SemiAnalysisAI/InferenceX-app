@@ -15,11 +15,11 @@ describe('Line Labels Toggle', () => {
     cy.get('label[for="scatter-line-labels"]').should('contain.text', 'Line Labels');
   });
 
-  it('Line Labels toggle is off by default', () => {
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
+  it('Line Labels toggle is on by default', () => {
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
 
-    // No line labels render without interaction
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
+    // Line labels render on load without interaction
+    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
 
   it('toggling Line Labels on then back off adds and removes label elements', () => {
