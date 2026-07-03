@@ -74,8 +74,11 @@ describe('Agentic point request metric time series', () => {
       cy.get('[data-testid="interactivity-percentile-toggle"]')
         .find('[role="tab"][aria-selected="true"]')
         .should('have.text', 'P90');
-      cy.get('[data-testid="interactivity-point-count"]').should('have.text', '5 points');
-      cy.get('svg circle').should('have.length', 5);
+      // 6 points: profiling slice includes requests 0-4 (profiling) + request 5
+      // (phase='warmup' label but start=5s > profiling boundary=0s, so
+      // sliceTimelineByPhase keeps it); cancelled r6 and null-metric r7/r8 are dropped.
+      cy.get('[data-testid="interactivity-point-count"]').should('have.text', '6 points');
+      cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'P90 (rolling 50 req)');
       cy.get('svg').should('contain.text', '1 / cumulative P90 TPOT');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
@@ -83,8 +86,9 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.contains('h2', 'TTFT over time').should('be.visible');
-      cy.get('[data-testid="ttft-point-count"]').should('have.text', '5 points');
-      cy.get('svg circle').should('have.length', 5);
+      // Same 6-point slice as interactivity (warmup r5 included by time-boundary).
+      cy.get('[data-testid="ttft-point-count"]').should('have.text', '6 points');
+      cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'TTFT (s)');
       cy.get('svg').should('contain.text', 'Cumulative P90 TTFT');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
@@ -109,8 +113,11 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();
       cy.contains('h2', 'E2E latency over time').should('be.visible');
-      cy.get('[data-testid="e2e-point-count"]').should('have.text', '7 points');
-      cy.get('svg circle').should('have.length', 7);
+      // 8 points: e2e = (end−start)/1e6 > 0 for all non-cancelled requests —
+      // includes r0-r5 (profiling slice) + r7, r8 (subagent/aux with null ttft/tpot
+      // but valid start/end). Cancelled r6 is excluded.
+      cy.get('[data-testid="e2e-point-count"]').should('have.text', '8 points');
+      cy.get('svg circle').should('have.length', 8);
       cy.get('svg').should('contain.text', 'E2E latency (s)');
       cy.get('svg').should('contain.text', 'Cumulative P90 E2E latency');
 
