@@ -1,3 +1,5 @@
+import { unlockAgenticGate } from '../support/e2e';
+
 describe('Dataset conversation flamegraph timing', () => {
   before(() => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset/conversations/conversation-1', {
@@ -93,7 +95,9 @@ describe('Dataset conversation flamegraph timing', () => {
         },
       },
     });
-    cy.visit('/datasets/test-dataset/conversations/conversation-1');
+    cy.visit('/datasets/test-dataset/conversations/conversation-1', {
+      onBeforeLoad: unlockAgenticGate,
+    });
   });
 
   it('shows turn offsets and a collapsed subagent time range', () => {

@@ -1,3 +1,5 @@
+import { unlockAgenticGate } from '../support/e2e';
+
 const timelineRequest = (
   index: number,
   ttftMs: number,
@@ -63,7 +65,7 @@ describe('Agentic point request metric time series', () => {
         ],
       },
     });
-    cy.visit('/inference/agentic/206885');
+    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {
@@ -276,7 +278,7 @@ describe('Agentic point orchestrator metric sources', () => {
         metricSources: [prefill, decode],
       },
     });
-    cy.visit('/inference/agentic/206885');
+    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('switches every server chart to an orchestrator-normalized worker', () => {

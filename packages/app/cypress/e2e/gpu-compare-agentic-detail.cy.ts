@@ -1,3 +1,5 @@
+import { unlockAgenticGate } from '../support/e2e';
+
 describe('GPU comparison agentic point detail', () => {
   it('exposes the per-point charts as a normal browser link', () => {
     cy.intercept('GET', '/api/v1/trace-availability*', (request) => {
@@ -9,6 +11,7 @@ describe('GPU comparison agentic point detail', () => {
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
       },
     });
 

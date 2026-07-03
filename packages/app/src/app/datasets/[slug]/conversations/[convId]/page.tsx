@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
+import { AgenticGate } from '@/components/agentic-gate';
 import { ConversationView } from '@/components/datasets/conversation-view';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -24,12 +25,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ConversationPage({ params }: Props) {
   const { slug, convId } = await params;
   return (
-    <main className="relative">
-      <div className="container mx-auto px-4 pb-8 lg:px-8">
-        <Suspense>
-          <ConversationView slug={slug} convId={decodeURIComponent(convId)} />
-        </Suspense>
-      </div>
-    </main>
+    <AgenticGate>
+      <main className="relative">
+        <div className="container mx-auto px-4 pb-8 lg:px-8">
+          <Suspense>
+            <ConversationView slug={slug} convId={decodeURIComponent(convId)} />
+          </Suspense>
+        </div>
+      </main>
+    </AgenticGate>
   );
 }

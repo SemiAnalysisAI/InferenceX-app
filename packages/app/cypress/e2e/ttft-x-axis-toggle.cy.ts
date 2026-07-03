@@ -1,3 +1,5 @@
+import { unlockAgenticGate } from '../support/e2e';
+
 const interceptDerivedMetrics = () => {
   cy.intercept('GET', '/api/v1/derived-agentic-metrics*', (request) => {
     const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
@@ -132,6 +134,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
       },
     });
     cy.get('[data-testid="x-axis-mode-buttons"]').should('be.visible');
@@ -264,6 +267,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
       },
     });
     cy.wait('@unofficialRun');

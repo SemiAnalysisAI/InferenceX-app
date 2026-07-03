@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { AgenticGate } from '@/components/agentic-gate';
 import { DatasetDetail } from '@/components/datasets/dataset-detail';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -23,10 +24,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function DatasetDetailPage({ params }: Props) {
   const { slug } = await params;
   return (
-    <main className="relative">
-      <div className="container mx-auto px-4 pb-8 lg:px-8">
-        <DatasetDetail slug={slug} />
-      </div>
-    </main>
+    <AgenticGate>
+      <main className="relative">
+        <div className="container mx-auto px-4 pb-8 lg:px-8">
+          <DatasetDetail slug={slug} />
+        </div>
+      </main>
+    </AgenticGate>
   );
 }

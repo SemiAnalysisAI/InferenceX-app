@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { AgenticGate } from '@/components/agentic-gate';
 import { AgenticPointDetail } from '@/components/inference/agentic-point/agentic-point-detail';
 
 export const metadata: Metadata = {
@@ -13,5 +14,9 @@ export default async function AgenticPointDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <AgenticPointDetail id={Number(id)} />;
+  return (
+    <AgenticGate>
+      <AgenticPointDetail id={Number(id)} />
+    </AgenticGate>
+  );
 }
