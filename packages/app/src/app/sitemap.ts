@@ -21,6 +21,7 @@ const TABS = [
   'reliability',
   'gpu-specs',
   'gpu-metrics',
+  'collectivex',
 ] as const;
 
 type SitemapEntry = MetadataRoute.Sitemap[number];

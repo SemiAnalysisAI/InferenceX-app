@@ -11,7 +11,7 @@ describe('allowedDevOriginsFromEnv', () => {
 
   it('trims whitespace and removes empty entries', () => {
     expect(
-      allowedDevOriginsFromEnv(' 10.112.9.49 , , local-origin.dev , *.local-origin.dev '),
-    ).toEqual(['10.112.9.49', 'local-origin.dev', '*.local-origin.dev']);
+      allowedDevOriginsFromEnv(' dev-machine.local , , local-origin.dev , *.local-origin.dev '),
+    ).toEqual(['dev-machine.local', 'local-origin.dev', '*.local-origin.dev']);
   });
 });

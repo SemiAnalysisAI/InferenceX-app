@@ -19,12 +19,14 @@ export interface CommonLegendItemProps {
   isLegendExpanded?: boolean; // Whether the legend is expanded to show full text
   sidebarMode?: boolean; // Use sidebar-style visual feedback (line-through + faded dot)
   onRemove?: (name: string) => void;
+  hideAriaLabel?: string;
   /**
    * When provided, renders a small table icon that opens a per-series points
    * table (all data points for this hardware/framework series). Only the
    * inference tab's legend passes this — other tabs get no icon.
    */
   onShowPoints?: (name: string) => void;
+  showPointsAriaLabel?: string;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
@@ -43,6 +45,8 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   sidebarMode = false,
   onRemove,
   onShowPoints,
+  hideAriaLabel,
+  showPointsAriaLabel,
 }) => {
   const id = `checkbox-${hw || name}`; // Unique ID for accessibility
   const isLongText = (label ?? '').length > 8;
@@ -84,7 +88,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
                 onRemove!(hw || name);
               }}
               className="absolute inset-0 inline-flex items-center justify-center opacity-0 group-hover/item:opacity-100"
-              aria-label={`Hide ${label}`}
+              aria-label={hideAriaLabel ?? `Hide ${label}`}
             >
               <X size={14} strokeWidth={4} className="text-foreground" />
             </span>
@@ -108,7 +112,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         <button
           type="button"
           data-testid={`legend-points-${hw || name}`}
-          aria-label={`Show all ${label} data points`}
+          aria-label={showPointsAriaLabel ?? `Show all ${label} data points`}
           onClick={() => onShowPoints(hw || name)}
           // Reduced opacity at rest (still visible/tappable on touch), full on
           // row hover or keyboard focus. ml-auto pins the icon to the row's

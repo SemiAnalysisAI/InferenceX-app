@@ -4,9 +4,12 @@ import {
   fetchBenchmarks,
   fetchWorkflowInfo,
   fetchAvailability,
+  fetchCollectiveX,
   fetchReliability,
   fetchEvaluations,
 } from './api';
+import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
+import { collectiveXChannelUrl, sha256Hex } from '@/components/collectivex/reader';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -124,5 +127,43 @@ describe('fetchEvaluations', () => {
     const result = await fetchEvaluations();
     expect(mockFetch).toHaveBeenCalledWith('/api/v1/evaluations', expect.objectContaining({}));
     expect(result[0].task).toBe('gsm8k');
+  });
+});
+
+describe('fetchCollectiveX', () => {
+  it('resolves the no-cache channel to a digest-addressed dataset', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify(makeCollectiveXDataset()));
+    const digest = await sha256Hex(bytes);
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              format: 'collectivex.channel.v1',
+              channel: 'dev-latest',
+              generated_at: '2026-07-04T01:00:00Z',
+              dataset: {
+                path: `datasets/${digest}/dataset.json`,
+                sha256: digest,
+                bytes: bytes.length,
+              },
+            }),
+          ),
+      })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(bytes.buffer) });
+
+    const result = await fetchCollectiveX();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      collectiveXChannelUrl('dev-latest'),
+      expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
+    );
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      `/collectivex-data/v1/datasets/${digest}/dataset.json`,
+      expect.objectContaining({ cache: 'force-cache', credentials: 'same-origin' }),
+    );
+    expect(result.dataset.format).toBe('collectivex.public.v1');
+    expect(result.digest).toBe(digest);
   });
 });

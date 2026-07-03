@@ -4,8 +4,19 @@ import { GlobalFilterProvider } from '@/components/GlobalFilterContext';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { TabNav } from '@/components/tab-nav';
 import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
+import { usePathname } from 'next/navigation';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const content = (
+    <main className="relative">
+      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
+        <TabNav />
+        {children}
+      </div>
+    </main>
+  );
+  if (pathname === '/collectivex' || pathname === '/zh/collectivex') return content;
   return (
     <>
       <NudgeEngine scope="dashboard" />

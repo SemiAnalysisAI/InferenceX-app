@@ -24,6 +24,7 @@ const DASHBOARD_TABS = [
   '/reliability',
   '/gpu-specs',
   '/gpu-metrics',
+  '/collectivex',
   '/submissions',
   '/current-inferencex-image',
 ];

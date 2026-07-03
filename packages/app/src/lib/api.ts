@@ -3,6 +3,11 @@
  * Each function is a thin fetch wrapper returning typed data.
  */
 
+import {
+  fetchCollectiveXPublication,
+  type CollectiveXChannelName,
+} from '@/components/collectivex/reader';
+import type { CollectiveXVersion } from '@/components/collectivex/types';
 import type { WorkerPower } from '@/components/inference/types';
 
 import type { SubmissionsResponse } from './submissions-types';
@@ -298,6 +303,14 @@ export function fetchEvalSamplesLive(
 
 export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
+}
+
+export function fetchCollectiveX(
+  channel: CollectiveXChannelName = 'dev-latest',
+  signal?: AbortSignal,
+  version: CollectiveXVersion = 'v1',
+) {
+  return fetchCollectiveXPublication(channel, signal, version);
 }
 
 export interface FeedbackListRow {

@@ -269,23 +269,23 @@ describe('computeChartSeries', () => {
       metrics: {
         'vllm:prompt_tokens': {
           series: [
-            buildDynamoSeries('10.30.1.56:7500', 'prefill', 'prefill-a', 100),
-            buildDynamoSeries('10.30.1.36:7508', 'prefill', 'prefill-b', 200),
-            buildDynamoSeries('10.30.1.206:7516', 'backend', 'decode-a', 300),
+            buildDynamoSeries('prefill-a.internal.test:7500', 'prefill', 'prefill-a', 100),
+            buildDynamoSeries('prefill-b.internal.test:7508', 'prefill', 'prefill-b', 200),
+            buildDynamoSeries('decode-a.internal.test:7516', 'backend', 'decode-a', 300),
           ],
         },
         'vllm:generation_tokens': {
           series: [
-            buildDynamoSeries('10.30.1.56:7500', 'prefill', 'prefill-a', 1),
-            buildDynamoSeries('10.30.1.36:7508', 'prefill', 'prefill-b', 2),
-            buildDynamoSeries('10.30.1.206:7516', 'backend', 'decode-a', 400),
+            buildDynamoSeries('prefill-a.internal.test:7500', 'prefill', 'prefill-a', 1),
+            buildDynamoSeries('prefill-b.internal.test:7508', 'prefill', 'prefill-b', 2),
+            buildDynamoSeries('decode-a.internal.test:7516', 'backend', 'decode-a', 400),
           ],
         },
         'vllm:num_requests_running': {
           series: [
-            buildDynamoSeries('10.30.1.56:7500', 'prefill', 'prefill-a', 3, 'avg'),
-            buildDynamoSeries('10.30.1.36:7508', 'prefill', 'prefill-b', 4, 'avg'),
-            buildDynamoSeries('10.30.1.206:7516', 'backend', 'decode-a', 5, 'avg'),
+            buildDynamoSeries('prefill-a.internal.test:7500', 'prefill', 'prefill-a', 3, 'avg'),
+            buildDynamoSeries('prefill-b.internal.test:7508', 'prefill', 'prefill-b', 4, 'avg'),
+            buildDynamoSeries('decode-a.internal.test:7516', 'backend', 'decode-a', 5, 'avg'),
           ],
         },
       },
@@ -299,8 +299,8 @@ describe('computeChartSeries', () => {
 
     expect(result?.metricSources).toHaveLength(3);
     expect(result?.metricSources.map(({ source: s }) => [s.role, s.workerId, s.engine])).toEqual([
-      ['prefill', 'prefill-b', '0'],
       ['prefill', 'prefill-a', '0'],
+      ['prefill', 'prefill-b', '0'],
       ['decode', 'decode-a', '0'],
     ]);
     const prefillA = result?.metricSources.find(({ source: s }) => s.workerId === 'prefill-a');
@@ -322,7 +322,7 @@ describe('computeChartSeries', () => {
         'vllm:prompt_tokens': {
           series: [
             {
-              endpoint_url: '10.30.1.56:7500',
+              endpoint_url: 'prefill-a.internal.test:7500',
               labels: { dynamo_component: 'prefill', worker_id: 'prefill-a', engine: '0' },
               timeslices: [{ start_ns: 0, end_ns: 1e9, rate: 100 }],
             },

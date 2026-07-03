@@ -126,6 +126,8 @@ export interface AxisConfig {
   label?: string;
   tickFormat?: (d: d3.AxisDomain) => string;
   tickCount?: number;
+  /** Explicit ticks or a domain-aware generator, useful for geometric and sparse log axes. */
+  tickValues?: (number | Date)[] | ((scale: AnyScale) => (number | Date)[]);
   /** Post-render callback for custom axis label formatting (e.g., multi-line tspan). */
   customize?: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => void;
 }

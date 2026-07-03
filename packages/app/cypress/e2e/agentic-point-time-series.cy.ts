@@ -245,10 +245,10 @@ describe('Agentic point orchestrator metric sources', () => {
   beforeEach(() => {
     const prefill = sourceSeries(
       {
-        id: 'dynamo|prefill|10.30.1.56:7500|prefill-a|0|0',
+        id: 'dynamo|prefill|prefill-a.internal.test:7500|prefill-a|0|0',
         adapter: 'dynamo',
         role: 'prefill',
-        endpointUrl: '10.30.1.56:7500',
+        endpointUrl: 'prefill-a.internal.test:7500',
         nativeRole: 'prefill',
         workerId: 'prefill-a',
         dpRank: '0',
@@ -259,10 +259,10 @@ describe('Agentic point orchestrator metric sources', () => {
     );
     const decode = sourceSeries(
       {
-        id: 'dynamo|decode|10.30.1.206:7516|decode-a|0|0',
+        id: 'dynamo|decode|decode-a.internal.test:7516|decode-a|0|0',
         adapter: 'dynamo',
         role: 'decode',
-        endpointUrl: '10.30.1.206:7516',
+        endpointUrl: 'decode-a.internal.test:7516',
         nativeRole: 'backend',
         workerId: 'decode-a',
         dpRank: '0',

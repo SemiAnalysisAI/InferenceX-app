@@ -41,6 +41,7 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/')).toBe(true);
     expect(hasZhSibling('/inference')).toBe(true);
     expect(hasZhSibling('/about')).toBe(true);
+    expect(hasZhSibling('/collectivex')).toBe(true);
   });
 
   it('matches blog and compare child paths', () => {
@@ -72,12 +73,14 @@ describe('switchLocalePath', () => {
   it('switches English pages to their zh sibling', () => {
     expect(switchLocalePath('/')).toBe('/zh');
     expect(switchLocalePath('/inference')).toBe('/zh/inference');
+    expect(switchLocalePath('/collectivex')).toBe('/zh/collectivex');
     expect(switchLocalePath('/blog/some-post')).toBe('/zh/blog/some-post');
   });
 
   it('switches zh pages back to English', () => {
     expect(switchLocalePath('/zh')).toBe('/');
     expect(switchLocalePath('/zh/quotes')).toBe('/quotes');
+    expect(switchLocalePath('/zh/collectivex')).toBe('/collectivex');
     expect(switchLocalePath('/zh/blog/some-post')).toBe('/blog/some-post');
   });
 

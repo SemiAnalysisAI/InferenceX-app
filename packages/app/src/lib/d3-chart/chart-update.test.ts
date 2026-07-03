@@ -51,6 +51,23 @@ describe('renderAxes', () => {
       expect(tickCount).toBeLessThanOrEqual(8);
     });
 
+    it('renders only explicit x tick values within the visible domain', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLinear().domain([2, 10]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderAxes(layout, xScale, yScale, {
+        xTickValues: [1, 2, 4, 16],
+        xTickFormat: String,
+      });
+
+      const labels: string[] = [];
+      layout.xAxisGroup.selectAll('.tick text').each(function () {
+        labels.push(d3.select(this).text());
+      });
+      expect(labels).toEqual(['2', '4']);
+    });
+
     it('respects yTickCount', () => {
       const layout = makeLayout();
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
@@ -127,6 +144,26 @@ describe('renderAxes', () => {
       if (!firstTickLine.empty()) {
         expect(Number(firstTickLine.attr('x2'))).toBe(-10);
       }
+    });
+  });
+
+  describe('with log scales', () => {
+    it('uses measured geometric sweep values instead of generated log subdivisions', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLog().base(2).domain([0.9, 70]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+      const measuredValues = [1, 2, 4, 8, 16, 32, 64];
+
+      renderAxes(layout, xScale, yScale, {
+        xTickValues: measuredValues,
+        xTickFormat: String,
+      });
+
+      const labels: string[] = [];
+      layout.xAxisGroup.selectAll('.tick text').each(function () {
+        labels.push(d3.select(this).text());
+      });
+      expect(labels).toEqual(measuredValues.map(String));
     });
   });
 
@@ -279,6 +316,24 @@ describe('renderGrid', () => {
       expect(vGroup.empty()).toBe(false);
       const vLines = vGroup.selectAll('line').size();
       expect(vLines).toBeGreaterThan(0);
+    });
+
+    it('uses explicit x tick values for vertical grid lines', () => {
+      const layout = makeLayout();
+      const xScale = d3.scaleLog().base(2).domain([1, 64]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+      const measuredValues = [1, 4, 16, 64];
+
+      renderGrid(layout, xScale, yScale, 5, 0, measuredValues);
+
+      const positions: number[] = [];
+      layout.gridGroup
+        .select('.grid-v')
+        .selectAll('line')
+        .each(function () {
+          positions.push(Number(d3.select(this).attr('x1')));
+        });
+      expect(positions).toEqual(measuredValues.map((value) => xScale(value)));
     });
 
     it('creates horizontal grid lines matching y-scale ticks', () => {
