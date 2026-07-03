@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
-import { AgenticGate } from '@/components/agentic-gate';
 import { ConversationView } from '@/components/datasets/conversation-view';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -32,14 +31,12 @@ export default async function ConversationPage({ params }: Props) {
   // A second decodeURIComponent here would over-decode (and throw for ids that
   // contain a literal '%'). ConversationView re-encodes when it builds the API URL.
   return (
-    <AgenticGate>
-      <main className="relative">
-        <div className="container mx-auto px-4 pb-8 lg:px-8">
-          <Suspense>
-            <ConversationView slug={slug} convId={convId} />
-          </Suspense>
-        </div>
-      </main>
-    </AgenticGate>
+    <main className="relative">
+      <div className="container mx-auto px-4 pb-8 lg:px-8">
+        <Suspense>
+          <ConversationView slug={slug} convId={convId} />
+        </Suspense>
+      </div>
+    </main>
   );
 }

@@ -36,7 +36,6 @@ import {
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
-import { useFeatureGate } from '@/lib/use-feature-gate';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -161,14 +160,6 @@ export function GlobalFilterProvider({
   initialPrecisions?: string[];
 }) {
   const { hasUrlParam, getUrlParam, setUrlParams } = useUrlState();
-
-  // Agentic surfaces are hidden behind the shared konami-code feature gate
-  // (default OFF until agentic launches). When locked, agentic sequences are
-  // filtered out of `availableSequences` below — the single chokepoint that
-  // cascades: no agentic default (resolveEffectiveSequence falls to 8k/1k), no
-  // "Agentic Traces" scenario-selector entry, and no agentic x-axis mode /
-  // percentile selector (those key off effectiveSequence === AgenticTraces).
-  const agenticGateUnlocked = useFeatureGate();
 
   // ── Core filter state ─────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<Model>(
@@ -304,26 +295,17 @@ export function GlobalFilterProvider({
   }, [unofficialAvailable, selectedModel]);
 
   // Sequences available for the selected model (DB ∪ unofficial run for this model).
-  //
-  // When the agentic feature gate is locked (default), agentic sequences are
-  // dropped from every branch — including the static SEQUENCE_OPTIONS fallback —
-  // so no agentic scenario is ever selectable or defaulted. This is the single
-  // gate chokepoint for the main inference chart's agentic surfaces.
   const availableSequences = useMemo(() => {
-    const dropAgentic = (seqs: Sequence[]) =>
-      agenticGateUnlocked ? seqs : seqs.filter((s) => s !== Sequence.AgenticTraces);
     const unofficialSeqs = unofficialAvailable
       .filter((a) => a.model === selectedModel)
       .map((a) => a.sequence as Sequence);
     if (!availabilityRows) {
-      return unofficialSeqs.length > 0
-        ? dropAgentic([...new Set(unofficialSeqs)])
-        : dropAgentic(SEQUENCE_OPTIONS);
+      return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : [...SEQUENCE_OPTIONS];
     }
     const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
-    const merged = dropAgentic([...new Set([...dbSeqs, ...unofficialSeqs])]);
-    return merged.length > 0 ? merged : dropAgentic(SEQUENCE_OPTIONS);
-  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel, agenticGateUnlocked]);
+    const merged = [...new Set([...dbSeqs, ...unofficialSeqs])];
+    return merged.length > 0 ? merged : [...SEQUENCE_OPTIONS];
+  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
 
   // Whether we actually know the selected model's sequences yet. Availability
   // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run

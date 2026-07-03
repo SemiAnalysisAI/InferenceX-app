@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 
-import { AgenticGate } from '@/components/agentic-gate';
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
 import { DatasetList } from '@/components/datasets/dataset-list';
@@ -30,14 +29,6 @@ const jsonLd = {
 };
 
 export default function DatasetsPage() {
-  return (
-    <AgenticGate>
-      <DatasetsPageContent />
-    </AgenticGate>
-  );
-}
-
-function DatasetsPageContent() {
   return (
     <main className="relative">
       <JsonLd data={jsonLd} />

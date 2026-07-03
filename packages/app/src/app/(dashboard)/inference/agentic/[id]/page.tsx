@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { AgenticGate } from '@/components/agentic-gate';
 import { AgenticPointDetail } from '@/components/inference/agentic-point/agentic-point-detail';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 
@@ -21,9 +20,5 @@ export default async function AgenticPointDetailPage({
   // `/agentic/0`, `/agentic/-1`) can never resolve, so 404 instead of rendering a
   // blank detail shell that fires doomed id-keyed fetches.
   if (!isPersistedBenchmarkId(numericId)) notFound();
-  return (
-    <AgenticGate>
-      <AgenticPointDetail id={numericId} />
-    </AgenticGate>
-  );
+  return <AgenticPointDetail id={numericId} />;
 }

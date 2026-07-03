@@ -9,7 +9,6 @@ import { track } from '@/lib/analytics';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
 import { navigateInApp } from '@/lib/client-navigation';
-import { useFeatureGate } from '@/lib/use-feature-gate';
 import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
@@ -52,9 +51,6 @@ const NAV_LINKS = [
     label: 'Datasets',
     testId: 'nav-link-datasets',
     event: 'header_datasets_clicked',
-    // Agentic surface — hidden behind the konami-code feature gate (default off)
-    // until agentic launches. Same gate as the Hidden tab dropdown.
-    gated: true,
   },
   { href: '/blog', label: 'Articles', testId: 'nav-link-blog', event: 'header_blog_clicked' },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
@@ -72,13 +68,10 @@ function isActive(pathname: string, href: string): boolean {
 export const Header = ({ starCount }: { starCount?: number | null }) => {
   const pathname = usePathname() ?? '/';
   const router = useRouter();
-  const featureGateUnlocked = useFeatureGate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Hide gated nav links (e.g. Datasets — an agentic surface) unless the shared
-  // feature gate is unlocked. Mirrors the tab-nav "Hidden" dropdown gating.
-  const navLinks = NAV_LINKS.filter((l) => !('gated' in l && l.gated) || featureGateUnlocked);
+  const navLinks = NAV_LINKS;
 
   // Close menu on route change
   useEffect(() => {
