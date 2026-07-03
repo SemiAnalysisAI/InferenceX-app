@@ -613,6 +613,22 @@ describe('mapBenchmarkRow — agentic interactivity normalization', () => {
     const result = mapBenchmarkRow(makeV1Row({ p90_itl: 0.05, p90_intvty: 999 }), tracker);
     expect(result!.metrics.p90_intvty).toBe(999);
   });
+
+  it('DELETES a stale artifact *_intvty when the matching *_itl is absent', () => {
+    // Artifact ships intvty (possibly the drifted p(1/ITL) definition) but no itl
+    // for that percentile. Passing it through would mix harness semantics into a
+    // column meant to be 1/p(ITL) everywhere — so the key must be removed, not kept.
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeAgenticRow({ p90_intvty: 42, p95_itl: 0.2 }), tracker);
+    expect(result!.metrics).not.toHaveProperty('p90_intvty'); // stale → deleted
+    expect(result!.metrics.p95_intvty).toBeCloseTo(5, 6); // derived from itl
+  });
+
+  it('DELETES a stale artifact *_intvty when the matching *_itl is zero/invalid', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeAgenticRow({ p90_itl: 0, p90_intvty: 42 }), tracker);
+    expect(result!.metrics).not.toHaveProperty('p90_intvty');
+  });
 });
 
 /**

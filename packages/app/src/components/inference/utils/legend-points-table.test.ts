@@ -75,6 +75,15 @@ describe('pointDetailHref', () => {
     expect(pointDetailHref(pt(), false)).toEqual({ href: null, isExternal: false });
   });
 
+  it('does not build an /agentic/<id> link for a non-persisted id (0 / NaN)', () => {
+    // `typeof id === 'number'` accepted these; isPersistedBenchmarkId rejects
+    // them so we never link to /inference/agentic/0 or /inference/agentic/NaN.
+    for (const badId of [0, Number.NaN]) {
+      const d = pt({ benchmark_type: 'agentic_traces', id: badId });
+      expect(pointDetailHref(d, false)).toEqual({ href: null, isExternal: false });
+    }
+  });
+
   it('overlay points never get a link (no DB benchmark id)', () => {
     const d = pt({
       benchmark_type: 'agentic_traces',

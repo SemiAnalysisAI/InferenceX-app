@@ -26,7 +26,11 @@ export async function GET(
 ) {
   const { slug, convId } = await params;
   try {
-    const data = await getCachedConversation(slug, decodeURIComponent(convId));
+    // App Router has already decoded the `[convId]` segment exactly once, so
+    // `convId` is the raw conversation id. The client (useDatasetConversation)
+    // encodeURIComponent-encodes it before the fetch; decoding again here would
+    // over-decode and mis-key ids containing '%' / '/'. Decode exactly once.
+    const data = await getCachedConversation(slug, convId);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return cachedJson(data);
   } catch (error) {

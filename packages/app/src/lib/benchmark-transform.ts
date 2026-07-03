@@ -13,6 +13,7 @@ import type {
 } from '@/components/inference/types';
 import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
 import { getHardwareConfig } from '@/lib/constants';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
@@ -22,30 +23,32 @@ import type { BenchmarkRow } from '@/lib/api';
  *   tpot   ≡ itl    (time-per-output-token == inter-token-latency for single-output)
  *   intvty ≡ 1/itl  (tok/s from the user's perspective)
  *
- * e2el/tpot only fill gaps (existing fields win). `intvty` is ALWAYS derived from
- * itl, overriding any artifact-supplied value: the harness definition of
- * `*_intvty` has drifted (some versions emit `p(1/ITL)`, which inverts percentile
- * order), so for a slow-tail selector interactivity must be `1/p(ITL)`. This
- * matches the ingest mapper for official rows; doing it
- * here keeps overlay / `?unofficialrun=` rows (transformed live from raw
- * artifacts, never through the DB) on the same definition.
+ * e2el/tpot only fill gaps (existing fields win). `intvty` is ALWAYS 1/itl:
+ * derived where itl is valid, overriding any artifact-supplied value, AND any
+ * artifact `*_intvty` is DROPPED where itl is absent/zero/invalid rather than
+ * passed through. The harness definition of `*_intvty` has drifted (some versions
+ * emit `p(1/ITL)`, which inverts percentile order), so for a slow-tail selector
+ * interactivity must be `1/p(ITL)`. This matches the ingest mapper for official
+ * rows; doing it here keeps overlay / `?unofficialrun=` rows (transformed live
+ * from raw artifacts, never through the DB) on the same single definition.
  */
-function agenticAliases(m: Record<string, number>): Record<string, number> {
-  const out: Record<string, number> = {};
+function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, number> {
+  const m: Record<string, number> = { ...raw };
   for (const suffix of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
-    const itl = m[`${suffix}_itl`];
-    const ttlt = m[`${suffix}_ttlt`];
-    if (m[`${suffix}_e2el`] === undefined && ttlt !== undefined) out[`${suffix}_e2el`] = ttlt;
-    if (m[`${suffix}_tpot`] === undefined && itl !== undefined) out[`${suffix}_tpot`] = itl;
-    if (itl !== undefined && itl > 0) out[`${suffix}_intvty`] = 1 / itl;
+    const itl = raw[`${suffix}_itl`];
+    const ttlt = raw[`${suffix}_ttlt`];
+    if (m[`${suffix}_e2el`] === undefined && ttlt !== undefined) m[`${suffix}_e2el`] = ttlt;
+    if (m[`${suffix}_tpot`] === undefined && itl !== undefined) m[`${suffix}_tpot`] = itl;
+    if (typeof itl === 'number' && itl > 0) m[`${suffix}_intvty`] = 1 / itl;
+    else delete m[`${suffix}_intvty`];
   }
-  return out;
+  return m;
 }
 
 /** Convert a DB benchmark row to an AggDataEntry. */
 export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
-  const m = isAgentic ? { ...row.metrics, ...agenticAliases(row.metrics) } : row.metrics;
+  const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
   // Prefer the dedicated column (added in migration 004); fall back to the
   // legacy stash inside `metrics` for any rows ingested before that column
   // existed.
@@ -53,9 +56,14 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const offloadMode =
     row.offload_mode ??
     (typeof rawMetrics.offload_mode === 'string' ? rawMetrics.offload_mode : undefined);
+  // Postgres bigint comes through the SQL client as a string; coerce it. Overlay
+  // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
+  // is NaN — collapse any non-persisted value to undefined so downstream link /
+  // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
+  // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
+  const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   return {
-    // Coerce: Postgres bigint comes through the SQL client as a string.
-    id: typeof row.id === 'number' ? row.id : Number(row.id),
+    id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
     hw: row.hardware,
     framework: row.framework,
     model: DB_MODEL_TO_DISPLAY[row.model] ?? row.model,
@@ -178,10 +186,13 @@ export function withPercentile(key: string, percentile: string): string {
 }
 
 // Replacement granularity for single-run scoping: the changelog config_key
-// tuple (model-precision-hardware-framework) plus benchmark_type, so an
-// agentic-only run never hides the same config's fixed-seq carry-forward.
+// tuple (model-precision-hardware-framework) plus benchmark_type AND offload_mode.
+// benchmark_type keeps an agentic-only run from hiding the same config's
+// fixed-seq carry-forward; offload_mode keeps a run that produced only one
+// offload variant (e.g. offload=on) from claiming — and thereby suppressing —
+// the other variant's (offload=off) base rows, which are a distinct series.
 const runScopeKey = (r: BenchmarkRow): string =>
-  `${r.model}|${r.precision}|${r.hardware}|${r.framework}|${r.benchmark_type}`;
+  `${r.model}|${r.precision}|${r.hardware}|${r.framework}|${r.benchmark_type}|${r.offload_mode ?? 'off'}`;
 
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.

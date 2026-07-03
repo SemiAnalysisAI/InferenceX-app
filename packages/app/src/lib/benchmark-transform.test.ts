@@ -885,4 +885,81 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
     const entry = rowToAggDataEntry(makeRow({ metrics: { p90_itl: 0.05, p90_intvty: 999 } }));
     expect(entry.p90_intvty).toBe(999);
   });
+
+  it('DROPS a stale artifact *_intvty when the matching *_itl is absent (overlay mirror of the ETL fix)', () => {
+    // Artifact carries intvty (possibly the drifted p(1/ITL) definition) but no
+    // itl for that percentile — the value can't be reconciled to 1/p(ITL), so it
+    // must be discarded, not passed through. rowToAggDataEntry then coerces the
+    // now-missing key to 0.
+    const entry = agentic({ p90_intvty: 42, p95_itl: 0.2 });
+    expect(entry.p90_intvty).toBe(0); // dropped → default 0
+    expect(entry.p95_intvty).toBeCloseTo(5, 6); // derived from itl
+  });
+
+  it('DROPS a stale artifact *_intvty when the matching *_itl is zero/invalid', () => {
+    const entry = agentic({ p90_itl: 0, p90_intvty: 42 });
+    expect(entry.p90_intvty).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rowToAggDataEntry — persisted-id guard (overlay rows carry no DB id)
+// ---------------------------------------------------------------------------
+describe('rowToAggDataEntry — id coercion', () => {
+  it('coerces a stringified bigint id to a number', () => {
+    const entry = rowToAggDataEntry(makeRow({ id: '206863' as unknown as number }));
+    expect(entry.id).toBe(206863);
+  });
+
+  it('yields undefined (not NaN) for a missing id — overlay rows have no persisted id', () => {
+    const entry = rowToAggDataEntry(makeRow({ id: undefined as unknown as number }));
+    expect(entry.id).toBeUndefined();
+  });
+
+  it('yields undefined for a non-positive or non-numeric id', () => {
+    expect(rowToAggDataEntry(makeRow({ id: 0 })).id).toBeUndefined();
+    expect(rowToAggDataEntry(makeRow({ id: 'abc' as unknown as number })).id).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mergeRunScopedRows — offload-aware scoping (data-loss guard)
+// ---------------------------------------------------------------------------
+describe('mergeRunScopedRows — offload variants are distinct series', () => {
+  const agenticRow = (over: Partial<BenchmarkRow> = {}) =>
+    makeRow({
+      model: 'dsr1',
+      hardware: 'b300',
+      framework: 'vllm',
+      precision: 'fp4',
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      ...over,
+    });
+
+  it('a run row for offload=on does NOT claim/suppress the base offload=off rows', () => {
+    // The selected run produced only the offload=on variant. The offload=off base
+    // rows are a separate series and must carry forward, not vanish.
+    const runRows = [agenticRow({ id: 10, offload_mode: 'on' })];
+    const baseRows = [
+      agenticRow({ id: 90, offload_mode: 'on' }), // same series as the run → replaced
+      agenticRow({ id: 91, offload_mode: 'off' }), // distinct series → kept
+    ];
+    const merged = mergeRunScopedRows(runRows, baseRows);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91]);
+  });
+
+  it('a run covering both offload variants pins both', () => {
+    const runRows = [
+      agenticRow({ id: 10, offload_mode: 'on' }),
+      agenticRow({ id: 11, offload_mode: 'off' }),
+    ];
+    const baseRows = [
+      agenticRow({ id: 90, offload_mode: 'on' }),
+      agenticRow({ id: 91, offload_mode: 'off' }),
+    ];
+    const merged = mergeRunScopedRows(runRows, baseRows);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 11]);
+  });
 });

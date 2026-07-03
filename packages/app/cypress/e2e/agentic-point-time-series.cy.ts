@@ -169,10 +169,18 @@ describe('Agentic point request metric time series', () => {
     });
   });
 
-  it('shows total time with no requests in flight on the request timeline', () => {
+  it('shows total idle time on the request timeline (time-boundary phase slice, consistent with the charts)', () => {
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.location('search').should('contain', 'view=timeline');
-    cy.get('[data-testid="timeline-total-idle-time"]').should('have.text', 'idle 1.00s (14.3%)');
+    // The Gantt now slices by TIME BOUNDARY (sliceTimelineByPhase), matching the
+    // per-point charts, instead of the per-request phase LABEL. The earliest
+    // profiling request starts at t=0, so the boundary is 0 and warmup-labelled
+    // r5 (start=5s) is counted as profiling here too — exactly as the interactivity
+    // /TTFT charts already count it (their 6-point slice includes r5). That fills
+    // the former 5–6s gap that label-based filtering left open, so in-flight
+    // coverage is now continuous across [0s, 7s]: idle 0ms (0.0%). A 1.00s value
+    // here would mean the Gantt had regressed to label-based filtering.
+    cy.get('[data-testid="timeline-total-idle-time"]').should('have.text', 'idle 0ms (0.0%)');
     cy.get('[data-timeline-row-kind="aux"]')
       .should('have.css', 'padding-left', '24px')
       .and('contain.text', 'aux 011 · parallel');

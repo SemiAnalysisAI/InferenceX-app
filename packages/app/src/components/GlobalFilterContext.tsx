@@ -21,17 +21,6 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
   return (Object.values(e) as string[]).includes(v);
 }
 
-const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
-const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
-
-// Placeholder for the public (non-null) `effectiveSequence` during the window
-// before availability has loaded. It must be a fixed-seq scenario — never
-// AgenticTraces — so the scenario selector doesn't flash "Agentic Traces" for a
-// fixed-seq-only model while the chart shows its loading skeleton. `8k/1k` is
-// the pre-agentic default for non-agentic models. Consumers that must not act on
-// an unresolved sequence gate on `sequenceResolved` instead.
-const PRE_AVAILABILITY_SEQUENCE = Sequence.EightK_OneK;
-
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -49,6 +38,18 @@ import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/defaul
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+
+const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
+const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
+
+// Placeholder for the public (non-null) `effectiveSequence` during the window
+// before availability has loaded. It must be a fixed-seq scenario — never
+// AgenticTraces — so the scenario selector doesn't flash "Agentic Traces" for a
+// fixed-seq-only model while the chart shows its loading skeleton. `8k/1k` is
+// the pre-agentic default for non-agentic models. Consumers that must not act on
+// an unresolved sequence gate on `sequenceResolved` instead.
+// (Declared after the import block so it never references `Sequence` above its import.)
+const PRE_AVAILABILITY_SEQUENCE = Sequence.EightK_OneK;
 
 interface RunInfo {
   runId: string;

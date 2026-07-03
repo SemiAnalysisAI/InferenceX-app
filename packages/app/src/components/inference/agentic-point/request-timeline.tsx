@@ -7,7 +7,7 @@ import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-reques
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 
-import { requestsForPhase } from './phase-slice';
+import { sliceTimelineByPhase } from './phase-slice';
 import { TimelineBars } from './timeline-bars';
 import { formatDuration } from './timeline-format';
 import {
@@ -158,11 +158,16 @@ export function RequestTimelineView({
     [data.requests],
   );
 
-  // Apply phase filter, then group into rows. With no warmup data the filter
-  // collapses to "profiling" regardless of the (hidden) toggle state.
+  // Apply phase filter, then group into rows. Uses the SAME time-boundary
+  // slicing as the per-point charts (sliceTimelineByPhase) rather than the
+  // per-request phase LABEL, so the Gantt and the charts agree on exactly which
+  // requests belong to each phase (they diverge only when a warmup-labelled
+  // request starts after the first profiling request). With no warmup data the
+  // boundary is null and this is an identity passthrough — the filter collapses
+  // to "profiling" regardless of the (hidden) toggle state.
   const filtered = useMemo(
-    () => requestsForPhase(data.requests, hasWarmup ? phaseFilter : 'profiling'),
-    [data.requests, phaseFilter, hasWarmup],
+    () => sliceTimelineByPhase(data, hasWarmup ? phaseFilter : 'profiling').requests,
+    [data, phaseFilter, hasWarmup],
   );
   // Stable order/color per conversation (or worker), computed over the FULL
   // request set — NOT the phase-filtered subset — so a row keeps its position

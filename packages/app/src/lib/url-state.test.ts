@@ -30,9 +30,13 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-V4-Pro');
   });
 
-  it('has expected default for i_seq', async () => {
+  it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
+    // The UI default scenario (gate-unlocked) is AgenticTraces, not 8k/1k. An
+    // '8k/1k' default would strip an explicit 8K/1K selection from the URL, which
+    // then resolves back to the agentic default on reload/share. Empty means no
+    // scenario value ever matches the default, so it's always persisted.
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
-    expect(PARAM_DEFAULTS.i_seq).toBe('8k/1k');
+    expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
   it('has expected default for r_range', async () => {
@@ -180,6 +184,28 @@ describe('writeUrlParams + buildShareUrl', () => {
 
     const url = buildShareUrl();
     expect(url).not.toContain('g_model');
+  });
+
+  it('keeps an explicit i_seq=8k/1k in the share URL (no longer stripped as a default)', async () => {
+    setupWindow('', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    // Picking the fixed-seq scenario must survive into the share URL; before the
+    // fix this matched the '8k/1k' default and was dropped, reverting to agentic.
+    writeUrlParams({ i_seq: '8k/1k' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toContain('i_seq=8k%2F1k');
+  });
+
+  it('still strips i_seq when it is empty (the no-selection case)', async () => {
+    setupWindow('', '/inference');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({ i_seq: '' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).not.toContain('i_seq');
   });
 
   it('batches multiple params in a single debounce window', async () => {

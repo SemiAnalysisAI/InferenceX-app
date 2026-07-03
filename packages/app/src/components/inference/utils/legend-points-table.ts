@@ -1,4 +1,5 @@
 import { updateRepoUrl } from '@/lib/utils';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 
 import type { InferenceData } from '@/components/inference/types';
 import { fmt, getPointLabel } from '@/components/inference/utils/tooltipUtils';
@@ -56,7 +57,7 @@ export function pointDetailHref(
   isOverlay: boolean,
 ): { href: string | null; isExternal: boolean } {
   if (isOverlay) return { href: null, isExternal: false };
-  if (d.benchmark_type === 'agentic_traces' && typeof d.id === 'number') {
+  if (d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)) {
     return { href: `/inference/agentic/${d.id}`, isExternal: false };
   }
   if (d.run_url) return { href: updateRepoUrl(d.run_url), isExternal: true };

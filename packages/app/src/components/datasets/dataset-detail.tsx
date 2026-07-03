@@ -250,7 +250,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                   >
                     <td className="px-3 py-2">
                       <Link
-                        href={`/datasets/${slug}/conversations/${c.conv_id}`}
+                        href={`/datasets/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
                         onClick={() => track('datasets_conversation_clicked', { slug })}
                         className="font-mono text-xs text-primary hover:underline"
                       >

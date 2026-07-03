@@ -61,6 +61,7 @@ import {
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { isAgenticOnlyXAxisMode, type XAxisMode } from '@/components/inference/hooks/useChartData';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
 
@@ -428,7 +429,9 @@ export default function ChartDisplay() {
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
       for (const point of graph.data) {
-        if (point.benchmark_type === 'agentic_traces' && typeof point.id === 'number') {
+        // Overlay-only agentic points carry no persisted id — skip them so we
+        // never request `?ids=0`/`?ids=NaN` (which 400s and errors the chart).
+        if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
         }
       }
@@ -461,7 +464,7 @@ export default function ChartDisplay() {
       };
       const data = graph.data
         .map((point) => {
-          if (typeof point.id !== 'number') return null;
+          if (!isPersistedBenchmarkId(point.id)) return null;
           const raw = derivedSpec.value(derivedMetrics[point.id], selectedPercentile);
           if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
           return { ...point, x: derivedSpec.toX(raw) };

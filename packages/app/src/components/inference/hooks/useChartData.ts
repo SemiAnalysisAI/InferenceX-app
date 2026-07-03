@@ -29,6 +29,7 @@ import {
   withPercentile,
 } from '@/lib/benchmark-transform';
 import { Sequence, type Model } from '@/lib/data-mappings';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
 import {
@@ -116,7 +117,7 @@ function e2eParetoIds(
   const ids = new Set<number>();
   for (const bucket of byGroup.values()) {
     for (const f of frontierFn(bucket)) {
-      if (typeof f.id === 'number') ids.add(f.id);
+      if (isPersistedBenchmarkId(f.id)) ids.add(f.id);
     }
   }
   return ids;
@@ -164,6 +165,42 @@ const FLIP_MAP: Record<RooflineDirection, RooflineDirection> = {
 /** Flip roofline direction when the x-axis is swapped. */
 export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection {
   return FLIP_MAP[dir];
+}
+
+/** The dedup key fields a chart series is identified by. */
+interface DedupeRow {
+  hardware: string;
+  framework: string;
+  spec_method: string;
+  disagg: boolean;
+  precision: string;
+  offload_mode?: string | null;
+  date: string;
+}
+
+// offload_mode normalized `?? 'off'` to match the SQL layer's getBenchmarksForRun
+// lineKey — agentic offload=on and offload=off are distinct series.
+const dedupeSeriesKey = (r: DedupeRow): string =>
+  `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}|${r.offload_mode ?? 'off'}`;
+
+/**
+ * For each series — (hardware, framework, spec_method, disagg, precision,
+ * offload_mode) — keep only the rows from that series' most recent date. When
+ * parallelism settings change between runs, old config_ids create stale points
+ * under the same legend line; dropping all-but-latest removes them.
+ *
+ * Without `offload_mode` in the key, an offload=on sweep ingested on a LATER date
+ * than the offload=off sweep would win the shared group and silently drop the
+ * (earlier-dated) offload=off variant — a data-loss regression.
+ */
+export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
+  const maxDatePerGroup = new Map<string, string>();
+  for (const r of rows) {
+    const k = dedupeSeriesKey(r);
+    const cur = maxDatePerGroup.get(k);
+    if (!cur || r.date > cur) maxDatePerGroup.set(k, r.date);
+  }
+  return rows.filter((r) => r.date === maxDatePerGroup.get(dedupeSeriesKey(r)));
 }
 
 export function useChartData(
@@ -292,19 +329,10 @@ export function useChartData(
       rowToSequence(r) === selectedSequence;
     const seqFiltered = allRows.filter(seqFilter);
 
-    // For each (hw, framework, spec_method, disagg, precision) group, keep only
-    // rows from the most recent date. When parallelism settings change between runs,
-    // old config_ids create stale data points under the same legend line — drop them.
-    const maxDatePerGroup = new Map<string, string>();
-    for (const r of seqFiltered) {
-      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}`;
-      const cur = maxDatePerGroup.get(key);
-      if (!cur || r.date > cur) maxDatePerGroup.set(key, r.date);
-    }
-    const deduped = seqFiltered.filter((r) => {
-      const key = `${r.hardware}|${r.framework}|${r.spec_method}|${r.disagg}|${r.precision}`;
-      return r.date === maxDatePerGroup.get(key);
-    });
+    // Keep only each series' latest-date rows (drops stale config_ids left behind
+    // when parallelism settings change between runs). Keyed per offload variant so
+    // an offload=on sweep can't hide a differently-dated offload=off series.
+    const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
     const mainRows = deduped.map((r) =>
       selectedRunDate ? { ...r, date: selectedRunDate, actualDate: r.date } : r,
@@ -561,7 +589,7 @@ export function useChartData(
                 const isOnE2eFrontier =
                   e2eParetoSet === null
                     ? undefined
-                    : typeof d.id === 'number' && e2eParetoSet.has(d.id);
+                    : isPersistedBenchmarkId(d.id) && e2eParetoSet.has(d.id);
                 return {
                   ...d,
                   x: xValue,

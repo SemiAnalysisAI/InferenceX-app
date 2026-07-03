@@ -255,10 +255,20 @@ export function mapBenchmarkRow(
   // keeping every agentic row on one definition. `std` is excluded — the
   // reciprocal of a standard deviation is meaningless. Mirrored in the frontend
   // overlay path (agenticAliases).
+  //
+  // When `*_itl` is absent/zero/invalid we must DELETE any artifact-supplied
+  // `*_intvty` rather than let it survive: keeping it would mix the harness's
+  // (possibly `p(1/ITL)`) definition into a column that's meant to be `1/p(ITL)`
+  // everywhere else. Downstream reads a missing key as "not recorded"
+  // (rowToAggDataEntry coerces `?? 0`; the legend table renders a dash).
   if (isAgentic) {
     for (const k of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
       const itl = metrics[`${k}_itl`];
-      if (typeof itl === 'number' && itl > 0) metrics[`${k}_intvty`] = 1 / itl;
+      if (typeof itl === 'number' && itl > 0) {
+        metrics[`${k}_intvty`] = 1 / itl;
+      } else {
+        delete metrics[`${k}_intvty`];
+      }
     }
   }
 

@@ -159,6 +159,17 @@ describe('generateTooltipContent', () => {
     expect(html).not.toContain('data-action="view-charts" target=');
   });
 
+  it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
+    // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
+    // link to /inference/agentic/0, a doomed lookup.
+    for (const badId of [0, Number.NaN]) {
+      const html = generateTooltipContent(
+        tooltipConfig({ data: pt({ id: badId }), isPinned: true, hasTrace: true }),
+      );
+      expect(html).not.toContain('data-action="view-charts"');
+    }
+  });
+
   it('includes hardware display label from config', () => {
     const html = generateTooltipContent(tooltipConfig());
     expect(html).toContain('H100');

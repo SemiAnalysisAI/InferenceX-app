@@ -1,4 +1,5 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
@@ -142,7 +143,7 @@ const viewChartsButtonHTML = (
   hasTraceData: boolean,
   pointId: number | undefined,
 ): string => {
-  if (!isPinned || !hasTraceData || typeof pointId !== 'number') return '';
+  if (!isPinned || !hasTraceData || !isPersistedBenchmarkId(pointId)) return '';
   return `<a data-action="view-charts" href="/inference/agentic/${pointId}" style="
     display: block; margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
     border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
