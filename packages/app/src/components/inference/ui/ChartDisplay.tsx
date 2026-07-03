@@ -803,41 +803,29 @@ export default function ChartDisplay() {
           <CustomPowers loading={loading} />
         </section>
       )}
-      <section
-        className="flex flex-wrap justify-center gap-3 sm:gap-4"
-        role="tablist"
-        aria-label="Chart x-axis metric"
-        data-testid="x-axis-mode-buttons"
-      >
-        {X_AXIS_MODE_BUTTONS.filter(({ value }) => {
+      <SegmentedToggle
+        value={selectedXAxisMode}
+        options={X_AXIS_MODE_BUTTONS.filter(({ value }) => {
           if (!isAgenticOnlyXAxisMode(value)) return true;
           // Before mount, render all buttons so SSR and first client render match.
           if (!mounted) return true;
           return isAgenticSequence;
-        }).map(({ value, label }) => {
-          const isActive = selectedXAxisMode === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              data-testid={`x-axis-mode-${value}`}
-              onClick={() => {
-                setSelectedXAxisMode(value);
-                track('latency_x_axis_mode_selected', { mode: value });
-              }}
-              className={`min-w-[160px] flex-1 sm:flex-initial rounded-full border-2 px-6 py-3 text-base font-semibold transition-colors ${
-                isActive
-                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                  : 'border-border bg-card text-foreground hover:border-primary/60 hover:bg-accent'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </section>
+        }).map(({ value, label }) => ({
+          value,
+          label,
+          testId: `x-axis-mode-${value}`,
+        }))}
+        onValueChange={(value) => {
+          setSelectedXAxisMode(value);
+          track('latency_x_axis_mode_selected', { mode: value });
+        }}
+        ariaLabel="Chart x-axis metric"
+        testId="x-axis-mode-buttons"
+        className="flex-wrap justify-center gap-1.5 sm:gap-2"
+        buttonClassName="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center rounded-md px-4 py-2 text-sm font-semibold"
+        activeButtonClassName="bg-muted text-foreground shadow-sm"
+        inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      />
       <div className="flex flex-col gap-4">{displayGraphs}</div>
 
       {/* Performance Over Time — Modal Drill-Down */}
