@@ -31,6 +31,7 @@ import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { exportToCsv } from '@/lib/csv-export';
@@ -803,29 +804,35 @@ export default function ChartDisplay() {
           <CustomPowers loading={loading} />
         </section>
       )}
-      <SegmentedToggle
+      <Tabs
         value={selectedXAxisMode}
-        options={X_AXIS_MODE_BUTTONS.filter(({ value }) => {
-          if (!isAgenticOnlyXAxisMode(value)) return true;
-          // Before mount, render all buttons so SSR and first client render match.
-          if (!mounted) return true;
-          return isAgenticSequence;
-        }).map(({ value, label }) => ({
-          value,
-          label,
-          testId: `x-axis-mode-${value}`,
-        }))}
         onValueChange={(value) => {
-          setSelectedXAxisMode(value);
+          setSelectedXAxisMode(value as XAxisMode);
           track('latency_x_axis_mode_selected', { mode: value });
         }}
-        ariaLabel="Chart x-axis metric"
-        testId="x-axis-mode-buttons"
-        className="flex-wrap justify-center gap-1.5 sm:gap-2"
-        buttonClassName="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center rounded-md px-4 py-2 text-sm font-semibold"
-        activeButtonClassName="bg-muted text-foreground shadow-sm"
-        inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-      />
+      >
+        <TabsList
+          aria-label="Chart x-axis metric"
+          data-testid="x-axis-mode-buttons"
+          className="flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
+        >
+          {X_AXIS_MODE_BUTTONS.filter(({ value }) => {
+            if (!isAgenticOnlyXAxisMode(value)) return true;
+            // Before mount, render all buttons so SSR and first client render match.
+            if (!mounted) return true;
+            return isAgenticSequence;
+          }).map(({ value, label }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              data-testid={`x-axis-mode-${value}`}
+              className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
+            >
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       <div className="flex flex-col gap-4">{displayGraphs}</div>
 
       {/* Performance Over Time — Modal Drill-Down */}

@@ -17,14 +17,11 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
-    <div className={cn('flex flex-col', className)}>
-      <div className="w-full border-t-2 border-brand pb-6" />
-      <TabsPrimitive.List
-        data-slot="tabs-list"
-        className="relative inline-flex p-1 gap-1 items-center justify-center bg-transparent"
-        {...props}
-      />
-    </div>
+    <TabsPrimitive.List
+      data-slot="tabs-list"
+      className={cn('inline-flex flex-wrap items-end gap-1 border-b border-border', className)}
+      {...props}
+    />
   );
 }
 
@@ -34,24 +31,27 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
       data-slot="tabs-trigger"
       className={cn(
         'relative',
+        '-mb-px',
         'inline-flex',
-        'h-10',
         'items-center',
         'justify-center',
         'gap-1.5',
+        'rounded-t-md',
+        'border-b-2',
+        'border-transparent',
         'px-4',
-        'py-2.5',
-        'text-base',
-        'font-medium',
+        'py-2',
+        'text-sm',
+        'font-semibold',
         'whitespace-nowrap',
-        'text-foreground',
-        'hover:text-foreground/80',
+        'text-muted-foreground',
+        'hover:text-foreground',
+        'hover:bg-muted/40',
         'data-[state=active]:text-foreground',
-        'data-[state=active]:border-b-2',
+        'data-[state=active]:bg-muted/60',
         'data-[state=active]:border-secondary',
         'dark:data-[state=active]:border-primary',
-        'dark:hover:text-primary/80',
-        'transition-colors duration-200',
+        'transition-colors duration-150',
         'focus-visible:outline-none',
         'focus-visible:ring-[3px]',
         'focus-visible:ring-ring',
