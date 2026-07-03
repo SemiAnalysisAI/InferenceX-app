@@ -19,24 +19,27 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      className={cn('inline-flex flex-wrap items-end gap-1 border-b border-border', className)}
+      className={cn('inline-flex flex-wrap items-end gap-1', className)}
       {...props}
     />
   );
 }
 
+// Active/inactive recipe mirrors the top-of-page section nav
+// (data-testid="chart-section-tabs" in src/components/tab-nav.tsx: tabLinkClass +
+// currentTabClass) so the two tab rows read as the same flat underline-strip
+// component: accent text + accent border-b-2 underline when active, muted text
+// with no background fill when inactive, and a faint border highlight on hover.
 function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
         'relative',
-        '-mb-px',
         'inline-flex',
         'items-center',
         'justify-center',
         'gap-1.5',
-        'rounded-t-md',
         'border-b-2',
         'border-transparent',
         'px-4',
@@ -45,13 +48,12 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         'font-semibold',
         'whitespace-nowrap',
         'text-muted-foreground',
-        'hover:text-foreground',
-        'hover:bg-muted/40',
-        'data-[state=active]:text-foreground',
-        'data-[state=active]:bg-muted/60',
+        'hover:border-muted-foreground/30',
+        'data-[state=active]:text-secondary',
+        'dark:data-[state=active]:text-primary',
         'data-[state=active]:border-secondary',
         'dark:data-[state=active]:border-primary',
-        'transition-colors duration-150',
+        'transition-colors duration-200',
         'focus-visible:outline-none',
         'focus-visible:ring-[3px]',
         'focus-visible:ring-ring',
