@@ -366,3 +366,73 @@ describe('generateGPUGraphTooltipContent', () => {
     expect(html).toContain('vllm-v0.6.0<br />abc123');
   });
 });
+
+// ===========================================================================
+// KV transfer library line (official + overlay + GPU-graph tooltips)
+// ===========================================================================
+describe('kv_transfer_lib tooltip line', () => {
+  function overlayConfig(overrides: Partial<OverlayTooltipConfig> = {}): OverlayTooltipConfig {
+    return {
+      ...tooltipConfig(),
+      overlayData: {
+        label: 'feature-branch',
+        hardwareConfig: mockHardwareConfig,
+        data: [],
+        runUrl: 'https://example.com',
+      } as any,
+      ...overrides,
+    };
+  }
+
+  it('shows the mapped display label in the official tooltip', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ kv_transfer_lib: 'mooncake' }) }),
+    );
+    expect(html).toContain('KV Transfer');
+    expect(html).toContain('Mooncake');
+  });
+
+  it('maps known libraries to display casing', () => {
+    for (const [raw, label] of [
+      ['nixl', 'NIXL'],
+      ['mori', 'MoRI-IO'],
+      ['ucx', 'UCX'],
+    ] as const) {
+      const html = generateTooltipContent(tooltipConfig({ data: pt({ kv_transfer_lib: raw }) }));
+      expect(html).toContain(label);
+    }
+  });
+
+  it('uppercases unmapped values instead of hiding them', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ kv_transfer_lib: 'somefuturelib' }) }),
+    );
+    expect(html).toContain('SOMEFUTURELIB');
+  });
+
+  it('renders nothing when the field is absent (unknown history)', () => {
+    const html = generateTooltipContent(tooltipConfig());
+    expect(html).not.toContain('KV Transfer');
+  });
+
+  it('shows the line in overlay (unofficial run) tooltips', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({ data: pt({ kv_transfer_lib: 'mooncake' }) }),
+    );
+    expect(html).toContain('KV Transfer');
+    expect(html).toContain('Mooncake');
+  });
+
+  it('omits the line in overlay tooltips when absent', () => {
+    const html = generateOverlayTooltipContent(overlayConfig());
+    expect(html).not.toContain('KV Transfer');
+  });
+
+  it('shows the line in GPU-graph (date comparison) tooltips', () => {
+    const html = generateGPUGraphTooltipContent(
+      tooltipConfig({ data: pt({ kv_transfer_lib: 'nixl' }) }),
+    );
+    expect(html).toContain('KV Transfer');
+    expect(html).toContain('NIXL');
+  });
+});

@@ -57,6 +57,9 @@ const NON_METRIC_KEYS = new Set([
   'decode_num_workers',
   'num_prefill_gpu',
   'num_decode_gpu',
+  // KV-cache transfer library (string, e.g. 'mooncake'). Surfaced as a
+  // sibling of the metrics JSONB by mapBenchmarkRow, like `workers`.
+  'kv_transfer_lib',
   // per-worker measured-power array (not a numeric scalar). Surfaced as a
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
@@ -105,6 +108,13 @@ export interface BenchmarkParams {
    * predating the multinode patch.
    */
   workers?: WorkerPower[];
+  /**
+   * KV-cache transfer library used by a disaggregated run ('mooncake',
+   * 'nixl', 'mori', 'ucx'), derived by the runner's process_result.py.
+   * Undefined for non-disagg runs, runs predating the field, and runs whose
+   * recipe could not be resolved — consumers must treat that as unknown.
+   */
+  kvTransferLib?: string;
 }
 
 /**
@@ -222,6 +232,13 @@ export function mapBenchmarkRow(
   // narrowing — anything other than a non-empty array of objects is dropped.
   const workers = extractWorkers(row.workers);
 
+  // KV transfer library: non-empty string, normalized to lowercase.
+  // Anything else (absent, empty, non-string) is treated as unknown.
+  const kvTransferLib =
+    typeof row.kv_transfer_lib === 'string' && row.kv_transfer_lib.trim() !== ''
+      ? row.kv_transfer_lib.trim().toLowerCase()
+      : undefined;
+
   return {
     config: {
       hardware: gpuKey,
@@ -248,6 +265,7 @@ export function mapBenchmarkRow(
     image,
     metrics,
     workers,
+    kvTransferLib,
   };
 }
 

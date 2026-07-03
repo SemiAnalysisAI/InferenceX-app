@@ -106,6 +106,16 @@ describe('normalizeArtifactRows', () => {
     expect(rows[0].hardware).toBe('mi355x');
   });
 
+  it('carries kv_transfer_lib so overlays show the KV transfer library', () => {
+    const rows = normalizeArtifactRows([rawRow({ kv_transfer_lib: 'mooncake' })], '2026-03-01');
+    expect(rows[0].kv_transfer_lib).toBe('mooncake');
+  });
+
+  it('nulls kv_transfer_lib for artifacts predating the field', () => {
+    const rows = normalizeArtifactRows([rawRow()], '2026-03-01');
+    expect(rows[0].kv_transfer_lib).toBeNull();
+  });
+
   it('resolves model from infmax_model_prefix', () => {
     const rows = normalizeArtifactRows(
       [rawRow({ infmax_model_prefix: 'gptoss', model: 'openai/gpt-oss-120b' })],

@@ -39,6 +39,13 @@ export interface BenchmarkRow {
    * aggregate_power.py.
    */
   workers?: WorkerPower[];
+  /**
+   * KV-cache transfer library for disaggregated runs ('mooncake', 'nixl',
+   * 'mori', 'ucx'), emitted by the runner since mid-2026. Null/undefined means
+   * unknown (pre-field history, non-disagg runs, unresolvable recipes) — the
+   * UI must render nothing rather than assume a default.
+   */
+  kv_transfer_lib?: string | null;
   date: string;
   run_url: string | null;
 }

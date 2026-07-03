@@ -76,6 +76,8 @@ interface RawBenchmarkResult {
   metrics: Record<string, number>;
   /** Added in migration 006; older dumps omit this field — surfaced as undefined. */
   workers?: BenchmarkWorkerRow[] | null;
+  /** Added in migration 008; older dumps omit this field — surfaced as null. */
+  kv_transfer_lib?: string | null;
   error: string | null;
   server_log_id: number | null;
 }
@@ -307,6 +309,9 @@ function toBenchmarkRow(
     // simply lack the field — defensively narrow to an array or undefined so
     // downstream consumers can rely on the property being well-typed.
     workers: Array.isArray(br.workers) ? br.workers : undefined,
+    // kv_transfer_lib: optional column added in migration 008. Older dumps
+    // lack the field — normalize to null (unknown).
+    kv_transfer_lib: typeof br.kv_transfer_lib === 'string' ? br.kv_transfer_lib : null,
     date: toDateString(br.date),
     run_url: buildRunUrl(wr),
   };

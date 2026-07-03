@@ -72,6 +72,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.
     workers: Array.isArray(row.workers) ? row.workers : undefined,
+    kv_transfer_lib: row.kv_transfer_lib ?? undefined,
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
