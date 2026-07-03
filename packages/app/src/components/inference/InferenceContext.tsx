@@ -245,14 +245,13 @@ export function InferenceProvider({
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
   const [showPointLabels, setShowPointLabels] = useState(() => {
-    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels
-    // explicitly so the share link's intent survives future default changes.
+    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels.
     if (getUrlParam('i_nolabel') === '1') return false;
     if (getUrlParam('i_label') === '0') return false;
     if (getUrlParam('i_label') === '1') return true;
-    // Default on: point labels (TP + concurrency, or the fuller parallelism
-    // breakdown when Parallelism Labels is toggled on) are useful either way.
-    return true;
+    // Default off: per-point labels (TP + concurrency) clutter the chart; the
+    // per-line hardware labels (on by default) are the primary annotation.
+    return false;
   });
   const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
   // Parallelism labels default off (?i_advlabel=1 overrides on).
@@ -262,8 +261,8 @@ export function InferenceProvider({
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
   );
-  // Line labels default off (?i_linelabel=1 overrides on).
-  const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') === '1');
+  // Line labels default on (?i_linelabel=0 overrides off).
+  const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') !== '0');
   const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
   const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
     () => getUrlParam('i_mc') === '1',
@@ -1039,7 +1038,7 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
-      i_label: showPointLabels ? '' : '0',
+      i_label: showPointLabels ? '1' : '',
       i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
       i_xmetric: selectedXAxisMetric || '',
@@ -1049,7 +1048,7 @@ export function InferenceProvider({
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
-      i_linelabel: showLineLabels ? '1' : '',
+      i_linelabel: showLineLabels ? '' : '0',
       i_speed: showSpeedOverlay ? '1' : '',
       i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,

@@ -84,8 +84,8 @@ type InferenceViewMode = 'chart' | 'table';
 
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string }[] = [
   { value: 'interactivity', label: 'Interactivity' },
-  { value: 'ttft', label: 'TTFT' },
   { value: 'e2e', label: 'E2E Latency' },
+  { value: 'ttft', label: 'TTFT' },
   { value: 'normalized-e2e', label: 'Normalized E2E' },
   { value: 'session-time', label: 'Session Time' },
   { value: 'prefill-tps', label: 'Prefill TPS / user' },
