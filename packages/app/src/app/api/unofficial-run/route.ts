@@ -58,6 +58,7 @@ export function normalizeArtifactRows(
       // Surface the same per-worker payload the DB path emits so unofficial
       // overlays carry the multinode measured-power breakdown too.
       workers: params.workers,
+      kv_transfer_lib: params.kvTransferLib ?? null,
       date,
       run_url: runUrl,
     });

@@ -570,3 +570,40 @@ describe('extractWorkers', () => {
     expect(extractWorkers([null, 'bad', 0, undefined])).toBeUndefined();
   });
 });
+
+describe('kv_transfer_lib', () => {
+  it('captures kv_transfer_lib as a config sibling, not a metric', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row({ kv_transfer_lib: 'mooncake' }), tracker);
+
+    expect(result!.kvTransferLib).toBe('mooncake');
+    expect(result!.metrics).not.toHaveProperty('kv_transfer_lib');
+  });
+
+  it('normalizes to lowercase and trims', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row({ kv_transfer_lib: ' NIXL ' }), tracker);
+
+    expect(result!.kvTransferLib).toBe('nixl');
+  });
+
+  it('is undefined when absent', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row(), tracker);
+
+    expect(result!.kvTransferLib).toBeUndefined();
+  });
+
+  it('is undefined for empty or non-string values', () => {
+    const tracker = createSkipTracker();
+    expect(
+      mapBenchmarkRow(makeV2Row({ kv_transfer_lib: '' }), tracker)!.kvTransferLib,
+    ).toBeUndefined();
+    expect(
+      mapBenchmarkRow(makeV2Row({ kv_transfer_lib: 42 }), tracker)!.kvTransferLib,
+    ).toBeUndefined();
+    expect(
+      mapBenchmarkRow(makeV2Row({ kv_transfer_lib: null }), tracker)!.kvTransferLib,
+    ).toBeUndefined();
+  });
+});

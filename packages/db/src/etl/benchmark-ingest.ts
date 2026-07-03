@@ -46,11 +46,13 @@ export async function bulkIngestBenchmarkRows(
   const workersJsons = deduped.map((r) =>
     r.workers === undefined ? null : JSON.stringify(r.workers),
   );
+  // kv_transfer_lib is optional — SQL NULL for rows that didn't emit it.
+  const kvTransferLibs = deduped.map((r) => r.kvTransferLib ?? null);
 
   const result = await sql<{ inserted: boolean; id: number }[]>`
     insert into benchmark_results (
       workflow_run_id, config_id, benchmark_type, date,
-      isl, osl, conc, image, metrics, workers
+      isl, osl, conc, image, metrics, workers, kv_transfer_lib
     )
     select
       ${workflowRunId},
@@ -62,12 +64,14 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(concs)}::int[]),
       unnest(${sql.array(images)}),
       unnest(${sql.array(metricsJsons)}::jsonb[]),
-      unnest(${sql.array(workersJsons)}::jsonb[])
+      unnest(${sql.array(workersJsons)}::jsonb[]),
+      unnest(${sql.array(kvTransferLibs)}::text[])
     on conflict (workflow_run_id, config_id, benchmark_type, isl, osl, conc)
     do update set
       metrics = excluded.metrics,
       image = excluded.image,
-      workers = excluded.workers
+      workers = excluded.workers,
+      kv_transfer_lib = excluded.kv_transfer_lib
     returning (xmax = 0) as inserted, id
   `;
 

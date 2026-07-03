@@ -793,3 +793,23 @@ describe('transformBenchmarkRows — dp_attention narrowing', () => {
     expect(point.decode_dp_attention).toBe(true);
   });
 });
+
+describe('kv_transfer_lib passthrough', () => {
+  it('carries kv_transfer_lib from the row to the chart point', () => {
+    const rows = [makeRow({ kv_transfer_lib: 'mooncake' })];
+    const { chartData } = transformBenchmarkRows(rows);
+    expect(chartData.flat()[0].kv_transfer_lib).toBe('mooncake');
+  });
+
+  it('normalizes null to undefined (unknown)', () => {
+    const rows = [makeRow({ kv_transfer_lib: null })];
+    const { chartData } = transformBenchmarkRows(rows);
+    expect(chartData.flat()[0].kv_transfer_lib).toBeUndefined();
+  });
+
+  it('is undefined when the row predates the field', () => {
+    const rows = [makeRow()];
+    const { chartData } = transformBenchmarkRows(rows);
+    expect(chartData.flat()[0].kv_transfer_lib).toBeUndefined();
+  });
+});

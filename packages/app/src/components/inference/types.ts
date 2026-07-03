@@ -141,6 +141,10 @@ export interface AggDataEntry {
   // (a prefill, decode, agg, or frontend role). Optional because pre-multinode
   // and pre-aggregate_power.py runs don't emit it.
   workers?: WorkerPower[];
+  // KV-cache transfer library for disagg runs ('mooncake', 'nixl', 'mori',
+  // 'ucx'). Null/undefined = unknown (pre-field history, non-disagg runs) —
+  // render nothing rather than assume a default.
+  kv_transfer_lib?: string | null;
   disagg: boolean;
   num_prefill_gpu: number;
   num_decode_gpu: number;

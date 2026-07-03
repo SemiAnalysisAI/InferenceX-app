@@ -88,6 +88,27 @@ const runLinkHTML = (runUrl?: string) =>
 const tooltipLine = (label: string, value: string | number) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
+/** Display labels for kv_transfer_lib values; unmapped values are uppercased. */
+const KV_TRANSFER_LIB_LABELS: Record<string, string> = {
+  mooncake: 'Mooncake',
+  nixl: 'NIXL',
+  mori: 'MoRI-IO',
+  ucx: 'UCX',
+};
+
+/**
+ * KV-cache transfer library line for disagg runs. Empty when the field is
+ * absent (pre-2026 history, non-disagg runs, unresolvable recipes) — unknown
+ * must render nothing, never a guessed default.
+ */
+const kvTransferTooltipLine = (d: InferenceData): string =>
+  d.kv_transfer_lib
+    ? tooltipLine(
+        'KV Transfer',
+        KV_TRANSFER_LIB_LABELS[d.kv_transfer_lib] ?? d.kv_transfer_lib.toUpperCase(),
+      )
+    : '';
+
 const shortenSha = (image: string) =>
   image.replaceAll(/(?<shaPrefix>sha256:[a-f0-9]{7})[a-f0-9]+/giu, '$<shaPrefix>…');
 
@@ -180,6 +201,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       }
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
+      ${kvTransferTooltipLine(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
@@ -236,6 +258,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       </div>
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
+      ${kvTransferTooltipLine(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
@@ -295,6 +318,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       }
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
+      ${kvTransferTooltipLine(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
