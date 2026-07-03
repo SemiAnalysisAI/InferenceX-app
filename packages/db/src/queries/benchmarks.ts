@@ -145,7 +145,11 @@ export async function getLatestBenchmarks(
         br.image,
         br.metrics,
         br.workers,
-        br.kv_transfer_lib,
+        -- Read via to_jsonb(row)->>'kv_transfer_lib' rather than a bare column ref so the
+        -- query still plans (and returns null) until migration 008 is applied. A bare
+        -- reference to a non-existent column fails at parse time and 500s the whole
+        -- endpoint (same failure mode as the migration-006 workers rollout).
+        to_jsonb(br) ->> 'kv_transfer_lib' AS kv_transfer_lib,
         br.date::text,
         CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
       FROM benchmark_results br
@@ -189,7 +193,8 @@ export async function getLatestBenchmarks(
       lb.image,
       lb.metrics,
       lb.workers,
-      lb.kv_transfer_lib,
+      -- to_jsonb guard: tolerate a pre-migration-008 view (see date branch above).
+      to_jsonb(lb) ->> 'kv_transfer_lib' AS kv_transfer_lib,
       lb.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM latest_benchmarks lb
@@ -239,7 +244,8 @@ export async function getBenchmarksForRun(
       br.image,
       br.metrics,
       br.workers,
-      br.kv_transfer_lib,
+      -- to_jsonb guard: tolerate a pre-migration-008 base table (see getLatestBenchmarks).
+      to_jsonb(br) ->> 'kv_transfer_lib' AS kv_transfer_lib,
       br.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM benchmark_results br
@@ -289,7 +295,8 @@ export async function getAllBenchmarksForHistory(
       br.conc,
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
       br.workers,
-      br.kv_transfer_lib,
+      -- to_jsonb guard: tolerate a pre-migration-008 base table (see getLatestBenchmarks).
+      to_jsonb(br) ->> 'kv_transfer_lib' AS kv_transfer_lib,
       br.date::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url
     FROM configs c
