@@ -349,9 +349,12 @@ async function main(): Promise<void> {
   }
   if (parsedChangelogs.length === 0) {
     const headRef = workflowGhInfo?.headBranch ?? workflowGhInfo?.headSha ?? `run-${runIdStr}`;
+    // Prefer the workflow's display name ("e2e Test - B300 DSv4 AgentX vLLM 1h
+    // + 10m warmup") — it describes the sweep; the head commit message usually
+    // describes an unrelated code change.
     const fallbackDescription =
+      workflowGhInfo?.name?.trim() ||
       workflowGhInfo?.headCommitMessage?.trim().split('\n')[0]?.trim() ||
-      workflowGhInfo?.name ||
       `GitHub Actions run ${runIdStr}`;
 
     parsedChangelogs.push({
