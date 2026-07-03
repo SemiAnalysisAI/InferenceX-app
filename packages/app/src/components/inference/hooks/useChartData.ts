@@ -400,9 +400,19 @@ export function useChartData(
         const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
         // Default x-axis = chart's natural latency metric, percentile-adjusted
-        // for the agentic case (median_e2el → p99_e2el etc.). For non-agentic
-        // scenarios `withPercentile` is a no-op when percentile === 'median'.
-        const naturalX = withPercentile(chartDef.x, selectedPercentile) as keyof AggDataEntry;
+        // for the agentic case (median_e2el → p99_e2el etc.). Percentiles only
+        // exist for agentic scenarios; fixed-seq benchmarks have no p90_/p99_
+        // columns, and the percentile selector is hidden for them — but its
+        // state persists at the 'p90' default across mode/sequence switches.
+        // Applying that stale percentile to a fixed-seq metric yields a null
+        // column (e.g. p90_intvty), which renders as x=0/NaN and drops the
+        // point from the chart. Force median for non-agentic so the natural
+        // metric (median_intvty / median_e2el) is used.
+        const isAgentic = selectedSequence === Sequence.AgenticTraces;
+        const naturalX = withPercentile(
+          chartDef.x,
+          isAgentic ? selectedPercentile : 'median',
+        ) as keyof AggDataEntry;
         let xAxisField: keyof AggDataEntry = naturalX;
         let xAxisLabel = chartDef.x_label;
 
@@ -423,8 +433,6 @@ export function useChartData(
           : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
-
-        const isAgentic = selectedSequence === Sequence.AgenticTraces;
 
         if (
           effectiveXMetric &&
