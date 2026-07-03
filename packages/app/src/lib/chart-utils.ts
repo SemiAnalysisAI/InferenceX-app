@@ -475,6 +475,17 @@ export const getNestedYValue = <T extends InferenceData>(point: T, key: string):
 };
 
 /**
+ * Whether a point may sit on the Pareto frontier / "optimal" set. Points with a
+ * non-positive or non-finite x (e.g. interactivity = 0 when ITL is missing/zero,
+ * or a 0/negative latency) are degenerate — no real config runs there — so they
+ * must never be marked optimal. Apply this to a frontier function's INPUT; the
+ * points still render in the show-all view, they just lose roofline eligibility.
+ * NOTE: filter at the call site, not inside the paretoFront* functions — those are
+ * kept 1:1 with the calculator's Python port (iso_interactivity.py).
+ */
+export const isFrontierEligible = (p: { x: number }): boolean => Number.isFinite(p.x) && p.x > 0;
+
+/**
  * Calculates the Pareto front (upper right) for a given set of points.
  */
 export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] => {
@@ -639,7 +650,9 @@ export const calculateRoofline = (
     | `measuredJPerInputToken.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
-  const pointsForRoofline = points.map((p) => {
+  // Exclude degenerate x <= 0 points (see isFrontierEligible) so they never
+  // anchor a roofline or show up in the optimal-only view.
+  const pointsForRoofline = points.filter(isFrontierEligible).map((p) => {
     const yValue = getNestedYValue(p, yKey);
     return { ...p, y: yValue };
   });

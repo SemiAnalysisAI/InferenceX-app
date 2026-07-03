@@ -30,6 +30,7 @@ import {
   POINT_SIZE,
 } from '@/lib/chart-rendering';
 import {
+  isFrontierEligible,
   paretoFrontLowerLeft,
   paretoFrontLowerRight,
   paretoFrontUpperLeft,
@@ -230,14 +231,17 @@ const GPUGraph = React.memo(
         | 'lower_right'
         | undefined;
       for (const key of Object.keys(groupedData)) {
+        // Exclude degenerate x <= 0 points (interactivity = 0, etc.) from the
+        // frontier so they are never drawn as optimal.
+        const eligible = groupedData[key].filter(isFrontierEligible);
         result[key] =
           dir === 'upper_right'
-            ? paretoFrontUpperRight(groupedData[key])
+            ? paretoFrontUpperRight(eligible)
             : dir === 'upper_left'
-              ? paretoFrontUpperLeft(groupedData[key])
+              ? paretoFrontUpperLeft(eligible)
               : dir === 'lower_left'
-                ? paretoFrontLowerLeft(groupedData[key])
-                : paretoFrontLowerRight(groupedData[key]);
+                ? paretoFrontLowerLeft(eligible)
+                : paretoFrontLowerRight(eligible);
       }
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);

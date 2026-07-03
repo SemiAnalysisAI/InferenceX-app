@@ -51,7 +51,11 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
+import {
+  isFrontierEligible,
+  paretoFrontForDirection,
+  type ParetoDirection,
+} from '@/lib/chart-utils';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
@@ -482,9 +486,9 @@ const ScatterGraph = React.memo(
           // before paretoing (otherwise we'd recompute a fresh frontier
           // on the swapped x axis and reintroduce the benchmark hack).
           const flagged = datePoints.some((p) => p.isOnE2eFrontier !== undefined);
-          const seedPoints = flagged
-            ? datePoints.filter((p) => p.isOnE2eFrontier === true)
-            : datePoints;
+          const seedPoints = (
+            flagged ? datePoints.filter((p) => p.isOnE2eFrontier === true) : datePoints
+          ).filter(isFrontierEligible);
           if (seedPoints.length === 0) continue;
           combined.push(...frontierFn(seedPoints));
         }
@@ -603,7 +607,7 @@ const ScatterGraph = React.memo(
       const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        const front = frontierFn(group.points);
+        const front = frontierFn(group.points.filter(isFrontierEligible));
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }

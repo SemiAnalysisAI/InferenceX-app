@@ -542,6 +542,32 @@ describe('calculateRoofline', () => {
     expect(front[1].y).toBe(8);
   });
 
+  it('excludes x <= 0 points (e.g. interactivity = 0) from the frontier', () => {
+    // A degenerate x=0 point with the highest tpPerGpu would otherwise anchor the
+    // upper_right front as its leftmost point and show up as "optimal".
+    const points = [
+      pt(0, 999, 'h100', { tpPerGpuY: 999 }), // interactivity = 0 → degenerate
+      pt(1, 999, 'h100', { tpPerGpuY: 50 }),
+      pt(2, 999, 'h100', { tpPerGpuY: 80 }),
+    ];
+    const front = calculateRoofline(points, 'tpPerGpu.y', 'upper_right');
+    expect(front.every((p) => p.x > 0)).toBe(true);
+    expect(front.some((p) => p.x === 0)).toBe(false);
+    // real front is the two positive-x points
+    expect(front.map((p) => p.y)).toEqual([50, 80]);
+  });
+
+  it('excludes non-finite / negative x from the frontier', () => {
+    const points = [
+      pt(Number.NaN, 999, 'h100', { tpPerGpuY: 999 }),
+      pt(-1, 999, 'h100', { tpPerGpuY: 999 }),
+      pt(3, 999, 'h100', { tpPerGpuY: 40 }),
+    ];
+    const front = calculateRoofline(points, 'tpPerGpu.y', 'upper_right');
+    expect(front).toHaveLength(1);
+    expect(front[0].x).toBe(3);
+  });
+
   it.each([
     ['upper_right', 2], // A(1,50) and B(2,80) both on front
     ['upper_left', 1], // B(2,80) dominates A(1,50) → only B kept
