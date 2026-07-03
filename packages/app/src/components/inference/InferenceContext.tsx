@@ -241,8 +241,6 @@ export function InferenceProvider({
   const dataQuickFilters = activeTab === 'historical' ? EMPTY_QUICK_FILTERS : quickFilters;
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
-    // Inference chart defaults to high contrast (?i_hc=0 overrides off).
-    defaultHighContrast: true,
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
@@ -252,14 +250,14 @@ export function InferenceProvider({
     if (getUrlParam('i_nolabel') === '1') return false;
     if (getUrlParam('i_label') === '0') return false;
     if (getUrlParam('i_label') === '1') return true;
-    // Default on: parallelism labels (also default on) are point labels and
-    // are pointless without them shown.
+    // Default on: point labels (TP + concurrency, or the fuller parallelism
+    // breakdown when Parallelism Labels is toggled on) are useful either way.
     return true;
   });
   const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
-  // Parallelism labels default on (?i_advlabel=0 overrides off).
+  // Parallelism labels default off (?i_advlabel=1 overrides on).
   const [useAdvancedLabels, setUseAdvancedLabels] = useState(
-    () => getUrlParam('i_advlabel') !== '0',
+    () => getUrlParam('i_advlabel') === '1',
   );
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
@@ -1042,14 +1040,14 @@ export function InferenceProvider({
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
       i_label: showPointLabels ? '' : '0',
-      i_hc: highContrast ? '' : '0',
+      i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
       i_xmetric: selectedXAxisMetric || '',
       i_e2e_xmetric: selectedE2eXAxisMetric || '',
       i_xmode: selectedXAxisMode,
       i_scale: scaleType,
       i_legend: isLegendExpanded ? '' : '0',
-      i_advlabel: useAdvancedLabels ? '' : '0',
+      i_advlabel: useAdvancedLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_linelabel: showLineLabels ? '1' : '',
       i_speed: showSpeedOverlay ? '1' : '',

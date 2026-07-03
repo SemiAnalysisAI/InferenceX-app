@@ -24,8 +24,8 @@ describe('Gradient Labels Toggle', () => {
     cy.get('label[for="scatter-parallelism-labels"]').should('contain.text', 'Parallelism Labels');
   });
 
-  it('Parallelism Labels toggle is on by default', () => {
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+  it('Parallelism Labels toggle is off by default', () => {
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
   it('per-point labels are visible by default (gradient labels off)', () => {
@@ -60,7 +60,7 @@ describe('Gradient Labels Toggle', () => {
   });
 
   it('both toggles can be enabled simultaneously', () => {
-    // Parallelism Labels is on by default; ensure it's on, then turn on Gradient.
+    // Parallelism Labels is off by default; turn it on, then turn on Gradient.
     cy.get('#scatter-parallelism-labels').then(($el) => {
       if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
     });
@@ -71,8 +71,10 @@ describe('Gradient Labels Toggle', () => {
     cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
 
-    // Reset gradient for next tests (parallelism stays at its default-on).
+    // Reset both for next tests (each subsequent test does a fresh cy.visit,
+    // but keep state tidy here too).
     cy.get('#scatter-gradient-labels').click();
+    cy.get('#scatter-parallelism-labels').click();
   });
 
   it('URL param i_gradlabel=1 enables gradient labels on load', () => {

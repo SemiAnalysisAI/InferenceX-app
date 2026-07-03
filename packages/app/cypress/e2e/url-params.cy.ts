@@ -236,10 +236,10 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('High contrast mode', () => {
-    it('inference loads with high contrast on by default', () => {
+    it('inference loads with high contrast off by default', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').should('exist');
-      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
     });
 
     it('i_hc=0 disables high contrast on load', () => {
@@ -273,18 +273,34 @@ describe('URL Parameter Persistence', () => {
       cy.get('#eval-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
-    it('historical trends tab shares the inference high-contrast default (on)', () => {
+    it('historical trends tab shares the inference high-contrast default (off)', () => {
       // Historical reads highContrast from the same InferenceContext as the
-      // scatter chart, so it inherits the default-on behavior.
+      // scatter chart, so it inherits the default-off behavior.
       visitWithDismissedModal('/historical');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
-      cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'checked');
+      cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
     });
 
     it('i_hc=1 enables historical trends high contrast', () => {
       visitWithDismissedModal('/historical?i_hc=1');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
       cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'checked');
+    });
+  });
+
+  describe('Default toggle states (share-link correctness)', () => {
+    it('a bare /inference link with neither param renders high contrast AND parallelism labels off', () => {
+      visitWithDismissedModal('/inference');
+      cy.get('[data-testid="scatter-graph"]').should('exist');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    });
+
+    it('i_hc=1&i_advlabel=1 enables both high contrast and parallelism labels on load', () => {
+      visitWithDismissedModal('/inference?i_hc=1&i_advlabel=1');
+      cy.get('[data-testid="scatter-graph"]').should('exist');
+      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     });
   });
 });
