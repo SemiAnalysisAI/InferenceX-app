@@ -197,14 +197,15 @@ export function mapBenchmarkRow(
   }
 
   // Failed-run guard: aggregated artifacts (`results_bmk`) merge rows from
-  // every runner, including ones with 0 successful requests and null metrics.
-  // Without this skip, the empty row's nulls overwrite a good row via
+  // every runner, including failed ones with 0 successful requests and null
+  // metrics — both the "issued requests but none succeeded" case (total > 0)
+  // and the "server never came up" case (total === 0). Without this skip the
+  // empty row lands as a dataless point, or overwrites a good row via
   // ON CONFLICT DO UPDATE when both share the same (config, conc, offload).
   if (
     typeof row.num_requests_successful === 'number' &&
     row.num_requests_successful === 0 &&
-    typeof row.num_requests_total === 'number' &&
-    row.num_requests_total > 0
+    typeof row.num_requests_total === 'number'
   ) {
     tracker.skips.failedRun++;
     return null;

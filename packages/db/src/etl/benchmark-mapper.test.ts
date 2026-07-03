@@ -850,6 +850,16 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(tracker.skips.failedRun).toBe(1);
   });
 
+  it('skips rows where the server never came up (zero total requests)', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({ num_requests_successful: 0, num_requests_total: 0 }),
+      tracker,
+    );
+    expect(result).toBeNull();
+    expect(tracker.skips.failedRun).toBe(1);
+  });
+
   it('leaves v2 flat agentic rows byte-identical (no flattening applied)', () => {
     const tracker = createSkipTracker();
     const result = mapBenchmarkRow(
