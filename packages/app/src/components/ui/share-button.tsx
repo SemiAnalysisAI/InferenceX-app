@@ -10,7 +10,11 @@ import { buildShareUrl } from '@/lib/url-state';
 import { Button } from './button';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
-export function ShareButton() {
+interface ShareButtonProps {
+  testId?: string;
+}
+
+export function ShareButton({ testId = 'share-button' }: ShareButtonProps = {}) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState('');
@@ -53,7 +57,7 @@ export function ShareButton() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          data-testid="share-button"
+          data-testid={testId}
           size="sm"
           className="h-8 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium"
           title="Share this view"
@@ -65,7 +69,7 @@ export function ShareButton() {
       <PopoverContent
         align="end"
         className="w-80"
-        data-testid="share-popover"
+        data-testid={`${testId}-popover`}
         onOpenAutoFocus={(event) => {
           // Keep focus on the URL input rather than the first focusable child.
           event.preventDefault();
@@ -83,14 +87,14 @@ export function ShareButton() {
           <div className="flex items-center gap-1.5">
             <input
               ref={inputRef}
-              data-testid="share-url-input"
+              data-testid={`${testId}-url-input`}
               readOnly
               value={url}
               onFocus={(event) => event.currentTarget.select()}
               className="border-input bg-background h-8 flex-1 min-w-0 rounded-md border px-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button
-              data-testid="share-copy-button"
+              data-testid={`${testId}-copy-button`}
               size="sm"
               variant="outline"
               className="h-8 gap-1.5 text-xs shrink-0"

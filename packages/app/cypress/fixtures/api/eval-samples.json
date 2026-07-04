@@ -1,0 +1,63 @@
+{
+  "total": 5,
+  "passedTotal": 4,
+  "failedTotal": 1,
+  "source": "db",
+  "samples": [
+    {
+      "docId": 1,
+      "prompt": "Janet's ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers market daily for $2 per fresh duck egg. How much does she make every day at the farmers market?",
+      "target": "18",
+      "response": "18",
+      "rawResponse": "18",
+      "demonstrations": null,
+      "passed": true,
+      "score": 1,
+      "metrics": { "em_strict": 1 }
+    },
+    {
+      "docId": 2,
+      "prompt": "A robe takes 2 bolts of blue fiber and half that much white fiber. How many bolts in total does it take?",
+      "target": "3",
+      "response": "3",
+      "rawResponse": "3",
+      "demonstrations": null,
+      "passed": true,
+      "score": 1,
+      "metrics": { "em_strict": 1 }
+    },
+    {
+      "docId": 3,
+      "prompt": "James decides to run 3 sprints 3 times a week. He runs 60 meters each sprint. How many total meters does he run a week?",
+      "target": "540",
+      "response": "540",
+      "rawResponse": "540",
+      "demonstrations": null,
+      "passed": true,
+      "score": 1,
+      "metrics": { "em_strict": 1 }
+    },
+    {
+      "docId": 4,
+      "prompt": "Toulouse has twice as many sheep as Charleston. Charleston has 4 times as many sheep as Seattle. How many sheep do Toulouse, Charleston, and Seattle have together if Seattle has 20 sheep?",
+      "target": "260",
+      "response": "260",
+      "rawResponse": "260",
+      "demonstrations": null,
+      "passed": true,
+      "score": 1,
+      "metrics": { "em_strict": 1 }
+    },
+    {
+      "docId": 5,
+      "prompt": "Carlos is planting a lemon tree. The tree will cost $90 to plant. Each year it will grow 7 lemons, which he can sell for $1.5 each. It costs $3 a year to water and feed the tree. How many years will it take before he starts earning money on the lemon tree?",
+      "target": "11",
+      "response": "12",
+      "rawResponse": "12",
+      "demonstrations": null,
+      "passed": false,
+      "score": 0,
+      "metrics": { "em_strict": 0 }
+    }
+  ]
+}

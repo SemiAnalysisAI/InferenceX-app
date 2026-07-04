@@ -58,6 +58,10 @@ const URL_STATE_KEYS = [
   'e_labels',
   'e_legend',
   'e_active',
+  // Evaluation drawer
+  'e_drawer',
+  'e_dfilter',
+  'e_dq',
   // Reliability
   'r_range',
   'r_pct',
@@ -117,6 +121,9 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   e_labels: '',
   e_legend: '',
   e_active: '',
+  e_drawer: '',
+  e_dfilter: '',
+  e_dq: '',
   r_range: 'last-3-months',
   r_pct: '',
   r_hc: '',

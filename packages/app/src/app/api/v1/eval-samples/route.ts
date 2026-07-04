@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import { getEvalSamples } from '@semianalysisai/inferencex-db/queries/eval-samples';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { extractDemonstrations } from '@/lib/eval-sample-utils';
+import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,41 @@ export async function GET(request: NextRequest) {
     );
   }
   const filter = filterParam as 'all' | 'passed' | 'failed';
+
+  if (FIXTURES_MODE) {
+    // The fixture is captured for filter='all'. Recompute the per-filter view
+    // (samples + total) here so chip counts and the filter chip itself match
+    // what the live route would return.
+    const fx = loadFixture<{
+      samples: {
+        docId: number;
+        prompt: string | null;
+        target: string | null;
+        response: string | null;
+        rawResponse: string | null;
+        demonstrations: { question: string; answer: string }[] | null;
+        passed: boolean | null;
+        score: number | null;
+        metrics: Record<string, number>;
+      }[];
+      total: number;
+      passedTotal: number;
+      failedTotal: number;
+      source: 'db' | 'github_artifact';
+    }>('eval-samples');
+    const filtered =
+      filter === 'all'
+        ? fx.samples
+        : fx.samples.filter((s) => (filter === 'passed' ? s.passed === true : s.passed === false));
+    const sliced = filtered.slice(offset, offset + limit);
+    return cachedJson({
+      samples: sliced,
+      total: filter === 'all' ? fx.total : filter === 'passed' ? fx.passedTotal : fx.failedTotal,
+      passedTotal: fx.passedTotal,
+      failedTotal: fx.failedTotal,
+      source: fx.source,
+    });
+  }
 
   try {
     const result = await getCachedEvalSamples(evalResultId, filter, offset, limit);

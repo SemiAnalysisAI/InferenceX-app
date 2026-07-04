@@ -26,6 +26,17 @@ const fixturesDir = resolve(__dirname, '..', 'cypress', 'fixtures', 'api');
 // doesn't assert on specific values, so any realistic snapshot suffices.
 const BENCHMARK_MODEL = 'DeepSeek-R1-0528';
 
+// eval-samples: the fixture represents a single eval_result_id. We pick the
+// first non-disaggregated dsr1 gsm8k row (most likely to have samples ingested).
+// The cypress tests intercept ALL eval-samples requests with this fixture, so
+// the specific ID doesn't matter — only the shape matters.
+const EVAL_SAMPLES_MODEL = 'dsr1';
+const EVAL_SAMPLES_TASK = 'gsm8k';
+// How many sample rows to keep per filter variant (all / passed / failed).
+// Enough to render the drawer and exercise filter-chip counts; not so many
+// that the fixture gets large.
+const EVAL_SAMPLES_LIMIT = 10;
+
 // History must cover every (isl, osl) combo that appears in the benchmarks
 // fixture, otherwise the drill-down trend modal shows "no historical data"
 // when the user double-clicks a scatter point with a non-default (isl, osl).
@@ -140,9 +151,35 @@ async function main() {
     `Latest date: ${latestDate}; keeping top ${TOP_DATES_PER_PARTITION} dates per partition`,
   );
 
+  interface EvalSampleRow {
+    docId: number;
+    prompt: string | null;
+    target: string | null;
+    response: string | null;
+    rawResponse: string | null;
+    demonstrations: { question: string; answer: string }[] | null;
+    passed: boolean | null;
+    score: number | null;
+    metrics: Record<string, number>;
+  }
+  interface EvalSamplesResponse {
+    total: number;
+    passedTotal: number;
+    failedTotal: number;
+    source: string;
+    samples: EvalSampleRow[];
+  }
+  interface EvalRow {
+    id: string;
+    model: string;
+    task: string;
+    disagg: boolean;
+    date: string;
+  }
+
   const availability = await fetchJson<{ date: string; model: string }[]>('/api/v1/availability');
   const reliability = await fetchJson<{ date: string; hardware: string }[]>('/api/v1/reliability');
-  const evaluations = await fetchJson<{ date: string; model: string }[]>('/api/v1/evaluations');
+  const evaluations = await fetchJson<EvalRow[]>('/api/v1/evaluations');
 
   // Latest-snapshot: already deduped to one row per config, no date filter.
   // ~20 conc levels per (hw, fw, prec, isl, osl) — sample down to keep the
@@ -177,6 +214,37 @@ async function main() {
       ...(await fetchJson<HistoryRow[]>(
         `/api/v1/benchmarks/history?model=${encodeURIComponent(HISTORY_MODEL)}&isl=${isl}&osl=${osl}`,
       )),
+    );
+  }
+
+  // Find a non-disaggregated eval row with samples likely to be ingested.
+  const evalSampleSourceRow = evaluations.find(
+    (r) => r.model === EVAL_SAMPLES_MODEL && r.task === EVAL_SAMPLES_TASK && !r.disagg,
+  );
+  let evalSamples: EvalSamplesResponse | null = null;
+  if (evalSampleSourceRow) {
+    const params = new URLSearchParams({
+      eval_result_id: evalSampleSourceRow.id,
+      filter: 'all',
+      offset: '0',
+      limit: String(EVAL_SAMPLES_LIMIT),
+    });
+    try {
+      const raw = await fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples?${params}`);
+      // Strip the demonstrations field from each sample to keep the fixture small.
+      evalSamples = {
+        ...raw,
+        samples: raw.samples.slice(0, EVAL_SAMPLES_LIMIT).map((s) => ({
+          ...s,
+          demonstrations: null,
+        })),
+      };
+    } catch (error) {
+      console.warn(`eval-samples fetch failed (${evalSampleSourceRow.id}): ${error}; skipping`);
+    }
+  } else {
+    console.warn(
+      `No non-disagg ${EVAL_SAMPLES_MODEL}/${EVAL_SAMPLES_TASK} row found; skipping eval-samples fixture`,
     );
   }
 
@@ -250,6 +318,9 @@ async function main() {
       }),
     ],
     ['workflow-info', await writeFixture('workflow-info', workflowInfo)],
+    ...(evalSamples
+      ? ([['eval-samples', await writeFixture('eval-samples', evalSamples)]] as [string, number][])
+      : []),
   ];
 
   for (const [name, bytes] of sizes) {

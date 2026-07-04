@@ -6,10 +6,14 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+
+// useLayoutEffect warns during SSR; alias to useEffect on the server (no-op there anyway).
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
@@ -59,9 +63,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
 
-  const [selectedRunDate, setSelectedRunDate] = useState<string>(
-    () => getUrlParam('e_rundate') || globalRunDate || '',
-  );
+  // Initialize with safe defaults that match SSR output — URL-param values
+  // are applied in useIsomorphicLayoutEffect below to avoid hydration mismatches.
+  const [selectedRunDate, setSelectedRunDate] = useState<string>('');
 
   const handleSetSelectedRunDate = useCallback(
     (date: string) => {
@@ -73,15 +77,13 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [inferenceAvailableDates, setGlobalRunDate],
   );
 
-  const [selectedBenchmark, setSelectedBenchmark] = useState<string | undefined>(
-    () => getUrlParam('e_bench') || undefined,
-  );
+  const [selectedBenchmark, setSelectedBenchmark] = useState<string | undefined>(undefined);
 
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'e_',
   });
 
-  const [showLabels, setShowLabels] = useState<boolean>(() => getUrlParam('e_labels') === '1');
+  const [showLabels, setShowLabels] = useState<boolean>(false);
 
   const {
     activeSet: enabledHardware,
@@ -93,12 +95,25 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
 
   // Pending legend-active selection restored from `e_active` URL param.
   // Consumed once when hwTypesWithData first populates.
-  const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
-    const v = getUrlParam('e_active');
-    if (!v) return null;
-    const set = new Set(v.split(',').filter(Boolean));
-    return set.size > 0 ? set : null;
-  });
+  const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(null);
+
+  // Apply URL-param overrides client-side only (avoids SSR/hydration mismatch).
+  // Runs synchronously before paint via useIsomorphicLayoutEffect.
+  const urlInitRef = useRef(false);
+  useIsomorphicLayoutEffect(() => {
+    if (urlInitRef.current) return;
+    urlInitRef.current = true;
+    const urlRunDate = getUrlParam('e_rundate');
+    if (urlRunDate) setSelectedRunDate(urlRunDate);
+    const urlBench = getUrlParam('e_bench');
+    if (urlBench) setSelectedBenchmark(urlBench);
+    if (getUrlParam('e_labels') === '1') setShowLabels(true);
+    const urlActive = getUrlParam('e_active');
+    if (urlActive) {
+      const set = new Set(urlActive.split(',').filter(Boolean));
+      if (set.size > 0) setPendingActiveHardware(set);
+    }
+  }, []);
 
   const availableBenchmarks = useMemo(() => {
     const tasks = new Set([
