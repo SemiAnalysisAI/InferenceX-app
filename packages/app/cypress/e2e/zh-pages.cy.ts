@@ -21,6 +21,18 @@ describe('Chinese (/zh) pages', () => {
     it('header language toggle points back to English', () => {
       cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/');
     });
+
+    it('footer renders in Chinese with zh-internal links', () => {
+      cy.get('[data-testid="footer-brand-description"]').should('contain.text', '开源推理基准测试');
+      cy.get('[data-testid="footer-link-land-acknowledgement"]').should(
+        'have.attr',
+        'href',
+        '/zh/land-acknowledgement',
+      );
+      cy.get('[data-testid="footer-link-zh"]')
+        .should('contain.text', 'English')
+        .and('have.attr', 'href', '/');
+    });
   });
 
   describe('zh dashboard tab page', () => {

@@ -9,6 +9,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
+import { languageAlternates } from '@/lib/i18n';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
 import {
   canonicalCompareSlug,
@@ -50,7 +51,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${fullLabel} Inference Benchmark`,
     description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      languages: languageAlternates(
+        `/compare/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`,
+      ),
+    },
     openGraph: {
       title: `${fullLabel} | ${SITE_NAME}`,
       description,

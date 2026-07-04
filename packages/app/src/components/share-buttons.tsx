@@ -2,11 +2,24 @@
 
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
-const SHARE_TEXT =
-  'Check out InferenceX — open-source ML inference benchmarks comparing GPUs across real-world workloads. Transparent, up-to-date data for the ML community.';
+const STRINGS = {
+  en: {
+    shareText:
+      'Check out InferenceX — open-source ML inference benchmarks comparing GPUs across real-world workloads. Transparent, up-to-date data for the ML community.',
+    twitter: 'Share on X (Twitter)',
+    linkedin: 'Share on LinkedIn',
+  },
+  zh: {
+    shareText:
+      '来看 InferenceX——开源 ML 推理基准测试，跨真实工作负载对比 GPU 性能。为 ML 社区提供透明、最新的数据。',
+    twitter: '分享到 X（推特）',
+    linkedin: '分享到 LinkedIn',
+  },
+} as const;
 
 function getShareUrl(): string {
   if (typeof window === 'undefined') return SITE_URL;
@@ -14,17 +27,18 @@ function getShareUrl(): string {
 }
 
 export function ShareTwitterButton({ text }: { text?: string }) {
+  const t = STRINGS[useLocale()];
   return (
     <Button
       variant="outline"
       size="icon"
       className="size-7"
-      title="Share on X (Twitter)"
+      title={t.twitter}
       data-testid="share-twitter"
       onClick={() => {
         const url = getShareUrl();
         window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? SHARE_TEXT)}&url=${encodeURIComponent(url)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? t.shareText)}&url=${encodeURIComponent(url)}`,
           '_blank',
           'noopener,noreferrer,width=600,height=400',
         );
@@ -39,12 +53,13 @@ export function ShareTwitterButton({ text }: { text?: string }) {
 }
 
 export function ShareLinkedInButton() {
+  const t = STRINGS[useLocale()];
   return (
     <Button
       variant="outline"
       size="icon"
       className="size-7"
-      title="Share on LinkedIn"
+      title={t.linkedin}
       data-testid="share-linkedin"
       onClick={() => {
         const url = getShareUrl();

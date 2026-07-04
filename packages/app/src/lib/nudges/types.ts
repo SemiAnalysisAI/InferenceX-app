@@ -45,6 +45,7 @@ export interface NudgeCondition {
 
 export interface NudgeAction {
   label: string;
+  labelZh?: string;
   icon?: ReactNode;
   /**
    * Called when the user clicks the action button.
@@ -62,7 +63,9 @@ export interface NudgeContent {
   icon: ComponentType<{ className?: string }>;
   iconClassName?: string;
   title: string;
+  titleZh?: string;
   description: string;
+  descriptionZh?: string;
   action?: NudgeAction;
   /** data-testid on the nudge container (preserves existing selectors). */
   testId?: string;
@@ -74,6 +77,7 @@ export interface NudgeContent {
 
   /** Label for the dismiss button (default "Maybe Later"). */
   dismissLabel?: string;
+  dismissLabelZh?: string;
   /** Label + handler for the primary CTA (modals only). */
   primaryAction?: NudgeAction;
   /** Extra CSS class on the modal container (e.g. branded border). */
@@ -84,6 +88,7 @@ export interface NudgeContent {
   actionClassName?: string;
   /** Badge text rendered next to the title (e.g. "New"). */
   badge?: string;
+  badgeZh?: string;
 
   // -- Banner-specific (ignored by toasts/modals) --
 

@@ -43,11 +43,11 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/about')).toBe(true);
   });
 
-  it('matches blog child paths but not compare slug pages', () => {
+  it('matches blog and compare child paths', () => {
     expect(hasZhSibling('/blog/some-post')).toBe(true);
-    // Per-slug comparison pages are English-only; only the index is mirrored.
     expect(hasZhSibling('/compare')).toBe(true);
-    expect(hasZhSibling('/compare/deepseek-r1-h100-vs-h200')).toBe(false);
+    expect(hasZhSibling('/compare/deepseek-r1-h100-vs-h200')).toBe(true);
+    expect(hasZhSibling('/compare-per-dollar/deepseek-r1-h100-vs-h200')).toBe(true);
   });
 
   it('rejects unmirrored routes', () => {
@@ -69,9 +69,15 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/zh/blog/some-post')).toBe('/blog/some-post');
   });
 
+  it('switches compare slug pages within the language trees', () => {
+    expect(switchLocalePath('/compare/foo-vs-bar')).toBe('/zh/compare/foo-vs-bar');
+    expect(switchLocalePath('/zh/compare-per-dollar/foo-vs-bar')).toBe(
+      '/compare-per-dollar/foo-vs-bar',
+    );
+  });
+
   it('falls back to the other homepage for unmirrored paths', () => {
     expect(switchLocalePath('/datasets')).toBe('/zh');
-    expect(switchLocalePath('/compare/foo-vs-bar')).toBe('/zh');
     expect(switchLocalePath('/zh/unknown-page')).toBe('/');
   });
 });

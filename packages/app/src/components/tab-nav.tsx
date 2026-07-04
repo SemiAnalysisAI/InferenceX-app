@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UnofficialRunContext } from '@/components/unofficial-run-provider';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
+import { hasZhSibling, isZhPathname, ZH_PREFIX } from '@/lib/i18n';
 import { TAB_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
@@ -80,11 +80,13 @@ export function TabNav() {
   const isZh = isZhPathname(pathname);
   const current = activeTab(pathname);
   const selectedTab = TAB_VALUES.has(current) ? current : '';
-  // On /zh pages, visible tabs navigate within the Chinese tree and show
-  // Chinese labels. Gated tabs have no /zh sibling and keep English targets.
+  // On /zh pages, tabs with a Chinese sibling navigate within the Chinese
+  // tree and show Chinese labels; the rest (most gated tabs) keep English
+  // targets.
   const tabLabel = (tab: { href: string; label: string }) =>
     isZh ? (TAB_LABELS_ZH[tab.href.slice(1)] ?? tab.label) : tab.label;
-  const localizedPath = (path: string) => (isZh ? `${ZH_PREFIX}${path}` : path);
+  const localizedPath = (path: string) =>
+    isZh && hasZhSibling(path) ? `${ZH_PREFIX}${path}` : path;
 
   // Preserve the `unofficialrun(s)` URL param across tab navigation so an
   // overlay loaded on /inference doesn't get dropped when switching to
@@ -117,7 +119,7 @@ export function TabNav() {
   const handleMobileChange = (value: string) => {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
     track('tab_changed', { tab: value });
-    router.push(tabHref(GATED_VALUES.has(value) ? `/${value}` : localizedPath(`/${value}`)));
+    router.push(tabHref(localizedPath(`/${value}`)));
   };
 
   return (
@@ -189,7 +191,7 @@ export function TabNav() {
             {featureGateUnlocked && (
               <HiddenTabsPopover
                 current={current}
-                tabHref={tabHref}
+                tabHref={(path) => tabHref(localizedPath(path))}
                 onSelect={handleDesktopClick}
               />
             )}

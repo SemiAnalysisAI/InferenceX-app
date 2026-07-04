@@ -145,7 +145,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Link href={isZh ? '/zh' : '/'} className="flex items-center gap-2 shrink-0">
             <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by

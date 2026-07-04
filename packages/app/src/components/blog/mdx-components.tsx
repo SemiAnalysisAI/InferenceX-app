@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { slugify } from '@/lib/blog';
+import type { Locale } from '@/lib/i18n';
 import { HeadingLink } from '@/components/blog/heading-link';
 import { JsonLd } from '@/components/json-ld';
 
@@ -50,7 +51,9 @@ function Blur(props: { children?: ReactNode }) {
 }
 
 /** Creates a fresh set of MDX components with clean heading dedup state per render. */
-export function createMdxComponents(): Record<string, React.ComponentType<any>> {
+export function createMdxComponents(
+  locale: Locale = 'en',
+): Record<string, React.ComponentType<any>> {
   const seen = new Set<string>();
   const parents: string[] = [];
   let figureCount = 0;
@@ -159,7 +162,13 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
     ),
     Blur,
     DashboardCTA: (props: { href?: string; children?: ReactNode }) => {
-      const href = props.href ?? 'https://inferencex.semianalysis.com';
+      const defaultHref =
+        locale === 'zh'
+          ? 'https://inferencex.semianalysis.com/zh'
+          : 'https://inferencex.semianalysis.com';
+      const defaultLabel =
+        locale === 'zh' ? '查看完整 InferenceX 仪表板' : 'See full InferenceX Dashboard';
+      const href = props.href ?? defaultHref;
       return (
         <div className="my-6 flex justify-center">
           <a
@@ -168,7 +177,7 @@ export function createMdxComponents(): Record<string, React.ComponentType<any>> 
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-md bg-brand px-4 py-0 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
           >
-            {props.children ?? 'See full InferenceX Dashboard'}
+            {props.children ?? defaultLabel}
           </a>
         </div>
       );

@@ -105,7 +105,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
 
   const { content } = await compileMDX({
     source: raw,
-    components: createMdxComponents(),
+    components: createMdxComponents('zh'),
     options: {
       mdxOptions: {
         remarkPlugins: [remarkGfm],

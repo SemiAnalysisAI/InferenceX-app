@@ -47,8 +47,8 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/about', exact: true },
   { path: '/quotes', exact: true },
   { path: '/land-acknowledgement', exact: true },
-  { path: '/compare', exact: true },
-  { path: '/compare-per-dollar', exact: true },
+  { path: '/compare' },
+  { path: '/compare-per-dollar' },
   { path: '/blog' },
 ];
 

@@ -130,7 +130,7 @@ export default async function ComparePerDollarIndexPageZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/compare-per-dollar/${slug}`}
+                          href={`/zh/compare-per-dollar/${slug}`}
                           slug={slug}
                           label={label}
                           archLine={archLine}

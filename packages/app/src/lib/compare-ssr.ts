@@ -319,7 +319,7 @@ export function computeCompareImageRows(
 // JSON-LD graph
 // ---------------------------------------------------------------------------
 
-function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
+export function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
   const meta = HW_REGISTRY[key];
   const label = meta?.label ?? key.toUpperCase();
   const props: { name: string; value: string | number }[] = [{ name: 'Category', value: 'GPU' }];
@@ -376,13 +376,13 @@ export type CompareJsonLdVariant = 'full' | 'per-dollar';
 // ---------------------------------------------------------------------------
 
 /** Format cost as $X.XX or $X.X depending on magnitude. */
-function fmtCost(v: number): string {
+export function fmtCost(v: number): string {
   if (v >= 10) return `$${v.toFixed(1)}`;
   return `$${v.toFixed(2)}`;
 }
 
 /** Round a ratio (always ≥ 1) into a percentage delta, e.g. 1.3 → "30%". */
-function fmtPctDelta(ratio: number): string {
+export function fmtPctDelta(ratio: number): string {
   return `${Math.round((ratio - 1) * 100)}%`;
 }
 
@@ -400,7 +400,10 @@ function hashStr(s: string): number {
 /** Bucket the target into low / middle / high segment of the benchmarked
  *  range. Used by templates that say things like "Near the low end" or
  *  "At the upper edge" so the same prose array doesn't all read identically. */
-function bandFor(target: number, range: { min: number; max: number }): 'low' | 'middle' | 'high' {
+export function bandFor(
+  target: number,
+  range: { min: number; max: number },
+): 'low' | 'middle' | 'high' {
   const span = range.max - range.min;
   if (span <= 0) return 'middle';
   const t = (target - range.min) / span;
@@ -409,7 +412,7 @@ function bandFor(target: number, range: { min: number; max: number }): 'low' | '
   return 'middle';
 }
 
-interface PerDollarBoth {
+export interface PerDollarBoth {
   modelLabel: string;
   aLabel: string;
   bLabel: string;
@@ -425,7 +428,7 @@ interface PerDollarBoth {
   band: 'low' | 'middle' | 'high';
 }
 
-interface FullBoth {
+export interface FullBoth {
   modelLabel: string;
   aLabel: string;
   bLabel: string;
@@ -444,7 +447,7 @@ interface FullBoth {
   band: 'low' | 'middle' | 'high';
 }
 
-const BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
+export const BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
   low: 'near the low end',
   middle: 'around the middle',
   high: 'toward the upper edge',
@@ -566,7 +569,7 @@ const FULL_SINGLE_TEMPLATES: ((args: {
  *  pages get different starting templates. Avoids the birthday-problem
  *  collisions that pickTemplate alone produces when sampling N times from a
  *  pool of size M near N. */
-function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {
+export function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {
   const start = hashStr(pageSeed) % arr.length;
   return arr[(start + rowIndex) % arr.length];
 }

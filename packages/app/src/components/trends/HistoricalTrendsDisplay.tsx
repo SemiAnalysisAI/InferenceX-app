@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { useInference } from '@/components/inference/InferenceContext';
@@ -31,7 +32,41 @@ import {
 import { getDisplayLabel } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
+const STRINGS = {
+  en: {
+    heading: 'Historical Trends',
+    description:
+      'Interpolated performance metrics over time at a fixed interactivity operating point.',
+    targetLabel: 'Target Interactivity (tok/s/user)',
+    targetTooltip:
+      "The interactivity operating point used for interpolation. Move the slider to see how each GPU's performance changes at different interactivity levels.",
+    captionTitle: (yTitle: string, target: number) =>
+      `${yTitle} Over Time at ${target} tok/s/user Interactivity`,
+    source: 'Source: SemiAnalysis InferenceX™',
+    updated: 'Updated:',
+    logScale: 'Log Scale',
+    highContrast: 'High Contrast',
+    resetFilter: 'Reset filter',
+    noData: 'No interactivity chart data available for the selected model and sequence.',
+  },
+  zh: {
+    heading: '历史趋势',
+    description: '在固定交互性操作点下，各性能指标随时间的插值变化。',
+    targetLabel: '目标交互性 (tok/s/user)',
+    targetTooltip: '用于插值的交互性操作点。移动滑块可查看各 GPU 在不同交互性水平下的性能变化。',
+    captionTitle: (yTitle: string, target: number) =>
+      `${yTitle} 随时间变化（交互性 ${target} tok/s/user）`,
+    source: '来源：SemiAnalysis InferenceX™',
+    updated: '更新时间：',
+    logScale: '对数缩放',
+    highContrast: '高对比度',
+    resetFilter: '重置筛选',
+    noData: '所选模型和序列无可用的交互性图表数据。',
+  },
+};
+
 export default function HistoricalTrendsDisplay() {
+  const t = STRINGS[useLocale()];
   const {
     graphs,
     loading,
@@ -162,10 +197,8 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <div>
-              <h2 className="text-lg font-semibold mb-2">Historical Trends</h2>
-              <p className="text-muted-foreground text-sm mb-4">
-                Interpolated performance metrics over time at a fixed interactivity operating point.
-              </p>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
             </div>
             <ChartControls hideGpuComparison />
             <div className="space-y-2">
@@ -190,10 +223,8 @@ export default function HistoricalTrendsDisplay() {
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-semibold mb-2">Historical Trends</h2>
-              <p className="text-muted-foreground text-sm mb-4">
-                Interpolated performance metrics over time at a fixed interactivity operating point.
-              </p>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-muted-foreground text-sm mb-4">{t.description}</p>
             </div>
             <ChartShareActions />
           </div>
@@ -205,8 +236,8 @@ export default function HistoricalTrendsDisplay() {
               <div className="space-y-2">
                 <LabelWithTooltip
                   htmlFor="historical-target"
-                  label="Target Interactivity (tok/s/user)"
-                  tooltip="The interactivity operating point used for interpolation. Move the slider to see how each GPU's performance changes at different interactivity levels."
+                  label={t.targetLabel}
+                  tooltip={t.targetTooltip}
                 />
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
@@ -287,17 +318,19 @@ export default function HistoricalTrendsDisplay() {
                 caption={
                   <>
                     <h2 className="text-lg font-semibold">
-                      {currentYTitle} Over Time at {targetInteractivity} tok/s/user Interactivity
+                      {t.captionTitle(currentYTitle, targetInteractivity)}
                     </h2>
                     <p className="text-sm text-muted-foreground mb-2">
                       {getModelLabel(selectedModel as Model)} •{' '}
                       {selectedPrecisions
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}{' '}
-                      • {getSequenceLabel(selectedSequence as Sequence)} • Source: SemiAnalysis
-                      InferenceX™
+                      • {getSequenceLabel(selectedSequence as Sequence)} • {t.source}
                       {workflowInfo && workflowInfo.length > 0 && workflowInfo[0]?.run_date && (
-                        <> • Updated: {workflowInfo[0].run_date.split(',')[0]}</>
+                        <>
+                          {' '}
+                          • {t.updated} {workflowInfo[0].run_date.split(',')[0]}
+                        </>
                       )}
                     </p>
                     <MetricAssumptionNotes
@@ -343,7 +376,7 @@ export default function HistoricalTrendsDisplay() {
                     switches={[
                       {
                         id: 'historical-log-scale',
-                        label: 'Log Scale',
+                        label: t.logScale,
                         checked: logScale,
                         onCheckedChange: (checked: boolean) => {
                           setLogScale(checked);
@@ -352,7 +385,7 @@ export default function HistoricalTrendsDisplay() {
                       },
                       {
                         id: 'historical-high-contrast',
-                        label: 'High Contrast',
+                        label: t.highContrast,
                         checked: highContrast,
                         onCheckedChange: (checked: boolean) => {
                           setHighContrast(checked);
@@ -365,7 +398,7 @@ export default function HistoricalTrendsDisplay() {
                         ? [
                             {
                               id: 'historical-reset-filter',
-                              label: 'Reset filter',
+                              label: t.resetFilter,
                               onClick: () => {
                                 selectAllHwTypes();
                                 track('historical_legend_filter_reset');
@@ -384,9 +417,7 @@ export default function HistoricalTrendsDisplay() {
         </section>
       ) : (
         <Card>
-          <p className="text-muted-foreground text-sm">
-            No interactivity chart data available for the selected model and sequence.
-          </p>
+          <p className="text-muted-foreground text-sm">{t.noData}</p>
         </Card>
       )}
     </section>

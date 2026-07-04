@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 
 import { relockFeatureGate } from '@/lib/use-feature-gate';
+import { useLocale } from '@/lib/use-locale';
 
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
@@ -37,6 +38,63 @@ import {
 } from './types';
 
 const GPU_COLORS = d3.schemeTableau10;
+
+const STRINGS = {
+  en: {
+    heading: 'PowerX',
+    descPre: 'Enter a GitHub Actions run ID to visualize GPU metrics over time from',
+    descPost: 'artifacts.',
+    relockButton: 'Re-lock feature gate',
+    runIdLabel: 'Run ID',
+    runIdPlaceholder: 'e.g. 22806827144',
+    loadButton: 'Load',
+    loadingButton: 'Loading...',
+    runLabel: 'Run:',
+    branchLabel: 'Branch:',
+    dateLabel: 'Date:',
+    statusLabel: 'Status:',
+    dataPointsLabel: 'Data points:',
+    artifactLabel: 'Artifact',
+    metricLabel: 'Metric',
+    copied: 'Copied',
+    share: 'Share',
+    xAxis: 'X Axis',
+    yAxis: 'Y Axis',
+    metricOverTimeSuffix: ' over Time',
+    metricCorrelation: 'Metric Correlation',
+    resetFilter: 'Reset filter',
+    downsample: 'Downsample',
+    perGpuStats: 'Per-GPU Statistics',
+    rows: 'rows',
+  },
+  zh: {
+    heading: 'PowerX',
+    descPre: '输入 GitHub Actions 运行 ID，可视化',
+    descPost: '产物中 GPU 指标的时间变化趋势。',
+    relockButton: '重新锁定功能入口',
+    runIdLabel: '运行 ID',
+    runIdPlaceholder: '例如 22806827144',
+    loadButton: '加载',
+    loadingButton: '加载中...',
+    runLabel: '运行：',
+    branchLabel: '分支：',
+    dateLabel: '日期：',
+    statusLabel: '状态：',
+    dataPointsLabel: '数据点：',
+    artifactLabel: '产物',
+    metricLabel: '指标',
+    copied: '已复制',
+    share: '分享',
+    xAxis: 'X 轴',
+    yAxis: 'Y 轴',
+    metricOverTimeSuffix: ' 时间趋势',
+    metricCorrelation: '指标相关性',
+    resetFilter: '重置筛选',
+    downsample: '降采样',
+    perGpuStats: '每 GPU 统计信息',
+    rows: '行',
+  },
+} as const;
 
 type GpuMetricsView = 'chart' | 'correlation';
 
@@ -57,6 +115,7 @@ const GPU_METRICS_VIEW_OPTIONS: SegmentedToggleOption<GpuMetricsView>[] = [
 
 export default function GpuMetricsDisplay() {
   const router = useRouter();
+  const t = STRINGS[useLocale()];
   const [runIdInput, setRunIdInput] = useState('22806827144');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -237,10 +296,11 @@ export default function GpuMetricsDisplay() {
         <div className="space-y-3">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-semibold mb-2">PowerX</h2>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
               <p className="text-muted-foreground text-sm">
-                Enter a GitHub Actions run ID to visualize GPU metrics over time from{' '}
-                <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code> artifacts.
+                {t.descPre}{' '}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code>{' '}
+                {t.descPost}
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -256,18 +316,18 @@ export default function GpuMetricsDisplay() {
                 title="Re-lock feature gate"
               >
                 <Lock className="size-3" />
-                Re-lock feature gate
+                {t.relockButton}
               </Button>
               <ChartShareActions />
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 max-w-sm space-y-1">
-              <Label htmlFor="gpu-metrics-run-id">Run ID</Label>
+              <Label htmlFor="gpu-metrics-run-id">{t.runIdLabel}</Label>
               <Input
                 id="gpu-metrics-run-id"
                 data-testid="gpu-metrics-run-input"
-                placeholder="e.g. 22806827144"
+                placeholder={t.runIdPlaceholder}
                 value={runIdInput}
                 onChange={(e) => setRunIdInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -283,10 +343,10 @@ export default function GpuMetricsDisplay() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Loading...
+                  {t.loadingButton}
                 </>
               ) : (
-                'Load'
+                t.loadButton
               )}
             </Button>
           </div>
@@ -304,7 +364,7 @@ export default function GpuMetricsDisplay() {
           <Card className="mb-4">
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-4">
               <span>
-                <span className="text-muted-foreground">Run:</span>{' '}
+                <span className="text-muted-foreground">{t.runLabel}</span>{' '}
                 <a
                   href={runInfo.url}
                   target="_blank"
@@ -315,17 +375,17 @@ export default function GpuMetricsDisplay() {
                 </a>
               </span>
               <span>
-                <span className="text-muted-foreground">Branch:</span> {runInfo.branch}
+                <span className="text-muted-foreground">{t.branchLabel}</span> {runInfo.branch}
               </span>
               <span>
-                <span className="text-muted-foreground">Date:</span>{' '}
+                <span className="text-muted-foreground">{t.dateLabel}</span>{' '}
                 {new Date(runInfo.createdAt).toLocaleDateString()}
               </span>
               <span>
-                <span className="text-muted-foreground">Status:</span> {runInfo.conclusion}
+                <span className="text-muted-foreground">{t.statusLabel}</span> {runInfo.conclusion}
               </span>
               <span>
-                <span className="text-muted-foreground">Data points:</span>{' '}
+                <span className="text-muted-foreground">{t.dataPointsLabel}</span>{' '}
                 {currentData.length.toLocaleString()}
               </span>
             </div>
@@ -333,7 +393,7 @@ export default function GpuMetricsDisplay() {
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] items-end gap-3">
               {artifacts.length > 1 && (
                 <div className="space-y-1 min-w-0">
-                  <Label htmlFor="gpu-metrics-artifact-select">Artifact</Label>
+                  <Label htmlFor="gpu-metrics-artifact-select">{t.artifactLabel}</Label>
                   <Select value={selectedArtifact} onValueChange={handleArtifactChange}>
                     <SelectTrigger
                       id="gpu-metrics-artifact-select"
@@ -345,7 +405,7 @@ export default function GpuMetricsDisplay() {
                     <SelectContent>
                       {artifacts.map((a) => (
                         <SelectItem key={a.name} value={a.name}>
-                          {a.name} ({a.data.length.toLocaleString()} rows)
+                          {a.name} ({a.data.length.toLocaleString()} {t.rows})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -353,7 +413,7 @@ export default function GpuMetricsDisplay() {
                 </div>
               )}
               <div className="space-y-1">
-                <Label htmlFor="gpu-metrics-metric-select">Metric</Label>
+                <Label htmlFor="gpu-metrics-metric-select">{t.metricLabel}</Label>
                 <Select value={selectedMetric} onValueChange={handleMetricChange}>
                   <SelectTrigger
                     id="gpu-metrics-metric-select"
@@ -402,12 +462,12 @@ export default function GpuMetricsDisplay() {
                   {copied ? (
                     <>
                       <Check className="size-3" />
-                      Copied
+                      {t.copied}
                     </>
                   ) : (
                     <>
                       <LinkIcon className="size-3" />
-                      Share
+                      {t.share}
                     </>
                   )}
                 </Button>
@@ -417,7 +477,7 @@ export default function GpuMetricsDisplay() {
             {chartView === 'correlation' && (
               <div className="flex flex-wrap items-end gap-3 mb-3 no-export">
                 <div className="space-y-1">
-                  <Label className="text-xs">X Axis</Label>
+                  <Label className="text-xs">{t.xAxis}</Label>
                   <Select
                     value={corrXMetric}
                     onValueChange={(v) => setCorrXMetric(v as GpuMetricKey)}
@@ -435,7 +495,7 @@ export default function GpuMetricsDisplay() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Y Axis</Label>
+                  <Label className="text-xs">{t.yAxis}</Label>
                   <Select
                     value={corrYMetric}
                     onValueChange={(v) => setCorrYMetric(v as GpuMetricKey)}
@@ -464,7 +524,10 @@ export default function GpuMetricsDisplay() {
                 maxPoints={downsample ? 2000 : Infinity}
                 caption={
                   <>
-                    <h2 className="text-lg font-semibold">{metricConfig.label} over Time</h2>
+                    <h2 className="text-lg font-semibold">
+                      {metricConfig.label}
+                      {t.metricOverTimeSuffix}
+                    </h2>
                     <UnofficialDomainNotice />
                   </>
                 }
@@ -491,7 +554,7 @@ export default function GpuMetricsDisplay() {
                         : [
                             {
                               id: 'gpu-metrics-reset-filter',
-                              label: 'Reset filter',
+                              label: t.resetFilter,
                               onClick: selectAllGpus,
                             },
                           ]
@@ -499,7 +562,7 @@ export default function GpuMetricsDisplay() {
                     switches={[
                       {
                         id: 'gpu-metrics-downsample',
-                        label: 'Downsample',
+                        label: t.downsample,
                         checked: downsample,
                         onCheckedChange: (c) => {
                           setDownsample(c);
@@ -520,7 +583,7 @@ export default function GpuMetricsDisplay() {
                 maxPoints={downsample ? 2000 : Infinity}
                 caption={
                   <>
-                    <h2 className="text-lg font-semibold">Metric Correlation</h2>
+                    <h2 className="text-lg font-semibold">{t.metricCorrelation}</h2>
                     <UnofficialDomainNotice />
                   </>
                 }
@@ -547,7 +610,7 @@ export default function GpuMetricsDisplay() {
                         : [
                             {
                               id: 'gpu-metrics-reset-filter-2',
-                              label: 'Reset filter',
+                              label: t.resetFilter,
                               onClick: selectAllGpus,
                             },
                           ]
@@ -555,7 +618,7 @@ export default function GpuMetricsDisplay() {
                     switches={[
                       {
                         id: 'gpu-metrics-downsample-corr',
-                        label: 'Downsample',
+                        label: t.downsample,
                         checked: downsample,
                         onCheckedChange: (c) => {
                           setDownsample(c);
@@ -572,7 +635,7 @@ export default function GpuMetricsDisplay() {
           {/* Statistics Table */}
           <Card className="mt-4">
             <h3 className="text-sm font-semibold mb-2">
-              Per-GPU Statistics ({metricConfig.label})
+              {t.perGpuStats} ({metricConfig.label})
             </h3>
             <GpuStatsTable data={currentData} metricKey={selectedMetric} />
           </Card>

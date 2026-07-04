@@ -10,6 +10,7 @@ import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/seg
 import { exportToCsv } from '@/lib/csv-export';
 import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
+import { useLocale } from '@/lib/use-locale';
 
 import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
 import SubmissionsTable from './SubmissionsTable';
@@ -17,14 +18,60 @@ import { computeTotalStats } from './submissions-utils';
 
 const CHART_ID = 'submissions-chart';
 
-const SUBMISSIONS_CHART_MODE_OPTIONS: SegmentedToggleOption<ChartMode>[] = [
-  { value: 'weekly', label: 'Weekly', testId: 'submissions-weekly-btn' },
-  { value: 'cumulative', label: 'Cumulative', testId: 'submissions-cumulative-btn' },
-];
+const STRINGS = {
+  en: {
+    heading: 'Benchmark Submissions',
+    description:
+      'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes.',
+    modeWeekly: 'Weekly',
+    modeCumulative: 'Cumulative',
+    loadingChart: 'Loading chart data...',
+    loadingTable: 'Loading submissions...',
+    errorText: 'Failed to load submission data.',
+    chartCaption: 'Submission Activity',
+    chartSource: 'Source: SemiAnalysis InferenceX™',
+    statDatapoints: 'Datapoints Generated',
+    statConfigs: 'Distinct Configurations',
+    statModels: 'Unique Models',
+    statHardware: 'Unique Hardware',
+    subtitleResults: 'results',
+    subtitleTested: 'tested',
+    subtitleLLMs: 'LLMs',
+    subtitleSKUs: 'SKUs',
+  },
+  zh: {
+    heading: '基准测试提交',
+    description: '所有提交至 InferenceX 的基准测试配置。查看提交历史、活动趋势和数据点数量。',
+    modeWeekly: '按周',
+    modeCumulative: '累计',
+    loadingChart: '正在加载图表数据...',
+    loadingTable: '正在加载提交记录...',
+    errorText: '加载提交数据失败。',
+    chartCaption: '提交活动',
+    chartSource: '数据来源：SemiAnalysis InferenceX™',
+    statDatapoints: '已生成数据点',
+    statConfigs: '不同配置数',
+    statModels: '模型数',
+    statHardware: '硬件类型',
+    subtitleResults: '条结果',
+    subtitleTested: '已测试',
+    subtitleLLMs: '个 LLM',
+    subtitleSKUs: '种 SKU',
+  },
+} as const;
 
 export default function SubmissionsDisplay() {
   const { data, isLoading, error } = useSubmissions();
+  const t = STRINGS[useLocale()];
   const [chartMode, setChartMode] = useState<ChartMode>('weekly');
+
+  const chartModeOptions = useMemo<SegmentedToggleOption<ChartMode>[]>(
+    () => [
+      { value: 'weekly', label: t.modeWeekly, testId: 'submissions-weekly-btn' },
+      { value: 'cumulative', label: t.modeCumulative, testId: 'submissions-cumulative-btn' },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     track('submissions_page_viewed');
@@ -49,7 +96,7 @@ export default function SubmissionsDisplay() {
   if (error) {
     return (
       <Card>
-        <p className="text-destructive text-sm">Failed to load submission data.</p>
+        <p className="text-destructive text-sm">{t.errorText}</p>
       </Card>
     );
   }
@@ -61,11 +108,8 @@ export default function SubmissionsDisplay() {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-semibold mb-2">Benchmark Submissions</h2>
-              <p className="text-muted-foreground text-sm">
-                All benchmark configurations submitted to InferenceX. View submission history,
-                activity trends, and datapoint volumes.
-              </p>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-muted-foreground text-sm">{t.description}</p>
             </div>
             <div className="flex items-center gap-1.5">
               <ChartShareActions />
@@ -79,10 +123,14 @@ export default function SubmissionsDisplay() {
         <section>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Datapoints Generated', value: stats.totalDatapoints, subtitle: 'results' },
-              { label: 'Distinct Configurations', value: stats.totalConfigs, subtitle: 'tested' },
-              { label: 'Unique Models', value: stats.uniqueModels, subtitle: 'LLMs' },
-              { label: 'Unique Hardware', value: stats.uniqueGpus, subtitle: 'SKUs' },
+              {
+                label: t.statDatapoints,
+                value: stats.totalDatapoints,
+                subtitle: t.subtitleResults,
+              },
+              { label: t.statConfigs, value: stats.totalConfigs, subtitle: t.subtitleTested },
+              { label: t.statModels, value: stats.uniqueModels, subtitle: t.subtitleLLMs },
+              { label: t.statHardware, value: stats.uniqueGpus, subtitle: t.subtitleSKUs },
             ]
               .toSorted((a, b) => b.value - a.value)
               .map((s) => (
@@ -109,7 +157,7 @@ export default function SubmissionsDisplay() {
             leadingControls={
               <SegmentedToggle
                 value={chartMode}
-                options={SUBMISSIONS_CHART_MODE_OPTIONS}
+                options={chartModeOptions}
                 onValueChange={handleModeChange}
                 ariaLabel="Chart mode"
                 testId="submissions-mode-toggle"
@@ -120,7 +168,7 @@ export default function SubmissionsDisplay() {
           <Card>
             {isLoading ? (
               <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
-                Loading chart data...
+                {t.loadingChart}
               </div>
             ) : data?.volume ? (
               <SubmissionsChart
@@ -128,10 +176,8 @@ export default function SubmissionsDisplay() {
                 mode={chartMode}
                 caption={
                   <>
-                    <h3 className="text-lg font-semibold">Submission Activity</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Source: SemiAnalysis InferenceX&trade;
-                    </p>
+                    <h3 className="text-lg font-semibold">{t.chartCaption}</h3>
+                    <p className="text-sm text-muted-foreground">{t.chartSource}</p>
                   </>
                 }
               />
@@ -145,7 +191,7 @@ export default function SubmissionsDisplay() {
         <Card>
           {isLoading ? (
             <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
-              Loading submissions...
+              {t.loadingTable}
             </div>
           ) : data?.summary ? (
             <SubmissionsTable data={data.summary} />

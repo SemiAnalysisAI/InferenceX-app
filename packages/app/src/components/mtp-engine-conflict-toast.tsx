@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 import { BottomToast } from '@/components/ui/bottom-toast';
 
 /**
@@ -31,7 +33,15 @@ function joinList(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')}, and ${parts.at(-1)}`;
 }
 
-function describe(detail: MtpEngineConflictDetail): string {
+function joinListZh(parts: string[]): string {
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[0]} 和 ${parts[1]}`;
+  return `${parts.slice(0, -1).join('、')}和 ${parts.at(-1)}`;
+}
+
+function describe(detail: MtpEngineConflictDetail, locale: Locale): string {
+  if (locale === 'zh') return describeZh(detail);
   if (detail.kind === 'blocked') {
     const attempted = familyLabel(detail.attempted);
     if (detail.existing) {
@@ -47,12 +57,34 @@ function describe(detail: MtpEngineConflictDetail): string {
   return `${joinList(labels)} use different MTP acceptance-rate implementations and can't be shown on the same graph. All MTP configs are disabled by default. Enable one from the legend to view it.`;
 }
 
+function describeZh(detail: MtpEngineConflictDetail): string {
+  if (detail.kind === 'blocked') {
+    const attempted = familyLabel(detail.attempted);
+    if (detail.existing) {
+      const existing = familyLabel(detail.existing);
+      return `${attempted} 和 ${existing} 使用不同的 MTP 接受率实现，数值不可直接比较。请先移除 ${existing} MTP 配置再切换。`;
+    }
+    return `另一个引擎的 MTP 处于启用状态时，无法启用 ${attempted} MTP。请先移除现有 MTP 配置。`;
+  }
+  const labels = [...detail.families].toSorted().map(familyLabel);
+  if (labels.length === 0) {
+    return '不同引擎的 MTP 配置使用不同的接受率实现，无法在同一图表上显示。所有 MTP 配置默认禁用，请从图例中启用一项来查看。';
+  }
+  return `${joinListZh(labels)} 使用不同的 MTP 接受率实现，无法在同一图表上显示。所有 MTP 配置默认禁用，请从图例中启用一项来查看。`;
+}
+
+const TITLES = {
+  en: "MTP configs from different engines can't share a graph",
+  zh: '不同引擎的 MTP 配置无法共享同一图表',
+} as const;
+
 interface Props {
   detail: MtpEngineConflictDetail | null;
   onDismiss?: () => void;
 }
 
 export function MtpEngineConflictToast({ detail, onDismiss }: Props) {
+  const locale = useLocale();
   const [seq, setSeq] = useState(0);
 
   useEffect(() => {
@@ -73,8 +105,8 @@ export function MtpEngineConflictToast({ detail, onDismiss }: Props) {
       key={seq}
       testId="mtp-engine-conflict-toast"
       icon={<AlertTriangle className="text-amber-500" />}
-      title="MTP configs from different engines can't share a graph"
-      description={describe(detail)}
+      title={TITLES[locale]}
+      description={describe(detail, locale)}
       onDismiss={onDismiss}
     />
   );

@@ -4,12 +4,17 @@ import { ArrowRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import type { FavoritePreset } from '@/components/favorites/favorite-presets';
 
 export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
+  const locale = useLocale();
+  const isZh = locale === 'zh';
   const isNew = preset.tags.some((t) => t.toLowerCase() === 'new');
   const visibleTags = preset.tags.filter((t) => t.toLowerCase() !== 'new');
-  const href = `/inference?preset=${preset.id}`;
+  const title = (isZh && preset.titleZh) || preset.title;
+  const description = (isZh && preset.descriptionZh) || preset.description;
+  const href = `${isZh ? '/zh' : ''}/inference?preset=${preset.id}`;
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
@@ -31,7 +36,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
       <div className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-brand/60 transition-all duration-200 group-hover:bg-brand group-hover:inset-y-2" />
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-sm leading-tight group-hover:text-brand transition-colors duration-200">
-          <span className="align-middle">{preset.title}</span>
+          <span className="align-middle">{title}</span>
           {isNew && (
             <span className="ml-2 inline-flex items-center gap-1.5 align-middle rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
               New
@@ -41,7 +46,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
         <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed mt-1.5 line-clamp-2">
-        {preset.description}
+        {description}
       </p>
       <div className="flex flex-wrap gap-1.5 mt-auto pt-3">
         {visibleTags.map((tag) => (

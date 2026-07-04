@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 const DISMISS_EVENT = 'inferencex:dismiss-toast';
 
@@ -34,6 +35,7 @@ export function BottomToast({
   onDismiss,
   testId,
 }: BottomToastProps) {
+  const locale = useLocale();
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
   const actionClickedRef = useRef(false);
@@ -80,7 +82,7 @@ export function BottomToast({
           type="button"
           onClick={dismiss}
           className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Dismiss"
+          aria-label={locale === 'zh' ? '关闭' : 'Dismiss'}
         >
           <X className="size-3.5" />
         </button>

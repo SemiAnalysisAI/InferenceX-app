@@ -142,7 +142,7 @@ export default async function CompareIndexPageZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={`/compare/${slug}`}
+                          href={`/zh/compare/${slug}`}
                           slug={slug}
                           label={label}
                           archLine={archLine}

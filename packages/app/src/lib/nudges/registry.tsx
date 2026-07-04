@@ -51,10 +51,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: ShieldCheck,
       iconClassName: 'text-brand',
       title: 'Every result is reproducible',
+      titleZh: '每项结果均可复现',
       description:
         'Each data point is produced by a public GitHub Actions run. Click any point on a chart to jump to the exact run, logs, and artifacts.',
+      descriptionZh:
+        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点即可跳转到对应的运行记录、日志和产物。',
       action: {
         label: 'See how',
+        labelZh: '了解详情',
         onClick: () => {
           window.location.href = '/about#reproducibility';
         },
@@ -84,9 +88,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: Star,
       iconClassName: 'text-yellow-500 fill-yellow-500',
       title: 'Finding us useful?',
+      titleZh: '觉得有用吗？',
       description: 'Help the project grow so we can add more benchmarks! Star us on GitHub.',
+      descriptionZh: '帮助项目成长，让我们可以添加更多基准测试！在 GitHub 上为我们加星。',
       action: {
         label: 'Star on GitHub',
+        labelZh: '在 GitHub 上加星',
         icon: <GitHubIcon />,
         onClick: () => {
           window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
@@ -117,8 +124,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: Download,
       iconClassName: 'text-blue-500',
       title: 'Need the data?',
+      titleZh: '需要数据？',
       description:
         'Use the download button on any chart to export as PNG or CSV — no need to copy from tooltips.',
+      descriptionZh: '使用任意图表上的下载按钮导出 PNG 或 CSV——无需从提示框中复制。',
       testId: 'export-nudge',
     },
     analytics: {
@@ -138,10 +147,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: Palette,
       iconClassName: 'text-purple-500',
       title: 'Try Gradient Labels',
+      titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
+      descriptionZh: '渐变标签按并发级别对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
         label: 'Enable Gradient Labels',
+        labelZh: '启用渐变标签',
         onClick: (eventDetail?: unknown) => {
           const detail = eventDetail as { enableGradient?: () => void } | undefined;
           detail?.enableGradient?.();
@@ -179,8 +191,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: MessageSquareText,
       iconClassName: 'text-brand',
       title: "See the model's actual answers",
+      titleZh: '查看模型的实际回答',
       description:
         'Click Prompts on any row to compare each prompt, the expected answer, and what the model actually responded.',
+      descriptionZh: '点击任意行的"提示词"按钮，对比每条提示、预期答案和模型的实际回复。',
       testId: 'eval-samples-nudge',
     },
     analytics: {
@@ -210,7 +224,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: MessageSquareText,
       iconClassName: 'text-brand',
       title: 'Help us improve InferenceX',
+      titleZh: '帮助我们改进 InferenceX',
       description: "We'd love to hear what's working and what isn't.",
+      descriptionZh: '我们非常希望了解哪些方面做得好，哪些方面需要改进。',
       testId: 'feedback-modal',
       centered: true,
       renderContent: ({ dismiss }) => <FeedbackForm onDismiss={dismiss} />,
@@ -236,14 +252,20 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: Sparkles,
       iconClassName: 'text-brand',
       title: 'MiniMax M3 is live',
+      titleZh: 'MiniMax M3 已上线',
       description:
         'Day-zero benchmarks for MiniMax M3 are now available across the latest NVIDIA and AMD GPUs. Results are experimental — see how the new model performs across hardware.',
+      descriptionZh:
+        'MiniMax M3 的首日基准测试数据现已覆盖最新的 NVIDIA 和 AMD GPU。结果为实验性数据——来看看新模型在不同硬件上的表现。',
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       badge: 'New',
+      badgeZh: '最新',
       dismissLabel: 'Maybe Later',
+      dismissLabelZh: '稍后再看',
       primaryAction: {
         label: 'Explore',
+        labelZh: '开始探索',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
           window.location.href = '/inference?preset=minimax-m3-launch';
@@ -270,12 +292,17 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: Star,
       iconClassName: 'text-yellow-500 fill-yellow-500',
       title: 'Star InferenceX on GitHub',
+      titleZh: '在 GitHub 上为 InferenceX 加星',
       description:
         'Star InferenceX on GitHub to get notified when we publish new benchmark data. We update GPU performance comparisons regularly — starring is the easiest way to stay in the loop and help the project grow.',
+      descriptionZh:
+        '在 GitHub 上为 InferenceX 加星，以便在我们发布新基准测试数据时收到通知。我们定期更新 GPU 性能对比——加星是保持关注并帮助项目成长的最简单方式。',
       testId: 'github-star-modal',
       dismissLabel: 'Maybe Later',
+      dismissLabelZh: '稍后再看',
       primaryAction: {
         label: 'Star on GitHub',
+        labelZh: '在 GitHub 上加星',
         icon: <GitHubIcon className="size-4" />,
         onClick: () => {
           window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
@@ -307,9 +334,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       icon: Sparkles,
       iconClassName: 'text-brand',
       title: 'MiniMax M3 benchmarks are live',
+      titleZh: 'MiniMax M3 基准测试已上线',
       description: 'First inference numbers across NVIDIA and AMD GPUs, click to explore.',
+      descriptionZh: 'NVIDIA 和 AMD GPU 的首批推理数据，点击探索。',
       testId: 'launch-banner',
       badge: 'New',
+      badgeZh: '最新',
       href: '/inference?preset=minimax-m3-launch',
       onLinkClick: () => {
         window.location.href = '/inference?preset=minimax-m3-launch';

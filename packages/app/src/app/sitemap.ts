@@ -76,23 +76,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
-    ...compareSlugs.map(({ modelSlug, a, b }) => ({
-      url: `${BASE_URL}/compare/${canonicalCompareSlug(modelSlug, a, b)}`,
-      lastModified: now,
-      changeFrequency: 'daily' as const,
-      priority: 0.7,
-    })),
-    // Every indexed per-dollar landing page has a stable data graphic so image
-    // crawlers discover the PNG alongside the canonical comparison URL.
-    ...compareSlugs.map(({ modelSlug, a, b }) => {
-      const url = `${BASE_URL}/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
-      return {
-        url,
-        images: [`${url}/performance-per-dollar.png`],
+    ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
+      localizedPair(`/compare/${canonicalCompareSlug(modelSlug, a, b)}`, {
         lastModified: now,
         changeFrequency: 'daily' as const,
         priority: 0.7,
-      };
+      }),
+    ),
+    // Every indexed per-dollar landing page has a stable data graphic so image
+    // crawlers discover the PNG alongside the canonical comparison URL. The
+    // Chinese sibling references the same English-hosted PNG.
+    ...compareSlugs.flatMap(({ modelSlug, a, b }) => {
+      const enPath = `/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
+      return localizedPair(enPath, {
+        images: [`${BASE_URL}${enPath}/performance-per-dollar.png`],
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      });
     }),
   ];
 }

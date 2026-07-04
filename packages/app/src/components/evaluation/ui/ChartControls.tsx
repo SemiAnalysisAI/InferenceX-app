@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { ChevronDownIcon } from 'lucide-react';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -14,7 +15,31 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
+const STRINGS = {
+  en: {
+    benchmarkLabel: 'Benchmark',
+    benchmarkTooltip:
+      'The standardized test used to measure model performance. Common benchmarks include reasoning, coding, and knowledge-based evaluations.',
+    selectBenchmark: 'Select benchmark',
+    selectRunDate: 'Select run date',
+    changelog: 'Changelog',
+    newResultsOn: 'New results on',
+    noNewResults: 'No new results for this model on this date.',
+  },
+  zh: {
+    benchmarkLabel: '基准测试',
+    benchmarkTooltip:
+      '用于衡量模型性能的标准化测试。常见的基准测试包括推理能力、编程能力和知识评估。',
+    selectBenchmark: '选择基准测试',
+    selectRunDate: '选择运行日期',
+    changelog: '变更记录',
+    newResultsOn: '新结果 ·',
+    noNewResults: '该日期该模型无新结果。',
+  },
+};
+
 export default function EvaluationChartControls() {
+  const t = STRINGS[useLocale()];
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
     if (isOpen) {
@@ -59,8 +84,8 @@ export default function EvaluationChartControls() {
         <div className="flex flex-col space-y-1.5 lg:col-span-1">
           <LabelWithTooltip
             htmlFor="eval-benchmark-select"
-            label="Benchmark"
-            tooltip="The standardized test used to measure model performance. Common benchmarks include reasoning, coding, and knowledge-based evaluations."
+            label={t.benchmarkLabel}
+            tooltip={t.benchmarkTooltip}
           />
           <div>
             <MultiSelect
@@ -79,7 +104,7 @@ export default function EvaluationChartControls() {
               onOpenChange={handleDropdownOpenChange('benchmark')}
               triggerId="eval-benchmark-select"
               triggerTestId="evaluation-benchmark-selector"
-              placeholder="Select benchmark"
+              placeholder={t.selectBenchmark}
               minSelections={1}
               maxSelections={1}
               showClearAll={false}
@@ -116,7 +141,7 @@ export default function EvaluationChartControls() {
             setSelectedRunDate(date);
             track('evaluation_date_selected', { date });
           }}
-          placeholder="Select run date"
+          placeholder={t.selectRunDate}
           availableDates={availableDates}
         />
 
@@ -124,13 +149,15 @@ export default function EvaluationChartControls() {
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="ghost" className="self-start">
-              <strong>Changelog</strong>
+              <strong>{t.changelog}</strong>
               <ChevronDownIcon />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[400px]">
             <div className="flex flex-col gap-3">
-              <div className="text-xs font-bold">New results on {selectedRunDate}</div>
+              <div className="text-xs font-bold">
+                {t.newResultsOn} {selectedRunDate}
+              </div>
               {changelogEntries.length > 0 ? (
                 changelogEntries.map((entry) => (
                   <div key={entry.benchmark} className="flex flex-col gap-1 text-xs">
@@ -143,9 +170,7 @@ export default function EvaluationChartControls() {
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  No new results for this model on this date.
-                </p>
+                <p className="text-xs text-muted-foreground">{t.noNewResults}</p>
               )}
             </div>
           </PopoverContent>

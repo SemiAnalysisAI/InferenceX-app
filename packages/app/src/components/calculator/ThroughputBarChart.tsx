@@ -3,6 +3,7 @@
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
 import { useEffect, useMemo, useRef } from 'react';
+import { useLocale } from '@/lib/use-locale';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { getHardwareConfig } from '@/lib/constants';
@@ -554,14 +555,17 @@ export default function ThroughputBarChart({
     applySelectionOpacities(svg as any, selectedBars);
   }, [selectedBars]);
 
+  const locale = useLocale();
+
   if (results.length === 0) {
     return (
       <div
         className="flex items-center justify-center h-64 text-muted-foreground"
         data-testid="calculator-no-data"
       >
-        No data available for the current selection. Try adjusting the model, sequence, or
-        precision.
+        {locale === 'zh'
+          ? '当前选择无可用数据。请尝试调整模型、序列长度或精度。'
+          : 'No data available for the current selection. Try adjusting the model, sequence, or precision.'}
       </div>
     );
   }

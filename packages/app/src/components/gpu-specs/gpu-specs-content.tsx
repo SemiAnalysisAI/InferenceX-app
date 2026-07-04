@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { BarChart3, Radar, Table2 } from 'lucide-react';
 
@@ -26,6 +26,7 @@ import {
 } from '@/components/gpu-specs/scale-up-topology-diagram';
 import { GpuSpecsBarChart } from '@/components/gpu-specs/gpu-specs-bar-chart';
 import { GpuSpecsRadarChart } from '@/components/gpu-specs/gpu-specs-radar-chart';
+import { useLocale } from '@/lib/use-locale';
 
 function SpecCell({
   children,
@@ -65,28 +66,69 @@ function VendorBadge({ vendor }: { vendor: GpuSpec['vendor'] }) {
   );
 }
 
-type GpuSpecsViewMode = 'table' | 'chart' | 'radar';
+const STRINGS = {
+  en: {
+    heading: 'GPU Specifications',
+    description:
+      'Hardware specifications for GPUs used in InferenceX™ benchmarks, including compute performance, memory bandwidth, and interconnect details.',
+    viewTable: 'Table',
+    viewChart: 'Chart',
+    viewRadar: 'Radar',
+    colGpu: 'GPU',
+    colMemory: 'Memory',
+    colMemBw: 'Mem BW',
+    colScaleUp: 'Scale Up',
+    colScaleUpBw: 'Scale Up BW',
+    colWorldSize: 'World Size',
+    colScaleUpDomainMem: 'Scale Up Domain Memory',
+    colScaleUpDomainMemBw: 'Scale Up Domain Mem BW',
+    colScaleUpTopology: 'Scale Up Topology',
+    colScaleUpSwitch: 'Scale Up Switch',
+    colScaleOutBwPerGpu: 'Scale Out BW per GPU',
+    colScaleOutTech: 'Scale Out Tech',
+    colScaleOutSwitch: 'Scale Out Switch',
+    colScaleOutTopology: 'Scale Out Topology',
+    colNic: 'NIC',
+    footnote1: 'Dense tensor core peak TFLOP/s (without sparsity).',
+    footnote2: 'Scale out isn’t used in InferenceX™ for rack scale.',
+    scaleOutHeading: 'Scale-Out Topology Diagrams',
+    scaleOutDescription:
+      'Per-server scale-out network topology for each GPU SKU, showing GPU → NIC → leaf switch connectivity.',
+    scaleUpHeading: 'Scale-Up Topology Diagrams',
+    scaleUpDescription:
+      'Intra-node scale-up interconnect topology for each GPU SKU, showing GPU → NVSwitch or direct GPU-to-GPU connectivity.',
+  },
+  zh: {
+    heading: 'GPU 规格',
+    description: 'InferenceX™ 基准测试中使用的 GPU 硬件规格，包括计算性能、显存带宽和互联详情。',
+    viewTable: '表格',
+    viewChart: '图表',
+    viewRadar: '雷达图',
+    colGpu: 'GPU',
+    colMemory: '显存',
+    colMemBw: '显存带宽',
+    colScaleUp: '纵向扩展',
+    colScaleUpBw: '纵向扩展带宽',
+    colWorldSize: '域内 GPU 数',
+    colScaleUpDomainMem: '纵向扩展域显存',
+    colScaleUpDomainMemBw: '纵向扩展域显存带宽',
+    colScaleUpTopology: '纵向扩展拓扑',
+    colScaleUpSwitch: '纵向扩展交换机',
+    colScaleOutBwPerGpu: '每 GPU 横向扩展带宽',
+    colScaleOutTech: '横向扩展技术',
+    colScaleOutSwitch: '横向扩展交换机',
+    colScaleOutTopology: '横向扩展拓扑',
+    colNic: 'NIC',
+    footnote1: '密集 Tensor Core 峰值 TFLOP/s（不含稀疏加速）。',
+    footnote2: 'InferenceX™ 机柜级测试不使用横向扩展。',
+    scaleOutHeading: '横向扩展拓扑图',
+    scaleOutDescription: '每台服务器的横向扩展网络拓扑，展示 GPU → NIC → Leaf 交换机的连接方式。',
+    scaleUpHeading: '纵向扩展拓扑图',
+    scaleUpDescription: '节点内纵向扩展互联拓扑，展示 GPU → NVSwitch 或 GPU 直连方式。',
+  },
+} as const;
 
-const GPU_SPECS_VIEW_MODE_OPTIONS: SegmentedToggleOption<GpuSpecsViewMode>[] = [
-  {
-    value: 'table',
-    label: 'Table',
-    icon: <Table2 className="size-3.5" />,
-    testId: 'gpu-specs-table-view-btn',
-  },
-  {
-    value: 'chart',
-    label: 'Chart',
-    icon: <BarChart3 className="size-3.5" />,
-    testId: 'gpu-specs-chart-view-btn',
-  },
-  {
-    value: 'radar',
-    label: 'Radar',
-    icon: <Radar className="size-3.5" />,
-    testId: 'gpu-specs-radar-view-btn',
-  },
-];
+type GpuSpecsViewMode = 'table' | 'chart' | 'radar';
 
 function GpuSpecsTable({
   onTopologyClick,
@@ -95,19 +137,20 @@ function GpuSpecsTable({
   onTopologyClick?: (gpuName: string) => void;
   onScaleUpTopologyClick?: (gpuName: string) => void;
 }) {
+  const t = STRINGS[useLocale()];
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse min-w-[1400px]">
         <thead>
           <tr className="border-b border-border">
             <SpecCell header align="left" sticky>
-              GPU
+              {t.colGpu}
             </SpecCell>
             <SpecCell header align="right">
-              Memory
+              {t.colMemory}
             </SpecCell>
             <SpecCell header align="right">
-              Mem BW
+              {t.colMemBw}
             </SpecCell>
             <SpecCell header align="right">
               FP4{' '}
@@ -128,40 +171,40 @@ function GpuSpecsTable({
               </span>
             </SpecCell>
             <SpecCell header align="left">
-              Scale Up
+              {t.colScaleUp}
             </SpecCell>
             <SpecCell header align="right">
-              Scale Up BW
+              {t.colScaleUpBw}
             </SpecCell>
             <SpecCell header align="right">
-              World Size
+              {t.colWorldSize}
             </SpecCell>
             <SpecCell header align="right" className="min-w-36">
-              Scale Up Domain Memory
+              {t.colScaleUpDomainMem}
             </SpecCell>
             <SpecCell header align="right" className="min-w-36">
-              Scale Up Domain Mem BW
+              {t.colScaleUpDomainMemBw}
             </SpecCell>
             <SpecCell header align="left">
-              Scale Up Topology
+              {t.colScaleUpTopology}
             </SpecCell>
             <SpecCell header align="left">
-              Scale Up Switch
+              {t.colScaleUpSwitch}
             </SpecCell>
             <SpecCell header align="right" className="min-w-28">
-              Scale Out BW per GPU
+              {t.colScaleOutBwPerGpu}
             </SpecCell>
             <SpecCell header align="left">
-              Scale Out Tech
+              {t.colScaleOutTech}
             </SpecCell>
             <SpecCell header align="left">
-              Scale Out Switch
+              {t.colScaleOutSwitch}
             </SpecCell>
             <SpecCell header align="left">
-              Scale Out Topology
+              {t.colScaleOutTopology}
             </SpecCell>
             <SpecCell header align="left">
-              NIC
+              {t.colNic}
             </SpecCell>
           </tr>
         </thead>
@@ -286,9 +329,34 @@ function GpuSpecsTable({
 
 export function GpuSpecsContent() {
   const specsWithTopology = GPU_SPECS.filter((spec) => spec.scaleOutTopology !== null);
+  const t = STRINGS[useLocale()];
 
   const [viewMode, setViewMode] = useState<GpuSpecsViewMode>('table');
   const [selectedMetric, setSelectedMetric] = useState(GPU_CHART_METRICS[0].key);
+
+  const viewModeOptions = useMemo<SegmentedToggleOption<GpuSpecsViewMode>[]>(
+    () => [
+      {
+        value: 'table',
+        label: t.viewTable,
+        icon: <Table2 className="size-3.5" />,
+        testId: 'gpu-specs-table-view-btn',
+      },
+      {
+        value: 'chart',
+        label: t.viewChart,
+        icon: <BarChart3 className="size-3.5" />,
+        testId: 'gpu-specs-chart-view-btn',
+      },
+      {
+        value: 'radar',
+        label: t.viewRadar,
+        icon: <Radar className="size-3.5" />,
+        testId: 'gpu-specs-radar-view-btn',
+      },
+    ],
+    [t],
+  );
 
   // Refs for each scale-out topology diagram, keyed by GPU name
   const diagramRefs = useRef<Record<string, TopologyDiagramHandle | null>>({});
@@ -314,11 +382,8 @@ export function GpuSpecsContent() {
         <Card>
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-semibold mb-2">GPU Specifications</h2>
-              <p className="text-muted-foreground text-sm">
-                Hardware specifications for GPUs used in InferenceX&trade; benchmarks, including
-                compute performance, memory bandwidth, and interconnect details.
-              </p>
+              <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
+              <p className="text-muted-foreground text-sm">{t.description}</p>
             </div>
             <ChartShareActions />
           </div>
@@ -330,7 +395,7 @@ export function GpuSpecsContent() {
             <div />
             <SegmentedToggle
               value={viewMode}
-              options={GPU_SPECS_VIEW_MODE_OPTIONS}
+              options={viewModeOptions}
               onValueChange={handleViewModeChange}
               ariaLabel="View mode"
               testId="gpu-specs-view-toggle"
@@ -346,10 +411,10 @@ export function GpuSpecsContent() {
               />
               <div className="px-4 md:px-8 pt-4">
                 <p className="text-xs text-muted-foreground">
-                  <sup>1</sup> Dense tensor core peak TFLOP/s (without sparsity).
+                  <sup>1</sup> {t.footnote1}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  <sup>2</sup> Scale out isn&apos;t used in InferenceX&trade; for rack scale.
+                  <sup>2</sup> {t.footnote2}
                 </p>
               </div>
             </>
@@ -362,11 +427,8 @@ export function GpuSpecsContent() {
       </section>
       <section className="pt-8 md:pt-0">
         <Card>
-          <h3 className="text-lg font-semibold mb-2">Scale-Out Topology Diagrams</h3>
-          <p className="text-muted-foreground text-sm mb-6">
-            Per-server scale-out network topology for each GPU SKU, showing GPU &rarr; NIC &rarr;
-            leaf switch connectivity.
-          </p>
+          <h3 className="text-lg font-semibold mb-2">{t.scaleOutHeading}</h3>
+          <p className="text-muted-foreground text-sm mb-6">{t.scaleOutDescription}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {specsWithTopology.map((spec) => (
               <div
@@ -388,11 +450,8 @@ export function GpuSpecsContent() {
       </section>
       <section className="pt-8 md:pt-0">
         <Card>
-          <h3 className="text-lg font-semibold mb-2">Scale-Up Topology Diagrams</h3>
-          <p className="text-muted-foreground text-sm mb-6">
-            Intra-node scale-up interconnect topology for each GPU SKU, showing GPU &rarr; NVSwitch
-            or direct GPU-to-GPU connectivity.
-          </p>
+          <h3 className="text-lg font-semibold mb-2">{t.scaleUpHeading}</h3>
+          <p className="text-muted-foreground text-sm mb-6">{t.scaleUpDescription}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {GPU_SPECS.map((spec) => (
               <div

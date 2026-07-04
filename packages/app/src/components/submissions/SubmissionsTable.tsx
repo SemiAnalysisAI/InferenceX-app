@@ -20,6 +20,8 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 
+import { useLocale } from '@/lib/use-locale';
+
 import {
   buildInferenceCompareUrl,
   computePreviousImages,
@@ -27,6 +29,116 @@ import {
   getVendor,
   submissionRowKey,
 } from './submissions-utils';
+
+const STRINGS = {
+  en: {
+    searchPlaceholder: 'Search configs...',
+    colGpu: 'GPU',
+    colModel: 'Model',
+    colPrecision: 'Precision',
+    colSpecMethod: 'Spec Method',
+    colFramework: 'Framework',
+    colDate: 'Date',
+    colDatapoints: 'Datapoints',
+    colCompare: 'Compare',
+    noMatch: 'No matching submissions found.',
+    noData: 'No submission data available.',
+    vsPrev: 'vs prev',
+    vendorLabel: 'Vendor:',
+    vendorTip: 'GPU manufacturer',
+    specMethodLabel: 'Spec Method:',
+    specMethodTip: 'Speculative decoding method (e.g. MTP, Eagle)',
+    disaggLabel: 'Disaggregated:',
+    disaggTip: 'Prefill and decode run on separate GPU pools',
+    multinodeLabel: 'Multinode:',
+    multinodeTip: 'Config spans multiple physical nodes',
+    totalGpusLabel: 'Total GPUs:',
+    totalGpusTip: 'Total physical GPUs. When disaggregated, prefill + decode are separate pools',
+    prefillGpusLabel: 'Prefill GPUs:',
+    prefillGpusTip: 'GPUs for the prefill (prompt processing) phase',
+    decodeGpusLabel: 'Decode GPUs:',
+    decodeGpusTip: 'GPUs for the decode (token generation) phase',
+    prefillTpEpLabel: 'Prefill TP/EP:',
+    prefillTpEpTip: 'Tensor parallelism / Expert parallelism for prefill',
+    decodeTpEpLabel: 'Decode TP/EP:',
+    decodeTpEpTip: 'Tensor parallelism / Expert parallelism for decode',
+    sequencesLabel: 'Sequences:',
+    sequencesTip: 'Distinct ISL/OSL sequence length combinations tested',
+    concurrenciesLabel: 'Concurrencies:',
+    concurrenciesTip: 'Distinct concurrency levels tested',
+    imageLabel: 'Image:',
+    imageTipChanged:
+      'Container image used for this benchmark configuration. The previous run of this config used a different image — shown on the left.',
+    imageTipDefault: 'Container image used for this benchmark configuration',
+    showMorePre: 'Show ',
+    showMorePost: ' more',
+    hiddenPre: '(',
+    hiddenPost: ' hidden)',
+    showingPrefix: 'Showing ',
+    showingOf: ' of ',
+    configSingular: ' config',
+    configPlural: ' configs',
+    totalDatapointsSuffix: ' total datapoints',
+    compareTipPre: 'Compare ',
+    compareTipPost: ' on chart',
+    maxPrefix: 'max ',
+    yes: 'Yes',
+    no: 'No',
+  },
+  zh: {
+    searchPlaceholder: '搜索配置...',
+    colGpu: 'GPU',
+    colModel: '模型',
+    colPrecision: '精度',
+    colSpecMethod: '推测解码',
+    colFramework: '框架',
+    colDate: '日期',
+    colDatapoints: '数据点',
+    colCompare: '对比',
+    noMatch: '未找到匹配的提交记录。',
+    noData: '暂无提交数据。',
+    vsPrev: '对比',
+    vendorLabel: '厂商：',
+    vendorTip: 'GPU 制造商',
+    specMethodLabel: '推测解码方法：',
+    specMethodTip: '推测解码方法（如 MTP、Eagle）',
+    disaggLabel: '分离式部署：',
+    disaggTip: 'Prefill 和 Decode 在不同 GPU 池上运行',
+    multinodeLabel: '多节点：',
+    multinodeTip: '配置跨多个物理节点',
+    totalGpusLabel: '总 GPU 数：',
+    totalGpusTip: '物理 GPU 总数。分离式部署时，Prefill 和 Decode 使用不同的 GPU 池',
+    prefillGpusLabel: 'Prefill GPU 数：',
+    prefillGpusTip: '用于 Prefill（提示处理）阶段的 GPU',
+    decodeGpusLabel: 'Decode GPU 数：',
+    decodeGpusTip: '用于 Decode（Token 生成）阶段的 GPU',
+    prefillTpEpLabel: 'Prefill TP/EP：',
+    prefillTpEpTip: 'Prefill 的张量并行 / 专家并行',
+    decodeTpEpLabel: 'Decode TP/EP：',
+    decodeTpEpTip: 'Decode 的张量并行 / 专家并行',
+    sequencesLabel: '序列组合：',
+    sequencesTip: '测试的不同 ISL/OSL 序列长度组合数',
+    concurrenciesLabel: '并发数：',
+    concurrenciesTip: '测试的不同并发级别数',
+    imageLabel: '镜像：',
+    imageTipChanged: '此基准测试配置使用的容器镜像。上一次运行使用了不同的镜像——显示在左侧。',
+    imageTipDefault: '此基准测试配置使用的容器镜像',
+    showMorePre: '再显示 ',
+    showMorePost: ' 条',
+    hiddenPre: '（还有 ',
+    hiddenPost: ' 条隐藏）',
+    showingPrefix: '显示 ',
+    showingOf: ' / ',
+    configSingular: ' 条配置',
+    configPlural: ' 条配置',
+    totalDatapointsSuffix: ' 个数据点',
+    compareTipPre: '对比 ',
+    compareTipPost: '（在图表中查看）',
+    maxPrefix: '最大 ',
+    yes: '是',
+    no: '否',
+  },
+} as const;
 
 const ROW_PAGE_SIZE = 100;
 
@@ -105,6 +217,7 @@ function SortHeader({
 }
 
 export default function SubmissionsTable({ data }: SubmissionsTableProps) {
+  const t = STRINGS[useLocale()];
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
@@ -189,7 +302,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         onBlur={() => {
           if (search.trim()) track('submissions_table_searched', { query: search.trim() });
         }}
-        placeholder="Search configs..."
+        placeholder={t.searchPlaceholder}
         className="w-full max-w-sm px-3 py-1.5 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
       />
       <div className="overflow-x-auto rounded-md border border-border">
@@ -199,13 +312,13 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
               <th className="w-8 px-2" />
               {(
                 [
-                  ['GPU', 'hardware'],
-                  ['Model', 'model'],
-                  ['Precision', 'precision'],
-                  ['Spec Method', 'spec_method'],
-                  ['Framework', 'framework'],
-                  ['Date', 'date'],
-                  ['Datapoints', 'total_datapoints'],
+                  [t.colGpu, 'hardware'],
+                  [t.colModel, 'model'],
+                  [t.colPrecision, 'precision'],
+                  [t.colSpecMethod, 'spec_method'],
+                  [t.colFramework, 'framework'],
+                  [t.colDate, 'date'],
+                  [t.colDatapoints, 'total_datapoints'],
                 ] as [string, SortKey][]
               ).map(([label, field]) => (
                 <SortHeader
@@ -221,7 +334,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                 className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
                 scope="col"
               >
-                Compare
+                {t.colCompare}
               </th>
             </tr>
           </thead>
@@ -243,7 +356,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
             {sorted.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
-                  {search ? 'No matching submissions found.' : 'No submission data available.'}
+                  {search ? t.noMatch : t.noData}
                 </td>
               </tr>
             )}
@@ -259,15 +372,25 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
             onClick={loadMore}
             data-testid="submissions-load-more"
           >
-            Show {Math.min(ROW_PAGE_SIZE, hiddenCount)} more
-            <span className="text-muted-foreground">({hiddenCount} hidden)</span>
+            {t.showMorePre}
+            {Math.min(ROW_PAGE_SIZE, hiddenCount)}
+            {t.showMorePost}
+            <span className="text-muted-foreground">
+              {t.hiddenPre}
+              {hiddenCount}
+              {t.hiddenPost}
+            </span>
           </Button>
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        Showing {visibleRows.length} of {filtered.length} config
-        {filtered.length === 1 ? '' : 's'} ·{' '}
-        {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()} total datapoints
+        {t.showingPrefix}
+        {visibleRows.length}
+        {t.showingOf}
+        {filtered.length}
+        {filtered.length === 1 ? t.configSingular : t.configPlural} ·{' '}
+        {filtered.reduce((sum, r) => sum + r.total_datapoints, 0).toLocaleString()}
+        {t.totalDatapointsSuffix}
       </p>
     </div>
   );
@@ -286,6 +409,7 @@ function SubmissionRow({
   previousRun: SubmissionSummaryRow | null;
   onToggle: () => void;
 }) {
+  const t = STRINGS[useLocale()];
   const vendor = getVendor(row.hardware);
   const compareUrl = previousRun ? buildInferenceCompareUrl(row, previousRun) : null;
 
@@ -344,13 +468,15 @@ function SubmissionRow({
                       }}
                     >
                       <GitCompare className="size-3.5" />
-                      <span className="hidden lg:inline">vs prev</span>
+                      <span className="hidden lg:inline">{t.vsPrev}</span>
                     </a>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" collisionPadding={10}>
                   <span className="text-xs">
-                    Compare {previousRun.date} → {row.date} on chart
+                    {t.compareTipPre}
+                    {previousRun.date} → {row.date}
+                    {t.compareTipPost}
                   </span>
                 </TooltipContent>
               </TooltipRoot>
@@ -366,79 +492,54 @@ function SubmissionRow({
           <td colSpan={8} className="px-3 py-3">
             <TooltipProvider>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
-                <DetailItem label="Vendor:" tip="GPU manufacturer">
+                <DetailItem label={t.vendorLabel} tip={t.vendorTip}>
                   {vendor}
                 </DetailItem>
-                <DetailItem
-                  label="Spec Method:"
-                  tip="Speculative decoding method (e.g. MTP, Eagle)"
-                >
+                <DetailItem label={t.specMethodLabel} tip={t.specMethodTip}>
                   {row.spec_method && row.spec_method !== 'none'
                     ? resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
                     : 'none'}
                 </DetailItem>
-                <DetailItem
-                  label="Disaggregated:"
-                  tip="Prefill and decode run on separate GPU pools"
-                >
-                  {row.disagg ? 'Yes' : 'No'}
+                <DetailItem label={t.disaggLabel} tip={t.disaggTip}>
+                  {row.disagg ? t.yes : t.no}
                 </DetailItem>
-                <DetailItem label="Multinode:" tip="Config spans multiple physical nodes">
-                  {row.is_multinode ? 'Yes' : 'No'}
+                <DetailItem label={t.multinodeLabel} tip={t.multinodeTip}>
+                  {row.is_multinode ? t.yes : t.no}
                 </DetailItem>
-                <DetailItem
-                  label="Total GPUs:"
-                  tip="Total physical GPUs. When disaggregated, prefill + decode are separate pools"
-                >
+                <DetailItem label={t.totalGpusLabel} tip={t.totalGpusTip}>
                   <span className="tabular-nums">
                     {row.disagg ? row.num_prefill_gpu + row.num_decode_gpu : row.num_prefill_gpu}
                   </span>
                 </DetailItem>
-                <DetailItem
-                  label="Prefill GPUs:"
-                  tip="GPUs for the prefill (prompt processing) phase"
-                >
+                <DetailItem label={t.prefillGpusLabel} tip={t.prefillGpusTip}>
                   <span className="tabular-nums">{row.num_prefill_gpu}</span>
                 </DetailItem>
-                <DetailItem label="Decode GPUs:" tip="GPUs for the decode (token generation) phase">
+                <DetailItem label={t.decodeGpusLabel} tip={t.decodeGpusTip}>
                   <span className="tabular-nums">{row.num_decode_gpu}</span>
                 </DetailItem>
-                <DetailItem
-                  label="Prefill TP/EP:"
-                  tip="Tensor parallelism / Expert parallelism for prefill"
-                >
+                <DetailItem label={t.prefillTpEpLabel} tip={t.prefillTpEpTip}>
                   <span className="tabular-nums">
                     {row.prefill_tp ?? '—'}/{row.prefill_ep ?? '—'}
                   </span>
                 </DetailItem>
-                <DetailItem
-                  label="Decode TP/EP:"
-                  tip="Tensor parallelism / Expert parallelism for decode"
-                >
+                <DetailItem label={t.decodeTpEpLabel} tip={t.decodeTpEpTip}>
                   <span className="tabular-nums">
                     {row.decode_tp ?? '—'}/{row.decode_ep ?? '—'}
                   </span>
                 </DetailItem>
-                <DetailItem
-                  label="Sequences:"
-                  tip="Distinct ISL/OSL sequence length combinations tested"
-                >
+                <DetailItem label={t.sequencesLabel} tip={t.sequencesTip}>
                   <span className="tabular-nums">{row.distinct_sequences ?? '—'}</span>
                 </DetailItem>
-                <DetailItem label="Concurrencies:" tip="Distinct concurrency levels tested">
+                <DetailItem label={t.concurrenciesLabel} tip={t.concurrenciesTip}>
                   <span className="tabular-nums">
                     {row.distinct_concurrencies ?? '—'}
-                    {row.max_concurrency ? ` (max ${row.max_concurrency})` : ''}
+                    {row.max_concurrency ? ` (${t.maxPrefix}${row.max_concurrency})` : ''}
                   </span>
                 </DetailItem>
                 <div className="col-span-2 md:col-span-4">
                   <DetailItem
-                    label="Image:"
-                    tip={
-                      previousImage
-                        ? 'Container image used for this benchmark configuration. The previous run of this config used a different image — shown on the left.'
-                        : 'Container image used for this benchmark configuration'
-                    }
+                    label={t.imageLabel}
+                    tip={previousImage ? t.imageTipChanged : t.imageTipDefault}
                   >
                     {previousImage ? (
                       <span
@@ -476,7 +577,9 @@ function SubmissionRow({
                         }}
                       >
                         <GitCompare className="size-3.5" />
-                        Compare {previousRun.date} → {row.date} on chart
+                        {t.compareTipPre}
+                        {previousRun.date} → {row.date}
+                        {t.compareTipPost}
                       </a>
                     </Button>
                   </div>

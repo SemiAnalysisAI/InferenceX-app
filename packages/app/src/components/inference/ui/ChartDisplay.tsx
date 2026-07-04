@@ -65,6 +65,7 @@ import { isAgenticOnlyXAxisMode, type XAxisMode } from '@/components/inference/h
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useTrendData } from '@/components/inference/hooks/useTrendData';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { useLocale } from '@/lib/use-locale';
 
 import ChartControls from './ChartControls';
 import ComparisonChangelog from './ComparisonChangelog';
@@ -81,6 +82,41 @@ const ModelArchitectureDiagram = dynamic(() => import('./ModelArchitectureDiagra
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 
 type InferenceViewMode = 'chart' | 'table';
+
+const STRINGS = {
+  en: {
+    inferencePerformance: 'Inference Performance',
+    inferencePerformanceDesc:
+      'Inference performance metrics across different models, hardware configurations, and serving parameters.',
+    chart: 'Chart',
+    table: 'Table',
+    sourceUnofficial: 'Source: UNOFFICIAL',
+    sourceOfficial: 'Source: SemiAnalysis InferenceX™',
+    updated: 'Updated:',
+    normalizedE2eDisclaimer:
+      'Normalized E2E requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    selectDateRange: 'Select a date range or add a run to view GPU comparison',
+    performanceOverTime: 'Performance Over Time',
+    performanceOverTimeDesc:
+      'Double-click points on the scatter chart to track configurations over time.',
+    viewMode: 'View mode',
+  },
+  zh: {
+    inferencePerformance: '推理性能',
+    inferencePerformanceDesc: '不同模型、硬件配置和服务参数下的推理性能指标。',
+    chart: '图表',
+    table: '表格',
+    sourceUnofficial: '来源：非官方',
+    sourceOfficial: '来源：SemiAnalysis InferenceX™',
+    updated: '更新时间：',
+    normalizedE2eDisclaimer:
+      'Normalized E2E 需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
+    selectDateRange: '请选择日期范围或添加运行以查看 GPU 对比',
+    performanceOverTime: '性能趋势',
+    performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
+    viewMode: '视图模式',
+  },
+} as const;
 
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string }[] = [
   { value: 'interactivity', label: 'Interactivity' },
@@ -153,6 +189,8 @@ const VIEW_MODE_OPTIONS: SegmentedToggleOption<InferenceViewMode>[] = [
  * the current filtered benchmark data.
  */
 export default function ChartDisplay() {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const {
     graphs,
     loading,
@@ -251,6 +289,15 @@ export default function ChartDisplay() {
     setViewModes((prev) => ({ ...prev, [index]: value }));
     track('inference_view_changed', { view: value, chartIndex: index });
   };
+
+  const viewModeOptions = useMemo<SegmentedToggleOption<InferenceViewMode>[]>(
+    () =>
+      VIEW_MODE_OPTIONS.map((opt) => ({
+        ...opt,
+        label: opt.value === 'chart' ? t.chart : t.table,
+      })),
+    [t],
+  );
 
   const {
     unofficialRunInfo,
@@ -506,9 +553,9 @@ export default function ChartDisplay() {
                     leadingControls={
                       <SegmentedToggle
                         value={getViewMode(graphIndex)}
-                        options={VIEW_MODE_OPTIONS}
+                        options={viewModeOptions}
                         onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                        ariaLabel="View mode"
+                        ariaLabel={t.viewMode}
                         testId={`inference-view-toggle-${graphIndex}`}
                       />
                     }
@@ -621,15 +668,13 @@ export default function ChartDisplay() {
                               .map((prec) => getPrecisionLabel(prec as Precision))
                               .join(', ')}{' '}
                             • {getSequenceLabel(graph.sequence as Sequence)} •{' '}
-                            {isUnofficialRun
-                              ? 'Source: UNOFFICIAL'
-                              : 'Source: SemiAnalysis InferenceX™'}
+                            {isUnofficialRun ? t.sourceUnofficial : t.sourceOfficial}
                             {selectedRunDate && (
                               <>
                                 {' '}
-                                • Updated:{' '}
+                                • {t.updated}{' '}
                                 {new Date(`${selectedRunDate}T00:00:00Z`).toLocaleDateString(
-                                  'en-US',
+                                  locale === 'zh' ? 'zh-CN' : 'en-US',
                                   {
                                     year: 'numeric',
                                     month: '2-digit',
@@ -643,8 +688,7 @@ export default function ChartDisplay() {
                           <MetricAssumptionNotes selectedYAxisMetric={selectedYAxisMetric} />
                           {isUnofficialRun && selectedXAxisMode === 'normalized-e2e' && (
                             <p className="mb-2 text-xs text-muted-foreground">
-                              Normalized E2E requires persisted per-request traces, so
-                              unofficial-run overlays are unavailable for this experimental view.
+                              {t.normalizedE2eDisclaimer}
                             </p>
                           )}
                           <UnofficialDomainNotice />
@@ -720,7 +764,7 @@ export default function ChartDisplay() {
                             selectedDates.length === 0 && (
                               <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg z-10">
                                 <p className="text-sm font-medium text-muted-foreground bg-background/90 border border-border rounded-md px-4 py-2 shadow-sm">
-                                  Select a date range or add a run to view GPU comparison
+                                  {t.selectDateRange}
                                 </p>
                               </div>
                             )}
@@ -755,11 +799,8 @@ export default function ChartDisplay() {
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold mb-2">Inference Performance</h2>
-                <p className="text-muted-foreground text-sm mb-4">
-                  Inference performance metrics across different models, hardware configurations,
-                  and serving parameters.
-                </p>
+                <h2 className="text-lg font-semibold mb-2">{t.inferencePerformance}</h2>
+                <p className="text-muted-foreground text-sm mb-4">{t.inferencePerformanceDesc}</p>
               </div>
               <ChartShareActions />
             </div>
@@ -854,10 +895,8 @@ export default function ChartDisplay() {
       >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Performance Over Time</DialogTitle>
-            <DialogDescription>
-              Double-click points on the scatter chart to track configurations over time.
-            </DialogDescription>
+            <DialogTitle>{t.performanceOverTime}</DialogTitle>
+            <DialogDescription>{t.performanceOverTimeDesc}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap gap-2 mb-4">
             {trackedConfigs.map((config) => (

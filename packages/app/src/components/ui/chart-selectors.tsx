@@ -30,6 +30,41 @@ import {
   groupByCategory,
   sequenceKind,
 } from '@/lib/data-mappings';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    model: 'Model',
+    modelTooltip: 'The language model being benchmarked.',
+    islOsl: 'ISL / OSL',
+    islOslTooltip:
+      'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
+    scenario: 'Scenario',
+    scenarioTooltip:
+      'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). Agentic Traces replay real agentic workloads with variable inputs/outputs.',
+    latencyPercentile: 'Latency Percentile',
+    latencyPercentileTooltip:
+      'Percentile of the latency distribution used for the chart x-axis on agentic runs.',
+    precision: 'Precision',
+    precisionTooltip:
+      "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
+  },
+  zh: {
+    model: '模型',
+    modelTooltip: '正在进行基准测试的语言模型。',
+    islOsl: 'ISL / OSL',
+    islOslTooltip:
+      '输入序列长度 / 输出序列长度（Input Sequence Length / Output Sequence Length）。定义基准测试的输入和输出 token 数量（如 1K/8K 表示 1,024 个输入 token 和 8,192 个输出 token）。',
+    scenario: '场景',
+    scenarioTooltip:
+      '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic Traces 回放具有可变输入/输出的真实智能体工作负载。',
+    latencyPercentile: '延迟分位数',
+    latencyPercentileTooltip: '用于智能体运行图表 X 轴的延迟分布分位数。',
+    precision: '精度',
+    precisionTooltip:
+      '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
+  },
+} as const;
 
 function CategorySectionTitle({ label, reason }: { label: string; reason: string }) {
   return (
@@ -69,6 +104,7 @@ export function ModelSelector({
   availableModels,
   'data-testid': testId,
 }: ModelSelectorProps) {
+  const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
   const sections = [
     {
@@ -128,11 +164,7 @@ export function ModelSelector({
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-2">
-      <LabelWithTooltip
-        htmlFor={id}
-        label="Model"
-        tooltip="The language model being benchmarked."
-      />
+      <LabelWithTooltip htmlFor={id} label={t.model} tooltip={t.modelTooltip} />
       <div>
         <MultiSelect
           sections={sections}
@@ -179,6 +211,7 @@ export function SequenceSelector({
   availableSequences,
   'data-testid': testId,
 }: SequenceSelectorProps) {
+  const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
   const sections = [
     {
@@ -209,11 +242,7 @@ export function SequenceSelector({
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
-      <LabelWithTooltip
-        htmlFor={id}
-        label="ISL / OSL"
-        tooltip="Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens)."
-      />
+      <LabelWithTooltip htmlFor={id} label={t.islOsl} tooltip={t.islOslTooltip} />
       <div>
         <MultiSelect
           sections={sections}
@@ -265,17 +294,14 @@ export function ScenarioSelector({
   availableSequences,
   'data-testid': testId,
 }: ScenarioSelectorProps) {
+  const t = STRINGS[useLocale()];
   const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
   const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
   const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
 
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
-      <LabelWithTooltip
-        htmlFor={id}
-        label="Scenario"
-        tooltip="Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). Agentic Traces replay real agentic workloads with variable inputs/outputs."
-      />
+      <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
       <Select
         value={value}
         onValueChange={(v) => {
@@ -349,12 +375,13 @@ export function PercentileSelector({
   onChange,
   'data-testid': testId,
 }: PercentileSelectorProps) {
+  const t = STRINGS[useLocale()];
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip
         htmlFor={id}
-        label="Latency Percentile"
-        tooltip="Percentile of the latency distribution used for the chart x-axis on agentic runs."
+        label={t.latencyPercentile}
+        tooltip={t.latencyPercentileTooltip}
       />
       <Select
         value={value}
@@ -397,13 +424,10 @@ export function PrecisionSelector({
   availablePrecisions,
   'data-testid': testId,
 }: PrecisionSelectorProps) {
+  const t = STRINGS[useLocale()];
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
-      <LabelWithTooltip
-        htmlFor={id}
-        label="Precision"
-        tooltip="Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'."
-      />
+      <LabelWithTooltip htmlFor={id} label={t.precision} tooltip={t.precisionTooltip} />
       <div>
         <MultiSelect
           options={availablePrecisions.map((p) => ({

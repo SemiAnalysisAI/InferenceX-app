@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
@@ -5,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.
@@ -35,11 +39,19 @@ function MetricBadges({
   );
 }
 
-function SourceLink({ href, children }: { href: string; children: ReactNode }) {
+function SourceLink({
+  href,
+  children,
+  sourceLabel = 'Source:',
+}: {
+  href: string;
+  children: ReactNode;
+  sourceLabel?: string;
+}) {
   return (
     <p className="text-muted-foreground">
       <small>
-        Source:{' '}
+        {sourceLabel}{' '}
         <Link target="_blank" className="underline hover:text-foreground" href={href}>
           {children}
           <ExternalLinkIcon />
@@ -49,15 +61,45 @@ function SourceLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
+const NOUN_ZH: Record<string, string> = {
+  cost: '成本',
+  'input throughput': '输入吞吐量',
+  'output throughput': '输出吞吐量',
+  power: '功耗',
+  Joules: '能耗',
+  'Joules per token': '每 token 能耗',
+};
+
 function DisaggCaveat({
   visible,
   calculationNoun,
   comparisonNoun = calculationNoun,
+  locale = 'en',
 }: {
   visible: boolean;
   calculationNoun: string;
   comparisonNoun?: string;
+  locale?: Locale;
 }) {
+  const content =
+    locale === 'zh' ? (
+      <>
+        <strong>注意：</strong>分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 GPU 或预填充
+        GPU 计算
+        {NOUN_ZH[calculationNoun] ?? calculationNoun}
+        ，而非按 GPU 总数计算。因此，与聚合配置进行
+        {NOUN_ZH[comparisonNoun] ?? comparisonNoun}
+        的直接对比并不完全等价。
+      </>
+    ) : (
+      <>
+        <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo
+        TRTLLM) calculate {calculationNoun} per decode GPU or per prefill GPU, rather than per total
+        GPU count. This makes direct {comparisonNoun} comparison with aggregated configs not an
+        apples-to-apples comparison.
+      </>
+    );
+
   return (
     <div
       className={`overflow-hidden transition-all duration-200 ease-in-out ${
@@ -65,10 +107,7 @@ function DisaggCaveat({
       }`}
     >
       <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-        <strong>Note:</strong> Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo
-        TRTLLM) calculate {calculationNoun} per decode GPU or per prefill GPU, rather than per total
-        GPU count. This makes direct {comparisonNoun} comparison with aggregated configs not an
-        apples-to-apples comparison.
+        {content}
       </p>
     </div>
   );
@@ -106,6 +145,7 @@ export function MetricAssumptionNotes({
   includeAllPowerThroughputMetrics?: boolean;
   includePowerThroughputCaveat?: boolean;
 }) {
+  const locale = useLocale();
   const showPowerSource = includeAllPowerThroughputMetrics
     ? POWER_SOURCE_METRICS.has(selectedYAxisMetric)
     : selectedYAxisMetric === 'y_tpPerMw';
@@ -121,37 +161,60 @@ export function MetricAssumptionNotes({
       ? getCostValues(selectedYAxisMetric)
       : null;
 
+  const powerLabel = locale === 'zh' ? '全包功耗/GPU：' : 'All in Power/GPU:';
+  const costLabel = locale === 'zh' ? 'TCO $/GPU/小时：' : 'TCO $/GPU/hr:';
+  const sourceLabel = locale === 'zh' ? '来源：' : 'Source:';
+
   return (
     <>
       {showPowerSource && (
         <>
-          <MetricBadges label="All in Power/GPU:" values={POWER_VALUES} />
-          <SourceLink href="https://semianalysis.com/datacenter-industry-model/">
+          <MetricBadges label={powerLabel} values={POWER_VALUES} />
+          <SourceLink
+            href="https://semianalysis.com/datacenter-industry-model/"
+            sourceLabel={sourceLabel}
+          >
             SemiAnalysis Datacenter Industry Model
           </SourceLink>
         </>
       )}
       {costValues && (
         <>
-          <MetricBadges label="TCO $/GPU/hr:" values={costValues} />
-          <SourceLink href="https://semianalysis.com/ai-cloud-tco-model/">
+          <MetricBadges label={costLabel} values={costValues} />
+          <SourceLink href="https://semianalysis.com/ai-cloud-tco-model/" sourceLabel={sourceLabel}>
             SemiAnalysis Market August 2025 Pricing Surveys & AI Cloud TCO Model
           </SourceLink>
         </>
       )}
-      <DisaggCaveat visible={selectedYAxisMetric.startsWith('y_cost')} calculationNoun="cost" />
-      <DisaggCaveat visible={showInputThroughputCaveat} calculationNoun="input throughput" />
-      <DisaggCaveat visible={showOutputThroughputCaveat} calculationNoun="output throughput" />
+      <DisaggCaveat
+        visible={selectedYAxisMetric.startsWith('y_cost')}
+        calculationNoun="cost"
+        locale={locale}
+      />
+      <DisaggCaveat
+        visible={showInputThroughputCaveat}
+        calculationNoun="input throughput"
+        locale={locale}
+      />
+      <DisaggCaveat
+        visible={showOutputThroughputCaveat}
+        calculationNoun="output throughput"
+        locale={locale}
+      />
       {includePowerThroughputCaveat && (
         <DisaggCaveat
           visible={POWER_SOURCE_METRICS.has(selectedYAxisMetric)}
           calculationNoun="power"
+          locale={locale}
         />
       )}
       {showJouleSource && (
         <>
-          <MetricBadges label="All in Power/GPU:" values={POWER_VALUES} />
-          <SourceLink href="https://semianalysis.com/datacenter-industry-model/">
+          <MetricBadges label={powerLabel} values={POWER_VALUES} />
+          <SourceLink
+            href="https://semianalysis.com/datacenter-industry-model/"
+            sourceLabel={sourceLabel}
+          >
             SemiAnalysis Datacenter Industry Model
           </SourceLink>
         </>
@@ -160,6 +223,7 @@ export function MetricAssumptionNotes({
         visible={showJouleSource}
         calculationNoun="Joules"
         comparisonNoun="Joules per token"
+        locale={locale}
       />
     </>
   );

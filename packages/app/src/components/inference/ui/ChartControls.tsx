@@ -30,6 +30,69 @@ import chartDefinitions from '@/components/inference/inference-chart-config.json
 import type { ChartDefinition, DisaggMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    yAxisMetric: 'Y-Axis Metric',
+    yAxisMetricTooltip:
+      "The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values.",
+    xAxisMetric: 'X-Axis Metric',
+    xAxisMetricTooltip:
+      "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
+    xAxisScale: 'X-Axis Scale',
+    xAxisScaleTooltip:
+      'The scale type for the X-axis. Auto automatically chooses between linear and logarithmic based on the data range. Linear uses a linear scale. Logarithmic uses a log scale for better visualization of wide-ranging values.',
+    scaleAuto: 'Auto',
+    scaleLinear: 'Linear',
+    scaleLog: 'Logarithmic',
+    gpuConfig: 'GPU Config',
+    gpuConfigTooltip:
+      'Select up to 4 GPU configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
+    gpuConfigPlaceholder: 'Select a GPU Config for comparison',
+    comparisonDateRange: 'Comparison Date Range',
+    comparisonDateRangeTooltip:
+      'Select the start and end dates for the historical comparison. The chart will show performance data for the selected GPU configs across this time range.',
+    dateRangePlaceholder: 'Select date range',
+    quickFilters: 'Quick Filters',
+    quickFiltersTooltip:
+      'Narrow the chart to any combination of GPU vendor, serving framework, aggregation mode (aggregated vs disaggregated serving), and speculative decoding (MTP vs standard). Selecting none in a group shows all.',
+    filterVendor: 'Vendor',
+    filterFramework: 'Framework',
+    filterAggregation: 'Aggregation',
+    filterSpecDecoding: 'Spec Decoding',
+    noData: 'No data for the current selection',
+  },
+  zh: {
+    yAxisMetric: 'Y 轴指标',
+    yAxisMetricTooltip:
+      '图表 Y 轴显示的性能指标。包括吞吐量（token/秒）、每百万 token 成本以及自定义用户值。',
+    xAxisMetric: 'X 轴指标',
+    xAxisMetricTooltip: '图表 X 轴显示的延迟指标：P90 Time To First Token。',
+    xAxisScale: 'X 轴刻度',
+    xAxisScaleTooltip:
+      'X 轴的刻度类型。自动模式根据数据范围自动选择线性或对数刻度。线性使用线性刻度。对数使用对数刻度，更适合展示范围较大的数据。',
+    scaleAuto: '自动',
+    scaleLinear: '线性',
+    scaleLog: '对数',
+    gpuConfig: 'GPU 配置',
+    gpuConfigTooltip:
+      '最多选择 4 个 GPU 配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
+    gpuConfigPlaceholder: '选择 GPU 配置进行对比',
+    comparisonDateRange: '对比日期范围',
+    comparisonDateRangeTooltip:
+      '选择历史对比的起止日期。图表将展示所选 GPU 配置在此时间范围内的性能数据。',
+    dateRangePlaceholder: '选择日期范围',
+    quickFilters: '快捷筛选',
+    quickFiltersTooltip:
+      '按 GPU 厂商、推理框架、聚合模式（聚合 vs 分离式）和投机解码（MTP vs 标准）的任意组合筛选图表。某组不选则显示全部。',
+    filterVendor: '厂商',
+    filterFramework: '框架',
+    filterAggregation: '聚合模式',
+    filterSpecDecoding: '投机解码',
+    noData: '当前选择无可用数据',
+  },
+} as const;
 
 /**
  * Y-axis metric options from static chart config JSON — available immediately, no API wait.
@@ -110,6 +173,7 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+  const t = STRINGS[useLocale()];
   // The percentile selector is rendered conditionally on `selectedSequence`,
   // which on the client is hydrated from URL params. SSR doesn't see the URL,
   // so deferring the conditional until after mount keeps the initial DOM
@@ -316,7 +380,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
   }[] = [
     {
       key: 'vendor',
-      label: 'Vendor',
+      label: t.filterVendor,
       options: QUICK_FILTER_VENDORS.map((o) => ({
         ...o,
         available: availableQuickFilters.vendors.includes(o.value),
@@ -327,7 +391,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
       ? [
           {
             key: 'framework' as const,
-            label: 'Framework',
+            label: t.filterFramework,
             options: frameworkOptions,
             selected: quickFilters.frameworks,
           },
@@ -335,7 +399,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
       : []),
     {
       key: 'disagg',
-      label: 'Aggregation',
+      label: t.filterAggregation,
       options: QUICK_FILTER_DISAGG.map((o) => ({
         ...o,
         available: availableQuickFilters.disagg.includes(o.value),
@@ -344,7 +408,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     },
     {
       key: 'spec',
-      label: 'Spec Decoding',
+      label: t.filterSpecDecoding,
       options: QUICK_FILTER_SPEC.map((o) => ({
         ...o,
         available: availableQuickFilters.spec.includes(o.value),
@@ -391,8 +455,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           <div className="flex flex-col space-y-1.5 lg:col-span-2">
             <LabelWithTooltip
               htmlFor="y-axis-select"
-              label="Y-Axis Metric"
-              tooltip="The performance metric displayed on the chart's Y-axis. Options include throughput (tokens/sec), cost per million tokens, and custom user-defined values."
+              label={t.yAxisMetric}
+              tooltip={t.yAxisMetricTooltip}
             />
             <SearchableSelect
               triggerId="y-axis-select"
@@ -414,8 +478,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               <div className="flex flex-col space-y-1.5 lg:col-span-1">
                 <LabelWithTooltip
                   htmlFor="x-axis-select"
-                  label="X-Axis Metric"
-                  tooltip="The latency metric displayed on the chart's X-axis: P90 Time To First Token."
+                  label={t.xAxisMetric}
+                  tooltip={t.xAxisMetricTooltip}
                 />
                 <Select
                   onValueChange={handleXAxisMetricChange}
@@ -440,8 +504,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               <div className="flex flex-col space-y-1.5 lg:col-span-1">
                 <LabelWithTooltip
                   htmlFor="scale-type-select"
-                  label="X-Axis Scale"
-                  tooltip="The scale type for the X-axis. Auto automatically chooses between linear and logarithmic based on the data range. Linear uses a linear scale. Logarithmic uses a log scale for better visualization of wide-ranging values."
+                  label={t.xAxisScale}
+                  tooltip={t.xAxisScaleTooltip}
                 />
                 <Select onValueChange={handleScaleTypeChange} value={scaleType}>
                   <SelectTrigger
@@ -452,9 +516,9 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent portalled={false}>
-                    <SelectItem value="auto">Auto</SelectItem>
-                    <SelectItem value="linear">Linear</SelectItem>
-                    <SelectItem value="log">Logarithmic</SelectItem>
+                    <SelectItem value="auto">{t.scaleAuto}</SelectItem>
+                    <SelectItem value="linear">{t.scaleLinear}</SelectItem>
+                    <SelectItem value="log">{t.scaleLog}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -464,8 +528,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             <div className="flex flex-col space-y-1.5 lg:col-span-2">
               <LabelWithTooltip
                 htmlFor="gpu-config-select"
-                label="GPU Config"
-                tooltip="Select up to 4 GPU configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware."
+                label={t.gpuConfig}
+                tooltip={t.gpuConfigTooltip}
               />
               <div data-testid="gpu-multiselect">
                 <MultiSelect
@@ -474,7 +538,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                   onChange={handleGPUChange}
                   open={openDropdown === 'gpu'}
                   onOpenChange={handleDropdownOpenChange('gpu')}
-                  placeholder="Select a GPU Config for comparison"
+                  placeholder={t.gpuConfigPlaceholder}
                   maxSelections={4}
                 />
               </div>
@@ -485,13 +549,13 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             <div className="flex flex-col space-y-1.5 lg:col-span-2">
               <LabelWithTooltip
                 htmlFor="date-picker"
-                label="Comparison Date Range"
-                tooltip="Select the start and end dates for the historical comparison. The chart will show performance data for the selected GPU configs across this time range."
+                label={t.comparisonDateRange}
+                tooltip={t.comparisonDateRangeTooltip}
               />
               <DateRangePicker
                 dateRange={selectedDateRange}
                 onChange={handleDateRangeChange}
-                placeholder="Select date range"
+                placeholder={t.dateRangePlaceholder}
                 availableDates={dateRangeAvailableDates}
                 isCheckingAvailableDates={isCheckingAvailableDates}
                 className={
@@ -509,8 +573,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           <div className="flex flex-col space-y-1.5" data-testid="quick-filters">
             <LabelWithTooltip
               htmlFor="quick-filters"
-              label="Quick Filters"
-              tooltip="Narrow the chart to any combination of GPU vendor, serving framework, aggregation mode (aggregated vs disaggregated serving), and speculative decoding (MTP vs standard). Selecting none in a group shows all."
+              label={t.quickFilters}
+              tooltip={t.quickFiltersTooltip}
             />
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               {quickFilterGroups.map((group) => (
@@ -530,7 +594,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                           variant={active ? 'default' : 'outline'}
                           aria-pressed={active}
                           disabled={disabled}
-                          title={disabled ? 'No data for the current selection' : undefined}
+                          title={disabled ? t.noData : undefined}
                           // Active pills use the brand color (blue in light, amber in dark)
                           // rather than the amber primary fill.
                           className={cn(

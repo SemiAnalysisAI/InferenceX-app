@@ -12,7 +12,7 @@ export function ZhTabIntro({ tab }: { tab: ZhTabKey }) {
       <h1 className="text-xl lg:text-2xl font-bold tracking-tight">{TAB_META_ZH[tab].title}</h1>
       <p className="mt-2 text-sm lg:text-base text-muted-foreground">{TAB_INTRO_ZH[tab]}</p>
       <p className="mt-2 text-xs text-muted-foreground">
-        下方交互式图表界面目前为英文。图表中的模型、GPU 与框架名称均为业界通用英文名称。
+        图表中的模型、GPU、框架与指标名称均沿用业界通用英文名称。
       </p>
     </Card>
   );
