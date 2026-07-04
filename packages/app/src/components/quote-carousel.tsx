@@ -19,8 +19,6 @@ export interface CarouselQuote {
 export interface QuoteCarouselProps {
   quotes: CarouselQuote[];
   overrides?: {
-    /** Companies pinned to the front in this order; rest are shuffled after */
-    order?: string[];
     /** Override display names in the org strip */
     labels?: Record<string, string>;
   };
@@ -35,26 +33,18 @@ interface CompanyEntry {
   quote: CarouselQuote;
 }
 
-function buildCompanyQuotes(quotes: CarouselQuote[], order?: string[]): CompanyEntry[] {
+// One entry per org, first quote wins; entries keep the order of the quotes array.
+function buildCompanyQuotes(quotes: CarouselQuote[]): CompanyEntry[] {
   const byCompany = new Map<string, CarouselQuote[]>();
   for (const q of quotes) {
     const list = byCompany.get(q.org);
     if (list) list.push(q);
     else byCompany.set(q.org, [q]);
   }
-  const entries = [...byCompany.entries()].map(([org, pool]) => ({
+  return [...byCompany.entries()].map(([org, pool]) => ({
     org,
     quote: pool[0],
   }));
-  if (order?.length) {
-    const orderSet = new Set(order);
-    const pinned = order
-      .map((c) => entries.find((e) => e.org === c))
-      .filter(Boolean) as CompanyEntry[];
-    const rest = entries.filter((e) => !orderSet.has(e.org));
-    return [...pinned, ...rest];
-  }
-  return entries;
 }
 
 // Warm a logo into the browser cache so it paints instantly when its quote
@@ -106,10 +96,10 @@ export function QuoteCarousel({
   moreHref,
   intervalMs = 8_000,
 }: QuoteCarouselProps) {
-  const { order, labels = {} } = overrides;
+  const { labels = {} } = overrides;
 
   // Keep the first render deterministic so SSR reserves the carousel's full height before hydration.
-  const entries = useMemo(() => buildCompanyQuotes(quotes, order), [quotes, order]);
+  const entries = useMemo(() => buildCompanyQuotes(quotes), [quotes]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);

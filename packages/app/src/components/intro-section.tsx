@@ -5,10 +5,10 @@ import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { QuoteCarousel } from '@/components/quote-carousel';
 import { QUOTES, CAROUSEL_ORGS, CAROUSEL_LABELS } from '@/components/quotes/quotes-data';
 
+// Carousel order follows QUOTES order — carousel orgs are listed first there.
 const carouselQuotes = QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org));
 
 const CAROUSEL_OVERRIDES = {
-  order: [...CAROUSEL_ORGS] as string[],
   labels: CAROUSEL_LABELS,
 };
 
