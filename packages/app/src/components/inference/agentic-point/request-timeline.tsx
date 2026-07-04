@@ -145,9 +145,11 @@ export function RequestTimelineView({
         });
       }
       track('agentic_timeline_to_dataset', { slug: datasetSlug });
-      router.push(conversationHref(datasetSlug, req));
+      // Stay within the Chinese tree when this timeline renders under /zh.
+      const href = conversationHref(datasetSlug, req);
+      router.push(locale === 'zh' ? `/zh${href}` : href);
     },
-    [datasetSlug, router, pointId],
+    [datasetSlug, router, pointId, locale],
   );
   // Which multi-stream subagents currently have their per-stream rows
   // expanded. Key is the subagent row's `key` (parent_cid::sa:agent_id).

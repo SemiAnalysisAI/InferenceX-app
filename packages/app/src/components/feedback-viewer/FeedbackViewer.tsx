@@ -181,7 +181,7 @@ export default function FeedbackViewer() {
             onClick={() => {
               relockFeatureGate();
               track('feedback_viewer_relocked');
-              router.push('/inference');
+              router.push(locale === 'zh' ? '/zh/inference' : '/inference');
             }}
             title={t.relock}
           >
