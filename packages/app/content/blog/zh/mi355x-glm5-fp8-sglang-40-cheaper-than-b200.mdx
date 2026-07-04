@@ -137,7 +137,7 @@ TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `spar
 此次结果为单节点、聚合、仅 FP8。仍有两个差距待弥合：
 
 - **FP4 可组合性。** 本次对比中 B200 使用的是 CUDA nightly 上的 FP8。B200 NVFP4 SGLang 的 GLM-5 方案已开始交付，将进一步压缩 B200 的成本曲线。MI355X MXFP4 GLM-5.1 SGLang 已通过 [InferenceX PR #1098](https://github.com/SemiAnalysisAI/InferenceX/pull/1098) 于 2026-04-21 交付，但 MI355X 上的 FP4 + MTP 组合尚未达到本文展示的 FP8 + MTP 方案的水平。
-- **分离式部署和宽专家并行。** MI355X 上的 GLM-5 尚无分离式部署或宽 EP 方案。NVIDIA 的 GB200 NVL72 Dynamo TRT-LLM 和 Dynamo vLLM 方案在 Kimi K2.5 上已展示了[机架级宽 EP 带来的约 3 倍每 GPU 吞吐量优势](https://inferencex.semianalysis.com/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200)。AMD 尚未为 GLM-5 交付分离式部署方案。
+- **分离式部署和宽专家并行。** MI355X 上的 GLM-5 尚无分离式部署或宽 EP 方案。NVIDIA 的 GB200 NVL72 Dynamo TRT-LLM 和 Dynamo vLLM 方案在 Kimi K2.5 上已展示了[机架级宽 EP 带来的约 3 倍每 GPU 吞吐量优势](https://inferencex.semianalysis.com/zh/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200)。AMD 尚未为 GLM-5 交付分离式部署方案。
 
 ## 致谢
 

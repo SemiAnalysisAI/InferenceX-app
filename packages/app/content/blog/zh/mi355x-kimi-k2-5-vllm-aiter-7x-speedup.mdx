@@ -18,7 +18,7 @@ tags:
 
 然而，他们最令人印象深刻的成就在于推动曲线改变的速度。[vLLM PR #35850](https://github.com/vllm-project/vllm/pull/35850) 于 3 月 6 日合入并随 vLLM 0.18 发布，到 3 月 26 日 InferenceX 的基准测试流水线就通过 [InferenceX PR #936](https://github.com/SemiAnalysisAI/InferenceX/pull/936)（该 PR 启用了 MI355X Kimi K2.5 [配方](https://recipes.vllm.ai/moonshotai/Kimi-K2.5?hardware=mi355x&features=tool_calling%2Creasoning%2Cencoder_parallel)上的 AITER、专家并行及 vLLM 0.18.0 升级）捕获了完整效果——距离我们 3 月 1 日的 vLLM 0.16.0 基线仅 25 天。MI355X Kimi K2.5 MXFP4 上的每一个工作点都从一个几乎不可用、只有单点延迟下限的状态，被重写为一条可达 78.9 tok/s/user 低批次交互性和 2,687 tok/s/GPU 峰值吞吐量的完整 Pareto 前沿。这正是我们构建 [InferenceX](https://github.com/SemiAnalysisAI/InferenceX) 自动化基准测试的原因——高效地捕获并报告此类变化。
 
-我们在 [InferenceXv2](https://inferencex.semianalysis.com/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper) 中对 AMD Kimi K2.5 推理提出的最持续的批评之一是可组合性。MI355X 在 CDNA4 上的硅片能力在 tensor-core 层面与 B200 有竞争力，但 AMD 的 ROCm 和 vLLM 路径并不总能释放该能力。这在推理配方仍在成熟中的新一代前沿 MoE 模型上尤为明显。
+我们在 [InferenceXv2](https://inferencex.semianalysis.com/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper) 中对 AMD Kimi K2.5 推理提出的最持续的批评之一是可组合性。MI355X 在 CDNA4 上的硅片能力在 tensor-core 层面与 B200 有竞争力，但 AMD 的 ROCm 和 vLLM 路径并不总能释放该能力。这在推理配方仍在成熟中的新一代前沿 MoE 模型上尤为明显。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference">
   点击查看完整 InferenceX 仪表板 →
