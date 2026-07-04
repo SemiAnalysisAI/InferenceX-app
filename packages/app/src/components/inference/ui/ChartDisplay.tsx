@@ -101,6 +101,9 @@ const STRINGS = {
     performanceOverTimeDesc:
       'Double-click points on the scatter chart to track configurations over time.',
     viewMode: 'View mode',
+    vsTtft: (word: string) => `vs. ${word} Time To First Token`,
+    vsE2eLatency: (pctl?: string) =>
+      pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
   },
   zh: {
     inferencePerformance: '推理性能',
@@ -116,8 +119,18 @@ const STRINGS = {
     performanceOverTime: '性能趋势',
     performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
     viewMode: '视图模式',
+    vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
+    vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
 } as const;
+
+// Chinese variants of the static "vs. …" chart-heading strings that come from
+// inference-chart-config.json, keyed by their English value.
+const HEADING_FALLBACK_ZH: Record<string, string> = {
+  'vs. Interactivity': 'vs. 交互性',
+  'vs. End-to-end Latency': 'vs. 端到端延迟',
+  'vs. P90 Time To First Token': 'vs. P90 首 token 延迟（TTFT）',
+};
 
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
   { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
@@ -136,8 +149,12 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[
  */
 interface DerivedXModeSpec {
   xLabel: (percentileLabel: string) => string;
+  /** Chinese x-label; omit to reuse the English one (technical terms). */
+  xLabelZh?: (percentileLabel: string) => string;
   /** Chart heading suffix ("vs. …") shown above the plot. */
   heading: (percentileLabel: string) => string;
+  /** Chinese heading suffix; omit to reuse the English one. */
+  headingZh?: (percentileLabel: string) => string;
   rooflineCorner: 'upper_right' | 'upper_left';
   /** Pull the raw metric for this mode off the derived-metrics payload. */
   value: (m: DerivedAgenticMetric | undefined, percentile: string) => number | null | undefined;
@@ -148,14 +165,18 @@ interface DerivedXModeSpec {
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
   'session-time': {
     xLabel: () => 'Mean Normalized Session Time (min)',
+    xLabelZh: () => '平均归一化会话时长（min）',
     heading: () => 'vs. Mean Normalized Session Time',
+    headingZh: () => 'vs. 平均归一化会话时长',
     rooflineCorner: 'upper_right',
     value: (m) => m?.normalized_session_time_s,
     toX: (raw) => raw / 60,
   },
   'normalized-e2e': {
     xLabel: (pctl) => `${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} output tokens (s)`,
+    xLabelZh: (pctl) => `${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} 输出 token（s）`,
     heading: (pctl) => `vs. ${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} output tokens`,
+    headingZh: (pctl) => `vs. ${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} 输出 token`,
     rooflineCorner: 'upper_right',
     value: (m, percentile) =>
       percentile === 'p75' ? m?.p75_normalized_e2e_400_s : m?.p90_normalized_e2e_400_s,
@@ -501,7 +522,9 @@ export default function ChartDisplay() {
   const renderableGraphs = useMemo(() => {
     if (!derivedSpec) return visibleGraphs;
     if (!derivedMetrics) return visibleGraphs.map((graph) => ({ ...graph, data: [] }));
-    const xLabel = derivedSpec.xLabel(selectedPercentile.toUpperCase());
+    const xLabelFn =
+      locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
+    const xLabel = xLabelFn(selectedPercentile.toUpperCase());
     return visibleGraphs.map((graph) => {
       const chartDefinition = {
         ...graph.chartDefinition,
@@ -520,7 +543,7 @@ export default function ChartDisplay() {
         .filter((point): point is NonNullable<typeof point> => point !== null);
       return { ...graph, chartDefinition, data };
     });
-  }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile]);
+  }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile, locale]);
 
   const displayGraphs =
     isFirstLoad || isDerivedLoading
@@ -614,13 +637,14 @@ export default function ChartDisplay() {
                           <h2 className="text-lg font-semibold">
                             {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                             {(() => {
-                              // For Input metrics with dynamic x-axis, use dynamic heading
-                              const currentMetricTitle = metricTitle(
+                              // For Input metrics with dynamic x-axis, use dynamic heading.
+                              // Classify off the ENGLISH title — the localized one has no
+                              // 'input' substring to match on zh pages.
+                              const isInputMetric = metricTitle(
                                 graph.chartDefinition,
                                 selectedYAxisMetric,
-                                locale,
-                              );
-                              const isInputMetric = currentMetricTitle
+                                'en',
+                              )
                                 .toLowerCase()
                                 .includes('input');
                               if (
@@ -629,9 +653,9 @@ export default function ChartDisplay() {
                                 selectedXAxisMetric
                               ) {
                                 if (selectedXAxisMetric === 'p99_ttft') {
-                                  return 'vs. P99 Time To First Token';
+                                  return t.vsTtft('P99');
                                 } else if (selectedXAxisMetric === 'median_ttft') {
-                                  return 'vs. Median Time To First Token';
+                                  return t.vsTtft('Median');
                                 }
                               }
 
@@ -640,25 +664,31 @@ export default function ChartDisplay() {
                               if (graph.chartDefinition.chartType === 'e2e') {
                                 const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
                                 if (modeSpec) {
-                                  return modeSpec.heading(selectedPercentile.toUpperCase());
+                                  const heading =
+                                    locale === 'zh' && modeSpec.headingZh
+                                      ? modeSpec.headingZh
+                                      : modeSpec.heading;
+                                  return heading(selectedPercentile.toUpperCase());
                                 }
                                 if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
                                   const percentile = selectedE2eXAxisMetric.replace(/_ttft$/u, '');
                                   const word =
                                     percentile === 'median' ? 'Median' : percentile.toUpperCase();
-                                  return `vs. ${word} Time To First Token`;
+                                  return t.vsTtft(word);
                                 }
                                 return isAgenticSequence
-                                  ? `vs. ${selectedPercentile.toUpperCase()} End-to-end Latency`
-                                  : 'vs. End-to-end Latency';
+                                  ? t.vsE2eLatency(selectedPercentile.toUpperCase())
+                                  : t.vsE2eLatency();
                               }
 
                               // Fall back to configured heading
-                              return (
+                              const configured =
                                 graph.chartDefinition[
                                   `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                                ] || graph.chartDefinition.heading
-                              );
+                                ] || graph.chartDefinition.heading;
+                              return locale === 'zh'
+                                ? (HEADING_FALLBACK_ZH[String(configured)] ?? configured)
+                                : configured;
                             })()}
                           </h2>
                           <p className="text-sm text-muted-foreground mb-2">
