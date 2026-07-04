@@ -100,8 +100,8 @@ export function QuotesContent() {
             </h2>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
               InferenceX&trade; initiative is supported by many major buyers of compute and
-              prominent members of the ML community including those from OpenAI, Microsoft, vLLM,
-              PyTorch Foundation, Oracle and more.
+              prominent members of the ML community including those from MiniMax, Moonshot Kimi,
+              Alibaba Qwen, OpenAI, Microsoft, vLLM, PyTorch Foundation, Oracle and more.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               {orgLogos.map(({ org, logo }) => (
