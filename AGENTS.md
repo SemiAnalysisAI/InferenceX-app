@@ -6,6 +6,8 @@ For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 > **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Preferred terms: benchmark 基准测试, dashboard 仪表板, chart 图表, config 配置, throughput 吞吐量, latency 延迟, single-node/multi-node 单节点/多节点, evaluation 评估, artifact 产物.
 
+> **The website itself is bilingual too — every indexable page must ship a Simplified Chinese sibling under `/zh`.** See [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces) below; a new page, tab, or blog post without its `/zh` version is 🔴 BLOCKING on PR review.
+
 ## Project Overview
 
 InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-backed with Neon PostgreSQL, React Query for data fetching, D3.js for charts.
@@ -121,6 +123,18 @@ When adding a chart feature (toggle, label, overlay, filter, export, share-link 
 
 If the feature genuinely cannot apply to overlays (e.g., it depends on data only ingested for official runs), say so explicitly in code comments and the PR description. Default to "must support overlays."
 
+## Chinese Website Pages (/zh) — Mandatory for All Indexable Surfaces
+
+The site ships a hand-authored Simplified Chinese sibling for every indexable page under the `/zh` route prefix (`/` ↔ `/zh`, `/about` ↔ `/zh/about`, `/blog/<slug>` ↔ `/zh/blog/<slug>`, …) so the site is crawled and indexed in Chinese as well as English. There is no i18n framework — each `/zh` page is a real page that reuses the shared helpers in `packages/app/src/lib/i18n.ts` (`zhAlternates`, `enAlternates`, `ZH_OG_LOCALE`, `ZH_MIRRORED_ROUTES`) and `src/lib/tab-meta-zh.ts`. The translation quality bar above applies to all site content.
+
+**Every new indexable page, dashboard tab, or blog post MUST ship its Chinese version in the same PR:**
+
+1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register the route in `ZH_MIRRORED_ROUTES` (`src/lib/i18n.ts`) so the header nav and EN↔中文 toggle link to it, and add it to the sitemap via `localizedPair()` in `src/app/sitemap.ts`.
+2. **New dashboard tab** → add the tab to `ZH_TAB_KEYS`, `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/tab-meta-zh.ts`, then create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart (the interactive chart UI itself stays English). `tab-meta-zh.test.ts` enforces dictionary completeness.
+3. **New blog post** → the translation `packages/app/content/blog/zh/<same-filename>.mdx` is REQUIRED in the same PR. Translate frontmatter `title`/`subtitle` and the body; keep `date`, `publishDate`, `modifiedDate`, `tags`, and the filename/slug identical (English and Chinese posts pair by filename; visibility gating always follows the English post's `publishDate`). Rewrite internal `/blog/<slug>` links to `/zh/blog/<slug>`; never alter numbers, code blocks, or `<Figure>`/`<JsonLd>` structure. The `/zh/blog` listing, hreflang, and sitemap pick the file up automatically.
+4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Content drift between languages is a 🔴 BLOCKING review issue.
+5. **Intentionally not mirrored** (skip these, or add them to `ZH_MIRRORED_ROUTES` when you do mirror them): per-slug compare pages (`/compare/[slug]`, `/compare-per-dollar/[slug]` — the `/zh/compare*` index pages link to the English slug pages), `/datasets`, feature-gated tabs (`ai-chart`, `current-inferencex-image`, `feedback`), `feed.xml`/`llms.txt`, and per-post OG images (Chinese posts reuse the English post's OG image — the OG renderer's font has no CJK glyphs).
+
 ## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
 
 The blog-writing workflow (`.claude/skills/write-inferencex-blog/`) ships a Python port of the chart's interpolation algorithm at `.claude/skills/write-inferencex-blog/iso_interactivity.py`. It exists so iso-interactivity tables in blog posts produce **exactly the same numbers** readers see when they hover the rendered chart. Linear-interpolation shell scripts will produce visibly different values — Cursor Bugbot has flagged this on prior posts.
@@ -197,7 +211,8 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 1. Create `packages/app/content/blog/<slug>.mdx` with frontmatter: `title`, `subtitle`, `date` (required), `tags`, `modifiedDate` (optional)
 2. Write content using Markdown + custom MDX components (`Figure`, `Blur`)
-3. No code changes needed — the post automatically appears in the blog list, sitemap, RSS feed, llms.txt, and gets a generated OG image
+3. Create the Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` (**required** — see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces))
+4. No code changes needed — the post automatically appears in the blog list, sitemap, RSS feed, llms.txt, and gets a generated OG image; the zh file appears on `/zh/blog` with hreflang pairing
 
 See [Blog](./docs/blog.md) for content format, available MDX components, and design details.
 
@@ -222,6 +237,7 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 2. Create a per-section context provider (see `InferenceContext.tsx`, `EvaluationContext.tsx` for patterns)
 3. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded
 4. Analytics: all interactive elements use `track()` with `{tabname}_` prefix
+5. Create the Chinese sibling: extend `src/lib/tab-meta-zh.ts` dictionaries and add `src/app/zh/(dashboard)/<tab>/page.tsx` (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces))
 
 ### Bumping dependencies
 

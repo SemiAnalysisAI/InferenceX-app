@@ -15,7 +15,14 @@ import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
-import { getAllPosts, getAdjacentPosts, extractHeadings, getPostBySlug } from '@/lib/blog';
+import {
+  getAllPosts,
+  getAdjacentPosts,
+  extractHeadings,
+  getPostBySlug,
+  hasZhTranslation,
+} from '@/lib/blog';
+import { languageAlternates } from '@/lib/i18n';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,
@@ -42,7 +49,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: meta.subtitle,
     keywords: meta.tags,
     authors: [{ name: AUTHOR_NAME }],
-    alternates: { canonical: `${SITE_URL}/blog/${slug}` },
+    alternates: {
+      canonical: `${SITE_URL}/blog/${slug}`,
+      // hreflang to the Chinese translation when one exists under content/blog/zh/.
+      ...(hasZhTranslation(slug) && { languages: languageAlternates(`/blog/${slug}`) }),
+    },
     openGraph: {
       title: `${meta.title} | ${SITE_NAME}`,
       description: meta.subtitle,

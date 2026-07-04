@@ -7,6 +7,8 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
+import { enAlternates } from '@/lib/i18n';
+
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
@@ -21,7 +23,7 @@ const DESCRIPTION = `Which GPU delivers more inference performance per dollar? I
 export const metadata: Metadata = {
   title: 'GPU Performance per Dollar',
   description: DESCRIPTION,
-  alternates: { canonical: `${SITE_URL}/compare-per-dollar` },
+  alternates: enAlternates('/compare-per-dollar'),
   openGraph: {
     title: `GPU Performance per Dollar | ${SITE_NAME}`,
     description: DESCRIPTION,

@@ -24,6 +24,8 @@ export interface QuoteCarouselProps {
   };
   /** Link to a page with all quotes */
   moreHref?: string;
+  /** Label for the moreHref link (default "See more supporters →") */
+  moreLabel?: string;
   /** Auto-rotate interval in ms (default 8000) */
   intervalMs?: number;
 }
@@ -94,6 +96,7 @@ export function QuoteCarousel({
   quotes,
   overrides = {},
   moreHref,
+  moreLabel,
   intervalMs = 8_000,
 }: QuoteCarouselProps) {
   const { labels = {} } = overrides;
@@ -202,7 +205,7 @@ export function QuoteCarousel({
             className="text-xs font-bold text-brand hover:underline"
             onClick={() => track('quote_carousel_see_more_clicked')}
           >
-            See more supporters &rarr;
+            {moreLabel ?? 'See more supporters →'}
           </Link>
         </div>
       )}

@@ -6,12 +6,13 @@ import { BlogTagLink } from '@/components/blog/blog-tag-link';
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
 import { getAllPosts } from '@/lib/blog';
+import { enAlternates } from '@/lib/i18n';
 import { SITE_URL, SITE_NAME, AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {
   title: 'Articles',
   description: `Technical articles from ${SITE_NAME} by ${AUTHOR_NAME} — AI inference benchmarking, GPU performance analysis, and ML infrastructure insights.`,
-  alternates: { canonical: `${SITE_URL}/blog` },
+  alternates: enAlternates('/blog'),
   openGraph: {
     title: `Articles | ${SITE_NAME} by ${AUTHOR_NAME}`,
     description: 'AI inference benchmarking insights and GPU performance analysis.',

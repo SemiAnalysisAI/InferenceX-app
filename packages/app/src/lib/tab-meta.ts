@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { hasZhSibling, languageAlternates } from '@/lib/i18n';
 
 export const LANDING_META = {
   title: 'Open Source AI Inference Benchmark',
@@ -95,11 +96,16 @@ export function getTabTitle(tab: string): string {
 /** Generate Next.js Metadata for a tab page. */
 export function tabMetadata(tab: TabKey): Metadata {
   const meta = TAB_META[tab];
+  const enPath = tab === 'inference' ? '/' : `/${tab}`;
   const url = tab === 'inference' ? SITE_URL : `${SITE_URL}/${tab}`;
   return {
     title: meta.title,
     description: meta.description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      // hreflang to the Chinese sibling page, for tabs mirrored under /zh.
+      ...(hasZhSibling(enPath) && { languages: languageAlternates(enPath) }),
+    },
     openGraph: {
       title: `${meta.title} | InferenceX`,
       description: meta.description,

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { Card } from '@/components/ui/card';
+import { enAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const REGIONAL_ACKNOWLEDGEMENTS = [
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   title: 'Land Acknowledgement',
   description:
     'A land acknowledgement for the Indigenous peoples and homelands connected to InferenceX US benchmark clusters in San Jose, Los Angeles, and Chicago.',
-  alternates: { canonical: `${SITE_URL}/land-acknowledgement` },
+  alternates: enAlternates('/land-acknowledgement'),
   openGraph: {
     title: 'Land Acknowledgement | InferenceX',
     description:

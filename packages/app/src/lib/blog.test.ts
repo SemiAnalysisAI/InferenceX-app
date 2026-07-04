@@ -7,6 +7,7 @@ import {
   getAllPosts,
   getPostBySlug,
   getReadingTime,
+  hasZhTranslation,
   slugify,
 } from './blog';
 
@@ -80,10 +81,43 @@ date: '2025-08-01'
 This post has no publishDate field at all.
 `;
 
+const FAKE_MDX_ZH = `---
+title: '测试文章'
+subtitle: '一个测试副标题'
+date: '2026-01-15'
+tags:
+  - testing
+---
+
+# 测试标题
+
+这是一段中文正文内容。
+`;
+
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
   return { ...actual, default: { ...actual } };
 });
+
+const isZhPath = (p: string) => p.includes('/zh/');
+
+/**
+ * Mock the content tree with English posts and a zh/ translations subdir.
+ * Directory existence checks return true; file checks consult the maps.
+ */
+function mockLocalizedFiles(en: Record<string, string>, zh: Record<string, string>) {
+  const lookup = (p: string) => {
+    const files = isZhPath(p) ? zh : en;
+    return Object.entries(files).find(([name]) => p.includes(name.replace('.mdx', '')))?.[1];
+  };
+  vi.spyOn(fs, 'existsSync').mockImplementation((filePath) => {
+    const p = String(filePath);
+    if (!p.endsWith('.mdx')) return true;
+    return lookup(p) !== undefined;
+  });
+  vi.spyOn(fs, 'readdirSync').mockReturnValue(Object.keys(en) as any);
+  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => lookup(String(filePath)) ?? '');
+}
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -112,6 +146,12 @@ describe('slugify', () => {
   it('passes through already-valid slugs unchanged', () => {
     expect(slugify('hello-world')).toBe('hello-world');
   });
+
+  it('keeps Han characters so Chinese headings get meaningful ids', () => {
+    expect(slugify('性能 分析')).toBe('性能-分析');
+    expect(slugify('GB200 性能对比')).toBe('gb200-性能对比');
+    expect(slugify('（结论）')).toBe('结论');
+  });
 });
 
 describe('getReadingTime', () => {
@@ -123,6 +163,19 @@ describe('getReadingTime', () => {
     const words = Array.from({ length: 500 }, () => 'word').join(' ');
     // 500 words / 265 wpm = 1.89 → ceil = 2
     expect(getReadingTime(words)).toBe(2);
+  });
+
+  it('counts CJK prose by characters, not whitespace-separated words', () => {
+    // 800 Han chars with no spaces: 800 / 400 cpm = 2 minutes. The old
+    // word-split logic would have counted this as a single "word" → 1 minute.
+    const cjk = '推'.repeat(800);
+    expect(getReadingTime(cjk)).toBe(2);
+  });
+
+  it('combines CJK characters and Latin words in mixed content', () => {
+    // 400 Han chars (1 min at 400 cpm) + 265 Latin words (1 min at 265 wpm)
+    const mixed = `${'理'.repeat(400)} ${Array.from({ length: 265 }, () => 'word').join(' ')}`;
+    expect(getReadingTime(mixed)).toBe(2);
   });
 });
 
@@ -276,6 +329,92 @@ describe('getAllPosts — publishDate filtering', () => {
     // only past-publish has a valid publishDate <= now
     expect(posts).toHaveLength(1);
     expect(posts[0].slug).toBe('past-publish');
+  });
+});
+
+describe('getAllPosts — zh locale', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns only posts with a zh translation, using zh frontmatter', () => {
+    mockLocalizedFiles(
+      { 'test-post.mdx': FAKE_MDX, 'older-post.mdx': FAKE_MDX_OLDER },
+      { 'test-post.mdx': FAKE_MDX_ZH },
+    );
+
+    const posts = getAllPosts('zh');
+    expect(posts).toHaveLength(1);
+    expect(posts[0].slug).toBe('test-post');
+    expect(posts[0].title).toBe('测试文章');
+    expect(posts[0].subtitle).toBe('一个测试副标题');
+  });
+
+  it('inherits publishDate gating from the English post in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    // English original is unpublished (no publishDate) — the zh translation
+    // must not leak even though its file exists.
+    mockLocalizedFiles(
+      { 'no-publish.mdx': FAKE_MDX_NO_PUBLISH },
+      { 'no-publish.mdx': FAKE_MDX_ZH },
+    );
+
+    expect(getAllPosts('zh')).toHaveLength(0);
+  });
+
+  it('keeps English getAllPosts unaffected by zh translations', () => {
+    mockLocalizedFiles({ 'test-post.mdx': FAKE_MDX }, { 'test-post.mdx': FAKE_MDX_ZH });
+
+    const posts = getAllPosts();
+    expect(posts).toHaveLength(1);
+    expect(posts[0].title).toBe('Test Post');
+  });
+});
+
+describe('getPostBySlug — zh locale', () => {
+  it('returns the zh translation meta and content', () => {
+    mockLocalizedFiles({ 'test-post.mdx': FAKE_MDX }, { 'test-post.mdx': FAKE_MDX_ZH });
+
+    const result = getPostBySlug('test-post', 'zh');
+    expect(result).not.toBeNull();
+    expect(result!.meta.title).toBe('测试文章');
+    expect(result!.raw).toContain('# 测试标题');
+  });
+
+  it('returns null when no zh translation exists', () => {
+    mockLocalizedFiles({ 'test-post.mdx': FAKE_MDX }, {});
+
+    expect(getPostBySlug('test-post', 'zh')).toBeNull();
+  });
+});
+
+describe('hasZhTranslation', () => {
+  it('reflects existence of the zh translation file', () => {
+    mockLocalizedFiles(
+      { 'test-post.mdx': FAKE_MDX, 'older-post.mdx': FAKE_MDX_OLDER },
+      { 'test-post.mdx': FAKE_MDX_ZH },
+    );
+
+    expect(hasZhTranslation('test-post')).toBe(true);
+    expect(hasZhTranslation('older-post')).toBe(false);
+  });
+});
+
+describe('getAdjacentPosts — zh locale', () => {
+  it('navigates within translated posts only', () => {
+    mockLocalizedFiles(
+      {
+        'test-post.mdx': FAKE_MDX,
+        'middle-post.mdx': FAKE_MDX_MIDDLE,
+        'older-post.mdx': FAKE_MDX_OLDER,
+      },
+      // middle-post has no translation: zh prev/next must skip over it.
+      { 'test-post.mdx': FAKE_MDX_ZH, 'older-post.mdx': FAKE_MDX_ZH },
+    );
+
+    const { prev, next } = getAdjacentPosts('test-post', 'zh');
+    expect(next).toBeNull();
+    expect(prev!.slug).toBe('older-post');
   });
 });
 

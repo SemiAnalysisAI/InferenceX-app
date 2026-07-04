@@ -133,6 +133,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => (
             >
               Performance per Dollar
             </Link>
+            <Link
+              data-testid="footer-link-zh"
+              href="/zh"
+              hrefLang="zh-CN"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              中文版
+            </Link>
           </div>
         </div>
 

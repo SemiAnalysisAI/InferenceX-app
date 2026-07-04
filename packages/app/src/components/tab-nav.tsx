@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UnofficialRunContext } from '@/components/unofficial-run-provider';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
+import { TAB_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 const VISIBLE_TABS = [
@@ -61,8 +63,9 @@ const currentTabClass = (active: boolean) =>
     : 'hover:border-muted-foreground/30';
 
 function activeTab(pathname: string): string {
-  const seg = pathname.split('/').filter(Boolean)[0] || 'inference';
-  return seg;
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments[0] === ZH_PREFIX.slice(1)) segments.shift();
+  return segments[0] || 'inference';
 }
 
 function handleDesktopClick(tab: string) {
@@ -74,8 +77,14 @@ export function TabNav() {
   const pathname = usePathname();
   const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
+  const isZh = isZhPathname(pathname);
   const current = activeTab(pathname);
   const selectedTab = TAB_VALUES.has(current) ? current : '';
+  // On /zh pages, visible tabs navigate within the Chinese tree and show
+  // Chinese labels. Gated tabs have no /zh sibling and keep English targets.
+  const tabLabel = (tab: { href: string; label: string }) =>
+    isZh ? (TAB_LABELS_ZH[tab.href.slice(1)] ?? tab.label) : tab.label;
+  const localizedPath = (path: string) => (isZh ? `${ZH_PREFIX}${path}` : path);
 
   // Preserve the `unofficialrun(s)` URL param across tab navigation so an
   // overlay loaded on /inference doesn't get dropped when switching to
@@ -108,7 +117,7 @@ export function TabNav() {
   const handleMobileChange = (value: string) => {
     window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
     track('tab_changed', { tab: value });
-    router.push(tabHref(`/${value}`));
+    router.push(tabHref(GATED_VALUES.has(value) ? `/${value}` : localizedPath(`/${value}`)));
   };
 
   return (
@@ -118,17 +127,17 @@ export function TabNav() {
         <div className="w-full pb-6" />
         <Card>
           <div className="space-y-2">
-            <Label htmlFor="chart-select">Select Chart</Label>
+            <Label htmlFor="chart-select">{isZh ? '选择图表' : 'Select Chart'}</Label>
             <Select value={selectedTab} onValueChange={handleMobileChange}>
               <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
-                <SelectValue placeholder="Select Chart" />
+                <SelectValue placeholder={isZh ? '选择图表' : 'Select Chart'} />
               </SelectTrigger>
               <SelectContent>
                 {VISIBLE_TABS.map((tab) => {
                   const value = tab.href.slice(1);
                   return (
                     <SelectItem key={value} value={value} data-ph-capture-attribute-tab={value}>
-                      {tab.label}
+                      {tabLabel(tab)}
                     </SelectItem>
                   );
                 })}
@@ -168,13 +177,13 @@ export function TabNav() {
             {VISIBLE_TABS.map((tab) => (
               <Link
                 key={tab.href}
-                href={tabHref(tab.href)}
+                href={tabHref(localizedPath(tab.href))}
                 data-testid={tab.testId}
                 data-ph-capture-attribute-tab={tab.href.slice(1)}
                 onClick={() => handleDesktopClick(tab.href.slice(1))}
                 className={cn(tabLinkClass, currentTabClass(current === tab.href.slice(1)))}
               >
-                {tab.label}
+                {tabLabel(tab)}
               </Link>
             ))}
             {featureGateUnlocked && (

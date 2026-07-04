@@ -1,0 +1,179 @@
+---
+title: 'AMD MI355X Qwen3.5 397B-A17B 推理：SGLang FP8 三个月内每 GPU 吞吐量提升最高 19 倍'
+subtitle: '从 v0.5.8（2 月）→ v0.5.10rc0（4 月）→ v0.5.12（5 月），三次 AITER 内核合入 MI355X 加上从 TP=8 到 TP=2/TP=4 的重新调优，将 Qwen3.5 8k/1k 峰值从 1.3k 推高至 6.4k tok/s/GPU，并将曲线延伸至 75 tok/s/user'
+date: '2026-05-25'
+publishDate: '2026-05-25'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - qwen
+  - amd
+  - mi355x
+  - sglang
+  - rocm
+---
+
+阿里巴巴于 [2026-02-16 发布 Qwen3.5-397B-A17B](https://www.alibabacloud.com/blog/602894) 后 13 周，AMD MI355X 上 SGLang FP8 在 8k/1k 工作负载下的每 GPU 吞吐量在 40 tok/s/user 的等交互性下**最高提升至 19.0 倍**（在仪表板的单调三次 Hermite Pareto 插值上，从 2026-02-20 v0.5.8.post1 基线的 192 tok/s/GPU 提升至 2026-05-19 v0.5.12 运行的 3,660 tok/s/GPU）。这一增长叠加了三个 SGLang 版本以及三次 AITER MoE 内核合入带来的大部分提升，5 月的 v0.5.10rc0 → v0.5.12 镜像升级又在此基础上额外贡献了约 **1.5 倍**。
+
+这完全是软件优化——全程使用相同的 MI355X CDNA4 硅片，TCO 始终为 $1.48/GPU/hr。相关记录：[sgl-project/sglang#20736](https://github.com/sgl-project/sglang/pull/20736)、[sgl-project/sglang#21188](https://github.com/sgl-project/sglang/pull/21188) 和 [sgl-project/sglang#21421](https://github.com/sgl-project/sglang/pull/21421)，均在 3–4 月合入，且均通过 `SGLANG_USE_AITER=1` 开关控制。上游到基准测试的闭环速度本身就是护城河。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+<Figure
+  srcLight="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-light.png"
+  srcDark="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-dark.png"
+  alt="Qwen3.5 FP8 8k/1k tok/s/GPU vs 交互性，MI355X SGLang 三个日期对比：2026-02-20（v0.5.8.post1）、2026-04-16（v0.5.10rc0）、2026-05-19（v0.5.12）。每条曲线标注日期和各点的 TP 值。"
+  caption="Qwen3.5-397B-A17B FP8 8k/1k 在 MI355X SGLang 上的表现。三个月内三次运行：v0.5.8.post1（2 月 20 日，TP=8）、v0.5.10rc0（4 月 16 日，TP=2/4）、v0.5.12（5 月 19 日，TP=2/4）。点标签表示该配置所使用的 TP 值。"
+/>
+
+Qwen3.5-397B-A17B 是阿里巴巴的 MoE 旗舰模型，于 2026-02-16 发布，总参数量 397B，每 token 激活 17B，拥有 **512 个专家**（top-K 路由），并采用混合注意力架构，交替使用 Gated DeltaNet 和 Gated Attention 层。首次 InferenceX 基准测试在模型发布四天后便在 MI355X 上完成。
+
+## 推动性能提升的具体优化
+
+带来这些巨大性能提升的部分优化包括：
+
+- **[sgl-project/sglang PR #20736](https://github.com/sgl-project/sglang/pull/20736)**，由 [zhentaocc](https://github.com/zhentaocc) 提交（合著者 [yichiche](https://github.com/yichiche)），2026-04-15 合入——**在 Qwen2 MoE 和 Qwen3.5 MoE 中将共享专家与路由专家融合**。当 `shared_expert_intermediate_size == moe_intermediate_size` 时，共享专家被视为额外的一个专家（top-K + 1），在单次 AITER MoE 分发中一并处理。每个 MoE 层减少一次内核启动，共享专家权重的 HBM 往返次数也减少。据报告在 Qwen3.5 并发 16 时总吞吐量提升 +4.6%，TPOT 降低 -4%；FP8 精度最初需要 AITER split-K 修复后才能启用。
+- **[sgl-project/sglang PR #21188](https://github.com/sgl-project/sglang/pull/21188)**，由 [yichiche](https://github.com/yichiche) 提交，2026-03-23 合入——**为 `GemmaRMSNorm` 添加 `forward_hip` 路径，使 AMD GPU 使用融合 RMSNorm 内核（AITER `fused_add_rms_norm` / `rms_norm`）而非原生回退路径**。原生路径在 MI355X 上受标量运算限制；融合路径将 Gemma 风格的 `weight + 1.0` 偏移吸收进内核中。据报告在 8x MI355X、并发 1、8k/1k 下：**中位端到端延迟降低 -23.1%，总吞吐量提升 +30.0%，中位首 token 延迟（TTFT）降低 -17.0%**，同时 GSM8K 精度从 0.943 提升至 0.955。
+- **[sgl-project/sglang PR #21421](https://github.com/sgl-project/sglang/pull/21421)**，由 [zhentaocc](https://github.com/zhentaocc) 提交，2026-03-26 合入——**将 AITER 的 `fused_topk` 内核集成到 SGLang 的 `fused_topk` 中，用于 softmax 评分的 MoE top-K 选择**。启用 AITER 时自动分发到 `aiter.fused_moe.fused_topk`。内核微基准测试显示：在 Qwen3.5 形态（E=512, top-K=10）上比 sgl-kernel 基线快约 1.31x 到 **6.29x**，在高 token 数下增益最大。端到端 bs=64 1k/1k 下：总吞吐量提升 +1.9%，GSM8K 精度与基线偏差在 ±0.001 以内。
+
+## 测试数据
+
+所有行均为 Qwen3.5-397B-A17B FP8、**ISL 8192 / OSL 1024**、单节点非分离式 MI355X，在 InferenceX 上测量。每百万总 token 成本按 `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)` 计算，MI355X TCO 为 $1.48/GPU/hr，来自 [SemiAnalysis AI Cloud TCO 模型](https://newsletter.semianalysis.com/p/ai-cloud-economics)。
+
+各日期使用的容器镜像：
+
+- **2026-02-20:** `rocm/sgl-dev:v0.5.8.post1-rocm720-mi35x-20260218`
+- **2026-04-16:** `lmsysorg/sglang-rocm:v0.5.10rc0-rocm720-mi35x-20260414`
+- **2026-05-19:** `lmsysorg/sglang-rocm:v0.5.12-rocm720-mi35x-20260517`
+
+**2026-02-20，MI355X SGLang FP8，TP=8、8 GPU**（基线）：
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 171.9     | 40.86      | 24.47     | $2.39      |
+| 8    | 312.1     | 37.66      | 26.55     | $1.32      |
+| 16   | 568.0     | 35.47      | 28.19     | $0.72      |
+| 32   | 917.8     | 28.48      | 35.11     | $0.45      |
+| 64   | 1,288.0   | 19.22      | 52.03     | $0.32      |
+
+**2026-04-16，MI355X SGLang FP8，TP=2、2 GPU**（重新调优 + AITER PR 后）：
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 1,074.3   | 63.89      | 15.65     | $0.38      |
+| 8    | 1,704.6   | 50.98      | 19.61     | $0.24      |
+| 16   | 2,571.9   | 38.50      | 26.51     | $0.16      |
+| 32   | 3,567.8   | 26.22      | 38.15     | $0.12      |
+
+**2026-04-16，MI355X SGLang FP8，TP=4、4 GPU**（高吞吐量分支）：
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 32   | 2,584.9   | 38.56      | 25.94     | $0.16      |
+| 64   | 3,426.6   | 24.84      | 40.25     | $0.12      |
+| 128  | 4,263.2   | 15.38      | 65.01     | $0.10      |
+| 256  | 5,099.3   | 9.20       | 108.64    | $0.08      |
+
+**2026-05-19，MI355X SGLang FP8，TP=2、2 GPU**（v0.5.12 升级）：
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 4    | 1,267.5   | 75.22      | 13.29     | $0.32      |
+| 8    | 2,008.1   | 59.67      | 16.76     | $0.20      |
+| 16   | 3,175.6   | 46.73      | 21.40     | $0.13      |
+| 32   | 4,346.8   | 31.91      | 31.34     | $0.09      |
+
+**2026-05-19，MI355X SGLang FP8，TP=4、4 GPU**（v0.5.12 升级）：
+
+| Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens |
+| ---- | --------- | ---------- | --------- | ---------- |
+| 32   | 3,171.8   | 46.82      | 21.36     | $0.13      |
+| 64   | 4,113.4   | 29.83      | 33.53     | $0.10      |
+| 128  | 5,019.6   | 18.09      | 55.27     | $0.08      |
+| 256  | 6,409.1   | 11.56      | 86.53     | $0.06      |
+
+## 等交互性吞吐量对比
+
+每个日期沿其 Pareto 前沿插值（4 月和 5 月运行取 TP=2 和 TP=4 中较高的每交互性吞吐量；2 月基线仅有 TP=8）。比率为匹配 tok/s/user 下的每 GPU 吞吐量：
+
+| 交互性 (tok/s/user) | 2 月 v0.5.8 tok/s/GPU | 4 月 v0.5.10rc0 tok/s/GPU | 5 月 v0.5.12 tok/s/GPU | 5 月 / 2 月 | 5 月 / 4 月 |
+| ------------------- | --------------------- | ------------------------- | ---------------------- | ----------- | ----------- |
+| 20                  | 1,259                 | 3,906                     | 4,861                  | 3.86x       | 1.24x       |
+| 30                  | 859                   | 3,278                     | 4,449                  | 5.18x       | 1.36x       |
+| 35                  | 612                   | 2,867                     | 4,114                  | 6.72x       | 1.44x       |
+| **40**              | **192**               | **2,476**                 | **3,660**              | **19.0x**   | **1.48x**   |
+| 50                  | _unreachable_         | 1,765                     | 2,959                  | _∞_         | 1.68x       |
+| 60                  | _unreachable_         | 1,244                     | 1,985                  | _∞_         | 1.60x       |
+
+40 tok/s/user 处的 19 倍峰值部分源于区间延伸——2 月 TP=8 配方在并发 4 时有 24.5 ms 的 TPOT 下限（40.86 tok/s/user），在该工作负载上无法再降低，因此对比区间的上限恰好是旧配方已开始崩溃的位置。到 50 tok/s/user 时 v0.5.8 曲线已不存在；到 75 tok/s/user 时只有 v0.5.12 曲线仍有数据点。仅 5 月 v0.5.12 镜像就在整个共享区间内在 4 月基线基础上额外贡献了 1.44x 到 1.68x——这是纯粹的版本升级收益。
+
+<Figure
+  srcLight="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-light.png"
+  srcDark="/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-dark.png"
+  alt="Qwen3.5 FP8 8k/1k tok/s/GPU vs 交互性，MI355X SGLang 三个日期对比：2026-02-20（v0.5.8.post1）、2026-04-16（v0.5.10rc0）、2026-05-19（v0.5.12）。每条曲线标注日期和各点的 TP 值。"
+  caption="Qwen3.5-397B-A17B FP8 8k/1k 在 MI355X SGLang 上的表现。三个月内三次运行：v0.5.8.post1（2 月 20 日，TP=8）、v0.5.10rc0（4 月 16 日，TP=2/4）、v0.5.12（5 月 19 日，TP=2/4）。点标签表示该配置所使用的 TP 值。"
+/>
+
+[在线图表](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8)，已预筛选为 MI355X SGLang Qwen3.5 FP8 三次运行的数据。
+
+## MI355X 上 Qwen3.5 的下一步
+
+- **分离式推理服务。** Qwen3.5 的 512 专家池恰好是分离式预填充/解码拆分能大显身手的场景。目前尚无 MI355X Qwen3.5 分离式配方，AMD 也尚未为 Qwen3.5 交付分离式推理方案。
+
+## 致谢
+
+这条三个月的性能提升曲线来自 AMD 的 [zhentaocc](https://github.com/zhentaocc)（Todd Chen）和 [yichiche](https://github.com/yichiche)（Jacky Cheng），他们编写了全部三个上游 SGLang PR，由 [HaiShaw](https://github.com/HaiShaw) 审核并合入。上游到基准测试的闭环速度本身就是护城河。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "与三个月前相比，MI355X SGLang 在 Qwen3.5 FP8 上快了多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 Qwen3.5-397B-A17B FP8 8k/1k 的 MI355X SGLang 上，等交互性下的每 GPU 吞吐量在 2026-02-20 v0.5.8.post1 基线和 2026-05-19 v0.5.12 运行之间最高提升 19.0 倍，峰值出现在 40 tok/s/user（在仪表板的单调三次 Hermite Pareto 插值上为 192 到 3,660 tok/s/GPU）。每 GPU 峰值吞吐量从 1,288 提升至 6,409 tok/s/GPU（5.0 倍）。2 月基线使用 TP=8；4 月和 5 月运行使用 TP=2 和 TP=4。全程使用单台 MI355X 节点，无硬件变更。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "哪些 SGLang PR 推动了 MI355X Qwen3.5 的加速？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "三个由 AMD 编写、通过 SGLANG_USE_AITER=1 开关控制的上游 PR 被纳入 v0.5.10rc0 镜像。PR #20736（zhentaocc 提交，2026-04-15 合入）在 Qwen2/Qwen3.5 MoE 中将共享专家与路由专家融合为单次 AITER 分发中的 topk+1。PR #21188（yichiche 提交，2026-03-23 合入）为 GemmaRMSNorm 添加 forward_hip 路径，使 AMD GPU 使用融合 RMSNorm 内核（AITER fused_add_rms_norm / rms_norm）而非原生回退路径，据报告在 8k/1k 并发 1 下端到端延迟降低 -23.1%，吞吐量提升 +30.0%。PR #21421（zhentaocc 提交，2026-03-26 合入）将 AITER 的 fused_topk 内核集成到 SGLang 的 fused_topk 中用于 softmax MoE top-K 选择，内核微基准测试在 Qwen3.5 形态上比 sgl-kernel 基线快 1.31x 到 6.29x。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "从 TP=8 切换到 TP=2/TP=4 带来了多少增益？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "2026 年 4 月的 InferenceX 配方更新将 TP 重新调优、v0.5.10rc0 镜像升级和 AITER PR 打包为一次变更，因此从公开的 InferenceX 数据集无法将它们完全分离。可以确定的是：TP=8 在 Qwen3.5 的 512 专家 MoE 分发路径上浪费了 MI355X 大部分的 tensor-core 算力，而 TP=2 / TP=4 将解码批次分配到更少的 rank 上以保持 AITER 融合 MoE 分发的高效运行。TP 重新调优是 AITER 内核优化在端到端层面得以体现的必要条件。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "仅 5 月 v0.5.12 镜像升级带来了多少加速？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在保持 TP=2/TP=4 配方不变的情况下，2026-05-19 SGLang v0.5.12 镜像在 30 到 60 tok/s/user 区间内的等交互性下，每 GPU 吞吐量比 2026-04-16 v0.5.10rc0 镜像提升了 1.44x 到 1.68x，并将 Pareto 前沿延伸至 75 tok/s/user，而 4 月配方的上限为 64。TP=4 并发 256 时的峰值吞吐量从 5,099 提升至 6,409 tok/s/GPU。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "这一仅限 MI355X 的 Qwen3.5 结果未涵盖什么？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "分离式推理服务。Qwen3.5 的 512 专家池恰好是分离式预填充/解码拆分能大显身手的场景，但目前尚无 MI355X Qwen3.5 分离式配方，AMD 也尚未为 Qwen3.5 交付分离式推理方案。"
+      }
+    }
+  ]
+}`}</JsonLd>

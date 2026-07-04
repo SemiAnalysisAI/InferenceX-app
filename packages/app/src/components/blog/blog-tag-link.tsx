@@ -6,12 +6,14 @@ import { track } from '@/lib/analytics';
 interface BlogTagLinkProps {
   tag: string;
   active?: boolean;
+  /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
+  basePath?: string;
 }
 
-export function BlogTagLink({ tag, active }: BlogTagLinkProps) {
+export function BlogTagLink({ tag, active, basePath = '/blog' }: BlogTagLinkProps) {
   return (
     <Link
-      href={`/blog?tag=${encodeURIComponent(tag)}`}
+      href={`${basePath}?tag=${encodeURIComponent(tag)}`}
       className={`rounded-full px-3 py-0.5 text-xs transition-colors ${
         active
           ? 'bg-primary/15 text-primary ring-1 ring-primary/30'

@@ -8,6 +8,8 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
+import { enAlternates } from '@/lib/i18n';
+
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
@@ -22,7 +24,7 @@ const DESCRIPTION = `InferenceX is the independent, open-source GPU inference be
 export const metadata: Metadata = {
   title: 'GPU Comparisons',
   description: DESCRIPTION,
-  alternates: { canonical: `${SITE_URL}/compare` },
+  alternates: enAlternates('/compare'),
   openGraph: {
     title: `GPU Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,

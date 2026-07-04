@@ -7,8 +7,25 @@ import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { track } from '@/lib/analytics';
 
+import type { Locale } from '@/lib/i18n';
+
 import { CompanyLogo, highlightBrand } from './quote-utils';
 import { QUOTES } from './quotes-data';
+
+const STRINGS = {
+  en: {
+    heading: <>InferenceX&trade; Initiative Supporters</>,
+    intro:
+      'InferenceX™ initiative is supported by many major buyers of compute and prominent members of the ML community including those from MiniMax, Moonshot Kimi, Alibaba Qwen, OpenAI, Microsoft, vLLM, PyTorch Foundation, Oracle and more.',
+    jumpTo: (org: string) => `Jump to ${org}’s quote`,
+  },
+  zh: {
+    heading: <>InferenceX&trade; 计划支持者</>,
+    intro:
+      'InferenceX™ 计划获得众多主要算力买家与 ML 社区知名成员的支持，包括来自 MiniMax、Moonshot Kimi、阿里巴巴 Qwen、OpenAI、Microsoft、vLLM、PyTorch 基金会、Oracle 等机构的支持者。',
+    jumpTo: (org: string) => `跳转到 ${org} 的评价`,
+  },
+} as const;
 
 /** Stable anchor id for an org's quote (first occurrence wins). */
 function orgAnchorId(org: string): string {
@@ -89,20 +106,15 @@ function QuoteCard({
   return content;
 }
 
-export function QuotesContent() {
+export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
+  const t = STRINGS[locale];
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <section className="flex flex-col gap-4">
           <Card>
-            <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">
-              InferenceX&trade; Initiative Supporters
-            </h2>
-            <p className="mt-3 text-base lg:text-lg text-muted-foreground">
-              InferenceX&trade; initiative is supported by many major buyers of compute and
-              prominent members of the ML community including those from MiniMax, Moonshot Kimi,
-              Alibaba Qwen, OpenAI, Microsoft, vLLM, PyTorch Foundation, Oracle and more.
-            </p>
+            <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">{t.heading}</h2>
+            <p className="mt-3 text-base lg:text-lg text-muted-foreground">{t.intro}</p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               {orgLogos.map(({ org, logo }) => (
                 <button
@@ -113,8 +125,8 @@ export function QuotesContent() {
                     scrollToOrg(org);
                   }}
                   className="group flex items-center justify-center h-10 px-3 cursor-pointer rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                  title={`Jump to ${org}’s quote`}
-                  aria-label={`Jump to ${org}’s quote`}
+                  title={t.jumpTo(org)}
+                  aria-label={t.jumpTo(org)}
                 >
                   <img
                     src={`/logos/${logo}`}
@@ -135,7 +147,7 @@ export function QuotesContent() {
                       id={
                         firstQuoteIndexForOrg[quote.org] === i ? orgAnchorId(quote.org) : undefined
                       }
-                      text={quote.text}
+                      text={locale === 'zh' ? (quote.textZh ?? quote.text) : quote.text}
                       name={quote.name}
                       title={quote.title}
                       org={quote.org}

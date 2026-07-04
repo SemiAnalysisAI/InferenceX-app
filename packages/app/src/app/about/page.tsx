@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { FAQ_ITEMS } from '@/components/about/faq-data';
 import { JsonLd } from '@/components/json-ld';
+import { enAlternates } from '@/lib/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = {
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
   title: 'About',
   description:
     'InferenceX is an independent, vendor neutral, reproducible benchmark which continuously benchmarks inference software across a wide range of AI accelerators.',
-  alternates: { canonical: `${SITE_URL}/about` },
+  alternates: enAlternates('/about'),
   openGraph: {
     title: 'About | InferenceX',
     description:

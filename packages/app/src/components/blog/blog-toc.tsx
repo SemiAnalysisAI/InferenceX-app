@@ -7,6 +7,8 @@ import type { TocHeading } from '@/lib/blog';
 
 interface BlogTocProps {
   headings: TocHeading[];
+  /** Heading label, e.g. '本页目录' on Chinese pages. */
+  label?: string;
 }
 
 function handleClick(heading: TocHeading) {
@@ -17,7 +19,7 @@ function handleClick(heading: TocHeading) {
   window.scrollTo({ top, behavior: 'smooth' });
 }
 
-export function BlogToc({ headings }: BlogTocProps) {
+export function BlogToc({ headings, label = 'On this page' }: BlogTocProps) {
   const [activeId, setActiveId] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -141,8 +143,7 @@ export function BlogToc({ headings }: BlogTocProps) {
       {!showSidebar && (
         <details aria-label="Table of contents">
           <summary className="text-sm font-medium cursor-pointer">
-            On this page{' '}
-            <span className="text-muted-foreground font-normal">(click to expand)</span>
+            {label} <span className="text-muted-foreground font-normal">(click to expand)</span>
           </summary>
           <div className="mt-2">{list}</div>
         </details>
@@ -161,7 +162,7 @@ export function BlogToc({ headings }: BlogTocProps) {
             }}
             aria-label="Table of contents"
           >
-            <p className="text-sm font-medium mb-2">On this page</p>
+            <p className="text-sm font-medium mb-2">{label}</p>
             {list}
           </nav>,
           document.body,

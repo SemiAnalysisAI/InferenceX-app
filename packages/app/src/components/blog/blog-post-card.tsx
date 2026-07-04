@@ -8,13 +8,15 @@ import { track } from '@/lib/analytics';
 interface BlogPostCardProps {
   slug: string;
   title: string;
+  /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
+  basePath?: string;
   children: ReactNode;
 }
 
-export function BlogPostCard({ slug, title, children }: BlogPostCardProps) {
+export function BlogPostCard({ slug, title, basePath = '/blog', children }: BlogPostCardProps) {
   return (
     <Link
-      href={`/blog/${slug}`}
+      href={`${basePath}/${slug}`}
       className="group relative block rounded-xl border border-border bg-background/20 backdrop-blur-[2px] p-4 md:p-8 transition-all duration-200 hover:border-brand/50 hover:shadow-lg hover:shadow-brand/5 hover:scale-[1.01]"
       onClick={() => track('blog_post_clicked', { slug, title })}
     >
