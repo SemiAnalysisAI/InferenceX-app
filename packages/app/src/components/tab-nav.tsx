@@ -147,7 +147,7 @@ export function TabNav() {
                   <>
                     <SelectSeparator />
                     <SelectGroup>
-                      <SelectLabel>Hidden</SelectLabel>
+                      <SelectLabel>{isZh ? '隐藏' : 'Hidden'}</SelectLabel>
                       {GATED_TABS.map((tab) => {
                         const value = tab.href.slice(1);
                         return (
@@ -156,7 +156,7 @@ export function TabNav() {
                             value={value}
                             data-ph-capture-attribute-tab={value}
                           >
-                            {tab.label}
+                            {tabLabel(tab)}
                           </SelectItem>
                         );
                       })}
@@ -193,6 +193,8 @@ export function TabNav() {
                 current={current}
                 tabHref={(path) => tabHref(localizedPath(path))}
                 onSelect={handleDesktopClick}
+                tabLabel={tabLabel}
+                isZh={isZh}
               />
             )}
           </nav>
@@ -206,10 +208,14 @@ function HiddenTabsPopover({
   current,
   tabHref,
   onSelect,
+  tabLabel,
+  isZh,
 }: {
   current: string;
   tabHref: (path: string) => string;
   onSelect: (tab: string) => void;
+  tabLabel: (tab: { href: string; label: string }) => string;
+  isZh: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const active = GATED_VALUES.has(current);
@@ -221,7 +227,7 @@ function HiddenTabsPopover({
         data-ph-capture-attribute-tab="hidden"
         className={cn(tabLinkClass, currentTabClass(active), 'gap-1 cursor-pointer')}
       >
-        Hidden
+        {isZh ? '隐藏' : 'Hidden'}
         <ChevronDown
           className={cn('size-4 transition-transform', open && 'rotate-180')}
           aria-hidden
@@ -250,7 +256,7 @@ function HiddenTabsPopover({
                       : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                   )}
                 >
-                  {tab.label}
+                  {tabLabel(tab)}
                 </Link>
               </li>
             );

@@ -10,6 +10,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
+import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
@@ -71,6 +72,27 @@ function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): str
   return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
+const GPU_STRINGS = {
+  en: {
+    logScale: 'Log Scale',
+    highContrast: 'High Contrast',
+    optimalOnly: 'Optimal Only',
+    labels: 'Labels',
+    parallelismLabels: 'Parallelism Labels',
+    lineLabels: 'Line Labels',
+    resetFilter: 'Reset filter',
+  },
+  zh: {
+    logScale: '对数缩放',
+    highContrast: '高对比度',
+    optimalOnly: '仅最优',
+    labels: '标签',
+    parallelismLabels: '并行配置标签',
+    lineLabels: '曲线标签',
+    resetFilter: '重置筛选',
+  },
+} as const;
+
 const GPUGraph = React.memo(
   ({
     chartId,
@@ -109,6 +131,8 @@ const GPUGraph = React.memo(
       showLineLabels,
       setShowLineLabels,
     } = useInference();
+    const locale = useLocale();
+    const legendT = GPU_STRINGS[locale];
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
 
@@ -928,7 +952,7 @@ const GPUGraph = React.memo(
             switches={[
               {
                 id: 'gpu-log-scale',
-                label: 'Log Scale',
+                label: legendT.logScale,
                 checked: logScale,
                 onCheckedChange: (c) => {
                   setLogScale(c);
@@ -937,7 +961,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-high-contrast',
-                label: 'High Contrast',
+                label: legendT.highContrast,
                 checked: highContrast,
                 onCheckedChange: (c) => {
                   setHighContrast(c);
@@ -946,7 +970,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-hide-non-optimal',
-                label: 'Optimal Only',
+                label: legendT.optimalOnly,
                 checked: hideNonOptimal,
                 onCheckedChange: (c) => {
                   setHideNonOptimal(c);
@@ -955,7 +979,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-point-labels',
-                label: 'Labels',
+                label: legendT.labels,
                 checked: showPointLabels,
                 onCheckedChange: (c) => {
                   setShowPointLabels(c);
@@ -964,7 +988,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-parallelism-labels',
-                label: 'Parallelism Labels',
+                label: legendT.parallelismLabels,
                 checked: useAdvancedLabels,
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
@@ -976,7 +1000,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-line-labels',
-                label: 'Line Labels',
+                label: legendT.lineLabels,
                 checked: showLineLabels,
                 onCheckedChange: (c) => {
                   setShowLineLabels(c);
@@ -987,7 +1011,7 @@ const GPUGraph = React.memo(
             actions={[
               {
                 id: 'gpu-reset-filter',
-                label: 'Reset filter',
+                label: legendT.resetFilter,
                 onClick: () => {
                   selectAllActiveDates();
                   track('gpu_timeseries_reset_filter');

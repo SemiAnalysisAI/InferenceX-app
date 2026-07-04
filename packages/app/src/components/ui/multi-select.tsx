@@ -38,6 +38,11 @@ interface MultiSelectProps {
   searchable?: boolean;
   plainSelectedText?: boolean;
   showSelectionSummary?: boolean;
+  searchPlaceholder?: string;
+  noResultsLabel?: string;
+  clearSearchLabel?: string;
+  selectedSuffix?: string;
+  minimumPrefix?: string;
 }
 
 function MultiSelect({
@@ -59,6 +64,11 @@ function MultiSelect({
   searchable = true,
   plainSelectedText = false,
   showSelectionSummary = true,
+  searchPlaceholder = 'Search...',
+  noResultsLabel = 'No results',
+  clearSearchLabel = 'Clear search',
+  selectedSuffix = ' selected',
+  minimumPrefix = 'Minimum: ',
 }: MultiSelectProps) {
   const [internalIsOpen, setInternalIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -348,7 +358,7 @@ function MultiSelect({
                     setSearch(e.target.value);
                     if (e.target.value) searchUsedRef.current = true;
                   }}
-                  placeholder="Search..."
+                  placeholder={searchPlaceholder}
                   className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
                 />
                 {search && (
@@ -359,7 +369,7 @@ function MultiSelect({
                       searchRef.current?.focus();
                     }}
                     className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Clear search"
+                    aria-label={clearSearchLabel}
                   >
                     <XIcon className="size-3.5" />
                   </button>
@@ -370,15 +380,19 @@ function MultiSelect({
               (maxSelections !== undefined || minSelections !== undefined) && (
                 <div className="text-muted-foreground px-2 py-1.5 text-xs border-b mb-1">
                   {value.length}
-                  {maxSelections !== undefined && ` / ${maxSelections}`} selected
+                  {maxSelections !== undefined && ` / ${maxSelections}`}
+                  {selectedSuffix}
                   {minSelections !== undefined && minSelections > 0 && (
-                    <span className="block text-xs mt-0.5">Minimum: {minSelections}</span>
+                    <span className="block text-xs mt-0.5">
+                      {minimumPrefix}
+                      {minSelections}
+                    </span>
                   )}
                 </div>
               )}
             {filteredOptions.length === 0 && (
               <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
-                No results
+                {noResultsLabel}
               </div>
             )}
             {filteredSections

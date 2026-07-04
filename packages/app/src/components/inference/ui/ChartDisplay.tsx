@@ -34,6 +34,7 @@ import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/seg
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { metricLabel, metricTitle } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -118,13 +119,13 @@ const STRINGS = {
   },
 } as const;
 
-const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string }[] = [
-  { value: 'interactivity', label: 'Interactivity' },
-  { value: 'e2e', label: 'E2E Latency' },
-  { value: 'ttft', label: 'TTFT' },
-  { value: 'normalized-e2e', label: 'Normalized E2E' },
-  { value: 'session-time', label: 'Session Time' },
-  { value: 'prefill-tps', label: 'Prefill TPS / user' },
+const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
+  { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
+  { value: 'e2e', label: 'E2E Latency', labelZh: '端到端延迟' },
+  { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
+  { value: 'normalized-e2e', label: 'Normalized E2E', labelZh: 'Normalized E2E' },
+  { value: 'session-time', label: 'Session Time', labelZh: '会话时长' },
+  { value: 'prefill-tps', label: 'Prefill TPS / user', labelZh: 'Prefill TPS / user' },
 ];
 
 /**
@@ -414,9 +415,8 @@ export default function ChartDisplay() {
   // Get the current Y-axis label from the first graph's chart definition
   const currentYLabel = useMemo(() => {
     if (graphs.length === 0) return '';
-    const yLabelKey = `${selectedYAxisMetric}_label` as keyof (typeof graphs)[0]['chartDefinition'];
-    return (graphs[0].chartDefinition[yLabelKey] as string) || '';
-  }, [graphs, selectedYAxisMetric]);
+    return metricLabel(graphs[0].chartDefinition, selectedYAxisMetric, locale);
+  }, [graphs, selectedYAxisMetric, locale]);
 
   // Derive x-axis trend lines by swapping each point's x → value
   const xTrendLines = useMemo(() => {
@@ -612,18 +612,17 @@ export default function ChartDisplay() {
                       const chartCaption = (
                         <>
                           <h2 className="text-lg font-semibold">
-                            {
-                              graph.chartDefinition[
-                                `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                              ]
-                            }{' '}
+                            {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                             {(() => {
                               // For Input metrics with dynamic x-axis, use dynamic heading
-                              const metricTitle =
-                                (graph.chartDefinition[
-                                  `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                                ] as string) || '';
-                              const isInputMetric = metricTitle.toLowerCase().includes('input');
+                              const currentMetricTitle = metricTitle(
+                                graph.chartDefinition,
+                                selectedYAxisMetric,
+                                locale,
+                              );
+                              const isInputMetric = currentMetricTitle
+                                .toLowerCase()
+                                .includes('input');
                               if (
                                 graph.chartDefinition.chartType === 'interactivity' &&
                                 isInputMetric &&
@@ -728,11 +727,7 @@ export default function ChartDisplay() {
                           modelLabel={graph.model}
                           data={graph.data}
                           xLabel={graph.chartDefinition.x_label}
-                          yLabel={`${
-                            graph.chartDefinition[
-                              `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                            ]
-                          }`}
+                          yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
                           runNumbering={runNumbering}
@@ -744,11 +739,7 @@ export default function ChartDisplay() {
                             modelLabel={graph.model}
                             data={graph.data}
                             xLabel={graph.chartDefinition.x_label}
-                            yLabel={`${
-                              graph.chartDefinition[
-                                `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                              ]
-                            }`}
+                            yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
                             overlayData={
@@ -778,11 +769,7 @@ export default function ChartDisplay() {
                         }}
                         parentChartId={`chart-${graphIndex}`}
                         chartDefinition={graph.chartDefinition}
-                        yLabel={`${
-                          graph.chartDefinition[
-                            `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                          ]
-                        }`}
+                        yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                         xLabel={graph.chartDefinition.x_label}
                       />
                     )}
@@ -862,14 +849,14 @@ export default function ChartDisplay() {
             // Before mount, render all buttons so SSR and first client render match.
             if (!mounted) return true;
             return isAgenticSequence;
-          }).map(({ value, label }) => (
+          }).map(({ value, label, labelZh }) => (
             <TabsTrigger
               key={value}
               value={value}
               data-testid={`x-axis-mode-${value}`}
               className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
             >
-              {label}
+              {locale === 'zh' ? labelZh : label}
             </TabsTrigger>
           ))}
         </TabsList>

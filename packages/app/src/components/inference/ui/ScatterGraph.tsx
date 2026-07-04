@@ -24,6 +24,7 @@ import {
   Sequence,
 } from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
+import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -290,6 +291,29 @@ const lineLabelText = (
   return includePrecision ? `${base} ${getPrecisionLabel(precision as Precision)}` : base;
 };
 
+const SCATTER_STRINGS = {
+  en: {
+    logScale: 'Log Scale',
+    optimalOnly: 'Optimal Only',
+    labels: 'Labels',
+    highContrast: 'High Contrast',
+    parallelismLabels: 'Parallelism Labels',
+    gradientLabels: 'Gradient Labels',
+    lineLabels: 'Line Labels',
+    resetFilter: 'Reset filter',
+  },
+  zh: {
+    logScale: '对数缩放',
+    optimalOnly: '仅最优',
+    labels: '标签',
+    highContrast: '高对比度',
+    parallelismLabels: '并行配置标签',
+    gradientLabels: '渐变标签',
+    lineLabels: '曲线标签',
+    resetFilter: '重置筛选',
+  },
+} as const;
+
 const ScatterGraph = React.memo(
   ({
     chartId,
@@ -347,6 +371,8 @@ const ScatterGraph = React.memo(
       selectedSequence,
       quickFilters,
     } = useInference();
+    const locale = useLocale();
+    const legendT = SCATTER_STRINGS[locale];
 
     const {
       isUnofficialRun,
@@ -2662,7 +2688,7 @@ const ScatterGraph = React.memo(
                   : [
                       {
                         id: 'scatter-log-scale',
-                        label: 'Log Scale',
+                        label: legendT.logScale,
                         checked: logScale,
                         onCheckedChange: (checked: boolean) => {
                           setLogScale(checked);
@@ -2672,7 +2698,7 @@ const ScatterGraph = React.memo(
                     ]),
                 {
                   id: 'scatter-hide-non-optimal',
-                  label: 'Optimal Only',
+                  label: legendT.optimalOnly,
                   checked: hideNonOptimal,
                   onCheckedChange: (checked: boolean) => {
                     setHideNonOptimal(checked);
@@ -2692,7 +2718,7 @@ const ScatterGraph = React.memo(
                 },
                 {
                   id: 'scatter-point-labels',
-                  label: 'Labels',
+                  label: legendT.labels,
                   checked: showPointLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowPointLabels(checked);
@@ -2701,7 +2727,7 @@ const ScatterGraph = React.memo(
                 },
                 {
                   id: 'scatter-high-contrast',
-                  label: 'High Contrast',
+                  label: legendT.highContrast,
                   checked: highContrast,
                   onCheckedChange: (checked: boolean) => {
                     setHighContrast(checked);
@@ -2710,7 +2736,7 @@ const ScatterGraph = React.memo(
                 },
                 {
                   id: 'scatter-parallelism-labels',
-                  label: 'Parallelism Labels',
+                  label: legendT.parallelismLabels,
                   checked: useAdvancedLabels,
                   onCheckedChange: (checked: boolean) => {
                     setUseAdvancedLabels(checked);
@@ -2738,7 +2764,7 @@ const ScatterGraph = React.memo(
                 },
                 {
                   id: 'scatter-gradient-labels',
-                  label: 'Gradient Labels',
+                  label: legendT.gradientLabels,
                   checked: showGradientLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowGradientLabels(checked);
@@ -2747,7 +2773,7 @@ const ScatterGraph = React.memo(
                 },
                 {
                   id: 'scatter-line-labels',
-                  label: 'Line Labels',
+                  label: legendT.lineLabels,
                   checked: showLineLabels,
                   onCheckedChange: (checked: boolean) => {
                     setShowLineLabels(checked);
@@ -2784,7 +2810,7 @@ const ScatterGraph = React.memo(
                   ? [
                       {
                         id: 'scatter-reset-filter',
-                        label: 'Reset filter',
+                        label: legendT.resetFilter,
                         onClick: () => {
                           selectAllHwTypes();
                           setLocalOfficialOverride(null);

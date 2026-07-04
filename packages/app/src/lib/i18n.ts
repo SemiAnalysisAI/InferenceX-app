@@ -37,6 +37,7 @@ export function isZhPathname(pathname: string): boolean {
 export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = [
   { path: '/', exact: true },
   { path: '/inference', exact: true },
+  { path: '/inference/agentic' },
   { path: '/evaluation', exact: true },
   { path: '/historical', exact: true },
   { path: '/calculator', exact: true },
@@ -44,12 +45,16 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/gpu-specs', exact: true },
   { path: '/gpu-metrics', exact: true },
   { path: '/submissions', exact: true },
+  { path: '/ai-chart', exact: true },
+  { path: '/current-inferencex-image', exact: true },
+  { path: '/feedback', exact: true },
   { path: '/about', exact: true },
   { path: '/quotes', exact: true },
   { path: '/land-acknowledgement', exact: true },
   { path: '/compare' },
   { path: '/compare-per-dollar' },
   { path: '/blog' },
+  { path: '/datasets' },
 ];
 
 export function hasZhSibling(enPathname: string): boolean {

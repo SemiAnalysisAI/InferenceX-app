@@ -9,6 +9,7 @@ import { GPU_SPECS, GPU_CHART_METRICS, type GpuSpec } from '@/lib/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { RadarDot } from '@/lib/d3-chart/layers/radar';
+import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 
 const NVIDIA_COLOR = '#76b900';
@@ -64,11 +65,18 @@ interface GpuSpecsRadarChartProps {
   caption?: ReactNode;
 }
 
+const RADAR_STRINGS = {
+  en: { resetFilter: 'Reset filter' },
+  zh: { resetFilter: '重置筛选' },
+} as const;
+
 export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
   const [selectedGpus, setSelectedGpus] = useState<Set<string>>(
     () => new Set(GPU_SPECS.map((s) => s.name)),
   );
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const locale = useLocale();
+  const legendT = RADAR_STRINGS[locale];
 
   const metrics = RADAR_METRICS;
 
@@ -206,7 +214,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
                 ? [
                     {
                       id: 'radar-reset-filter',
-                      label: 'Reset filter',
+                      label: legendT.resetFilter,
                       onClick: () => {
                         selectAll();
                         track('gpu_specs_radar_reset_filter');

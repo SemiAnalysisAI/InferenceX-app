@@ -50,9 +50,17 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/compare-per-dollar/deepseek-r1-h100-vs-h200')).toBe(true);
   });
 
-  it('rejects unmirrored routes', () => {
-    expect(hasZhSibling('/datasets')).toBe(false);
-    expect(hasZhSibling('/feedback')).toBe(false);
+  it('matches datasets, gated tabs, and agentic detail pages', () => {
+    expect(hasZhSibling('/datasets')).toBe(true);
+    expect(hasZhSibling('/datasets/some-set/conversations/abc123')).toBe(true);
+    expect(hasZhSibling('/ai-chart')).toBe(true);
+    expect(hasZhSibling('/current-inferencex-image')).toBe(true);
+    expect(hasZhSibling('/feedback')).toBe(true);
+    expect(hasZhSibling('/inference/agentic/42')).toBe(true);
+  });
+
+  it('rejects unknown routes', () => {
+    expect(hasZhSibling('/nonexistent')).toBe(false);
   });
 });
 
@@ -76,8 +84,13 @@ describe('switchLocalePath', () => {
     );
   });
 
+  it('switches datasets pages within the language trees', () => {
+    expect(switchLocalePath('/datasets')).toBe('/zh/datasets');
+    expect(switchLocalePath('/zh/datasets/some-set')).toBe('/datasets/some-set');
+  });
+
   it('falls back to the other homepage for unmirrored paths', () => {
-    expect(switchLocalePath('/datasets')).toBe('/zh');
+    expect(switchLocalePath('/some-unknown-route')).toBe('/zh');
     expect(switchLocalePath('/zh/unknown-page')).toBe('/');
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
 
 const HW_LABELS: Record<string, string> = {
   b200: 'B200',
@@ -131,6 +132,10 @@ const isSortMode = (v: string | null): v is SortMode =>
 
 export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: BenchmarkSibling[] }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const agenticBase = isZhPathname(pathname)
+    ? `${ZH_PREFIX}/inference/agentic`
+    : '/inference/agentic';
   // Persist the sort in the URL so clicking a point (which remounts this
   // component on the new route) keeps the chosen order instead of resetting.
   // Read it once from the URL on mount — this component only renders after the
@@ -151,9 +156,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
 
   // Carry the active sort through every point-to-point link.
   const hrefFor = (id: number) =>
-    sortMode === 'default'
-      ? `/inference/agentic/${id}`
-      : `/inference/agentic/${id}?sort=${sortMode}`;
+    sortMode === 'default' ? `${agenticBase}/${id}` : `${agenticBase}/${id}?sort=${sortMode}`;
 
   const currentId = siblings.find((s) => s.is_current)?.id;
 
@@ -181,8 +184,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               if (currentId !== undefined) {
                 const href =
                   mode === 'default'
-                    ? `/inference/agentic/${currentId}`
-                    : `/inference/agentic/${currentId}?sort=${mode}`;
+                    ? `${agenticBase}/${currentId}`
+                    : `${agenticBase}/${currentId}?sort=${mode}`;
                 router.replace(href, { scroll: false });
               }
             }}

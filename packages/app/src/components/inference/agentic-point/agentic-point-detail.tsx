@@ -11,6 +11,8 @@ import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -38,17 +40,52 @@ import {
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
 
+const STRINGS = {
+  en: {
+    back: 'Back',
+    inferenceChart: 'Inference chart',
+    loadingSku: 'Loading SKU navigator…',
+    loadingPoint: 'Loading point metadata…',
+    configsInSku: 'configs in SKU',
+    requests: 'requests',
+    interactivityOverTime: 'Interactivity over time',
+    ttftOverTime: 'TTFT over time',
+    perPoint: 'Per-point',
+    requestTimeline: 'Request timeline',
+    aggregatesAcrossConfigs: 'Aggregates across configs',
+    warmupWord: 'warmup',
+    warmupNotePrefix: 'Showing the ',
+    warmupNoteBody:
+      ' phase — a cache-warming pass whose outputs are capped at 1 token. Warmup OSL ≈ 1, and interactivity/decode are blank (single-token outputs have no inter-token latency).',
+    warmupNoServerData:
+      ' Warmup server-side metrics aren’t available for this point, so the server charts below are empty — the request-level charts above still reflect warmup.',
+  },
+  zh: {
+    back: '返回',
+    inferenceChart: '推理图表',
+    loadingSku: '加载 SKU 导航器……',
+    loadingPoint: '加载数据点元信息……',
+    configsInSku: '个配置',
+    requests: '个请求',
+    interactivityOverTime: '交互性随时间变化',
+    ttftOverTime: 'TTFT 随时间变化',
+    perPoint: '单点',
+    requestTimeline: '请求时间线',
+    aggregatesAcrossConfigs: '跨配置聚合',
+    warmupWord: 'warmup',
+    warmupNotePrefix: '当前显示 ',
+    warmupNoteBody:
+      ' 预热阶段——该阶段用于缓存预热，输出被限制为 1 个 token。预热阶段 OSL ≈ 1，交互性/解码指标为空（单 token 输出没有 token 间延迟）。',
+    warmupNoServerData:
+      ' 该数据点没有预热阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映预热阶段数据。',
+  },
+} as const;
+
 interface Props {
   id: number;
 }
 
 type DetailView = 'point' | 'timeline' | 'aggregates';
-
-const VIEW_OPTIONS: SegmentedToggleOption<DetailView>[] = [
-  { value: 'point', label: 'Per-point', testId: 'detail-view-point' },
-  { value: 'timeline', label: 'Request timeline', testId: 'detail-view-timeline' },
-  { value: 'aggregates', label: 'Aggregates across configs', testId: 'detail-view-aggregates' },
-];
 
 const isDetailView = (value: string | null): value is DetailView =>
   value === 'point' || value === 'timeline' || value === 'aggregates';
@@ -76,6 +113,19 @@ function useDetailView(): [DetailView, (nextView: DetailView) => void] {
 
 export function AgenticPointDetail({ id }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const isZh = isZhPathname(pathname);
+  const inferenceHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  const viewOptions: SegmentedToggleOption<DetailView>[] = useMemo(
+    () => [
+      { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
+      { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
+      { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
+    ],
+    [t],
+  );
   const metricsQuery = useTraceServerMetrics(id, true);
   const siblingsQuery = useBenchmarkSiblings(id);
 
@@ -168,24 +218,24 @@ export function AgenticPointDetail({ id }: Props) {
           onClick={() => router.back()}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="size-4" /> Back
+          <ArrowLeft className="size-4" /> {t.back}
         </button>
         <span className="text-sm text-muted-foreground">·</span>
-        <Link href="/inference" className="text-sm text-muted-foreground hover:text-foreground">
-          Inference chart
+        <Link href={inferenceHref} className="text-sm text-muted-foreground hover:text-foreground">
+          {t.inferenceChart}
         </Link>
       </div>
 
       {siblingsData ? (
         <SiblingNav sku={siblingsData.sku} siblings={siblingsData.siblings} />
       ) : siblingsQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading SKU navigator…</div>
+        <div className="text-sm text-muted-foreground">{t.loadingSku}</div>
       ) : null}
 
       {metrics ? (
         <PointSummary meta={metrics.meta} />
       ) : metricsQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading point metadata…</div>
+        <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
       ) : null}
 
       {metricsQuery.isError && (
@@ -203,7 +253,7 @@ export function AgenticPointDetail({ id }: Props) {
       <div className="flex items-center justify-between gap-3">
         <SegmentedToggle
           value={view}
-          options={VIEW_OPTIONS}
+          options={viewOptions}
           onValueChange={setView}
           ariaLabel="Detail view"
           testId="detail-view-toggle"
@@ -211,13 +261,13 @@ export function AgenticPointDetail({ id }: Props) {
         />
         {view === 'aggregates' && (
           <span className="text-xs text-muted-foreground">
-            {siblingIds.length} configs in SKU
+            {siblingIds.length} {t.configsInSku}
             {aggregatesQuery.isLoading ? ' · loading…' : ''}
           </span>
         )}
         {view === 'timeline' && timelineQuery.data && (
           <span className="text-xs text-muted-foreground">
-            {timelineQuery.data.requests.length} requests
+            {timelineQuery.data.requests.length} {t.requests}
           </span>
         )}
       </div>
@@ -264,11 +314,10 @@ export function AgenticPointDetail({ id }: Props) {
               className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
               data-testid="warmup-phase-note"
             >
-              Showing the <span className="font-medium text-foreground">warmup</span> phase — a
-              cache-warming pass whose outputs are capped at 1 token. Warmup OSL ≈ 1, and
-              interactivity/decode are blank (single-token outputs have no inter-token latency).
-              {!slicedHasServerData &&
-                ' Warmup server-side metrics aren’t available for this point, so the server charts below are empty — the request-level charts above still reflect warmup.'}
+              {t.warmupNotePrefix}
+              <span className="font-medium text-foreground">{t.warmupWord}</span>
+              {t.warmupNoteBody}
+              {!slicedHasServerData && t.warmupNoServerData}
             </p>
           )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -284,14 +333,14 @@ export function AgenticPointDetail({ id }: Props) {
             />
 
             <RequestMetricOverTime
-              title="Interactivity over time"
+              title={t.interactivityOverTime}
               metric="interactivity"
               timeline={phaseTimeline}
               isLoading={timelineQuery.isLoading}
             />
 
             <RequestMetricOverTime
-              title="TTFT over time"
+              title={t.ttftOverTime}
               metric="ttft"
               timeline={phaseTimeline}
               isLoading={timelineQuery.isLoading}

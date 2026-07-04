@@ -65,6 +65,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.8,
     }),
+    ...localizedPair('/datasets', { lastModified: now, changeFrequency: 'weekly', priority: 0.6 }),
     ...localizedPair('/blog', { lastModified: now, changeFrequency: 'weekly', priority: 0.8 }),
     ...getAllPosts().flatMap((post) => {
       const entry = {
