@@ -501,7 +501,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
               triggerTestId="yaxis-metric-selector"
               value={selectedYAxisMetric}
               onValueChange={handleYAxisMetricChange}
-              placeholder="Y-Axis Metric"
+              placeholder={t.yAxisMetric}
               trackPrefix="yaxis_metric"
               groups={groupedYAxisOptions.map((g) => ({
                 label: g.groupLabel,

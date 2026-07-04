@@ -124,13 +124,25 @@ const STRINGS = {
   },
 } as const;
 
-// Chinese variants of the static "vs. …" chart-heading strings that come from
-// inference-chart-config.json, keyed by their English value.
-const HEADING_FALLBACK_ZH: Record<string, string> = {
-  'vs. Interactivity': 'vs. 交互性',
-  'vs. End-to-end Latency': 'vs. 端到端延迟',
-  'vs. P90 Time To First Token': 'vs. P90 首 token 延迟（TTFT）',
+// Translate the "vs. …" chart-heading suffix from inference-chart-config.json
+// into Chinese. useChartData rewrites the heading with the selected percentile
+// for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
+// pattern instead of a fixed string; unknown headings pass through unchanged.
+const HEADING_SUBJECT_ZH: Record<string, string> = {
+  Interactivity: '交互性',
+  'End-to-end Latency': '端到端延迟',
+  'Time To First Token': '首 token 延迟（TTFT）',
 };
+
+function zhHeading(configured: string): string {
+  const match = /^vs\.\s+(?:(?<pctl>Median|Mean|P\d+(?:\.\d+)?)\s+)?(?<subject>.+)$/iu.exec(
+    configured,
+  );
+  const subjectZh = match?.groups && HEADING_SUBJECT_ZH[match.groups.subject];
+  if (!subjectZh) return configured;
+  const pctl = match.groups?.pctl;
+  return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
+}
 
 const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
   { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
@@ -686,9 +698,7 @@ export default function ChartDisplay() {
                                 graph.chartDefinition[
                                   `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
                                 ] || graph.chartDefinition.heading;
-                              return locale === 'zh'
-                                ? (HEADING_FALLBACK_ZH[String(configured)] ?? configured)
-                                : configured;
+                              return locale === 'zh' ? zhHeading(String(configured)) : configured;
                             })()}
                           </h2>
                           <p className="text-sm text-muted-foreground mb-2">
