@@ -107,17 +107,33 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
   // Visible shape is created (or swapped, if selectedPrecisions changed) in the
   // merged update pass below.
 
-  // Label (enter only)
+  // Label (enter only). Multi-line labels are passed as `\n`-separated strings;
+  // we anchor the entire stack via the FIRST tspan's `dy` so getBBox() doesn't
+  // pick up the text element's own (unused) y=0 origin. The first tspan is
+  // raised so the LAST line baseline lands ~8px above the point; subsequent
+  // tspans cascade down by 1.1em.
   if (!config.hideLabels && config.getLabelText && config.foreground) {
-    entered
-      .append('text')
-      .attr('class', 'point-label')
-      .attr('dy', -8)
-      .attr('text-anchor', 'middle')
-      .attr('fill', config.foreground)
-      .attr('font-size', '10px')
-      .attr('pointer-events', 'none')
-      .text(config.getLabelText);
+    const labelGetter = config.getLabelText;
+    entered.each(function (d) {
+      const lines = labelGetter(d).split('\n');
+      const text = d3
+        .select(this)
+        .append('text')
+        .attr('class', 'point-label')
+        .attr('text-anchor', 'middle')
+        .attr('fill', config.foreground!)
+        .attr('font-size', '10px')
+        .attr('font-weight', '700')
+        .attr('pointer-events', 'none');
+      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
+      lines.forEach((line, i) => {
+        text
+          .append('tspan')
+          .attr('x', 0)
+          .attr('dy', i === 0 ? `${firstDy}em` : '1.1em')
+          .text(line);
+      });
+    });
   }
 
   // Exit: remove stale points
@@ -150,20 +166,32 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     syncPointShape(g, shapeKey, config.getColor(d));
   });
 
-  // Update labels: use data join so labels are created/removed properly on toggle
+  // Update labels: use data join so labels are created/removed properly on toggle.
+  // Anchor the stack via the first tspan (NOT the text dy — that doesn't shift the
+  // bbox cleanly when there are tspan children).
   if (!config.hideLabels && config.getLabelText && config.foreground) {
+    const labelGetter = config.getLabelText;
     points.each(function (d) {
-      const g = d3.select(this);
-      g.selectAll<SVGTextElement, boolean>('.point-label')
+      const lines = labelGetter(d).split('\n');
+      const text = d3
+        .select(this)
+        .selectAll<SVGTextElement, boolean>('.point-label')
         .data([true])
         .join('text')
         .attr('class', 'point-label')
-        .attr('dy', -8)
         .attr('text-anchor', 'middle')
         .attr('fill', config.foreground!)
         .attr('font-size', '10px')
-        .attr('pointer-events', 'none')
-        .text(config.getLabelText!(d));
+        .attr('font-weight', '700')
+        .attr('pointer-events', 'none');
+      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
+      text
+        .selectAll<SVGTSpanElement, string>('tspan')
+        .data(lines)
+        .join('tspan')
+        .attr('x', 0)
+        .attr('dy', (_l, i) => (i === 0 ? `${firstDy}em` : '1.1em'))
+        .text((l) => l);
     });
   } else {
     points.selectAll('.point-label').remove();
@@ -283,7 +311,22 @@ export function attachScatterTooltipHandlers<
     });
 }
 
-/** Compute tooltip left/top, flipping when it would overflow the chart container. */
+/**
+ * Compute tooltip left/top **in viewport coordinates** so the tooltip can be
+ * rendered via portal with `position: fixed`. Callers still pass cursor coords
+ * relative to `container` (matching `d3.pointer(event, container)`).
+ *
+ * Why viewport coords: the chart cards use `backdrop-filter`, which creates
+ * a stacking context. A tooltip painted inside the upper card's stacking
+ * context cannot rise above the lower card's stacking context regardless of
+ * its z-index. Portalling to document.body + `position: fixed` sidesteps the
+ * whole problem; we just need the coordinates in viewport space.
+ *
+ * Strategy: pick preferred side (right/below cursor), flip if it overflows the
+ * container, then clamp the final fixed coordinates to the viewport. The
+ * viewport clamp matters when a chart continues below the fold: container-
+ * local coordinates can otherwise place a pinned tooltip's actions offscreen.
+ */
 export function computeTooltipPosition(
   mx: number,
   my: number,
@@ -302,11 +345,27 @@ export function computeTooltipPosition(
   // Force reflow so we get real dimensions
   const tw = node.getBoundingClientRect().width || node.offsetWidth;
   const th = node.getBoundingClientRect().height || node.offsetHeight;
+  const rect = container.getBoundingClientRect();
   const cw = container.clientWidth;
   const ch = container.clientHeight;
+  const EDGE_PAD = 4;
 
-  const left = mx + offset + tw > cw ? mx - offset - tw : mx + offset;
-  const top = my + offset + th > ch ? my - offset - th : my + offset;
+  // Prefer right of cursor; flip to left if no room.
+  let left = mx + offset + tw <= cw ? mx + offset : mx - offset - tw;
+  left = Math.max(EDGE_PAD, Math.min(cw - tw - EDGE_PAD, left));
+
+  // Prefer below cursor; flip above if no room.
+  let top = my + offset + th <= ch ? my + offset : my - offset - th;
+  top = Math.max(EDGE_PAD, Math.min(ch - th - EDGE_PAD, top));
+
+  // Convert container-local coords → viewport coords for `position: fixed`,
+  // then keep the complete tooltip visible when its dimensions permit it.
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+  const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+  left += rect.left;
+  top += rect.top;
+  left = Math.max(EDGE_PAD, Math.min(viewportWidth - tw - EDGE_PAD, left));
+  top = Math.max(EDGE_PAD, Math.min(viewportHeight - th - EDGE_PAD, top));
 
   return { left, top };
 }

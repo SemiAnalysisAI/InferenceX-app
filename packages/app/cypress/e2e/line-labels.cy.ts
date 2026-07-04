@@ -18,23 +18,27 @@ describe('Line Labels Toggle', () => {
   it('Line Labels toggle is on by default', () => {
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
 
-    // Line labels render without any interaction
+    // Line labels render on load without interaction
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
 
-  it('toggling Line Labels off then back on removes and restores label elements', () => {
-    // On by default — turn it off first.
-    cy.get('#scatter-line-labels').click();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
-
-    // Turn it back on — labels return.
+  it('toggling Line Labels on then back off adds and removes label elements', () => {
+    // Off by default — turn it on first.
     cy.get('#scatter-line-labels').click();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
+
+    // Turn it back off — labels disappear.
+    cy.get('#scatter-line-labels').click();
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
   });
 
   it('line labels have colored background rects and text', () => {
+    // Off by default — ensure on (idempotent; prior test left them off).
+    cy.get('#scatter-line-labels').then(($el) => {
+      if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
+    });
     // Each line label group should contain a background rect and text
     cy.get('[data-testid="scatter-graph"] svg g.line-label .ll-bg').should(
       'have.length.greaterThan',
@@ -47,7 +51,10 @@ describe('Line Labels Toggle', () => {
   });
 
   it('line labels render in the foreground, after the scatter points', () => {
-    // Labels were toggled on in the test above and remain on here.
+    // Off by default — ensure on (idempotent; previous test leaves them on).
+    cy.get('#scatter-line-labels').then(($el) => {
+      if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
+    });
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
 
     cy.get('[data-testid="scatter-graph"] svg').then(($svg) => {

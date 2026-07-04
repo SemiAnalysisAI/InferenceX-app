@@ -17,17 +17,19 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
-    <div className={cn('flex flex-col', className)}>
-      <div className="w-full border-t-2 border-brand pb-6" />
-      <TabsPrimitive.List
-        data-slot="tabs-list"
-        className="relative inline-flex p-1 gap-1 items-center justify-center bg-transparent"
-        {...props}
-      />
-    </div>
+    <TabsPrimitive.List
+      data-slot="tabs-list"
+      className={cn('inline-flex flex-wrap items-end gap-1', className)}
+      {...props}
+    />
   );
 }
 
+// Active/inactive recipe mirrors the top-of-page section nav
+// (data-testid="chart-section-tabs" in src/components/tab-nav.tsx: tabLinkClass +
+// currentTabClass) so the two tab rows read as the same flat underline-strip
+// component: accent text + accent border-b-2 underline when active, muted text
+// with no background fill when inactive, and a faint border highlight on hover.
 function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
@@ -35,22 +37,22 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
       className={cn(
         'relative',
         'inline-flex',
-        'h-10',
         'items-center',
         'justify-center',
         'gap-1.5',
+        'border-b-2',
+        'border-transparent',
         'px-4',
-        'py-2.5',
-        'text-base',
-        'font-medium',
+        'py-2',
+        'text-sm',
+        'font-semibold',
         'whitespace-nowrap',
-        'text-foreground',
-        'hover:text-foreground/80',
-        'data-[state=active]:text-foreground',
-        'data-[state=active]:border-b-2',
+        'text-muted-foreground',
+        'hover:border-muted-foreground/30',
+        'data-[state=active]:text-secondary',
+        'dark:data-[state=active]:text-primary',
         'data-[state=active]:border-secondary',
         'dark:data-[state=active]:border-primary',
-        'dark:hover:text-primary/80',
         'transition-colors duration-200',
         'focus-visible:outline-none',
         'focus-visible:ring-[3px]',

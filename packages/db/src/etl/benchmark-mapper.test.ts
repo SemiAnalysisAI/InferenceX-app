@@ -22,6 +22,20 @@ function makeV1Row(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
+/** Minimal valid agentic row: scenario_type triggers the agentic path; `users` → conc. */
+function makeAgenticRow(overrides: Record<string, any> = {}): Record<string, any> {
+  return {
+    infmax_model_prefix: 'dsv4',
+    hw: 'b200-nv',
+    framework: 'vllm',
+    precision: 'fp4',
+    scenario_type: 'agentic-coding',
+    users: 72,
+    tput_per_gpu: 20000,
+    ...overrides,
+  };
+}
+
 /** Minimal valid v2 benchmark row (disaggregated prefill/decode parallelism). */
 function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
   return {
@@ -568,5 +582,308 @@ describe('extractWorkers', () => {
 
   it('returns undefined when every entry is malformed', () => {
     expect(extractWorkers([null, 'bad', 0, undefined])).toBeUndefined();
+  });
+});
+
+describe('mapBenchmarkRow — agentic interactivity normalization', () => {
+  it('derives *_intvty from 1/*_itl, discarding the artifact value', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeAgenticRow({
+        p90_itl: 0.0893,
+        p90_intvty: 23.91, // fast-tail contamination — must be overwritten
+        p75_itl: 0.0692,
+        p75_intvty: 19,
+      }),
+      tracker,
+    );
+    expect(result!.benchmarkType).toBe('agentic_traces');
+    expect(result!.metrics.p90_intvty).toBeCloseTo(1 / 0.0893, 6);
+    expect(result!.metrics.p75_intvty).toBeCloseTo(1 / 0.0692, 6);
+  });
+
+  it('derives *_intvty even when the artifact omits it', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeAgenticRow({ p90_itl: 0.1 }), tracker);
+    expect(result!.metrics.p90_intvty).toBeCloseTo(10, 6);
+  });
+
+  it('does not touch *_intvty for single_turn rows', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV1Row({ p90_itl: 0.05, p90_intvty: 999 }), tracker);
+    expect(result!.metrics.p90_intvty).toBe(999);
+  });
+
+  it('DELETES a stale artifact *_intvty when the matching *_itl is absent', () => {
+    // Artifact ships intvty (possibly the drifted p(1/ITL) definition) but no itl
+    // for that percentile. Passing it through would mix harness semantics into a
+    // column meant to be 1/p(ITL) everywhere — so the key must be removed, not kept.
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeAgenticRow({ p90_intvty: 42, p95_itl: 0.2 }), tracker);
+    expect(result!.metrics).not.toHaveProperty('p90_intvty'); // stale → deleted
+    expect(result!.metrics.p95_intvty).toBeCloseTo(5, 6); // derived from itl
+  });
+
+  it('DELETES a stale artifact *_intvty when the matching *_itl is zero/invalid', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeAgenticRow({ p90_itl: 0, p90_intvty: 42 }), tracker);
+    expect(result!.metrics).not.toHaveProperty('p90_intvty');
+  });
+});
+
+/**
+ * Minimal v3 agentic row (2026-07-02+): nested request_metrics/server_metrics,
+ * p50 percentiles, pre-inverted intvty, kv_offloading descriptors. Mirrors the
+ * real artifact from GH run 28553943579 (trimmed).
+ */
+function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, any> {
+  return {
+    infmax_model_prefix: 'dsv4',
+    hw: 'cluster:b300-nv',
+    framework: 'vllm',
+    precision: 'fp4',
+    spec_decoding: 'none',
+    disagg: false,
+    scenario_type: 'agentic-coding',
+    is_multinode: false,
+    tp: 4,
+    ep: 1,
+    dp_attention: 'false',
+    conc: 16,
+    image: 'vllm/vllm-openai:v0.23.0',
+    kv_offloading: 'none',
+    kv_offload_backend: '',
+    num_requests_total: 1648,
+    num_requests_successful: 1648,
+    dataset: {
+      source_type: 'public_dataset',
+      hf_dataset_name: 'semianalysisai/cc-traces-weka-062126',
+    },
+    request_metrics: {
+      qps: {
+        window_seconds: 1,
+        samples: 7209,
+        mean: 0.22846,
+        p50: 0,
+        p75: 0,
+        p90: 1,
+        p95: 1,
+        std: 0.60707,
+      },
+      latency: {
+        ttft: {
+          mean: 12.90033,
+          p50: 1.49712,
+          p75: 12.09501,
+          p90: 56.22194,
+          p95: 68.03156,
+          std: 22.68353,
+        },
+        e2el: {
+          mean: 81.05644,
+          p50: 26.18817,
+          p75: 84.93601,
+          p90: 199.85996,
+          p95: 360.31579,
+          std: 149.59205,
+        },
+        itl: {
+          mean: 0.07548,
+          p50: 0.03677,
+          p75: 0.10253,
+          p90: 0.16652,
+          p95: 0.22255,
+          std: 0.08327,
+        },
+        tpot: {
+          mean: 0.07548,
+          p50: 0.03677,
+          p75: 0.10253,
+          p90: 0.16652,
+          p95: 0.22255,
+          std: 0.08327,
+        },
+        // already slow-tail inverted upstream (pXX_intvty = 1/pXX_itl)
+        intvty: {
+          mean: 13.2482,
+          p50: 27.19411,
+          p75: 9.75304,
+          p90: 6.00526,
+          p95: 4.49335,
+          std: 24.77636,
+        },
+      },
+      tokens: {
+        input: {
+          mean: 157676.054,
+          p50: 96047,
+          p75: 197684.25,
+          p90: 404935.9,
+          p95: 547502.85,
+          std: 152480.17653,
+        },
+        output_actual: {
+          mean: 849.06735,
+          p50: 290.5,
+          p75: 783.5,
+          p90: 2231.8,
+          p95: 3915.45,
+          std: 1568.90823,
+        },
+        output_expected: {
+          mean: 1432.32728,
+          p50: 571.5,
+          p75: 1820,
+          p90: 3927,
+          p95: 5312.9,
+          std: 2067.19215,
+        },
+      },
+      throughput: {
+        input: { tokens_per_second: 35980.14001 },
+        output: { tokens_per_second: 193.7489 },
+        total: { tokens_per_second: 36173.88892 },
+        duration_seconds: 7222.04352,
+        per_gpu: {
+          total_tput_tps: 9043.47223,
+          output_tput_tps: 48.43723,
+          input_tput_tps: 8995.035,
+        },
+      },
+      cache: { theoretical_cache_hit_rate: 0.97509 },
+    },
+    server_metrics: {
+      present: true,
+      adapter: 'vllm',
+      metric_count: 49,
+      cache: {
+        gpu_cache_hit_rate: 0.78539,
+        cpu_cache_hit_rate: 0,
+        external_cache_hit_rate: 0,
+        overall_cache_hit_rate: 0.78539,
+        prefix_cache_hits: 205576960,
+        prefix_cache_queries: 261750519,
+        frontend_cache_hit_rate: null,
+      },
+      kv_cache: { gpu_usage_pct: 0.82134, cpu_usage_pct: null, cpu_used_tokens: null },
+      tokens: {
+        prompt_total: 261750519,
+        generation_total: 1422696,
+        requests_completed: 1648,
+        prompt_by_source: {
+          gpu_cache_hit: 205576960,
+          cpu_or_external_cache_hit: 0,
+          computed: 56173559,
+        },
+      },
+      sources: [{ id: 'combined|http://localhost:8888/metrics|engine=0', role: 'combined' }],
+    },
+    ...overrides,
+  };
+}
+
+describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
+  it('maps identity/routing and flattens the nested containers', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV3AgenticRow(), tracker);
+
+    expect(result).not.toBeNull();
+    expect(result!.benchmarkType).toBe('agentic_traces');
+    expect(result!.config.hardware).toBe('b300');
+    expect(result!.conc).toBe(16);
+    expect(result!.isl).toBeNull();
+    expect(result!.osl).toBeNull();
+
+    const m = result!.metrics;
+    // latency distributions, p50 stored under the canonical median_* name
+    expect(m.median_ttft).toBeCloseTo(1.49712, 6);
+    expect(m.p90_ttft).toBeCloseTo(56.22194, 6);
+    expect(m.std_e2el).toBeCloseTo(149.59205, 6);
+    expect(m.p95_itl).toBeCloseTo(0.22255, 6);
+    expect(m.mean_tpot).toBeCloseTo(0.07548, 6);
+    // qps + token distributions
+    expect(m.median_qps).toBe(0);
+    expect(m.p90_input_tokens).toBeCloseTo(404935.9, 3);
+    expect(m.median_output_tokens_actual).toBeCloseTo(290.5, 3);
+    expect(m.p95_output_tokens_expected).toBeCloseTo(5312.9, 3);
+    // throughput scalars under the v2 flat names
+    expect(m.tput_per_gpu).toBeCloseTo(9043.47223, 3);
+    expect(m.output_tput_per_gpu).toBeCloseTo(48.43723, 3);
+    expect(m.input_tput_per_gpu).toBeCloseTo(8995.035, 3);
+    expect(m.total_tput_tps).toBeCloseTo(36173.88892, 3);
+    expect(m.duration_seconds).toBeCloseTo(7222.04352, 3);
+    // cache / kv / totals
+    expect(m.theoretical_cache_hit_rate).toBeCloseTo(0.97509, 6);
+    expect(m.server_gpu_cache_hit_rate).toBeCloseTo(0.78539, 6);
+    expect(m.server_external_cache_hit_rate).toBe(0);
+    expect(m.gpu_kv_cache_usage_pct).toBeCloseTo(0.82134, 6);
+    expect(m.total_prompt_tokens).toBe(261750519);
+    expect(m.total_generation_tokens).toBe(1422696);
+    expect(m.total_requests_completed).toBe(1648);
+    // nested containers must not leak into metrics
+    expect(m).not.toHaveProperty('request_metrics');
+    expect(m).not.toHaveProperty('server_metrics');
+  });
+
+  it('re-derives *_intvty from *_itl (matching the pre-inverted artifact values)', () => {
+    const tracker = createSkipTracker();
+    const m = mapBenchmarkRow(makeV3AgenticRow(), tracker)!.metrics;
+    // The artifact already ships slow-tail intvty; the derive invariant keeps
+    // one definition and must agree with it (up to the artifact's rounding).
+    expect(m.median_intvty).toBeCloseTo(1 / 0.03677, 6);
+    expect(m.p90_intvty).toBeCloseTo(1 / 0.16652, 6);
+    expect(m.median_intvty).toBeCloseTo(27.19411, 2);
+    expect(m.p90_intvty).toBeCloseTo(6.00526, 2);
+    // std is never inverted — passes through from the artifact
+    expect(m.std_intvty).toBeCloseTo(24.77636, 6);
+  });
+
+  it("maps kv_offloading 'none' to offload off and skips the empty backend", () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV3AgenticRow(), tracker);
+    expect(result!.offloadMode).toBe('off');
+    expect(result!.metrics).not.toHaveProperty('kv_offload_backend');
+  });
+
+  it("maps kv_offloading 'dram' + backend to offload on with the backend preserved", () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({ kv_offloading: 'dram', kv_offload_backend: 'mooncake', conc: 32 }),
+      tracker,
+    );
+    expect(result!.offloadMode).toBe('on');
+    expect((result!.metrics as Record<string, unknown>).kv_offloading).toBe('dram');
+    expect((result!.metrics as Record<string, unknown>).kv_offload_backend).toBe('mooncake');
+  });
+
+  it('still applies the failed-run guard to v3 rows', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({ num_requests_successful: 0, num_requests_total: 100 }),
+      tracker,
+    );
+    expect(result).toBeNull();
+    expect(tracker.skips.failedRun).toBe(1);
+  });
+
+  it('skips rows where the server never came up (zero total requests)', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({ num_requests_successful: 0, num_requests_total: 0 }),
+      tracker,
+    );
+    expect(result).toBeNull();
+    expect(tracker.skips.failedRun).toBe(1);
+  });
+
+  it('leaves v2 flat agentic rows byte-identical (no flattening applied)', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeAgenticRow({ p90_itl: 0.1, mean_ttft: 1.5, offload_mode: 'on' }),
+      tracker,
+    );
+    expect(result!.metrics.mean_ttft).toBe(1.5);
+    expect(result!.metrics.p90_intvty).toBeCloseTo(10, 6);
+    expect(result!.offloadMode).toBe('on');
   });
 });

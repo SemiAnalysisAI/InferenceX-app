@@ -4,8 +4,13 @@ import type { BenchmarkRow } from '@/lib/api';
 
 import { computeCompareImageRows } from './compare-ssr';
 
+// BenchmarkRow.id is required (stable per-point id from benchmark_results);
+// hand out a fresh one per stub so id-keyed logic can't collide across rows.
+let nextStubId = 1;
+
 function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
+    id: nextStubId++,
     hardware: 'h200',
     framework: 'sglang',
     model: 'dsr1',
@@ -23,6 +28,8 @@ function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
     decode_num_workers: 0,
     num_prefill_gpu: 8,
     num_decode_gpu: 8,
+    benchmark_type: 'single_turn',
+    offload_mode: 'off',
     isl: 1024,
     osl: 1024,
     conc: 128,

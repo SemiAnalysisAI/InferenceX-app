@@ -29,8 +29,9 @@ export function LandingPage() {
               with date ranges, concurrency sweeps, and raw data export.
             </p>
             <p className="text-sm text-muted-foreground mb-6">
-              Compare NVIDIA B200, H200, H100, AMD MI355X, MI325X, MI300X and more across DeepSeek,
-              gpt-oss, Llama, Qwen, and other models.
+              Compare NVIDIA GB300 NVL72, GB200 NVL72, B300, B200, H200, H100, AMD MI355X, MI325X,
+              MI300X and soon VR200 NVL72, AMD MI455X UALoE72, TPUv7 Ironwood, etc across DeepSeekv4
+              Pro, Qwen, Kimi, GLM, MiniMax, gpt-oss, Llama and other models.
             </p>
             <div className="mt-auto">
               <LandingTrackedLink

@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 import {
   FAVORITE_PRESETS,
@@ -44,7 +44,7 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { getModelExclusion, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { getModelExclusion, MODEL_PREFIX_MAPPING, sequenceKind } from '@/lib/data-mappings';
 import {
   MtpEngineConflictToast,
   type MtpEngineConflictDetail,
@@ -57,7 +57,12 @@ import {
 } from '@/lib/exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
-import { useChartData } from './hooks/useChartData';
+import {
+  isAgenticOnlyXAxisMode,
+  useChartData,
+  X_AXIS_MODES,
+  type XAxisMode,
+} from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
 import {
   EMPTY_QUICK_FILTERS,
@@ -105,6 +110,7 @@ export function InferenceProvider({
     selectedModel,
     setSelectedModel,
     effectiveSequence,
+    sequenceResolved,
     setSelectedSequence,
     effectivePrecisions,
     setSelectedPrecisions,
@@ -150,10 +156,44 @@ export function InferenceProvider({
     () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
   );
   const [selectedXAxisMetric, setSelectedXAxisMetric] = useState<string | null>(
-    () => getUrlParam('i_xmetric') || 'p99_ttft',
+    () => getUrlParam('i_xmetric') || 'p90_ttft',
   );
   const [selectedE2eXAxisMetric, setSelectedE2eXAxisMetric] = useState<string | null>(
-    () => getUrlParam('i_e2e_xmetric') || null,
+    () => getUrlParam('i_e2e_xmetric') || 'p90_ttft',
+  );
+  // Selected chart variant. Initialize from URL only — SSR cannot read URL, so
+  // computing a kind-based default here would diverge between server and client
+  // and cause a hydration mismatch. The scenario-kind default is applied in a
+  // post-mount effect below (and a ref tracks whether the user has overridden).
+  //
+  // SSR has no URL access, so seed with a fixed default and apply the URL
+  // value (if any) in a post-mount effect — keeps server + client first render
+  // identical and avoids "didn't match" hydration warnings when the URL holds
+  // a non-default mode.
+  const [selectedXAxisMode, setSelectedXAxisMode] = useState<XAxisMode>('interactivity');
+  const xAxisModeFromUrlRef = useRef(false);
+  useEffect(() => {
+    if (xAxisModeFromUrlRef.current) return;
+    const v = getUrlParam('i_xmode');
+    if (v && (X_AXIS_MODES as readonly string[]).includes(v)) {
+      xAxisModeFromUrlRef.current = true;
+      setSelectedXAxisMode(v as XAxisMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Wrap the setter so a button click also aligns selectedE2eXAxisMetric — the
+  // existing useChartData pipeline keys off that flag for the e2e chart's x-axis.
+  const handleSetXAxisMode = useCallback((mode: XAxisMode) => {
+    xAxisModeFromUrlRef.current = true;
+    setSelectedXAxisMode(mode);
+    // The e2e chart's x-axis metric is reconciled in a separate effect below,
+    // because it depends on sequence kind (fixed-seq has no p90_* metrics) and
+    // the agentic percentile, both of which can change independently.
+  }, []);
+  // Latency percentile applied to the chart x-axis for agentic scenarios.
+  // Values: 'p90' | 'p99'. Non-agentic charts ignore.
+  const [selectedPercentile, setSelectedPercentile] = useState<string>(
+    () => getUrlParam('i_pctl') || 'p90',
   );
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
@@ -205,23 +245,28 @@ export function InferenceProvider({
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
   const [showPointLabels, setShowPointLabels] = useState(() => {
-    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels
-    // explicitly so the share link's intent survives future default changes.
+    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels.
     if (getUrlParam('i_nolabel') === '1') return false;
+    if (getUrlParam('i_label') === '0') return false;
     if (getUrlParam('i_label') === '1') return true;
-    // Old share links set `?i_advlabel=1` while keeping the labels default
-    // (shown). Mirror the toggle's auto-enable side-effect on load so those
-    // links still render advanced labels under the new default-off behavior.
+    // Advanced (parallelism) labels are a richer form of point label; a share
+    // link that requests them must auto-enable point labels so they actually
+    // render (mirrors the runtime toggle coupling in ScatterGraph). A later
+    // explicit i_nolabel=1 still wins — it is checked first above.
     if (getUrlParam('i_advlabel') === '1') return true;
+    // Default off: per-point labels (TP + concurrency) clutter the chart; the
+    // per-line hardware labels (on by default) are the primary annotation.
     return false;
   });
   const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
+  // Parallelism labels default off (?i_advlabel=1 overrides on).
   const [useAdvancedLabels, setUseAdvancedLabels] = useState(
     () => getUrlParam('i_advlabel') === '1',
   );
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
   );
+  // Line labels default on (?i_linelabel=0 overrides off).
   const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') !== '0');
   const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
   const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
@@ -291,11 +336,66 @@ export function InferenceProvider({
     return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
   }, [filteredAvailableRuns]);
 
-  // Only constrain the query when an earlier-than-latest run is selected; otherwise
-  // the chart shows the full latest view (and reuses the materialized-view fast path).
+  // Only constrain the base query when an earlier-than-latest run is selected.
   const asOfRunId =
     effectiveSelectedRunId && latestRunIdForModel && effectiveSelectedRunId !== latestRunIdForModel
       ? effectiveSelectedRunId
+      : undefined;
+
+  // Run-selector scoping: only constrain benchmark data to a specific run when
+  // there's actually a disambiguation to make for the CURRENT model. The
+  // raw `availableRuns` is across ALL models on the date, so the picker may
+  // auto-select a run that produced nothing for the current model — passing
+  // that runId would return zero rows and hide the chart entirely.
+  // Compute the set of runs whose CHANGELOG explicitly mentions this model +
+  // precision. We can't reuse `filterRunsByModel` here because it has a
+  // fallback that returns all runs when nothing matches (so the picker still
+  // renders) — which would make us pass a runId that produced no rows for
+  // the current model, hiding the chart.
+  // Map each FULL config_key (model-precision-hardware-framework) a run's
+  // changelog claims to the set of runs claiming it. Single-run scoping should
+  // only kick in when two runs contest the SAME full key — e.g. a same-day
+  // re-run of one hardware — because then a DISTINCT ON merge could mix them
+  // and the user needs to pick which run wins. Runs covering DIFFERENT hardware
+  // of the same model (e.g. a B300 run and a B200 run on the same date) are
+  // complementary: both must render via carry-forward. Matching on model+
+  // precision alone (the old behavior) wrongly treated those as alternatives
+  // and scoped the chart to one run, hiding the other GPU's curve.
+  const contestedRunIds = useMemo(() => {
+    const runsByConfigKey = new Map<string, Set<string>>();
+    if (availableRuns) {
+      for (const [runId, runInfo] of Object.entries(availableRuns)) {
+        if (!runInfo.changelog) continue;
+        for (const entry of runInfo.changelog.entries) {
+          for (const key of entry.config_keys) {
+            const parts = key.split('-');
+            if (modelPrefixes.includes(parts[0]!) && effectivePrecisions.includes(parts[1]!)) {
+              let runs = runsByConfigKey.get(key);
+              if (!runs) {
+                runs = new Set<string>();
+                runsByConfigKey.set(key, runs);
+              }
+              runs.add(runId);
+            }
+          }
+        }
+      }
+    }
+    // A run is "contested" only if some full config_key it claims is also claimed
+    // by another run. Only then does picking a run disambiguate anything.
+    // Downstream (useChartData / mergeRunScopedRows) this no longer scopes the
+    // WHOLE chart to the run: only the configs the run actually produced are
+    // pinned to it, and every other config (e.g. another framework's same-day
+    // run) still carries forward from the normal latest-per-config rows.
+    const contested = new Set<string>();
+    for (const runs of runsByConfigKey.values()) {
+      if (runs.size > 1) for (const r of runs) contested.add(r);
+    }
+    return contested;
+  }, [availableRuns, modelPrefixes, effectivePrecisions]);
+  const benchmarkRunId =
+    effectiveSelectedRunId && contestedRunIds.has(String(effectiveSelectedRunId))
+      ? String(effectiveSelectedRunId)
       : undefined;
 
   const {
@@ -317,9 +417,17 @@ export function InferenceProvider({
     userCosts,
     userPowers,
     effectiveRunDate,
-    isActive,
+    // Gate benchmark fetching on sequenceResolved: before availability loads we
+    // don't yet know the model's real sequence, and the selectedSequence default
+    // is AgenticTraces. Fetching now would fire the agentic data path for a
+    // fixed-seq-only model, then refetch once availability snaps the sequence.
+    // The chart's normal loading state covers this brief window.
+    isActive && sequenceResolved,
     latestDate,
+    selectedPercentile,
     compareGpuPair ?? null,
+    benchmarkRunId,
+    selectedXAxisMode,
     asOfRunId,
     dataQuickFilters,
   );
@@ -335,7 +443,7 @@ export function InferenceProvider({
     if (!availabilityRows) return availableDates;
     const rows = availabilityRows.filter((r) => {
       if (!dbModelKeys.includes(r.model)) return false;
-      if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) return false;
+      if (rowToSequence(r) !== effectiveSequence) return false;
       if (!effectivePrecisions.includes(r.precision)) return false;
       if (!r.hardware) return false;
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
@@ -360,7 +468,7 @@ export function InferenceProvider({
     const hwKeys = new Set<string>();
     for (const r of availabilityRows) {
       if (!dbModelKeys.includes(r.model)) continue;
-      if (islOslToSequence(r.isl, r.osl) !== effectiveSequence) continue;
+      if (rowToSequence(r) !== effectiveSequence) continue;
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
       const hwKey = buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg);
@@ -431,6 +539,60 @@ export function InferenceProvider({
   useEffect(() => {
     setTrackedConfigs((prev) => (prev.length > 0 ? [] : prev));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
+
+  // Reconcile the x-axis mode with the scenario kind:
+  //  - On mount with no `i_xmode` URL param: snap to the kind's natural default
+  //    (interactivity for both agentic and fixed-sequence scenarios). The state was initialized
+  //    to a SSR-stable constant so server and client render the same DOM; this
+  //    effect fixes it up after hydration.
+  //  - When the user later switches sequence kinds: snap to the new kind's
+  //    natural default (the prior selection was for a different kind, so it
+  //    doesn't carry over).
+  const lastSeqKindRef = useRef<ReturnType<typeof sequenceKind> | null>(null);
+  useEffect(() => {
+    const kind = sequenceKind(effectiveSequence);
+    const isInitialMount = lastSeqKindRef.current === null;
+    const isAgenticOnlyMode = isAgenticOnlyXAxisMode(selectedXAxisMode);
+    // On a stale render where kind hasn't changed, bail unless the current
+    // mode is agentic-only and we just landed on a fixed-seq scenario — in
+    // that case force the snap so the chart doesn't try to plot trace-derived
+    // metrics against rows that have no trace_replay.
+    if (!isInitialMount && lastSeqKindRef.current === kind) {
+      if (kind === 'fixed-seq' && isAgenticOnlyMode) {
+        handleSetXAxisMode('interactivity');
+      }
+      return;
+    }
+    lastSeqKindRef.current = kind;
+    if (
+      isInitialMount &&
+      xAxisModeFromUrlRef.current &&
+      !(kind === 'fixed-seq' && isAgenticOnlyMode)
+    ) {
+      // URL-restored agentic-only mode on a fixed-seq sequence makes no sense
+      // — fall through to the default snap below.
+      return;
+    }
+    handleSetXAxisMode('interactivity');
+  }, [effectiveSequence, selectedXAxisMode, handleSetXAxisMode]);
+
+  // Reconcile selectedE2eXAxisMetric whenever the mode, sequence kind, or
+  // agentic percentile changes. For fixed-seq the JSONB only carries
+  // median_* / p99_* (no p90_*), so the TTFT button there has to point at
+  // median_ttft — otherwise the chart goes blank. For agentic, we point at
+  // the user's chosen percentile so the dropdown actually drives the axis.
+  useEffect(() => {
+    const isAgentic = sequenceKind(effectiveSequence) === 'agentic';
+    if (selectedXAxisMode === 'ttft') {
+      setSelectedE2eXAxisMetric(isAgentic ? `${selectedPercentile}_ttft` : 'median_ttft');
+    } else if (selectedXAxisMode === 'e2e') {
+      // null = use the chart-config natural x (median_e2el), which useChartData
+      // rewrites to <pctl>_e2el for agentic via withPercentile().
+      setSelectedE2eXAxisMetric(null);
+    }
+    // 'interactivity' mode renders the interactivity chart, which keys off
+    // selectedXAxisMetric (not the e2e one), so nothing to do here.
+  }, [selectedXAxisMode, effectiveSequence, selectedPercentile]);
 
   // Ref guard: when true, filter changes don't clear the active preset.
   // FavoritePresetsDropdown sets this while applying a preset so its own
@@ -875,6 +1037,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
+      i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
       i_dstart: selectedDateRange.startDate,
@@ -885,6 +1048,7 @@ export function InferenceProvider({
       i_log: logScale ? '1' : '',
       i_xmetric: selectedXAxisMetric || '',
       i_e2e_xmetric: selectedE2eXAxisMetric || '',
+      i_xmode: selectedXAxisMode,
       i_scale: scaleType,
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: useAdvancedLabels ? '1' : '',
@@ -902,6 +1066,7 @@ export function InferenceProvider({
       selectedYAxisMetric,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
+      selectedXAxisMode,
       scaleType,
       selectedGPUs,
       selectedDates,
@@ -1066,6 +1231,8 @@ export function InferenceProvider({
       setSelectedXAxisMetric,
       selectedE2eXAxisMetric,
       setSelectedE2eXAxisMetric,
+      selectedXAxisMode,
+      setSelectedXAxisMode: handleSetXAxisMode,
       scaleType,
       setScaleType,
       quickFilters,
@@ -1079,6 +1246,8 @@ export function InferenceProvider({
       workflowInfo,
       selectedYAxisMetric,
       setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+      selectedPercentile,
+      setSelectedPercentile,
       selectedGPUs,
       setSelectedGPUs: setSelectedGPUsAndClear,
       availableGPUs,
@@ -1143,6 +1312,7 @@ export function InferenceProvider({
       selectedYAxisMetric,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
+      selectedXAxisMode,
       scaleType,
       quickFilters,
       availableQuickFilters,

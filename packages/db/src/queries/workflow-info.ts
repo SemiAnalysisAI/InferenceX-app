@@ -129,20 +129,22 @@ export async function getDateConfigs(sql: DbClient, date: string): Promise<DateC
 
 export interface AvailabilityRow {
   model: string;
-  isl: number;
-  osl: number;
+  // Null for agentic_traces rows; numeric for single_turn fixed-seq rows.
+  isl: number | null;
+  osl: number | null;
   precision: string;
   hardware: string;
   framework: string;
   spec_method: string;
   disagg: boolean;
+  benchmark_type: string;
   date: string;
 }
 
-/** Get available (model, ISL/OSL, precision, hardware, framework, spec_method, date) combos for the availability API. */
+/** Get available (model, ISL/OSL, precision, hardware, framework, spec_method, benchmark_type, date) combos for the availability API. */
 export async function getAvailabilityData(sql: DbClient): Promise<AvailabilityRow[]> {
   const rows = await sql`
-    SELECT a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.date::text
+    SELECT a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.benchmark_type, a.date::text
     FROM availability a
     WHERE EXISTS (
       SELECT 1
@@ -153,8 +155,9 @@ export async function getAvailabilityData(sql: DbClient): Promise<AvailabilityRo
         AND c.hardware = a.hardware
         AND c.framework = a.framework
         AND c.precision = a.precision
-        AND br.isl = a.isl
-        AND br.osl = a.osl
+        AND br.isl IS NOT DISTINCT FROM a.isl
+        AND br.osl IS NOT DISTINCT FROM a.osl
+        AND br.benchmark_type = a.benchmark_type
         AND br.date = a.date
         AND br.error IS NULL
         AND wr.conclusion IS NOT NULL

@@ -43,6 +43,8 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   24959542295, // 2026-04-25 | Reason: MTP without chat template leads to supernatural AR
   24960716250, // 2026-04-25 | Reason: incorrect usage of run sweep and sweep failed, fixed in subsequent PR
   25603981395, // 2026-05-09 | Reason: not enough successful points on pareto
+  28505258231, // 2026-07-01 | Reason: cross-layer indexer top-k sharing (--hf-overrides index_topk_freq=4); skips FLOPs
+  28507173993, // 2026-07-01 | Reason: cross-layer indexer top-k sharing (--hf-overrides index_topk_freq=4); skips FLOPs
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([

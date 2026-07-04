@@ -1,7 +1,26 @@
 import { describe, it, expect } from 'vitest';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { filterDataByCostLimit, processOverlayChartData } from '@/components/inference/utils';
+import {
+  filterDataByCostLimit,
+  processOverlayChartData,
+  selectUnofficialOverlayForMode,
+} from '@/components/inference/utils';
+
+describe('selectUnofficialOverlayForMode', () => {
+  const overlays = { e2e: { id: 'e2e' }, interactivity: { id: 'interactivity' } };
+
+  it('suppresses raw unofficial E2E data for normalized E2E mode', () => {
+    expect(selectUnofficialOverlayForMode('normalized-e2e', 'e2e', overlays)).toBeNull();
+  });
+
+  it('preserves matching unofficial overlays for supported modes', () => {
+    expect(selectUnofficialOverlayForMode('e2e', 'e2e', overlays)).toBe(overlays.e2e);
+    expect(selectUnofficialOverlayForMode('interactivity', 'interactivity', overlays)).toBe(
+      overlays.interactivity,
+    );
+  });
+});
 
 // ---------------------------------------------------------------------------
 // fixture factories
@@ -157,12 +176,12 @@ describe('processOverlayChartData', () => {
   });
 
   it('remaps x to config override for input metrics on interactivity chart', () => {
-    // inputTputPerGpu has x override to p99_ttft on interactivity chart
+    // inputTputPerGpu has x override to p90_ttft on interactivity chart
     const data = [
       pt({
         x: 100,
         inputTputPerGpu: { y: 5, roof: false },
-        p99_ttft: 0.25,
+        p90_ttft: 0.25,
         median_intvty: 50,
       } as any),
     ];
@@ -176,16 +195,11 @@ describe('processOverlayChartData', () => {
       pt({
         x: 100,
         inputTputPerGpu: { y: 5, roof: false },
-        median_ttft: 0.1,
+        p90_ttft: 0.1,
         median_intvty: 50,
       } as any),
     ];
-    const result = processOverlayChartData(
-      data,
-      'interactivity',
-      'y_inputTputPerGpu',
-      'median_ttft',
-    );
+    const result = processOverlayChartData(data, 'interactivity', 'y_inputTputPerGpu', 'p90_ttft');
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.1);
   });
@@ -195,76 +209,62 @@ describe('processOverlayChartData', () => {
       pt({
         x: 100,
         inputTputPerGpu: { y: 5, roof: false },
-        p99_ttft: 0.25,
+        p90_ttft: 0.25,
         median_e2el: 2.5,
       } as any),
     ];
     const result = processOverlayChartData(data, 'e2e', 'y_inputTputPerGpu', null);
     expect(result).toHaveLength(1);
-    // e2e uses median_e2el as x (from chart config default), not p99_ttft
+    // e2e uses median_e2el as x (from chart config default), not p90_ttft
     expect(result[0].x).toBe(2.5);
   });
 
-  it('remaps x to TTFT for e2e chart when selectedXAxisMetric is p99_ttft', () => {
+  it('remaps x to TTFT for e2e chart when selectedXAxisMetric is p90_ttft', () => {
     const data = [
       pt({
         x: 100,
         tpPerGpu: { y: 42, roof: false },
-        p99_ttft: 0.35,
+        p90_ttft: 0.12,
         median_e2el: 2.5,
       } as any),
     ];
-    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p99_ttft');
-    expect(result).toHaveLength(1);
-    expect(result[0].x).toBe(0.35);
-  });
-
-  it('remaps x to TTFT for e2e chart when selectedXAxisMetric is median_ttft', () => {
-    const data = [
-      pt({
-        x: 100,
-        tpPerGpu: { y: 42, roof: false },
-        median_ttft: 0.12,
-        median_e2el: 2.5,
-      } as any),
-    ];
-    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'median_ttft');
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p90_ttft');
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.12);
   });
 
   it('filters e2e TTFT outliers exceeding y_latency_limit', () => {
     const data = [
-      pt({ tpPerGpu: { y: 10, roof: false }, p99_ttft: 0.5, median_e2el: 1 } as any),
-      pt({ tpPerGpu: { y: 5, roof: false }, p99_ttft: 999, median_e2el: 2 } as any),
+      pt({ tpPerGpu: { y: 10, roof: false }, p90_ttft: 0.5, median_e2el: 1 } as any),
+      pt({ tpPerGpu: { y: 5, roof: false }, p90_ttft: 999, median_e2el: 2 } as any),
     ];
-    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p99_ttft');
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p90_ttft');
     // y_latency_limit is 60 in the e2e chart config — the 999 outlier should be filtered
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.5);
   });
 
   it('does not filter interactivity points by latency limit when x-axis is default', () => {
-    // Regression: selectedXAxisMetric defaults to 'p99_ttft' but the interactivity
+    // Regression: selectedXAxisMetric defaults to 'p90_ttft' but the interactivity
     // chart's x-axis stays median_intvty for non-input metrics. The latency limit
     // (60) must NOT apply to median_intvty values.
     const data = [
       pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200 } as any),
       pt({ tpPerGpu: { y: 10, roof: false }, median_intvty: 30 } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', 'p99_ttft');
+    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', 'p90_ttft');
     expect(result).toHaveLength(2);
   });
 
   it('applies latency limit on interactivity only when x-axis is actually overridden', () => {
-    // When an input metric IS selected and x-axis overrides to p99_ttft,
+    // When an input metric IS selected and x-axis overrides to p90_ttft,
     // the latency limit should apply.
     const data = [
-      pt({ inputTputPerGpu: { y: 5, roof: false }, p99_ttft: 0.5, median_intvty: 10 } as any),
-      pt({ inputTputPerGpu: { y: 3, roof: false }, p99_ttft: 999, median_intvty: 20 } as any),
+      pt({ inputTputPerGpu: { y: 5, roof: false }, p90_ttft: 0.5, median_intvty: 10 } as any),
+      pt({ inputTputPerGpu: { y: 3, roof: false }, p90_ttft: 999, median_intvty: 20 } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_inputTputPerGpu', 'p99_ttft');
-    // x-axis is overridden to p99_ttft for input metric — latency limit SHOULD filter 999
+    const result = processOverlayChartData(data, 'interactivity', 'y_inputTputPerGpu', 'p90_ttft');
+    // x-axis is overridden to p90_ttft for input metric — latency limit SHOULD filter 999
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.5);
   });

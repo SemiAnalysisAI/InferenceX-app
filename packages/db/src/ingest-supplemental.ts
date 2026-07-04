@@ -219,8 +219,10 @@ async function ingestSupplementalBmk(
 
     const rows: {
       configId: number;
-      isl: number;
-      osl: number;
+      benchmarkType: 'single_turn' | 'agentic_traces';
+      offloadMode: string;
+      isl: number | null;
+      osl: number | null;
       conc: number;
       image: string | null;
       metrics: Record<string, number>;
@@ -271,6 +273,8 @@ async function ingestSupplementalBmk(
 
       rows.push({
         configId,
+        benchmarkType: 'single_turn',
+        offloadMode: 'off',
         isl: entry.isl,
         osl: entry.osl,
         conc: entry.conc,
@@ -294,13 +298,14 @@ async function ingestSupplementalBmk(
     // to `rows` are exactly the valid ones.
     const availRows: {
       model: string;
-      isl: number;
-      osl: number;
+      isl: number | null;
+      osl: number | null;
       precision: string;
       hardware: string;
       framework: string;
       specMethod: string;
       disagg: boolean;
+      benchmarkType: string;
     }[] = [];
     for (const entry of entries) {
       const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
@@ -317,6 +322,7 @@ async function ingestSupplementalBmk(
         framework,
         specMethod,
         disagg,
+        benchmarkType: 'single_turn',
       });
     }
     if (availRows.length > 0) {

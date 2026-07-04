@@ -9,6 +9,20 @@ import chartDefinitions from '@/components/inference/inference-chart-config.json
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
 /**
+ * Select the matching unofficial-run overlay for a chart mode. Normalized E2E
+ * is intentionally excluded: unofficial benchmark rows do not include the
+ * persisted per-request trace needed to normalize before taking percentiles.
+ */
+export function selectUnofficialOverlayForMode<T>(
+  xAxisMode: string,
+  chartType: 'e2e' | 'interactivity',
+  overlays: { e2e: T | null; interactivity: T | null },
+): T | null {
+  if (xAxisMode === 'normalized-e2e') return null;
+  return overlays[chartType];
+}
+
+/**
  * Filters data points based on cost limits defined in the chart definition.
  * Only applies filtering for cost-related metrics, and only filters based on
  * the currently selected cost metric (not all cost fields).
@@ -75,11 +89,13 @@ export function processOverlayChartData(
   chartType: 'e2e' | 'interactivity',
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
+  options?: { isAgentic?: boolean },
 ): InferenceData[] {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
   if (!chartDef) return [];
 
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
+  const isAgentic = options?.isAgentic === true;
 
   // Resolve x-axis field (must match useChartData logic)
   const metricTitle =
@@ -87,9 +103,11 @@ export function processOverlayChartData(
   const isInputMetric = metricTitle.toLowerCase().includes('input');
   let xAxisField: string = chartDef.x;
   // selectedXAxisMetric is already the effective metric for this chart type
-  // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric)
+  // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric).
+  // Match any *_ttft metric — the x-axis-mode picker can now select any
+  // percentile (median/p75/p90/p99) depending on sequence kind.
   const isTtftOverride =
-    selectedXAxisMetric === 'p99_ttft' || selectedXAxisMetric === 'median_ttft';
+    typeof selectedXAxisMetric === 'string' && selectedXAxisMetric.endsWith('_ttft');
 
   if (selectedXAxisMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
     xAxisField = selectedXAxisMetric;
@@ -109,7 +127,12 @@ export function processOverlayChartData(
     })
     .filter(
       (d) =>
-        xAxisField === chartDef.x || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,
+        // Skip the latency limit for the natural x-axis or for agentic
+        // (long TTFTs are normal there, not overload outliers).
+        xAxisField === chartDef.x ||
+        isAgentic ||
+        !chartDef.y_latency_limit ||
+        d.x <= chartDef.y_latency_limit,
     );
 
   return filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);

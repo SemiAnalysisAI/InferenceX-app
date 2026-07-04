@@ -15,6 +15,7 @@
 
 # next.js
 **/.next
+**/.next-*
 **/out
 
 # production
@@ -71,3 +72,4 @@ C:*
 # python bytecode (e.g. .claude/skills/*/iso-interactivity.py imports)
 **/__pycache__/
 **/*.pyc
+.playwright-mcp/

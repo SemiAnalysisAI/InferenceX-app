@@ -8,7 +8,10 @@ export interface Skips {
   unmappedModel: number;
   unmappedHw: number;
   noIslOsl: number;
+  failedRun: number;
   dbError: number;
+  /** Agentic point whose sibling `agentic_<suffix>` artifact had no trace_replay files. */
+  traceReplayMissing: number;
 }
 
 export interface SkipSnapshot {
@@ -66,7 +69,15 @@ const MAX_DB_ERRORS = 10;
  * @returns A `SkipTracker` with zeroed counters and empty unmapped-name sets.
  */
 export function createSkipTracker(): SkipTracker {
-  const skips: Skips = { badZip: 0, unmappedModel: 0, unmappedHw: 0, noIslOsl: 0, dbError: 0 };
+  const skips: Skips = {
+    badZip: 0,
+    unmappedModel: 0,
+    unmappedHw: 0,
+    noIslOsl: 0,
+    failedRun: 0,
+    dbError: 0,
+    traceReplayMissing: 0,
+  };
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();
   const unmappedPrecisions = new Set<string>();

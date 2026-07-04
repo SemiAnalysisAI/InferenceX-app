@@ -22,8 +22,10 @@ const URL_STATE_KEYS = [
   'i_seq',
   'i_prec',
   'i_metric',
+  'i_pctl',
   'i_xmetric',
   'i_e2e_xmetric',
+  'i_xmode',
   'i_scale',
   'i_gpus',
   'i_dates',
@@ -72,14 +74,22 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
-  i_seq: '8k/1k',
+  // No strippable default: the UI default scenario (gate-unlocked) is
+  // AgenticTraces, not 8k/1k, so an '8k/1k' default here would strip an explicit
+  // 8K/1K selection from the URL — on reload the empty i_seq resolves back to the
+  // agentic default. Empty means the resolved scenario is ALWAYS written
+  // explicitly (effectiveSequence is never ''), so a shared/reloaded link keeps
+  // whatever the user picked. The no-param case still resolves via availability.
+  i_seq: '',
   // No strippable default: precision is only written to the URL once chosen
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
   i_metric: 'y_tpPerGpu',
-  i_xmetric: 'p99_ttft',
-  i_e2e_xmetric: '',
+  i_pctl: 'p90',
+  i_xmetric: 'p90_ttft',
+  i_e2e_xmetric: 'p90_ttft',
+  i_xmode: '',
   i_scale: 'auto',
   i_gpus: '',
   i_dates: '',

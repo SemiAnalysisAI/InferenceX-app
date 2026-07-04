@@ -33,6 +33,13 @@ vi.mock('@/components/unofficial-run-provider', () => ({
   useUnofficialRun: () => overlayState.current,
 }));
 
+// ScatterGraph calls useTraceAvailability (a useQuery) for the agentic "View
+// charts" tooltip button. Stub it so these decoration tests don't need a
+// QueryClientProvider — trace presence is irrelevant to the toggle path.
+vi.mock('@/hooks/api/use-trace-availability', () => ({
+  useTraceAvailability: () => ({ data: undefined }),
+}));
+
 import ScatterGraph from './ScatterGraph';
 
 // ── Environment stubs ────────────────────────────────────────────────────────

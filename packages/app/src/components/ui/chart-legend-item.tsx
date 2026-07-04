@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Table2, X } from 'lucide-react';
 import React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -19,6 +19,12 @@ export interface CommonLegendItemProps {
   isLegendExpanded?: boolean; // Whether the legend is expanded to show full text
   sidebarMode?: boolean; // Use sidebar-style visual feedback (line-through + faded dot)
   onRemove?: (name: string) => void;
+  /**
+   * When provided, renders a small table icon that opens a per-series points
+   * table (all data points for this hardware/framework series). Only the
+   * inference tab's legend passes this — other tabs get no icon.
+   */
+  onShowPoints?: (name: string) => void;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
@@ -36,6 +42,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   isLegendExpanded = true,
   sidebarMode = false,
   onRemove,
+  onShowPoints,
 }) => {
   const id = `checkbox-${hw || name}`; // Unique ID for accessibility
   const isLongText = (label ?? '').length > 8;
@@ -97,6 +104,20 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
           {label}
         </span>
       </label>
+      {onShowPoints && (
+        <button
+          type="button"
+          data-testid={`legend-points-${hw || name}`}
+          aria-label={`Show all ${label} data points`}
+          onClick={() => onShowPoints(hw || name)}
+          // Reduced opacity at rest (still visible/tappable on touch), full on
+          // row hover or keyboard focus. ml-auto pins the icon to the row's
+          // right edge so icons align in a column across variable-length labels.
+          className="ml-auto shrink-0 p-1 -my-1 rounded-sm text-muted-foreground hover:text-foreground opacity-35 group-hover/row:opacity-100 focus-visible:opacity-100 transition-opacity no-export"
+        >
+          <Table2 size={13} />
+        </button>
+      )}
     </>
   );
 
@@ -104,6 +125,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
     'transition-opacity duration-300',
     isActive ? 'opacity-100' : sidebarMode ? 'no-export' : 'opacity-50 no-export',
     isHighlighted && 'text-red-900 dark:text-red-400 font-bold',
+    onShowPoints && 'group/row flex w-full items-center',
   );
 
   if (asFragment) {

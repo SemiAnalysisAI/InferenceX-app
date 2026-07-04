@@ -107,8 +107,7 @@ function resolveXAxisField(
   const metricTitle =
     (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
   const isInputMetric = metricTitle.toLowerCase().includes('input');
-  const isTtftOverride =
-    selectedXAxisMetric === 'p99_ttft' || selectedXAxisMetric === 'median_ttft';
+  const isTtftOverride = selectedXAxisMetric === 'p90_ttft';
 
   if (selectedXAxisMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
     return selectedXAxisMetric;

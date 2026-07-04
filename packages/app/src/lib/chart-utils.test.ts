@@ -353,30 +353,29 @@ describe('generateHighContrastColors', () => {
     expect(Object.values(dark).join(',')).not.toEqual(Object.values(light).join(','));
   });
 
-  // ---------- Tier 1: few items → brand zone ----------
+  // ---------- Single vendor: full wheel for maximum contrast ----------
+  // Brand-zone / rival-ban only apply when MULTIPLE vendors are present (so the
+  // vendors stay visually separable). With a single vendor there's no rival to
+  // distinguish from, so HC opens the full hue wheel — brand hue is sacrificed
+  // for the contrast HC exists to provide (fixes the all-NVIDIA agentic case
+  // where every series otherwise collapsed into the green brand band).
 
-  it('3 NVIDIA GPUs are not red', () => {
+  it('3 NVIDIA GPUs (single vendor) are distinguishable across the full wheel', () => {
     const result = generateHighContrastColors(['h100_vllm', 'h200_vllm', 'b200_vllm'], 'dark');
-    for (const color of Object.values(result)) {
-      expect(isNotReddish(parseRgb(color))).toBe(true);
-    }
+    expect(Object.keys(result)).toHaveLength(3);
     assertMinDist(result, 30);
   });
 
-  it('2 AMD GPUs are not green', () => {
+  it('2 AMD GPUs (single vendor) are distinguishable across the full wheel', () => {
     const result = generateHighContrastColors(['mi300x_sglang', 'mi325x_sglang'], 'dark');
-    for (const color of Object.values(result)) {
-      expect(isNotGreenish(parseRgb(color))).toBe(true);
-    }
+    expect(Object.keys(result)).toHaveLength(2);
     assertMinDist(result, 30);
   });
 
-  it('4 NVIDIA GPUs stay in brand zone and are distinguishable', () => {
+  it('4 NVIDIA GPUs (single vendor) use the full wheel and stay well-separated', () => {
     const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm'];
     const result = generateHighContrastColors(keys, 'dark');
-    for (const color of Object.values(result)) {
-      expect(isNotReddish(parseRgb(color))).toBe(true);
-    }
+    expect(Object.keys(result)).toHaveLength(4);
     assertMinDist(result, 25);
   });
 
@@ -401,19 +400,13 @@ describe('generateHighContrastColors', () => {
     assertMinDist(result, 25);
   });
 
-  // ---------- Tier 2: moderate items → full wheel minus rival color ----------
+  // ---------- Single vendor, many items → full wheel, best spacing ----------
 
-  it('10 NVIDIA GPUs: no red hues, still distinguishable', () => {
+  it('10 NVIDIA GPUs (single vendor) are well-separated across the full wheel', () => {
     const gpus = ['h100', 'h200', 'b200', 'b300', 'gb200'];
     const keys = gpus.flatMap((g) => [`${g}_vllm`, `${g}_sglang`]);
     const result = generateHighContrastColors(keys, 'dark');
-    // Should not be reddish (banned)
-    for (const color of Object.values(result)) {
-      const rgb = parseRgb(color);
-      // Not red-dominant with low green — i.e. not in the red/pink zone
-      const isRedPink = rgb[0] > 150 && rgb[1] < 80 && rgb[2] < 150;
-      expect(isRedPink).toBe(false);
-    }
+    expect(Object.keys(result)).toHaveLength(10);
     assertMinDist(result, 20);
   });
 
@@ -547,6 +540,32 @@ describe('calculateRoofline', () => {
     expect(front).toHaveLength(2);
     expect(front[0].y).toBe(5);
     expect(front[1].y).toBe(8);
+  });
+
+  it('excludes x <= 0 points (e.g. interactivity = 0) from the frontier', () => {
+    // A degenerate x=0 point with the highest tpPerGpu would otherwise anchor the
+    // upper_right front as its leftmost point and show up as "optimal".
+    const points = [
+      pt(0, 999, 'h100', { tpPerGpuY: 999 }), // interactivity = 0 → degenerate
+      pt(1, 999, 'h100', { tpPerGpuY: 50 }),
+      pt(2, 999, 'h100', { tpPerGpuY: 80 }),
+    ];
+    const front = calculateRoofline(points, 'tpPerGpu.y', 'upper_right');
+    expect(front.every((p) => p.x > 0)).toBe(true);
+    expect(front.some((p) => p.x === 0)).toBe(false);
+    // real front is the two positive-x points
+    expect(front.map((p) => p.y)).toEqual([50, 80]);
+  });
+
+  it('excludes non-finite / negative x from the frontier', () => {
+    const points = [
+      pt(Number.NaN, 999, 'h100', { tpPerGpuY: 999 }),
+      pt(-1, 999, 'h100', { tpPerGpuY: 999 }),
+      pt(3, 999, 'h100', { tpPerGpuY: 40 }),
+    ];
+    const front = calculateRoofline(points, 'tpPerGpu.y', 'upper_right');
+    expect(front).toHaveLength(1);
+    expect(front[0].x).toBe(3);
   });
 
   it.each([

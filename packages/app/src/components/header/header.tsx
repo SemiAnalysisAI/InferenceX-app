@@ -46,6 +46,12 @@ const NAV_LINKS = [
     testId: 'nav-link-supporters',
     event: 'header_supporters_clicked',
   },
+  {
+    href: '/datasets',
+    label: 'Datasets',
+    testId: 'nav-link-datasets',
+    event: 'header_datasets_clicked',
+  },
   { href: '/blog', label: 'Articles', testId: 'nav-link-blog', event: 'header_blog_clicked' },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
@@ -64,6 +70,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const navLinks = NAV_LINKS;
 
   // Close menu on route change
   useEffect(() => {
@@ -118,7 +126,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-1">
-            {NAV_LINKS.map(({ href, label, testId, event }) => (
+            {navLinks.map(({ href, label, testId, event }) => (
               <Link
                 key={href}
                 data-testid={testId}
@@ -172,7 +180,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
               </button>
               {mobileMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40">
-                  {NAV_LINKS.map(({ href, label, event }) => (
+                  {navLinks.map(({ href, label, event }) => (
                     <Link
                       key={href}
                       href={href}

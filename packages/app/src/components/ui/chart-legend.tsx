@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Circle,
   Diamond,
+  Info,
   Square,
   Triangle,
   X,
@@ -38,6 +39,8 @@ export interface LegendSwitchConfig {
   label: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /** Optional explainer rendered as an info-icon tooltip next to the label. */
+  infoTooltip?: React.ReactNode;
   advanced?: boolean;
 }
 
@@ -279,6 +282,29 @@ export default function ChartLegend({
             >
               {sw.label}
             </Label>
+            {sw.infoTooltip && (
+              <TooltipProvider delayDuration={100}>
+                <TooltipRoot>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      data-testid={`${sw.id}-info`}
+                      aria-label={`More info about ${sw.label}`}
+                      className="text-muted-foreground hover:text-foreground cursor-help -m-1.5 p-1.5 inline-flex items-center"
+                    >
+                      <Info size={14} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    sideOffset={6}
+                    className="max-w-[260px] text-xs leading-snug"
+                  >
+                    {sw.infoTooltip}
+                  </TooltipContent>
+                </TooltipRoot>
+              </TooltipProvider>
+            )}
           </div>
         ))}
       </div>
@@ -401,6 +427,7 @@ export default function ChartLegend({
         onHover={onItemHover}
         onHoverEnd={onItemHoverEnd}
         onRemove={effectiveRemove}
+        onShowPoints={item.onShowPoints}
         asFragment
         isLegendExpanded={effectiveExpanded}
         sidebarMode={isSidebar}
@@ -412,7 +439,9 @@ export default function ChartLegend({
         {enableTooltips ? (
           <TooltipRoot>
             <TooltipTrigger asChild>
-              <div className="w-fit">{legendItem}</div>
+              {/* Full width when the row carries a points-table icon so the
+                  ml-auto icon pins to a consistent right-edge column. */}
+              <div className={item.onShowPoints ? 'w-full' : 'w-fit'}>{legendItem}</div>
             </TooltipTrigger>
             {item.isHighlighted && item.tooltip && (
               <TooltipContent side="bottom" collisionPadding={10}>
@@ -495,6 +524,7 @@ export default function ChartLegend({
                         onHover={onItemHover}
                         onHoverEnd={onItemHoverEnd}
                         onRemove={effectiveRemove}
+                        onShowPoints={item.onShowPoints}
                         sidebarMode={isSidebar}
                         asFragment
                       />

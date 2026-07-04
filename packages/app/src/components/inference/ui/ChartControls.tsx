@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import { useFeatureGate } from '@/lib/use-feature-gate';
@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils';
 import { useInference } from '@/components/inference/InferenceContext';
 import {
   ModelSelector,
-  SequenceSelector,
+  ScenarioSelector,
+  PercentileSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -28,7 +29,7 @@ import { Button } from '@/components/ui/button';
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import type { ChartDefinition, DisaggMode, SpecMode } from '@/components/inference/types';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 
 /**
  * Y-axis metric options from static chart config JSON — available immediately, no API wait.
@@ -109,6 +110,13 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({ hideGpuComparison = false }: ChartControlsProps) {
+  // The percentile selector is rendered conditionally on `selectedSequence`,
+  // which on the client is hydrated from URL params. SSR doesn't see the URL,
+  // so deferring the conditional until after mount keeps the initial DOM
+  // identical between server and client (avoids hydration warnings).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const handleDropdownOpenChange = (dropdownKey: string) => (open: boolean) => {
     if (open) {
@@ -117,6 +125,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     }
     setOpenDropdown((current) => (current === dropdownKey ? null : current));
   };
+
   const {
     selectedModel,
     setSelectedModel,
@@ -126,6 +135,8 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
     setSelectedPrecisions,
     selectedYAxisMetric,
     setSelectedYAxisMetric,
+    selectedPercentile,
+    setSelectedPercentile,
     graphs,
     selectedGPUs,
     setSelectedGPUs,
@@ -354,14 +365,21 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
             availableModels={availableModels}
             data-testid="model-selector"
           />
-          <SequenceSelector
+          <ScenarioSelector
             value={selectedSequence}
             onChange={handleSequenceChange}
             open={openDropdown === 'sequence'}
             onOpenChange={handleDropdownOpenChange('sequence')}
             availableSequences={availableSequences}
-            data-testid="sequence-selector"
+            data-testid="scenario-selector"
           />
+          {mounted && selectedSequence === Sequence.AgenticTraces && (
+            <PercentileSelector
+              value={selectedPercentile}
+              onChange={(p: Percentile) => setSelectedPercentile(p)}
+              data-testid="percentile-selector"
+            />
+          )}
           <PrecisionSelector
             value={selectedPrecisions}
             onChange={handlePrecisionChange}
@@ -391,16 +409,17 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
           </div>
 
           {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-            isInputMetric && (
+            isInputMetric &&
+            selectedSequence !== Sequence.AgenticTraces && (
               <div className="flex flex-col space-y-1.5 lg:col-span-1">
                 <LabelWithTooltip
                   htmlFor="x-axis-select"
                   label="X-Axis Metric"
-                  tooltip="The latency metric displayed on the chart's X-axis. Options include P99 Time To First Token and Median Time To First Token."
+                  tooltip="The latency metric displayed on the chart's X-axis: P90 Time To First Token."
                 />
                 <Select
                   onValueChange={handleXAxisMetricChange}
-                  value={selectedXAxisMetric ?? 'p99_ttft'}
+                  value={selectedXAxisMetric ?? 'p90_ttft'}
                 >
                   <SelectTrigger
                     id="x-axis-select"
@@ -410,8 +429,7 @@ export default function ChartControls({ hideGpuComparison = false }: ChartContro
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent portalled={false}>
-                    <SelectItem value="p99_ttft">P99 TTFT</SelectItem>
-                    <SelectItem value="median_ttft">Median TTFT</SelectItem>
+                    <SelectItem value="p90_ttft">P90 TTFT</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

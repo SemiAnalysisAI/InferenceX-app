@@ -11,6 +11,8 @@ import type { WorkerPower } from '../etl/benchmark-mapper.js';
 export type BenchmarkWorkerRow = WorkerPower;
 
 export interface BenchmarkRow {
+  /** Stable benchmark_results id used for agentic detail lookups. */
+  id: number;
   hardware: string;
   framework: string;
   model: string;
@@ -28,9 +30,11 @@ export interface BenchmarkRow {
   decode_num_workers: number;
   num_prefill_gpu: number;
   num_decode_gpu: number;
-  isl: number;
-  osl: number;
+  benchmark_type: string;
+  isl: number | null;
+  osl: number | null;
   conc: number;
+  offload_mode: string;
   image: string | null;
   metrics: Record<string, number>;
   /**
@@ -50,7 +54,7 @@ export interface BenchmarkRow {
  * `['glm5', 'glm5.1']` unions both buckets under the one display.
  *
  * Selection unit is the LINE, not the point: for each line
- * `(config_id, benchmark_type, isl, osl)` we pick the single newest workflow run that
+ * `(config_id, benchmark_type, isl, osl, offload_mode)` we pick the single newest workflow run that
  * produced data for it (newest date, then latest sweep, then highest run id) and return
  * EVERY concurrency that one run measured — and nothing from any other run. A partial
  * re-sweep therefore truncates the line to its own concurrencies rather than stitching the
@@ -93,7 +97,8 @@ export async function getLatestBenchmarks(
             )
           )`
         : sql``;
-    // winners: the single newest run per LINE (config_id, benchmark_type, isl, osl) under the
+    // winners: the single newest run per LINE
+    // (config_id, benchmark_type, isl, osl, offload_mode) under the
     // date/run cutoff. br.date is a calendar day, so two same-day sweeps tie on date — break
     // by wr.run_started_at (latest sweep wins), then br.workflow_run_id so exactly one run wins
     // even when run_started_at is equal/null. The outer join then pulls EVERY concurrency that
@@ -101,8 +106,8 @@ export async function getLatestBenchmarks(
     // of concurrencies a partial re-sweep skipped).
     const rows = await sql`
       WITH winners AS (
-        SELECT DISTINCT ON (br.config_id, br.benchmark_type, br.isl, br.osl)
-          br.config_id, br.benchmark_type, br.isl, br.osl,
+        SELECT DISTINCT ON (br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode)
+          br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
           br.workflow_run_id AS winning_run_id
         FROM benchmark_results br
         JOIN configs c ON c.id = br.config_id
@@ -111,10 +116,11 @@ export async function getLatestBenchmarks(
           AND br.error IS NULL
           AND ${dateFilter}
           ${runFilter}
-        ORDER BY br.config_id, br.benchmark_type, br.isl, br.osl,
+        ORDER BY br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
                  br.date DESC, wr.run_started_at DESC NULLS LAST, br.workflow_run_id DESC
       )
       SELECT
+        br.id,
         c.hardware,
         c.framework,
         c.model,
@@ -132,6 +138,8 @@ export async function getLatestBenchmarks(
         c.decode_num_workers,
         c.num_prefill_gpu,
         c.num_decode_gpu,
+        br.benchmark_type,
+        br.offload_mode,
         br.isl,
         br.osl,
         br.conc,
@@ -148,6 +156,7 @@ export async function getLatestBenchmarks(
         AND w.benchmark_type = br.benchmark_type
         AND w.isl IS NOT DISTINCT FROM br.isl
         AND w.osl IS NOT DISTINCT FROM br.osl
+        AND w.offload_mode = br.offload_mode
         AND w.winning_run_id = br.workflow_run_id
       WHERE br.error IS NULL
       ORDER BY br.config_id, br.conc, br.isl, br.osl
@@ -158,6 +167,7 @@ export async function getLatestBenchmarks(
   // No date filter: use materialized view for instant lookups
   const rows = await sql`
     SELECT
+      lb.id,
       c.hardware,
       c.framework,
       c.model,
@@ -175,6 +185,8 @@ export async function getLatestBenchmarks(
       c.decode_num_workers,
       c.num_prefill_gpu,
       c.num_decode_gpu,
+      lb.benchmark_type,
+      lb.offload_mode,
       lb.isl,
       lb.osl,
       lb.conc,
@@ -206,7 +218,8 @@ export async function getBenchmarksForRun(
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   const rows = await sql`
-    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl)
+    SELECT DISTINCT ON (br.config_id, br.conc, br.isl, br.osl, br.offload_mode)
+      br.id,
       c.hardware,
       c.framework,
       c.model,
@@ -224,6 +237,8 @@ export async function getBenchmarksForRun(
       c.decode_num_workers,
       c.num_prefill_gpu,
       c.num_decode_gpu,
+      br.benchmark_type,
+      br.offload_mode,
       br.isl,
       br.osl,
       br.conc,
@@ -238,7 +253,7 @@ export async function getBenchmarksForRun(
     WHERE c.model = ANY(${modelKeys})
       AND br.error IS NULL
       AND wr.github_run_id = ${Number(githubRunId)}
-    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.date DESC
+    ORDER BY br.config_id, br.conc, br.isl, br.osl, br.offload_mode, br.date DESC
   `;
   return rows as unknown as BenchmarkRow[];
 }
@@ -257,6 +272,7 @@ export async function getAllBenchmarksForHistory(
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   const rows = await sql`
     SELECT
+      br.id,
       c.hardware,
       c.framework,
       c.model,
@@ -274,9 +290,12 @@ export async function getAllBenchmarksForHistory(
       c.decode_num_workers,
       c.num_prefill_gpu,
       c.num_decode_gpu,
+      br.benchmark_type,
+      br.offload_mode,
       br.isl,
       br.osl,
       br.conc,
+      br.image,
       br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] as metrics,
       br.workers,
       br.date::text,

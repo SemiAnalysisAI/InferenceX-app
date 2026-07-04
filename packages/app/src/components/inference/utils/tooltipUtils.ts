@@ -1,6 +1,8 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
 
 export interface TooltipConfig {
   /** The data point to display */
@@ -19,6 +21,14 @@ export interface TooltipConfig {
   isTracked?: boolean;
   /** URL to the GitHub Actions workflow run */
   runUrl?: string;
+  /**
+   * Whether this agentic point has a stored trace_replay blob. Controls
+   * visibility of the "View charts" button — the actual distributions are
+   * rendered on the detail page, not inline, so all the tooltip needs is a
+   * presence boolean (sourced from the bulk `/api/v1/trace-availability`
+   * call so we don't ship megabytes of profile JSONL just for this check).
+   */
+  hasTrace?: boolean;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
@@ -26,57 +36,37 @@ export interface OverlayTooltipConfig extends TooltipConfig {
   overlayData: OverlayData;
 }
 
-/**
- * Generates a short config segment label from parallelism params.
- * - tp == ep and dp-attn false: "TEP{N}"
- * - tp == ep and dp-attn true: "DEP{N}"
- * - ep > 1 (tp != ep): "EP{ep}" or "DPAEP{ep}"
- * - ep <= 1 (or no EP): "TP{tp}" or "DPATP{tp}"
- */
-const configSegmentLabel = (
-  tp: number,
-  ep: number | undefined,
-  dpAttention: boolean | undefined,
-): string => {
-  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
-    return dpAttention ? `DEP${tp}` : `TEP${tp}`;
-  }
-  const dpaPrefix = dpAttention ? 'DPA' : '';
-  if (ep === null || ep === undefined || ep <= 1) return `${dpaPrefix}TP${tp}`;
-  return `${dpaPrefix}EP${ep}`;
-};
+// `dp_attention` is `boolean | string` on InferenceData (DB sends raw, the
+// transform narrows "true"/"false" → boolean). Coerce to a plain boolean for
+// the shared labeler, treating the legacy string form correctly.
+const asBool = (v: boolean | string | undefined): boolean | undefined =>
+  typeof v === 'string' ? v === 'true' : v;
 
 /**
  * Returns the short label for a data point on the chart.
  * - Non-multinode: e.g. "TP8", "EP8", "TEP8", "DEP8", "DPAEP8"
  * - Multinode disagg: e.g. "2xEP4+1xDPAEP32"
  * - Old data (no ep field): falls back to tp value
+ *
+ * Delegates to the shared {@link parallelismLabel} so the chart points and the
+ * agentic sibling navigator describe a config identically.
  */
-export const getPointLabel = (d: InferenceData): string => {
-  if (
-    (d.ep === null || d.ep === undefined) &&
-    (d.prefill_ep === null || d.prefill_ep === undefined)
-  )
-    return String(d.tp);
-
-  if (d.is_multinode && d.disagg) {
-    const prefillLabel = configSegmentLabel(
-      d.prefill_tp ?? d.tp,
-      d.prefill_ep ?? d.ep,
-      d.prefill_dp_attention ?? d.dp_attention,
-    );
-    const decodeLabel = configSegmentLabel(
-      d.decode_tp ?? d.tp,
-      d.decode_ep ?? d.ep,
-      d.decode_dp_attention ?? d.dp_attention,
-    );
-    const pw = d.prefill_num_workers ?? 1;
-    const dw = d.decode_num_workers ?? 1;
-    return `${pw}x${prefillLabel}+${dw}x${decodeLabel}`;
-  }
-
-  return configSegmentLabel(d.tp, d.ep, d.dp_attention);
-};
+export const getPointLabel = (d: InferenceData): string =>
+  parallelismLabel({
+    tp: d.tp,
+    ep: d.ep,
+    dpAttention: asBool(d.dp_attention),
+    disagg: d.disagg,
+    isMultinode: d.is_multinode,
+    prefillTp: d.prefill_tp,
+    prefillEp: d.prefill_ep,
+    prefillDpAttention: asBool(d.prefill_dp_attention),
+    prefillNumWorkers: d.prefill_num_workers,
+    decodeTp: d.decode_tp,
+    decodeEp: d.decode_ep,
+    decodeDpAttention: asBool(d.decode_dp_attention),
+    decodeNumWorkers: d.decode_num_workers,
+  });
 
 const runLinkHTML = (runUrl?: string) =>
   runUrl
@@ -87,6 +77,79 @@ const runLinkHTML = (runUrl?: string) =>
 
 const tooltipLine = (label: string, value: string | number) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
+
+const formatPct = (v: number | undefined): string | null =>
+  v === undefined || v === null || Number.isNaN(v) ? null : `${(v * 100).toFixed(1)}%`;
+
+/** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped).
+ *  Exported so the legend points table shows exactly the numbers the tooltip shows. */
+export const fmt = (v: number): string => {
+  if (!Number.isFinite(v)) return String(v);
+  const rounded = parseFloat(v.toFixed(3));
+  if (Math.abs(rounded) >= 10000) return new Intl.NumberFormat('en-US').format(rounded);
+  return String(rounded);
+};
+
+/**
+ * Agentic-only tooltip rows: offload mode, KV cache hit rates, request
+ * success, token totals. Returns an empty string for non-agentic rows.
+ */
+const generateAgenticHTML = (d: InferenceData): string => {
+  if (d.benchmark_type !== 'agentic_traces') return '';
+
+  const parts: string[] = [];
+  if (d.offload_mode) {
+    parts.push(tooltipLine('Offload Mode', d.offload_mode.toUpperCase()));
+  }
+
+  const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
+  const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
+  const theoHit = formatPct(d.theoretical_cache_hit_rate);
+  if (gpuHit) parts.push(tooltipLine('GPU Cache Hit Rate', gpuHit));
+  if (cpuHit) parts.push(tooltipLine('CPU Cache Hit Rate', cpuHit));
+  if (theoHit) parts.push(tooltipLine('Theoretical Cache Hit Rate', theoHit));
+
+  if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
+    const successPct =
+      d.num_requests_total > 0
+        ? ` (${((d.num_requests_successful / d.num_requests_total) * 100).toFixed(0)}%)`
+        : '';
+    parts.push(
+      tooltipLine(
+        'Requests',
+        `${d.num_requests_successful} / ${d.num_requests_total}${successPct}`,
+      ),
+    );
+  }
+
+  if (d.total_prompt_tokens !== undefined) {
+    parts.push(tooltipLine('Prompt Tokens', formatNumber(d.total_prompt_tokens)));
+  }
+  if (d.total_generation_tokens !== undefined) {
+    parts.push(tooltipLine('Generated Tokens', formatNumber(d.total_generation_tokens)));
+  }
+
+  // Histograms + time-series live on the dedicated detail page now; the
+  // "View charts" button (rendered by the wrapper when pinned + has trace
+  // data) takes the user there.
+
+  return parts.join('');
+};
+
+/** "View charts" link — only visible when the tooltip is pinned and the
+ *  point has stored trace data. Wired up by the scatter/GPU graph click handlers. */
+const viewChartsButtonHTML = (
+  isPinned: boolean,
+  hasTraceData: boolean,
+  pointId: number | undefined,
+): string => {
+  if (!isPinned || !hasTraceData || !isPersistedBenchmarkId(pointId)) return '';
+  return `<a data-action="view-charts" href="/inference/agentic/${pointId}" style="
+    display: block; margin-top: 8px; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
+  ">View charts &rarr;</a>`;
+};
 
 const shortenSha = (image: string) =>
   image.replaceAll(/(?<shaPrefix>sha256:[a-f0-9]{7})[a-f0-9]+/giu, '$<shaPrefix>…');
@@ -139,7 +202,16 @@ const generateParallelismHTML = (d: InferenceData): string => {
  * @returns HTML string for the tooltip content
  */
 export const generateTooltipContent = (config: TooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, runUrl } = config;
+  const {
+    data: d,
+    isPinned,
+    xLabel,
+    yLabel,
+    selectedYAxisMetric,
+    hardwareConfig,
+    runUrl,
+    hasTrace,
+  } = config;
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -157,16 +229,16 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${xLabel}:</strong> ${formatNumber(d.x)}
+        <strong>${xLabel}:</strong> ${fmt(d.x)}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${yLabel}:</strong> ${formatNumber(d.y)}
+        <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Input Token Throughput per GPU:</strong> ${formatNumber(d['inputTputPerGpu'].y)}
+            <strong>Input Token Throughput per GPU:</strong> ${fmt(d['inputTputPerGpu'].y)}
           </div>`
           : ''
       }
@@ -174,7 +246,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
         selectedYAxisMetric === 'y_tpPerGpu' && d['outputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Output Token Throughput per GPU:</strong> ${formatNumber(d['outputTputPerGpu'].y)}
+            <strong>Output Token Throughput per GPU:</strong> ${fmt(d['outputTputPerGpu'].y)}
           </div>`
           : ''
       }
@@ -183,10 +255,12 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
-      <div style="color: var(--muted-foreground); font-size: 11px;">
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${generateAgenticHTML(d)}
       ${runLinkHTML(runUrl)}
+      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
       ${
         isPinned
           ? `<button data-action="track-over-time" style="
@@ -229,19 +303,20 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
         <strong>Date:</strong> ${d.actualDate ?? d.date}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${xLabel}:</strong> ${formatNumber(d.x)}
+        <strong>${xLabel}:</strong> ${fmt(d.x)}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${yLabel}:</strong> ${formatNumber(d.y)}
+        <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
-      <div style="color: var(--muted-foreground); font-size: 11px;">
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${generateAgenticHTML(d)}
     </div>
   `;
 };
@@ -254,7 +329,16 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
  * @returns HTML string for the tooltip content
  */
 export const generateGPUGraphTooltipContent = (config: TooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, runUrl } = config;
+  const {
+    data: d,
+    isPinned,
+    xLabel,
+    yLabel,
+    selectedYAxisMetric,
+    hardwareConfig,
+    runUrl,
+    hasTrace,
+  } = config;
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -272,16 +356,16 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${xLabel}:</strong> ${formatNumber(d.x)}
+        <strong>${xLabel}:</strong> ${fmt(d.x)}
       </div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${yLabel}:</strong> ${formatNumber(d.y)}
+        <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Input Token Throughput per GPU:</strong> ${formatNumber(d['inputTputPerGpu'].y)}
+            <strong>Input Token Throughput per GPU:</strong> ${fmt(d['inputTputPerGpu'].y)}
           </div>`
           : ''
       }
@@ -289,7 +373,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         selectedYAxisMetric === 'y_tpPerGpu' && d['outputTputPerGpu']
           ? `
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>Output Token Throughput per GPU:</strong> ${formatNumber(d['outputTputPerGpu'].y)}
+            <strong>Output Token Throughput per GPU:</strong> ${fmt(d['outputTputPerGpu'].y)}
           </div>`
           : ''
       }
@@ -298,10 +382,12 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ${d.conc}
       </div>
-      <div style="color: var(--muted-foreground); font-size: 11px;">
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${generateAgenticHTML(d)}
       ${runLinkHTML(runUrl)}
+      ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
     </div>
   `;
 };

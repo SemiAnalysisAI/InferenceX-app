@@ -1,11 +1,13 @@
 /**
  * Benchmark row mapper: raw JSON dict → typed `BenchmarkParams`.
- * Handles both v1 (single tp/ep) and v2 (separate prefill/decode fields).
+ * Handles v1 (single tp/ep), v2 (separate prefill/decode fields), and v3
+ * (nested agentic containers, flattened via {@link flattenAgenticAggRow}).
  */
 
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
 import { METRIC_KEYS, PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
+import { flattenAgenticAggRow } from './agentic-v3-flatten';
 import {
   resolveModelKey,
   hwToGpuKey,
@@ -17,11 +19,7 @@ import {
   parseInt2,
 } from './normalizers';
 
-/**
- * Raw artifact field names that are renamed when stored as metrics.
- * All other numeric fields not in `NON_METRIC_KEYS` are stored under their raw name.
- */
-const METRIC_RENAMES: Record<string, string> = {};
+export { flattenAgenticAggRow };
 
 /**
  * Raw artifact fields that are config/routing dimensions, not metrics.
@@ -57,11 +55,40 @@ const NON_METRIC_KEYS = new Set([
   'decode_num_workers',
   'num_prefill_gpu',
   'num_decode_gpu',
+  // agentic scenario
+  'scenario_type',
+  'users',
+  'offload_mode',
+  'num_requests_total',
+  'num_requests_successful',
+  // v3 agentic KV-offload descriptors ('none'|'dram'|… + backend name). Mapped
+  // to offloadMode / stringified metrics explicitly in mapBenchmarkRow.
+  'kv_offloading',
+  'kv_offload_backend',
+  // v3 agentic nested containers — flattened by flattenAgenticAggRow before
+  // the auto-capture loop runs; the raw objects themselves are not metrics.
+  'request_metrics',
+  'server_metrics',
+  // Public-dataset provenance emitted by aiperf. The ingest runner uses this
+  // object to populate run_datasets; it is not a benchmark metric.
+  'dataset',
   // per-worker measured-power array (not a numeric scalar). Surfaced as a
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
   'workers',
 ]);
+
+/**
+ * `benchmark_type` values understood by the ingest.
+ * - `single_turn`    — fixed sequence-length runs (isl/osl set).
+ * - `agentic_traces` — trace-replay agentic runs (isl/osl null, `users` → conc).
+ */
+export type BenchmarkType = 'single_turn' | 'agentic_traces';
+
+/** Reduce an offload descriptor ('none'|'dram'|…) to the binary on/off. */
+function descriptorToOnOff(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? (v === 'none' ? 'off' : 'on') : null;
+}
 
 /**
  * METRIC_KEYS from constants is the canonical set of known metric keys.
@@ -91,9 +118,13 @@ export interface WorkerPower {
 
 export interface BenchmarkParams {
   config: ConfigParams;
-  isl: number;
-  osl: number;
+  benchmarkType: BenchmarkType;
+  // Null for agentic_traces; present for single_turn.
+  isl: number | null;
+  osl: number | null;
   conc: number;
+  /** 'on' | 'off' — KV cache offload to CPU. Defaults to 'off'. */
+  offloadMode: string;
   image: string | null;
   metrics: Record<string, number>;
   /**
@@ -110,9 +141,11 @@ export interface BenchmarkParams {
 /**
  * Map a raw benchmark result dict to typed `BenchmarkParams`.
  *
- * Supports two artifact schemas:
+ * Supports three artifact schemas:
  * - **v1** (pre-2025-12-19): single `tp`/`ep` for both prefill and decode.
  * - **v2** (2025-12-19+): separate `prefill_tp`/`decode_tp` etc. for disaggregated configs.
+ * - **v3** (2026-07-02+, agentic only): nested `request_metrics`/`server_metrics`
+ *   containers, flattened to the v2 flat schema up front by `flattenAgenticAggRow`.
  *
  * When mapping fails (unknown model, unknown hardware, or missing ISL/OSL/conc),
  * the appropriate skip counter on `tracker` is incremented and `null` is returned.
@@ -128,6 +161,11 @@ export function mapBenchmarkRow(
   tracker: SkipTracker,
   islOslFallback?: { isl: number; osl: number } | null,
 ): BenchmarkParams | null {
+  // v3 agentic rows nest their metrics; flatten to the canonical flat schema
+  // first so the rest of the mapper (auto-capture, intvty invariant, guards)
+  // is version-agnostic. No-op for v1/v2 rows.
+  row = flattenAgenticAggRow(row);
+
   const modelKey = resolveModelKey(row);
   if (!modelKey) {
     tracker.skips.unmappedModel++;
@@ -144,13 +182,44 @@ export function mapBenchmarkRow(
     return null;
   }
 
-  const isl = parseInt2(row.isl) ?? islOslFallback?.isl;
-  const osl = parseInt2(row.osl) ?? islOslFallback?.osl;
-  const conc = parseInt2(row.conc);
-  if (!isl || !osl || !conc) {
+  // Agentic-trace runs emit `scenario_type: 'agentic-coding'` (and variants),
+  // no isl/osl, and `users` instead of `conc`. Everything else stays as-is.
+  const isAgentic = String(row.scenario_type ?? '').startsWith('agentic');
+  const benchmarkType: BenchmarkType = isAgentic ? 'agentic_traces' : 'single_turn';
+
+  const isl = isAgentic ? null : (parseInt2(row.isl) ?? islOslFallback?.isl ?? null);
+  const osl = isAgentic ? null : (parseInt2(row.osl) ?? islOslFallback?.osl ?? null);
+  // Agentic artifacts encode concurrency as `users` in older schemas and `conc` in newer ones.
+  const conc = isAgentic ? (parseInt2(row.users) ?? parseInt2(row.conc)) : parseInt2(row.conc);
+  if (!conc || (!isAgentic && (!isl || !osl))) {
     tracker.skips.noIslOsl++;
     return null;
   }
+
+  // Failed-run guard: aggregated artifacts (`results_bmk`) merge rows from
+  // every runner, including failed ones with 0 successful requests and null
+  // metrics — both the "issued requests but none succeeded" case (total > 0)
+  // and the "server never came up" case (total === 0). Without this skip the
+  // empty row lands as a dataless point, or overwrites a good row via
+  // ON CONFLICT DO UPDATE when both share the same (config, conc, offload).
+  if (
+    typeof row.num_requests_successful === 'number' &&
+    row.num_requests_successful === 0 &&
+    typeof row.num_requests_total === 'number'
+  ) {
+    tracker.skips.failedRun++;
+    return null;
+  }
+
+  // Agentic offload signal: prefer `offload_mode` ('on'|'off'), then the v3
+  // `kv_offloading` descriptor ('none'|'dram'|…), then legacy `offloading`.
+  // Descriptors reduce to the binary on/off used for row identity ('none' →
+  // 'off', anything else → 'on') so v3 offload points keep colliding-key parity
+  // with their v2 predecessors instead of forking a third offload_mode value.
+  const offloadModeRaw =
+    typeof row.offload_mode === 'string' && row.offload_mode.length > 0
+      ? row.offload_mode
+      : (descriptorToOnOff(row.kv_offloading) ?? descriptorToOnOff(row.offloading) ?? 'off');
 
   const { framework, disagg } = normalizeFramework(String(row.framework ?? ''), row.disagg);
   const isMultinode = parseBool(row.is_multinode);
@@ -160,55 +229,46 @@ export function mapBenchmarkRow(
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
-  let decodeTp: number, decodeEp: number, decodeDpAttn: boolean, decodeNumWorkers: number;
-  let numPrefillGpu: number, numDecodeGpu: number;
+  const parallelism = resolveParallelism(row);
+  const metrics = captureNumericMetrics(row);
 
-  if ('prefill_tp' in row) {
-    // v2 schema: full disagg parallelism fields
-    prefillTp = parseInt2(row.prefill_tp) ?? 1;
-    prefillEp = parseInt2(row.prefill_ep) ?? 1;
-    prefillDpAttn = parseBool(row.prefill_dp_attention);
-    prefillNumWorkers = parseInt2(row.prefill_num_workers) ?? 0;
-    decodeTp = parseInt2(row.decode_tp) ?? 1;
-    decodeEp = parseInt2(row.decode_ep) ?? 1;
-    decodeDpAttn = parseBool(row.decode_dp_attention);
-    decodeNumWorkers = parseInt2(row.decode_num_workers) ?? 0;
-    numPrefillGpu = parseInt2(row.num_prefill_gpu) ?? prefillTp * prefillEp;
-    numDecodeGpu = parseInt2(row.num_decode_gpu) ?? decodeTp * decodeEp;
-  } else {
-    // v1 schema: single tp/ep, prefill = decode
-    const tp = parseInt2(row.tp) ?? 1;
-    const ep = parseInt2(row.ep) ?? 1;
-    const dpAttn = parseBool(row.dp_attention);
-    prefillTp = tp;
-    decodeTp = tp;
-    prefillEp = ep;
-    decodeEp = ep;
-    prefillDpAttn = dpAttn;
-    decodeDpAttn = dpAttn;
-    prefillNumWorkers = 0;
-    decodeNumWorkers = 0;
-    numPrefillGpu = tp * ep;
-    numDecodeGpu = tp * ep;
+  // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
+  // — preserve as a stringified metric so the frontend can expose it in tooltips.
+  // v3 rows additionally carry the offload tier + backend ('dram'/'mooncake');
+  // keep them so the UI can say *what kind* of offload, not just on/off.
+  if (isAgentic) {
+    (metrics as Record<string, unknown>).offload_mode = offloadModeRaw;
+    if (typeof row.kv_offloading === 'string' && row.kv_offloading.length > 0) {
+      (metrics as Record<string, unknown>).kv_offloading = row.kv_offloading;
+    }
+    if (typeof row.kv_offload_backend === 'string' && row.kv_offload_backend.length > 0) {
+      (metrics as Record<string, unknown>).kv_offload_backend = row.kv_offload_backend;
+    }
   }
 
-  // Auto-capture all numeric fields not reserved for config/routing dimensions.
-  // Fields in METRIC_RENAMES are stored under their canonical name; all others
-  // use the raw key. Any key outside METRIC_KEYS triggers a one-time
-  // warning so new schema additions don't go silently unnoticed.
-  const metrics: Record<string, number> = {};
-  for (const [rawKey, val] of Object.entries(row)) {
-    if (NON_METRIC_KEYS.has(rawKey)) continue;
-    const n = parseNum(val);
-    if (n === undefined) continue;
-    const storedKey = METRIC_RENAMES[rawKey] ?? rawKey;
-    metrics[storedKey] = n;
-    if (!METRIC_KEYS.has(rawKey) && !_warnedMetricKeys.has(rawKey)) {
-      _warnedMetricKeys.add(rawKey);
-      console.warn(
-        `  [WARN] auto-captured unexpected metric '${rawKey}' — add to METRIC_KEYS in constants/src/metric-keys.ts or NON_METRIC_KEYS in benchmark-mapper.ts`,
-      );
+  // Slow-tail interactivity invariant. Agentic artifacts ship `*_intvty`, but the
+  // definition has drifted across harness versions: some emit `1/p(ITL)`
+  // (slow-tail), others `p(1/ITL)` — which inverts percentile order, so p90 comes
+  // out as ~1/p10(ITL) instead. The inference chart's interactivity selector and
+  // the detail time-series both treat interactivity as the reciprocal of the ITL
+  // percentile, so we derive it from `*_itl` here rather than trust the artifact,
+  // keeping every agentic row on one definition. `std` is excluded — the
+  // reciprocal of a standard deviation is meaningless. Mirrored in the frontend
+  // overlay path (agenticAliases).
+  //
+  // When `*_itl` is absent/zero/invalid we must DELETE any artifact-supplied
+  // `*_intvty` rather than let it survive: keeping it would mix the harness's
+  // (possibly `p(1/ITL)`) definition into a column that's meant to be `1/p(ITL)`
+  // everywhere else. Downstream reads a missing key as "not recorded"
+  // (rowToAggDataEntry coerces `?? 0`; the legend table renders a dash).
+  if (isAgentic) {
+    for (const k of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
+      const itl = metrics[`${k}_itl`];
+      if (typeof itl === 'number' && itl > 0) {
+        metrics[`${k}_intvty`] = 1 / itl;
+      } else {
+        delete metrics[`${k}_intvty`];
+      }
     }
   }
 
@@ -231,24 +291,97 @@ export function mapBenchmarkRow(
       specMethod,
       disagg,
       isMultinode,
-      prefillTp,
-      prefillEp,
-      prefillDpAttn,
-      prefillNumWorkers,
-      decodeTp,
-      decodeEp,
-      decodeDpAttn,
-      decodeNumWorkers,
-      numPrefillGpu,
-      numDecodeGpu,
+      ...parallelism,
     },
+    benchmarkType,
     isl,
     osl,
     conc,
+    offloadMode: offloadModeRaw,
     image,
     metrics,
     workers,
   };
+}
+
+/** The parallelism slice of `ConfigParams`, resolved from either artifact schema. */
+type ParallelismParams = Pick<
+  ConfigParams,
+  | 'prefillTp'
+  | 'prefillEp'
+  | 'prefillDpAttn'
+  | 'prefillNumWorkers'
+  | 'decodeTp'
+  | 'decodeEp'
+  | 'decodeDpAttn'
+  | 'decodeNumWorkers'
+  | 'numPrefillGpu'
+  | 'numDecodeGpu'
+>;
+
+/**
+ * Resolve prefill/decode parallelism from a raw row. v2 rows (2025-12-19+)
+ * carry full disagg fields keyed by the presence of `prefill_tp`; v1 rows have
+ * a single `tp`/`ep` that applies to both phases.
+ */
+function resolveParallelism(row: Record<string, any>): ParallelismParams {
+  if ('prefill_tp' in row) {
+    // v2 schema: full disagg parallelism fields
+    const prefillTp = parseInt2(row.prefill_tp) ?? 1;
+    const prefillEp = parseInt2(row.prefill_ep) ?? 1;
+    const decodeTp = parseInt2(row.decode_tp) ?? 1;
+    const decodeEp = parseInt2(row.decode_ep) ?? 1;
+    return {
+      prefillTp,
+      prefillEp,
+      prefillDpAttn: parseBool(row.prefill_dp_attention),
+      prefillNumWorkers: parseInt2(row.prefill_num_workers) ?? 0,
+      decodeTp,
+      decodeEp,
+      decodeDpAttn: parseBool(row.decode_dp_attention),
+      decodeNumWorkers: parseInt2(row.decode_num_workers) ?? 0,
+      numPrefillGpu: parseInt2(row.num_prefill_gpu) ?? prefillTp * prefillEp,
+      numDecodeGpu: parseInt2(row.num_decode_gpu) ?? decodeTp * decodeEp,
+    };
+  }
+  // v1 schema: single tp/ep, prefill = decode
+  const tp = parseInt2(row.tp) ?? 1;
+  const ep = parseInt2(row.ep) ?? 1;
+  const dpAttn = parseBool(row.dp_attention);
+  return {
+    prefillTp: tp,
+    prefillEp: ep,
+    prefillDpAttn: dpAttn,
+    prefillNumWorkers: 0,
+    decodeTp: tp,
+    decodeEp: ep,
+    decodeDpAttn: dpAttn,
+    decodeNumWorkers: 0,
+    numPrefillGpu: tp * ep,
+    numDecodeGpu: tp * ep,
+  };
+}
+
+/**
+ * Auto-capture all numeric fields not reserved for config/routing dimensions,
+ * stored under their raw key. Any key outside METRIC_KEYS triggers a one-time
+ * warning so new schema additions don't go silently unnoticed.
+ */
+function captureNumericMetrics(row: Record<string, any>): Record<string, number> {
+  const metrics: Record<string, number> = {};
+  for (const [rawKey, val] of Object.entries(row)) {
+    if (NON_METRIC_KEYS.has(rawKey)) continue;
+    const n = parseNum(val);
+    if (n === undefined) continue;
+    metrics[rawKey] = n;
+    if (!METRIC_KEYS.has(rawKey) && !_warnedMetricKeys.has(rawKey)) {
+      _warnedMetricKeys.add(rawKey);
+      console.warn(
+        `  [WARN] auto-captured unexpected metric '${rawKey}' — add to METRIC_KEYS in constants/src/metric-keys.ts or NON_METRIC_KEYS in benchmark-mapper.ts`,
+      );
+    }
+  }
+  return metrics;
 }
 
 /**

@@ -2,10 +2,11 @@
 
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
+import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import {
   labelOpacityForActiveState,
@@ -15,7 +16,13 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getChartWatermark, getPrecisionLabel, type Precision } from '@/lib/data-mappings';
+import {
+  getChartWatermark,
+  getPrecisionLabel,
+  getSequenceLabel,
+  type Precision,
+  Sequence,
+} from '@/lib/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -45,10 +52,9 @@ import {
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
-  paretoFrontLowerLeft,
-  paretoFrontLowerRight,
-  paretoFrontUpperLeft,
-  paretoFrontUpperRight,
+  isFrontierEligible,
+  paretoFrontForDirection,
+  type ParetoDirection,
 } from '@/lib/chart-utils';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
@@ -61,6 +67,8 @@ import {
   generateTooltipContent,
   getPointLabel,
 } from '@/components/inference/utils/tooltipUtils';
+import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
+import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import {
   type ParetoPointLabel,
   getParetoLabel,
@@ -75,6 +83,96 @@ import {
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+
+// Greedy label-collision avoidance.
+// Each candidate is the y-position of the FIRST baseline (relative to point
+// center) which we apply via the first tspan's `dy` — later tspans cascade
+// down by 1.1em. We try above/below at primary and secondary offsets, and
+// hide the label if all four positions collide.
+function avoidLabelCollisions(
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+): void {
+  interface LabelInfo {
+    el: SVGTextElement;
+    firstTspan: SVGTSpanElement;
+    cx: number;
+    cy: number;
+    w: number;
+    nLines: number;
+    defaultFirstY: number;
+  }
+  const labels: LabelInfo[] = [];
+  const ASCENT = 9;
+  const DESCENT = 3;
+  const LINE_H = 11;
+
+  zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+    const labelEl = this.querySelector<SVGTextElement>('.point-label');
+    if (!labelEl) return;
+    if ((this as SVGGElement).style.opacity === '0') return;
+    const tspans = labelEl.querySelectorAll<SVGTSpanElement>('tspan');
+    if (tspans.length === 0) return;
+    const transform = (this as SVGGElement).getAttribute('transform') ?? '';
+    const m = transform.match(/translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u);
+    if (!m) return;
+    const cx = parseFloat(m[1]);
+    const cy = parseFloat(m[2]);
+    const nLines = tspans.length;
+    const defaultFirstY = -(8 + (nLines - 1) * LINE_H); // last baseline 8px above point
+    // Reset to default before measuring so prior positioning doesn't bias bbox
+    tspans[0].setAttribute('dy', `${defaultFirstY}px`);
+    labelEl.style.opacity = '1';
+    const bbox = labelEl.getBBox();
+    labels.push({
+      el: labelEl,
+      firstTspan: tspans[0],
+      cx,
+      cy,
+      w: bbox.width,
+      nLines,
+      defaultFirstY,
+    });
+  });
+
+  labels.sort((a, b) => a.cx - b.cx);
+  const placed: { left: number; right: number; top: number; bottom: number }[] = [];
+  const pad = 2;
+
+  for (const lab of labels) {
+    const blockH = (lab.nLines - 1) * LINE_H + ASCENT + DESCENT;
+    const aboveFirstY = lab.defaultFirstY;
+    const belowFirstY = 14; // first baseline 14px below point center
+    const candidates = [
+      aboveFirstY,
+      belowFirstY,
+      aboveFirstY - blockH - 2,
+      belowFirstY + blockH + 2,
+    ];
+    let chosenY: number | null = null;
+    let chosenBox: { left: number; right: number; top: number; bottom: number } | null = null;
+    for (const firstY of candidates) {
+      const top = lab.cy + firstY - ASCENT - pad;
+      const bottom = lab.cy + firstY + (lab.nLines - 1) * LINE_H + DESCENT + pad;
+      const left = lab.cx - lab.w / 2 - pad;
+      const right = lab.cx + lab.w / 2 + pad;
+      const collides = placed.some(
+        (p) => !(right < p.left || left > p.right || bottom < p.top || top > p.bottom),
+      );
+      if (!collides) {
+        chosenY = firstY;
+        chosenBox = { left, right, top, bottom };
+        break;
+      }
+    }
+    if (chosenY !== null && chosenBox) {
+      lab.firstTspan.setAttribute('dy', `${chosenY}px`);
+      lab.el.style.opacity = '1';
+      placed.push(chosenBox);
+    } else {
+      lab.el.style.opacity = '0';
+    }
+  }
+}
 
 // X-shape path for overlay (unofficial) data points
 const X_SIZE = 5;
@@ -108,8 +206,39 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 
+/**
+ * Bucket points by their (requested) date. Comparison overlays put multiple
+ * dates under one legend key, and rooflines / gradient paths must never span
+ * dates — a May 15 point can't dominate a May 17 plot.
+ */
+function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]> {
+  const byDate = new Map<string, InferenceData[]>();
+  for (const p of points) {
+    let bucket = byDate.get(p.date);
+    if (!bucket) {
+      bucket = [];
+      byDate.set(p.date, bucket);
+    }
+    bucket.push(p);
+  }
+  return byDate;
+}
+
+/** Identity key for "is this point on a roofline" lookups (scoped per date). */
+const optimalPointKey = (d: InferenceData): string =>
+  `${d.hwKey}_${d.precision}_${d.date}-${d.x}-${d.y}`;
+
+/** Point label lines: TP (or full parallelism label) plus the C= concurrency. */
+const pointLabelText = (d: InferenceData, advanced: boolean): string =>
+  advanced ? `${getPointLabel(d)}\nC=${d.conc}` : `${d.tp}\nC=${d.conc}`;
+
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
+
+/** Which legend series' points table is open (per-series drill-down dialog). */
+type LegendPointsTarget =
+  | { kind: 'official'; hwKey: string }
+  | { kind: 'overlay'; runIndex: number; runId: number; branch: string };
 
 // Scale configs are recomputed from the visible points on every render, but a
 // legend / precision toggle usually leaves the actual domain untouched (x-min
@@ -214,6 +343,8 @@ const ScatterGraph = React.memo(
       trackedConfigs,
       addTrackedConfig,
       removeTrackedConfig,
+      selectedXAxisMode,
+      selectedSequence,
       quickFilters,
     } = useInference();
 
@@ -289,10 +420,18 @@ const ScatterGraph = React.memo(
       () => [...effectiveOfficialHwTypes],
       [effectiveOfficialHwTypes],
     );
+    // High-contrast palette is keyed off the FULL set of official hw types with
+    // data, not the active subset. Otherwise deselecting a line shrinks the key
+    // set, which re-sizes the iwanthue palette and shifts every remaining line's
+    // hue (most visible for single-vendor agentic runs that span the full wheel —
+    // e.g. deselecting B300 would recolor B200 from red to blue). Keying off the
+    // stable full set fixes each hw's color so toggling only hides/shows lines.
+    const stableHcKeys = useMemo(() => [...hwTypesWithData], [hwTypesWithData]);
     const { resolveColor, getCssColor } = useThemeColors({
       highContrast,
       identifiers: activeHwKeys,
       activeKeys: activeOfficialKeys,
+      hcKeys: stableHcKeys,
     });
 
     // --- Changelog ---
@@ -328,34 +467,40 @@ const ScatterGraph = React.memo(
     );
 
     const rooflines = useMemo(() => {
+      // Frontier scope is (hw, precision, date) — points from different dates
+      // can never share a frontier (a May 15 point can't dominate a May 17 plot).
+      // The legend grouping is still by (hw, precision); we just split the
+      // pareto compute per date and re-merge into the legend bucket.
       const result: Record<string, InferenceData[]> = {};
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as
-        | 'upper_right'
-        | 'upper_left'
-        | 'lower_left'
-        | 'lower_right'
-        | undefined;
-      for (const hw of Object.keys(groupedData)) {
-        const front =
-          dir === 'upper_right'
-            ? paretoFrontUpperRight(groupedData[hw])
-            : dir === 'upper_left'
-              ? paretoFrontUpperLeft(groupedData[hw])
-              : dir === 'lower_left'
-                ? paretoFrontLowerLeft(groupedData[hw])
-                : paretoFrontLowerRight(groupedData[hw]);
-        front.sort((a, b) => a.x - b.x);
-        result[hw] = front;
+      const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
+      for (const hwKey of Object.keys(groupedData)) {
+        const combined: InferenceData[] = [];
+        for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
+          // In non-e2e xmodes, useChartData stamps every point with an
+          // `isOnE2eFrontier` flag so the line is restricted to the
+          // e2e-Pareto winners — same set of points across every chart,
+          // just re-plotted at the chosen x metric. When the flag is
+          // present on ANY point in the bucket, narrow to the winners
+          // before paretoing (otherwise we'd recompute a fresh frontier
+          // on the swapped x axis and reintroduce the benchmark hack).
+          const flagged = datePoints.some((p) => p.isOnE2eFrontier !== undefined);
+          const seedPoints = (
+            flagged ? datePoints.filter((p) => p.isOnE2eFrontier === true) : datePoints
+          ).filter(isFrontierEligible);
+          if (seedPoints.length === 0) continue;
+          combined.push(...frontierFn(seedPoints));
+        }
+        combined.sort((a, b) => a.x - b.x);
+        result[hwKey] = combined;
       }
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
     const optimalPointKeys = useMemo(() => {
       const keys = new Set<string>();
-      Object.values(rooflines).forEach((pts) =>
-        pts.forEach((p) => keys.add(`${p.hwKey}_${p.precision}-${p.x}-${p.y}`)),
-      );
+      Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(optimalPointKey(p))));
       return keys;
     }, [rooflines]);
 
@@ -381,6 +526,10 @@ const ScatterGraph = React.memo(
     const buildPointConfigId = useCallback((point: InferenceData): string => {
       let key = `${point.hwKey}|${point.precision}|${point.tp}|${point.conc}|${point.decode_ep ?? 0}|${point.prefill_tp ?? 0}|${point.prefill_ep ?? 0}`;
       if (point.disagg) key += `|disagg|${point.num_prefill_gpu ?? 0}|${point.num_decode_gpu ?? 0}`;
+      // Agentic runs emit two rows per (config, conc) — one offload=on, one off.
+      // Without this suffix, d3's data join treats them as the same point and
+      // drops one variant (along with its halo).
+      if (point.offload_mode) key += `|offload-${point.offload_mode}`;
       return key;
     }, []);
 
@@ -454,22 +603,11 @@ const ScatterGraph = React.memo(
         {} as Record<string, Entry>,
       );
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as
-        | 'upper_right'
-        | 'upper_left'
-        | 'lower_left'
-        | 'lower_right'
-        | undefined;
+      const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
+      const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        const front =
-          dir === 'upper_right'
-            ? paretoFrontUpperRight(group.points)
-            : dir === 'upper_left'
-              ? paretoFrontUpperLeft(group.points)
-              : dir === 'lower_left'
-                ? paretoFrontLowerLeft(group.points)
-                : paretoFrontLowerRight(group.points);
+        const front = frontierFn(group.points.filter(isFrontierEligible));
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }
@@ -478,6 +616,71 @@ const ScatterGraph = React.memo(
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
+
+    // Bulk presence lookup for agentic points: which ids have a stored
+    // trace_replay blob → controls the "View charts" button in the pinned
+    // tooltip. We deliberately don't fetch the histograms themselves here;
+    // a 95-point dsv4-b300 dashboard would pull GB of profile blobs through
+    // Neon's HTTP API and trip its 64 MB per-response cap.
+    const agenticIds = useMemo(() => {
+      const ids: number[] = [];
+      for (const p of pointsData) {
+        if (p.benchmark_type === 'agentic_traces' && typeof p.id === 'number') ids.push(p.id);
+      }
+      return ids;
+    }, [pointsData]);
+    const { data: traceAvailability } = useTraceAvailability(agenticIds);
+
+    // --- Legend points table (per-series drill-down opened from the legend) ---
+    const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
+
+    const pointsTable = useMemo(() => {
+      if (!pointsTableTarget) return null;
+      if (pointsTableTarget.kind === 'official') {
+        const { hwKey } = pointsTableTarget;
+        const hwConfig = hardwareConfig[hwKey];
+        // Same visibility filters the chart applies (precision, Optimal Only),
+        // scoped to the clicked series.
+        const pts = pointsData.filter(
+          (p) =>
+            p.hwKey === hwKey &&
+            selectedPrecisions.includes(p.precision) &&
+            (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(p))),
+        );
+        return {
+          hw: hwKey,
+          title: hwConfig ? getDisplayLabel(hwConfig) : hwKey,
+          color: resolveColor(hwKey),
+          isOverlay: false,
+          rows: buildLegendPointsRows(pts, false),
+        };
+      }
+      const { runIndex, runId, branch } = pointsTableTarget;
+      // Overlay series: this run's points, respecting the overlay hw toggles.
+      const pts = processedOverlayData.filter(
+        (p) =>
+          overlayRunIndex(p.run_url ?? null, runIndexByUrl) === runIndex &&
+          activeOverlayHwTypes.has(p.hwKey as string),
+      );
+      return {
+        hw: `overlay-run-${runId}`,
+        title: `✕ ${branch}`,
+        color: overlayRunColor(runIndex),
+        isOverlay: true,
+        rows: buildLegendPointsRows(pts, true),
+      };
+    }, [
+      pointsTableTarget,
+      hardwareConfig,
+      pointsData,
+      selectedPrecisions,
+      hideNonOptimal,
+      optimalPointKeys,
+      resolveColor,
+      processedOverlayData,
+      runIndexByUrl,
+      activeOverlayHwTypes,
+    ]);
 
     // Gradient label data
     const allPointLabelsByKey = useMemo(() => {
@@ -518,7 +721,7 @@ const ScatterGraph = React.memo(
     const visiblePoints = useMemo(() => {
       let pts = filteredData;
       if (hideNonOptimal) {
-        pts = pts.filter((d) => optimalPointKeys.has(`${d.hwKey}_${d.precision}-${d.x}-${d.y}`));
+        pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
       return processedOverlayData.length > 0 ? [...pts, ...processedOverlayData] : pts;
     }, [filteredData, processedOverlayData, hideNonOptimal, optimalPointKeys]);
@@ -607,7 +810,7 @@ const ScatterGraph = React.memo(
       (d: InferenceData) =>
         effectiveActiveHwTypes.has(d.hwKey as string) &&
         selectedPrecisions.includes(d.precision) &&
-        (!hideNonOptimal || optimalPointKeys.has(`${d.hwKey}_${d.precision}-${d.x}-${d.y}`)),
+        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
       [effectiveActiveHwTypes, selectedPrecisions, hideNonOptimal, optimalPointKeys],
     );
 
@@ -755,6 +958,7 @@ const ScatterGraph = React.memo(
               d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
             );
           }
+          avoidLabelCollisions(ctx.layout.zoomGroup);
         },
       }),
       [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type],
@@ -774,6 +978,7 @@ const ScatterGraph = React.memo(
             hardwareConfig,
             isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+            hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
@@ -789,26 +994,39 @@ const ScatterGraph = React.memo(
           ),
         onPointClick: (d: InferenceData) => {
           track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
-          // Attach track-over-time button handler in the tooltip
           const tooltipEl = chartRef.current?.getTooltipElement();
-          if (tooltipEl) {
-            const btn = tooltipEl.querySelector('[data-action="track-over-time"]');
-            if (btn) {
-              btn.addEventListener('click', (btnEvent) => {
-                btnEvent.stopPropagation();
-                const configId = buildPointConfigId(d);
-                if (trackedConfigIdsRef.current.has(configId)) removeTrackedConfig(configId);
-                else addTrackedConfig(d, chartDefinition.chartType);
-                chartRef.current?.dismissTooltip();
-                chartRef.current?.hideTooltip();
-                track('latency_point_tracked_via_tooltip', {
-                  hwKey: String(d.hwKey),
-                  tp: d.tp,
-                  conc: d.conc,
-                  precision: d.precision,
-                });
+          if (!tooltipEl) return;
+
+          // ── Summary-page actions ──────────────────────────────────────────
+          const trackBtn = tooltipEl.querySelector('[data-action="track-over-time"]');
+          if (trackBtn) {
+            trackBtn.addEventListener('click', (btnEvent) => {
+              btnEvent.stopPropagation();
+              const configId = buildPointConfigId(d);
+              if (trackedConfigIdsRef.current.has(configId)) removeTrackedConfig(configId);
+              else addTrackedConfig(d, chartDefinition.chartType);
+              chartRef.current?.dismissTooltip();
+              chartRef.current?.hideTooltip();
+              track('latency_point_tracked_via_tooltip', {
+                hwKey: String(d.hwKey),
+                tp: d.tp,
+                conc: d.conc,
+                precision: d.precision,
               });
-            }
+            });
+          }
+
+          // ── "View charts" real link (supports browser open-in-new-tab) ───
+          const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
+          if (viewBtn && typeof d.id === 'number') {
+            viewBtn.addEventListener('click', (btnEvent) => {
+              btnEvent.stopPropagation();
+              track('latency_view_charts_opened', {
+                id: d.id,
+                hwKey: String(d.hwKey),
+                conc: d.conc,
+              });
+            });
           }
         },
         attachToLayer: 1, // scatter layer is index 1 (after rooflines at 0)
@@ -822,6 +1040,11 @@ const ScatterGraph = React.memo(
         addTrackedConfig,
         removeTrackedConfig,
         chartDefinition.chartType,
+        // selectedPrecisions is read via interactionRef.current in the hover
+        // handlers, so it isn't a dep. traceAvailability IS read directly in the
+        // tooltip content closure (the "View charts" button), so rebuild the
+        // config when the presence fetch resolves.
+        traceAvailability,
       ],
     );
 
@@ -876,35 +1099,56 @@ const ScatterGraph = React.memo(
             const precision = key.split('_').pop()!;
             const visible =
               ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
-            let stroke = ir.getCssColor(ir.resolveColor(hw));
+            const baseStroke = ir.getCssColor(ir.resolveColor(hw));
 
-            if (showGradientLabels) {
-              const pointLabels = allPointLabelsByKey[key];
-              if (pointLabels) {
-                const stops = computeGradientStops(pointLabels, xScale);
-                if (stops) {
-                  const gid = `roofline-gradient-${chartId}-${key}`;
-                  activeGradientIds.add(gid);
-                  let gradient = defs.select<SVGLinearGradientElement>(`#${CSS.escape(gid)}`);
-                  if (gradient.empty()) gradient = defs.append('linearGradient').attr('id', gid);
-                  gradient
-                    .attr('gradientUnits', 'userSpaceOnUse')
-                    .attr('x1', xScale(pts[0].x))
-                    .attr('y1', 0)
-                    .attr('x2', xScale(pts.at(-1)!.x))
-                    .attr('y2', 0);
-                  gradient
-                    .selectAll('stop')
-                    .data(stops)
-                    .join('stop')
-                    .attr('offset', (s) => `${(s.offset * 100).toFixed(2)}%`)
-                    .attr('stop-color', (s) => s.color);
-                  stroke = `url(#${gid})`;
+            // Split into per-date sub-paths so the line never crosses dates.
+            // (When only one date is present the loop runs once with the full set.)
+            const byDate = groupPointsByDate(pts);
+            const singleDate = byDate.size === 1;
+
+            for (const [date, datePoints] of byDate) {
+              if (datePoints.length <= 1) continue;
+              const entryKey = singleDate ? key : `${key}__${date}`;
+              let stroke = baseStroke;
+
+              // Gradient labels only apply in the single-date case; mapping the
+              // (key-wide) ParetoPointLabel array onto per-date sub-segments is
+              // ambiguous and the comparison-date overlay is a rare combo.
+              if (singleDate && showGradientLabels) {
+                const pointLabels = allPointLabelsByKey[key];
+                if (pointLabels) {
+                  const stops = computeGradientStops(pointLabels, xScale);
+                  if (stops) {
+                    const gid = `roofline-gradient-${chartId}-${entryKey}`;
+                    activeGradientIds.add(gid);
+                    let gradient = defs.select<SVGLinearGradientElement>(`#${CSS.escape(gid)}`);
+                    if (gradient.empty()) gradient = defs.append('linearGradient').attr('id', gid);
+                    gradient
+                      .attr('gradientUnits', 'userSpaceOnUse')
+                      .attr('x1', xScale(datePoints[0].x))
+                      .attr('y1', 0)
+                      .attr('x2', xScale(datePoints.at(-1)!.x))
+                      .attr('y2', 0);
+                    gradient
+                      .selectAll('stop')
+                      .data(stops)
+                      .join('stop')
+                      .attr('offset', (s) => `${(s.offset * 100).toFixed(2)}%`)
+                      .attr('stop-color', (s) => s.color);
+                    stroke = `url(#${gid})`;
+                  }
                 }
               }
-            }
 
-            entries.push({ key, hw, precision, points: pts, stroke, visible });
+              entries.push({
+                key: entryKey,
+                hw,
+                precision,
+                points: datePoints,
+                stroke,
+                visible,
+              });
+            }
           });
 
           // Remove stale gradients
@@ -1346,11 +1590,18 @@ const ScatterGraph = React.memo(
             .y((d) => newYScale(d.y))
             .curve(d3.curveMonotoneX);
 
-          // Update roofline paths
+          // Update roofline paths — must split per-date so the zoom redraw
+          // matches the per-date sub-paths created in the initial render.
           Object.entries(rooflines).forEach(([key, pts]) => {
             if (pts.length < 2) return;
-            const sel = zoomGroup.select<SVGPathElement>(`.roofline-${key}`);
-            if (!sel.empty()) sel.attr('d', lineGen(pts) as string);
+            const byDate = groupPointsByDate(pts);
+            const singleDate = byDate.size === 1;
+            for (const [date, datePoints] of byDate) {
+              if (datePoints.length < 2) continue;
+              const cls = singleDate ? `roofline-${key}` : `roofline-${key}__${date}`;
+              const sel = zoomGroup.select<SVGPathElement>(`.${CSS.escape(cls)}`);
+              if (!sel.empty()) sel.attr('d', lineGen(datePoints) as string);
+            }
           });
 
           // Update gradient coordinates
@@ -1578,7 +1829,8 @@ const ScatterGraph = React.memo(
           getOpacity: (d) => (interactionRef.current.isPointVisible(d) ? 1 : 0),
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: !showPointLabels || showGradientLabels,
-          getLabelText: (d) => (useAdvancedLabels ? getPointLabel(d) : String(d.tp)),
+          // Keep the concurrency (C=) annotation from the agentx scatter labels.
+          getLabelText: (d) => pointLabelText(d, useAdvancedLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
@@ -1679,17 +1931,26 @@ const ScatterGraph = React.memo(
               // Labels
               const showLabels = showPointLabels && !showGradientLabels;
               overlayPoints.each(function (d) {
-                d3.select(this)
+                const lines = showLabels ? pointLabelText(d, useAdvancedLabels).split('\n') : [];
+                const text = d3
+                  .select(this)
                   .selectAll<SVGTextElement, boolean>('.overlay-label')
                   .data(showLabels ? [true] : [])
                   .join('text')
                   .attr('class', 'overlay-label')
-                  .attr('dy', -10)
                   .attr('text-anchor', 'middle')
                   .style('fill', 'var(--foreground)')
                   .attr('font-size', '10px')
-                  .attr('pointer-events', 'none')
-                  .text(useAdvancedLabels ? getPointLabel(d) : String(d.tp));
+                  .attr('font-weight', '700')
+                  .attr('pointer-events', 'none');
+                const firstDy = -(1 + (lines.length - 1) * 1.1);
+                text
+                  .selectAll<SVGTSpanElement, string>('tspan')
+                  .data(lines)
+                  .join('tspan')
+                  .attr('x', 0)
+                  .attr('dy', (_l, i) => (i === 0 ? `${firstDy}em` : '1.1em'))
+                  .text((l) => l);
               });
 
               // Overlay tooltip handlers
@@ -2007,6 +2268,23 @@ const ScatterGraph = React.memo(
             .attr('pointer-events', 'none');
         });
 
+        // Offload halo: dashed ring on every point that used KV offload (Pareto or not)
+        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
+          const showHalo = d.offload_mode === 'on';
+          d3.select(this)
+            .selectAll<SVGCircleElement, boolean>('.offload-halo')
+            .data(showHalo ? [true] : [])
+            .join('circle')
+            .attr('class', 'offload-halo')
+            .attr('r', POINT_SIZE + 4)
+            .attr('fill', 'none')
+            .attr('stroke', 'var(--foreground)')
+            .attr('stroke-width', 1.5)
+            .attr('stroke-dasharray', '3 2')
+            .attr('opacity', 0.9)
+            .attr('pointer-events', 'none');
+        });
+
         // Double-click to track/untrack
         zoomGroup
           .selectAll<SVGGElement, InferenceData>('.dot-group')
@@ -2041,6 +2319,8 @@ const ScatterGraph = React.memo(
             });
           });
 
+        avoidLabelCollisions(zoomGroup);
+
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
           const xScale = ctx.xScale as d3.ScaleLogarithmic<number, number>;
@@ -2063,6 +2343,9 @@ const ScatterGraph = React.memo(
         chartDefinition.chartType,
         xScaleConfig._isLog,
         yScaleConfig.type,
+        optimalPointKeys,
+        getCssColor,
+        resolveColor,
       ],
     );
 
@@ -2234,256 +2517,310 @@ const ScatterGraph = React.memo(
     }
 
     return (
-      <D3Chart<InferenceData>
-        ref={chartRef}
-        chartId={chartId}
-        // Stable across toggles: the render effect keys on this for "data
-        // changed" rebuilds; scale domains come from x/yScaleConfig (computed
-        // from the visible points), and visibility is applied via opacity.
-        data={pointsData}
-        margin={CHART_MARGIN}
-        watermark={getChartWatermark(isUnofficialRun)}
-        testId="scatter-graph"
-        grabCursor={true}
-        caption={caption}
-        xScale={xScaleConfig}
-        yScale={yScaleConfig}
-        xAxis={xAxisConfig}
-        yAxis={yAxisConfig}
-        layers={layers}
-        zoom={zoomConfig}
-        tooltip={tooltipConfig}
-        transitionDuration={transitionDuration}
-        onRender={onRender}
-        noDataOverlay={
-          filteredData.length === 0 && processedOverlayData.length === 0 ? (
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: 100 }}
-            >
-              <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
-                <p className="text-sm font-medium">No data available</p>
-                <p className="text-xs mt-1">
-                  Please change the model, sequence, precision, date range or GPU selection.
-                </p>
+      <>
+        <D3Chart<InferenceData>
+          ref={chartRef}
+          chartId={chartId}
+          // Stable across toggles: the render effect keys on this for "data
+          // changed" rebuilds; scale domains come from x/yScaleConfig (computed
+          // from the visible points), and visibility is applied via opacity.
+          data={pointsData}
+          margin={CHART_MARGIN}
+          watermark={getChartWatermark(isUnofficialRun)}
+          testId="scatter-graph"
+          grabCursor={true}
+          caption={caption}
+          xScale={xScaleConfig}
+          yScale={yScaleConfig}
+          xAxis={xAxisConfig}
+          yAxis={yAxisConfig}
+          layers={layers}
+          zoom={zoomConfig}
+          tooltip={tooltipConfig}
+          transitionDuration={transitionDuration}
+          onRender={onRender}
+          noDataOverlay={
+            filteredData.length === 0 && processedOverlayData.length === 0 ? (
+              <div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                style={{ zIndex: 100 }}
+              >
+                <div className="text-muted-foreground text-center bg-background/80 px-4 py-2 rounded-md">
+                  <p className="text-sm font-medium">No data available</p>
+                  <p className="text-xs mt-1">
+                    Please change the model, sequence, precision, date range or GPU selection.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : undefined
-        }
-        legendElement={
-          <ChartLegend
-            variant="sidebar"
-            onItemHover={handleLegendHover}
-            onItemHoverEnd={handleLegendHoverEnd}
-            onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
-            legendItems={[
-              // Overlay legend: one entry per loaded unofficial run that actually
-              // contributes points to this chart. Colored from the shared palette
-              // so the legend swatch matches the stroke color used in the chart.
-              ...(overlayData && unofficialRunInfos.length > 0
-                ? unofficialRunInfos
-                    .map((info, idx) => {
-                      const hasPoints = overlayData.data.some(
-                        (d) =>
-                          overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
-                          selectedPrecisions.includes(d.precision),
-                      );
-                      if (!hasPoints) return null;
-                      const branch = info.branch || `run ${info.id}`;
-                      return {
-                        name: `✕ unofficial-run-${info.id}`,
-                        label: `✕ ${branch}`,
-                        color: overlayRunColor(idx),
-                        title: `UNOFFICIAL: ${branch}`,
-                        isHighlighted: true,
-                        hw: `overlay-run-${info.id}`,
-                        isActive: true,
-                        onClick: () => {},
-                        tooltip: (
-                          <div className="font-normal text-xs">
-                            <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
-                            <div>Branch: {branch}</div>
-                            {info.url && (
-                              <a
-                                href={info.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="underline"
-                              >
-                                View workflow run
-                              </a>
-                            )}
-                          </div>
-                        ),
-                      };
-                    })
-                    .filter((x): x is NonNullable<typeof x> => x !== null)
-                : []),
-              ...Object.entries(hardwareConfig)
-                .filter(([key]) =>
-                  showAllHardwareTypes ? effectiveActiveHwTypes.has(key) : hwTypesWithData.has(key),
-                )
-                .toSorted(
-                  ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                )
-                .map(([key, hwConfig]: [string, any]) => ({
-                  name: hwConfig.name,
-                  label: getDisplayLabel(hwConfig),
-                  color: resolveColor(key),
-                  title: hwConfig.gpu,
-                  isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
-                  hw: key,
-                  isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
-                  onClick: showAllHardwareTypes
-                    ? () => {}
-                    : () => {
-                        handleToggleHwType(key);
-                        track('latency_hw_type_toggled', { hw: key });
-                      },
-                  tooltip: changelog
-                    ? formatChangelogDescription(changelog.entries[0].description)
-                    : null,
-                })),
-            ]}
-            disableActiveSort={false}
-            isLegendExpanded={isLegendExpanded}
-            onExpandedChange={(expanded) => {
-              setIsLegendExpanded(expanded);
-              track('latency_legend_expanded', { expanded });
-            }}
-            switches={[
-              ...(selectedYAxisMetric === 'y_inputTputPerGpu'
-                ? []
-                : [
-                    {
-                      id: 'scatter-log-scale',
-                      label: 'Log Scale',
-                      checked: logScale,
-                      onCheckedChange: (checked: boolean) => {
-                        setLogScale(checked);
-                        track('latency_log_scale_toggled', { enabled: checked });
-                      },
-                    },
-                  ]),
-              {
-                id: 'scatter-hide-non-optimal',
-                label: 'Optimal Only',
-                checked: hideNonOptimal,
-                onCheckedChange: (checked: boolean) => {
-                  setHideNonOptimal(checked);
-                  track('latency_hide_non_optimal_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-point-labels',
-                label: 'Labels',
-                checked: showPointLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setShowPointLabels(checked);
-                  track('latency_point_labels_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-high-contrast',
-                label: 'High Contrast',
-                checked: highContrast,
-                onCheckedChange: (checked: boolean) => {
-                  setHighContrast(checked);
-                  track('latency_high_contrast_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-parallelism-labels',
-                label: 'Parallelism Labels',
-                checked: useAdvancedLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setUseAdvancedLabels(checked);
-                  track('latency_advanced_labels_toggled', { enabled: checked });
-                  // Parallelism labels are point labels; turning them on is
-                  // pointless if labels are hidden, so auto-enable Labels.
-                  if (checked && !showPointLabels) setShowPointLabels(true);
-                  if (checked && !showGradientLabels) {
-                    window.dispatchEvent(
-                      new CustomEvent(GRADIENT_NUDGE_EVENT, {
-                        detail: {
-                          enableGradient: () => {
-                            setShowGradientLabels(true);
-                            setUseAdvancedLabels(false);
-                            track('latency_gradient_labels_toggled', {
-                              enabled: true,
-                              source: 'nudge',
+            ) : undefined
+          }
+          legendElement={
+            <ChartLegend
+              variant="sidebar"
+              onItemHover={handleLegendHover}
+              onItemHoverEnd={handleLegendHoverEnd}
+              onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
+              legendItems={[
+                // Overlay legend: one entry per loaded unofficial run that actually
+                // contributes points to this chart. Colored from the shared palette
+                // so the legend swatch matches the stroke color used in the chart.
+                ...(overlayData && unofficialRunInfos.length > 0
+                  ? unofficialRunInfos
+                      .map((info, idx) => {
+                        const hasPoints = overlayData.data.some(
+                          (d) =>
+                            overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
+                            selectedPrecisions.includes(d.precision),
+                        );
+                        if (!hasPoints) return null;
+                        const branch = info.branch || `run ${info.id}`;
+                        return {
+                          name: `✕ unofficial-run-${info.id}`,
+                          label: `✕ ${branch}`,
+                          color: overlayRunColor(idx),
+                          title: `UNOFFICIAL: ${branch}`,
+                          isHighlighted: true,
+                          hw: `overlay-run-${info.id}`,
+                          isActive: true,
+                          onClick: () => {},
+                          onShowPoints: () => {
+                            setPointsTableTarget({
+                              kind: 'overlay',
+                              runIndex: idx,
+                              runId: info.id,
+                              branch,
+                            });
+                            track('inference_legend_points_table_opened', {
+                              hw: `overlay-run-${info.id}`,
+                              framework: 'overlay',
                             });
                           },
+                          tooltip: (
+                            <div className="font-normal text-xs">
+                              <div className="text-red-500 font-semibold">UNOFFICIAL RUN</div>
+                              <div>Branch: {branch}</div>
+                              {info.url && (
+                                <a
+                                  href={info.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline"
+                                >
+                                  View workflow run
+                                </a>
+                              )}
+                            </div>
+                          ),
+                        };
+                      })
+                      .filter((x): x is NonNullable<typeof x> => x !== null)
+                  : []),
+                ...Object.entries(hardwareConfig)
+                  .filter(([key]) =>
+                    showAllHardwareTypes
+                      ? effectiveActiveHwTypes.has(key)
+                      : hwTypesWithData.has(key),
+                  )
+                  .toSorted(
+                    ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+                  )
+                  .map(([key, hwConfig]: [string, any]) => ({
+                    name: hwConfig.name,
+                    label: getDisplayLabel(hwConfig),
+                    color: resolveColor(key),
+                    title: hwConfig.gpu,
+                    isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
+                    hw: key,
+                    isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
+                    onClick: showAllHardwareTypes
+                      ? () => {}
+                      : () => {
+                          handleToggleHwType(key);
+                          track('latency_hw_type_toggled', { hw: key });
                         },
-                      }),
-                    );
-                  }
-                },
-              },
-              {
-                id: 'scatter-gradient-labels',
-                label: 'Gradient Labels',
-                checked: showGradientLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setShowGradientLabels(checked);
-                  track('latency_gradient_labels_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-line-labels',
-                label: 'Line Labels',
-                checked: showLineLabels,
-                onCheckedChange: (checked: boolean) => {
-                  setShowLineLabels(checked);
-                  track('latency_line_labels_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-speed-overlay',
-                label: 'Bus / Race Car',
-                advanced: true,
-                checked: showSpeedOverlay,
-                onCheckedChange: (checked: boolean) => {
-                  setShowSpeedOverlay(checked);
-                  track('latency_speed_overlay_toggled', { enabled: checked });
-                },
-              },
-              {
-                id: 'scatter-minecraft-overlay',
-                label: 'Donkey / Elytra',
-                advanced: true,
-                checked: showMinecraftOverlay,
-                onCheckedChange: (checked: boolean) => {
-                  setShowMinecraftOverlay(checked);
-                  track('latency_minecraft_overlay_toggled', { enabled: checked });
-                },
-              },
-            ]}
-            onAdvancedExpandedChange={(expanded) => {
-              track('latency_advanced_controls_toggled', { expanded });
-            }}
-            actions={
-              effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-              activeOverlayHwTypes.size < allOverlayHwTypes.size
-                ? [
-                    {
-                      id: 'scatter-reset-filter',
-                      label: 'Reset filter',
-                      onClick: () => {
-                        selectAllHwTypes();
-                        setLocalOfficialOverride(null);
-                        resetOverlayHwTypes();
-                        track('latency_legend_filter_reset');
-                      },
+                    onShowPoints: () => {
+                      setPointsTableTarget({ kind: 'official', hwKey: key });
+                      track('inference_legend_points_table_opened', {
+                        hw: key,
+                        framework: hwConfig.framework ?? '',
+                      });
                     },
-                  ]
-                : []
+                    tooltip: changelog
+                      ? formatChangelogDescription(changelog.entries[0].description)
+                      : null,
+                  })),
+              ]}
+              disableActiveSort={false}
+              isLegendExpanded={isLegendExpanded}
+              onExpandedChange={(expanded) => {
+                setIsLegendExpanded(expanded);
+                track('latency_legend_expanded', { expanded });
+              }}
+              switches={[
+                ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                  ? []
+                  : [
+                      {
+                        id: 'scatter-log-scale',
+                        label: 'Log Scale',
+                        checked: logScale,
+                        onCheckedChange: (checked: boolean) => {
+                          setLogScale(checked);
+                          track('latency_log_scale_toggled', { enabled: checked });
+                        },
+                      },
+                    ]),
+                {
+                  id: 'scatter-hide-non-optimal',
+                  label: 'Optimal Only',
+                  checked: hideNonOptimal,
+                  onCheckedChange: (checked: boolean) => {
+                    setHideNonOptimal(checked);
+                    track('latency_hide_non_optimal_toggled', { enabled: checked });
+                  },
+                  // On agentic + non-e2e chart, "optimal" means "on the
+                  // e2e-latency Pareto frontier" (not a per-axis Pareto on the
+                  // current x metric). Explain that so users don't wonder why
+                  // a point sitting above the line is still considered
+                  // dominated.
+                  ...(selectedSequence === Sequence.AgenticTraces && selectedXAxisMode !== 'e2e'
+                    ? {
+                        infoTooltip:
+                          "On agentic, optimal = on the end-to-end latency Pareto frontier, so a config can't win this axis by tanking e2e. Off-frontier points may appear above the line.",
+                      }
+                    : {}),
+                },
+                {
+                  id: 'scatter-point-labels',
+                  label: 'Labels',
+                  checked: showPointLabels,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowPointLabels(checked);
+                    track('latency_point_labels_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-high-contrast',
+                  label: 'High Contrast',
+                  checked: highContrast,
+                  onCheckedChange: (checked: boolean) => {
+                    setHighContrast(checked);
+                    track('latency_high_contrast_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-parallelism-labels',
+                  label: 'Parallelism Labels',
+                  checked: useAdvancedLabels,
+                  onCheckedChange: (checked: boolean) => {
+                    setUseAdvancedLabels(checked);
+                    track('latency_advanced_labels_toggled', { enabled: checked });
+                    // Parallelism labels are point labels; turning them on is
+                    // pointless if labels are hidden, so auto-enable Labels.
+                    if (checked && !showPointLabels) setShowPointLabels(true);
+                    if (checked && !showGradientLabels) {
+                      window.dispatchEvent(
+                        new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                          detail: {
+                            enableGradient: () => {
+                              setShowGradientLabels(true);
+                              setUseAdvancedLabels(false);
+                              track('latency_gradient_labels_toggled', {
+                                enabled: true,
+                                source: 'nudge',
+                              });
+                            },
+                          },
+                        }),
+                      );
+                    }
+                  },
+                },
+                {
+                  id: 'scatter-gradient-labels',
+                  label: 'Gradient Labels',
+                  checked: showGradientLabels,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowGradientLabels(checked);
+                    track('latency_gradient_labels_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-line-labels',
+                  label: 'Line Labels',
+                  checked: showLineLabels,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowLineLabels(checked);
+                    track('latency_line_labels_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-speed-overlay',
+                  label: 'Bus / Race Car',
+                  advanced: true,
+                  checked: showSpeedOverlay,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowSpeedOverlay(checked);
+                    track('latency_speed_overlay_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-minecraft-overlay',
+                  label: 'Donkey / Elytra',
+                  advanced: true,
+                  checked: showMinecraftOverlay,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowMinecraftOverlay(checked);
+                    track('latency_minecraft_overlay_toggled', { enabled: checked });
+                  },
+                },
+              ]}
+              onAdvancedExpandedChange={(expanded) => {
+                track('latency_advanced_controls_toggled', { expanded });
+              }}
+              actions={
+                effectiveOfficialHwTypes.size < hwTypesWithData.size ||
+                activeOverlayHwTypes.size < allOverlayHwTypes.size
+                  ? [
+                      {
+                        id: 'scatter-reset-filter',
+                        label: 'Reset filter',
+                        onClick: () => {
+                          selectAllHwTypes();
+                          setLocalOfficialOverride(null);
+                          resetOverlayHwTypes();
+                          track('latency_legend_filter_reset');
+                        },
+                      },
+                    ]
+                  : []
+              }
+              precisionIndicators={selectedPrecisions}
+              enableTooltips={true}
+            />
+          }
+        />
+        {pointsTable && (
+          <LegendPointsDialog
+            open
+            onOpenChange={(open) => {
+              if (!open) setPointsTableTarget(null);
+            }}
+            title={pointsTable.title}
+            subtitle={`${modelLabel} · ${getSequenceLabel(selectedSequence)}`}
+            accentColor={pointsTable.color}
+            rows={pointsTable.rows}
+            isOverlay={pointsTable.isOverlay}
+            onRowClick={(row) =>
+              track('inference_legend_points_table_row_clicked', {
+                hw: pointsTable.hw,
+                conc: row.conc,
+                href: row.href ?? '',
+              })
             }
-            precisionIndicators={selectedPrecisions}
-            enableTooltips={true}
           />
-        }
-      />
+        )}
+      </>
     );
   },
 );

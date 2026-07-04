@@ -1,0 +1,3 @@
+# Stale agent worktrees produced by parallel Claude Code sessions — they
+# hold their own branches and are linted as part of their own runs.
+.claude/worktrees/

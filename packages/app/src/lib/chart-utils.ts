@@ -61,10 +61,17 @@ const PALETTE_CACHE = new Map<string, string[]>();
 /**
  * Generates high-contrast colors using iwanthue (k-means in CIELab space).
  *
- * Tiered strategy per vendor:
+ * Tiered strategy per vendor (only when >1 vendor is present):
  *   ≤ PREFERRED_MAX → constrain to brand zone (NVIDIA=green, AMD=red)
  *   ≤ BAN_MAX       → full wheel minus rival's brand color
  *   > BAN_MAX       → full wheel, no restrictions, best spacing wins
+ *
+ * Single-vendor case (e.g. an all-NVIDIA agentic comparison of B200/B300 ×
+ * vLLM/SGLang): the brand zone and rival-ban exist to keep vendors apart at a
+ * glance, but with one vendor there's no rival — clamping every series into the
+ * same narrow hue band just collapses the contrast HC is supposed to maximize.
+ * So skip both restrictions and use the full wheel, giving the series the widest
+ * possible separation.
  */
 export const generateHighContrastColors = (
   keys: string[],
@@ -91,6 +98,12 @@ export const generateHighContrastColors = (
     list.push(key);
   }
 
+  // Brand-zone / rival-ban only serve to keep DIFFERENT vendors apart. With a
+  // single vendor present there's nothing to separate from, so those
+  // restrictions only shrink the usable hue range and kill contrast — open the
+  // full wheel instead (the common all-NVIDIA agentic comparison case).
+  const multiVendor = groups.size > 1;
+
   for (const [vendor, vendorKeys] of groups) {
     const count = vendorKeys.length;
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
@@ -99,8 +112,8 @@ export const generateHighContrastColors = (
     // Tier 1: few items → brand zone only
     // Tier 2: moderate  → full wheel minus rival color
     // Tier 3: many      → full wheel, no restrictions
-    const usePreferred = preferred && count <= PREFERRED_MAX;
-    const useBan = !usePreferred && isBanned && count <= BAN_MAX;
+    const usePreferred = multiVendor && preferred && count <= PREFERRED_MAX;
+    const useBan = multiVendor && !usePreferred && isBanned && count <= BAN_MAX;
 
     // Everything iwanthue's output depends on (the ban filter and preferred
     // zone are functions of vendor; the seed is vendor+theme).
@@ -462,6 +475,17 @@ export const getNestedYValue = <T extends InferenceData>(point: T, key: string):
 };
 
 /**
+ * Whether a point may sit on the Pareto frontier / "optimal" set. Points with a
+ * non-positive or non-finite x (e.g. interactivity = 0 when ITL is missing/zero,
+ * or a 0/negative latency) are degenerate — no real config runs there — so they
+ * must never be marked optimal. Apply this to a frontier function's INPUT; the
+ * points still render in the show-all view, they just lose roofline eligibility.
+ * NOTE: filter at the call site, not inside the paretoFront* functions — those are
+ * kept 1:1 with the calculator's Python port (iso_interactivity.py).
+ */
+export const isFrontierEligible = (p: { x: number }): boolean => Number.isFinite(p.x) && p.x > 0;
+
+/**
  * Calculates the Pareto front (upper right) for a given set of points.
  */
 export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] => {
@@ -579,6 +603,20 @@ export const paretoFrontLowerRight = (points: InferenceData[]): InferenceData[] 
   return front;
 };
 
+const PARETO_BY_DIRECTION = {
+  upper_right: paretoFrontUpperRight,
+  upper_left: paretoFrontUpperLeft,
+  lower_left: paretoFrontLowerLeft,
+  lower_right: paretoFrontLowerRight,
+} as const;
+
+export type ParetoDirection = keyof typeof PARETO_BY_DIRECTION;
+
+/** Look up the Pareto frontier function for a roofline direction. */
+export const paretoFrontForDirection = (
+  dir: ParetoDirection,
+): ((points: InferenceData[]) => InferenceData[]) => PARETO_BY_DIRECTION[dir];
+
 /**
  * Calculates the roofline for a given set of points.
  */
@@ -612,7 +650,9 @@ export const calculateRoofline = (
     | `measuredJPerInputToken.y`,
   rooflineDirection: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right',
 ): InferenceData[] => {
-  const pointsForRoofline = points.map((p) => {
+  // Exclude degenerate x <= 0 points (see isFrontierEligible) so they never
+  // anchor a roofline or show up in the optimal-only view.
+  const pointsForRoofline = points.filter(isFrontierEligible).map((p) => {
     const yValue = getNestedYValue(p, yKey);
     return { ...p, y: yValue };
   });

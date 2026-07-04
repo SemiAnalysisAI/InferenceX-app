@@ -26,6 +26,7 @@ export interface GithubRunInfo {
   runStartedAt: string | null;
   headSha: string | null;
   headBranch: string | null;
+  headCommitMessage: string | null;
   runAttempt: number | null;
   pullRequests: GithubPullRequestRef[];
 }
@@ -101,6 +102,7 @@ export function createWorkflowRunServices(sql: Sql, githubToken?: string) {
         runStartedAt: d.run_started_at ? String(d.run_started_at) : null,
         headSha: d.head_sha ? String(d.head_sha) : null,
         headBranch: d.head_branch ? String(d.head_branch) : null,
+        headCommitMessage: d.head_commit?.message ? String(d.head_commit.message) : null,
         runAttempt: typeof d.run_attempt === 'number' ? d.run_attempt : null,
         pullRequests,
       };

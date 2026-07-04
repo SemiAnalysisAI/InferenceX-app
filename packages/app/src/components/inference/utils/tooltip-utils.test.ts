@@ -150,6 +150,26 @@ describe('getPointLabel', () => {
 // generateTooltipContent
 // ===========================================================================
 describe('generateTooltipContent', () => {
+  it('renders View charts as a same-tab anchor so browsers offer open-in-new-tab', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+    );
+    expect(html).toContain('<a data-action="view-charts"');
+    expect(html).toContain('href="/inference/agentic/1"');
+    expect(html).not.toContain('data-action="view-charts" target=');
+  });
+
+  it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
+    // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
+    // link to /inference/agentic/0, a doomed lookup.
+    for (const badId of [0, Number.NaN]) {
+      const html = generateTooltipContent(
+        tooltipConfig({ data: pt({ id: badId }), isPinned: true, hasTrace: true }),
+      );
+      expect(html).not.toContain('data-action="view-charts"');
+    }
+  });
+
   it('includes hardware display label from config', () => {
     const html = generateTooltipContent(tooltipConfig());
     expect(html).toContain('H100');
@@ -364,5 +384,28 @@ describe('generateGPUGraphTooltipContent', () => {
       tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
     );
     expect(html).toContain('vllm-v0.6.0<br />abc123');
+  });
+
+  it('shows View charts only for pinned points with stored trace data', () => {
+    expect(
+      generateGPUGraphTooltipContent(
+        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+      ),
+    ).toContain('data-action="view-charts"');
+    expect(
+      generateGPUGraphTooltipContent(
+        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: true }),
+      ),
+    ).toContain('href="/inference/agentic/1"');
+    expect(
+      generateGPUGraphTooltipContent(
+        tooltipConfig({ data: pt({ id: 1 }), isPinned: false, hasTrace: true }),
+      ),
+    ).not.toContain('data-action="view-charts"');
+    expect(
+      generateGPUGraphTooltipContent(
+        tooltipConfig({ data: pt({ id: 1 }), isPinned: true, hasTrace: false }),
+      ),
+    ).not.toContain('data-action="view-charts"');
   });
 });

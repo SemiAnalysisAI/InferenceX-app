@@ -1,0 +1,233 @@
+name: Ingest Agentic Benchmark Results
+
+# Dispatched from the main InferenceX repo at the end of an agentic (AgentX
+# trace-replay) sweep, mirroring the fixed-seq-len `ingest-results` dispatch:
+#
+#   curl -sSf -X POST \
+#     -H "Authorization: Bearer $INFX_FRONTEND_PAT" \
+#     -H "Accept: application/vnd.github+v3+json" \
+#     https://api.github.com/repos/SemiAnalysisAI/InferenceX-app/dispatches \
+#     -d '{"event_type": "ingest-agentic-results",
+#          "client_payload": {"run-id": "<run_id>", "run-attempt": "<attempt>",
+#                             "database-target": "production"}}'
+#
+# The ingest script (packages/db/src/ingest-ci-run.ts) auto-detects agentic
+# artifacts: benchmark rows land in benchmark_results (benchmark_type=
+# 'agentic_traces'), raw profile exports + server metrics land in the
+# agentic_trace_replay sidecar with precomputed chart/timeline JSONBs, the
+# run is linked to its dataset in run_datasets, and changelog-metadata is
+# ingested when present. This is a separate workflow from ingest-results.yml
+# because agentic ingests are blob-heavy (100MB+ gzipped profile exports per
+# high-concurrency point) and need a much longer timeout, plus
+# agentic-specific alerting (missing dataset slug).
+
+on:
+  repository_dispatch:
+    types: [ingest-agentic-results]
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: InferenceX Actions run ID to ingest
+        required: true
+        type: string
+      run-attempt:
+        description: InferenceX Actions run attempt to ingest
+        required: false
+        default: '1'
+        type: string
+      database-target:
+        description: Database/cache target for the ingest
+        required: false
+        default: production
+        type: choice
+        options:
+          - production
+          - dev
+          - agentx-v1
+
+jobs:
+  ingest:
+    # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
+    # far longer than a fixed-seq-len ingest.
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Wait for source run to finish
+        if: github.event_name != 'workflow_dispatch'
+        run: sleep 300
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --filter @semianalysisai/inferencex-db...
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Select ingest target
+        env:
+          REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
+          DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
+          DATABASE_WRITE_URL_AGENTX_V1: ${{ secrets.DATABASE_AGENTX_V1_WRITE_URL }}
+        run: |
+          case "$REQUESTED_DATABASE_TARGET" in
+            production)
+              database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
+              cache_invalidate_url="https://inferencex.semianalysis.com/api/v1/invalidate"
+              ;;
+            dev)
+              database_write_url="$DATABASE_WRITE_URL_DEV"
+              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              ;;
+            agentx-v1)
+              database_write_url="$DATABASE_WRITE_URL_AGENTX_V1"
+              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              ;;
+            *)
+              echo "::error::Unsupported database-target: $REQUESTED_DATABASE_TARGET"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$database_write_url" ]; then
+            echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
+            exit 1
+          fi
+
+          echo "::add-mask::$database_write_url"
+          echo "DATABASE_WRITE_URL=$database_write_url" >> "$GITHUB_ENV"
+          echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET" >> "$GITHUB_ENV"
+          echo "CACHE_INVALIDATE_URL=$cache_invalidate_url" >> "$GITHUB_ENV"
+          echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
+          echo "Cache invalidate URL: $cache_invalidate_url"
+
+      - name: Run migrations
+        run: pnpm admin:db:migrate --yes
+
+      - name: Download artifacts from InferenceX run
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
+          ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+        run: |
+          mkdir -p "$ARTIFACTS_PATH"
+
+          # Download all artifacts for the run, deduplicated by name (keep latest).
+          gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}/artifacts" --paginate \
+            | jq -r '
+                [.artifacts[]]
+                | group_by(.name) | map(sort_by(.created_at) | last)[]
+                | "\(.name)\t\(.archive_download_url)"' \
+            | while IFS=$'\t' read -r name url; do
+                echo "Downloading artifact: ${name}"
+                ok=false
+                for attempt in 1 2 3; do
+                  if gh api "${url}" > artifact.zip; then
+                    ok=true
+                    break
+                  fi
+                  echo "  Attempt ${attempt}/3 failed, retrying in ${attempt}s..."
+                  sleep "$attempt"
+                done
+                if [ "$ok" = false ]; then
+                  echo "::warning::Failed to download artifact after 3 attempts: ${name} — skipping"
+                  rm -f artifact.zip
+                  echo "$name" >> "$ARTIFACTS_PATH/.failures"
+                  continue
+                fi
+                mkdir -p "${ARTIFACTS_PATH}/${name}"
+                if ! unzip -o artifact.zip -d "${ARTIFACTS_PATH}/${name}"; then
+                  echo "::warning::Failed to extract artifact: ${name} — skipping"
+                  rm -rf "${ARTIFACTS_PATH:?}/${name}"
+                  echo "$name" >> "$ARTIFACTS_PATH/.failures"
+                fi
+                rm -f artifact.zip
+              done
+
+          if [ -f "$ARTIFACTS_PATH/.failures" ]; then
+            count=$(wc -l < "$ARTIFACTS_PATH/.failures")
+            rm "$ARTIFACTS_PATH/.failures"
+            echo "::warning::${count} artifact(s) failed to download; ingesting what's available"
+          fi
+
+          echo "Downloaded artifacts:"
+          ls "$ARTIFACTS_PATH/"
+
+          if [ -z "$(ls -A "$ARTIFACTS_PATH")" ]; then
+            echo "::error::No artifacts could be downloaded from run ${RUN_ID}"
+            exit 1
+          fi
+
+      - name: Ingest results to DB
+        env:
+          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          INGEST_RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
+          INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || inputs.run-attempt }}
+          INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+          INGEST_REPO: SemiAnalysisAI/InferenceX
+          UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
+        run: pnpm admin:db:ingest:ci
+
+      - name: Apply run overrides
+        run: pnpm admin:db:apply-overrides --yes
+
+      - name: Verify database
+        run: pnpm admin:db:verify
+
+      - name: Invalidate Vercel cache
+        env:
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: |
+          curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
+            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true
+
+      - name: Check for unmapped entities
+        if: always()
+        id: unmapped
+        run: |
+          f="${{ github.workspace }}/unmapped-entities.json"
+          if [ -f "$f" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            models=$(jq -r '.models // [] | join(", ")' "$f")
+            hardware=$(jq -r '.hardware // [] | join(", ")' "$f")
+            precisions=$(jq -r '.precisions // [] | join(", ")' "$f")
+            datasets=$(jq -r '.datasets // [] | join(", ")' "$f")
+            msg=""
+            [ -n "$models" ] && msg="${msg}Models: ${models}\n"
+            [ -n "$hardware" ] && msg="${msg}Hardware: ${hardware}\n"
+            [ -n "$precisions" ] && msg="${msg}Precisions: ${precisions}\n"
+            [ -n "$datasets" ] && msg="${msg}Datasets missing from datasets table (run ingest-weka-dataset): ${datasets}\n"
+            {
+              echo 'summary<<EOF'
+              echo -e "$msg"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack on unmapped entities
+        if: steps.unmapped.outputs.found == 'true'
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":warning: *Unrecognized entities during agentic ingest*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n```${{ steps.unmapped.outputs.summary }}```\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: *Agentic ingest workflow failed*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }

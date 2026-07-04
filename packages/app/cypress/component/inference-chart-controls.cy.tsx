@@ -14,8 +14,8 @@ describe('Inference ChartControls', () => {
 
   it('renders the sequence selector with the current sequence', () => {
     // Default mock: selectedSequence = Sequence.EightK_OneK -> label "8K / 1K"
-    cy.get('#sequence-select').should('be.visible');
-    cy.get('#sequence-select').should('contain.text', '8K / 1K');
+    cy.get('#scenario-select').should('be.visible');
+    cy.get('#scenario-select').should('contain.text', '8K / 1K');
   });
 
   it('renders the precision multi-select with the current precision', () => {

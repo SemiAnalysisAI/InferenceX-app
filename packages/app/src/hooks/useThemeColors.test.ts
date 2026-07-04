@@ -170,4 +170,32 @@ describe('useThemeColors color maps', () => {
     }
     unmountOn();
   });
+
+  // Regression: deselecting a legend line must not recolor the remaining lines.
+  // The HC palette is sized/indexed by the key set it's generated over, so when
+  // it was generated over the *active* subset (no hcKeys), shrinking the
+  // selection re-sized the palette and shifted every remaining line's hue (most
+  // visible on single-vendor agentic runs spanning the full wheel). Passing a
+  // stable `hcKeys` (the full set with data) fixes each line's color.
+  it('keeps a line HC color stable across active subsets when hcKeys is the full set', () => {
+    const FULL = ['b200', 'b300']; // single-vendor (NVIDIA) agentic comparison
+
+    const all = renderHook<UseThemeColorsResult>(() =>
+      useThemeColors({ highContrast: true, activeKeys: ['b200', 'b300'], hcKeys: FULL }),
+    );
+    const b200WithBoth = all.result.current.resolveColor('b200');
+    const b300Color = all.result.current.resolveColor('b300');
+    all.unmount();
+
+    // b300 deselected → only b200 active, but hcKeys is still the full set.
+    const subset = renderHook<UseThemeColorsResult>(() =>
+      useThemeColors({ highContrast: true, activeKeys: ['b200'], hcKeys: FULL }),
+    );
+    const b200Alone = subset.result.current.resolveColor('b200');
+    subset.unmount();
+
+    expect(b200WithBoth).toMatch(/^#[0-9a-f]{6}$/iu);
+    expect(b200WithBoth).not.toBe(b300Color); // HC still produces distinct hues
+    expect(b200Alone).toBe(b200WithBoth); // deselecting b300 did NOT recolor b200
+  });
 });

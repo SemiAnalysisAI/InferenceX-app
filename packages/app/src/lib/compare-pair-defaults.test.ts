@@ -6,6 +6,7 @@ import { pickPairDefaults } from './compare-pair-defaults';
 
 function makeRow(overrides: Partial<BenchmarkRow>): BenchmarkRow {
   return {
+    id: 1,
     hardware: 'h100',
     framework: 'sglang',
     model: 'dsr1',
@@ -30,6 +31,8 @@ function makeRow(overrides: Partial<BenchmarkRow>): BenchmarkRow {
     metrics: { tput_per_gpu: 100 },
     date: '2026-01-01',
     run_url: null,
+    benchmark_type: 'single_turn',
+    offload_mode: 'off',
     ...overrides,
   };
 }
