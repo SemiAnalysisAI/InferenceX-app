@@ -1,4 +1,10 @@
-# InferenceX Dashboard
+# InferenceX Dashboard / InferenceX 仪表板
+
+<div align="center">
+
+**English** | [中文](./README_zh.md)
+
+</div>
 
 A [Next.js](https://nextjs.org) dashboard for visualizing ML inference benchmark data. DB-backed with Neon PostgreSQL, React Query for data fetching, D3.js for interactive charts.
 
