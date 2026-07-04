@@ -93,44 +93,44 @@ pnpm dev
 以下是开发过程中的常用脚本。数据库与缓存管理的运维脚本单独列在下方。
 部分脚本可能需要额外的配置或环境变量。
 
-| 脚本                        | 说明                                       |
-| --------------------------- | ------------------------------------------ |
-| `pnpm dev`                  | 启动开发服务器（Turbopack）                |
-| `pnpm build`                | 生产构建                                   |
-| `pnpm start`                | 启动生产服务器                             |
-| `pnpm preview`              | 本地构建并启动生产服务器                   |
-| `pnpm typecheck`            | TypeScript 类型检查（所有包）              |
-| `pnpm lint`                 | 使用 oxlint 进行 lint                      |
-| `pnpm lint:fix`             | 自动修复 lint 问题                         |
-| `pnpm fmt`                  | 使用 oxfmt 检查格式                        |
-| `pnpm fmt:fix`              | 自动修复格式                               |
-| `pnpm security`             | 安全审计（pnpm audit + audit-ci）          |
-| `pnpm test`                 | 运行所有测试（单元 + E2E）                 |
-| `pnpm test:unit`            | Vitest 单元测试                            |
-| `pnpm test:unit:coverage`   | Vitest 单元测试（含覆盖率）                |
-| `pnpm test:e2e`             | Cypress E2E 测试                           |
-| `pnpm test:e2e:component`   | 仅 Cypress 组件测试                        |
-| `pnpm test:e2e:integration` | 仅 Cypress 集成测试                        |
-| `pnpm clean`                | 清除构建产物                               |
-| `pnpm clean:all`            | 清除构建产物 + node_modules                |
+| 脚本                        | 说明                              |
+| --------------------------- | --------------------------------- |
+| `pnpm dev`                  | 启动开发服务器（Turbopack）       |
+| `pnpm build`                | 生产构建                          |
+| `pnpm start`                | 启动生产服务器                    |
+| `pnpm preview`              | 本地构建并启动生产服务器          |
+| `pnpm typecheck`            | TypeScript 类型检查（所有包）     |
+| `pnpm lint`                 | 使用 oxlint 进行 lint             |
+| `pnpm lint:fix`             | 自动修复 lint 问题                |
+| `pnpm fmt`                  | 使用 oxfmt 检查格式               |
+| `pnpm fmt:fix`              | 自动修复格式                      |
+| `pnpm security`             | 安全审计（pnpm audit + audit-ci） |
+| `pnpm test`                 | 运行所有测试（单元 + E2E）        |
+| `pnpm test:unit`            | Vitest 单元测试                   |
+| `pnpm test:unit:coverage`   | Vitest 单元测试（含覆盖率）       |
+| `pnpm test:e2e`             | Cypress E2E 测试                  |
+| `pnpm test:e2e:component`   | 仅 Cypress 组件测试               |
+| `pnpm test:e2e:integration` | 仅 Cypress 集成测试               |
+| `pnpm clean`                | 清除构建产物                      |
+| `pnpm clean:all`            | 清除构建产物 + node_modules       |
 
 ### 运维脚本
 
 以下脚本用于数据库与缓存的管理维护，常规开发中一般不需要。
 不过在改动数据库或 API 路由后，将 `pnpm admin:cache:invalidate` 指向本地开发服务器进行测试会很有用。
 
-| 脚本                                | 说明                                   |
-| ----------------------------------- | -------------------------------------- |
-| `pnpm admin:db:migrate`             | 运行数据库迁移                         |
-| `pnpm admin:db:ingest:run`          | 从 GitHub 运行摄取基准测试数据         |
-| `pnpm admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）            |
-| `pnpm admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据                |
-| `pnpm admin:db:ingest:supplemental` | 摄取补充数据                           |
-| `pnpm admin:db:apply-overrides`     | 应用数据覆盖                           |
-| `pnpm admin:db:reset`               | 重置数据库                             |
-| `pnpm admin:db:verify`              | 校验数据库完整性                       |
-| `pnpm admin:cache:invalidate`       | 失效 API 缓存                          |
-| `pnpm admin:cache:warmup`           | 预热 API 缓存                          |
+| 脚本                                | 说明                           |
+| ----------------------------------- | ------------------------------ |
+| `pnpm admin:db:migrate`             | 运行数据库迁移                 |
+| `pnpm admin:db:ingest:run`          | 从 GitHub 运行摄取基准测试数据 |
+| `pnpm admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）    |
+| `pnpm admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据        |
+| `pnpm admin:db:ingest:supplemental` | 摄取补充数据                   |
+| `pnpm admin:db:apply-overrides`     | 应用数据覆盖                   |
+| `pnpm admin:db:reset`               | 重置数据库                     |
+| `pnpm admin:db:verify`              | 校验数据库完整性               |
+| `pnpm admin:cache:invalidate`       | 失效 API 缓存                  |
+| `pnpm admin:cache:warmup`           | 预热 API 缓存                  |
 
 ## 部署
 
