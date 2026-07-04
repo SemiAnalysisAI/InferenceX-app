@@ -8,6 +8,8 @@ For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 > **The website itself is bilingual too — every indexable page must ship a Simplified Chinese sibling under `/zh`.** See [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces) below; a new page, tab, or blog post without its `/zh` version is 🔴 BLOCKING on PR review.
 
+> **Cursor Bugbot re-reviews on EVERY push** — each new commit to a PR can surface new inline comments, including on code an earlier review passed. Before merging, loop until convergence: wait for checks (the Bugbot review is one of the PR checks) → fetch unresolved review comments → fix or answer each with a reply → push → repeat until a push produces no new findings. Branch rules require all review threads resolved before merge, so resolve addressed threads as you go.
+
 ## Project Overview
 
 InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-backed with Neon PostgreSQL, React Query for data fetching, D3.js for charts.
