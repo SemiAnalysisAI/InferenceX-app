@@ -84,6 +84,9 @@ const STRINGS = {
     loadingRows: 'Loading rows…',
     noRows: 'No feedback rows yet.',
     enterKey: 'Enter the key above to decrypt.',
+    encryptedRowsLoaded: (n: number) => `${n} encrypted row${n === 1 ? '' : 's'} loaded.`,
+    rowCount: (n: number) => `${n} row${n === 1 ? '' : 's'}`,
+    failedToDecrypt: (n: number) => ` · ${n} failed to decrypt`,
     decryptFailed: 'decrypt failed',
     whatWorksWell: 'What works well',
     whatCouldBeBetter: 'What could be better',
@@ -105,6 +108,9 @@ const STRINGS = {
     loadingRows: '加载中……',
     noRows: '暂无反馈记录。',
     enterKey: '请在上方输入密钥进行解密。',
+    encryptedRowsLoaded: (n: number) => `已加载 ${n} 条加密记录。`,
+    rowCount: (n: number) => `共 ${n} 条记录`,
+    failedToDecrypt: (n: number) => `，其中 ${n} 条解密失败`,
     decryptFailed: '解密失败',
     whatWorksWell: '做得好的地方',
     whatCouldBeBetter: '可以改进的地方',
@@ -271,7 +277,7 @@ export default function FeedbackViewer() {
       {data && data.rows.length > 0 && decryptedRows === null && (
         <Card>
           <p className="text-muted-foreground text-sm">
-            {data.rows.length} encrypted row{data.rows.length === 1 ? '' : 's'} loaded. {t.enterKey}
+            {t.encryptedRowsLoaded(data.rows.length)} {t.enterKey}
           </p>
         </Card>
       )}
@@ -282,8 +288,8 @@ export default function FeedbackViewer() {
             <FeedbackRow key={row.id} row={row} />
           ))}
           <p className="text-xs text-muted-foreground">
-            {decryptedRows.length} row{decryptedRows.length === 1 ? '' : 's'}
-            {failedDecrypts > 0 ? ` · ${failedDecrypts} failed to decrypt` : ''}
+            {t.rowCount(decryptedRows.length)}
+            {failedDecrypts > 0 ? t.failedToDecrypt(failedDecrypts) : ''}
           </p>
         </div>
       )}
