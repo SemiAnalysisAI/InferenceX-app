@@ -17,6 +17,10 @@ describe('FRAMEWORK_LABELS', () => {
   it('labels the atom-disagg alias with its canonical label', () => {
     expect(FRAMEWORK_LABELS['atom-disagg']).toBe('Mooncake ATOMesh¹');
   });
+
+  it('labels the canonical llm-d-vllm framework "llm-d vLLM"', () => {
+    expect(FRAMEWORK_LABELS['llm-d-vllm']).toBe('llm-d vLLM');
+  });
 });
 
 describe('MODEL_SPEC_METHOD_LABELS', () => {
