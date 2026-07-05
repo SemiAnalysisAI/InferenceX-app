@@ -53,6 +53,8 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/land-acknowledgement', exact: true },
   { path: '/compare' },
   { path: '/compare-per-dollar' },
+  { path: '/compare-precision' },
+  { path: '/compare-spec-decode' },
   { path: '/blog' },
   { path: '/datasets' },
 ];

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import {
   HW_REGISTRY,
@@ -107,6 +108,38 @@ export default async function ComparePerDollarIndexPage() {
             each page renders the cost-per-token chart and an interpolated dollars-per-million
             comparison table so you can pick the cheaper SKU at any target interactivity level.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              data-testid="compare-per-dollar-index-compare-link"
+              href="/compare"
+              className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+            >
+              GPU latency + throughput comparisons
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-precision-link"
+              href="/compare-precision"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              Compare precisions (FP8 vs BF16 ...)
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-spec-decode-link"
+              href="/compare-spec-decode"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              Compare speculative decoding (MTP vs off)
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+          </div>
         </Card>
       </section>
 

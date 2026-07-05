@@ -73,7 +73,7 @@ export const KNOWN_MODELS = new Set([
   'DeepSeek-V4-Pro',
 ]);
 export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k']);
-export const KNOWN_PRECISIONS = new Set(['fp4', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
+export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
 export function pickString(value: string | string[] | undefined): string | undefined {
   if (typeof value === 'string') return value;
@@ -130,18 +130,20 @@ export interface SsrInterpolatedRow {
   b: InterpolatedResult | null;
 }
 
-function buildGpuDataPoints(
+export function buildGpuDataPoints(
   rows: BenchmarkRow[],
   hw: string,
   isl: number,
   osl: number,
   precision: string,
+  specMethod?: string,
 ): GPUDataPoint[] {
   const points: GPUDataPoint[] = [];
   for (const row of rows) {
     if (row.hardware !== hw) continue;
     if (row.isl !== isl || row.osl !== osl) continue;
     if (row.precision !== precision) continue;
+    if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
     const entry = rowToAggDataEntry(row);
     const hwKey = getHardwareKey(entry);

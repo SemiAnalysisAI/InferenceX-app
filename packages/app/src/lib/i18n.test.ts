@@ -48,6 +48,10 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/compare')).toBe(true);
     expect(hasZhSibling('/compare/deepseek-r1-h100-vs-h200')).toBe(true);
     expect(hasZhSibling('/compare-per-dollar/deepseek-r1-h100-vs-h200')).toBe(true);
+    expect(hasZhSibling('/compare-precision')).toBe(true);
+    expect(hasZhSibling('/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(true);
+    expect(hasZhSibling('/compare-spec-decode')).toBe(true);
+    expect(hasZhSibling('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(true);
   });
 
   it('matches datasets, gated tabs, and agentic detail pages', () => {
@@ -81,6 +85,18 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/compare/foo-vs-bar')).toBe('/zh/compare/foo-vs-bar');
     expect(switchLocalePath('/zh/compare-per-dollar/foo-vs-bar')).toBe(
       '/compare-per-dollar/foo-vs-bar',
+    );
+    expect(switchLocalePath('/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(
+      '/zh/compare-precision/deepseek-r1-h100-fp8-vs-bf16',
+    );
+    expect(switchLocalePath('/zh/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(
+      '/compare-precision/deepseek-r1-h100-fp8-vs-bf16',
+    );
+    expect(switchLocalePath('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(
+      '/zh/compare-spec-decode/deepseek-r1-h100-mtp-vs-none',
+    );
+    expect(switchLocalePath('/zh/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(
+      '/compare-spec-decode/deepseek-r1-h100-mtp-vs-none',
     );
   });
 

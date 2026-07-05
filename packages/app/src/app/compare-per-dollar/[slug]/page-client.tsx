@@ -11,7 +11,7 @@ import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
-import { Model, Precision, Sequence } from '@/lib/data-mappings';
+import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
 
 interface SsrTableData {
   defaultTargets: number[];
@@ -93,20 +93,6 @@ interface ComparePerDollarPageClientProps {
   /** Crawlable data graphic generated for the canonical default comparison. */
   heroImageSrc: string;
   locale?: 'en' | 'zh';
-}
-
-function toModel(value: string): Model | undefined {
-  return Object.values(Model).includes(value as Model) ? (value as Model) : undefined;
-}
-
-function toSequence(value: string | null): Sequence | undefined {
-  if (!value) return undefined;
-  return Object.values(Sequence).includes(value as Sequence) ? (value as Sequence) : undefined;
-}
-
-function toPrecisions(value: string | null): string[] | undefined {
-  if (!value) return undefined;
-  return Object.values(Precision).includes(value as Precision) ? [value] : undefined;
 }
 
 export default function ComparePerDollarPageClient({

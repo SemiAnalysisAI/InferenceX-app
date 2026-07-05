@@ -27,21 +27,28 @@ import {
   COMPARE_MODEL_SLUGS,
 } from '@/lib/compare-slug';
 
-const getCachedAvailability = cachedQuery(() => {
+/** Cached availability query — shared with compare-variant-availability.ts. */
+export const getCachedAvailability = cachedQuery(() => {
   if (FIXTURES_MODE) return Promise.resolve(loadFixture<AvailabilityRow[]>('availability'));
   if (JSON_MODE) return Promise.resolve(jsonProvider.getAvailabilityData());
   return getAvailabilityData(getDb());
 }, 'availability');
 
-/** Map from canonical model slug → set of GPU keys that have benchmark rows
- *  for any of the model's dbKeys. */
-async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
-  const rows = await getCachedAvailability();
-  // Build a quick dbKey → modelSlug index so each row maps to at most one slug.
+/** Build a dbKey → canonical model slug index from COMPARE_MODEL_SLUGS. Shared
+ *  with compare-variant-availability.ts to avoid duplicating the mapping. */
+export function buildDbKeyToSlugMap(): Map<string, string> {
   const dbKeyToSlug = new Map<string, string>();
   for (const m of COMPARE_MODEL_SLUGS) {
     for (const dbKey of m.dbKeys) dbKeyToSlug.set(dbKey, m.slug);
   }
+  return dbKeyToSlug;
+}
+
+/** Map from canonical model slug → set of GPU keys that have benchmark rows
+ *  for any of the model's dbKeys. */
+async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
+  const rows = await getCachedAvailability();
+  const dbKeyToSlug = buildDbKeyToSlugMap();
   const out = new Map<string, Set<string>>();
   for (const m of COMPARE_MODEL_SLUGS) out.set(m.slug, new Set());
   for (const row of rows) {

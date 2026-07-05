@@ -3,6 +3,14 @@ import type { MetadataRoute } from 'next';
 import { getAllPosts } from '@/lib/blog';
 import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare-slug';
+import {
+  getAllComparablePrecisionSlugs,
+  getAllComparableSpecDecodeSlugs,
+} from '@/lib/compare-variant-availability';
+import {
+  canonicalPrecisionCompareSlug,
+  canonicalSpecDecodeCompareSlug,
+} from '@/lib/compare-variant-slug';
 import { languageAlternates, zhPath } from '@/lib/i18n';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -40,7 +48,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
   // Only emit (model, pair) URLs that have benchmark data on both sides —
   // avoids polluting the sitemap with empty pages that hurt crawl budget.
-  const compareSlugs = await getAllComparableCompareSlugs();
+  const [compareSlugs, precisionSlugs, specDecodeSlugs] = await Promise.all([
+    getAllComparableCompareSlugs(),
+    getAllComparablePrecisionSlugs(),
+    getAllComparableSpecDecodeSlugs(),
+  ]);
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
 
   return [
@@ -61,6 +73,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     ...localizedPair('/compare', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
     ...localizedPair('/compare-per-dollar', {
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }),
+    ...localizedPair('/compare-precision', {
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }),
+    ...localizedPair('/compare-spec-decode', {
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.8,
@@ -91,6 +113,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const enPath = `/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
       return localizedPair(enPath, {
         images: [`${BASE_URL}${enPath}/performance-per-dollar.png`],
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      });
+    }),
+    // Precision comparison pages — each slug page has a hero PNG chart.
+    ...precisionSlugs.flatMap(({ modelSlug, gpu, precA, precB }) => {
+      const enPath = `/compare-precision/${canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB)}`;
+      return localizedPair(enPath, {
+        images: [`${BASE_URL}${enPath}/precision-comparison.png`],
+        lastModified: now,
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      });
+    }),
+    // Speculative decoding comparison pages — each slug page has a hero PNG chart.
+    ...specDecodeSlugs.flatMap(({ modelSlug, gpu, method }) => {
+      const enPath = `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, method)}`;
+      return localizedPair(enPath, {
+        images: [`${BASE_URL}${enPath}/spec-decode-comparison.png`],
         lastModified: now,
         changeFrequency: 'daily' as const,
         priority: 0.7,
