@@ -228,6 +228,7 @@ export default function CompareSpecDecodePageClient({
             <CompareTableSection
               gpu={gpu}
               method={method}
+              precision={defaultPrecision}
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
@@ -244,6 +245,7 @@ export default function CompareSpecDecodePageClient({
 function CompareTableSection({
   gpu,
   method,
+  precision,
   aLabel,
   bLabel,
   ssrTableData,
@@ -251,6 +253,7 @@ function CompareTableSection({
 }: {
   gpu: string;
   method: string;
+  precision: string | null;
   aLabel: string;
   bLabel: string;
   ssrTableData: SsrTableData;
@@ -279,15 +282,18 @@ function CompareTableSection({
       if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`)) continue;
       // getHardwareKey appends the spec-decode suffix LAST (h200_sglang_mtp),
       // so side membership is decided by the key's ending.
-      if (hwKey.endsWith(methodSuffix)) {
-        pA.push(...points);
-      } else if (![...SPEC_METHODS_ACTIVE].some((m) => hwKey.endsWith(`_${m}`))) {
-        // No spec-decode suffix at all = side B (Off).
-        pB.push(...points);
+      const isSideA = hwKey.endsWith(methodSuffix);
+      const isSideB = !isSideA && ![...SPEC_METHODS_ACTIVE].some((m) => hwKey.endsWith(`_${m}`));
+      if (!isSideA && !isSideB) continue;
+      for (const point of points) {
+        // The slug pins one precision — ignore points from other precisions
+        // the user may enable in the chart controls.
+        if (precision !== null && point.precision !== precision) continue;
+        (isSideA ? pA : pB).push(point);
       }
     }
     return { pointsA: pA, pointsB: pB };
-  }, [gpuDataByGroupKey, gpu, method]);
+  }, [gpuDataByGroupKey, gpu, method, precision]);
 
   const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
 
