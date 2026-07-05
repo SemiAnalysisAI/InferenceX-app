@@ -70,6 +70,22 @@ jobs:
         if: matrix.browser == 'firefox'
         with:
           firefox-version: latest
+      # Persist .next/cache between builds (Turbopack compiler cache — enabled
+      # via turbopackFileSystemCacheForBuild in next.config.ts for CI — plus
+      # the incremental fetch cache), per
+      # https://nextjs.org/docs/pages/guides/ci-build-caching#github-actions.
+      # Runs before `pnpm install` so hashFiles never scans node_modules.
+      - name: Cache Next.js build
+        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
+        with:
+          path: packages/app/.next/cache
+          # New cache whenever packages or source files change; fall back to
+          # the newest cache for the same lockfile so changed sources still
+          # start from a warm compiler cache.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('packages/**/*.js', 'packages/**/*.jsx', 'packages/**/*.ts', 'packages/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nextjs-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:

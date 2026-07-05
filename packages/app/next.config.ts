@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['shiki'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
+    // Persist Turbopack's compiler cache under .next/cache in GitHub Actions
+    // so the workflow cache step makes warm builds fast. Gated on
+    // GITHUB_ACTIONS (not CI, which Vercel also sets) to keep the
+    // experimental flag out of production builds.
+    ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
     remotePatterns: [
