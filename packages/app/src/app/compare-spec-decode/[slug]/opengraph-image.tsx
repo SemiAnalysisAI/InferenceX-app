@@ -31,7 +31,20 @@ export async function generateStaticParams() {
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const parsed = parseSpecDecodeCompareSlug(slug);
-  if (!parsed) notFound();
+  // Reject non-canonical slugs (reversed order, aliases, mixed case) so OG
+  // URLs can't render labels that disagree with the canonical page — same
+  // strictness as the sibling PNG route.
+  if (
+    !parsed ||
+    canonicalSpecDecodeCompareSlug(
+      parsed.model.slug,
+      parsed.gpu,
+      parsed.precision,
+      parsed.method,
+    ) !== slug.toLowerCase()
+  ) {
+    notFound();
+  }
   const [logoSrc, tiles] = await Promise.all([getLogoSrc(), getTiles()]);
 
   const gpuMeta = HW_REGISTRY[parsed.gpu];
