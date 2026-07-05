@@ -29,6 +29,7 @@ export interface PrecisionPair {
 
 export interface SpecDecodePair {
   gpu: string;
+  precision: string;
   method: string;
 }
 
@@ -121,26 +122,28 @@ export async function getAllComparablePrecisionSlugs(): Promise<
 // Spec-decode pairs
 // ---------------------------------------------------------------------------
 
-/** For each canonical model slug, return the (gpu, method) combos where both
- *  the method AND 'none' have benchmark data on that GPU. Output sorted by
- *  model slug order, GPU alphabetical, methods alphabetical. */
+/** For each canonical model slug, return the (gpu, precision, method) combos
+ *  where both the method AND 'none' have benchmark data on that GPU at that
+ *  precision. Output sorted by model slug order, GPU alphabetical, then
+ *  precision by PRECISION_SLUG_ORDER index, then method alphabetical. */
 export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecDecodePair[]>> {
   const rows = await getCachedAvailability();
   const dbKeyToSlug = buildDbKeyToSlugMap();
 
-  // Collect distinct spec_methods per (modelSlug, gpu).
-  const methodsByModelGpu = new Map<string, Set<string>>();
+  // Collect distinct spec_methods per (modelSlug, gpu, precision).
+  const methodsByModelGpuPrec = new Map<string, Set<string>>();
   for (const row of rows) {
     const slug = dbKeyToSlug.get(row.model);
     if (!slug) continue;
     if (!GPU_KEYS.has(row.hardware)) continue;
+    if (!PRECISION_SLUG_TOKENS.has(row.precision)) continue;
     // Accept methods present in data that are in SPEC_METHOD_KEYS.
     if (!SPEC_METHOD_KEYS.has(row.spec_method)) continue;
-    const key = `${slug}\0${row.hardware}`;
-    let s = methodsByModelGpu.get(key);
+    const key = `${slug}\0${row.hardware}\0${row.precision}`;
+    let s = methodsByModelGpuPrec.get(key);
     if (!s) {
       s = new Set();
-      methodsByModelGpu.set(key, s);
+      methodsByModelGpuPrec.set(key, s);
     }
     s.add(row.spec_method);
   }
@@ -149,22 +152,30 @@ export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecD
   for (const m of COMPARE_MODEL_SLUGS) {
     const pairs: SpecDecodePair[] = [];
 
-    const gpus: string[] = [];
-    for (const [key, methods] of methodsByModelGpu.entries()) {
+    // Collect valid (gpu, precision) combos that have both 'none' and an active method.
+    const gpuPrecCombos: { gpu: string; precision: string }[] = [];
+    for (const [key, methods] of methodsByModelGpuPrec.entries()) {
       if (!key.startsWith(`${m.slug}\0`)) continue;
       // Need both 'none' and at least one active method.
       if (!methods.has('none')) continue;
       const active = [...methods].filter((meth) => SPEC_METHODS_ACTIVE.has(meth));
       if (active.length === 0) continue;
-      gpus.push(key.split('\0')[1]);
+      const parts = key.split('\0');
+      gpuPrecCombos.push({ gpu: parts[1], precision: parts[2] });
     }
-    gpus.sort();
+    // Sort: gpu alphabetical, then precision by PRECISION_SLUG_ORDER index.
+    gpuPrecCombos.sort((a, b) => {
+      if (a.gpu !== b.gpu) return a.gpu < b.gpu ? -1 : 1;
+      const ai = PRECISION_SLUG_ORDER.indexOf(a.precision);
+      const bi = PRECISION_SLUG_ORDER.indexOf(b.precision);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
 
-    for (const gpu of gpus) {
-      const methods = methodsByModelGpu.get(`${m.slug}\0${gpu}`)!;
+    for (const { gpu, precision } of gpuPrecCombos) {
+      const methods = methodsByModelGpuPrec.get(`${m.slug}\0${gpu}\0${precision}`)!;
       const active = [...methods].filter((meth) => SPEC_METHODS_ACTIVE.has(meth)).toSorted();
       for (const method of active) {
-        pairs.push({ gpu, method });
+        pairs.push({ gpu, precision, method });
       }
     }
 
@@ -175,15 +186,16 @@ export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecD
 }
 
 /** Flattened list of all comparable spec-decode slugs. Sorted by model slug
- *  order, GPU alphabetical, methods alphabetical. */
+ *  order, GPU alphabetical, precision by PRECISION_SLUG_ORDER, methods
+ *  alphabetical. */
 export async function getAllComparableSpecDecodeSlugs(): Promise<
-  { modelSlug: string; gpu: string; method: string }[]
+  { modelSlug: string; gpu: string; precision: string; method: string }[]
 > {
   const byModel = await getSpecDecodePairsByModelSlug();
-  const result: { modelSlug: string; gpu: string; method: string }[] = [];
+  const result: { modelSlug: string; gpu: string; precision: string; method: string }[] = [];
   for (const [modelSlug, pairs] of byModel.entries()) {
     for (const p of pairs) {
-      result.push({ modelSlug, gpu: p.gpu, method: p.method });
+      result.push({ modelSlug, gpu: p.gpu, precision: p.precision, method: p.method });
     }
   }
   return result;

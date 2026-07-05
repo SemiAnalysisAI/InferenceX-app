@@ -13,6 +13,7 @@ import {
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
+  precisionDisplayLabel,
   specMethodDisplayLabel,
 } from '@/lib/compare-variant-slug';
 import { getLogoSrc } from '@/lib/og-assets';
@@ -41,7 +42,12 @@ export async function GET(
   const parsed = parseSpecDecodeCompareSlug(slug);
   if (
     !parsed ||
-    canonicalSpecDecodeCompareSlug(parsed.model.slug, parsed.gpu, parsed.method) !== slug
+    canonicalSpecDecodeCompareSlug(
+      parsed.model.slug,
+      parsed.gpu,
+      parsed.precision,
+      parsed.method,
+    ) !== slug
   ) {
     return new Response('Not found', { status: 404 });
   }
@@ -51,40 +57,34 @@ export async function GET(
     getLogoSrc(),
   ]);
 
-  const sideA: VariantCompareSide = { specMethod: parsed.method };
-  const sideB: VariantCompareSide = { specMethod: 'none' };
+  // Precision is fixed by the slug — both sides share it.
+  const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
+  const sideB: VariantCompareSide = { specMethod: 'none', precision: parsed.precision };
   const defaults = pickVariantPairDefaults('spec-decode', rows, parsed.gpu, sideA, sideB);
-  const { sequence, precision } = defaults;
-
-  const sideAFull: VariantCompareSide = {
-    specMethod: parsed.method,
-    ...(precision ? { precision } : {}),
-  };
-  const sideBFull: VariantCompareSide = {
-    specMethod: 'none',
-    ...(precision ? { precision } : {}),
-  };
+  const { sequence } = defaults;
+  const precision = parsed.precision;
 
   const { ssrRows, interactivityRange } = computeVariantCompareTableData(
     rows,
     parsed.gpu,
     sequence,
-    sideAFull,
-    sideBFull,
+    sideA,
+    sideB,
   );
   const plottedRows = ssrRows.filter((row) => row.a || row.b);
   const imageRows = computeVariantCompareImageRows(
     rows,
     parsed.gpu,
     sequence,
-    sideAFull,
-    sideBFull,
+    sideA,
+    sideB,
     interactivityRange,
     plottedRows.map((r) => r.target),
   ).filter((row) => row.a || row.b);
   const curveRows = imageRows.length > 0 ? imageRows : plottedRows;
 
   const gpuLabel = HW_REGISTRY[parsed.gpu]?.label ?? parsed.gpu.toUpperCase();
+  const precLabel = precisionDisplayLabel(parsed.precision);
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
   const bLabel = 'Off';
 
@@ -163,7 +163,7 @@ export async function GET(
               {parsed.model.label}
             </div>
             <div style={{ display: 'flex', fontSize: 25 * R, color: COLORS.muted }}>
-              {gpuLabel}: {aLabel} vs {bLabel} | Cost per Million Tokens
+              {gpuLabel} {precLabel}: {aLabel} vs {bLabel} | Cost per Million Tokens
             </div>
           </div>
           <div

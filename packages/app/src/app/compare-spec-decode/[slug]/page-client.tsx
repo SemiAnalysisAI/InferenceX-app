@@ -65,6 +65,7 @@ interface CompareSpecDecodePageClientProps {
   ssrTableData: SsrTableData;
   narrative: string[];
   gpuLabel: string;
+  precisionLabel: string;
   gpuArch: string;
   gpuVendor: string;
   aLabel: string;
@@ -84,6 +85,7 @@ export default function CompareSpecDecodePageClient({
   ssrTableData,
   narrative,
   gpuLabel,
+  precisionLabel,
   gpuArch,
   gpuVendor,
   aLabel,
@@ -121,14 +123,14 @@ export default function CompareSpecDecodePageClient({
                 {modelLabel} · {t.eyebrowSuffix}
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {gpuLabel}: {aLabel} vs {bLabel} {t.h1Suffix}
+                {gpuLabel} {precisionLabel}: {aLabel} vs {bLabel} {t.h1Suffix}
               </h1>
               {isZh ? (
                 <p className="mt-2 text-sm text-muted-foreground">
                   <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 在{' '}
-                  <strong>{gpuLabel}</strong>（{gpuVendor} {gpuArch}）上运行{' '}
+                  <strong>{gpuLabel}</strong> {precisionLabel}（{gpuVendor} {gpuArch}）上运行{' '}
                   <strong>{modelLabel}</strong> 的投机解码对比。在各类 LLM
-                  工作负载下的吞吐量、成本和交互性差异。使用下方图表控件切换序列、精度和指标——交互方式与
+                  工作负载下的吞吐量、成本和交互性差异。使用下方图表控件切换序列和指标——交互方式与
                   <Link href="/zh" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>
@@ -137,10 +139,10 @@ export default function CompareSpecDecodePageClient({
               ) : (
                 <p className="mt-2 text-sm text-muted-foreground">
                   Speculative decoding comparison of <strong>{aLabel}</strong> versus{' '}
-                  <strong>{bLabel}</strong> on <strong>{gpuLabel}</strong> ({gpuVendor} {gpuArch})
-                  running <strong>{modelLabel}</strong>. Throughput, cost, and interactivity
-                  differences across LLM workloads. Use the chart controls below to switch
-                  sequences, precisions, and metrics — same interactions as{' '}
+                  <strong>{bLabel}</strong> on <strong>{gpuLabel}</strong> {precisionLabel} (
+                  {gpuVendor} {gpuArch}) running <strong>{modelLabel}</strong>. Throughput, cost,
+                  and interactivity differences across LLM workloads. Use the chart controls below
+                  to switch sequences and metrics — same interactions as{' '}
                   <Link href="/" className="underline hover:text-primary">
                     {t.mainChartLinkText}
                   </Link>
@@ -208,8 +210,8 @@ export default function CompareSpecDecodePageClient({
                 src={heroImageSrc}
                 alt={
                   isZh
-                    ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的投机解码对比`
-                    : `${modelLabel}: ${gpuLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
+                    ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的投机解码对比`
+                    : `${modelLabel}: ${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
                 }
                 width={1200}
                 height={675}
@@ -219,8 +221,8 @@ export default function CompareSpecDecodePageClient({
               />
               <figcaption className="text-xs text-muted-foreground">
                 {isZh
-                  ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 的投机解码对比（默认工作负载）。`
-                  : `${gpuLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload.`}
+                  ? `${gpuLabel} ${precisionLabel} 上 ${aLabel} 与 ${bLabel} 的投机解码对比（默认工作负载）。`
+                  : `${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload.`}
               </figcaption>
             </figure>
             <CompareTableSection

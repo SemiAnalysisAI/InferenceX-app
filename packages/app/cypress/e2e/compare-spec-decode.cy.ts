@@ -10,7 +10,7 @@ describe('Compare spec-decode index + slug page', () => {
     cy.contains('h1', /speculative decoding/iu).should('be.visible');
   });
 
-  it('navigates to the first card slug if available, and renders table + hero PNG + JSON-LD', () => {
+  it('navigates to the first card slug if available, and renders table + hero PNG + JSON-LD + precision in h1', () => {
     cy.visit('/compare-spec-decode');
     cy.get('body').then(($body) => {
       const cards = $body.find('a[href^="/compare-spec-decode/"]');
@@ -38,10 +38,21 @@ describe('Compare spec-decode index + slug page', () => {
       // Method label present (MTP, or a model-specific label like M3 EAGLE).
       cy.get('[data-testid="compare-interpolated-table"] tbody').should(($tbody) => {
         const text = $tbody.text().toUpperCase();
-        const methodPart = slug.split('-vs-')[0].split('-').pop()!;
+        // Slug format: {model}-{gpu}-{precision}-{method}-vs-none
+        const leftParts = slug.split('-vs-')[0].split('-');
+        const methodPart = leftParts.at(-1)!;
         expect(text).to.satisfy(
           (t: string) => t.includes(methodPart.toUpperCase()) || t.includes('EAGLE'),
         );
+      });
+
+      // Precision label appears in the h1 — slug format:
+      // {model}-{gpu}-{precision}-{method}-vs-none
+      const leftTokens = slug.split('-vs-')[0].split('-');
+      const precisionToken = leftTokens.at(-2)!;
+      cy.get('h1').should(($h1) => {
+        const text = $h1.text().toUpperCase();
+        expect(text).to.contain(precisionToken.toUpperCase());
       });
 
       // Hero PNG image present.
@@ -63,16 +74,16 @@ describe('Compare spec-decode index + slug page', () => {
 
       const href = cards.first().attr('href')!;
       const slug = href.replace('/compare-spec-decode/', '');
-      // Canonical form: {model}-{gpu}-{method}-vs-none
-      // Reversed form:  {model}-{gpu}-none-vs-{method}
+      // Canonical form: {model}-{gpu}-{prec}-{method}-vs-none
+      // Reversed form:  {model}-{gpu}-{prec}-none-vs-{method}
       const vsIdx = slug.indexOf('-vs-');
       const left = slug.slice(0, vsIdx);
       const right = slug.slice(vsIdx + 4); // 'none'
       const leftParts = left.split('-');
       const method = leftParts.pop()!;
-      const modelGpu = leftParts.join('-');
-      // Build reversed: {model}-{gpu}-none-vs-{method}
-      const reversedSlug = `${modelGpu}-${right}-vs-${method}`;
+      const modelGpuPrec = leftParts.join('-');
+      // Build reversed: {model}-{gpu}-{prec}-none-vs-{method}
+      const reversedSlug = `${modelGpuPrec}-${right}-vs-${method}`;
 
       cy.visit(`/compare-spec-decode/${reversedSlug}`);
       cy.location('pathname').should('eq', href);

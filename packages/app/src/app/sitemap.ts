@@ -129,8 +129,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }),
     // Speculative decoding comparison pages — each slug page has a hero PNG chart.
-    ...specDecodeSlugs.flatMap(({ modelSlug, gpu, method }) => {
-      const enPath = `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, method)}`;
+    ...specDecodeSlugs.flatMap(({ modelSlug, gpu, precision, method }) => {
+      const enPath = `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, precision, method)}`;
       return localizedPair(enPath, {
         images: [`${BASE_URL}${enPath}/spec-decode-comparison.png`],
         lastModified: now,

@@ -5,7 +5,7 @@
  *
  * Slug formats:
  * - Precision:   `{model}-{gpu}-{precA}-vs-{precB}`
- * - Spec decode: `{model}-{gpu}-{method}-vs-none`
+ * - Spec decode: `{model}-{gpu}-{precision}-{method}-vs-none`
  *
  * Both families require a model prefix — there is no legacy bare form.
  */
@@ -159,14 +159,22 @@ export function precisionDisplayLabel(p: string): string {
 export interface SpecDecodeCompareSlug {
   model: CompareModelSlug;
   gpu: string;
+  precision: string;
   method: string;
   isAliasModel: boolean;
 }
 
-/** Parse `{model}-{gpu}-{method}-vs-none`. Also accepts the reversed form
- *  `{model}-{gpu}-none-vs-{method}` (caller should redirect to canonical).
+/** Parse `{model}-{gpu}-{precision}-{method}-vs-none`. Also accepts the
+ *  reversed form `{model}-{gpu}-{precision}-none-vs-{method}` (caller should
+ *  redirect to canonical).
  *
- *  Same layered-suffix algorithm as the precision parser. */
+ *  Canonical form (right === 'none'): from the left side, peel tokens
+ *  right-to-left — method (must be in SPEC_METHODS_ACTIVE), precision (must be
+ *  in PRECISION_SLUG_TOKENS), gpu (GPU_KEYS), remainder = model slug.
+ *
+ *  Reversed form (right is a method in SPEC_METHODS_ACTIVE): left side ends
+ *  with '-none' preceded by precision/gpu/model —
+ *  `{model}-{gpu}-{prec}-none-vs-{method}`. */
 export function parseSpecDecodeCompareSlug(slug: string): SpecDecodeCompareSlug | null {
   if (!slug) return null;
   const lower = slug.toLowerCase();
@@ -178,37 +186,49 @@ export function parseSpecDecodeCompareSlug(slug: string): SpecDecodeCompareSlug 
   if (!prefix || !right) return null;
 
   let method: string;
-  let modelGpuPart: string;
+  let modelGpuPrecPart: string;
 
   if (right === 'none') {
-    // Normal form: {model}-{gpu}-{method}-vs-none
+    // Canonical form: {model}-{gpu}-{precision}-{method}-vs-none
+    // Peel method (last token of left side).
     const lastDash = prefix.lastIndexOf('-');
     if (lastDash === -1) return null;
     const candidate = prefix.slice(lastDash + 1);
     if (!SPEC_METHODS_ACTIVE.has(candidate)) return null;
     method = candidate;
-    modelGpuPart = prefix.slice(0, lastDash);
+    modelGpuPrecPart = prefix.slice(0, lastDash);
   } else if (SPEC_METHODS_ACTIVE.has(right)) {
-    // Reversed form: {model}-{gpu}-none-vs-{method}
+    // Reversed form: {model}-{gpu}-{precision}-none-vs-{method}
+    // Left side must end with '-none'.
     const lastDash = prefix.lastIndexOf('-');
     if (lastDash === -1) return null;
     const lastToken = prefix.slice(lastDash + 1);
     if (lastToken !== 'none') return null;
     method = right;
-    modelGpuPart = prefix.slice(0, lastDash);
+    modelGpuPrecPart = prefix.slice(0, lastDash);
   } else {
     return null;
   }
 
+  if (!modelGpuPrecPart) return null;
+
+  // modelGpuPrecPart = '{model}-{gpu}-{precision}'
+  // Peel precision (last token).
+  const precDash = modelGpuPrecPart.lastIndexOf('-');
+  if (precDash === -1) return null;
+  const precision = modelGpuPrecPart.slice(precDash + 1);
+  if (!PRECISION_SLUG_TOKENS.has(precision)) return null;
+
+  const modelGpuPart = modelGpuPrecPart.slice(0, precDash);
   if (!modelGpuPart) return null;
 
   // modelGpuPart = '{model}-{gpu}'
-  const lastDash = modelGpuPart.lastIndexOf('-');
-  if (lastDash === -1) return null; // model prefix required
-  const gpu = modelGpuPart.slice(lastDash + 1);
+  const gpuDash = modelGpuPart.lastIndexOf('-');
+  if (gpuDash === -1) return null; // model prefix required
+  const gpu = modelGpuPart.slice(gpuDash + 1);
   if (!GPU_KEYS.has(gpu)) return null;
 
-  const modelPart = modelGpuPart.slice(0, lastDash);
+  const modelPart = modelGpuPart.slice(0, gpuDash);
   if (!modelPart) return null;
 
   let isAliasModel = false;
@@ -225,16 +245,17 @@ export function parseSpecDecodeCompareSlug(slug: string): SpecDecodeCompareSlug 
   const model = getCompareModelBySlug(resolvedSlug);
   if (!model) return null;
 
-  return { model, gpu, method, isAliasModel };
+  return { model, gpu, precision, method, isAliasModel };
 }
 
-/** Canonical spec-decode slug: `{model}-{gpu}-{method}-vs-none`. */
+/** Canonical spec-decode slug: `{model}-{gpu}-{precision}-{method}-vs-none`. */
 export function canonicalSpecDecodeCompareSlug(
   modelSlug: string,
   gpu: string,
+  precision: string,
   method: string,
 ): string {
-  return `${modelSlug}-${gpu}-${method}${SEPARATOR}none`;
+  return `${modelSlug}-${gpu}-${precision}-${method}${SEPARATOR}none`;
 }
 
 /** Display label for a speculative decoding method.

@@ -127,23 +127,24 @@ export function pickVariantPairDefaults(
   }
 
   // kind === 'spec-decode'
-  // Bucket by (sequence, precision); variantId = framework|conc.
-  // Overlap between method and none buckets.
+  // Precision is FIXED by the caller — filter to it and bucket by sequence
+  // only. variantId = framework|conc. Overlap between method and none buckets.
+  const fixedPrecision = sideA.precision;
   const seenMethod = new Map<string, Set<string>>();
   const seenNone = new Map<string, Set<string>>();
   for (const row of hwRows) {
     if (row.isl === null || row.osl === null) continue;
+    if (fixedPrecision !== undefined && row.precision !== fixedPrecision) continue;
     const seq = islOslToSequence(row.isl, row.osl);
     if (!seq) continue;
-    const bucketKey = `${seq}|${row.precision}`;
     const variantId = `${row.framework}|${row.conc}`;
     if (row.spec_method === sideA.specMethod) {
-      if (!seenMethod.has(bucketKey)) seenMethod.set(bucketKey, new Set());
-      seenMethod.get(bucketKey)!.add(variantId);
+      if (!seenMethod.has(seq)) seenMethod.set(seq, new Set());
+      seenMethod.get(seq)!.add(variantId);
     }
     if (row.spec_method === sideB.specMethod) {
-      if (!seenNone.has(bucketKey)) seenNone.set(bucketKey, new Set());
-      seenNone.get(bucketKey)!.add(variantId);
+      if (!seenNone.has(seq)) seenNone.set(seq, new Set());
+      seenNone.get(seq)!.add(variantId);
     }
   }
   const tally = new Map<string, { both: number; either: number }>();
@@ -159,9 +160,7 @@ export function pickVariantPairDefaults(
     if (left[1].both !== right[1].both) return right[1].both - left[1].both;
     return right[1].either - left[1].either;
   })[0];
-  const [seq, prec] = best[0].split('|');
-  if (!seq || !prec) return { sequence: null, precision: null };
-  return { sequence: seq, precision: prec };
+  return { sequence: best[0], precision: sideA.precision ?? null };
 }
 
 // ---------------------------------------------------------------------------

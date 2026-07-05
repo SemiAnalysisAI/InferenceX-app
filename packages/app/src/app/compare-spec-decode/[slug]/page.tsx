@@ -10,15 +10,11 @@ import {
 
 import { JsonLd } from '@/components/json-ld';
 import { languageAlternates } from '@/lib/i18n';
-import {
-  getCachedBenchmarks,
-  KNOWN_PRECISIONS,
-  KNOWN_SEQUENCES,
-  pickString,
-} from '@/lib/compare-ssr';
+import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
+  precisionDisplayLabel,
   specMethodDisplayLabel,
 } from '@/lib/compare-variant-slug';
 import {
@@ -47,11 +43,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!parsed) return {};
   const gpuMeta = HW_REGISTRY[parsed.gpu];
   const gpuLabel = gpuMeta?.label ?? parsed.gpu.toUpperCase();
+  const precLabel = precisionDisplayLabel(parsed.precision);
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
-  const canonical = canonicalSpecDecodeCompareSlug(parsed.model.slug, parsed.gpu, parsed.method);
+  const canonical = canonicalSpecDecodeCompareSlug(
+    parsed.model.slug,
+    parsed.gpu,
+    parsed.precision,
+    parsed.method,
+  );
   const url = `${SITE_URL}/compare-spec-decode/${canonical}`;
-  const description = `${parsed.model.label} on ${gpuLabel}: ${aLabel} vs Off speculative decoding comparison. Verified, reproducible results from InferenceX, the independent open-source benchmark by SemiAnalysis. ${SUPPORTERS_LINE} See whether speculative decoding improves throughput and cost at every interactivity level.`;
-  const title = `${parsed.model.label} — ${gpuLabel} ${aLabel} vs Off — Speculative Decoding`;
+  const description = `${parsed.model.label} on ${gpuLabel} ${precLabel}: ${aLabel} vs Off speculative decoding comparison. Verified, reproducible results from InferenceX, the independent open-source benchmark by SemiAnalysis. ${SUPPORTERS_LINE} See whether speculative decoding improves throughput and cost at every interactivity level.`;
+  const title = `${parsed.model.label} — ${gpuLabel} ${precLabel}: ${aLabel} vs Off — Speculative Decoding`;
   return {
     title,
     description,
@@ -81,7 +83,12 @@ export default async function CompareSpecDecodePage({ params, searchParams }: Pr
   const sp = await searchParams;
 
   // 308 canonical redirect: alias model, reversed 'none-vs-mtp' form.
-  const canonical = canonicalSpecDecodeCompareSlug(parsed.model.slug, parsed.gpu, parsed.method);
+  const canonical = canonicalSpecDecodeCompareSlug(
+    parsed.model.slug,
+    parsed.gpu,
+    parsed.precision,
+    parsed.method,
+  );
   if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
@@ -97,28 +104,27 @@ export default async function CompareSpecDecodePage({ params, searchParams }: Pr
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
   const gpuMeta = HW_REGISTRY[parsed.gpu];
   const gpuLabel = gpuMeta?.label ?? parsed.gpu.toUpperCase();
+  const precLabel = precisionDisplayLabel(parsed.precision);
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
   const bLabel = 'Off';
 
-  const sideA: VariantCompareSide = { specMethod: parsed.method };
-  const sideB: VariantCompareSide = { specMethod: 'none' };
+  // Precision is fixed by the slug — both sides share it.
+  const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
+  const sideB: VariantCompareSide = { specMethod: 'none', precision: parsed.precision };
 
   const defaults = pickVariantPairDefaults('spec-decode', rows, parsed.gpu, sideA, sideB);
 
   const urlSeq = pickString(sp.i_seq);
-  const urlPrec = pickString(sp.i_prec);
   const effectiveSequence = urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : defaults.sequence;
-  const effectivePrecision =
-    urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : defaults.precision;
+  const effectivePrecision = parsed.precision;
 
-  // For spec-decode, both sides share the same precision.
   const sideAFull: VariantCompareSide = {
     specMethod: parsed.method,
-    ...(effectivePrecision ? { precision: effectivePrecision } : {}),
+    precision: effectivePrecision,
   };
   const sideBFull: VariantCompareSide = {
     specMethod: 'none',
-    ...(effectivePrecision ? { precision: effectivePrecision } : {}),
+    precision: effectivePrecision,
   };
 
   const { defaultTargets, ssrRows, interactivityRange } = computeVariantCompareTableData(
@@ -152,13 +158,13 @@ export default async function CompareSpecDecodePage({ params, searchParams }: Pr
   );
   const breadcrumbJsonLd = buildVariantBreadcrumbJsonLd(
     'spec-decode',
-    `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel}`,
+    `${parsed.model.label} — ${gpuLabel} ${precLabel}: ${aLabel} vs ${bLabel}`,
     url,
   );
   const narrative = variantCompareNarrative(
     'spec-decode',
     parsed.model.label,
-    gpuLabel,
+    `${gpuLabel} ${precLabel}`,
     aLabel,
     bLabel,
     ssrRows,
@@ -180,6 +186,7 @@ export default async function CompareSpecDecodePage({ params, searchParams }: Pr
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
         gpuLabel={gpuLabel}
+        precisionLabel={precLabel}
         gpuArch={gpuMeta?.arch ?? ''}
         gpuVendor={gpuMeta?.vendor ?? ''}
         aLabel={aLabel}

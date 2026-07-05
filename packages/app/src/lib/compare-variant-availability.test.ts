@@ -196,16 +196,16 @@ describe('getAllComparablePrecisionSlugs', () => {
 // ---------------------------------------------------------------------------
 
 describe('getSpecDecodePairsByModelSlug', () => {
-  it('returns spec-decode pairs when both mtp and none exist', async () => {
+  it('returns spec-decode pairs when both mtp and none exist at same precision', async () => {
     mockFn.mockResolvedValue([
-      stubAvailRow({ model: 'dsr1', hardware: 'h100', spec_method: 'none' }),
-      stubAvailRow({ model: 'dsr1', hardware: 'h100', spec_method: 'mtp' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'mtp' }),
     ]);
 
     const result = await getSpecDecodePairsByModelSlug();
     const dsr1 = result.get('deepseek-r1')!;
     expect(dsr1).toHaveLength(1);
-    expect(dsr1[0]).toEqual({ gpu: 'h100', method: 'mtp' });
+    expect(dsr1[0]).toEqual({ gpu: 'h100', precision: 'fp8', method: 'mtp' });
   });
 
   it('returns empty when only none exists (no active method)', async () => {
@@ -224,6 +224,37 @@ describe('getSpecDecodePairsByModelSlug', () => {
 
     const result = await getSpecDecodePairsByModelSlug();
     expect(result.get('deepseek-r1')!).toHaveLength(0);
+  });
+
+  it('rows differing only in precision yield separate pairs', async () => {
+    mockFn.mockResolvedValue([
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'mtp' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'bf16', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'bf16', spec_method: 'mtp' }),
+    ]);
+
+    const result = await getSpecDecodePairsByModelSlug();
+    const dsr1 = result.get('deepseek-r1')!;
+    expect(dsr1).toHaveLength(2);
+    // Sorted by PRECISION_SLUG_ORDER: fp8 (index 5) before bf16 (index 6).
+    expect(dsr1[0]).toEqual({ gpu: 'h100', precision: 'fp8', method: 'mtp' });
+    expect(dsr1[1]).toEqual({ gpu: 'h100', precision: 'bf16', method: 'mtp' });
+  });
+
+  it('(gpu,precision) with method-only or none-only data must NOT emit', async () => {
+    mockFn.mockResolvedValue([
+      // fp8 has both none+mtp → should emit
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'mtp' }),
+      // bf16 has only mtp (no none) → should NOT emit
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'bf16', spec_method: 'mtp' }),
+    ]);
+
+    const result = await getSpecDecodePairsByModelSlug();
+    const dsr1 = result.get('deepseek-r1')!;
+    expect(dsr1).toHaveLength(1);
+    expect(dsr1[0]).toEqual({ gpu: 'h100', precision: 'fp8', method: 'mtp' });
   });
 
   it('ignores rows with hardware not in GPU_KEYS', async () => {
@@ -246,38 +277,62 @@ describe('getSpecDecodePairsByModelSlug', () => {
     expect(result.get('deepseek-r1')!).toHaveLength(0);
   });
 
-  it('sorts GPUs alphabetically', async () => {
+  it('ignores rows with precision outside the allowlist', async () => {
     mockFn.mockResolvedValue([
-      stubAvailRow({ model: 'dsr1', hardware: 'h200', spec_method: 'none' }),
-      stubAvailRow({ model: 'dsr1', hardware: 'h200', spec_method: 'mtp' }),
-      stubAvailRow({ model: 'dsr1', hardware: 'h100', spec_method: 'none' }),
-      stubAvailRow({ model: 'dsr1', hardware: 'h100', spec_method: 'mtp' }),
+      stubAvailRow({
+        model: 'dsr1',
+        hardware: 'h100',
+        precision: 'weirdprec',
+        spec_method: 'none',
+      }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'weirdprec', spec_method: 'mtp' }),
+    ]);
+
+    const result = await getSpecDecodePairsByModelSlug();
+    expect(result.get('deepseek-r1')!).toHaveLength(0);
+  });
+
+  it('sorts GPUs alphabetically, then precision by PRECISION_SLUG_ORDER', async () => {
+    mockFn.mockResolvedValue([
+      stubAvailRow({ model: 'dsr1', hardware: 'h200', precision: 'bf16', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h200', precision: 'bf16', spec_method: 'mtp' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h200', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h200', precision: 'fp8', spec_method: 'mtp' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'mtp' }),
     ]);
 
     const result = await getSpecDecodePairsByModelSlug();
     const dsr1 = result.get('deepseek-r1')!;
+    expect(dsr1).toHaveLength(3);
+    // h100 before h200
     expect(dsr1[0].gpu).toBe('h100');
+    expect(dsr1[0].precision).toBe('fp8');
+    // h200: fp8 (index 5) before bf16 (index 6)
     expect(dsr1[1].gpu).toBe('h200');
+    expect(dsr1[1].precision).toBe('fp8');
+    expect(dsr1[2].gpu).toBe('h200');
+    expect(dsr1[2].precision).toBe('bf16');
   });
 
   it('maps multi-dbKey models correctly', async () => {
     mockFn.mockResolvedValue([
-      stubAvailRow({ model: 'kimik2.5', hardware: 'h100', spec_method: 'none' }),
-      stubAvailRow({ model: 'kimik2.6', hardware: 'h100', spec_method: 'mtp' }),
+      stubAvailRow({ model: 'kimik2.5', hardware: 'h100', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'kimik2.6', hardware: 'h100', precision: 'fp8', spec_method: 'mtp' }),
     ]);
 
     const result = await getSpecDecodePairsByModelSlug();
     const kimi = result.get('kimi-k26')!;
     expect(kimi).toHaveLength(1);
-    expect(kimi[0]).toEqual({ gpu: 'h100', method: 'mtp' });
+    expect(kimi[0]).toEqual({ gpu: 'h100', precision: 'fp8', method: 'mtp' });
   });
 });
 
 describe('getAllComparableSpecDecodeSlugs', () => {
   it('returns a flat list matching the map', async () => {
     mockFn.mockResolvedValue([
-      stubAvailRow({ model: 'dsr1', hardware: 'h100', spec_method: 'none' }),
-      stubAvailRow({ model: 'dsr1', hardware: 'h100', spec_method: 'mtp' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'none' }),
+      stubAvailRow({ model: 'dsr1', hardware: 'h100', precision: 'fp8', spec_method: 'mtp' }),
     ]);
 
     const slugs = await getAllComparableSpecDecodeSlugs();
@@ -285,6 +340,7 @@ describe('getAllComparableSpecDecodeSlugs', () => {
     expect(slugs[0]).toEqual({
       modelSlug: 'deepseek-r1',
       gpu: 'h100',
+      precision: 'fp8',
       method: 'mtp',
     });
   });

@@ -12,6 +12,7 @@ import { getAllComparableSpecDecodeSlugs } from '@/lib/compare-variant-availabil
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
+  precisionDisplayLabel,
   specMethodDisplayLabel,
 } from '@/lib/compare-variant-slug';
 import { BG, BLUE, getLogoSrc, getTiles, PANEL_BG } from '@/lib/og-assets';
@@ -22,8 +23,8 @@ export const contentType = 'image/png';
 
 export async function generateStaticParams() {
   const slugs = await getAllComparableSpecDecodeSlugs();
-  return slugs.map(({ modelSlug, gpu, method }) => ({
-    slug: canonicalSpecDecodeCompareSlug(modelSlug, gpu, method),
+  return slugs.map(({ modelSlug, gpu, precision, method }) => ({
+    slug: canonicalSpecDecodeCompareSlug(modelSlug, gpu, precision, method),
   }));
 }
 
@@ -35,10 +36,11 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
 
   const gpuMeta = HW_REGISTRY[parsed.gpu];
   const gpuLabel = gpuMeta?.label ?? parsed.gpu.toUpperCase();
+  const precLabel = precisionDisplayLabel(parsed.precision);
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
-  const title = `${gpuLabel}: ${aLabel} vs Off`;
+  const title = `${gpuLabel} ${precLabel}: ${aLabel} vs Off`;
   const eyebrow = `${parsed.model.label} · Speculative Decoding`;
-  const titleSize = title.length > 26 ? 80 : title.length > 18 ? 96 : 112;
+  const titleSize = title.length > 34 ? 72 : title.length > 26 ? 80 : title.length > 18 ? 96 : 112;
 
   return new ImageResponse(
     <div

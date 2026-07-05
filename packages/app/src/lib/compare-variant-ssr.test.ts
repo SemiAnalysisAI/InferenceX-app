@@ -178,13 +178,13 @@ describe('pickVariantPairDefaults', () => {
     expect(result.precision).toBeNull();
   });
 
-  it('spec-decode: picks the best (sequence, precision) with overlapping variants', () => {
+  it('spec-decode: picks the best sequence, precision fixed by caller', () => {
     const result = pickVariantPairDefaults(
       'spec-decode',
       variantRows(),
       'h200',
-      { specMethod: 'mtp' },
-      { specMethod: 'none' },
+      { specMethod: 'mtp', precision: 'fp8' },
+      { specMethod: 'none', precision: 'fp8' },
     );
     expect(result.sequence).toBe('1k/1k');
     expect(result.precision).toBe('fp8');

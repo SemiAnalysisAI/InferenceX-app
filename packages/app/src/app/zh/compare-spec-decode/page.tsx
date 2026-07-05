@@ -17,7 +17,11 @@ import {
 } from '@/lib/compare-variant-availability';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
 import { formatModelList } from '@/lib/compare-ssr';
-import { canonicalSpecDecodeCompareSlug, specMethodDisplayLabel } from '@/lib/compare-variant-slug';
+import {
+  canonicalSpecDecodeCompareSlug,
+  precisionDisplayLabel,
+  specMethodDisplayLabel,
+} from '@/lib/compare-variant-slug';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -55,13 +59,14 @@ function buildCards(
   model: CompareModelSlug,
   pairs: SpecDecodePair[],
 ): { slug: string; label: string; archLine: string }[] {
-  return pairs.map(({ gpu, method }) => {
+  return pairs.map(({ gpu, precision, method }) => {
     const gpuMeta = HW_REGISTRY[gpu];
     const gpuLabel = gpuMeta?.label ?? gpu.toUpperCase();
+    const precLabel = precisionDisplayLabel(precision);
     const methodLabel = specMethodDisplayLabel(model.displayName, method);
     return {
-      slug: canonicalSpecDecodeCompareSlug(model.slug, gpu, method),
-      label: `${gpuLabel} — ${methodLabel} vs Off`,
+      slug: canonicalSpecDecodeCompareSlug(model.slug, gpu, precision, method),
+      label: `${gpuLabel} ${precLabel} — ${methodLabel} vs Off`,
       archLine: `${gpuMeta?.vendor ?? '—'} · ${gpuMeta?.arch ?? '—'}`,
     };
   });
