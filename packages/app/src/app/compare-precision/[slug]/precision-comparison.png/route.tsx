@@ -38,10 +38,12 @@ export async function GET(
 ): Promise<Response> {
   const { slug } = await params;
   const parsed = parsePrecisionCompareSlug(slug);
+  // Compare case-insensitively — the HTML pages lowercase before their 308,
+  // so a mixed-case PNG URL should serve rather than 404.
   if (
     !parsed ||
     canonicalPrecisionCompareSlug(parsed.model.slug, parsed.gpu, parsed.precA, parsed.precB) !==
-      slug
+      slug.toLowerCase()
   ) {
     return new Response('Not found', { status: 404 });
   }

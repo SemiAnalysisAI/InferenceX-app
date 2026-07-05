@@ -47,7 +47,7 @@ export async function GET(
       parsed.gpu,
       parsed.precision,
       parsed.method,
-    ) !== slug
+    ) !== slug.toLowerCase()
   ) {
     return new Response('Not found', { status: 404 });
   }
