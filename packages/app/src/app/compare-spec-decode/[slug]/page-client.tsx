@@ -12,6 +12,7 @@ import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track } from '@/lib/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
+import { SPEC_METHODS_ACTIVE } from '@/lib/compare-variant-slug';
 
 interface SsrTableData {
   defaultTargets: number[];
@@ -272,13 +273,14 @@ function CompareTableSection({
     const methodSuffix = `_${method}`;
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
       const hwKey = groupKey.split('__')[0];
-      // Must belong to this GPU
-      if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`) && !hwKey.startsWith(`${gpu}__`)) continue;
-      // Check if the hw key carries the spec-decode method suffix
-      if (hwKey === `${gpu}${methodSuffix}` || hwKey.startsWith(`${gpu}${methodSuffix}_`)) {
+      // Must belong to this GPU. Keys are framework-qualified (h200_sglang).
+      if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`)) continue;
+      // getHardwareKey appends the spec-decode suffix LAST (h200_sglang_mtp),
+      // so side membership is decided by the key's ending.
+      if (hwKey.endsWith(methodSuffix)) {
         pA.push(...points);
-      } else if (hwKey === gpu) {
-        // Base GPU without any spec-decode suffix = side B (Off)
+      } else if (![...SPEC_METHODS_ACTIVE].some((m) => hwKey.endsWith(`_${m}`))) {
+        // No spec-decode suffix at all = side B (Off).
         pB.push(...points);
       }
     }
