@@ -148,8 +148,8 @@ export default function ComparePrecisionPageClient({
                           {' '}
                           <span className="text-muted-foreground italic">
                             {isZh
-                              ? `（数据反映此 URL 的默认 ${defaultSequence ?? t.caveatSeqFallback} 选择——如果您在控件中更改序列或模型，下方表格和图表会自动更新。）`
-                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} selection for this URL — table and chart below update if you change sequence or model in the controls.)`}
+                              ? `（数据反映此 URL 的默认 ${defaultSequence ?? t.caveatSeqFallback} 选择——如果您在控件中更改序列或模型，下方表格和图表会自动更新。每一侧取该精度下的最优可用推理配置，可能包含投机解码（如 MTP）——与其他对比页面的口径一致。）`
+                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} selection for this URL — table and chart below update if you change sequence or model in the controls. Each side uses the best available serving configuration for that precision, which may include speculative decoding such as MTP where recipes exist — the same convention as the other comparison pages.)`}
                           </span>
                         </>
                       )}
