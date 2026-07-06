@@ -23,6 +23,7 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
+import { CollectiveXInventory } from './CollectiveXInventory';
 import { collectiveXAvailabilityReason } from './reader';
 import {
   CollectiveXAttemptTable,
@@ -55,7 +56,6 @@ import {
 } from './types';
 
 type EvidenceScope = 'controlled' | 'diagnostic';
-type PublicationChannel = 'dev-latest' | 'latest-attempt';
 type CollectiveXTab = 'results' | 'decisions' | 'evidence';
 interface SelectOption<T extends string> {
   value: T;
@@ -382,7 +382,17 @@ const COHORT_KIND_ORDER: Record<CollectiveXCohort['kind'], number> = {
   chip: 1,
   system: 2,
   routing: 3,
+  'dispatch-precision': 4,
+  'combine-precision': 5,
+  'precision-pair': 6,
 };
+
+function precisionCohortKindLabel(kind: CollectiveXCohort['kind']): string | null {
+  if (kind === 'dispatch-precision') return 'Dispatch precision';
+  if (kind === 'combine-precision') return 'Combine precision';
+  if (kind === 'precision-pair') return 'Precision pairs';
+  return null;
+}
 
 function formatDate(value: string, locale: 'en' | 'zh'): string {
   return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
@@ -434,8 +444,7 @@ export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>('v1');
-  const [publication, setPublication] = useState<PublicationChannel>('dev-latest');
-  const { data, error, isLoading, isFetching, refetch } = useCollectiveX(publication, version);
+  const { data, error, isLoading, isFetching, refetch } = useCollectiveX('dev-latest', version);
   const [tab, setTab] = useState<CollectiveXTab>('results');
   const [evidenceScope, setEvidenceScope] = useState<EvidenceScope>('controlled');
   const [mode, setMode] = useState<CollectiveXMode>('normal');
@@ -458,6 +467,7 @@ export default function CollectiveXDisplay() {
   const [highContrast, setHighContrast] = useState(false);
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
     { value: 'dispatch', label: t.operation.dispatch },
+    { value: 'stage', label: 'Stage' },
     { value: 'combine', label: t.operation.combine },
     { value: 'roundtrip', label: t.operation.roundtrip },
     { value: 'isolated-sum', label: t.operation['isolated-sum'] },
@@ -481,17 +491,10 @@ export default function CollectiveXDisplay() {
     { value: 'controlled', label: t.evidenceScope.controlled },
     { value: 'diagnostic', label: t.evidenceScope.diagnostic },
   ];
-  const diagnosticEvidenceScopeOptions: SegmentedToggleOption<EvidenceScope>[] = [
-    evidenceScopeOptions[1],
-  ];
   const fabricScopeOptions: SegmentedToggleOption<CollectiveXFabricScope>[] = [
     { value: 'all', label: t.fabricScope.all },
     { value: 'scale-up', label: t.fabricScope['scale-up'] },
     { value: 'scale-out', label: t.fabricScope['scale-out'] },
-  ];
-  const channelOptions: SegmentedToggleOption<PublicationChannel>[] = [
-    { value: 'dev-latest', label: t.channel['dev-latest'] },
-    { value: 'latest-attempt', label: t.channel['latest-attempt'] },
   ];
   const versionOptions: SelectOption<CollectiveXVersion>[] = COLLECTIVEX_VERSIONS.map((value) => ({
     value,
@@ -590,7 +593,12 @@ export default function CollectiveXDisplay() {
           }));
         return options.length === 0
           ? []
-          : [{ label: `${t.cohortKind[kind]} (${options.length})`, options }];
+          : [
+              {
+                label: `${precisionCohortKindLabel(kind) ?? t.cohortKind[kind as keyof typeof t.cohortKind]} (${options.length})`,
+                options,
+              },
+            ];
       },
     );
     return evidenceScope === 'controlled'
@@ -627,12 +635,9 @@ export default function CollectiveXDisplay() {
     if (!dataset) return [];
     const diagnosticMembers = new Set(allDiagnosticCohorts.flatMap((cohort) => cohort.series_ids));
     return dataset.series.filter(
-      (item) =>
-        publication === 'latest-attempt' ||
-        item.status === 'diagnostic' ||
-        diagnosticMembers.has(item.series_id),
+      (item) => item.status === 'diagnostic' || diagnosticMembers.has(item.series_id),
     );
-  }, [allDiagnosticCohorts, dataset, publication]);
+  }, [allDiagnosticCohorts, dataset]);
   const filteredDiagnosticSeries = useMemo(
     () => diagnosticSeries.filter((item) => seriesMatchesSelection(item, seriesSelection)),
     [diagnosticSeries, seriesSelection],
@@ -792,19 +797,6 @@ export default function CollectiveXDisplay() {
     track('collectivex_data_refreshed');
     void refetch();
   }, [refetch]);
-  const handlePublication = useCallback((value: PublicationChannel) => {
-    setPublication(value);
-    setEvidenceScope(value === 'dev-latest' ? 'controlled' : 'diagnostic');
-    setDiagnosticCohortId('all');
-    setMode('normal');
-    setEpSize(8);
-    setFabricScope('all');
-    setPhase('decode');
-    setSku('all');
-    setBackend('all');
-    setRouting('all');
-    track('collectivex_publication_changed', { publication: value });
-  }, []);
   const handleTab = useCallback((value: string) => {
     const next = value as CollectiveXTab;
     setTab(next);
@@ -825,15 +817,11 @@ export default function CollectiveXDisplay() {
     const message =
       availabilityReason === 'source-unavailable'
         ? t.artifactSourceUnavailable
-        : availabilityReason === 'store-unavailable'
-          ? t.storeUnavailable
-          : availabilityReason === 'channel-unavailable'
-            ? publication === 'dev-latest'
-              ? t.promotedUnavailable
-              : t.attemptUnavailable
-            : error instanceof Error
-              ? error.message
-              : t.failedValidation;
+        : availabilityReason === 'channel-unavailable'
+          ? t.promotedUnavailable
+          : error instanceof Error
+            ? error.message
+            : t.failedValidation;
     return (
       <Card
         data-testid="collectivex-error"
@@ -859,15 +847,6 @@ export default function CollectiveXDisplay() {
               onChange={setVersion}
             />
           </div>
-          {!['store-unavailable', 'source-unavailable'].includes(availabilityReason ?? '') && (
-            <SegmentedToggle
-              value={publication}
-              options={channelOptions}
-              onValueChange={handlePublication}
-              ariaLabel={t.publicationAria}
-              testId="collectivex-error-channel-toggle"
-            />
-          )}
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="size-4" />
             {t.retry}
@@ -960,17 +939,10 @@ export default function CollectiveXDisplay() {
         </div>
       </Card>
 
+      <CollectiveXInventory dataset={dataset} />
+
       <Card className="py-4 md:py-5">
         <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          <ControlGroup label={t.publication}>
-            <SegmentedToggle
-              value={publication}
-              options={channelOptions}
-              onValueChange={handlePublication}
-              ariaLabel={t.publicationAria}
-              testId="collectivex-channel-toggle"
-            />
-          </ControlGroup>
           <SelectControl
             label={t.version}
             testId="collectivex-version-select"
@@ -984,9 +956,7 @@ export default function CollectiveXDisplay() {
           <ControlGroup label={t.evidence}>
             <SegmentedToggle
               value={evidenceScope}
-              options={
-                publication === 'dev-latest' ? evidenceScopeOptions : diagnosticEvidenceScopeOptions
-              }
+              options={evidenceScopeOptions}
               onValueChange={(value) => {
                 setEvidenceScope(value);
                 track('collectivex_evidence_scope_changed', { scope: value });
@@ -1073,7 +1043,11 @@ export default function CollectiveXDisplay() {
             onChange={(next) => {
               setOperation(next);
               if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
-              if (next === 'isolated-sum' && yAxis === 'payload-rate') setYAxis('latency');
+              if (
+                next === 'isolated-sum' &&
+                (yAxis === 'activation-rate' || yAxis === 'total-logical-rate')
+              )
+                setYAxis('latency');
             }}
           />
           <ControlGroup label={t.phaseControl}>
@@ -1154,8 +1128,12 @@ export default function CollectiveXDisplay() {
                 ? []
                 : ([
                     {
-                      value: 'payload-rate',
-                      label: t.payloadRateOption,
+                      value: 'activation-rate',
+                      label: 'Activation-data rate at latency percentile',
+                    },
+                    {
+                      value: 'total-logical-rate',
+                      label: 'Total logical data rate at latency percentile',
                     },
                   ] as const)),
             ]}
@@ -1203,7 +1181,8 @@ export default function CollectiveXDisplay() {
               caption={
                 <>
                   <h2 className="text-lg font-semibold">
-                    {t.operationHeading[operation]} · {t.phaseValue[phase]} ·{' '}
+                    {operation === 'stage' ? 'Stage' : t.operationHeading[operation]} ·{' '}
+                    {t.phaseValue[phase]} ·{' '}
                     {yAxis === 'latency'
                       ? percentile
                       : locale === 'zh'
@@ -1217,7 +1196,12 @@ export default function CollectiveXDisplay() {
                       : selectedDiagnosticCohort
                         ? collectiveXCohortLabel(selectedDiagnosticCohort, seriesById, locale)
                         : t.diagnosticEvidence}{' '}
-                    · {t.yAxis[yAxis]}
+                    ·{' '}
+                    {yAxis === 'activation-rate'
+                      ? 'Activation-data rate at selected latency percentile'
+                      : yAxis === 'total-logical-rate'
+                        ? 'Total logical data rate at selected latency percentile'
+                        : t.yAxis[yAxis]}
                   </p>
                   {chartSemantics && (
                     <p
@@ -1326,20 +1310,13 @@ export default function CollectiveXDisplay() {
             {operation === 'isolated-sum' && (
               <p className="mt-2 text-xs text-muted-foreground">{t.isolatedNote}</p>
             )}
-            {yAxis === 'payload-rate' && (
+            {(yAxis === 'activation-rate' || yAxis === 'total-logical-rate') && (
               <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
             )}
           </Card>
         </TabsContent>
         <TabsContent value="decisions" className="space-y-4">
-          {publication === 'dev-latest' ? (
-            <CollectiveXDecisionTables dataset={dataset} cohort={selectedControlledCohort} />
-          ) : (
-            <Card data-testid="collectivex-unpromoted-decisions">
-              <h2 className="text-lg font-semibold">{t.unpromotedEvidence}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{t.unpromotedNote}</p>
-            </Card>
-          )}
+          <CollectiveXDecisionTables dataset={dataset} cohort={selectedControlledCohort} />
         </TabsContent>
         <TabsContent value="evidence" className="space-y-4">
           <CollectiveXCoverageTable coverage={dataset.coverage} />

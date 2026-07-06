@@ -8,10 +8,13 @@ import { parseCollectiveXDatasetText } from '@/components/collectivex/reader';
 import type { CollectiveXDataset, CollectiveXVersion } from '@/components/collectivex/types';
 
 const BRANCH = 'collectivex';
-const PUBLICATION_POLICY: Record<CollectiveXVersion, { file: RegExp; workflowName: string }> = {
+const WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
+const WORKFLOW_FILE = 'collectivex-sweep.yml';
+const WORKFLOW_NAME = 'CollectiveX Sweep';
+const RUNS_PER_PAGE = 100;
+const PUBLICATION_POLICY: Record<CollectiveXVersion, { file: RegExp }> = {
   v1: {
     file: /^collectivex_public_v1_(?<digest>[a-f0-9]{64})\.ndjson$/,
-    workflowName: 'CollectiveX Publish V1',
   },
 };
 const MAX_PUBLICATION_BYTES = 32 * 1024 * 1024;
@@ -26,10 +29,12 @@ type PublicationErrorCode = 'invalid' | 'not-found' | 'unavailable';
 interface WorkflowRun {
   id: number;
   name: string;
+  path: string;
   head_branch: string | null;
   head_sha: string;
   status: string | null;
   conclusion: string | null;
+  run_attempt: number;
 }
 
 interface GithubArtifact {
@@ -51,6 +56,7 @@ export interface CollectiveXGithubPublication {
   dataset: CollectiveXDataset;
   digest: string;
   runId: number;
+  runAttempt: number;
   version: CollectiveXVersion;
 }
 
@@ -120,60 +126,86 @@ async function githubFetch(url: string, token: string): Promise<Response> {
   });
 }
 
-async function publicationCandidates(
+async function* publicationCandidates(
   version: CollectiveXVersion,
   token: string,
-): Promise<PublicationCandidate[]> {
-  const policy = PUBLICATION_POLICY[version];
-  const parameters = new URLSearchParams({
-    branch: BRANCH,
-    status: 'completed',
-    per_page: '20',
-  });
-  const runsResponse = await githubFetch(
-    `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/collectivex-publish.yml/runs?${parameters}`,
-    token,
-  );
-  if (!runsResponse.ok) {
-    throw new CollectiveXPublicationError(
-      'unavailable',
-      `GitHub publication discovery failed (${runsResponse.status})`,
-    );
-  }
-  const runs =
-    ((await runsResponse.json()) as { workflow_runs?: WorkflowRun[] }).workflow_runs ?? [];
-  const candidates: PublicationCandidate[] = [];
-  for (const run of runs) {
-    if (
-      run.name !== policy.workflowName ||
-      run.head_branch !== BRANCH ||
-      run.status !== 'completed' ||
-      run.conclusion !== 'success' ||
-      !/^[a-f0-9]{40}$/.test(run.head_sha)
-    ) {
-      continue;
-    }
-    const artifactsResponse = await githubFetch(
-      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${run.id}/artifacts?per_page=100`,
+): AsyncGenerator<PublicationCandidate> {
+  let page = 1;
+  let visitedRuns = 0;
+  let totalRuns: number | null = null;
+
+  while (totalRuns === null || visitedRuns < totalRuns) {
+    const parameters = new URLSearchParams({
+      branch: BRANCH,
+      status: 'completed',
+      per_page: String(RUNS_PER_PAGE),
+      page: String(page),
+    });
+    const runsResponse = await githubFetch(
+      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/runs?${parameters}`,
       token,
     );
-    if (!artifactsResponse.ok) {
+    if (!runsResponse.ok) {
       throw new CollectiveXPublicationError(
         'unavailable',
-        `GitHub artifact discovery failed (${artifactsResponse.status})`,
+        `GitHub publication discovery failed (${runsResponse.status})`,
       );
     }
-    const artifacts = ((await artifactsResponse.json()) as { artifacts?: GithubArtifact[] })
-      .artifacts;
-    const matching = (artifacts ?? []).filter(
-      (artifact) => artifact.name.startsWith(`cxpublication-${version}-`) && !artifact.expired,
-    );
-    if (matching.length > 1) {
-      throw new CollectiveXPublicationError('invalid', 'publication run has duplicate artifacts');
+    const payload = (await runsResponse.json()) as {
+      total_count?: number;
+      workflow_runs?: WorkflowRun[];
+    };
+    const runs = payload.workflow_runs ?? [];
+    if (
+      totalRuns === null &&
+      Number.isSafeInteger(payload.total_count) &&
+      (payload.total_count ?? -1) >= 0
+    ) {
+      totalRuns = payload.total_count!;
     }
-    if (matching[0]) candidates.push({ artifact: matching[0], run });
+    if (runs.length === 0) break;
+    visitedRuns += runs.length;
+
+    for (const run of runs) {
+      if (
+        run.name !== WORKFLOW_NAME ||
+        run.path !== WORKFLOW_PATH ||
+        run.head_branch !== BRANCH ||
+        run.status !== 'completed' ||
+        run.conclusion !== 'success' ||
+        !Number.isSafeInteger(run.id) ||
+        run.id <= 0 ||
+        !Number.isSafeInteger(run.run_attempt) ||
+        run.run_attempt <= 0 ||
+        !/^[a-f0-9]{40}$/.test(run.head_sha)
+      ) {
+        continue;
+      }
+      const artifactsResponse = await githubFetch(
+        `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${run.id}/artifacts?per_page=100`,
+        token,
+      );
+      if (!artifactsResponse.ok) {
+        throw new CollectiveXPublicationError(
+          'unavailable',
+          `GitHub artifact discovery failed (${artifactsResponse.status})`,
+        );
+      }
+      const artifacts = ((await artifactsResponse.json()) as { artifacts?: GithubArtifact[] })
+        .artifacts;
+      const expectedName = `cxpublication-${version}-${run.id}-${run.run_attempt}`;
+      const matching = (artifacts ?? []).filter(
+        (artifact) => artifact.name === expectedName && !artifact.expired,
+      );
+      if (matching.length > 1) {
+        throw new CollectiveXPublicationError('invalid', 'publication run has duplicate artifacts');
+      }
+      if (matching[0]) yield { artifact: matching[0], run };
+    }
+
+    if (runs.length < RUNS_PER_PAGE || (totalRuns !== null && visitedRuns >= totalRuns)) break;
+    page += 1;
   }
-  return candidates;
 }
 
 async function downloadPublication(
@@ -265,6 +297,7 @@ async function downloadPublication(
     dataset,
     digest,
     runId: candidate.run.id,
+    runAttempt: candidate.run.run_attempt,
     version,
   };
 }
@@ -277,17 +310,18 @@ async function fetchPublication(
   if (!token) {
     throw new CollectiveXPublicationError('unavailable', 'GITHUB_TOKEN is not configured');
   }
-  const candidates = await publicationCandidates(version, token);
-  if (candidates.length === 0) {
-    throw new CollectiveXPublicationError('not-found', 'no CollectiveX publication artifact');
-  }
-  for (const candidate of candidates) {
+  let foundCandidate = false;
+  for await (const candidate of publicationCandidates(version, token)) {
+    foundCandidate = true;
     const publication = await downloadPublication(version, candidate, token);
     digestCache.set(`${version}:${publication.digest}`, {
       expiresAt: Date.now() + DIGEST_TTL_MS,
       publication,
     });
     if (!digest || publication.digest === digest) return publication;
+  }
+  if (!foundCandidate) {
+    throw new CollectiveXPublicationError('not-found', 'no CollectiveX publication artifact');
   }
   throw new CollectiveXPublicationError('not-found', 'CollectiveX publication digest not found');
 }

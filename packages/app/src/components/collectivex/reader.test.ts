@@ -11,6 +11,8 @@ import {
   makeCollectiveXContractDataset,
   makeCollectiveXDataset,
   makeCollectiveXDiagnosticDataset,
+  makeCollectiveXDatasetWithPrecisionCohorts,
+  makeCollectiveXInventoryDataset,
 } from './test-fixture';
 
 const mockFetch = vi.fn();
@@ -57,9 +59,10 @@ describe('CollectiveX publication reader', () => {
     });
     expect(lowLatency.measurement).toMatchObject({
       contract: 'expert-packed-weighted-combine-v1',
-      component_order_contract: 'roundtrip-dispatch-gate-weighted-combine-v1',
+      component_order_contract: 'qualification-hash-rotated-components-v1',
       combine_semantics: 'gate-weighted',
       payload_unit: 'token-expert',
+      qualification_indices: [1, 2, 3],
     });
     expect(unsupported.topology).toMatchObject({
       ep_size: 16,
@@ -67,6 +70,91 @@ describe('CollectiveX publication reader', () => {
       scale_up_transport: 'xgmi',
       scale_out_transport: 'rdma',
     });
+  });
+
+  it('parses inventory coverage with independent precision axes and point status', () => {
+    const result = parseCollectiveXDataset(makeCollectiveXInventoryDataset());
+    const points = result.coverage.flatMap((item) => item.points);
+    const precisionPairs = new Set(
+      result.coverage.map(
+        (item) =>
+          `${item.dispatch_precision.communication_format}/${item.combine_precision.communication_format}`,
+      ),
+    );
+
+    const unsupportedCases = result.coverage.filter((item) => item.disposition === 'unsupported');
+    const measuredCases = result.coverage.filter((item) => item.disposition === 'runnable');
+    expect(result.coverage).toHaveLength(result.promotion.requested_cases);
+    expect(points).toHaveLength(result.promotion.requested_points);
+    expect(result.promotion).toMatchObject({
+      measured_cases: measuredCases.length,
+      unsupported_cases: unsupportedCases.length,
+      measured_points: measuredCases.reduce((total, item) => total + item.points.length, 0),
+      unsupported_points: unsupportedCases.reduce((total, item) => total + item.points.length, 0),
+    });
+    expect(precisionPairs).toEqual(new Set(['bf16/bf16', 'fp8-e4m3fn/bf16']));
+    expect(points.find((point) => point.terminal_status === 'unsupported')).toMatchObject({
+      point_id: null,
+      series_id: null,
+      reason: 'backend-platform-unsupported',
+    });
+    expect(points.find((point) => point.terminal_status === 'measured')).toMatchObject({
+      terminal_status: 'measured',
+      reason: null,
+    });
+    expect(new TextEncoder().encode(JSON.stringify(result)).length).toBeLessThan(32 * 1024 * 1024);
+  });
+
+  it('accepts publisher-declared precision cohorts without inventing recommendations', () => {
+    const result = parseCollectiveXDataset(makeCollectiveXDatasetWithPrecisionCohorts());
+    const precisionKinds = new Set(['dispatch-precision', 'combine-precision', 'precision-pair']);
+    const precisionCohorts = result.cohorts.filter((cohort) => precisionKinds.has(cohort.kind));
+
+    expect(precisionCohorts.map((cohort) => cohort.kind)).toEqual([
+      'dispatch-precision',
+      'combine-precision',
+      'precision-pair',
+    ]);
+    expect(
+      result.rankings.filter((ranking) =>
+        precisionCohorts.some((cohort) => cohort.cohort_id === ranking.cohort_id),
+      ),
+    ).toHaveLength(12);
+    expect(
+      result.sensitivities.filter((sensitivity) =>
+        precisionCohorts.some((cohort) => cohort.cohort_id === sensitivity.cohort_id),
+      ),
+    ).toHaveLength(2);
+    expect(
+      result.recommendations.some((recommendation) =>
+        precisionCohorts.some((cohort) => cohort.cohort_id === recommendation.cohort_id),
+      ),
+    ).toBe(false);
+    const pair = precisionCohorts.find((cohort) => cohort.kind === 'precision-pair')!;
+    expect(result.rankings.some((ranking) => ranking.cohort_id === pair.cohort_id)).toBe(false);
+  });
+
+  it('accepts publisher p99 equivalence ties and rejects descriptive pair rankings', () => {
+    const tied = makeCollectiveXDataset();
+    const p99 = tied.rankings.find(
+      (ranking) => ranking.metric.measure === 'latency_us' && ranking.metric.statistic === 'p99',
+    )!;
+    p99.entries[1].rank = 1;
+    tied.recommendations = tied.recommendations.filter(
+      (recommendation) => recommendation.cohort_id !== p99.cohort_id,
+    );
+    expect(() => parseCollectiveXDataset(tied)).not.toThrow();
+
+    const paired = makeCollectiveXDatasetWithPrecisionCohorts();
+    const pair = paired.cohorts.find((cohort) => cohort.kind === 'precision-pair')!;
+    const dispatch = paired.cohorts.find((cohort) => cohort.kind === 'dispatch-precision')!;
+    const ranking = structuredClone(
+      paired.rankings.find((item) => item.cohort_id === dispatch.cohort_id)!,
+    );
+    ranking.ranking_id = `cxranking-v1-${'f'.repeat(64)}`;
+    ranking.cohort_id = pair.cohort_id;
+    paired.rankings.push(ranking);
+    expect(() => parseCollectiveXDataset(paired)).toThrow('invalid metric metadata');
   });
 
   it('rejects unknown, missing, and stale structural fields', () => {
@@ -83,9 +171,11 @@ describe('CollectiveX publication reader', () => {
       string,
       unknown
     >;
-    component.logical_gbps = component.logical_payload_rate_gbps_at_latency_percentile;
-    delete component.logical_payload_rate_gbps_at_latency_percentile;
-    expect(() => parseCollectiveXDataset(staleMetric)).toThrow('logical_payload_rate');
+    component.logical_gbps = component.total_logical_data_rate_gbps_at_latency_percentile;
+    delete component.total_logical_data_rate_gbps_at_latency_percentile;
+    expect(() => parseCollectiveXDataset(staleMetric)).toThrow(
+      'total_logical_data_rate_gbps_at_latency_percentile',
+    );
 
     const missingTopologyScope = makeCollectiveXContractDataset();
     delete (
@@ -98,6 +188,10 @@ describe('CollectiveX publication reader', () => {
     const staleMode = makeCollectiveXContractDataset();
     (staleMode.series.at(-1) as unknown as Record<string, unknown>).mode = 'll';
     expect(() => parseCollectiveXDataset(staleMode)).toThrow('normal');
+
+    const disabledCalibration = makeCollectiveXDataset();
+    disabledCalibration.series[0].eplb.calibration_token_offset = 0;
+    expect(() => parseCollectiveXDataset(disabledCalibration)).toThrow('EPLB calibration fields');
   });
 
   it('matches backend eligibility and evidence uniqueness constraints', () => {
@@ -360,6 +454,32 @@ describe('CollectiveX publication reader', () => {
     );
   });
 
+  it('rejects misordered or incomplete publisher decisions', () => {
+    const misordered = makeCollectiveXDataset();
+    const entries = misordered.rankings[0].entries;
+    [entries[0], entries[1]] = [entries[1], entries[0]];
+    entries.forEach((entry, index) => {
+      entry.rank = index + 1;
+    });
+    expect(() => parseCollectiveXDataset(misordered)).toThrow('invalid ordering');
+
+    const missingRanking = makeCollectiveXDataset();
+    missingRanking.rankings.pop();
+    expect(() => parseCollectiveXDataset(missingRanking)).toThrow(
+      'rankings do not cover every eligible cohort metric',
+    );
+
+    const wrongObjective = makeCollectiveXDataset();
+    wrongObjective.recommendations[0].objective = 'min-p50-latency';
+    expect(() => parseCollectiveXDataset(wrongObjective)).toThrow('invalid publication links');
+
+    const missingRecommendation = makeCollectiveXDataset();
+    missingRecommendation.recommendations.pop();
+    expect(() => parseCollectiveXDataset(missingRecommendation)).toThrow(
+      'recommendations do not cover every actionable ranking',
+    );
+  });
+
   it('accepts only digest-addressed public channel paths', () => {
     const digest = 'a'.repeat(64);
     expect(
@@ -435,7 +555,7 @@ describe('CollectiveX publication reader', () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503, headers: new Headers() });
     await expect(fetchCollectiveXPublication()).rejects.toMatchObject({
       name: 'CollectiveXDataError',
-      availabilityReason: 'store-unavailable',
+      availabilityReason: 'source-unavailable',
     });
 
     mockFetch.mockReset();
@@ -479,28 +599,20 @@ describe('CollectiveX publication reader', () => {
 
     mockFetch.mockReset();
     mockPublication(bytes, digest, { pointerChannel: 'latest-attempt' });
-    await expect(fetchCollectiveXPublication('dev-latest')).rejects.toThrow(
-      'channel name does not match',
-    );
+    await expect(fetchCollectiveXPublication('dev-latest')).rejects.toThrow('dev-latest');
 
     mockFetch.mockReset();
     mockPublication(bytes, digest, { pointerTimestamp: '2099-01-01T00:00:00Z' });
     await expect(fetchCollectiveXPublication()).rejects.toThrow('timestamp does not match');
   });
 
-  it('requires a promoted dataset only on dev-latest', async () => {
+  it('requires the only public channel to reference a promoted dataset', async () => {
     const bytes = new TextEncoder().encode(JSON.stringify(makeCollectiveXDiagnosticDataset()));
     const digest = await sha256Hex(bytes);
     mockPublication(bytes, digest);
     await expect(fetchCollectiveXPublication('dev-latest')).rejects.toThrow(
       'does not reference a promoted dataset',
     );
-
-    mockFetch.mockReset();
-    mockPublication(bytes, digest, { pointerChannel: 'latest-attempt' });
-    await expect(fetchCollectiveXPublication('latest-attempt')).resolves.toMatchObject({
-      dataset: { promotion: { status: 'diagnostic' } },
-    });
   });
 
   it('rejects duplicate JSON keys before schema validation', async () => {

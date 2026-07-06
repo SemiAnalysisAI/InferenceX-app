@@ -332,6 +332,12 @@ export function collectiveXReasonLabel(value: string, locale: 'en' | 'zh'): stri
 
 function cohortDescription(cohort: CollectiveXCohort, locale: 'en' | 'zh'): string {
   if (locale === 'en') return cohort.description;
+  if (
+    cohort.kind === 'dispatch-precision' ||
+    cohort.kind === 'combine-precision' ||
+    cohort.kind === 'precision-pair'
+  )
+    return cohort.description;
   return {
     library: '在相同实际系统、工作负载与测量协议下对比通信库及其调优资源配置。',
     chip: '在相同后端谱系、工作负载与测量协议下对比完整平台系统。',
@@ -427,14 +433,24 @@ function seriesContextColumns<T>(
 }
 
 function decisionMetricName(metric: CollectiveXMetric, locale: 'en' | 'zh'): string {
+  if (locale === 'zh' && metric.measure !== 'latency_us') {
+    const rate =
+      metric.measure === 'activation_data_rate_gbps_at_latency_percentile'
+        ? 'activation-data rate'
+        : 'total logical data rate';
+    return `${rate} at ${metric.statistic} latency`;
+  }
   if (locale === 'zh') {
     return metric.measure === 'latency_us'
       ? `${metric.statistic} 延迟`
       : `${metric.statistic} 延迟分位点对应的逻辑载荷速率`;
   }
-  return metric.measure === 'latency_us'
-    ? `${metric.statistic} latency`
-    : `logical payload rate at ${metric.statistic} latency`;
+  if (metric.measure === 'latency_us') return `${metric.statistic} latency`;
+  const rate =
+    metric.measure === 'activation_data_rate_gbps_at_latency_percentile'
+      ? 'activation-data rate'
+      : 'total logical data rate';
+  return `${rate} at ${metric.statistic} latency`;
 }
 
 function metricLabel(ranking: CollectiveXRanking, locale: 'en' | 'zh'): string {
@@ -445,7 +461,7 @@ function metricLabel(ranking: CollectiveXRanking, locale: 'en' | 'zh'): string {
   const measure =
     metric.measure === 'latency_us'
       ? `${metric.statistic} latency`
-      : `logical payload rate at ${metric.statistic} latency`;
+      : decisionMetricName(metric, 'en');
   return `${metric.phase} T=${metric.tokens_per_rank} ${metric.operation} ${measure}`;
 }
 
@@ -455,6 +471,12 @@ export function collectiveXCohortLabel(
   locale: 'en' | 'zh',
 ): string {
   if (locale === 'en') return cohort.label;
+  if (
+    cohort.kind === 'dispatch-precision' ||
+    cohort.kind === 'combine-precision' ||
+    cohort.kind === 'precision-pair'
+  )
+    return cohort.label;
   const first = seriesById.get(cohort.series_ids[0]);
   if (!first) return cohort.label;
   const members = cohort.series_ids.flatMap((seriesId) => {
@@ -483,6 +505,12 @@ function rankingLabel(
   locale: 'en' | 'zh',
 ): string {
   if (locale === 'en') return ranking.label;
+  if (
+    cohort.kind === 'dispatch-precision' ||
+    cohort.kind === 'combine-precision' ||
+    cohort.kind === 'precision-pair'
+  )
+    return ranking.label;
   return `${STRINGS.zh.decision.cohortKind[cohort.kind]} ${decisionMetricName(ranking.metric, locale)} T=${ranking.metric.tokens_per_rank}`;
 }
 
@@ -495,7 +523,12 @@ function recommendationLabel(
   const point = seriesById
     .get(recommendation.series_id)
     ?.points.find((item) => item.point_id === recommendation.point_id);
-  const objective = STRINGS.zh.decision.recommendationObjective[recommendation.objective];
+  const objective =
+    recommendation.objective === 'min-p50-latency' || recommendation.objective === 'min-p99-latency'
+      ? STRINGS.zh.decision.recommendationObjective[recommendation.objective]
+      : recommendation.objective.includes('activation')
+        ? `highest activation-data rate at ${recommendation.objective.includes('p50') ? 'p50' : 'p99'} latency`
+        : `highest total logical data rate at ${recommendation.objective.includes('p50') ? 'p50' : 'p99'} latency`;
   return point ? `T=${point.tokens_per_rank} 时 ${objective}` : objective;
 }
 
@@ -524,8 +557,22 @@ function recommendationMetric(
   const [measure, statistic] = {
     'min-p50-latency': ['latency_us', 'p50'],
     'min-p99-latency': ['latency_us', 'p99'],
-    'max-payload-rate-at-p50-latency': ['logical_payload_rate_gbps_at_latency_percentile', 'p50'],
-    'max-payload-rate-at-p99-latency': ['logical_payload_rate_gbps_at_latency_percentile', 'p99'],
+    'max-activation-data-rate-at-p50-latency': [
+      'activation_data_rate_gbps_at_latency_percentile',
+      'p50',
+    ],
+    'max-activation-data-rate-at-p99-latency': [
+      'activation_data_rate_gbps_at_latency_percentile',
+      'p99',
+    ],
+    'max-total-logical-data-rate-at-p50-latency': [
+      'total_logical_data_rate_gbps_at_latency_percentile',
+      'p50',
+    ],
+    'max-total-logical-data-rate-at-p99-latency': [
+      'total_logical_data_rate_gbps_at_latency_percentile',
+      'p99',
+    ],
   }[recommendation.objective] as [CollectiveXMetric['measure'], CollectiveXMetric['statistic']];
   return {
     operation: 'roundtrip',
@@ -713,6 +760,13 @@ export function CollectiveXAttemptTable({
         cell: (row) => row.attempt_index,
         sortValue: (row) => row.attempt_index,
         className: 'tabular-nums',
+      },
+      {
+        header: 'Qualification',
+        align: 'right',
+        cell: (row) => `Q${row.qualification_index}`,
+        sortValue: (row) => row.qualification_index,
+        className: 'tabular-nums whitespace-nowrap',
       },
       {
         header: t.outcomeHeader,

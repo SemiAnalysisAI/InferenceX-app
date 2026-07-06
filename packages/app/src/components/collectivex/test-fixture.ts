@@ -26,16 +26,17 @@ function fixtureId(
   return `cx${kind}-v1-${value.toString(16).padStart(64, '0')}`;
 }
 
-const allocations = [1, 2, 3].map((value) => fixtureId('allocation', value));
+const qualificationIndices = [1, 2, 3] as const;
+const allocations = qualificationIndices.map((value) => fixtureId('allocation', value));
 const decisionIds = {
   libraryCohort: fixtureId('cohort', 1),
   routingCohort: fixtureId('cohort', 2),
   chipCohort: fixtureId('cohort', 3),
   systemCohort: fixtureId('cohort', 4),
   diagnosticLibraryCohort: fixtureId('cohort', 5),
-  rankings: Array.from({ length: 16 }, (_, index) => fixtureId('ranking', index + 1)),
-  recommendations: Array.from({ length: 16 }, (_, index) => fixtureId('recommendation', index + 1)),
-  sensitivities: Array.from({ length: 8 }, (_, index) => fixtureId('sensitivity', index + 1)),
+  rankings: Array.from({ length: 24 }, (_, index) => fixtureId('ranking', index + 1)),
+  recommendations: Array.from({ length: 24 }, (_, index) => fixtureId('recommendation', index + 1)),
+  sensitivities: Array.from({ length: 12 }, (_, index) => fixtureId('sensitivity', index + 1)),
 } as const;
 
 function attemptId(caseIndex: number, allocationIndex: number, ordinal: number): string {
@@ -59,18 +60,54 @@ function makeEligibility(): CollectiveXEligibility {
 
 function component(base: number) {
   const latency = { p50: base, p90: base + 10, p95: base + 15, p99: base + 20 };
-  const logicalBytes = 1_048_576;
+  const activationBytes = 1_048_576;
+  const scaleBytes = 16_384;
+  const totalBytes = activationBytes + scaleBytes;
+  const rate = (bytes: number) => ({
+    p50: bytes / (latency.p50 * 1000),
+    p90: bytes / (latency.p90 * 1000),
+    p95: bytes / (latency.p95 * 1000),
+    p99: bytes / (latency.p99 * 1000),
+  });
   return {
     origin: 'measured' as const,
     latency_us: latency,
-    logical_bytes: logicalBytes,
-    logical_payload_rate_gbps_at_latency_percentile: {
-      p50: logicalBytes / (latency.p50 * 1000),
-      p90: logicalBytes / (latency.p90 * 1000),
-      p95: logicalBytes / (latency.p95 * 1000),
-      p99: logicalBytes / (latency.p99 * 1000),
+    byte_provenance: {
+      accounting_contract: 'activation-data-plus-scales-v1' as const,
+      activation_data_bytes: activationBytes,
+      scale_bytes: scaleBytes,
+      total_logical_bytes: totalBytes,
     },
+    activation_data_rate_gbps_at_latency_percentile: rate(activationBytes),
+    total_logical_data_rate_gbps_at_latency_percentile: rate(totalBytes),
     sample_count: 512,
+  };
+}
+
+const bf16Precision = {
+  alignment_contract: 'native-bf16-vector-alignment',
+  api_input_dtype: 'bf16',
+  api_output_dtype: 'bf16',
+  communication_format: 'bf16',
+  conversion_boundary: 'none',
+  padding_contract: 'none',
+  quantization_origin: 'none',
+  scale_dtype: null,
+  scale_group_size: null,
+  scale_layout: 'none',
+} as const;
+
+function precisionEvidence() {
+  return {
+    dequantized_semantics: true,
+    encoded_payload_valid: true,
+    max_abs_error: 0,
+    max_rel_error: 0,
+    passed: true,
+    saturation_count: 0,
+    saturation_rate: 0,
+    scales_finite: null,
+    scales_positive: null,
   };
 }
 
@@ -81,13 +118,15 @@ function decisionMetricValue(
   const roundtrip = item.points[0].components.roundtrip!;
   return metric.measure === 'latency_us'
     ? roundtrip.latency_us[metric.statistic]
-    : roundtrip.logical_payload_rate_gbps_at_latency_percentile![metric.statistic];
+    : metric.measure === 'activation_data_rate_gbps_at_latency_percentile'
+      ? roundtrip.activation_data_rate_gbps_at_latency_percentile![metric.statistic]
+      : roundtrip.total_logical_data_rate_gbps_at_latency_percentile![metric.statistic];
 }
 
 function metricLabel(metric: CollectiveXMetric): string {
   return metric.measure === 'latency_us'
     ? `${metric.statistic} latency`
-    : `payload rate at ${metric.statistic} latency`;
+    : `${metric.measure === 'activation_data_rate_gbps_at_latency_percentile' ? 'activation' : 'total logical'} rate at ${metric.statistic} latency`;
 }
 
 function coverageTopology(series: CollectiveXSeries): CollectiveXCoverage['topology'] {
@@ -168,12 +207,17 @@ function makeSeries(
       experts: 256,
       routing: 'uniform',
       eplb: false,
-      dispatch_dtype: 'bf16',
-      combine_dtype: 'bf16',
-      activation_profile: 'canonical-counter-source-v3',
+      precision_profile: 'd-bf16.c-bf16',
+      dispatch_precision: { ...bf16Precision },
+      combine_precision: { ...bf16Precision },
+      activation_profile: 'canonical-counter-source-v4',
     },
     eplb: {
       enabled: false,
+      calibration_workload_id: null,
+      calibration_trace_sha256: null,
+      calibration_window: null,
+      calibration_token_offset: null,
       planner: null,
       mapping_sha256: null,
       logical_experts: 256,
@@ -186,16 +230,14 @@ function makeSeries(
       imbalance_after: null,
     },
     resource: {
-      mode: 'tuned',
+      mode: 'fixed-profile',
       profile: 'backend-default',
       comm_units_kind: 'sm',
       configured_units: 20,
     },
     measurement: {
       contract: lowLatency ? 'expert-packed-weighted-combine-v1' : 'layout-and-dispatch-v1',
-      component_order_contract: lowLatency
-        ? 'roundtrip-dispatch-gate-weighted-combine-v1'
-        : 'roundtrip-dispatch-activation-only-combine-v2',
+      component_order_contract: 'qualification-hash-rotated-components-v1',
       combine_semantics: lowLatency ? 'gate-weighted' : 'activation-only',
       payload_unit: lowLatency ? 'token-expert' : 'token-rank',
       sampling_contract: 'fixed-512-v1',
@@ -203,6 +245,7 @@ function makeSeries(
       trials: 64,
       warmups: 32,
       samples_per_component: 512,
+      qualification_indices: [1, 2, 3],
       headline_component: 'roundtrip',
       headline_percentile: 'p99',
     },
@@ -211,7 +254,67 @@ function makeSeries(
         point_id: fixtureId('point', index),
         tokens_per_rank: 128,
         global_tokens: globalTokens,
-        correct: true,
+        anomalies: [],
+        correctness: {
+          semantic_pass: true,
+          precision: {
+            dispatch: precisionEvidence(),
+            combine: precisionEvidence(),
+            passed: true,
+            profile_id: 'd-bf16.c-bf16',
+          },
+        },
+        stability: {
+          complete: true,
+          qualification_indices: [...qualificationIndices],
+          p50_max_min_ratio: 1.05,
+          p99_max_min_ratio: 1.1,
+          stable_p50: true,
+          stable_p99: true,
+        },
+        trial_diagnostics: {
+          flagged: false,
+          reasons: [],
+          components: {
+            dispatch:
+              index === 1
+                ? {
+                    drift_flagged: false,
+                    first_last_median_ratio: 1.02,
+                    outlier_flagged: false,
+                    robust_outlier_fraction: 0,
+                    trial_count: 192 as const,
+                  }
+                : null,
+            stage:
+              index === 1
+                ? {
+                    drift_flagged: false,
+                    first_last_median_ratio: 1.01,
+                    outlier_flagged: false,
+                    robust_outlier_fraction: 0,
+                    trial_count: 192 as const,
+                  }
+                : null,
+            combine:
+              index === 1
+                ? {
+                    drift_flagged: false,
+                    first_last_median_ratio: 1.03,
+                    outlier_flagged: false,
+                    robust_outlier_fraction: 0,
+                    trial_count: 192 as const,
+                  }
+                : null,
+            roundtrip: {
+              drift_flagged: false,
+              first_last_median_ratio: 1.04,
+              outlier_flagged: false,
+              robust_outlier_fraction: 0,
+              trial_count: 192 as const,
+            },
+          },
+        },
         routing: {
           fanout_mean: 5.25,
           recv_tokens_max: 740,
@@ -224,6 +327,7 @@ function makeSeries(
         },
         components: {
           dispatch: index === 1 ? component(30) : null,
+          stage: index === 1 ? component(20) : null,
           combine: index === 1 ? component(40) : null,
           roundtrip,
           isolated_sum:
@@ -231,8 +335,14 @@ function makeSeries(
               ? {
                   origin: 'derived',
                   latency_us: { p50: 70, p90: 90, p95: 100, p99: 110 },
-                  logical_bytes: null,
-                  logical_payload_rate_gbps_at_latency_percentile: null,
+                  byte_provenance: {
+                    accounting_contract: 'activation-data-plus-scales-v1',
+                    activation_data_bytes: 0,
+                    scale_bytes: 0,
+                    total_logical_bytes: 0,
+                  },
+                  activation_data_rate_gbps_at_latency_percentile: null,
+                  total_logical_data_rate_gbps_at_latency_percentile: null,
                   sample_count: null,
                 }
               : null,
@@ -263,6 +373,7 @@ function successfulAttempts(item: CollectiveXSeries, caseIndex: number): Collect
     allocation_id: allocationId,
     run_id: String(1000 + allocationIndex),
     run_attempt: 1,
+    qualification_index: qualificationIndices[allocationIndex],
     attempt_index: 1,
     outcome: 'success',
     failure_mode: null,
@@ -284,10 +395,33 @@ function seriesCoverage(
     required: true,
     disposition: 'runnable',
     sku: item.system.sku,
+    suite: item.suite,
+    workload: item.model,
+    publication_tier: item.publication_tier,
     backend: item.backend.id,
+    backend_generation: item.backend.generation,
     mode: item.mode,
     phase: item.phase,
+    routing: item.workload.routing,
+    eplb: item.workload.eplb,
+    precision_profile: item.workload.precision_profile,
+    dispatch_precision: structuredClone(item.workload.dispatch_precision),
+    combine_precision: structuredClone(item.workload.combine_precision),
+    resource: {
+      mode: item.resource.mode,
+      profile: item.resource.profile,
+      comm_units_kind: item.resource.comm_units_kind,
+      configured_units: item.resource.configured_units,
+    },
     topology: coverageTopology(item),
+    points: item.points.map((point) => ({
+      point_id: point.point_id,
+      series_id: item.series_id,
+      tokens_per_rank: point.tokens_per_rank,
+      global_tokens: point.global_tokens,
+      terminal_status: 'measured' as const,
+      reason: null,
+    })),
     selected_attempt_id: selected?.attempt_id ?? null,
     outcome: selected?.outcome ?? 'invalid',
     failure_mode: selected?.failure_mode ?? null,
@@ -318,6 +452,10 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
   routingEplbVariant.build.implementation_contract_sha256 = 'f'.repeat(64);
   routingEplbVariant.eplb = {
     enabled: true,
+    calibration_workload_id: fixtureId('work', 70),
+    calibration_trace_sha256: '7'.repeat(64),
+    calibration_window: 'collectivex-eplb-calibration-window-v1',
+    calibration_token_offset: 0,
     planner: 'greedy-rank-major-v1',
     mapping_sha256: 'f'.repeat(64),
     logical_experts: 256,
@@ -356,7 +494,11 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
     routingEplbVariant,
   ];
   const metrics = (
-    ['latency_us', 'logical_payload_rate_gbps_at_latency_percentile'] as const
+    [
+      'latency_us',
+      'activation_data_rate_gbps_at_latency_percentile',
+      'total_logical_data_rate_gbps_at_latency_percentile',
+    ] as const
   ).flatMap((measure) =>
     (['p50', 'p99'] as const).map((statistic) => ({
       operation: 'roundtrip' as const,
@@ -377,6 +519,7 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
       allocation_id: allocationId,
       run_id: String(1000 + allocationIndex),
       run_attempt: 1,
+      qualification_index: qualificationIndices[allocationIndex],
       attempt_index: 1,
       outcome: 'unsupported',
       failure_mode: 'capability',
@@ -433,7 +576,10 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
         ranking,
       ): ranking is CollectiveXDataset['rankings'][number] & {
         publication_tier: 'official';
-      } => ranking.publication_tier === 'official',
+      } =>
+        ranking.publication_tier === 'official' &&
+        ranking.metric.measure === 'latency_us' &&
+        ranking.metric.statistic === 'p99',
     )
     .map((ranking) => {
       const idIndex = cohortIds.indexOf(ranking.cohort_id as (typeof cohortIds)[number]);
@@ -443,15 +589,11 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
           metric.statistic === ranking.metric.statistic,
       );
       const top = ranking.entries[0];
-      const objective: CollectiveXDataset['recommendations'][number]['objective'] =
-        ranking.metric.measure === 'latency_us'
-          ? `min-${ranking.metric.statistic}-latency`
-          : `max-payload-rate-at-${ranking.metric.statistic}-latency`;
       return {
         recommendation_id: decisionIds.recommendations[idIndex * metrics.length + metricIndex],
         cohort_id: ranking.cohort_id,
         label: `Best ${metricLabel(ranking.metric)} at T=128`,
-        objective,
+        objective: 'min-p99-latency' as const,
         publication_tier: ranking.publication_tier,
         series_id: top.series_id,
         point_id: top.point_id,
@@ -491,9 +633,24 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
     required: true,
     disposition: 'unsupported',
     sku: 'mi355x',
+    suite: 'ep-core-v1',
+    workload: 'deepseek-v3-v1',
+    publication_tier: 'official',
     backend: 'deepep',
+    backend_generation: 'v1',
     mode: 'normal',
     phase: 'decode',
+    routing: 'uniform',
+    eplb: false,
+    precision_profile: 'd-bf16.c-bf16',
+    dispatch_precision: { ...bf16Precision },
+    combine_precision: { ...bf16Precision },
+    resource: {
+      mode: 'fixed-profile',
+      profile: null,
+      comm_units_kind: null,
+      configured_units: null,
+    },
     topology: {
       ep_size: 16,
       nodes: 2,
@@ -505,6 +662,16 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
       transport: 'xgmi-rdma',
       topology_class: 'mi355x-xgmi-rdma',
     },
+    points: [
+      {
+        point_id: null,
+        series_id: null,
+        tokens_per_rank: 128,
+        global_tokens: 2048,
+        terminal_status: 'unsupported',
+        reason: 'backend-platform-unsupported',
+      },
+    ],
     selected_attempt_id: unsupportedAttempts.at(-1)!.attempt_id,
     outcome: 'unsupported',
     failure_mode: 'capability',
@@ -524,8 +691,15 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
       matrix_id: '5'.repeat(64),
       allocation_ids: [...allocations],
       required_allocations: 3,
+      qualification_indices: [1, 2, 3],
       requested_cases: 8,
       terminal_cases: 8,
+      measured_cases: 7,
+      unsupported_cases: 1,
+      requested_points: 8,
+      terminal_points: 8,
+      measured_points: 7,
+      unsupported_points: 1,
       policy: 'collectivex-decision-grade-v1',
       reason: null,
     },
@@ -646,7 +820,7 @@ export function makeCollectiveXDatasetWithPrefillCohort(): CollectiveXDataset {
     const metric = { ...ranking.metric, tokens_per_rank: 512, phase: 'prefill' as const };
     return {
       ...structuredClone(ranking),
-      ranking_id: fixtureId('ranking', 20 + index),
+      ranking_id: fixtureId('ranking', 100 + index),
       cohort_id: prefillCohort.cohort_id,
       label: ranking.label.replace('T=128', 'T=512').replace('Library', 'Prefill library'),
       metric,
@@ -666,28 +840,33 @@ export function makeCollectiveXDatasetWithPrefillCohort(): CollectiveXDataset {
   });
   dataset.rankings.push(...prefillRankings);
   dataset.recommendations.push(
-    ...prefillRankings.map((ranking, index) => {
-      const top = ranking.entries[0];
-      return {
-        recommendation_id: fixtureId('recommendation', 20 + index),
-        cohort_id: prefillCohort.cohort_id,
-        label: `Best ${metricLabel(ranking.metric)} at T=512`,
-        objective:
-          ranking.metric.measure === 'latency_us'
-            ? (`min-${ranking.metric.statistic}-latency` as const)
-            : (`max-payload-rate-at-${ranking.metric.statistic}-latency` as const),
-        publication_tier: 'official' as const,
-        series_id: top.series_id,
-        point_id: top.point_id,
-        value: top.value,
-        unit: top.unit,
-        rationale: 'Top stable measured roundtrip result in a controlled cohort',
-        eligibility: makeEligibility(),
-      };
-    }),
+    ...prefillRankings
+      .filter(
+        (ranking) => ranking.metric.measure === 'latency_us' && ranking.metric.statistic === 'p99',
+      )
+      .map((ranking, index) => {
+        const top = ranking.entries[0];
+        return {
+          recommendation_id: fixtureId('recommendation', 100 + index),
+          cohort_id: prefillCohort.cohort_id,
+          label: `Best ${metricLabel(ranking.metric)} at T=512`,
+          objective: 'min-p99-latency' as const,
+          publication_tier: 'official' as const,
+          series_id: top.series_id,
+          point_id: top.point_id,
+          value: top.value,
+          unit: top.unit,
+          rationale: 'Top stable measured roundtrip result in a controlled cohort',
+          eligibility: makeEligibility(),
+        };
+      }),
   );
   dataset.promotion.requested_cases += prefill.length;
   dataset.promotion.terminal_cases += prefill.length;
+  dataset.promotion.measured_cases += prefill.length;
+  dataset.promotion.requested_points += prefill.length;
+  dataset.promotion.terminal_points += prefill.length;
+  dataset.promotion.measured_points += prefill.length;
   return dataset;
 }
 
@@ -700,6 +879,10 @@ export function makeCollectiveXContractDataset(): CollectiveXDataset {
   dataset.coverage.push(seriesCoverage(series, attempts));
   dataset.promotion.requested_cases += 1;
   dataset.promotion.terminal_cases += 1;
+  dataset.promotion.measured_cases += 1;
+  dataset.promotion.requested_points += 1;
+  dataset.promotion.terminal_points += 1;
+  dataset.promotion.measured_points += 1;
   return dataset;
 }
 
@@ -711,6 +894,15 @@ export function makeCollectiveXDiagnosticDataset(): CollectiveXDataset {
   const evidenceId = series.points[0].evidence_ids[0];
   series.allocation_ids = [allocationId];
   series.points[0].evidence_ids = [evidenceId];
+  series.points[0].stability = {
+    complete: false,
+    qualification_indices: [1],
+    p50_max_min_ratio: null,
+    p99_max_min_ratio: null,
+    stable_p50: false,
+    stable_p99: false,
+  };
+  series.measurement.qualification_indices = [1];
   series.eligibility = {
     decision_grade: false,
     allocation_ids: [allocationId],
@@ -736,6 +928,7 @@ export function makeCollectiveXDiagnosticDataset(): CollectiveXDataset {
     allocation_id: attempt.allocation_id,
     run_id: attempt.run_id,
     run_attempt: attempt.run_attempt,
+    qualification_index: attempt.qualification_index,
     attempt_index: 1,
     outcome: 'failed',
     failure_mode: 'timeout',
@@ -751,8 +944,15 @@ export function makeCollectiveXDiagnosticDataset(): CollectiveXDataset {
     ...dataset.promotion,
     status: 'diagnostic',
     allocation_ids: [allocationId],
+    qualification_indices: [1],
     requested_cases: 1,
     terminal_cases: 1,
+    measured_cases: 1,
+    unsupported_cases: 0,
+    requested_points: 1,
+    terminal_points: 1,
+    measured_points: 1,
+    unsupported_points: 0,
   };
   dataset.source_bundle_ids = [dataset.source_bundle_ids[0]];
   dataset.coverage = [coverage];
@@ -783,5 +983,73 @@ export function makeCollectiveXDatasetWithDiagnosticCohort(): CollectiveXDataset
   };
   dataset.cohorts.push(cohort);
   dataset.cohorts.sort((left, right) => left.cohort_id.localeCompare(right.cohort_id));
+  return dataset;
+}
+
+export function makeCollectiveXDatasetWithPrecisionCohorts(): CollectiveXDataset {
+  const dataset = makeCollectiveXDataset();
+  const routing = dataset.cohorts.find((item) => item.kind === 'routing')!;
+  const routingRankings = dataset.rankings.filter((item) => item.cohort_id === routing.cohort_id);
+  const routingSensitivity = dataset.sensitivities.find(
+    (item) => item.cohort_id === routing.cohort_id,
+  )!;
+  const kinds = ['dispatch-precision', 'combine-precision', 'precision-pair'] as const;
+  for (const [index, kind] of kinds.entries()) {
+    const cohortId = fixtureId('cohort', 100 + index);
+    dataset.cohorts.push({
+      ...structuredClone(routing),
+      cohort_id: cohortId,
+      kind,
+      label: `${kind} / normal / fixture comparison`,
+      description: `Publisher-declared ${kind} comparison`,
+      controlled_factors:
+        kind === 'dispatch-precision'
+          ? ['system', 'combine-precision']
+          : kind === 'combine-precision'
+            ? ['system', 'dispatch-precision']
+            : ['system'],
+      varying_factors:
+        kind === 'precision-pair'
+          ? ['dispatch-precision', 'combine-precision', 'precision-profile']
+          : [kind],
+    });
+    if (kind !== 'precision-pair') {
+      dataset.rankings.push(
+        ...routingRankings.map((ranking, rankingIndex) => ({
+          ...structuredClone(ranking),
+          ranking_id: fixtureId('ranking', 200 + index * 10 + rankingIndex),
+          cohort_id: cohortId,
+          label: `${kind} publisher ranking`,
+        })),
+      );
+      dataset.sensitivities.push({
+        ...structuredClone(routingSensitivity),
+        sensitivity_id: fixtureId('sensitivity', 100 + index),
+        cohort_id: cohortId,
+        label: `${kind} publisher sensitivity`,
+      });
+    }
+  }
+  return dataset;
+}
+
+export function makeCollectiveXInventoryDataset(): CollectiveXDataset {
+  const dataset = makeCollectiveXDataset();
+  const unsupported = dataset.coverage.find((item) => item.disposition === 'unsupported');
+  if (!unsupported) throw new Error('Inventory fixture requires an unsupported case');
+  unsupported.label = unsupported.label.replace('BF16', 'FP8 dispatch');
+  unsupported.precision_profile = 'd-fp8-e4m3fn-b128-f32-prequantized.c-bf16';
+  unsupported.dispatch_precision = {
+    alignment_contract: 'hidden-block-128',
+    api_input_dtype: 'fp8-e4m3fn-with-f32-scale',
+    api_output_dtype: 'fp8-e4m3fn-with-f32-scale',
+    communication_format: 'fp8-e4m3fn',
+    conversion_boundary: 'before-dispatch-timing',
+    padding_contract: 'right-zero-pad-hidden-to-128',
+    quantization_origin: 'caller-prequantized',
+    scale_dtype: 'f32',
+    scale_group_size: 128,
+    scale_layout: 'per-token-hidden-block',
+  };
   return dataset;
 }

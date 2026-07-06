@@ -36,14 +36,17 @@ function installGithubResponses(archive: ReturnType<typeof publicationArchive>) 
   mockFetch
     .mockResolvedValueOnce(
       jsonResponse({
+        total_count: 1,
         workflow_runs: [
           {
             id: 456,
-            name: 'CollectiveX Publish V1',
+            name: 'CollectiveX Sweep',
+            path: '.github/workflows/collectivex-sweep.yml',
             head_branch: 'collectivex',
             head_sha: 'a'.repeat(40),
             status: 'completed',
             conclusion: 'success',
+            run_attempt: 1,
           },
         ],
       }),
@@ -91,15 +94,123 @@ describe('CollectiveX GitHub publication loader', () => {
       artifactId: 123,
       digest: archive.digest,
       runId: 456,
+      runAttempt: 1,
       version: 'v1',
     });
     expect(Buffer.from(first.body)).toEqual(archive.body);
     expect(first.dataset.promotion.status).toBe('promoted');
     expect(second).toBe(first);
     expect(mockFetch).toHaveBeenCalledTimes(3);
-    expect(mockFetch.mock.calls[0][0]).toContain(
-      '/actions/workflows/collectivex-publish.yml/runs?',
-    );
+    expect(mockFetch.mock.calls[0][0]).toContain('/actions/workflows/collectivex-sweep.yml/runs?');
+  });
+
+  it('paginates workflow runs until it finds a publication operation', async () => {
+    const archive = publicationArchive();
+    const ordinaryRuns = Array.from({ length: 100 }, (_, index) => ({
+      id: 1000 - index,
+      name: 'CollectiveX Sweep',
+      path: '.github/workflows/collectivex-sweep.yml',
+      head_branch: 'collectivex',
+      head_sha: 'a'.repeat(40),
+      status: 'completed',
+      conclusion: 'failure',
+      run_attempt: 1,
+    }));
+    ordinaryRuns[0].conclusion = 'success';
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ total_count: 101, workflow_runs: ordinaryRuns }))
+      .mockResolvedValueOnce(jsonResponse({ artifacts: [] }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          total_count: 101,
+          workflow_runs: [
+            {
+              id: 456,
+              name: 'CollectiveX Sweep',
+              path: '.github/workflows/collectivex-sweep.yml',
+              head_branch: 'collectivex',
+              head_sha: 'a'.repeat(40),
+              status: 'completed',
+              conclusion: 'success',
+              run_attempt: 1,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          artifacts: [
+            {
+              id: 123,
+              name: 'cxpublication-v1-456-1',
+              archive_download_url: 'https://example.test/publication.zip',
+              expired: false,
+              size_in_bytes: archive.zip.byteLength,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(archive.zip, {
+          headers: { 'Content-Length': String(archive.zip.byteLength) },
+        }),
+      );
+
+    await expect(loadCollectiveXPublication('v1')).resolves.toMatchObject({ runId: 456 });
+    expect(mockFetch.mock.calls[0][0]).toContain('page=1');
+    expect(mockFetch.mock.calls[2][0]).toContain('page=2');
+  });
+
+  it('selects only the artifact from the current run attempt', async () => {
+    const archive = publicationArchive();
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          total_count: 1,
+          workflow_runs: [
+            {
+              id: 456,
+              name: 'CollectiveX Sweep',
+              path: '.github/workflows/collectivex-sweep.yml',
+              head_branch: 'collectivex',
+              head_sha: 'a'.repeat(40),
+              status: 'completed',
+              conclusion: 'success',
+              run_attempt: 2,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          artifacts: [
+            {
+              id: 122,
+              name: 'cxpublication-v1-456-1',
+              archive_download_url: 'https://example.test/stale.zip',
+              expired: false,
+            },
+            {
+              id: 123,
+              name: 'cxpublication-v1-456-2',
+              archive_download_url: 'https://example.test/publication.zip',
+              expired: false,
+              size_in_bytes: archive.zip.byteLength,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(archive.zip, {
+          headers: { 'Content-Length': String(archive.zip.byteLength) },
+        }),
+      );
+
+    await expect(loadCollectiveXPublication('v1')).resolves.toMatchObject({
+      artifactId: 123,
+      runAttempt: 2,
+    });
+    expect(mockFetch).not.toHaveBeenCalledWith('https://example.test/stale.zip', expect.anything());
   });
 
   it('resolves an immutable digest from the publication cache', async () => {

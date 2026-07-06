@@ -3,12 +3,12 @@ import {
   makeCollectiveXContractDataset,
   makeCollectiveXDatasetWithPrefillCohort,
   makeCollectiveXDatasetWithDiagnosticCohort,
-  makeCollectiveXDiagnosticDataset,
+  makeCollectiveXDatasetWithPrecisionCohorts,
+  makeCollectiveXInventoryDataset,
 } from '@/components/collectivex/test-fixture';
 import type { CollectiveXDataset } from '@/components/collectivex/types';
 
-type Channel = 'dev-latest' | 'latest-attempt';
-const channelUrl = (channel: Channel) => `/collectivex-data/v1/channels/${channel}.json`;
+const channelUrl = '/collectivex-data/v1/channels/dev-latest.json';
 
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -17,18 +17,17 @@ async function sha256(value: string): Promise<string> {
 
 function installPublication(
   dataset: CollectiveXDataset | Record<string, unknown> = makeCollectiveXDataset(),
-  options: { channel?: Channel; digest?: string; delay?: number } = {},
+  options: { digest?: string; delay?: number } = {},
 ) {
-  const channel = options.channel ?? 'dev-latest';
   const body = JSON.stringify(dataset);
   const generatedAt =
     typeof dataset.generated_at === 'string' ? dataset.generated_at : '2026-07-04T01:00:00Z';
   return cy.wrap(sha256(body), { log: false }).then((actualDigest) => {
     const digest = options.digest ?? actualDigest;
-    cy.intercept('GET', channelUrl(channel), {
+    cy.intercept('GET', channelUrl, {
       body: {
         format: 'collectivex.channel.v1',
-        channel,
+        channel: 'dev-latest',
         generated_at: generatedAt,
         dataset: {
           path: `datasets/${digest}/dataset.json`,
@@ -36,12 +35,12 @@ function installPublication(
           bytes: new TextEncoder().encode(body).length,
         },
       },
-    }).as(`collectivexChannel-${channel}`);
+    }).as('collectivexChannel-dev-latest');
     cy.intercept('GET', `/collectivex-data/v1/datasets/${digest}/dataset.json`, {
       body,
       delay: options.delay,
       headers: { 'content-type': 'application/json' },
-    }).as(`collectivexDataset-${channel}`);
+    }).as('collectivexDataset-dev-latest');
   });
 }
 
@@ -54,7 +53,6 @@ function openCollectiveX() {
 describe('CollectiveX native publication', () => {
   beforeEach(() => {
     installPublication();
-    installPublication(makeCollectiveXDiagnosticDataset(), { channel: 'latest-attempt' });
     openCollectiveX();
   });
 
@@ -68,6 +66,7 @@ describe('CollectiveX native publication', () => {
       .contains('button', 'Controlled')
       .should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="collectivex-version-select"]').should('contain.text', 'V1');
+    cy.get('[data-testid="collectivex-channel-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-mode-select"]').should('contain.text', 'Normal');
     cy.get('[data-testid="collectivex-ep-select"]').should('contain.text', 'EP8');
     cy.get('[data-testid="collectivex-fabric-scope-toggle"]')
@@ -112,6 +111,141 @@ describe('CollectiveX native publication', () => {
     cy.get('[data-testid="collectivex-cohort-select"]').click();
   });
 
+  it('makes the full matrix inventory primary and exposes point-level evidence', () => {
+    const inventory = makeCollectiveXInventoryDataset();
+    installPublication(inventory);
+    cy.reload();
+    cy.wait('@collectivexChannel-dev-latest');
+    const unsupportedCases = inventory.coverage.filter(
+      (item) => item.disposition === 'unsupported',
+    );
+    const unsupportedPoints = unsupportedCases.reduce(
+      (total, item) => total + item.points.length,
+      0,
+    );
+    const measuredPoints = inventory.coverage
+      .filter((item) => item.disposition === 'runnable')
+      .reduce((total, item) => total + item.points.length, 0);
+
+    cy.get('[data-testid="collectivex-inventory"]')
+      .should('be.visible')
+      .and('contain.text', 'Matrix case inventory')
+      .and('contain.text', `${inventory.coverage.length} of ${inventory.coverage.length} cases`)
+      .and('contain.text', `${measuredPoints} measured points`)
+      .and('contain.text', `${unsupportedPoints} unsupported points`);
+    cy.get('[data-testid="collectivex-version-select"]').should('contain.text', 'V1');
+    [
+      'sku',
+      'backend',
+      'ep',
+      'mode',
+      'phase',
+      'routing',
+      'topology',
+      'dispatch-precision',
+      'combine-precision',
+      'tier',
+      'terminal',
+    ].forEach((filter) =>
+      cy.get(`[data-testid="collectivex-inventory-${filter}"]`).should('be.visible'),
+    );
+    cy.get('[data-testid="collectivex-inventory-table"]')
+      .should('contain.text', 'Dispatch precision')
+      .and('contain.text', 'Combine precision')
+      .and('contain.text', 'Point terminal status');
+
+    cy.get('[data-testid="collectivex-case-detail"]')
+      .should('contain.text', 'Selected matrix case')
+      .and('contain.text', 'Resource')
+      .and('contain.text', 'Topology')
+      .and('contain.text', 'Dispatch precision')
+      .and('contain.text', 'Combine precision');
+    cy.get('[data-testid="collectivex-case-points-table"]').should(
+      'contain.text',
+      '3/3 qualification runs',
+    );
+
+    const precision = inventory.coverage.find(
+      (item) =>
+        item.dispatch_precision.communication_format !== 'bf16' ||
+        item.combine_precision.communication_format !== 'bf16',
+    );
+    if (precision) {
+      const matchingCases = inventory.coverage.filter(
+        (item) => item.precision_profile === precision.precision_profile,
+      ).length;
+      cy.get('[data-testid="collectivex-inventory-dispatch-precision"]').click();
+      cy.contains(
+        '[role="option"]',
+        `${precision.dispatch_precision.communication_format} · ${precision.dispatch_precision.quantization_origin}`,
+      ).click();
+      cy.get('[data-testid="collectivex-inventory-combine-precision"]').click();
+      cy.contains(
+        '[role="option"]',
+        `${precision.combine_precision.communication_format} · ${precision.combine_precision.quantization_origin}`,
+      ).click();
+      cy.get('[data-testid="collectivex-inventory"]').should(
+        'contain.text',
+        `${matchingCases} of ${inventory.coverage.length} cases`,
+      );
+    }
+
+    cy.get('[data-testid="collectivex-inventory-terminal"]').click();
+    cy.contains('[role="option"]', 'unsupported').click();
+    cy.get('[data-testid="collectivex-case-points-table"]')
+      .should('contain.text', 'unsupported')
+      .and('contain.text', 'Unavailable');
+
+    installPublication(makeCollectiveXDataset());
+    cy.reload();
+    cy.wait('@collectivexChannel-dev-latest');
+    cy.get('[data-testid="collectivex-case-points-table"]')
+      .should('contain.text', 'Dispatch')
+      .and('contain.text', 'Stage')
+      .and('contain.text', 'Combine')
+      .and('contain.text', 'Round trip')
+      .and('contain.text', 'Isolated sum')
+      .and('contain.text', '512/512 samples')
+      .and('contain.text', '3/3 qualification runs')
+      .and('contain.text', 'Semantic pass')
+      .and('contain.text', 'Stability')
+      .and('contain.text', 'Trial diagnostics')
+      .and('contain.text', '192 trials')
+      .and('contain.text', 'No trial flags')
+      .and('contain.text', 'none declared');
+  });
+
+  it('renders publisher-declared dispatch, combine, and precision-pair cohorts', () => {
+    installPublication(makeCollectiveXDatasetWithPrecisionCohorts());
+    cy.reload();
+    cy.wait('@collectivexChannel-dev-latest');
+
+    cy.get('[data-testid="collectivex-cohort-select"]').click();
+    cy.get('[data-slot="select-content"]')
+      .should('contain.text', 'Dispatch precision')
+      .and('contain.text', 'Combine precision')
+      .and('contain.text', 'Precision pairs');
+    cy.contains('[role="option"]', 'dispatch-precision / normal / fixture comparison').click();
+    cy.contains('[role="tab"]', 'Decisions').click();
+    cy.get('[data-testid="collectivex-rankings"]').should(
+      'contain.text',
+      'dispatch-precision publisher ranking',
+    );
+    cy.get('[data-testid="collectivex-sensitivity"]').should(
+      'contain.text',
+      'dispatch-precision publisher sensitivity',
+    );
+    cy.get('[data-testid="collectivex-recommendations"]').should('not.exist');
+
+    cy.get('[data-testid="collectivex-cohort-select"]').click();
+    cy.contains('[role="option"]', 'precision-pair / normal / fixture comparison').click();
+    cy.get('[data-testid="collectivex-rankings"]')
+      .should('contain.text', 'No data available for the current filters.')
+      .and('not.contain.text', 'precision-pair publisher ranking');
+    cy.get('[data-testid="collectivex-sensitivity"]').should('not.exist');
+    cy.get('[data-testid="collectivex-recommendations"]').should('not.exist');
+  });
+
   it('serves the bilingual sibling from the same isolated publication', () => {
     cy.visit('/zh/collectivex');
     cy.wait('@collectivexChannel-dev-latest');
@@ -129,9 +263,6 @@ describe('CollectiveX native publication', () => {
         'href',
         `https://github.com/SemiAnalysisAI/InferenceX/blob/${'a'.repeat(40)}/experimental/CollectiveX/docs/methodology_zh.md`,
       );
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', '已发布')
-      .should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="collectivex-scope-toggle"]').should('contain.text', '受控对比');
     cy.get('[data-testid="collectivex-operation-select"]').should('contain.text', '往返');
     cy.get('[data-testid="chart-legend"] input[type="text"]')
@@ -208,12 +339,19 @@ describe('CollectiveX native publication', () => {
   });
 
   it('selects exact low-latency EP16 scale-out semantics without mixing normal mode', () => {
-    installPublication(makeCollectiveXContractDataset(), { channel: 'latest-attempt' });
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
-    cy.wait('@collectivexChannel-latest-attempt');
+    const contract = makeCollectiveXContractDataset();
+    const lowLatency = contract.series.find((item) => item.mode === 'low-latency')!;
+    lowLatency.status = 'diagnostic';
+    lowLatency.eligibility = {
+      ...lowLatency.eligibility,
+      decision_grade: false,
+      reasons: ['not-in-controlled-cohort'],
+    };
+    installPublication(contract);
+    cy.reload();
+    cy.wait('@collectivexChannel-dev-latest');
 
+    cy.get('[data-testid="collectivex-scope-toggle"]').contains('button', 'Diagnostics').click();
     cy.get('[data-testid="collectivex-mode-select"]').contains('button', 'Low latency').click();
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP16').click();
@@ -373,7 +511,7 @@ describe('CollectiveX native publication', () => {
     cy.viewport(390, 844);
     cy.visit('/zh/collectivex');
     cy.wait('@collectivexChannel-dev-latest');
-    cy.get('[data-testid="collectivex-channel-toggle"]').should('be.visible');
+    cy.get('[data-testid="collectivex-version-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-mode-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-fabric-scope-toggle"]').should('be.visible');
@@ -397,17 +535,15 @@ describe('CollectiveX native publication', () => {
       })
       .scrollTo('right');
     cy.get('[data-testid="collectivex-recommendations-table"]')
-      .find('[data-testid="data-table-pagination-summary"]')
-      .should('have.text', '第 1–4 行，共 4 行');
+      .find('tbody tr')
+      .should('have.length', 1);
     cy.get('[data-testid="collectivex-recommendations-table"]')
       .find('[data-testid="data-table-page-size"]')
       .should('contain.text', '每页')
       .and('contain.text', '25')
       .and('contain.text', '行');
     cy.get('[data-testid="collectivex-rankings-table"] input').type('正式');
-    cy.get('[data-testid="collectivex-rankings-table"]')
-      .find('[data-testid="data-table-pagination-summary"]')
-      .should('have.text', '第 1–8 行，共 8 行（筛选自 8 行）');
+    cy.get('[data-testid="collectivex-rankings-table"]').find('tbody tr').should('have.length', 12);
 
     cy.contains('[role="tab"]', '证据').click();
     cy.get('[data-testid="collectivex-coverage-table"]')
@@ -475,85 +611,8 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'H100 EP8 · mori');
   });
 
-  it('resolves the latest-attempt channel without carrying published data forward', () => {
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
-    cy.wait('@collectivexChannel-latest-attempt');
-
-    cy.get('[data-testid="collectivex-display"]')
-      .should('contain.text', 'diagnostic')
-      .and('contain.text', '1/1')
-      .and('contain.text', '2')
-      .and('contain.text', 'H100 EP8 · nccl-ep')
-      .and('not.contain.text', 'H100 EP8 · deepep');
-  });
-
-  it('resets diagnostic cohorts and filters when the publication changes', () => {
-    installPublication(makeCollectiveXDatasetWithDiagnosticCohort());
-    const latest = makeCollectiveXDiagnosticDataset();
-    latest.series[0].label = 'MI300X EP8 · nccl-ep';
-    latest.series[0].system = {
-      ...latest.series[0].system,
-      sku: 'mi300x',
-      label: 'AMD Instinct MI300X',
-      vendor: 'amd',
-      topology_class: 'single-node-xgmi',
-      transport: 'xgmi',
-    };
-    latest.coverage[0].sku = 'mi300x';
-    installPublication(latest, { channel: 'latest-attempt' });
-    cy.reload();
-    cy.wait('@collectivexChannel-dev-latest');
-
-    cy.get('[data-testid="collectivex-scope-toggle"]').contains('button', 'Diagnostics').click();
-    cy.get('[data-testid="collectivex-sku-select"]').click();
-    cy.contains('[role="option"]', 'H100').click();
-    cy.get('[data-testid="collectivex-cohort-select"]').click();
-    cy.contains('[role="option"]', 'H100 EP8 library comparison').click();
-    cy.get('[data-testid="collectivex-sku-select"]').should('not.exist');
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
-    cy.wait('@collectivexChannel-latest-attempt');
-
-    cy.get('[data-testid="collectivex-cohort-select"]').should(
-      'contain.text',
-      'All diagnostic evidence',
-    );
-    cy.get('[data-testid="collectivex-sku-select"]').should('contain.text', 'All');
-    cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'MI300X EP8 · nccl-ep')
-      .and('not.contain.text', 'H100 EP8 · deepep');
-  });
-
-  it('never promotes latest-attempt candidates in the browser', () => {
-    const unpromoted = makeCollectiveXDataset();
-    unpromoted.promotion.status = 'diagnostic';
-    installPublication(unpromoted, { channel: 'latest-attempt' });
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
-    cy.wait('@collectivexChannel-latest-attempt');
-
-    cy.get('[data-testid="collectivex-scope-toggle"]')
-      .find('button')
-      .should('have.length', 1)
-      .and('contain.text', 'Diagnostics');
-    cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'H100 EP8 · deepep')
-      .and('contain.text', 'H100 EP8 · nccl-ep');
-
-    cy.contains('[role="tab"]', 'Decisions').click();
-    cy.get('[data-testid="collectivex-unpromoted-decisions"]').should(
-      'contain.text',
-      'does not drive rankings or recommendations',
-    );
-    cy.get('[data-testid="collectivex-rankings"]').should('not.exist');
-  });
-
-  it('can inspect the latest attempt before the first promotion exists', () => {
-    cy.intercept('GET', channelUrl('dev-latest'), {
+  it('keeps the version selector available when no promotion exists', () => {
+    cy.intercept('GET', channelUrl, {
       statusCode: 404,
       headers: { 'X-CollectiveX-Status': 'channel-unavailable' },
     }).as('missingPromotion');
@@ -563,18 +622,12 @@ describe('CollectiveX native publication', () => {
       .should('be.visible')
       .and('contain.text', 'No promoted CollectiveX publication is available yet.')
       .and('not.contain.text', 'publication rejected');
-
-    cy.get('[data-testid="collectivex-error-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
-    cy.wait('@collectivexChannel-latest-attempt');
-    cy.get('[data-testid="collectivex-display"]')
-      .should('be.visible')
-      .and('contain.text', 'diagnostic');
+    cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
+    cy.get('[data-testid="collectivex-error-channel-toggle"]').should('not.exist');
   });
 
   it('reports an unavailable GitHub publication source as deployment availability', () => {
-    cy.intercept('GET', channelUrl('dev-latest'), {
+    cy.intercept('GET', channelUrl, {
       statusCode: 503,
       headers: { 'X-CollectiveX-Status': 'source-unavailable' },
     }).as('unavailableSource');
@@ -621,7 +674,7 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', '1.0.0 · backend-default · build dddddddd · series 00000001 · official');
     cy.get('[data-testid="collectivex-recommendations-table"] tbody tr')
       .first()
-      .should('contain.text', 'p50 latency');
+      .should('contain.text', 'p99 latency');
     cy.get('[data-testid="collectivex-comparison-contract"]')
       .should('contain.text', 'Comparison contract')
       .and('contain.text', 'Held constant')
@@ -649,20 +702,7 @@ describe('CollectiveX native publication', () => {
       .should('contain.text', 'p50 latency');
   });
 
-  it('localizes the bootstrap publication reason in Chinese', () => {
-    const bootstrap = makeCollectiveXDiagnosticDataset();
-    bootstrap.promotion.reason = 'awaiting-v1-runs';
-    installPublication(bootstrap, { channel: 'latest-attempt' });
-    cy.visit('/zh/collectivex');
-    cy.wait('@collectivexChannel-dev-latest');
-    cy.get('[data-testid="collectivex-channel-toggle"]').contains('button', '最新尝试').click();
-    cy.wait('@collectivexChannel-latest-attempt');
-    cy.get('[data-testid="collectivex-promotion-reason"]')
-      .should('contain.text', '等待 CollectiveX v1 运行结果')
-      .and('not.contain.text', 'awaiting-v1-runs');
-  });
-
-  it('shows terminal coverage and every retained retry', () => {
+  it('shows terminal coverage and retained publication attempts', () => {
     cy.contains('[role="tab"]', 'Evidence').click();
 
     cy.get('[data-testid="collectivex-coverage-table"]')
@@ -685,18 +725,8 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'a'.repeat(64))
       .and('contain.text', 'b'.repeat(64))
       .and('contain.text', 'c'.repeat(64));
-
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
-    cy.wait('@collectivexChannel-latest-attempt');
-    cy.contains('[role="tab"]', 'Evidence').click();
     cy.get('[data-testid="collectivex-attempts-table"]')
-      .should('contain.text', 'timeout')
-      .and('contain.text', 'execution-timeout')
-      .and('contain.text', 'failed')
-      .and('contain.text', 'retained')
-      .and('contain.text', 'allocation selection')
+      .should('contain.text', 'allocation selection')
       .and('contain.text', 'terminal selection')
       .and('contain.text', 'Attempt ID')
       .and('contain.text', 'nccl-ep decode')
@@ -717,7 +747,7 @@ describe('CollectiveX native publication', () => {
         cy.get('[data-testid="collectivex-attempts-table"]').should('contain.text', id.slice(-8));
       });
     cy.get('[data-testid="collectivex-provenance"]')
-      .should('contain.text', 'latest-attempt')
+      .should('contain.text', 'dev-latest')
       .and('contain.text', 'Dataset SHA-256');
   });
 
@@ -733,14 +763,12 @@ describe('CollectiveX native publication', () => {
   });
 
   it('renders loading while resolving immutable bytes', () => {
-    const delayed = makeCollectiveXDiagnosticDataset();
+    const delayed = makeCollectiveXDataset();
     delayed.generated_at = '2026-07-04T02:00:00Z';
-    installPublication(delayed, { channel: 'latest-attempt', delay: 750 });
-    cy.get('[data-testid="collectivex-channel-toggle"]')
-      .contains('button', 'Latest attempt')
-      .click();
+    installPublication(delayed, { delay: 750 });
+    cy.reload();
     cy.get('[data-testid="collectivex-loading"]').should('be.visible');
-    cy.wait('@collectivexDataset-latest-attempt');
+    cy.wait('@collectivexDataset-dev-latest');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 

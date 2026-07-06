@@ -66,11 +66,11 @@ describe('CollectiveX GitHub publication route', () => {
     expect(github.load).toHaveBeenCalledWith('v1', digest);
   });
 
-  it('keeps latest-attempt unavailable until an explicit artifact exists', async () => {
+  it('does not expose the private latest-attempt channel', async () => {
     const response = await request('v1', 'channels', 'latest-attempt.json');
 
     expect(response.status).toBe(404);
-    expect(response.headers.get('x-collectivex-status')).toBe('channel-unavailable');
+    expect(response.headers.get('x-collectivex-status')).toBeNull();
     expect(github.load).not.toHaveBeenCalled();
   });
 

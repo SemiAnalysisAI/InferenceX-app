@@ -8,9 +8,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const VERSION_PATTERN = COLLECTIVEX_VERSIONS.join('|');
-const CHANNEL = new RegExp(
-  `^(?<version>${VERSION_PATTERN})/channels/(?<channel>dev-latest|latest-attempt)\\.json$`,
-);
+const CHANNEL = new RegExp(`^(?<version>${VERSION_PATTERN})/channels/dev-latest\\.json$`);
 const DATASET = new RegExp(
   `^(?<version>${VERSION_PATTERN})/datasets/(?<digest>[a-f0-9]{64})/dataset\\.json$`,
 );
@@ -40,9 +38,6 @@ export async function GET(_request: Request, context: { params: Promise<{ path: 
   const channel = CHANNEL.exec(relative);
   const dataset = DATASET.exec(relative);
   if (!channel && !dataset) return unavailable(404);
-  if (channel?.groups?.channel === 'latest-attempt') {
-    return unavailable(404, 'channel-unavailable');
-  }
 
   try {
     const version = (channel?.groups?.version ?? dataset?.groups?.version) as CollectiveXVersion;

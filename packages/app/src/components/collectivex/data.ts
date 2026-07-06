@@ -25,7 +25,11 @@ export interface CollectiveXSeriesSelection {
 
 const DECISION_ORDER = {
   phase: { decode: 0, prefill: 1 },
-  measure: { latency_us: 0, logical_payload_rate_gbps_at_latency_percentile: 1 },
+  measure: {
+    latency_us: 0,
+    activation_data_rate_gbps_at_latency_percentile: 1,
+    total_logical_data_rate_gbps_at_latency_percentile: 2,
+  },
   statistic: { p50: 0, p99: 1 },
   objective: { min: 0, max: 1 },
 } as const;
@@ -66,7 +70,7 @@ export function collectiveXSeriesLabel(series: CollectiveXSeries): string {
   const identity = series.series_id.slice(-8);
   const tier = series.publication_tier === 'official' ? 'official' : 'experimental';
   const routing = `${series.workload.routing}${series.workload.eplb ? '+eplb' : ''}`;
-  return `${series.system.sku.toUpperCase()} EP${series.system.ep_size} · ${series.backend.label} · ${series.mode} · ${series.system.scope} · ${series.system.topology_class} · ${series.phase} · ${routing} · ${version} · ${series.resource.profile} · build ${build} · series ${identity} · ${tier}`;
+  return `${series.system.sku.toUpperCase()} EP${series.system.ep_size} · ${series.backend.label} · ${series.mode} · ${series.system.scope} · ${series.system.topology_class} · ${series.phase} · ${routing} · ${series.workload.precision_profile} · ${version} · ${series.resource.profile} · build ${build} · series ${identity} · ${tier}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries): string {
@@ -98,6 +102,9 @@ export function collectiveXColorKey(series: CollectiveXSeries): string {
     series.build.source_sha,
     series.build.squash_sha256,
     routing,
+    series.workload.precision_profile,
+    JSON.stringify(series.workload.dispatch_precision),
+    JSON.stringify(series.workload.combine_precision),
     eplb,
     series.resource.profile,
     units,
@@ -149,7 +156,9 @@ export function metricValue(
       ? point.roundtrip_token_rate_at_latency_percentile[percentile]
       : null;
   }
-  return component.logical_payload_rate_gbps_at_latency_percentile?.[percentile] ?? null;
+  return yAxis === 'activation-rate'
+    ? (component.activation_data_rate_gbps_at_latency_percentile?.[percentile] ?? null)
+    : (component.total_logical_data_rate_gbps_at_latency_percentile?.[percentile] ?? null);
 }
 
 export function chartPoints(
@@ -209,7 +218,11 @@ export function comparisonDifferences(series: CollectiveXSeries[]): string[] {
     ],
     ['routing', (item) => `${item.workload.routing}/${item.workload.eplb}`],
     ['EPLB plan', (item) => JSON.stringify(item.eplb)],
-    ['dtypes', (item) => `${item.workload.dispatch_dtype}/${item.workload.combine_dtype}`],
+    [
+      'dtypes',
+      (item) =>
+        `${item.workload.precision_profile}/${JSON.stringify(item.workload.dispatch_precision)}/${JSON.stringify(item.workload.combine_precision)}`,
+    ],
     ['resource profile', (item) => JSON.stringify(item.resource)],
     ['measurement', (item) => JSON.stringify(item.measurement)],
     ['token ladder', (item) => item.points.map((point) => point.tokens_per_rank).join(',')],
@@ -218,13 +231,16 @@ export function comparisonDifferences(series: CollectiveXSeries[]): string[] {
       (item) =>
         item.points
           .map((point) =>
-            ['dispatch', 'combine', 'roundtrip', 'isolated_sum']
+            ['dispatch', 'stage', 'combine', 'roundtrip', 'isolated_sum']
               .map((name) => point.components[name as keyof typeof point.components] !== null)
               .join('/'),
           )
           .join(','),
     ],
-    ['correctness', (item) => item.points.map((point) => point.correct).join(',')],
+    [
+      'correctness',
+      (item) => item.points.map((point) => JSON.stringify(point.correctness)).join(','),
+    ],
   ];
   for (const [label, getValue] of checks) {
     if (different(getValue)) warnings.push(label);

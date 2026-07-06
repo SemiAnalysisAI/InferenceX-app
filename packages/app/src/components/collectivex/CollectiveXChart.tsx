@@ -34,6 +34,7 @@ interface CollectiveXChartProps {
 
 const OPERATION_LABELS: Record<CollectiveXOperation, string> = {
   dispatch: 'Dispatch',
+  stage: 'Stage',
   combine: 'Combine',
   roundtrip: 'Round trip (measured)',
   'isolated-sum': 'Isolated sum (Σp, not measured)',
@@ -47,7 +48,8 @@ const X_AXIS_LABELS: Record<CollectiveXXAxis, string> = {
 const Y_AXIS_LABELS: Record<CollectiveXYAxis, string> = {
   latency: 'Latency (µs)',
   'tokens-per-second': 'Token rate at selected latency percentile (tokens/s)',
-  'payload-rate': 'Logical payload rate at selected latency percentile (GB/s)',
+  'activation-rate': 'Activation-data rate at selected latency percentile (GB/s)',
+  'total-logical-rate': 'Total logical data rate at selected latency percentile (GB/s)',
 };
 
 function paddedDomain(values: number[], scaleType: CollectiveXScale): [number, number] {
@@ -247,16 +249,20 @@ export function CollectiveXChart({
             <div>${escapeHtml(OPERATION_LABELS[operation])} ${yAxis === 'latency' ? percentile : `at ${percentile} latency`}: <strong>${formatMetric(point.y, yAxis)}</strong> · ${escapeHtml(point.series.status)}</div>
             <div class="text-muted-foreground">${measurement.tokens_per_rank} tokens/rank · ${measurement.global_tokens} global tokens</div>
             <div class="mt-1 text-muted-foreground">Dispatch p50/p90/p95/p99: ${formatPercentiles(measurement.components.dispatch)}</div>
+            <div class="text-muted-foreground">Stage p50/p90/p95/p99: ${formatPercentiles(measurement.components.stage)}</div>
             <div class="text-muted-foreground">Combine p50/p90/p95/p99: ${formatPercentiles(measurement.components.combine)}</div>
             <div class="text-muted-foreground">Round trip p50/p90/p95/p99: ${formatPercentiles(measuredRoundtrip)}${measuredRoundtrip ? ' (measured)' : ''}</div>
             <div class="text-muted-foreground">Fan-out: ${measurement.routing.fanout_mean.toFixed(2)} · routed copies: ${measurement.routing.routed_copies} · recv max: ${measurement.routing.recv_tokens_max}</div>
             <div class="text-muted-foreground">Expert CV: ${measurement.routing.expert_load_cv.toFixed(3)} · rank CV: ${measurement.routing.payload_rank_cv.toFixed(3)} · hotspot: ${measurement.routing.hotspot_ratio.toFixed(2)}x · empty experts/ranks: ${measurement.routing.empty_expert_count}/${measurement.routing.empty_rank_count}</div>
-            <div class="text-muted-foreground">Correctness: ${measurement.correct ? 'pass' : 'fail'} · EPLB: ${eplbDetails}</div>
+            <div class="text-muted-foreground">Correctness: semantic ${measurement.correctness.semantic_pass ? 'pass' : 'fail'} · precision ${measurement.correctness.precision.passed ? 'pass' : 'fail'} · EPLB: ${eplbDetails}</div>
+            <div class="text-muted-foreground">Stability: Q${measurement.stability.qualification_indices.join('/')} · p50 ${measurement.stability.p50_max_min_ratio?.toFixed(3) ?? '-'}x · p99 ${measurement.stability.p99_max_min_ratio?.toFixed(3) ?? '-'}x</div>
+            ${measurement.anomalies.length > 0 ? `<div class="text-muted-foreground">Anomalies: ${measurement.anomalies.map(escapeHtml).join(' · ')}</div>` : ''}
             ${eplb.mapping_sha256 ? `<div class="text-muted-foreground" style="word-break: break-all;">EPLB mapping SHA-256: ${escapeHtml(eplb.mapping_sha256)}</div>` : ''}
             <div class="mt-1 text-muted-foreground">Mode: ${escapeHtml(point.series.mode)} · payload unit: ${escapeHtml(point.series.measurement.payload_unit)} · combine: ${escapeHtml(point.series.measurement.combine_semantics)}</div>
             <div class="text-muted-foreground">Topology: EP${point.series.system.ep_size} · ${escapeHtml(point.series.system.scope)} · ${escapeHtml(collectiveXTopologyLabel(point.series.system))}</div>
             <div class="text-muted-foreground">${escapeHtml(point.series.measurement.contract)} · ${escapeHtml(point.series.suite)}</div>
-            <div class="text-muted-foreground">${escapeHtml(point.series.workload.dispatch_dtype)} · ${escapeHtml(point.series.workload.routing)}${point.series.workload.eplb ? '+eplb' : ''}</div>
+            <div class="text-muted-foreground">${escapeHtml(point.series.workload.precision_profile)} · dispatch ${escapeHtml(point.series.workload.dispatch_precision.communication_format)} · combine ${escapeHtml(point.series.workload.combine_precision.communication_format)}</div>
+            <div class="text-muted-foreground">${escapeHtml(point.series.workload.routing)}${point.series.workload.eplb ? '+eplb' : ''}</div>
             <div class="mt-1 text-muted-foreground">workload=${escapeHtml(point.series.workload.workload_id.slice(0, 24))} · allocations=${point.series.allocation_ids.length}</div>
             <div class="text-muted-foreground" style="word-break: break-all;">point=${escapeHtml(measurement.point_id)}</div>
             <div class="text-muted-foreground">evidence=${measurement.evidence_ids.map((id) => escapeHtml(id.slice(-8))).join(' · ')}</div>

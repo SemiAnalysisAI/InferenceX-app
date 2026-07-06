@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -13,13 +16,62 @@ import {
 import { makeCollectiveXDataset } from './test-fixture';
 
 describe('CollectiveX EP projections', () => {
+  it('covers the complete frozen seven-SKU V1 matrix catalog', () => {
+    const bytes = readFileSync(new URL('full-catalog.v1.json', import.meta.url));
+    const catalog = JSON.parse(bytes.toString()) as {
+      format: string;
+      schema_version: number;
+      matrix_sha256: string;
+      case_count: number;
+      point_count: number;
+      precision_profiles: Record<string, unknown>;
+      cases: {
+        case_id: string;
+        disposition: 'runnable' | 'unsupported';
+        points: unknown[];
+        precision_profile: string;
+        sku: string;
+      }[];
+    };
+
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+      '86ac7bb3f9f6310385db52f6f77554d705985bd99e387ecb5fedd627c11994d7',
+    );
+    expect(catalog).toMatchObject({
+      format: 'collectivex.frontend-catalog.v1',
+      schema_version: 1,
+      matrix_sha256: 'c6988c5e81239ace699541322a88a37bfd80819d8bc1a2446f928665cd3ebba0',
+      case_count: 664,
+      point_count: 1532,
+    });
+    expect(new Set(catalog.cases.map(({ case_id }) => case_id)).size).toBe(664);
+    expect(catalog.cases.reduce((count, { points }) => count + points.length, 0)).toBe(1532);
+    expect(catalog.cases.filter(({ disposition }) => disposition === 'runnable')).toHaveLength(393);
+    expect(catalog.cases.filter(({ disposition }) => disposition === 'unsupported')).toHaveLength(
+      271,
+    );
+    expect([...new Set(catalog.cases.map(({ sku }) => sku))].toSorted()).toEqual([
+      'b200-dgxc',
+      'b300',
+      'gb200',
+      'gb300',
+      'h100-dgxc',
+      'h200-dgxc',
+      'mi355x',
+    ]);
+    expect(catalog.cases.some(({ sku }) => sku === 'mi325x')).toBe(false);
+    expect(
+      [...new Set(catalog.cases.map(({ precision_profile }) => precision_profile))].toSorted(),
+    ).toEqual(Object.keys(catalog.precision_profiles).toSorted());
+  });
+
   it('orders decision metrics by phase, token count, measure, and percentile', () => {
     const base = makeCollectiveXDataset().rankings[0].metric;
     const metrics = [
       { ...base, phase: 'prefill' as const, tokens_per_rank: 512, statistic: 'p99' as const },
       {
         ...base,
-        measure: 'logical_payload_rate_gbps_at_latency_percentile' as const,
+        measure: 'total_logical_data_rate_gbps_at_latency_percentile' as const,
         objective: 'max' as const,
         statistic: 'p50' as const,
       },
@@ -35,7 +87,7 @@ describe('CollectiveX EP projections', () => {
     ).toEqual([
       'decode/16/latency_us/p50',
       'decode/16/latency_us/p99',
-      'decode/128/logical_payload_rate_gbps_at_latency_percentile/p50',
+      'decode/128/total_logical_data_rate_gbps_at_latency_percentile/p50',
       'prefill/512/latency_us/p99',
     ]);
   });
@@ -45,25 +97,28 @@ describe('CollectiveX EP projections', () => {
     const pairedOnly = dataset.series[1].points[0];
 
     expect(metricValue(pairedOnly, 'dispatch', 'p99', 'latency')).toBeNull();
-    expect(metricValue(pairedOnly, 'combine', 'p99', 'payload-rate')).toBeNull();
+    expect(metricValue(pairedOnly, 'combine', 'p99', 'total-logical-rate')).toBeNull();
     expect(metricValue(pairedOnly, 'roundtrip', 'p99', 'latency')).toBe(120);
     expect(metricValue(pairedOnly, 'roundtrip', 'p99', 'tokens-per-second')).toBeCloseTo(
       8_533_333.33,
     );
   });
 
-  it('uses publisher supplied logical rates', () => {
+  it('uses publisher supplied activation and total logical rates', () => {
     const point = makeCollectiveXDataset().series[0].points[0];
-    point.components.roundtrip!.logical_payload_rate_gbps_at_latency_percentile!.p99 = 123.45;
+    point.components.roundtrip!.activation_data_rate_gbps_at_latency_percentile!.p99 = 123.45;
+    point.components.roundtrip!.total_logical_data_rate_gbps_at_latency_percentile!.p99 = 125.67;
 
-    expect(metricValue(point, 'roundtrip', 'p99', 'payload-rate')).toBe(123.45);
-    expect(metricValue(point, 'roundtrip', 'p95', 'payload-rate')).toBeGreaterThan(0);
+    expect(metricValue(point, 'roundtrip', 'p99', 'activation-rate')).toBe(123.45);
+    expect(metricValue(point, 'roundtrip', 'p99', 'total-logical-rate')).toBe(125.67);
+    expect(metricValue(point, 'roundtrip', 'p95', 'total-logical-rate')).toBeGreaterThan(0);
   });
 
   it('omits unavailable series from a component projection', () => {
     const series = makeCollectiveXDataset().series;
 
     expect(chartPoints(series, 'dispatch', 'p99', 'tokens-per-rank', 'latency')).toHaveLength(1);
+    expect(chartPoints(series, 'stage', 'p99', 'tokens-per-rank', 'latency')).toHaveLength(1);
     expect(chartPoints(series, 'roundtrip', 'p99', 'tokens-per-rank', 'latency')).toHaveLength(7);
   });
 

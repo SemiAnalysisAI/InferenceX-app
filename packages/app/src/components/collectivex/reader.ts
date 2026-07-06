@@ -23,10 +23,7 @@ export const collectiveXChannelUrl = (
   version: CollectiveXVersion = 'v1',
 ) => `${collectiveXPublicRoot(version)}channels/${channel}.json`;
 
-export type CollectiveXAvailabilityReason =
-  | 'store-unavailable'
-  | 'source-unavailable'
-  | 'channel-unavailable';
+export type CollectiveXAvailabilityReason = 'source-unavailable' | 'channel-unavailable';
 
 class CollectiveXDataError extends Error {
   readonly availabilityReason: CollectiveXAvailabilityReason | null;
@@ -159,14 +156,40 @@ function sameValue(left: unknown, right: unknown): boolean {
 const RECOMMENDATION_METRICS = {
   'min-p50-latency': ['latency_us', 'p50'],
   'min-p99-latency': ['latency_us', 'p99'],
-  'max-payload-rate-at-p50-latency': ['logical_payload_rate_gbps_at_latency_percentile', 'p50'],
-  'max-payload-rate-at-p99-latency': ['logical_payload_rate_gbps_at_latency_percentile', 'p99'],
+  'max-activation-data-rate-at-p50-latency': [
+    'activation_data_rate_gbps_at_latency_percentile',
+    'p50',
+  ],
+  'max-activation-data-rate-at-p99-latency': [
+    'activation_data_rate_gbps_at_latency_percentile',
+    'p99',
+  ],
+  'max-total-logical-data-rate-at-p50-latency': [
+    'total_logical_data_rate_gbps_at_latency_percentile',
+    'p50',
+  ],
+  'max-total-logical-data-rate-at-p99-latency': [
+    'total_logical_data_rate_gbps_at_latency_percentile',
+    'p99',
+  ],
 } as const;
 
 function closeEnough(left: number, right: number): boolean {
   return (
     left === right || Math.abs(left - right) <= 1e-12 * Math.max(Math.abs(left), Math.abs(right))
   );
+}
+
+function rankingMetricKey(cohortId: string, metric: CollectiveXMetric): string {
+  return [
+    cohortId,
+    metric.operation,
+    metric.phase,
+    metric.tokens_per_rank,
+    metric.measure,
+    metric.statistic,
+    metric.objective,
+  ].join('\0');
 }
 
 function metricValue(
@@ -180,7 +203,7 @@ function metricValue(
   if (metric.measure === 'latency_us') {
     return { point, value: component.latency_us[metric.statistic], unit: 'us' };
   }
-  const value = component.logical_payload_rate_gbps_at_latency_percentile?.[metric.statistic];
+  const value = component[metric.measure]?.[metric.statistic];
   return value === null || value === undefined ? null : { point, value, unit: 'GB/s' };
 }
 
@@ -273,6 +296,20 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
   ) {
     throw new CollectiveXDataError('$.promotion.allocation_ids differs from retained attempts.');
   }
+  if (
+    !sameIds(
+      dataset.promotion.qualification_indices.map(String),
+      [
+        ...new Set(
+          dataset.attempts.filter((item) => item.selected).map((item) => item.qualification_index),
+        ),
+      ].map(String),
+    )
+  ) {
+    throw new CollectiveXDataError(
+      '$.promotion.qualification_indices differs from retained attempts.',
+    );
+  }
 
   for (const item of dataset.coverage) {
     const expectedAttempts = dataset.attempts
@@ -296,10 +333,41 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
       throw new CollectiveXDataError(`coverage ${item.case_id} has an invalid selected attempt.`);
     }
   }
+  const coveragePoints = dataset.coverage.flatMap((item) => item.points);
+  for (const item of dataset.coverage) {
+    for (const coveragePoint of item.points) {
+      if (coveragePoint.point_id === null || coveragePoint.series_id === null) continue;
+      const owner = points.get(coveragePoint.point_id);
+      if (
+        owner?.series.series_id !== coveragePoint.series_id ||
+        !owner.series.case_ids.includes(item.case_id) ||
+        owner.point.tokens_per_rank !== coveragePoint.tokens_per_rank ||
+        owner.point.global_tokens !== coveragePoint.global_tokens
+      ) {
+        throw new CollectiveXDataError(
+          `coverage ${item.case_id} has an invalid point catalog entry.`,
+        );
+      }
+    }
+  }
+  const measuredCases = dataset.coverage.filter((item) =>
+    item.points.every((point) => point.terminal_status === 'measured'),
+  ).length;
+  const unsupportedCases = dataset.coverage.filter((item) =>
+    item.points.every((point) => point.terminal_status === 'unsupported'),
+  ).length;
   if (
     dataset.promotion.requested_cases !== dataset.coverage.length ||
     dataset.promotion.terminal_cases !==
-      dataset.coverage.filter((item) => item.selected_attempt_id !== null).length
+      dataset.coverage.filter((item) => item.selected_attempt_id !== null).length ||
+    dataset.promotion.measured_cases !== measuredCases ||
+    dataset.promotion.unsupported_cases !== unsupportedCases ||
+    dataset.promotion.requested_points !== coveragePoints.length ||
+    dataset.promotion.terminal_points !== coveragePoints.length ||
+    dataset.promotion.measured_points !==
+      coveragePoints.filter((item) => item.terminal_status === 'measured').length ||
+    dataset.promotion.unsupported_points !==
+      coveragePoints.filter((item) => item.terminal_status === 'unsupported').length
   ) {
     throw new CollectiveXDataError('$.promotion coverage counters differ from coverage.');
   }
@@ -307,7 +375,11 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
   for (const item of dataset.series) {
     if (
       item.status !== (item.eligibility.decision_grade ? 'decision-grade' : 'diagnostic') ||
-      !sameIds(item.eligibility.allocation_ids, item.allocation_ids)
+      !sameIds(item.eligibility.allocation_ids, item.allocation_ids) ||
+      item.eligibility.correct !==
+        item.points.every(
+          (point) => point.correctness.semantic_pass && point.correctness.precision.passed,
+        )
     ) {
       throw new CollectiveXDataError(`series ${item.series_id} has inconsistent eligibility.`);
     }
@@ -320,6 +392,9 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
     const selected = dataset.attempts.filter(
       (attempt) => attempt.selected && attempt.series_id === item.series_id,
     );
+    const selectedQualificationIndices = [
+      ...new Set(selected.map((attempt) => attempt.qualification_index)),
+    ];
     if (
       !sameIds(
         item.case_ids,
@@ -328,6 +403,10 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
       !sameIds(
         item.allocation_ids,
         selected.map((attempt) => attempt.allocation_id),
+      ) ||
+      !sameIds(
+        item.measurement.qualification_indices.map(String),
+        selectedQualificationIndices.map(String),
       )
     ) {
       throw new CollectiveXDataError(
@@ -335,7 +414,10 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
       );
     }
     for (const point of item.points) {
-      const linkedEvidenceIds = selected.flatMap((attempt) =>
+      const pointAttempts = selected.filter((attempt) =>
+        attempt.evidence.some((evidence) => evidence.point_id === point.point_id),
+      );
+      const linkedEvidenceIds = pointAttempts.flatMap((attempt) =>
         attempt.evidence
           .filter((evidence) => evidence.point_id === point.point_id)
           .map((evidence) => evidence.evidence_id),
@@ -343,6 +425,53 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
       if (!sameIds(point.evidence_ids, linkedEvidenceIds)) {
         throw new CollectiveXDataError(`point ${point.point_id} has inconsistent evidence links.`);
       }
+      if (
+        !sameIds(
+          point.stability.qualification_indices.map(String),
+          pointAttempts.map((attempt) => String(attempt.qualification_index)),
+        )
+      ) {
+        throw new CollectiveXDataError(
+          `point ${point.point_id} has inconsistent qualification evidence.`,
+        );
+      }
+      if (
+        point.correctness.precision.profile_id !== item.workload.precision_profile ||
+        (point.correctness.semantic_pass && !point.correctness.precision.passed)
+      ) {
+        throw new CollectiveXDataError(
+          `point ${point.point_id} has inconsistent precision correctness.`,
+        );
+      }
+      for (const [name, component] of Object.entries(point.components)) {
+        if (component === null) continue;
+        const bytes = component.byte_provenance;
+        const derived = name === 'isolated_sum';
+        if (
+          bytes.total_logical_bytes !== bytes.activation_data_bytes + bytes.scale_bytes ||
+          (derived &&
+            (component.activation_data_rate_gbps_at_latency_percentile !== null ||
+              component.total_logical_data_rate_gbps_at_latency_percentile !== null)) ||
+          (!derived &&
+            (component.activation_data_rate_gbps_at_latency_percentile === null ||
+              component.total_logical_data_rate_gbps_at_latency_percentile === null))
+        ) {
+          throw new CollectiveXDataError(
+            `point ${point.point_id} has inconsistent ${name} byte accounting.`,
+          );
+        }
+      }
+    }
+    if (
+      item.eligibility.decision_grade &&
+      !sameIds(
+        selectedQualificationIndices.map(String),
+        dataset.promotion.qualification_indices.map(String),
+      )
+    ) {
+      throw new CollectiveXDataError(
+        `series ${item.series_id} lacks the required qualification indices.`,
+      );
     }
   }
 
@@ -367,6 +496,34 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
     string,
     CollectiveXDataset['rankings'][number]['entries'][number]
   >();
+  const expectedRankingMetrics = new Set<string>();
+  for (const cohort of dataset.cohorts) {
+    if (!cohort.eligibility.decision_grade || cohort.kind === 'precision-pair') continue;
+    const members = cohort.series_ids.map((id) => series.get(id)!);
+    const commonTokens = members
+      .map((item) => new Set(item.points.map((point) => point.tokens_per_rank)))
+      .reduce((left, right) => new Set([...left].filter((token) => right.has(token))));
+    for (const tokens of commonTokens) {
+      for (const measure of [
+        'latency_us',
+        'activation_data_rate_gbps_at_latency_percentile',
+        'total_logical_data_rate_gbps_at_latency_percentile',
+      ] as const) {
+        for (const statistic of ['p50', 'p99'] as const) {
+          expectedRankingMetrics.add(
+            rankingMetricKey(cohort.cohort_id, {
+              operation: 'roundtrip',
+              phase: members[0].phase,
+              tokens_per_rank: tokens,
+              measure,
+              statistic,
+              objective: measure === 'latency_us' ? 'min' : 'max',
+            }),
+          );
+        }
+      }
+    }
+  }
   const rankingMetrics = new Set<string>();
   for (const ranking of dataset.rankings) {
     const cohort = cohorts.get(ranking.cohort_id);
@@ -385,26 +542,23 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
     }
     const expectedObjective = ranking.metric.measure === 'latency_us' ? 'min' : 'max';
     const expectedUnit = ranking.metric.measure === 'latency_us' ? 'us' : 'GB/s';
+    const p99Latency =
+      ranking.metric.measure === 'latency_us' && ranking.metric.statistic === 'p99';
     if (
       ranking.publication_tier !== cohort.publication_tier ||
+      cohort.kind === 'precision-pair' ||
       !cohort.eligibility.decision_grade ||
       !sameValue(ranking.eligibility, cohort.eligibility) ||
       ranking.metric.objective !== expectedObjective ||
       ranking.entries.some(
-        (entry, index) => entry.rank !== index + 1 || entry.unit !== expectedUnit,
+        (entry, index) =>
+          entry.unit !== expectedUnit ||
+          (p99Latency ? entry.rank !== 1 && entry.rank !== index + 1 : entry.rank !== index + 1),
       )
     ) {
       throw new CollectiveXDataError(`ranking ${ranking.ranking_id} has invalid metric metadata.`);
     }
-    const metricKey = [
-      ranking.cohort_id,
-      ranking.metric.operation,
-      ranking.metric.phase,
-      ranking.metric.tokens_per_rank,
-      ranking.metric.measure,
-      ranking.metric.statistic,
-      ranking.metric.objective,
-    ].join('\0');
+    const metricKey = rankingMetricKey(ranking.cohort_id, ranking.metric);
     if (rankingMetrics.has(metricKey)) {
       throw new CollectiveXDataError(`ranking ${ranking.ranking_id} duplicates a decision metric.`);
     }
@@ -427,17 +581,63 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
         );
       }
     }
-    const declaredWinner = ranking.entries[0];
-    const winnerKey = [
-      ranking.cohort_id,
-      ranking.metric.measure,
-      ranking.metric.statistic,
-      declaredWinner.point_id,
-    ].join('\0');
-    declaredRankingLeaders.set(winnerKey, declaredWinner);
+    const expectedEntries = ranking.entries.toSorted((left, right) => {
+      const valueOrder = left.value - right.value;
+      if (valueOrder !== 0) {
+        return ranking.metric.objective === 'min' ? valueOrder : -valueOrder;
+      }
+      return ranking.metric.objective === 'min'
+        ? left.series_id.localeCompare(right.series_id)
+        : right.series_id.localeCompare(left.series_id);
+    });
+    const tiedFirst = p99Latency ? ranking.entries.filter((entry) => entry.rank === 1).length : 0;
+    const expectedRanks = p99Latency
+      ? ranking.entries.map((_, index) => (index < tiedFirst ? 1 : index + 1))
+      : ranking.entries.map((_, index) => index + 1);
+    if (
+      !sameValue(ranking.entries, expectedEntries) ||
+      !sameValue(
+        ranking.entries.map((entry) => entry.rank),
+        expectedRanks,
+      )
+    ) {
+      throw new CollectiveXDataError(`ranking ${ranking.ranking_id} has invalid ordering.`);
+    }
+    const rankOne = ranking.entries.filter((entry) => entry.rank === 1);
+    if (rankOne.length === 1) {
+      const declaredWinner = rankOne[0];
+      const winnerKey = [
+        ranking.cohort_id,
+        ranking.metric.measure,
+        ranking.metric.statistic,
+        declaredWinner.point_id,
+      ].join('\0');
+      declaredRankingLeaders.set(winnerKey, declaredWinner);
+    }
+  }
+  if (!sameIds([...rankingMetrics], expectedRankingMetrics)) {
+    throw new CollectiveXDataError('rankings do not cover every eligible cohort metric.');
   }
 
   const recommendationKeys = new Set<string>();
+  const expectedRecommendationKeys = new Set<string>();
+  for (const ranking of dataset.rankings) {
+    const cohort = cohorts.get(ranking.cohort_id)!;
+    const rankOne = ranking.entries.filter((entry) => entry.rank === 1);
+    if (
+      cohort.publication_tier === 'official' &&
+      !['routing', 'dispatch-precision', 'combine-precision', 'precision-pair'].includes(
+        cohort.kind,
+      ) &&
+      ranking.metric.measure === 'latency_us' &&
+      ranking.metric.statistic === 'p99' &&
+      rankOne.length === 1
+    ) {
+      expectedRecommendationKeys.add(
+        [ranking.cohort_id, 'min-p99-latency', rankOne[0].point_id].join('\0'),
+      );
+    }
+  }
   for (const recommendation of dataset.recommendations) {
     const cohort = cohorts.get(recommendation.cohort_id);
     const [measure, statistic] = RECOMMENDATION_METRICS[recommendation.objective];
@@ -451,8 +651,11 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
     ].join('\0');
     if (
       recommendationKeys.has(recommendationKey) ||
+      recommendation.objective !== 'min-p99-latency' ||
       !cohort ||
-      cohort.kind === 'routing' ||
+      ['routing', 'dispatch-precision', 'combine-precision', 'precision-pair'].includes(
+        cohort.kind,
+      ) ||
       cohort.publication_tier !== 'official' ||
       !cohort.eligibility.decision_grade ||
       !sameValue(recommendation.eligibility, cohort.eligibility) ||
@@ -467,6 +670,9 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
       );
     }
     recommendationKeys.add(recommendationKey);
+  }
+  if (!sameIds([...recommendationKeys], expectedRecommendationKeys)) {
+    throw new CollectiveXDataError('recommendations do not cover every actionable ranking.');
   }
 
   const sensitivityKeys = new Set<string>();
@@ -487,7 +693,7 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
     if (
       sensitivityKeys.has(sensitivityKey) ||
       !cohort ||
-      cohort.kind !== 'routing' ||
+      !['routing', 'dispatch-precision', 'combine-precision'].includes(cohort.kind) ||
       !cohort.eligibility.decision_grade ||
       sensitivity.publication_tier !== cohort.publication_tier ||
       !sameValue(sensitivity.eligibility, cohort.eligibility) ||
@@ -544,11 +750,7 @@ async function responseOrThrow(url: string, options: RequestInit, name: string):
   const response = await fetch(url, options);
   if (response.ok) return response;
   if (response.status === 503) {
-    const reason = response.headers.get('x-collectivex-status');
-    if (reason === 'source-unavailable') {
-      throw new CollectiveXDataError(reason, reason);
-    }
-    throw new CollectiveXDataError('store-unavailable', 'store-unavailable');
+    throw new CollectiveXDataError('source-unavailable', 'source-unavailable');
   }
   if (
     name === 'channel' &&
