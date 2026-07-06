@@ -5,6 +5,7 @@ import { Suspense, createContext, useContext, useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation';
 import { registerAnalyticsClient } from '@/lib/analytics';
 import { installChunkLoadRecovery } from '@/lib/chunk-load-recovery';
+import { shouldRecordSessionReplay } from '@/lib/replay-sampling';
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
@@ -38,7 +39,17 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
             autocapture: true,
             capture_dead_clicks: true,
             capture_performance: { network_timing: true, web_vitals: true },
+            // No PostHog surveys are configured for this product — without
+            // this flag posthog-js still pulls surveys.js (~32 KiB) on every
+            // load. Remove the flag if surveys are ever launched.
+            disable_surveys: true,
+            // Session replay is opted into per session below instead of
+            // starting unconditionally — see lib/replay-sampling.ts.
+            disable_session_recording: true,
           });
+          // startSessionRecording() flips disable_session_recording back off
+          // for the sampled sessions.
+          if (shouldRecordSessionReplay()) posthog.startSessionRecording();
           registerAnalyticsClient(posthog);
           setClient(posthog);
         })

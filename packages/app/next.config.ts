@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['shiki'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
+    // NOTE: experimental.inlineCss was evaluated (2026-07) for the PageSpeed
+    // "Render-blocking requests" insight and rejected: it embeds the full CSS
+    // text in every route's RSC payload (~46 KiB gz, duplicated 2×), so every
+    // client-side tab navigation re-downloads CSS that is otherwise a
+    // one-time immutable fetch. Net regression for this SPA-heavy dashboard.
     // Persist Turbopack's compiler cache under .next/cache in GitHub Actions
     // so the workflow cache step makes warm builds fast. Gated on
     // GITHUB_ACTIONS (not CI, which Vercel also sets) to keep the
