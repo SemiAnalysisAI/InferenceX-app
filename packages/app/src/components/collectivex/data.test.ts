@@ -16,7 +16,7 @@ import {
 import { makeCollectiveXDataset } from './test-fixture';
 
 describe('CollectiveX EP projections', () => {
-  it('covers the complete frozen seven-SKU V1 matrix catalog', () => {
+  it('covers the complete frozen eight-SKU V1 matrix catalog', () => {
     const bytes = readFileSync(new URL('full-catalog.v1.json', import.meta.url));
     const catalog = JSON.parse(bytes.toString()) as {
       format: string;
@@ -35,20 +35,20 @@ describe('CollectiveX EP projections', () => {
     };
 
     expect(createHash('sha256').update(bytes).digest('hex')).toBe(
-      '86ac7bb3f9f6310385db52f6f77554d705985bd99e387ecb5fedd627c11994d7',
+      '821e8c2c822da33359fb1ff9aeeea7da689d412824e15cb4b13397fb718ccd25',
     );
     expect(catalog).toMatchObject({
       format: 'collectivex.frontend-catalog.v1',
       schema_version: 1,
-      matrix_sha256: 'c6988c5e81239ace699541322a88a37bfd80819d8bc1a2446f928665cd3ebba0',
-      case_count: 664,
-      point_count: 1532,
+      matrix_sha256: '5894bab58d3deb2bcee51baa075ca5f5d324b4292ac1cef9f6bc08a07ab1d9a3',
+      case_count: 748,
+      point_count: 1740,
     });
-    expect(new Set(catalog.cases.map(({ case_id }) => case_id)).size).toBe(664);
-    expect(catalog.cases.reduce((count, { points }) => count + points.length, 0)).toBe(1532);
-    expect(catalog.cases.filter(({ disposition }) => disposition === 'runnable')).toHaveLength(393);
+    expect(new Set(catalog.cases.map(({ case_id }) => case_id)).size).toBe(748);
+    expect(catalog.cases.reduce((count, { points }) => count + points.length, 0)).toBe(1740);
+    expect(catalog.cases.filter(({ disposition }) => disposition === 'runnable')).toHaveLength(387);
     expect(catalog.cases.filter(({ disposition }) => disposition === 'unsupported')).toHaveLength(
-      271,
+      361,
     );
     expect([...new Set(catalog.cases.map(({ sku }) => sku))].toSorted()).toEqual([
       'b200-dgxc',
@@ -57,6 +57,7 @@ describe('CollectiveX EP projections', () => {
       'gb300',
       'h100-dgxc',
       'h200-dgxc',
+      'mi300x',
       'mi355x',
     ]);
     expect(catalog.cases.some(({ sku }) => sku === 'mi325x')).toBe(false);
