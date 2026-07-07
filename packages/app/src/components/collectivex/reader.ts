@@ -750,10 +750,13 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
   ) {
     throw new CollectiveXDataError('quarantined dataset exposes publication evidence.');
   }
-  if (
-    dataset.promotion.status === 'promoted' &&
-    (dataset.rankings.length === 0 || dataset.recommendations.length === 0)
-  ) {
+  if (dataset.promotion.status === 'promoted' && dataset.rankings.length === 0) {
+    // Rankings are the decision graph. Recommendations are unique-p99-latency-winner
+    // callouts that legitimately do not exist when a cohort's candidates fall within
+    // the bootstrap equivalence band (statistical ties) — a common, honest outcome for
+    // single-allocation publications. The recommendation-coverage check above already
+    // derives 0 as the expected count in that case, so requiring recommendations here
+    // would reject a complete, consistent ranking dataset.
     throw new CollectiveXDataError('promoted dataset lacks a complete decision graph.');
   }
 }

@@ -495,6 +495,44 @@ describe('CollectiveX publication reader', () => {
     );
   });
 
+  it('accepts a promoted dataset that has rankings but no recommendations', () => {
+    // Recommendations are unique-p99-latency-winner callouts. When every actionable
+    // (official) cohort's candidates fall within the bootstrap equivalence band, the
+    // p99 winners tie and no recommendation is emitted — a routine, honest outcome for
+    // single-allocation publications. Such a dataset still carries a complete decision
+    // graph (rankings + sensitivities) and must be accepted, not rejected.
+    const promotedWithoutRecommendations = makeCollectiveXDataset();
+    const decisionCohort = promotedWithoutRecommendations.cohorts.find(
+      (cohort) => cohort.publication_tier === 'comparable-experimental',
+    );
+    expect(decisionCohort).toBeDefined();
+    const keepId = decisionCohort!.cohort_id;
+    // Retire every official cohort so the only decision-grade cohort is non-official:
+    // it produces rankings but no actionable (recommendation-bearing) metric.
+    for (const cohort of promotedWithoutRecommendations.cohorts) {
+      if (cohort.cohort_id === keepId) continue;
+      cohort.eligibility = {
+        ...cohort.eligibility,
+        decision_grade: false,
+        stable_ordering: false,
+        reasons: ['unstable-ordering'],
+      };
+    }
+    promotedWithoutRecommendations.rankings = promotedWithoutRecommendations.rankings.filter(
+      (ranking) => ranking.cohort_id === keepId,
+    );
+    promotedWithoutRecommendations.recommendations = [];
+    promotedWithoutRecommendations.sensitivities =
+      promotedWithoutRecommendations.sensitivities.filter(
+        (sensitivity) => sensitivity.cohort_id === keepId,
+      );
+    expect(promotedWithoutRecommendations.rankings.length).toBeGreaterThan(0);
+    expect(promotedWithoutRecommendations.promotion.status).toBe('promoted');
+    const parsed = parseCollectiveXDataset(promotedWithoutRecommendations);
+    expect(parsed.recommendations).toHaveLength(0);
+    expect(parsed.rankings.length).toBeGreaterThan(0);
+  });
+
   it('rejects misordered or incomplete publisher decisions', () => {
     const misordered = makeCollectiveXDataset();
     const entries = misordered.rankings[0].entries;
