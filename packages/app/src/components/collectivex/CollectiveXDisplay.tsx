@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCollectiveX } from '@/hooks/api/use-collectivex';
+import { useCollectiveX, useCollectiveXRun, useCollectiveXRuns } from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -134,6 +134,12 @@ const STRINGS = {
     publishedUtc: 'Published (UTC)',
     publication: 'Publication',
     version: 'Benchmark version',
+    runControl: 'Run',
+    loadRuns: 'Load runs',
+    loadingRuns: 'Loading runs…',
+    latestPublished: 'Latest published',
+    coverageFull: 'Full',
+    coveragePartial: 'Partial',
     evidence: 'Evidence',
     evidenceAria: 'CollectiveX evidence scope',
     modeControl: 'Mode',
@@ -284,6 +290,14 @@ const STRINGS = {
     publishedUtc: '发布时间（UTC）',
     publication: '发布数据',
     version: '基准版本',
+    // English-only per the repository's temporary language override (no new
+    // Chinese text); these mirror the en values until the override is lifted.
+    runControl: 'Run',
+    loadRuns: 'Load runs',
+    loadingRuns: 'Loading runs…',
+    latestPublished: 'Latest published',
+    coverageFull: 'Full',
+    coveragePartial: 'Partial',
     evidence: '证据范围',
     evidenceAria: 'CollectiveX 证据范围',
     modeControl: '模式',
@@ -439,7 +453,18 @@ export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
-  const { data, error, isLoading, isFetching, refetch } = useCollectiveX('dev-latest', version);
+  // JIT run picker: `runsRequested` gates the eligible-run listing behind the
+  // "Load runs" button; `selectedDigest` (null = the dev-latest channel) pins
+  // the view to one specific published run's dataset.
+  const [runsRequested, setRunsRequested] = useState(false);
+  const [selectedDigest, setSelectedDigest] = useState<string | null>(null);
+  const channelQuery = useCollectiveX('dev-latest', version);
+  const runsQuery = useCollectiveXRuns(version, runsRequested);
+  const runQuery = useCollectiveXRun(version, selectedDigest);
+  // A pinned run overrides the dev-latest channel; both resolve to the same
+  // { channel, dataset, digest } shape the rest of the view consumes.
+  const activeQuery = selectedDigest === null ? channelQuery : runQuery;
+  const { data, error, isLoading, isFetching } = activeQuery;
   const [tab, setTab] = useState<CollectiveXTab>('results');
   const [evidenceScope, setEvidenceScope] = useState<EvidenceScope>('controlled');
   const [mode, setMode] = useState<CollectiveXMode>('normal');
@@ -495,6 +520,38 @@ export default function CollectiveXDisplay() {
     value,
     label: collectiveXVersionLabel(value),
   }));
+  const runList = runsQuery.data ?? [];
+  const runOptions: SelectOption<string>[] = useMemo(
+    () => [
+      { value: 'latest', label: t.latestPublished },
+      ...runList.map((run) => ({
+        value: run.digest,
+        label: `#${run.run_id} · ${
+          run.coverage_scope === 'partial'
+            ? `${t.coveragePartial} · ${run.covered_skus.length} SKU`
+            : t.coverageFull
+        } · ${formatDate(run.generated_at, locale)}`,
+      })),
+    ],
+    [locale, runList, t.coverageFull, t.coveragePartial, t.latestPublished],
+  );
+  // Runs are per-version; changing the version drops any pinned run and folds
+  // the picker back to its JIT button.
+  useEffect(() => {
+    setSelectedDigest(null);
+    setRunsRequested(false);
+  }, [version]);
+  // If a refreshed listing no longer carries the pinned run, fall back to the
+  // dev-latest channel rather than a dangling digest.
+  useEffect(() => {
+    if (
+      selectedDigest !== null &&
+      runsQuery.data &&
+      !runsQuery.data.some((run) => run.digest === selectedDigest)
+    ) {
+      setSelectedDigest(null);
+    }
+  }, [runsQuery.data, selectedDigest]);
   const tabOptions: { value: CollectiveXTab; label: string }[] = [
     { value: 'results', label: t.tabs.results },
     { value: 'decisions', label: t.tabs.decisions },
@@ -790,8 +847,9 @@ export default function CollectiveXDisplay() {
 
   const handleRefresh = useCallback(() => {
     track('collectivex_data_refreshed');
-    void refetch();
-  }, [refetch]);
+    void activeQuery.refetch();
+    if (runsRequested) void runsQuery.refetch();
+  }, [activeQuery, runsQuery, runsRequested]);
   const handleTab = useCallback((value: string) => {
     const next = value as CollectiveXTab;
     setTab(next);
@@ -842,6 +900,15 @@ export default function CollectiveXDisplay() {
               onChange={setVersion}
             />
           </div>
+          {selectedDigest !== null && (
+            <Button
+              variant="outline"
+              data-testid="collectivex-error-latest"
+              onClick={() => setSelectedDigest(null)}
+            >
+              {t.latestPublished}
+            </Button>
+          )}
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="size-4" />
             {t.retry}
@@ -948,6 +1015,62 @@ export default function CollectiveXDisplay() {
               track('collectivex_version_changed', { version: value });
             }}
           />
+          <ControlGroup label={t.runControl}>
+            {runsRequested ? (
+              runsQuery.isLoading ? (
+                <Button
+                  variant="outline"
+                  className="w-full justify-center"
+                  disabled
+                  data-testid="collectivex-runs-loading"
+                >
+                  <Loader2 className="size-4 animate-spin" />
+                  {t.loadingRuns}
+                </Button>
+              ) : runsQuery.error || !runsQuery.data ? (
+                <Button
+                  variant="outline"
+                  className="w-full justify-center"
+                  data-testid="collectivex-runs-retry"
+                  onClick={() => void runsQuery.refetch()}
+                >
+                  <RefreshCw className="size-4" />
+                  {t.retry}
+                </Button>
+              ) : (
+                <Select
+                  value={selectedDigest ?? 'latest'}
+                  onValueChange={(next) => {
+                    setSelectedDigest(next === 'latest' ? null : next);
+                    track('collectivex_run_selected', { version, run: next });
+                  }}
+                >
+                  <SelectTrigger data-testid="collectivex-run-select" className="min-w-0 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {runOptions.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full justify-center"
+                data-testid="collectivex-load-runs"
+                onClick={() => {
+                  setRunsRequested(true);
+                  track('collectivex_runs_requested', { version });
+                }}
+              >
+                {t.loadRuns}
+              </Button>
+            )}
+          </ControlGroup>
           <ControlGroup label={t.evidence}>
             <SegmentedToggle
               value={evidenceScope}

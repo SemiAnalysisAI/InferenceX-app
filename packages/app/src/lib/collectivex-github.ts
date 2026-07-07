@@ -62,6 +62,27 @@ export interface CollectiveXGithubPublication {
   version: CollectiveXVersion;
 }
 
+/**
+ * Lightweight descriptor of one eligible ("tagged + success") publication run —
+ * enough for the frontend JIT picker to list runs and let the operator select
+ * which one to display, without eagerly loading every dataset into the client.
+ */
+export interface CollectiveXPublicationRun {
+  version: CollectiveXVersion;
+  runId: number;
+  runAttempt: number;
+  headSha: string;
+  digest: string;
+  generatedAt: string;
+  coverageScope: 'full' | 'partial';
+  coveredSkus: string[];
+  bytes: number;
+}
+
+// A version accumulates independent runs over time; the picker only needs a
+// recent window. Bounds the JIT fan-out (one artifact download per eligible run).
+const MAX_LISTED_RUNS = 40;
+
 class CollectiveXPublicationError extends Error {
   readonly code: PublicationErrorCode;
 
@@ -83,6 +104,10 @@ const digestCache = new Map<
 const latestCache = new Map<
   CollectiveXVersion,
   { expiresAt: number; promise: Promise<CollectiveXGithubPublication> }
+>();
+const runsCache = new Map<
+  CollectiveXVersion,
+  { expiresAt: number; promise: Promise<CollectiveXPublicationRun[]> }
 >();
 
 function githubHeaders(token: string) {
@@ -350,7 +375,58 @@ export function loadCollectiveXPublication(
   return promise;
 }
 
+async function fetchPublicationRuns(
+  version: CollectiveXVersion,
+): Promise<CollectiveXPublicationRun[]> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new CollectiveXPublicationError('unavailable', 'GITHUB_TOKEN is not configured');
+  }
+  const runs: CollectiveXPublicationRun[] = [];
+  for await (const candidate of publicationCandidates(version, token)) {
+    const publication = await downloadPublication(version, candidate, token);
+    digestCache.set(`${version}:${publication.digest}`, {
+      expiresAt: Date.now() + DIGEST_TTL_MS,
+      publication,
+    });
+    const promotion = publication.dataset.promotion;
+    runs.push({
+      version,
+      runId: publication.runId,
+      runAttempt: publication.runAttempt,
+      headSha: candidate.run.head_sha,
+      digest: publication.digest,
+      generatedAt: publication.dataset.generated_at,
+      coverageScope: promotion.coverage_scope ?? 'full',
+      coveredSkus:
+        promotion.covered_skus ??
+        [...new Set(publication.dataset.coverage.map((item) => item.sku))].toSorted(),
+      bytes: publication.body.byteLength,
+    });
+    if (runs.length >= MAX_LISTED_RUNS) break;
+  }
+  // Most recent first — the GitHub runs feed is already newest-first, but a run
+  // may re-emit a prior digest; de-duplicate on runId keeping the first (newest).
+  const seen = new Set<number>();
+  return runs.filter((run) => (seen.has(run.runId) ? false : (seen.add(run.runId), true)));
+}
+
+export function listCollectiveXPublications(
+  version: CollectiveXVersion,
+): Promise<CollectiveXPublicationRun[]> {
+  const now = Date.now();
+  const cached = runsCache.get(version);
+  if (cached && cached.expiresAt > now) return cached.promise;
+  const promise = fetchPublicationRuns(version).catch((error) => {
+    runsCache.delete(version);
+    throw error;
+  });
+  runsCache.set(version, { expiresAt: now + LATEST_TTL_MS, promise });
+  return promise;
+}
+
 export function clearCollectiveXPublicationCache(): void {
   digestCache.clear();
   latestCache.clear();
+  runsCache.clear();
 }

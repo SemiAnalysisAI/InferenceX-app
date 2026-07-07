@@ -5,11 +5,14 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   collectiveXChannelSchema,
   collectiveXDatasetSchema,
+  collectiveXRunsSchema,
   type CollectiveXChannel,
   type CollectiveXDataset,
   type CollectiveXMetric,
   type CollectiveXPoint,
   type CollectiveXResolvedDataset,
+  type CollectiveXRuns,
+  type CollectiveXRunSummary,
   type CollectiveXSeries,
   type CollectiveXVersion,
   COLLECTIVEX_DEFAULT_VERSION,
@@ -23,6 +26,12 @@ export const collectiveXChannelUrl = (
   channel: CollectiveXChannelName,
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ) => `${collectiveXPublicRoot(version)}channels/${channel}.json`;
+
+export const collectiveXRunsUrl = (version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION) =>
+  `${collectiveXPublicRoot(version)}runs.json`;
+
+export const collectiveXDatasetUrl = (version: CollectiveXVersion, digest: string) =>
+  `${collectiveXPublicRoot(version)}datasets/${digest}/dataset.json`;
 
 export type CollectiveXAvailabilityReason = 'source-unavailable' | 'channel-unavailable';
 
@@ -125,6 +134,25 @@ export function parseCollectiveXChannel(value: unknown): CollectiveXChannel {
   const { dataset } = parsed.data;
   if (dataset.path !== `datasets/${dataset.sha256}/dataset.json`) {
     throw new CollectiveXDataError('$.dataset.path must be the digest-addressed dataset path.');
+  }
+  return parsed.data;
+}
+
+export function parseCollectiveXRuns(value: unknown, version: CollectiveXVersion): CollectiveXRuns {
+  const parsed = collectiveXRunsSchema.safeParse(value);
+  if (!parsed.success) throw schemaError(parsed.error);
+  if (parsed.data.version !== version) {
+    throw new CollectiveXDataError('$.version does not match the requested version.');
+  }
+  const runIds = new Set<string>();
+  for (const run of parsed.data.runs) {
+    if (runIds.has(run.run_id)) {
+      throw new CollectiveXDataError(`$.runs contains duplicate run ${run.run_id}.`);
+    }
+    runIds.add(run.run_id);
+    if (run.coverage_scope === 'partial' && run.covered_skus.length === 0) {
+      throw new CollectiveXDataError(`run ${run.run_id} claims partial coverage with no SKUs.`);
+    }
   }
   return parsed.data;
 }
@@ -803,5 +831,60 @@ export async function fetchCollectiveXPublication(
   if (channelName === 'dev-latest' && dataset.promotion.status !== 'promoted') {
     throw new CollectiveXDataError('dev-latest does not reference a promoted dataset.');
   }
+  return { channel, dataset, digest };
+}
+
+export async function fetchCollectiveXRuns(
+  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
+  signal?: AbortSignal,
+): Promise<CollectiveXRunSummary[]> {
+  const response = await responseOrThrow(
+    collectiveXRunsUrl(version),
+    { cache: 'no-store', credentials: 'same-origin', signal },
+    'channel',
+  );
+  const runs = parseCollectiveXRuns(strictJson(await response.text(), 'runs'), version);
+  return runs.runs;
+}
+
+export async function fetchCollectiveXByDigest(
+  version: CollectiveXVersion,
+  digest: string,
+  signal?: AbortSignal,
+): Promise<CollectiveXResolvedDataset> {
+  if (!/^[a-f0-9]{64}$/.test(digest)) {
+    throw new CollectiveXDataError('a run digest must be a 64-character SHA-256.');
+  }
+  const datasetResponse = await responseOrThrow(
+    collectiveXDatasetUrl(version, digest),
+    { cache: 'force-cache', credentials: 'same-origin', signal },
+    'dataset',
+  );
+  const bytes = new Uint8Array(await datasetResponse.arrayBuffer());
+  const resolvedDigest = await sha256Hex(bytes);
+  if (resolvedDigest !== digest) {
+    throw new CollectiveXDataError('dataset SHA-256 does not match the requested digest.');
+  }
+
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new CollectiveXDataError('dataset is not valid UTF-8 JSON.');
+  }
+  const dataset = parseCollectiveXDataset(strictJson(text, 'dataset'));
+  if (dataset.promotion.status !== 'promoted') {
+    throw new CollectiveXDataError('the selected run does not reference a promoted dataset.');
+  }
+  const channel: CollectiveXChannel = {
+    format: 'collectivex.channel.v1',
+    channel: 'dev-latest',
+    generated_at: dataset.generated_at,
+    dataset: {
+      path: `datasets/${digest}/dataset.json`,
+      sha256: digest,
+      bytes: bytes.byteLength,
+    },
+  };
   return { channel, dataset, digest };
 }

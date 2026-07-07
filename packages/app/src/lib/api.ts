@@ -4,7 +4,9 @@
  */
 
 import {
+  fetchCollectiveXByDigest,
   fetchCollectiveXPublication,
+  fetchCollectiveXRuns,
   type CollectiveXChannelName,
 } from '@/components/collectivex/reader';
 import {
@@ -314,6 +316,23 @@ export function fetchCollectiveX(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ) {
   return fetchCollectiveXPublication(channel, signal, version);
+}
+
+/** JIT list of eligible ("tagged + success") publication runs for a version. */
+export function fetchCollectiveXRunList(
+  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
+  signal?: AbortSignal,
+) {
+  return fetchCollectiveXRuns(version, signal);
+}
+
+/** Resolve a specific run's promoted dataset by its content digest. */
+export function fetchCollectiveXRun(
+  version: CollectiveXVersion,
+  digest: string,
+  signal?: AbortSignal,
+) {
+  return fetchCollectiveXByDigest(version, digest, signal);
 }
 
 export interface FeedbackListRow {

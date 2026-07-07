@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   collectiveXChannelUrl,
+  collectiveXDatasetUrl,
+  collectiveXRunsUrl,
+  fetchCollectiveXByDigest,
   fetchCollectiveXPublication,
+  fetchCollectiveXRuns,
   parseCollectiveXChannel,
   parseCollectiveXDataset,
+  parseCollectiveXRuns,
   sha256Hex,
 } from './reader';
 import {
@@ -642,6 +647,139 @@ describe('CollectiveX publication reader', () => {
     const digest = await sha256Hex(bytes);
     mockPublication(bytes, digest);
     await expect(fetchCollectiveXPublication()).rejects.toThrow('duplicate key schema_version');
+  });
+});
+
+const runSummary = (overrides: Record<string, unknown> = {}) => ({
+  run_id: '28874233148',
+  run_attempt: 1,
+  head_sha: 'a'.repeat(40),
+  digest: 'b'.repeat(64),
+  generated_at: '2026-07-07T01:00:00Z',
+  coverage_scope: 'full',
+  covered_skus: ['gb200', 'h100'],
+  bytes: 4096,
+  ...overrides,
+});
+const runsDoc = (runs: unknown[], version = 1) => ({
+  format: 'collectivex.runs.v1',
+  version,
+  runs,
+});
+
+describe('CollectiveX run picker (JIT publications)', () => {
+  it('parses a well-formed runs listing', () => {
+    const parsed = parseCollectiveXRuns(runsDoc([runSummary()]), 1);
+    expect(parsed.runs).toHaveLength(1);
+    expect(parsed.runs[0].run_id).toBe('28874233148');
+  });
+
+  it('rejects a version mismatch, duplicate runs, and empty partial coverage', () => {
+    expect(() => parseCollectiveXRuns(runsDoc([runSummary()], 2), 1)).toThrow(
+      'does not match the requested version',
+    );
+    expect(() => parseCollectiveXRuns(runsDoc([runSummary(), runSummary()]), 1)).toThrow(
+      'duplicate run',
+    );
+    expect(() =>
+      parseCollectiveXRuns(
+        runsDoc([runSummary({ coverage_scope: 'partial', covered_skus: [] })]),
+        1,
+      ),
+    ).toThrow('partial coverage with no SKUs');
+  });
+
+  it('fetches the eligible-run listing with a no-store cache', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify(
+            runsDoc([
+              runSummary(),
+              runSummary({
+                run_id: '28800000001',
+                digest: 'c'.repeat(64),
+                coverage_scope: 'partial',
+                covered_skus: ['gb200', 'gb300', 'h100', 'h200', 'mi300x', 'mi355x'],
+              }),
+            ]),
+          ),
+        ),
+    });
+    const runs = await fetchCollectiveXRuns(1);
+    expect(runs.map((run) => run.run_id)).toEqual(['28874233148', '28800000001']);
+    expect(runs[1].coverage_scope).toBe('partial');
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      collectiveXRunsUrl(1),
+      expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
+    );
+  });
+
+  it('maps run-listing availability failures like the channel', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, headers: new Headers() });
+    await expect(fetchCollectiveXRuns(1)).rejects.toMatchObject({
+      availabilityReason: 'source-unavailable',
+    });
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      headers: new Headers({ 'X-CollectiveX-Status': 'channel-unavailable' }),
+    });
+    await expect(fetchCollectiveXRuns(1)).rejects.toMatchObject({
+      availabilityReason: 'channel-unavailable',
+    });
+  });
+
+  it('resolves a pinned run by digest and verifies its content hash', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify(makeCollectiveXDataset()));
+    const digest = await sha256Hex(bytes);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(bytes.buffer),
+    });
+    const result = await fetchCollectiveXByDigest(1, digest);
+    expect(result.digest).toBe(digest);
+    expect(result.channel.channel).toBe('dev-latest');
+    expect(result.channel.dataset.sha256).toBe(digest);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      collectiveXDatasetUrl(1, digest),
+      expect.objectContaining({ cache: 'force-cache', credentials: 'same-origin' }),
+    );
+  });
+
+  it('rejects a malformed digest before fetching', async () => {
+    await expect(fetchCollectiveXByDigest(1, 'not-a-digest')).rejects.toThrow(
+      '64-character SHA-256',
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the fetched bytes do not hash to the requested digest', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify(makeCollectiveXDataset()));
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(bytes.buffer),
+    });
+    await expect(fetchCollectiveXByDigest(1, 'c'.repeat(64))).rejects.toThrow(
+      'does not match the requested digest',
+    );
+  });
+
+  it('refuses to pin a run whose dataset is not promoted', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify(makeCollectiveXDiagnosticDataset()));
+    const digest = await sha256Hex(bytes);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(bytes.buffer),
+    });
+    await expect(fetchCollectiveXByDigest(1, digest)).rejects.toThrow(
+      'does not reference a promoted dataset',
+    );
   });
 });
 

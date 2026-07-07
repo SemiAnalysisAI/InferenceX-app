@@ -79,6 +79,27 @@ export const collectiveXChannelSchema = z.strictObject({
   }),
 });
 
+// JIT listing of the eligible ("tagged + success") publication runs for a
+// version, backing the frontend multi-run picker. `collectivex.runs.v1` is a
+// frozen data-format literal (the shared schema-version, not the release).
+export const collectiveXRunSummarySchema = z.strictObject({
+  run_id: z.string().regex(/^[1-9][0-9]*$/),
+  run_attempt: positiveInteger,
+  head_sha: z.string().regex(/^[a-f0-9]{40}$/),
+  digest: hex64,
+  generated_at: timestamp,
+  coverage_scope: z.enum(['full', 'partial']),
+  covered_skus: unique(safeId),
+  bytes: positiveInteger.max(32 * 1024 * 1024),
+});
+export const collectiveXRunsSchema = z.strictObject({
+  format: z.literal('collectivex.runs.v1'),
+  version: positiveInteger,
+  runs: z.array(collectiveXRunSummarySchema),
+});
+export type CollectiveXRunSummary = z.infer<typeof collectiveXRunSummarySchema>;
+export type CollectiveXRuns = z.infer<typeof collectiveXRunsSchema>;
+
 const percentilesSchema = z.strictObject({
   p50: z.number().finite().positive(),
   p90: z.number().finite().positive(),
@@ -567,6 +588,12 @@ export const collectiveXDatasetSchema = z.strictObject({
     measured_points: nonnegativeInteger,
     unsupported_points: nonnegativeInteger,
     policy: z.literal('collectivex-decision-grade-v1'),
+    // Partial-coverage promotion ("tagged + success" over a SKU subset). Both are
+    // emitted by the publisher for full and partial runs alike; a full run reports
+    // coverage_scope 'full' with every canonical SKU. Optional so pre-partial
+    // datasets still parse.
+    coverage_scope: z.enum(['full', 'partial']).optional(),
+    covered_skus: unique(safeId).optional(),
   }),
   coverage: z.array(coverageSchema),
   attempts: z.array(attemptSchema),
