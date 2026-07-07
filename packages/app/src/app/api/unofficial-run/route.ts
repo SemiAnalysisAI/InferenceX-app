@@ -17,8 +17,16 @@ import {
   getGithubToken,
   getRunDate,
   normalizeGithubRunInfo,
+  type GithubArtifact,
   type GithubWorkflowRun,
 } from '@/lib/github-artifacts';
+
+/**
+ * Batch size for downloading per-config `bmk_*` artifacts. Big agentic sweeps
+ * upload one artifact per config (dozens per run); a bounded batch keeps us
+ * clear of GitHub's secondary rate limits while still parallelizing.
+ */
+const PER_CONFIG_DOWNLOAD_BATCH_SIZE = 8;
 
 /** Normalize raw artifact rows into the BenchmarkRow shape the frontend expects. */
 export function normalizeArtifactRows(
@@ -234,11 +242,32 @@ async function processSingleRun(
     .filter((a) => a.name === 'eval_results_all')
     .toSorted((a, b) => b.id - a.id)[0];
 
-  if (!bmkArtifact && !evalArtifact) {
+  // Agentic-only sweeps never run the collect-results merge job (run-sweep.yml
+  // only triggers it for fixed-seq sweeps), so they upload per-config
+  // `bmk_agentic_<config>` artifacts with no merged `results_bmk`. Fall back to
+  // downloading those directly. When `results_bmk` exists it already contains
+  // every `bmk_*` row (the merge job downloads the `bmk_*` pattern), so the
+  // fallback must stay off in that case — running both would double-count.
+  // Same-name re-uploads keep only the newest (highest id), mirroring the
+  // merged-artifact selection above.
+  const perConfigBmkArtifacts: GithubArtifact[] = bmkArtifact
+    ? []
+    : [
+        ...artifacts
+          .filter((a) => a.name.startsWith('bmk_'))
+          .reduce((byName, a) => {
+            const prev = byName.get(a.name);
+            if (!prev || a.id > prev.id) byName.set(a.name, a);
+            return byName;
+          }, new Map<string, GithubArtifact>())
+          .values(),
+      ];
+
+  if (!bmkArtifact && perConfigBmkArtifacts.length === 0 && !evalArtifact) {
     return {
       errorResponse: NextResponse.json(
         {
-          error: `No results_bmk or eval_results_all artifact found for runId ${runId}`,
+          error: `No results_bmk, per-config bmk_*, or eval_results_all artifact found for runId ${runId}`,
         },
         { status: 404 },
       ),
@@ -259,6 +288,19 @@ async function processSingleRun(
     );
     if (errorResponse) return { errorResponse };
     benchmarks = normalizeArtifactRows(rows, date, runUrl || null);
+  } else if (perConfigBmkArtifacts.length > 0) {
+    const rawRows: Record<string, unknown>[] = [];
+    for (let i = 0; i < perConfigBmkArtifacts.length; i += PER_CONFIG_DOWNLOAD_BATCH_SIZE) {
+      const batch = perConfigBmkArtifacts.slice(i, i + PER_CONFIG_DOWNLOAD_BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((a) => downloadArtifactRows(a.archive_download_url, githubToken)),
+      );
+      for (const result of results) {
+        if (result.errorResponse) return { errorResponse: result.errorResponse };
+        rawRows.push(...result.rows);
+      }
+    }
+    benchmarks = normalizeArtifactRows(rawRows, date, runUrl || null);
   }
 
   if (evalArtifact) {
