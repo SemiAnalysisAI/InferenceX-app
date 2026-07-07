@@ -56,7 +56,7 @@ function installGithubResponses(archive: ReturnType<typeof publicationArchive>) 
         artifacts: [
           {
             id: 123,
-            name: 'cxpublication-v1-456-1',
+            name: 'cxpublication-1-456-1',
             archive_download_url: 'https://example.test/publication.zip',
             expired: false,
             size_in_bytes: archive.zip.byteLength,
@@ -87,15 +87,15 @@ describe('CollectiveX GitHub publication loader', () => {
     const archive = publicationArchive();
     installGithubResponses(archive);
 
-    const first = await loadCollectiveXPublication('v1');
-    const second = await loadCollectiveXPublication('v1');
+    const first = await loadCollectiveXPublication(1);
+    const second = await loadCollectiveXPublication(1);
 
     expect(first).toMatchObject({
       artifactId: 123,
       digest: archive.digest,
       runId: 456,
       runAttempt: 1,
-      version: 'v1',
+      version: 1,
     });
     expect(Buffer.from(first.body)).toEqual(archive.body);
     expect(first.dataset.promotion.status).toBe('promoted');
@@ -142,7 +142,7 @@ describe('CollectiveX GitHub publication loader', () => {
           artifacts: [
             {
               id: 123,
-              name: 'cxpublication-v1-456-1',
+              name: 'cxpublication-1-456-1',
               archive_download_url: 'https://example.test/publication.zip',
               expired: false,
               size_in_bytes: archive.zip.byteLength,
@@ -156,7 +156,7 @@ describe('CollectiveX GitHub publication loader', () => {
         }),
       );
 
-    await expect(loadCollectiveXPublication('v1')).resolves.toMatchObject({ runId: 456 });
+    await expect(loadCollectiveXPublication(1)).resolves.toMatchObject({ runId: 456 });
     expect(mockFetch.mock.calls[0][0]).toContain('page=1');
     expect(mockFetch.mock.calls[2][0]).toContain('page=2');
   });
@@ -186,13 +186,13 @@ describe('CollectiveX GitHub publication loader', () => {
           artifacts: [
             {
               id: 122,
-              name: 'cxpublication-v1-456-1',
+              name: 'cxpublication-1-456-1',
               archive_download_url: 'https://example.test/stale.zip',
               expired: false,
             },
             {
               id: 123,
-              name: 'cxpublication-v1-456-2',
+              name: 'cxpublication-1-456-2',
               archive_download_url: 'https://example.test/publication.zip',
               expired: false,
               size_in_bytes: archive.zip.byteLength,
@@ -206,7 +206,7 @@ describe('CollectiveX GitHub publication loader', () => {
         }),
       );
 
-    await expect(loadCollectiveXPublication('v1')).resolves.toMatchObject({
+    await expect(loadCollectiveXPublication(1)).resolves.toMatchObject({
       artifactId: 123,
       runAttempt: 2,
     });
@@ -216,9 +216,9 @@ describe('CollectiveX GitHub publication loader', () => {
   it('resolves an immutable digest from the publication cache', async () => {
     const archive = publicationArchive();
     installGithubResponses(archive);
-    await loadCollectiveXPublication('v1');
+    await loadCollectiveXPublication(1);
 
-    await expect(loadCollectiveXPublication('v1', archive.digest)).resolves.toMatchObject({
+    await expect(loadCollectiveXPublication(1, archive.digest)).resolves.toMatchObject({
       digest: archive.digest,
     });
     expect(mockFetch).toHaveBeenCalledTimes(3);
@@ -229,7 +229,7 @@ describe('CollectiveX GitHub publication loader', () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 503));
     installGithubResponses(archive);
 
-    await expect(loadCollectiveXPublication('v1')).resolves.toMatchObject({
+    await expect(loadCollectiveXPublication(1)).resolves.toMatchObject({
       digest: archive.digest,
     });
     expect(mockFetch).toHaveBeenCalledTimes(4);
@@ -238,7 +238,7 @@ describe('CollectiveX GitHub publication loader', () => {
   it('rejects non-promoted and ambiguous publication artifacts', async () => {
     const diagnostic = publicationArchive(makeCollectiveXDiagnosticDataset());
     installGithubResponses(diagnostic);
-    await expect(loadCollectiveXPublication('v1')).rejects.toSatisfy(
+    await expect(loadCollectiveXPublication(1)).rejects.toSatisfy(
       (error: unknown) => collectiveXPublicationErrorCode(error) === 'invalid',
     );
 
@@ -246,7 +246,7 @@ describe('CollectiveX GitHub publication loader', () => {
     mockFetch.mockReset();
     const ambiguous = publicationArchive(makeCollectiveXDataset(), true);
     installGithubResponses(ambiguous);
-    await expect(loadCollectiveXPublication('v1')).rejects.toSatisfy(
+    await expect(loadCollectiveXPublication(1)).rejects.toSatisfy(
       (error: unknown) => collectiveXPublicationErrorCode(error) === 'invalid',
     );
   });
@@ -254,7 +254,7 @@ describe('CollectiveX GitHub publication loader', () => {
   it('fails as unavailable without a server-side GitHub token', async () => {
     delete process.env.GITHUB_TOKEN;
 
-    await expect(loadCollectiveXPublication('v1')).rejects.toSatisfy(
+    await expect(loadCollectiveXPublication(1)).rejects.toSatisfy(
       (error: unknown) => collectiveXPublicationErrorCode(error) === 'unavailable',
     );
     expect(mockFetch).not.toHaveBeenCalled();

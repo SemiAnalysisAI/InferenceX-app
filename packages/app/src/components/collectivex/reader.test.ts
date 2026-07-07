@@ -551,7 +551,7 @@ describe('CollectiveX publication reader', () => {
     );
     expect(mockFetch).toHaveBeenNthCalledWith(
       2,
-      `/collectivex-data/v1/datasets/${digest}/dataset.json`,
+      `/collectivex-data/1/datasets/${digest}/dataset.json`,
       expect.objectContaining({ cache: 'force-cache', credentials: 'same-origin' }),
     );
   });

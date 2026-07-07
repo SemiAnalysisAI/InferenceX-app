@@ -12,8 +12,10 @@ const WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
 const WORKFLOW_FILE = 'collectivex-sweep.yml';
 const WORKFLOW_NAME = 'CollectiveX Sweep';
 const RUNS_PER_PAGE = 100;
+// Keyed by the numeric release version. The filename regex keeps the frozen
+// data-format literal `collectivex_public_v1_` (schema-version, not the release).
 const PUBLICATION_POLICY: Record<CollectiveXVersion, { file: RegExp }> = {
-  v1: {
+  1: {
     file: /^collectivex_public_v1_(?<digest>[a-f0-9]{64})\.ndjson$/,
   },
 };

@@ -1,8 +1,23 @@
 import { z } from 'zod';
 
 export type CollectiveXPhase = 'decode' | 'prefill';
-export const COLLECTIVEX_VERSIONS = ['v1'] as const;
+// The release version is a numeric, incrementable identity (1, 2, 3, ...), matching
+// the backend release marker's "version": N and the cxpublication-<N>-* artifact name.
+// It is NOT the frozen data-format literal "v1" (collectivex.public.v1, cx*-v1-*,
+// collectivex_public_v1_*.ndjson), which is schema-version and shared across releases.
+export const COLLECTIVEX_VERSIONS = [1] as const;
 export type CollectiveXVersion = (typeof COLLECTIVEX_VERSIONS)[number];
+export const COLLECTIVEX_DEFAULT_VERSION: CollectiveXVersion = Math.max(
+  ...COLLECTIVEX_VERSIONS,
+) as CollectiveXVersion;
+export const collectiveXVersionLabel = (version: CollectiveXVersion): string => `V${version}`;
+export function parseCollectiveXVersion(raw: string): CollectiveXVersion | null {
+  if (!/^[1-9][0-9]*$/.test(raw)) return null;
+  const value = Number(raw);
+  return (COLLECTIVEX_VERSIONS as readonly number[]).includes(value)
+    ? (value as CollectiveXVersion)
+    : null;
+}
 export type CollectiveXMode = 'normal' | 'low-latency';
 export type CollectiveXTopologyScope = 'scale-up' | 'scale-out';
 export type CollectiveXOperation = 'dispatch' | 'stage' | 'combine' | 'roundtrip' | 'isolated-sum';

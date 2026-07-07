@@ -7,7 +7,10 @@ import {
   fetchCollectiveXPublication,
   type CollectiveXChannelName,
 } from '@/components/collectivex/reader';
-import type { CollectiveXVersion } from '@/components/collectivex/types';
+import {
+  COLLECTIVEX_DEFAULT_VERSION,
+  type CollectiveXVersion,
+} from '@/components/collectivex/types';
 import type { WorkerPower } from '@/components/inference/types';
 
 import type { SubmissionsResponse } from './submissions-types';
@@ -308,7 +311,7 @@ export function fetchSubmissions(signal?: AbortSignal) {
 export function fetchCollectiveX(
   channel: CollectiveXChannelName = 'dev-latest',
   signal?: AbortSignal,
-  version: CollectiveXVersion = 'v1',
+  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ) {
   return fetchCollectiveXPublication(channel, signal, version);
 }

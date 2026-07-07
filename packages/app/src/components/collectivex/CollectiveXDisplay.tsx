@@ -43,6 +43,8 @@ import {
 } from './data';
 import {
   COLLECTIVEX_VERSIONS,
+  COLLECTIVEX_DEFAULT_VERSION,
+  collectiveXVersionLabel,
   type CollectiveXCohort,
   type CollectiveXMode,
   type CollectiveXOperation,
@@ -57,7 +59,7 @@ import {
 
 type EvidenceScope = 'controlled' | 'diagnostic';
 type CollectiveXTab = 'results' | 'decisions' | 'evidence';
-interface SelectOption<T extends string> {
+interface SelectOption<T extends string | number> {
   value: T;
   label: string;
 }
@@ -106,7 +108,7 @@ const STRINGS = {
     },
     channel: { 'dev-latest': 'Published', 'latest-attempt': 'Latest attempt' },
     tabs: { results: 'EP results', decisions: 'Decisions', evidence: 'Evidence' },
-    promotion: { promoted: 'Promoted v1', diagnostic: 'diagnostic', quarantined: 'quarantined' },
+    promotion: { promoted: 'Promoted', diagnostic: 'diagnostic', quarantined: 'quarantined' },
     all: 'All',
     loading: 'Resolving CollectiveX publication...',
     unavailable: 'CollectiveX publication unavailable',
@@ -257,7 +259,7 @@ const STRINGS = {
     },
     channel: { 'dev-latest': '已发布', 'latest-attempt': '最新尝试' },
     tabs: { results: 'EP 结果', decisions: '决策', evidence: '证据' },
-    promotion: { promoted: '已发布 v1', diagnostic: '诊断', quarantined: '已隔离' },
+    promotion: { promoted: '已发布', diagnostic: '诊断', quarantined: '已隔离' },
     all: '全部',
     loading: '正在解析 CollectiveX 发布数据...',
     unavailable: 'CollectiveX 发布数据不可用',
@@ -436,7 +438,7 @@ function publicationSourceSha(series: CollectiveXSeries[]): string | null {
 export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [version, setVersion] = useState<CollectiveXVersion>('v1');
+  const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
   const { data, error, isLoading, isFetching, refetch } = useCollectiveX('dev-latest', version);
   const [tab, setTab] = useState<CollectiveXTab>('results');
   const [evidenceScope, setEvidenceScope] = useState<EvidenceScope>('controlled');
@@ -491,7 +493,7 @@ export default function CollectiveXDisplay() {
   ];
   const versionOptions: SelectOption<CollectiveXVersion>[] = COLLECTIVEX_VERSIONS.map((value) => ({
     value,
-    label: value.toUpperCase(),
+    label: collectiveXVersionLabel(value),
   }));
   const tabOptions: { value: CollectiveXTab; label: string }[] = [
     { value: 'results', label: t.tabs.results },
@@ -1342,7 +1344,7 @@ function Stat({
   );
 }
 
-function SelectControl<T extends string>({
+function SelectControl<T extends string | number>({
   label,
   testId,
   value,
@@ -1357,15 +1359,23 @@ function SelectControl<T extends string>({
   onChange: (value: T) => void;
   placeholder?: string;
 }) {
+  // Radix Select speaks strings; numeric option values (e.g. the release version)
+  // round-trip through String() and are recovered from the option list on change.
   return (
     <ControlGroup label={label}>
-      <Select value={value} onValueChange={(next) => onChange(next as T)}>
+      <Select
+        value={String(value)}
+        onValueChange={(next) => {
+          const match = options.find((item) => String(item.value) === next);
+          if (match) onChange(match.value);
+        }}
+      >
         <SelectTrigger data-testid={testId} className="min-w-0 w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {options.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
+            <SelectItem key={String(item.value)} value={String(item.value)}>
               {item.label}
             </SelectItem>
           ))}

@@ -8,7 +8,7 @@ import {
 } from '@/components/collectivex/test-fixture';
 import type { CollectiveXDataset } from '@/components/collectivex/types';
 
-const channelUrl = '/collectivex-data/v1/channels/dev-latest.json';
+const channelUrl = '/collectivex-data/1/channels/dev-latest.json';
 
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -36,7 +36,7 @@ function installPublication(
         },
       },
     }).as('collectivexChannel-dev-latest');
-    cy.intercept('GET', `/collectivex-data/v1/datasets/${digest}/dataset.json`, {
+    cy.intercept('GET', `/collectivex-data/1/datasets/${digest}/dataset.json`, {
       body,
       delay: options.delay,
       headers: { 'content-type': 'application/json' },
@@ -58,7 +58,7 @@ describe('CollectiveX native publication', () => {
 
   it('defaults to a publisher-controlled, decision-grade cohort', () => {
     cy.get('[data-testid="collectivex-display"]')
-      .should('contain.text', 'Promoted v1')
+      .should('contain.text', 'Promoted')
       .and('contain.text', '8/8')
       .and('contain.text', '24')
       .and('contain.text', 'H100 EP8 library comparison');
@@ -252,7 +252,7 @@ describe('CollectiveX native publication', () => {
       .should('contain.text', 'CollectiveX 通信基准测试')
       .and('contain.text', '专家并行');
     cy.get('[data-testid="collectivex-display"]')
-      .should('contain.text', '已发布 v1')
+      .should('contain.text', '已发布')
       .and('contain.text', '决策级序列')
       .and('contain.text', '受控队列');
     cy.get('[data-testid="collectivex-methodology-link"]')

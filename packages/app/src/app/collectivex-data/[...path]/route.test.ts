@@ -42,7 +42,7 @@ beforeEach(() => {
 
 describe('CollectiveX GitHub publication route', () => {
   it('resolves dev-latest to the JIT-fetched publication', async () => {
-    const response = await request('v1', 'channels', 'dev-latest.json');
+    const response = await request('1', 'channels', 'dev-latest.json');
     const channel = parseCollectiveXChannel(await response.json());
 
     expect(response.status).toBe(200);
@@ -52,22 +52,22 @@ describe('CollectiveX GitHub publication route', () => {
       channel: 'dev-latest',
       dataset: { bytes: body.byteLength, sha256: digest },
     });
-    expect(github.load).toHaveBeenCalledWith('v1', undefined);
+    expect(github.load).toHaveBeenCalledWith(1, undefined);
   });
 
   it('serves the exact digest-addressed dataset bytes', async () => {
-    const response = await request('v1', 'datasets', digest, 'dataset.json');
+    const response = await request('1', 'datasets', digest, 'dataset.json');
     const served = Buffer.from(await response.arrayBuffer());
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('immutable');
     expect(served).toEqual(body);
     expect(parseCollectiveXDataset(JSON.parse(served.toString('utf8')))).toEqual(dataset);
-    expect(github.load).toHaveBeenCalledWith('v1', digest);
+    expect(github.load).toHaveBeenCalledWith(1, digest);
   });
 
   it('does not expose the private latest-attempt channel', async () => {
-    const response = await request('v1', 'channels', 'latest-attempt.json');
+    const response = await request('1', 'channels', 'latest-attempt.json');
 
     expect(response.status).toBe(404);
     expect(response.headers.get('x-collectivex-status')).toBeNull();
@@ -81,7 +81,7 @@ describe('CollectiveX GitHub publication route', () => {
   ] as const)('maps %s source failures without exposing details', async (code, status, marker) => {
     github.load.mockRejectedValue(Object.assign(new Error('private upstream detail'), { code }));
 
-    const response = await request('v1', 'channels', 'dev-latest.json');
+    const response = await request('1', 'channels', 'dev-latest.json');
 
     expect(response.status).toBe(status);
     expect(response.headers.get('x-collectivex-status')).toBe(marker);
@@ -93,4 +93,13 @@ describe('CollectiveX GitHub publication route', () => {
     expect(response.status).toBe(404);
     expect(github.load).not.toHaveBeenCalled();
   });
+
+  it.each(['v1', '0', '99', '01'])(
+    'rejects the unknown version segment %s before contacting GitHub',
+    async (segment) => {
+      const response = await request(segment, 'channels', 'dev-latest.json');
+      expect(response.status).toBe(404);
+      expect(github.load).not.toHaveBeenCalled();
+    },
+  );
 });

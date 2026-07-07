@@ -12,6 +12,7 @@ import {
   type CollectiveXResolvedDataset,
   type CollectiveXSeries,
   type CollectiveXVersion,
+  COLLECTIVEX_DEFAULT_VERSION,
 } from './types';
 
 export type CollectiveXChannelName = CollectiveXChannel['channel'];
@@ -20,7 +21,7 @@ const collectiveXPublicRoot = (version: CollectiveXVersion) => `/collectivex-dat
 
 export const collectiveXChannelUrl = (
   channel: CollectiveXChannelName,
-  version: CollectiveXVersion = 'v1',
+  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ) => `${collectiveXPublicRoot(version)}channels/${channel}.json`;
 
 export type CollectiveXAvailabilityReason = 'source-unavailable' | 'channel-unavailable';
@@ -763,7 +764,7 @@ export async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string>
 export async function fetchCollectiveXPublication(
   channelName: CollectiveXChannelName = 'dev-latest',
   signal?: AbortSignal,
-  version: CollectiveXVersion = 'v1',
+  version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ): Promise<CollectiveXResolvedDataset> {
   const channelResponse = await responseOrThrow(
     collectiveXChannelUrl(channelName, version),

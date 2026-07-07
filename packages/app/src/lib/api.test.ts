@@ -160,7 +160,7 @@ describe('fetchCollectiveX', () => {
       expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
     );
     expect(mockFetch).toHaveBeenLastCalledWith(
-      `/collectivex-data/v1/datasets/${digest}/dataset.json`,
+      `/collectivex-data/1/datasets/${digest}/dataset.json`,
       expect.objectContaining({ cache: 'force-cache', credentials: 'same-origin' }),
     );
     expect(result.dataset.format).toBe('collectivex.public.v1');

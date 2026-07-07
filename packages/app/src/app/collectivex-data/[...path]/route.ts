@@ -2,7 +2,7 @@ import {
   collectiveXPublicationErrorCode,
   loadCollectiveXPublication,
 } from '@/lib/collectivex-github';
-import { COLLECTIVEX_VERSIONS, type CollectiveXVersion } from '@/components/collectivex/types';
+import { COLLECTIVEX_VERSIONS, parseCollectiveXVersion } from '@/components/collectivex/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -39,8 +39,12 @@ export async function GET(_request: Request, context: { params: Promise<{ path: 
   const dataset = DATASET.exec(relative);
   if (!channel && !dataset) return unavailable(404);
 
+  const version = parseCollectiveXVersion(
+    channel?.groups?.version ?? dataset?.groups?.version ?? '',
+  );
+  if (!version) return unavailable(404);
+
   try {
-    const version = (channel?.groups?.version ?? dataset?.groups?.version) as CollectiveXVersion;
     const publication = await loadCollectiveXPublication(version, dataset?.groups?.digest);
     if (dataset) {
       return json(publication.body, 'public, max-age=31536000, immutable');
