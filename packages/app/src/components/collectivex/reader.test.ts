@@ -54,6 +54,37 @@ describe('CollectiveX publication reader', () => {
     expect(result.series[1].points[0].components.dispatch).toBeNull();
   });
 
+  it('accepts a measured host-staging component with zero logical bytes and zero rate', () => {
+    // A host-staging (`stage`) step can spend real latency moving nothing over
+    // the logical byte accounting (bytes = 0 → rate = 0), e.g. UCCL host-staged
+    // dispatch. The rate percentiles floor at 0 while latency stays positive.
+    const zeroByte = makeCollectiveXDataset();
+    const stage = zeroByte.series[0].points[0].components.stage!;
+    stage.byte_provenance = {
+      accounting_contract: 'activation-data-plus-scales-v1',
+      activation_data_bytes: 0,
+      scale_bytes: 0,
+      total_logical_bytes: 0,
+    };
+    stage.activation_data_rate_gbps_at_latency_percentile = { p50: 0, p90: 0, p95: 0, p99: 0 };
+    stage.total_logical_data_rate_gbps_at_latency_percentile = { p50: 0, p90: 0, p95: 0, p99: 0 };
+    expect(() => parseCollectiveXDataset(zeroByte)).not.toThrow();
+
+    const negativeRate = makeCollectiveXDataset();
+    negativeRate.series[0].points[0].components.stage!.total_logical_data_rate_gbps_at_latency_percentile =
+      { p50: -1, p90: 0, p95: 0, p99: 0 };
+    expect(() => parseCollectiveXDataset(negativeRate)).toThrow();
+
+    const zeroLatency = makeCollectiveXDataset();
+    zeroLatency.series[0].points[0].components.stage!.latency_us = {
+      p50: 0,
+      p90: 0,
+      p95: 0,
+      p99: 0,
+    };
+    expect(() => parseCollectiveXDataset(zeroLatency)).toThrow();
+  });
+
   it('preserves mode, measurement, and topology dimensions from the publisher', () => {
     const result = parseCollectiveXDataset(makeCollectiveXContractDataset());
     const normal = result.series.find((item) => item.mode === 'normal')!;

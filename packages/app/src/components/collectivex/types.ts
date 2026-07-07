@@ -106,6 +106,15 @@ const percentilesSchema = z.strictObject({
   p95: z.number().finite().positive(),
   p99: z.number().finite().positive(),
 });
+// Data-rate percentiles admit 0.0: a host-staging component can have real
+// latency while measuring zero logical bytes (rate = bytes / latency = 0).
+// Latency percentiles stay strictly positive.
+const ratePercentilesSchema = z.strictObject({
+  p50: z.number().finite().nonnegative(),
+  p90: z.number().finite().nonnegative(),
+  p95: z.number().finite().nonnegative(),
+  p99: z.number().finite().nonnegative(),
+});
 const communicationAxisSchema = z.strictObject({
   alignment_contract: z.enum([
     'native-bf16-vector-alignment',
@@ -157,8 +166,8 @@ const componentSchema = z
     origin: z.enum(['measured', 'derived']),
     latency_us: percentilesSchema,
     byte_provenance: byteAccountingSchema,
-    activation_data_rate_gbps_at_latency_percentile: percentilesSchema.nullable(),
-    total_logical_data_rate_gbps_at_latency_percentile: percentilesSchema.nullable(),
+    activation_data_rate_gbps_at_latency_percentile: ratePercentilesSchema.nullable(),
+    total_logical_data_rate_gbps_at_latency_percentile: ratePercentilesSchema.nullable(),
     sample_count: positiveInteger.nullable(),
   })
   .superRefine((value, context) => {
@@ -213,7 +222,7 @@ const trialDiagnosticComponentSchema = z.strictObject({
   first_last_median_ratio: z.number().finite().min(1),
   outlier_flagged: z.boolean(),
   robust_outlier_fraction: z.number().finite().min(0).max(1),
-  trial_count: z.literal(192),
+  trial_count: z.literal(64),
 });
 const trialDiagnosticsSchema = z
   .strictObject({

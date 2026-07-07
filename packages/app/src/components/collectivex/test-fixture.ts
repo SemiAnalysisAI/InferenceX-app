@@ -271,7 +271,7 @@ function makeSeries(
                     first_last_median_ratio: 1.02,
                     outlier_flagged: false,
                     robust_outlier_fraction: 0,
-                    trial_count: 192 as const,
+                    trial_count: 64 as const,
                   }
                 : null,
             stage:
@@ -281,7 +281,7 @@ function makeSeries(
                     first_last_median_ratio: 1.01,
                     outlier_flagged: false,
                     robust_outlier_fraction: 0,
-                    trial_count: 192 as const,
+                    trial_count: 64 as const,
                   }
                 : null,
             combine:
@@ -291,7 +291,7 @@ function makeSeries(
                     first_last_median_ratio: 1.03,
                     outlier_flagged: false,
                     robust_outlier_fraction: 0,
-                    trial_count: 192 as const,
+                    trial_count: 64 as const,
                   }
                 : null,
             roundtrip: {
@@ -299,7 +299,7 @@ function makeSeries(
               first_last_median_ratio: 1.04,
               outlier_flagged: false,
               robust_outlier_fraction: 0,
-              trial_count: 192 as const,
+              trial_count: 64 as const,
             },
           },
         },

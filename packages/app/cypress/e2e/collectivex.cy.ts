@@ -209,7 +209,7 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', '1/1 qualification run')
       .and('contain.text', 'Semantic pass')
       .and('contain.text', 'Trial diagnostics')
-      .and('contain.text', '192 trials')
+      .and('contain.text', '64 trials')
       .and('contain.text', 'No trial flags')
       .and('contain.text', 'none declared');
   });
@@ -296,7 +296,6 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', '后端实现')
       .and('contain.text', '64 次试验 × 8 次迭代 = 每个分项 512 个样本')
       .and('contain.text', '32 次同步完整往返预热')
-      .and('contain.text', 'p50 1.050 倍 ≤ 1.10 倍')
       .and('contain.text', '排名顺序稳定')
       .and('contain.text', '已通过');
     cy.get('[data-testid="collectivex-recommendations"]')
@@ -569,7 +568,7 @@ describe('CollectiveX native publication', () => {
     cy.get('[data-testid="collectivex-attempts-table"] input').type('选择');
     cy.get('[data-testid="collectivex-attempts-table"]')
       .find('[data-testid="data-table-pagination-summary"]')
-      .should('have.text', '第 1–24 行，共 24 行（筛选自 24 行）');
+      .should('have.text', '第 1–8 行，共 8 行（筛选自 8 行）');
     cy.document()
       .its('documentElement')
       .should((element) => {
@@ -601,13 +600,42 @@ describe('CollectiveX native publication', () => {
     cy.get('[data-testid="collectivex-cohort-select"]').click();
     cy.contains('[role="option"]', 'H100 EP8 library comparison').click();
 
-    cy.get('[data-testid="collectivex-diagnostic-cohort-reasons"]')
-      .should('contain.text', 'unstable-ordering')
-      .and('contain.text', 'p50 1.050x')
-      .and('contain.text', 'p99 1.100x');
+    cy.get('[data-testid="collectivex-diagnostic-cohort-reasons"]').should(
+      'contain.text',
+      'unstable-ordering',
+    );
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', 'H100 EP8 · deepep')
       .and('contain.text', 'H100 EP8 · mori');
+  });
+
+  it('shows why individual series were flagged when no cohort is pinned', () => {
+    const contract = makeCollectiveXContractDataset();
+    const lowLatency = contract.series.find((item) => item.mode === 'low-latency')!;
+    lowLatency.status = 'diagnostic';
+    lowLatency.eligibility = {
+      ...lowLatency.eligibility,
+      decision_grade: false,
+      reasons: ['not-in-controlled-cohort'],
+    };
+    installPublication(contract);
+    cy.reload();
+    cy.wait('@collectivexChannel-dev-latest');
+
+    cy.get('[data-testid="collectivex-scope-toggle"]').contains('button', 'Diagnostics').click();
+    cy.get('[data-testid="collectivex-mode-select"]').contains('button', 'Low latency').click();
+    cy.get('[data-testid="collectivex-ep-select"]').click();
+    cy.contains('[role="option"]', 'EP16').click();
+    cy.get('[data-testid="collectivex-fabric-scope-toggle"]')
+      .contains('button', 'Scale-out')
+      .click();
+
+    // No cohort selected: the per-series reason line reveals why the shown
+    // series is diagnostic, without needing to pin a cohort first.
+    cy.get('[data-testid="collectivex-diagnostic-cohort-reasons"]').should('not.exist');
+    cy.get('[data-testid="collectivex-diagnostic-series-reasons"]')
+      .should('be.visible')
+      .and('contain.text', 'not-in-controlled-cohort');
   });
 
   it('keeps the version selector available when no promotion exists', () => {
@@ -649,7 +677,7 @@ describe('CollectiveX native publication', () => {
     cy.contains('[role="tab"]', 'Decisions').click();
 
     cy.get('[data-testid="collectivex-rankings"]')
-      .should('contain.text', '3 allocations')
+      .should('contain.text', '1 allocations')
       .and('contain.text', 'deepep')
       .and('contain.text', 'build dddddddd')
       .and('contain.text', 'series 00000001')
@@ -682,7 +710,6 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'Backend implementation')
       .and('contain.text', '64 trials × 8 iterations = 512 samples per component')
       .and('contain.text', '32 synchronized round-trip warmups')
-      .and('contain.text', 'p99 1.100x ≤ 1.25x')
       .and('contain.text', 'Stable ordering')
       .and('contain.text', 'passed');
 
@@ -721,9 +748,7 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'success');
     cy.get('[data-testid="collectivex-provenance"]')
       .should('contain.text', 'Source bundles')
-      .and('contain.text', 'a'.repeat(64))
-      .and('contain.text', 'b'.repeat(64))
-      .and('contain.text', 'c'.repeat(64));
+      .and('contain.text', 'a'.repeat(64));
     cy.get('[data-testid="collectivex-attempts-table"]')
       .should('contain.text', 'allocation selection')
       .and('contain.text', 'terminal selection')

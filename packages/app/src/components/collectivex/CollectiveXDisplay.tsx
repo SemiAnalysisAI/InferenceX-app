@@ -809,6 +809,17 @@ export default function CollectiveXDisplay() {
     () => (evidenceScope === 'diagnostic' ? comparisonDifferences(activeSeries) : []),
     [activeSeries, evidenceScope],
   );
+  // In free-form "all diagnostics" mode (no cohort pinned) the per-cohort reason
+  // line does not apply, so surface why the revealed series were flagged: the
+  // distinct eligibility reasons across the active diagnostic series. Series that
+  // are decision-grade cohort members carry no reasons and drop out.
+  const diagnosticSeriesReasons = useMemo(
+    () =>
+      evidenceScope !== 'diagnostic' || selectedDiagnosticCohort
+        ? []
+        : [...new Set(activeSeries.flatMap((item) => item.eligibility.reasons))].toSorted(),
+    [activeSeries, evidenceScope, selectedDiagnosticCohort],
+  );
   const missingComponents = activeSeries.some((item) =>
     item.points.some((point) =>
       operation === 'isolated-sum'
@@ -1388,6 +1399,20 @@ export default function CollectiveXDisplay() {
                 .
               </p>
             )}
+            {evidenceScope === 'diagnostic' &&
+              !selectedDiagnosticCohort &&
+              diagnosticSeriesReasons.length > 0 && (
+                <p
+                  data-testid="collectivex-diagnostic-series-reasons"
+                  className="mt-2 text-xs text-muted-foreground"
+                >
+                  {t.excluded}:{' '}
+                  {diagnosticSeriesReasons
+                    .map((reason) => collectiveXReasonLabel(reason, locale))
+                    .join(', ')}
+                  .
+                </p>
+              )}
             {evidenceScope === 'controlled' && selectedControlledCohort && (
               <p
                 data-testid="collectivex-controlled-stability"
