@@ -210,12 +210,6 @@ function componentSummary(component: CollectiveXComponent | null): React.ReactNo
   );
 }
 
-function pointStability(row: PointRow): string {
-  if (!row.point) return '-';
-  const stability = row.point.stability;
-  return `${stability.complete ? 'complete' : 'incomplete'} · Q${stability.qualification_indices.join('/')} · p50 ${stability.p50_max_min_ratio?.toFixed(3) ?? '-'}x ${stability.stable_p50 ? 'stable' : 'unstable'} · p99 ${stability.p99_max_min_ratio?.toFixed(3) ?? '-'}x ${stability.stable_p99 ? 'stable' : 'unstable'}`;
-}
-
 function pointAnomalies(row: PointRow): string {
   if (!row.point) return '-';
   const routing = row.point.routing;
@@ -353,10 +347,10 @@ function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: Coll
             : '',
       },
       {
-        header: '3-run evidence',
+        header: 'Evidence',
         cell: (row) => (
           <div className="min-w-32 text-xs">
-            <p>{row.qualificationIndices.length}/3 qualification runs</p>
+            <p>{row.qualificationIndices.length}/1 qualification run</p>
             <p className="text-muted-foreground">
               {row.qualificationIndices.map((index) => `Q${index}`).join(' · ') || '-'} ·{' '}
               {row.point?.evidence_ids.length ?? 0} evidence IDs
@@ -364,11 +358,6 @@ function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: Coll
           </div>
         ),
         sortValue: (row) => row.qualificationIndices.length,
-      },
-      {
-        header: 'Stability',
-        cell: (row) => <span className="block min-w-52 text-xs">{pointStability(row)}</span>,
-        sortValue: pointStability,
       },
       {
         header: 'Anomalies',

@@ -96,7 +96,6 @@ const STRINGS = {
     varyingFactors: 'Compared',
     sampling: 'Sampling',
     warmups: 'Warmups',
-    repeatStability: 'Repeat stability',
     stableOrdering: 'Stable ordering',
     passed: 'passed',
     notPassed: 'not passed',
@@ -186,7 +185,6 @@ const STRINGS = {
     varyingFactors: '对比变量',
     sampling: '采样',
     warmups: '预热',
-    repeatStability: '重复运行稳定性',
     stableOrdering: '排名顺序稳定',
     passed: '已通过',
     notPassed: '未通过',
@@ -302,8 +300,6 @@ const REASON_LABELS = {
     'incomplete-repeat-coverage': '重复运行覆盖不完整',
     'correctness-failed': '正确性校验失败',
     'missing-measured-roundtrip-p99': '缺少实测往返 p99',
-    'unstable-p50': 'p50 不稳定',
-    'unstable-p99': 'p99 不稳定',
     'unstable-ordering': '排名顺序不稳定',
     'incomplete-provenance': '来源与运行溯源不完整',
     'noncanonical-workload': '工作负载不符合规范',
@@ -316,7 +312,6 @@ const REASON_LABELS = {
     'incomplete-routing-anchors': '路由基准锚点不完整',
     'implementation-config-mismatch': '实现配置不一致',
     'unmatched-token-coverage': 'token 点位覆盖不一致',
-    'awaiting-repeat-allocations': '等待重复独立分配',
     'awaiting-v1-runs': '等待 CollectiveX v1 运行结果',
   },
 } as const;
@@ -344,11 +339,6 @@ function cohortDescription(cohort: CollectiveXCohort, locale: 'en' | 'zh'): stri
     system: '使用可移植 NCCL/RCCL 参考实现，在相同工作负载与测量协议下对比系统。',
     routing: '在相同实现、系统与资源配置下，对比路由分布及 EPLB 处理。',
   }[cohort.kind];
-}
-
-function repeatRatio(value: number | null, limit: number, locale: 'en' | 'zh'): string {
-  const suffix = locale === 'zh' ? ' 倍' : 'x';
-  return `${value?.toFixed(3) ?? 'n/a'}${suffix} ≤ ${limit.toFixed(2)}${suffix}`;
 }
 
 function attemptRoleLabel(
@@ -1032,12 +1022,7 @@ export function CollectiveXDecisionTables({
               </div>
             )}
             <div>
-              <dt className="text-xs text-muted-foreground">{t.repeatStability}</dt>
-              <dd className="mt-1 tabular-nums">
-                p50 {repeatRatio(cohort.eligibility.p50_max_min_ratio, 1.1, locale)} · p99{' '}
-                {repeatRatio(cohort.eligibility.p99_max_min_ratio, 1.25, locale)}
-              </dd>
-              <dt className="mt-2 text-xs text-muted-foreground">{t.stableOrdering}</dt>
+              <dt className="text-xs text-muted-foreground">{t.stableOrdering}</dt>
               <dd className="mt-1">
                 {cohort.eligibility.stable_ordering
                   ? t.passed

@@ -83,10 +83,10 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'Activation-only combine')
       .and('contain.text', '64×8 = 512 samples/component')
       .and('contain.text', '32 synchronized warmups');
-    cy.get('[data-testid="collectivex-controlled-stability"]')
-      .should('contain.text', 'p50 1.050x ≤ 1.10x')
-      .and('contain.text', 'p99 1.100x ≤ 1.25x')
-      .and('contain.text', 'stable ordering passed');
+    cy.get('[data-testid="collectivex-controlled-stability"]').should(
+      'contain.text',
+      'stable ordering passed',
+    );
     cy.get('[data-testid="collectivex-diagnostic-warning"]').should('not.exist');
     cy.get('[data-testid="collectivex-source-link"]').should(
       'have.attr',
@@ -162,7 +162,7 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'Combine precision');
     cy.get('[data-testid="collectivex-case-points-table"]').should(
       'contain.text',
-      '3/3 qualification runs',
+      '1/1 qualification run',
     );
 
     const precision = inventory.coverage.find(
@@ -206,9 +206,8 @@ describe('CollectiveX native publication', () => {
       .and('contain.text', 'Round trip')
       .and('contain.text', 'Isolated sum')
       .and('contain.text', '512/512 samples')
-      .and('contain.text', '3/3 qualification runs')
+      .and('contain.text', '1/1 qualification run')
       .and('contain.text', 'Semantic pass')
-      .and('contain.text', 'Stability')
       .and('contain.text', 'Trial diagnostics')
       .and('contain.text', '192 trials')
       .and('contain.text', 'No trial flags')

@@ -34,6 +34,11 @@ describe('CollectiveX publication reader', () => {
     )!;
     nonSuccessAttempt.failure_mode = 'future-runtime-mode';
     nonSuccessAttempt.reason = 'future-runtime-reason';
+    const nonSuccessCoverage = dataset.coverage.find(
+      (item) => item.selected_attempt_id === nonSuccessAttempt.attempt_id,
+    )!;
+    nonSuccessCoverage.failure_mode = 'future-runtime-mode';
+    nonSuccessCoverage.reason = 'future-runtime-reason';
 
     const result = parseCollectiveXDataset(dataset);
 
@@ -62,7 +67,7 @@ describe('CollectiveX publication reader', () => {
       component_order_contract: 'qualification-hash-rotated-components-v1',
       combine_semantics: 'gate-weighted',
       payload_unit: 'token-expert',
-      qualification_indices: [1, 2, 3],
+      qualification_indices: [1],
     });
     expect(unsupported.topology).toMatchObject({
       ep_size: 16,

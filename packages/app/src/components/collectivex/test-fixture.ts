@@ -26,7 +26,7 @@ function fixtureId(
   return `cx${kind}-v1-${value.toString(16).padStart(64, '0')}`;
 }
 
-const qualificationIndices = [1, 2, 3] as const;
+const qualificationIndices = [1] as const;
 const allocations = qualificationIndices.map((value) => fixtureId('allocation', value));
 const decisionIds = {
   libraryCohort: fixtureId('cohort', 1),
@@ -49,11 +49,7 @@ function makeEligibility(): CollectiveXEligibility {
     complete: true,
     correct: true,
     measured_roundtrip_p99: true,
-    stable_p50: true,
-    stable_p99: true,
     stable_ordering: true,
-    p50_max_min_ratio: 1.05,
-    p99_max_min_ratio: 1.1,
     reasons: [],
   };
 }
@@ -245,7 +241,7 @@ function makeSeries(
       trials: 64,
       warmups: 32,
       samples_per_component: 512,
-      qualification_indices: [1, 2, 3],
+      qualification_indices: [...qualificationIndices],
       headline_component: 'roundtrip',
       headline_percentile: 'p99',
     },
@@ -263,14 +259,6 @@ function makeSeries(
             passed: true,
             profile_id: 'd-bf16.c-bf16',
           },
-        },
-        stability: {
-          complete: true,
-          qualification_indices: [...qualificationIndices],
-          p50_max_min_ratio: 1.05,
-          p99_max_min_ratio: 1.1,
-          stable_p50: true,
-          stable_p99: true,
         },
         trial_diagnostics: {
           flagged: false,
@@ -685,13 +673,13 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
     format: 'collectivex.public.v1',
     schema_version: 1,
     generated_at: '2026-07-04T01:00:00Z',
-    source_bundle_ids: ['a'.repeat(64), 'b'.repeat(64), 'c'.repeat(64)],
+    source_bundle_ids: ['a'.repeat(64)],
     promotion: {
       status: 'promoted',
       matrix_id: '5'.repeat(64),
       allocation_ids: [...allocations],
-      required_allocations: 3,
-      qualification_indices: [1, 2, 3],
+      required_allocations: 1,
+      qualification_indices: [...qualificationIndices],
       requested_cases: 8,
       terminal_cases: 8,
       measured_cases: 7,
@@ -894,14 +882,6 @@ export function makeCollectiveXDiagnosticDataset(): CollectiveXDataset {
   const evidenceId = series.points[0].evidence_ids[0];
   series.allocation_ids = [allocationId];
   series.points[0].evidence_ids = [evidenceId];
-  series.points[0].stability = {
-    complete: false,
-    qualification_indices: [1],
-    p50_max_min_ratio: null,
-    p99_max_min_ratio: null,
-    stable_p50: false,
-    stable_p99: false,
-  };
   series.measurement.qualification_indices = [1];
   series.eligibility = {
     decision_grade: false,
@@ -909,12 +889,8 @@ export function makeCollectiveXDiagnosticDataset(): CollectiveXDataset {
     complete: false,
     correct: true,
     measured_roundtrip_p99: true,
-    stable_p50: false,
-    stable_p99: false,
     stable_ordering: false,
-    p50_max_min_ratio: null,
-    p99_max_min_ratio: null,
-    reasons: ['awaiting-repeat-allocations'],
+    reasons: ['incomplete-repeat-coverage'],
   };
   const attempt = dataset.attempts.find(
     (item) => item.series_id === series.series_id && item.allocation_id === allocationId,

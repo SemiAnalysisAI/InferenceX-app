@@ -426,16 +426,6 @@ function validateDatasetReferences(dataset: CollectiveXDataset): void {
         throw new CollectiveXDataError(`point ${point.point_id} has inconsistent evidence links.`);
       }
       if (
-        !sameIds(
-          point.stability.qualification_indices.map(String),
-          pointAttempts.map((attempt) => String(attempt.qualification_index)),
-        )
-      ) {
-        throw new CollectiveXDataError(
-          `point ${point.point_id} has inconsistent qualification evidence.`,
-        );
-      }
-      if (
         point.correctness.precision.profile_id !== item.workload.precision_profile ||
         (point.correctness.semantic_pass && !point.correctness.precision.passed)
       ) {

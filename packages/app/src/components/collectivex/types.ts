@@ -172,42 +172,6 @@ const pointCorrectnessSchema = z.strictObject({
   }),
 });
 const qualificationIndex = z.union([z.literal(1), z.literal(2), z.literal(3)]);
-const pointStabilitySchema = z
-  .strictObject({
-    complete: z.boolean(),
-    qualification_indices: unique(qualificationIndex).min(1).max(3),
-    p50_max_min_ratio: z.number().finite().min(1).nullable(),
-    p99_max_min_ratio: z.number().finite().min(1).nullable(),
-    stable_p50: z.boolean(),
-    stable_p99: z.boolean(),
-  })
-  .superRefine((value, context) => {
-    if (
-      value.complete &&
-      (value.qualification_indices.join(',') !== '1,2,3' ||
-        value.p50_max_min_ratio === null ||
-        value.p99_max_min_ratio === null)
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['qualification_indices'],
-        message: 'complete point stability requires Q1-Q3 and repeat ratios',
-      });
-    }
-    if (
-      !value.complete &&
-      (value.p50_max_min_ratio !== null ||
-        value.p99_max_min_ratio !== null ||
-        value.stable_p50 ||
-        value.stable_p99)
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['complete'],
-        message: 'incomplete point stability cannot claim stable repeat ratios',
-      });
-    }
-  });
 const trialDiagnosticComponentSchema = z.strictObject({
   drift_flagged: z.boolean(),
   first_last_median_ratio: z.number().finite().min(1),
@@ -237,11 +201,7 @@ const eligibilitySchema = z
     complete: z.boolean(),
     correct: z.boolean(),
     measured_roundtrip_p99: z.boolean(),
-    stable_p50: z.boolean(),
-    stable_p99: z.boolean(),
     stable_ordering: z.boolean(),
-    p50_max_min_ratio: z.number().finite().min(1).nullable(),
-    p99_max_min_ratio: z.number().finite().min(1).nullable(),
     reasons: unique(reason.unwrap()),
   })
   .refine((value) => value.decision_grade === (value.reasons.length === 0), {
@@ -266,7 +226,6 @@ const pointSchema = z.strictObject({
   global_tokens: positiveInteger,
   anomalies: unique(reasonId).max(16),
   correctness: pointCorrectnessSchema,
-  stability: pointStabilitySchema,
   trial_diagnostics: trialDiagnosticsSchema,
   routing: routingEvidenceSchema,
   components: z.strictObject({
@@ -582,8 +541,8 @@ export const collectiveXDatasetSchema = z.strictObject({
     reason,
     matrix_id: hex64.nullable(),
     allocation_ids: unique(typedId('allocation')),
-    required_allocations: z.literal(3),
-    qualification_indices: unique(qualificationIndex).max(3),
+    required_allocations: z.literal(1),
+    qualification_indices: unique(z.literal(1)).max(1),
     requested_cases: nonnegativeInteger,
     terminal_cases: nonnegativeInteger,
     measured_cases: nonnegativeInteger,
@@ -610,7 +569,6 @@ export type CollectiveXCommunicationAxis = z.infer<typeof communicationAxisSchem
 export type CollectiveXPrecisionProfile = z.infer<typeof precisionProfileSchema>;
 export type CollectiveXPoint = z.infer<typeof pointSchema>;
 export type CollectiveXPointCorrectness = z.infer<typeof pointCorrectnessSchema>;
-export type CollectiveXPointStability = z.infer<typeof pointStabilitySchema>;
 export type CollectiveXSeries = z.infer<typeof seriesSchema>;
 export type CollectiveXCoverage = z.infer<typeof coverageSchema>;
 export type CollectiveXCoverageTopology = z.infer<typeof coverageTopologySchema>;

@@ -178,7 +178,6 @@ const STRINGS = {
     diagnosticWarning:
       'Diagnostic evidence is excluded from rankings, recommendations, and regression claims.',
     excluded: 'Excluded',
-    repeatSpread: 'Repeat spread',
     stableOrdering: 'stable ordering passed',
     unstableOrdering: 'stable ordering not passed',
     samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
@@ -328,7 +327,6 @@ const STRINGS = {
     resetFilter: '重置筛选',
     diagnosticWarning: '诊断证据不会用于排名、推荐或回归结论。',
     excluded: '排除原因',
-    repeatSpread: '重复运行波动',
     stableOrdering: '排名顺序稳定性已通过',
     unstableOrdering: '排名顺序稳定性未通过',
     samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
@@ -400,11 +398,6 @@ function formatDate(value: string, locale: 'en' | 'zh'): string {
     timeStyle: 'short',
     timeZone: 'UTC',
   }).format(new Date(value));
-}
-
-function repeatRatio(value: number | null, limit: number, locale: 'en' | 'zh'): string {
-  const suffix = locale === 'zh' ? ' 倍' : 'x';
-  return `${value?.toFixed(3) ?? 'n/a'}${suffix} ≤ ${limit.toFixed(2)}${suffix}`;
 }
 
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
@@ -1267,10 +1260,7 @@ export default function CollectiveXDisplay() {
                 {selectedDiagnosticCohort.eligibility.reasons
                   .map((reason) => collectiveXReasonLabel(reason, locale))
                   .join(', ')}
-                . {t.repeatSpread}: p50{' '}
-                {repeatRatio(selectedDiagnosticCohort.eligibility.p50_max_min_ratio, 1.1, locale)},
-                p99{' '}
-                {repeatRatio(selectedDiagnosticCohort.eligibility.p99_max_min_ratio, 1.25, locale)}.
+                .
               </p>
             )}
             {evidenceScope === 'controlled' && selectedControlledCohort && (
@@ -1278,11 +1268,6 @@ export default function CollectiveXDisplay() {
                 data-testid="collectivex-controlled-stability"
                 className="mt-2 text-xs text-muted-foreground"
               >
-                {t.repeatSpread}: p50{' '}
-                {repeatRatio(selectedControlledCohort.eligibility.p50_max_min_ratio, 1.1, locale)},
-                p99{' '}
-                {repeatRatio(selectedControlledCohort.eligibility.p99_max_min_ratio, 1.25, locale)}{' '}
-                ·{' '}
                 {selectedControlledCohort.eligibility.stable_ordering
                   ? t.stableOrdering
                   : t.unstableOrdering}
