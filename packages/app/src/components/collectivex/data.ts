@@ -16,6 +16,31 @@ import type {
 
 export type CollectiveXFabricScope = 'all' | CollectiveXTopologyScope;
 
+export type CollectiveXEvidenceScope = 'controlled' | 'diagnostic';
+
+// Choose the landing scope for a freshly loaded dataset. Controlled (decision-grade
+// only) is the rigorous default, but on a partial-coverage publication — e.g. a
+// single-run v1 where the strict within-run trial gate leaves whole SKUs
+// diagnostic-tier — the controlled view would hide every series for those SKUs. When
+// any SKU with measured data at the landing phase has no decision-grade series there,
+// fall back to the full-evidence (diagnostic) scope so no working SKU is hidden by
+// default. When decision-grade coverage is complete, Controlled stays the default.
+export function collectiveXInitialScope(
+  series: CollectiveXSeries[],
+  phase: CollectiveXPhase,
+): CollectiveXEvidenceScope {
+  const atPhase = series.filter((item) => item.phase === phase);
+  if (atPhase.length === 0) return 'controlled';
+  const decisionGradeSkus = new Set(
+    atPhase.filter((item) => item.status === 'decision-grade').map((item) => item.system.sku),
+  );
+  const measuredSkus = new Set(atPhase.map((item) => item.system.sku));
+  for (const sku of measuredSkus) {
+    if (!decisionGradeSkus.has(sku)) return 'diagnostic';
+  }
+  return 'controlled';
+}
+
 export interface CollectiveXSeriesSelection {
   mode: CollectiveXMode;
   epSize: number;

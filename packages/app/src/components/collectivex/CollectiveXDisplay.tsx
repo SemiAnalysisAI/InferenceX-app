@@ -1,7 +1,7 @@
 'use client';
 
 import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -35,6 +35,7 @@ import {
 import {
   cohortMatchesSelection,
   collectiveXColorKey,
+  collectiveXInitialScope,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   comparisonDifferences,
@@ -184,7 +185,7 @@ const STRINGS = {
     highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
     diagnosticWarning:
-      'Diagnostic evidence is excluded from rankings, recommendations, and regression claims.',
+      'Showing all measured series. Only decision-grade series inform rankings, recommendations, and regression claims — switch to Controlled to see that subset.',
     excluded: 'Excluded',
     stableOrdering: 'stable ordering passed',
     unstableOrdering: 'stable ordering not passed',
@@ -466,6 +467,12 @@ export default function CollectiveXDisplay() {
   const activeQuery = selectedDigest === null ? channelQuery : runQuery;
   const { data, error, isLoading, isFetching } = activeQuery;
   const [tab, setTab] = useState<CollectiveXTab>('results');
+  // Landing scope is chosen per dataset by `collectiveXInitialScope` (see the effect
+  // below): Controlled (decision-grade only) when that set already covers every SKU
+  // measured at the landing phase, otherwise the full-evidence (diagnostic) scope so
+  // partial-coverage publications — e.g. a single-run v1 where the strict trial gate
+  // leaves whole SKUs diagnostic-tier — still show every working SKU by default. A
+  // user toggle persists until the underlying dataset changes.
   const [evidenceScope, setEvidenceScope] = useState<EvidenceScope>('controlled');
   const [mode, setMode] = useState<CollectiveXMode>('normal');
   const [epSize, setEpSize] = useState(8);
@@ -586,6 +593,22 @@ export default function CollectiveXDisplay() {
       setEpSize(availableEpSizes[0]);
     }
   }, [availableEpSizes, availableModes, epSize, mode]);
+  // Pick the landing scope once per loaded dataset, keyed by content digest so a
+  // version/run switch re-evaluates while an in-session user toggle is preserved.
+  // 'decode' is the initial phase; the discriminator hides no working SKU behind the
+  // controlled gate on partial-coverage publications (see collectiveXInitialScope).
+  const initialScope = useMemo(
+    () => collectiveXInitialScope(dataset?.series ?? [], 'decode'),
+    [dataset?.series],
+  );
+  const scopeInitDigestRef = useRef<string | null>(null);
+  useEffect(() => {
+    const digest = data?.digest ?? null;
+    if (digest !== null && scopeInitDigestRef.current !== digest) {
+      scopeInitDigestRef.current = digest;
+      setEvidenceScope(initialScope);
+    }
+  }, [data?.digest, initialScope]);
   const seriesSelection = useMemo(
     () => ({ mode, epSize, phase, fabricScope }),
     [epSize, fabricScope, mode, phase],
@@ -683,13 +706,12 @@ export default function CollectiveXDisplay() {
     };
   }, []);
 
-  const diagnosticSeries = useMemo(() => {
-    if (!dataset) return [];
-    const diagnosticMembers = new Set(allDiagnosticCohorts.flatMap((cohort) => cohort.series_ids));
-    return dataset.series.filter(
-      (item) => item.status === 'diagnostic' || diagnosticMembers.has(item.series_id),
-    );
-  }, [allDiagnosticCohorts, dataset]);
+  // The diagnostic scope is the full-evidence view: every measured series across all
+  // SKUs — both decision-grade and diagnostic-tier — badged by status. This keeps the
+  // best (decision-grade) series visible alongside the rest instead of hiding them,
+  // and drives the SKU/backend/routing dropdowns off the complete dataset. Controlled
+  // scope narrows to the decision-grade cohorts (rankings, recommendations).
+  const diagnosticSeries = useMemo(() => dataset?.series ?? [], [dataset?.series]);
   const filteredDiagnosticSeries = useMemo(
     () => diagnosticSeries.filter((item) => seriesMatchesSelection(item, seriesSelection)),
     [diagnosticSeries, seriesSelection],

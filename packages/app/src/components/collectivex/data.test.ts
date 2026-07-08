@@ -8,6 +8,7 @@ import {
   cohortMatchesSelection,
   compareCollectiveXDecisionMetrics,
   collectiveXColorKey,
+  collectiveXInitialScope,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   comparisonDifferences,
@@ -64,6 +65,23 @@ describe('CollectiveX EP projections', () => {
     expect(
       [...new Set(catalog.cases.map(({ precision_profile }) => precision_profile))].toSorted(),
     ).toEqual(Object.keys(catalog.precision_profiles).toSorted());
+  });
+
+  it('lands on controlled only when decision-grade covers every measured SKU at the phase', () => {
+    const dataset = makeCollectiveXDataset();
+    // Every fixture series is decision-grade, so the decision-grade set covers both
+    // measured SKUs (H100, B200) at decode: controlled is safe.
+    expect(collectiveXInitialScope(dataset.series, 'decode')).toBe('controlled');
+
+    // Drop B200 out of the decision-grade set: it still has decode data, so the
+    // controlled view would hide it — fall back to the full-evidence scope.
+    const partial = dataset.series.map((series) =>
+      series.system.sku === 'b200' ? { ...series, status: 'diagnostic' as const } : series,
+    );
+    expect(collectiveXInitialScope(partial, 'decode')).toBe('diagnostic');
+
+    // No series at the phase: nothing to hide, keep the rigorous default.
+    expect(collectiveXInitialScope(dataset.series, 'prefill')).toBe('controlled');
   });
 
   it('orders decision metrics by phase, token count, measure, and percentile', () => {

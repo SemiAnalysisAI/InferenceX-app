@@ -577,19 +577,61 @@ describe('CollectiveX native publication', () => {
   });
 
   it('requires an explicit switch to render diagnostics', () => {
+    // The fixture's decision-grade set covers every measured SKU, so the landing
+    // scope stays Controlled and reaching the full-evidence view needs an explicit
+    // switch to Diagnostics.
     installPublication(makeCollectiveXDatasetWithDiagnosticCohort());
     cy.reload();
     cy.wait('@collectivexChannel-dev-latest');
+    cy.get('[data-testid="collectivex-scope-toggle"]')
+      .contains('button', 'Controlled')
+      .should('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="collectivex-diagnostic-warning"]').should('not.exist');
     cy.get('[data-testid="collectivex-scope-toggle"]').contains('button', 'Diagnostics').click();
 
     cy.get('[data-testid="collectivex-diagnostic-warning"]')
       .should('be.visible')
-      .and('contain.text', 'excluded from rankings');
+      .and('contain.text', 'inform rankings');
+    // The full-evidence scope shows every measured series, not just the diagnostic
+    // cohort members, so the decision-grade series stay visible alongside the rest.
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', 'H100 EP8 · deepep')
       .and('contain.text', 'H100 EP8 · mori');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 2);
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 7);
     cy.get('[data-testid="collectivex-sku-select"]').should('exist');
+  });
+
+  it('lands on full-evidence when a measured SKU has no decision-grade coverage', () => {
+    // Flip the B200 series to diagnostic so B200 has data at decode but no
+    // decision-grade series there. The controlled view would hide B200 entirely, so
+    // the page must land on the full-evidence (diagnostic) scope without a switch and
+    // render both the H100 (decision-grade) and B200 (diagnostic) series.
+    const partial = makeCollectiveXDataset();
+    partial.series
+      .filter((item) => item.system.sku === 'b200')
+      .forEach((item) => {
+        item.status = 'diagnostic';
+        item.eligibility = {
+          ...item.eligibility,
+          decision_grade: false,
+          reasons: ['unresolved-trial-diagnostic'],
+        };
+      });
+    installPublication(partial);
+    cy.reload();
+    cy.wait('@collectivexChannel-dev-latest');
+
+    cy.get('[data-testid="collectivex-scope-toggle"]')
+      .contains('button', 'Diagnostics')
+      .should('have.attr', 'aria-selected', 'true');
+    cy.get('[data-testid="collectivex-diagnostic-warning"]').should('be.visible');
+    cy.get('[data-testid="collectivex-main-chart"]')
+      .should('contain.text', 'H100 EP8 · deepep')
+      .and('contain.text', 'B200 EP8');
+    cy.get('[data-testid="collectivex-sku-select"]').should('exist');
+    cy.get('[data-testid="collectivex-scope-toggle"]')
+      .contains('button', 'Controlled')
+      .should('have.attr', 'aria-selected', 'false');
   });
 
   it('shows why a controlled cohort was excluded', () => {
