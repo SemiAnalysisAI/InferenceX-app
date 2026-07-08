@@ -34,6 +34,7 @@ import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/seg
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { metricLabel, metricTitle } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -100,6 +101,9 @@ const STRINGS = {
     performanceOverTimeDesc:
       'Double-click points on the scatter chart to track configurations over time.',
     viewMode: 'View mode',
+    vsTtft: (word: string) => `vs. ${word} Time To First Token`,
+    vsE2eLatency: (pctl?: string) =>
+      pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
   },
   zh: {
     inferencePerformance: '推理性能',
@@ -115,16 +119,38 @@ const STRINGS = {
     performanceOverTime: '性能趋势',
     performanceOverTimeDesc: '双击散点图上的数据点以追踪配置随时间的变化。',
     viewMode: '视图模式',
+    vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
+    vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
 } as const;
 
-const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string }[] = [
-  { value: 'interactivity', label: 'Interactivity' },
-  { value: 'e2e', label: 'E2E Latency' },
-  { value: 'ttft', label: 'TTFT' },
-  { value: 'normalized-e2e', label: 'Normalized E2E' },
-  { value: 'session-time', label: 'Session Time' },
-  { value: 'prefill-tps', label: 'Prefill TPS / user' },
+// Translate the "vs. …" chart-heading suffix from inference-chart-config.json
+// into Chinese. useChartData rewrites the heading with the selected percentile
+// for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
+// pattern instead of a fixed string; unknown headings pass through unchanged.
+const HEADING_SUBJECT_ZH: Record<string, string> = {
+  Interactivity: '交互性',
+  'End-to-end Latency': '端到端延迟',
+  'Time To First Token': '首 token 延迟（TTFT）',
+};
+
+function zhHeading(configured: string): string {
+  const match = /^vs\.\s+(?:(?<pctl>Median|Mean|P\d+(?:\.\d+)?)\s+)?(?<subject>.+)$/iu.exec(
+    configured,
+  );
+  const subjectZh = match?.groups && HEADING_SUBJECT_ZH[match.groups.subject];
+  if (!subjectZh) return configured;
+  const pctl = match.groups?.pctl;
+  return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
+}
+
+const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string; labelZh: string }[] = [
+  { value: 'interactivity', label: 'Interactivity', labelZh: '交互性' },
+  { value: 'e2e', label: 'E2E Latency', labelZh: '端到端延迟' },
+  { value: 'ttft', label: 'TTFT', labelZh: 'TTFT' },
+  { value: 'normalized-e2e', label: 'Normalized E2E', labelZh: 'Normalized E2E' },
+  { value: 'session-time', label: 'Session Time', labelZh: '会话时长' },
+  { value: 'prefill-tps', label: 'Prefill TPS / user', labelZh: 'Prefill TPS / user' },
 ];
 
 /**
@@ -135,8 +161,12 @@ const X_AXIS_MODE_BUTTONS: { value: XAxisMode; label: string }[] = [
  */
 interface DerivedXModeSpec {
   xLabel: (percentileLabel: string) => string;
+  /** Chinese x-label; omit to reuse the English one (technical terms). */
+  xLabelZh?: (percentileLabel: string) => string;
   /** Chart heading suffix ("vs. …") shown above the plot. */
   heading: (percentileLabel: string) => string;
+  /** Chinese heading suffix; omit to reuse the English one. */
+  headingZh?: (percentileLabel: string) => string;
   rooflineCorner: 'upper_right' | 'upper_left';
   /** Pull the raw metric for this mode off the derived-metrics payload. */
   value: (m: DerivedAgenticMetric | undefined, percentile: string) => number | null | undefined;
@@ -147,14 +177,18 @@ interface DerivedXModeSpec {
 const DERIVED_X_MODE_SPECS: Partial<Record<XAxisMode, DerivedXModeSpec>> = {
   'session-time': {
     xLabel: () => 'Mean Normalized Session Time (min)',
+    xLabelZh: () => '平均归一化会话时长（min）',
     heading: () => 'vs. Mean Normalized Session Time',
+    headingZh: () => 'vs. 平均归一化会话时长',
     rooflineCorner: 'upper_right',
     value: (m) => m?.normalized_session_time_s,
     toX: (raw) => raw / 60,
   },
   'normalized-e2e': {
     xLabel: (pctl) => `${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} output tokens (s)`,
+    xLabelZh: (pctl) => `${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} 输出 token（s）`,
     heading: (pctl) => `vs. ${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} output tokens`,
+    headingZh: (pctl) => `vs. ${pctl} Normalized E2E @ ${NORMALIZED_E2E_OUTPUT_TOKENS} 输出 token`,
     rooflineCorner: 'upper_right',
     value: (m, percentile) =>
       percentile === 'p75' ? m?.p75_normalized_e2e_400_s : m?.p90_normalized_e2e_400_s,
@@ -414,9 +448,8 @@ export default function ChartDisplay() {
   // Get the current Y-axis label from the first graph's chart definition
   const currentYLabel = useMemo(() => {
     if (graphs.length === 0) return '';
-    const yLabelKey = `${selectedYAxisMetric}_label` as keyof (typeof graphs)[0]['chartDefinition'];
-    return (graphs[0].chartDefinition[yLabelKey] as string) || '';
-  }, [graphs, selectedYAxisMetric]);
+    return metricLabel(graphs[0].chartDefinition, selectedYAxisMetric, locale);
+  }, [graphs, selectedYAxisMetric, locale]);
 
   // Derive x-axis trend lines by swapping each point's x → value
   const xTrendLines = useMemo(() => {
@@ -501,7 +534,9 @@ export default function ChartDisplay() {
   const renderableGraphs = useMemo(() => {
     if (!derivedSpec) return visibleGraphs;
     if (!derivedMetrics) return visibleGraphs.map((graph) => ({ ...graph, data: [] }));
-    const xLabel = derivedSpec.xLabel(selectedPercentile.toUpperCase());
+    const xLabelFn =
+      locale === 'zh' && derivedSpec.xLabelZh ? derivedSpec.xLabelZh : derivedSpec.xLabel;
+    const xLabel = xLabelFn(selectedPercentile.toUpperCase());
     return visibleGraphs.map((graph) => {
       const chartDefinition = {
         ...graph.chartDefinition,
@@ -520,7 +555,7 @@ export default function ChartDisplay() {
         .filter((point): point is NonNullable<typeof point> => point !== null);
       return { ...graph, chartDefinition, data };
     });
-  }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile]);
+  }, [derivedSpec, visibleGraphs, derivedMetrics, selectedYAxisMetric, selectedPercentile, locale]);
 
   const displayGraphs =
     isFirstLoad || isDerivedLoading
@@ -612,27 +647,27 @@ export default function ChartDisplay() {
                       const chartCaption = (
                         <>
                           <h2 className="text-lg font-semibold">
-                            {
-                              graph.chartDefinition[
-                                `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                              ]
-                            }{' '}
+                            {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                             {(() => {
-                              // For Input metrics with dynamic x-axis, use dynamic heading
-                              const metricTitle =
-                                (graph.chartDefinition[
-                                  `${selectedYAxisMetric}_title` as keyof typeof graph.chartDefinition
-                                ] as string) || '';
-                              const isInputMetric = metricTitle.toLowerCase().includes('input');
+                              // For Input metrics with dynamic x-axis, use dynamic heading.
+                              // Classify off the ENGLISH title — the localized one has no
+                              // 'input' substring to match on zh pages.
+                              const isInputMetric = metricTitle(
+                                graph.chartDefinition,
+                                selectedYAxisMetric,
+                                'en',
+                              )
+                                .toLowerCase()
+                                .includes('input');
                               if (
                                 graph.chartDefinition.chartType === 'interactivity' &&
                                 isInputMetric &&
                                 selectedXAxisMetric
                               ) {
                                 if (selectedXAxisMetric === 'p99_ttft') {
-                                  return 'vs. P99 Time To First Token';
+                                  return t.vsTtft('P99');
                                 } else if (selectedXAxisMetric === 'median_ttft') {
-                                  return 'vs. Median Time To First Token';
+                                  return t.vsTtft('Median');
                                 }
                               }
 
@@ -641,25 +676,29 @@ export default function ChartDisplay() {
                               if (graph.chartDefinition.chartType === 'e2e') {
                                 const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
                                 if (modeSpec) {
-                                  return modeSpec.heading(selectedPercentile.toUpperCase());
+                                  const heading =
+                                    locale === 'zh' && modeSpec.headingZh
+                                      ? modeSpec.headingZh
+                                      : modeSpec.heading;
+                                  return heading(selectedPercentile.toUpperCase());
                                 }
                                 if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
                                   const percentile = selectedE2eXAxisMetric.replace(/_ttft$/u, '');
                                   const word =
                                     percentile === 'median' ? 'Median' : percentile.toUpperCase();
-                                  return `vs. ${word} Time To First Token`;
+                                  return t.vsTtft(word);
                                 }
                                 return isAgenticSequence
-                                  ? `vs. ${selectedPercentile.toUpperCase()} End-to-end Latency`
-                                  : 'vs. End-to-end Latency';
+                                  ? t.vsE2eLatency(selectedPercentile.toUpperCase())
+                                  : t.vsE2eLatency();
                               }
 
                               // Fall back to configured heading
-                              return (
+                              const configured =
                                 graph.chartDefinition[
                                   `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                                ] || graph.chartDefinition.heading
-                              );
+                                ] || graph.chartDefinition.heading;
+                              return locale === 'zh' ? zhHeading(String(configured)) : configured;
                             })()}
                           </h2>
                           <p className="text-sm text-muted-foreground mb-2">
@@ -728,11 +767,7 @@ export default function ChartDisplay() {
                           modelLabel={graph.model}
                           data={graph.data}
                           xLabel={graph.chartDefinition.x_label}
-                          yLabel={`${
-                            graph.chartDefinition[
-                              `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                            ]
-                          }`}
+                          yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
                           runNumbering={runNumbering}
@@ -744,11 +779,7 @@ export default function ChartDisplay() {
                             modelLabel={graph.model}
                             data={graph.data}
                             xLabel={graph.chartDefinition.x_label}
-                            yLabel={`${
-                              graph.chartDefinition[
-                                `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                              ]
-                            }`}
+                            yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
                             overlayData={
@@ -778,11 +809,7 @@ export default function ChartDisplay() {
                         }}
                         parentChartId={`chart-${graphIndex}`}
                         chartDefinition={graph.chartDefinition}
-                        yLabel={`${
-                          graph.chartDefinition[
-                            `${selectedYAxisMetric}_label` as keyof typeof graph.chartDefinition
-                          ]
-                        }`}
+                        yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                         xLabel={graph.chartDefinition.x_label}
                       />
                     )}
@@ -862,14 +889,14 @@ export default function ChartDisplay() {
             // Before mount, render all buttons so SSR and first client render match.
             if (!mounted) return true;
             return isAgenticSequence;
-          }).map(({ value, label }) => (
+          }).map(({ value, label, labelZh }) => (
             <TabsTrigger
               key={value}
               value={value}
               data-testid={`x-axis-mode-${value}`}
               className="min-w-[130px] sm:min-w-[140px] flex-1 sm:flex-initial justify-center"
             >
-              {label}
+              {locale === 'zh' ? labelZh : label}
             </TabsTrigger>
           ))}
         </TabsList>

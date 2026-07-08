@@ -105,13 +105,33 @@ export default async function CompareIndexPage() {
             {formatModelList(modelsWithPairs)}. Each page includes interactive charts for latency,
             throughput, and cost metrics, plus an interpolated comparison table.
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap gap-3">
             <Link
               data-testid="compare-index-per-dollar-link"
               href="/compare-per-dollar"
               className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
             >
               Compare GPU performance per dollar
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-precision-link"
+              href="/compare-precision"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              Compare precisions (FP8 vs BF16 ...)
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-spec-decode-link"
+              href="/compare-spec-decode"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              Compare speculative decoding (MTP vs off)
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>

@@ -5,6 +5,7 @@ import { AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
 import { PROVIDER_OPTIONS, getProviderLabel } from '@/lib/ai-providers';
+import { useLocale } from '@/lib/use-locale';
 import { useAiChart } from '@/hooks/api/use-ai-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +25,37 @@ import type { AiProvider } from './types';
 import { EXAMPLE_PROMPTS } from './example-prompts';
 import AiChartResult from './AiChartResult';
 
+const STRINGS = {
+  en: {
+    title: 'AI Chart Generation',
+    description:
+      'Describe the chart you want in natural language. Your API key is stored in your browser and only used by your selected provider. We never see it.',
+    placeholder: 'Describe the chart you want to see...',
+    enterToGenerate: '+Enter to generate',
+    generating: 'Generating...',
+    generateChart: 'Generate Chart',
+    error: 'Error',
+    tryAgain: 'Try Again',
+    examplePrompts: 'Example prompts',
+    hideKey: 'Hide API key',
+    showKey: 'Show API key',
+  },
+  zh: {
+    title: 'AI 图表生成',
+    description:
+      '用自然语言描述您想要的图表。您的 API 密钥仅存储在浏览器中，只发送给您选择的服务商，我们绝不会读取。',
+    placeholder: '描述您想查看的图表……',
+    enterToGenerate: '+Enter 生成',
+    generating: '生成中……',
+    generateChart: '生成图表',
+    error: '错误',
+    tryAgain: '重试',
+    examplePrompts: '示例提示',
+    hideKey: '隐藏 API 密钥',
+    showKey: '显示 API 密钥',
+  },
+} as const;
+
 export default function AiChartDisplay() {
   const [provider, setProvider] = useState<AiProvider>('openai');
   const [apiKeys, setApiKeys] = useState<Record<AiProvider, string>>({
@@ -35,6 +67,8 @@ export default function AiChartDisplay() {
   const [prompt, setPrompt] = useState('');
   const [showKey, setShowKey] = useState(false);
   const { result, isLoading, error, generate, reset } = useAiChart();
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   const apiKey = apiKeys[provider];
 
@@ -72,12 +106,9 @@ export default function AiChartDisplay() {
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="size-5" />
-            AI Chart Generation
+            {t.title}
           </CardTitle>
-          <CardDescription>
-            Describe the chart you want in natural language. Your API key is stored in your browser
-            and only used by your selected provider. We never see it.
-          </CardDescription>
+          <CardDescription>{t.description}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 sm:flex-row">
@@ -109,7 +140,7 @@ export default function AiChartDisplay() {
                 type="button"
                 className="text-muted-foreground hover:text-foreground absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
                 onClick={() => setShowKey((s) => !s)}
-                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+                aria-label={showKey ? t.hideKey : t.showKey}
               >
                 {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -117,7 +148,7 @@ export default function AiChartDisplay() {
           </div>
           <div className="mt-4 space-y-2">
             <Textarea
-              placeholder="Describe the chart you want to see..."
+              placeholder={t.placeholder}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -126,13 +157,14 @@ export default function AiChartDisplay() {
             />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground text-xs">
-                {navigator.userAgent.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to generate
+                {navigator.userAgent.includes('Mac') ? '⌘' : 'Ctrl'}
+                {t.enterToGenerate}
               </span>
               <Button
                 onClick={handleSubmit}
                 disabled={isLoading || !apiKey.trim() || !prompt.trim()}
               >
-                {isLoading ? 'Generating...' : 'Generate Chart'}
+                {isLoading ? t.generating : t.generateChart}
               </Button>
             </div>
           </div>
@@ -156,10 +188,10 @@ export default function AiChartDisplay() {
           <CardContent className="flex items-start gap-3 pt-6">
             <AlertCircle className="text-destructive mt-0.5 size-5 shrink-0" />
             <div>
-              <p className="text-destructive text-sm font-medium">Error</p>
+              <p className="text-destructive text-sm font-medium">{t.error}</p>
               <p className="text-muted-foreground text-sm">{error}</p>
               <Button variant="outline" size="sm" className="mt-2" onClick={reset}>
-                Try Again
+                {t.tryAgain}
               </Button>
             </div>
           </CardContent>
@@ -177,7 +209,7 @@ export default function AiChartDisplay() {
       {/* Example prompts (shown when no result) */}
       {!result && !isLoading && !error && (
         <div className="space-y-3">
-          <h3 className="text-muted-foreground text-sm font-medium">Example prompts</h3>
+          <h3 className="text-muted-foreground text-sm font-medium">{t.examplePrompts}</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             {EXAMPLE_PROMPTS.map((example, i) => (
               <button

@@ -18,6 +18,7 @@ import React, { useCallback, useId, useLayoutEffect, useMemo, useRef, useState }
 import { SHAPE_ORDER, type ShapeKey, getShapeKeyForPrecision } from '@/lib/chart-rendering';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { filterAndSortLegendItems } from '@/lib/legend-utils';
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
 const SHAPE_ICON: Record<ShapeKey, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -33,6 +34,30 @@ import { Switch } from './switch';
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from './tooltip';
 
 export type { CommonLegendItemProps } from './chart-legend-item';
+
+const STRINGS = {
+  en: {
+    advanced: 'Advanced',
+    collapse: 'Collapse',
+    expand: 'Expand',
+    searchPlaceholder: 'Search...',
+    clearSearch: 'Clear search',
+    collapseLegend: 'Collapse legend',
+    expandLegend: 'Expand legend',
+    atomFootnote:
+      'The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.',
+  },
+  zh: {
+    advanced: '高级',
+    collapse: '收起',
+    expand: '展开',
+    searchPlaceholder: '搜索…',
+    clearSearch: '清除搜索',
+    collapseLegend: '收起图例',
+    expandLegend: '展开图例',
+    atomFootnote: 'ATOM 引擎前景可期，但尚未用于生产环境 token 服务，仍处于早期阶段。',
+  },
+} as const;
 
 export interface LegendSwitchConfig {
   id: string;
@@ -97,6 +122,8 @@ export default function ChartLegend({
   onItemRemove,
   onAdvancedExpandedChange,
 }: ChartLegendProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const isSidebar = variant === 'sidebar';
   const [hasLongText, setHasLongText] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -242,7 +269,7 @@ export default function ChartLegend({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onBlur={trackSearchOnBlur}
-            placeholder="Search..."
+            placeholder={t.searchPlaceholder}
             className="w-full px-2 py-1 pr-6 rounded-md border border-border bg-background text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sky-500/50 focus:border-sky-500/50"
           />
           {searchQuery && (
@@ -253,7 +280,7 @@ export default function ChartLegend({
                 setSearchQuery('');
               }}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Clear search"
+              aria-label={t.clearSearch}
             >
               <X size={12} />
             </button>
@@ -329,7 +356,7 @@ export default function ChartLegend({
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {isAdvancedExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              Advanced
+              {t.advanced}
             </button>
             {isAdvancedExpanded && (
               <div
@@ -389,10 +416,10 @@ export default function ChartLegend({
         type="button"
         onClick={handleLegendExpand}
         className="text-xs text-accent-foreground hover:text-foreground flex items-center gap-1"
-        aria-label={isLegendExpanded ? 'Collapse legend' : 'Expand legend'}
+        aria-label={isLegendExpanded ? t.collapseLegend : t.expandLegend}
       >
         {isLegendExpanded ? <ArrowRightToLine size={16} /> : <ArrowLeftToLine size={16} />}
-        {isLegendExpanded ? 'Collapse' : 'Expand'}
+        {isLegendExpanded ? t.collapse : t.expand}
       </button>
     </div>
   ) : null;
@@ -473,8 +500,7 @@ export default function ChartLegend({
       {expandButton}
       {hasAtomFootnote && (
         <p className="mt-2 text-[10px] text-muted-foreground/70 leading-tight no-export">
-          <sup>1</sup> The ATOM engine is promising, however it has yet to serve production tokens.
-          It is still in its infant stage.
+          <sup>1</sup> {t.atomFootnote}
         </p>
       )}
     </div>

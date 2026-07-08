@@ -28,6 +28,9 @@ interface SearchableSelectProps {
   searchable?: boolean;
   /** Analytics event prefix, e.g. "yaxis_metric" → "yaxis_metric_searched" */
   trackPrefix?: string;
+  searchPlaceholder?: string;
+  noResultsLabel?: string;
+  clearSearchLabel?: string;
 }
 
 export function SearchableSelect({
@@ -41,6 +44,9 @@ export function SearchableSelect({
   disabled = false,
   searchable = true,
   trackPrefix,
+  searchPlaceholder = 'Search...',
+  noResultsLabel = 'No results',
+  clearSearchLabel = 'Clear search',
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -172,7 +178,7 @@ export function SearchableSelect({
                   setSearch(e.target.value);
                   if (e.target.value) searchUsedRef.current = true;
                 }}
-                placeholder="Search..."
+                placeholder={searchPlaceholder}
                 className="w-full bg-transparent py-1.5 text-sm outline-none placeholder:text-muted-foreground"
               />
               {search && (
@@ -183,7 +189,7 @@ export function SearchableSelect({
                     searchRef.current?.focus();
                   }}
                   className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Clear search"
+                  aria-label={clearSearchLabel}
                 >
                   <XIcon className="size-3.5" />
                 </button>
@@ -197,7 +203,7 @@ export function SearchableSelect({
           >
             {filteredGroups.length === 0 && (
               <div className="text-muted-foreground px-2 py-1.5 text-sm text-center">
-                No results
+                {noResultsLabel}
               </div>
             )}
             {filteredGroups.map((group) => (

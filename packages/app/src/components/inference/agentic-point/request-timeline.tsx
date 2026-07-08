@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-request-timeline';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 
 import { sliceTimelineByPhase } from './phase-slice';
 import { TimelineBars } from './timeline-bars';
@@ -67,15 +68,27 @@ export type { TimelineViewSnapshot } from './timeline-view-snapshot';
  * The reference for this layout is the agent-timeline in semianalysis-claude-code-proxy.
  */
 
-const ROW_MODE_OPTIONS: SegmentedToggleOption<RowMode>[] = [
-  { value: 'conversation', label: 'By conversation', testId: 'timeline-mode-conversation' },
-  { value: 'worker', label: 'By worker', testId: 'timeline-mode-worker' },
-];
+const ROW_MODE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<RowMode>[]> = {
+  en: [
+    { value: 'conversation', label: 'By conversation', testId: 'timeline-mode-conversation' },
+    { value: 'worker', label: 'By worker', testId: 'timeline-mode-worker' },
+  ],
+  zh: [
+    { value: 'conversation', label: '按对话', testId: 'timeline-mode-conversation' },
+    { value: 'worker', label: '按 worker', testId: 'timeline-mode-worker' },
+  ],
+};
 
-const PHASE_OPTIONS: SegmentedToggleOption<PhaseFilter>[] = [
-  { value: 'profiling', label: 'Profiling', testId: 'timeline-phase-profiling' },
-  { value: 'warmup', label: 'Warmup', testId: 'timeline-phase-warmup' },
-];
+const PHASE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<PhaseFilter>[]> = {
+  en: [
+    { value: 'profiling', label: 'Profiling', testId: 'timeline-phase-profiling' },
+    { value: 'warmup', label: 'Warmup', testId: 'timeline-phase-warmup' },
+  ],
+  zh: [
+    { value: 'profiling', label: '性能剖析', testId: 'timeline-phase-profiling' },
+    { value: 'warmup', label: '预热', testId: 'timeline-phase-warmup' },
+  ],
+};
 
 const PLOT_WIDTH = CHART_WIDTH - PADDING_RIGHT;
 
@@ -91,6 +104,7 @@ export function RequestTimelineView({
   pointId: number;
 }) {
   const router = useRouter();
+  const locale = useLocale();
   const [rowMode, setRowMode] = useState<RowMode>('conversation');
   const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('profiling');
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -131,9 +145,11 @@ export function RequestTimelineView({
         });
       }
       track('agentic_timeline_to_dataset', { slug: datasetSlug });
-      router.push(conversationHref(datasetSlug, req));
+      // Stay within the Chinese tree when this timeline renders under /zh.
+      const href = conversationHref(datasetSlug, req);
+      router.push(locale === 'zh' ? `/zh${href}` : href);
     },
-    [datasetSlug, router, pointId],
+    [datasetSlug, router, pointId, locale],
   );
   // Which multi-stream subagents currently have their per-stream rows
   // expanded. Key is the subagent row's `key` (parent_cid::sa:agent_id).
@@ -392,7 +408,7 @@ export function RequestTimelineView({
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedToggle
           value={rowMode}
-          options={ROW_MODE_OPTIONS}
+          options={ROW_MODE_OPTIONS[locale]}
           onValueChange={setRowMode}
           ariaLabel="Row mode"
           testId="timeline-row-mode"
@@ -401,7 +417,7 @@ export function RequestTimelineView({
         {hasWarmup && (
           <SegmentedToggle
             value={phaseFilter}
-            options={PHASE_OPTIONS}
+            options={PHASE_OPTIONS[locale]}
             onValueChange={setPhaseFilter}
             ariaLabel="Phase filter"
             testId="timeline-phase-filter"

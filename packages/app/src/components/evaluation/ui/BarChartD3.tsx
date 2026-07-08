@@ -20,6 +20,7 @@ import {
   getChartWatermark,
   getPrecisionLabel,
 } from '@/lib/data-mappings';
+import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
@@ -132,6 +133,19 @@ function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, u
   });
 }
 
+const EVAL_STRINGS = {
+  en: {
+    showLabels: 'Show Labels',
+    highContrast: 'High Contrast',
+    resetFilter: 'Reset filter',
+  },
+  zh: {
+    showLabels: '显示标签',
+    highContrast: '高对比度',
+    resetFilter: '重置筛选',
+  },
+} as const;
+
 export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   const {
     loading,
@@ -157,6 +171,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     setIsLegendExpanded,
     modelHasEvalData,
   } = useEvaluation();
+  const locale = useLocale();
+  const legendT = EVAL_STRINGS[locale];
   const {
     isUnofficialRun,
     unofficialRunInfo,
@@ -916,7 +932,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           switches={[
             {
               id: 'eval-show-labels',
-              label: 'Show Labels',
+              label: legendT.showLabels,
               checked: showLabels,
               onCheckedChange: (checked) => {
                 setShowLabels(checked);
@@ -925,7 +941,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             },
             {
               id: 'eval-high-contrast',
-              label: 'High Contrast',
+              label: legendT.highContrast,
               checked: highContrast,
               onCheckedChange: (checked) => {
                 setHighContrast(checked);
@@ -939,7 +955,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
               ? [
                   {
                     id: 'eval-reset-filter',
-                    label: 'Reset filter',
+                    label: legendT.resetFilter,
                     onClick: () => {
                       selectAllHwTypes();
                       setLocalOfficialOverride(null);

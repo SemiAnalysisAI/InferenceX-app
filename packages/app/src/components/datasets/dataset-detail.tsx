@@ -18,23 +18,114 @@ import {
   type ConversationSort,
 } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { compact, formatPct, formatShare, perConversation } from './format';
 import { Stat } from './stat';
 
 const PAGE = 50;
 
-const SORTS: { value: ConversationSort; label: string }[] = [
-  { value: 'tokens', label: 'Total input ↓' },
-  { value: 'turns', label: 'Turns ↓' },
-  { value: 'subagents', label: 'Subagent groups ↓' },
-  { value: 'id', label: 'Conversation ID' },
-];
+const STRINGS = {
+  en: {
+    loading: 'Loading dataset…',
+    notFound: 'Dataset not found.',
+    backToDatasets: 'Back to datasets',
+    breadcrumbDatasets: '← Datasets',
+    viewOnHf: 'View on HuggingFace ↗',
+    conversations: 'Conversations',
+    medianReqConvo: 'Median requests / convo',
+    meanReqConvo: 'Mean requests / convo',
+    mainTurns: 'Main turns',
+    medianSubagents: 'Median subagents / trace',
+    meanSubagents: 'Mean subagents / trace',
+    cachedInput: 'Cached input',
+    totalTokens: 'Total tokens',
+    modelMix: 'Model mix (turns)',
+    distributions: 'Distributions',
+    inputTokensPerTurn: 'Input tokens per turn',
+    outputTokensPerTurn: 'Output tokens per turn',
+    uncachedInputPerReq: 'Uncached input tokens per request',
+    turnsPerConvo: 'Turns per conversation',
+    subagentIsl: 'Subagent request ISL',
+    subagentIslSub: 'Inner subagent requests only',
+    subagentOsl: 'Subagent request OSL',
+    subagentOslSub: 'Inner subagent requests only',
+    cachedFraction: 'Cached fraction per turn',
+    searchPlaceholder: 'Search by ID…',
+    sortTokens: 'Total input ↓',
+    sortTurns: 'Turns ↓',
+    sortSubagents: 'Subagent groups ↓',
+    sortId: 'Conversation ID',
+    thConversation: 'Conversation',
+    thTurns: 'Turns',
+    thSubagents: 'Subagents',
+    thInput: 'Input',
+    thOutput: 'Output',
+    thCached: 'Cached',
+    modelSuffix: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
+    noMatch: 'No conversations match.',
+    prev: '← Prev',
+    next: 'Next →',
+    pageOf: (p: number, total: number) => `Page ${p} of ${total}`,
+  },
+  zh: {
+    loading: '正在加载数据集…',
+    notFound: '未找到数据集。',
+    backToDatasets: '返回数据集列表',
+    breadcrumbDatasets: '← 数据集',
+    viewOnHf: '在 HuggingFace 查看 ↗',
+    conversations: '对话数',
+    medianReqConvo: '每对话中位请求数',
+    meanReqConvo: '每对话平均请求数',
+    mainTurns: '主轮次',
+    medianSubagents: '每 trace 中位 subagent 数',
+    meanSubagents: '每 trace 平均 subagent 数',
+    cachedInput: '缓存输入',
+    totalTokens: '总 token 数',
+    modelMix: '模型组合（按轮次）',
+    distributions: '分布',
+    inputTokensPerTurn: '每轮输入 token 数',
+    outputTokensPerTurn: '每轮输出 token 数',
+    uncachedInputPerReq: '每请求未缓存输入 token 数',
+    turnsPerConvo: '每对话轮次数',
+    subagentIsl: 'Subagent 请求 ISL',
+    subagentIslSub: '仅内部 subagent 请求',
+    subagentOsl: 'Subagent 请求 OSL',
+    subagentOslSub: '仅内部 subagent 请求',
+    cachedFraction: '每轮缓存比例',
+    searchPlaceholder: '按 ID 搜索…',
+    sortTokens: '总输入 ↓',
+    sortTurns: '轮次 ↓',
+    sortSubagents: 'Subagent 组 ↓',
+    sortId: '对话 ID',
+    thConversation: '对话',
+    thTurns: '轮次',
+    thSubagents: 'Subagent',
+    thInput: '输入',
+    thOutput: '输出',
+    thCached: '缓存',
+    modelSuffix: (n: number) => `${n} 个模型`,
+    noMatch: '没有匹配的对话。',
+    prev: '← 上一页',
+    next: '下一页 →',
+    pageOf: (p: number, total: number) => `第 ${p} 页，共 ${total} 页`,
+  },
+} as const;
 
 export function DatasetDetail({ slug }: { slug: string }) {
   const { data: dataset, isLoading, isError } = useDataset(slug);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<ConversationSort>('tokens');
   const [page, setPage] = useState(0);
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const prefix = locale === 'zh' ? '/zh' : '';
+
+  const sorts: { value: ConversationSort; label: string }[] = [
+    { value: 'tokens', label: t.sortTokens },
+    { value: 'turns', label: t.sortTurns },
+    { value: 'subagents', label: t.sortSubagents },
+    { value: 'id', label: t.sortId },
+  ];
 
   const { data: convs, isFetching } = useDatasetConversations({
     slug,
@@ -45,14 +136,14 @@ export function DatasetDetail({ slug }: { slug: string }) {
   });
 
   if (isLoading) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">Loading dataset…</div>;
+    return <div className="py-12 text-center text-sm text-muted-foreground">{t.loading}</div>;
   }
   if (isError || !dataset) {
     return (
       <div className="py-12 text-center text-sm text-destructive">
-        Dataset not found.{' '}
-        <Link href="/datasets" className="text-primary underline">
-          Back to datasets
+        {t.notFound}{' '}
+        <Link href={`${prefix}/datasets`} className="text-primary underline">
+          {t.backToDatasets}
         </Link>
       </div>
     );
@@ -68,8 +159,11 @@ export function DatasetDetail({ slug }: { slug: string }) {
       {/* header */}
       <div>
         <div className="mb-1 flex items-center gap-2">
-          <Link href="/datasets" className="text-xs text-muted-foreground hover:text-foreground">
-            ← Datasets
+          <Link
+            href={`${prefix}/datasets`}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            {t.breadcrumbDatasets}
           </Link>
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -86,7 +180,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                 onClick={() => track('datasets_hf_link_clicked', { slug })}
                 className="text-primary hover:underline"
               >
-                View on HuggingFace ↗
+                {t.viewOnHf}
               </a>
             )}
           </div>
@@ -99,29 +193,18 @@ export function DatasetDetail({ slug }: { slug: string }) {
       {/* summary stats */}
       <Card className="p-4">
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
-          <Stat label="Conversations" value={dataset.conversation_count.toLocaleString()} />
-          <Stat
-            label="Median requests / convo"
-            value={perConversation(s.medianRequestsPerConversation)}
-          />
-          <Stat
-            label="Mean requests / convo"
-            value={perConversation(s.meanRequestsPerConversation)}
-          />
-          <Stat label="Main turns" value={compact(s.mainTurns ?? 0)} />
-          <Stat
-            label="Median subagents / trace"
-            value={perConversation(s.medianSubagentsPerTrace)}
-          />
-          <Stat label="Mean subagents / trace" value={perConversation(s.meanSubagentsPerTrace)} />
-          <Stat label="Cached input" value={formatPct(s.cachedPct)} />
-          <Stat label="Total tokens" value={compact((s.totalIn ?? 0) + (s.totalOut ?? 0))} />
+          <Stat label={t.conversations} value={dataset.conversation_count.toLocaleString()} />
+          <Stat label={t.medianReqConvo} value={perConversation(s.medianRequestsPerConversation)} />
+          <Stat label={t.meanReqConvo} value={perConversation(s.meanRequestsPerConversation)} />
+          <Stat label={t.mainTurns} value={compact(s.mainTurns ?? 0)} />
+          <Stat label={t.medianSubagents} value={perConversation(s.medianSubagentsPerTrace)} />
+          <Stat label={t.meanSubagents} value={perConversation(s.meanSubagentsPerTrace)} />
+          <Stat label={t.cachedInput} value={formatPct(s.cachedPct)} />
+          <Stat label={t.totalTokens} value={compact((s.totalIn ?? 0) + (s.totalOut ?? 0))} />
         </dl>
         {s.modelMix && Object.keys(s.modelMix).length > 0 && (
           <div className="mt-4 border-t border-border/40 pt-3">
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">
-              Model mix (turns)
-            </div>
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">{t.modelMix}</div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(s.modelMix)
                 .toSorted((a, b) => b[1] - a[1])
@@ -140,47 +223,47 @@ export function DatasetDetail({ slug }: { slug: string }) {
 
       {/* distribution cards */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-foreground">Distributions</h2>
+        <h2 className="text-lg font-semibold text-foreground">{t.distributions}</h2>
         <div className="grid gap-4 lg:grid-cols-2">
           <DistributionCard
-            title="Input tokens per turn"
+            title={t.inputTokensPerTurn}
             unit="tokens"
             scale="log"
             distribution={cd.inputTokensPerTurn}
           />
           <DistributionCard
-            title="Output tokens per turn"
+            title={t.outputTokensPerTurn}
             unit="tokens"
             scale="log"
             distribution={cd.outputTokensPerTurn}
           />
           <DistributionCard
-            title="Uncached input tokens per request"
+            title={t.uncachedInputPerReq}
             unit="tokens"
             scale="log"
             distribution={cd.uncachedInputTokensPerTurn}
           />
           <DistributionCard
-            title="Turns per conversation"
+            title={t.turnsPerConvo}
             unit="turns"
             distribution={cd.turnsPerConversation}
           />
           <DistributionCard
-            title="Subagent request ISL"
-            subtitle="Inner subagent requests only"
+            title={t.subagentIsl}
+            subtitle={t.subagentIslSub}
             unit="tokens"
             scale="log"
             distribution={cd.subagentInputTokensPerRequest}
           />
           <DistributionCard
-            title="Subagent request OSL"
-            subtitle="Inner subagent requests only"
+            title={t.subagentOsl}
+            subtitle={t.subagentOslSub}
             unit="tokens"
             scale="log"
             distribution={cd.subagentOutputTokensPerRequest}
           />
           <DistributionCard
-            title="Cached fraction per turn"
+            title={t.cachedFraction}
             unit=""
             distribution={cd.cachedFractionPerTurn}
             formatValue={formatPct}
@@ -192,7 +275,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">
-            Conversations{' '}
+            {t.conversations}{' '}
             <span className="text-sm font-normal text-muted-foreground">({total})</span>
           </h2>
           <div className="flex items-center gap-2">
@@ -203,7 +286,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                 setSearch(e.target.value);
                 setPage(0);
               }}
-              placeholder="Search by ID…"
+              placeholder={t.searchPlaceholder}
               className="h-8 w-40 rounded-md border border-border/40 bg-background px-2 text-xs outline-none focus:border-primary"
             />
             <Select
@@ -218,7 +301,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SORTS.map((o) => (
+                {sorts.map((o) => (
                   <SelectItem key={o.value} value={o.value} className="text-xs">
                     {o.label}
                   </SelectItem>
@@ -232,12 +315,12 @@ export function DatasetDetail({ slug }: { slug: string }) {
           <table className="w-full text-sm">
             <thead className="border-b border-border/40 bg-muted/30 text-xs text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Conversation</th>
-                <th className="px-3 py-2 text-right font-medium">Turns</th>
-                <th className="px-3 py-2 text-right font-medium">Subagents</th>
-                <th className="px-3 py-2 text-right font-medium">Input</th>
-                <th className="px-3 py-2 text-right font-medium">Output</th>
-                <th className="px-3 py-2 text-right font-medium">Cached</th>
+                <th className="px-3 py-2 text-left font-medium">{t.thConversation}</th>
+                <th className="px-3 py-2 text-right font-medium">{t.thTurns}</th>
+                <th className="px-3 py-2 text-right font-medium">{t.thSubagents}</th>
+                <th className="px-3 py-2 text-right font-medium">{t.thInput}</th>
+                <th className="px-3 py-2 text-right font-medium">{t.thOutput}</th>
+                <th className="px-3 py-2 text-right font-medium">{t.thCached}</th>
               </tr>
             </thead>
             <tbody>
@@ -250,7 +333,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                   >
                     <td className="px-3 py-2">
                       <Link
-                        href={`/datasets/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
+                        href={`${prefix}/datasets/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
                         onClick={() => track('datasets_conversation_clicked', { slug })}
                         className="font-mono text-xs text-primary hover:underline"
                       >
@@ -258,7 +341,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
                       </Link>
                       {c.models.length > 0 && (
                         <span className="ml-2 text-[11px] text-muted-foreground">
-                          {c.models.length} model{c.models.length === 1 ? '' : 's'}
+                          {t.modelSuffix(c.models.length)}
                         </span>
                       )}
                     </td>
@@ -275,7 +358,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
               {!isFetching && (convs?.items.length ?? 0) === 0 && (
                 <tr>
                   <td colSpan={6} className="px-3 py-8 text-center text-xs text-muted-foreground">
-                    No conversations match.
+                    {t.noMatch}
                   </td>
                 </tr>
               )}
@@ -295,11 +378,9 @@ export function DatasetDetail({ slug }: { slug: string }) {
               }}
               className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
-              ← Prev
+              {t.prev}
             </button>
-            <span className="text-muted-foreground">
-              Page {page + 1} of {pageCount}
-            </span>
+            <span className="text-muted-foreground">{t.pageOf(page + 1, pageCount)}</span>
             <button
               type="button"
               disabled={page >= pageCount - 1}
@@ -310,7 +391,7 @@ export function DatasetDetail({ slug }: { slug: string }) {
               }}
               className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
-              Next →
+              {t.next}
             </button>
           </div>
         )}

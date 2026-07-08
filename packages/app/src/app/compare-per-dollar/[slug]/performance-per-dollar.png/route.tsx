@@ -111,7 +111,10 @@ export async function GET(
 ): Promise<Response> {
   const { slug } = await params;
   const parsed = parseCompareSlug(slug);
-  if (!parsed || canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b) !== slug) {
+  if (
+    !parsed ||
+    canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b) !== slug.toLowerCase()
+  ) {
     return new Response('Not found', { status: 404 });
   }
 

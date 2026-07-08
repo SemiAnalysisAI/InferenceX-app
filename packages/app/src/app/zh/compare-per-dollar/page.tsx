@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import {
   HW_REGISTRY,
@@ -101,6 +102,38 @@ export default async function ComparePerDollarIndexPageZh() {
             。性能按所属云服务商 TCO 归一化——每个页面展示每 token 成本图表及插值美元/百万 token
             对比表格，帮助您在任意目标交互性水平下选出更经济的 GPU。
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              data-testid="compare-per-dollar-index-compare-link-zh"
+              href="/zh/compare"
+              className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+            >
+              GPU 延迟 + 吞吐量对比
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-precision-link-zh"
+              href="/zh/compare-precision"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              {'精度对比（FP8 vs BF16 等）'}
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-spec-decode-link-zh"
+              href="/zh/compare-spec-decode"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              {'投机解码对比（MTP vs 关闭）'}
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+          </div>
         </Card>
       </section>
 

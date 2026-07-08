@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
 import { DatasetList } from '@/components/datasets/dataset-list';
+import { enAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =
@@ -11,7 +12,7 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   title: 'Agentic Datasets',
   description: DESCRIPTION,
-  alternates: { canonical: `${SITE_URL}/datasets` },
+  alternates: enAlternates('/datasets'),
   openGraph: {
     title: 'Agentic Datasets | InferenceX',
     description: DESCRIPTION,

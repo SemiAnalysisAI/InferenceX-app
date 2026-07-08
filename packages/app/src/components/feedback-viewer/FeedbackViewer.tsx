@@ -16,6 +16,7 @@ import {
 import { useFeedbackList } from '@/hooks/api/use-feedback-list';
 import type { FeedbackListRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { relockFeatureGate } from '@/lib/use-feature-gate';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -66,9 +67,62 @@ function decryptRow(cipher: Cipher, row: FeedbackListRow): DecryptedRow {
   };
 }
 
+const STRINGS = {
+  en: {
+    heading: 'User Feedback',
+    explanation: 'All user-supplied columns are encrypted server-side. Paste the',
+    explanationSuffix: 'to decrypt in your browser. The key never leaves this page.',
+    relock: 'Re-lock feature gate',
+    keyLabel: 'Decryption key (base64, 32 bytes)',
+    keyPlaceholder: 'base64-encoded key',
+    decrypt: 'Decrypt',
+    forgetKey: 'Forget key',
+    hideKey: 'Hide key',
+    showKey: 'Show key',
+    allDecryptsFailed: "All rows failed to decrypt — the key parses but doesn't match the data.",
+    fetchError: 'Failed to load feedback rows.',
+    loadingRows: 'Loading rows…',
+    noRows: 'No feedback rows yet.',
+    enterKey: 'Enter the key above to decrypt.',
+    encryptedRowsLoaded: (n: number) => `${n} encrypted row${n === 1 ? '' : 's'} loaded.`,
+    rowCount: (n: number) => `${n} row${n === 1 ? '' : 's'}`,
+    failedToDecrypt: (n: number) => ` · ${n} failed to decrypt`,
+    decryptFailed: 'decrypt failed',
+    whatWorksWell: 'What works well',
+    whatCouldBeBetter: 'What could be better',
+    wouldLikeToSee: 'Would like to see',
+  },
+  zh: {
+    heading: '用户反馈',
+    explanation: '所有用户提交的字段均在服务端加密。粘贴',
+    explanationSuffix: '即可在浏览器中解密。密钥不会离开此页面。',
+    relock: '重新锁定功能入口',
+    keyLabel: '解密密钥（base64，32 字节）',
+    keyPlaceholder: 'base64 编码密钥',
+    decrypt: '解密',
+    forgetKey: '忘记密钥',
+    hideKey: '隐藏密钥',
+    showKey: '显示密钥',
+    allDecryptsFailed: '所有行均解密失败——密钥格式正确但与数据不匹配。',
+    fetchError: '无法加载反馈数据。',
+    loadingRows: '加载中……',
+    noRows: '暂无反馈记录。',
+    enterKey: '请在上方输入密钥进行解密。',
+    encryptedRowsLoaded: (n: number) => `已加载 ${n} 条加密记录。`,
+    rowCount: (n: number) => `共 ${n} 条记录`,
+    failedToDecrypt: (n: number) => `，其中 ${n} 条解密失败`,
+    decryptFailed: '解密失败',
+    whatWorksWell: '做得好的地方',
+    whatCouldBeBetter: '可以改进的地方',
+    wouldLikeToSee: '希望看到的功能',
+  },
+} as const;
+
 export default function FeedbackViewer() {
   const router = useRouter();
   const { data, isLoading, error: fetchError } = useFeedbackList();
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [keyInput, setKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [cipherKey, setCipherKey] = useState<CipherKey | null>(null);
@@ -119,11 +173,11 @@ export default function FeedbackViewer() {
       <Card>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold mb-2">User Feedback</h2>
+            <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
             <p className="text-muted-foreground text-sm">
-              All user-supplied columns are encrypted server-side. Paste the
+              {t.explanation}
               <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">FEEDBACK_SECRET</code>
-              to decrypt in your browser. The key never leaves this page.
+              {t.explanationSuffix}
             </p>
           </div>
           <Button
@@ -133,12 +187,12 @@ export default function FeedbackViewer() {
             onClick={() => {
               relockFeatureGate();
               track('feedback_viewer_relocked');
-              router.push('/inference');
+              router.push(locale === 'zh' ? '/zh/inference' : '/inference');
             }}
-            title="Re-lock feature gate"
+            title={t.relock}
           >
             <Lock className="size-3" />
-            Re-lock feature gate
+            {t.relock}
           </Button>
         </div>
       </Card>
@@ -146,7 +200,7 @@ export default function FeedbackViewer() {
       <Card>
         <form onSubmit={handleUnlock} className="flex flex-col gap-2">
           <label htmlFor="feedback-key" className="text-xs font-medium">
-            Decryption key (base64, 32 bytes)
+            {t.keyLabel}
           </label>
           <div className="flex flex-row gap-2">
             <div className="relative flex-1">
@@ -158,13 +212,13 @@ export default function FeedbackViewer() {
                 autoComplete="off"
                 spellCheck={false}
                 data-testid="feedback-key-input"
-                placeholder="base64-encoded key"
+                placeholder={t.keyPlaceholder}
                 className="pr-9 font-mono text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
-                aria-label={showKey ? 'Hide key' : 'Show key'}
+                aria-label={showKey ? t.hideKey : t.showKey}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -176,7 +230,7 @@ export default function FeedbackViewer() {
               data-testid="feedback-key-submit"
             >
               <KeyRound className="size-4" />
-              Decrypt
+              {t.decrypt}
             </Button>
             {cipherKey && (
               <Button
@@ -185,7 +239,7 @@ export default function FeedbackViewer() {
                 onClick={handleForget}
                 data-testid="feedback-key-forget"
               >
-                Forget key
+                {t.forgetKey}
               </Button>
             )}
           </div>
@@ -196,7 +250,7 @@ export default function FeedbackViewer() {
           )}
           {allDecryptsFailed && (
             <p role="alert" className="text-xs text-destructive">
-              All rows failed to decrypt — the key parses but doesn't match the data.
+              {t.allDecryptsFailed}
             </p>
           )}
         </form>
@@ -204,27 +258,26 @@ export default function FeedbackViewer() {
 
       {fetchError && (
         <Card>
-          <p className="text-destructive text-sm">Failed to load feedback rows.</p>
+          <p className="text-destructive text-sm">{t.fetchError}</p>
         </Card>
       )}
 
       {isLoading && (
         <Card>
-          <p className="text-muted-foreground text-sm">Loading rows…</p>
+          <p className="text-muted-foreground text-sm">{t.loadingRows}</p>
         </Card>
       )}
 
       {data && data.rows.length === 0 && (
         <Card>
-          <p className="text-muted-foreground text-sm">No feedback rows yet.</p>
+          <p className="text-muted-foreground text-sm">{t.noRows}</p>
         </Card>
       )}
 
       {data && data.rows.length > 0 && decryptedRows === null && (
         <Card>
           <p className="text-muted-foreground text-sm">
-            {data.rows.length} encrypted row{data.rows.length === 1 ? '' : 's'} loaded. Enter the
-            key above to decrypt.
+            {t.encryptedRowsLoaded(data.rows.length)} {t.enterKey}
           </p>
         </Card>
       )}
@@ -235,8 +288,8 @@ export default function FeedbackViewer() {
             <FeedbackRow key={row.id} row={row} />
           ))}
           <p className="text-xs text-muted-foreground">
-            {decryptedRows.length} row{decryptedRows.length === 1 ? '' : 's'}
-            {failedDecrypts > 0 ? ` · ${failedDecrypts} failed to decrypt` : ''}
+            {t.rowCount(decryptedRows.length)}
+            {failedDecrypts > 0 ? t.failedToDecrypt(failedDecrypts) : ''}
           </p>
         </div>
       )}
@@ -245,12 +298,14 @@ export default function FeedbackViewer() {
 }
 
 function FeedbackRow({ row }: { row: DecryptedRow }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   if (row.decryptError) {
     return (
       <Card>
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="text-muted-foreground">#{row.id}</span>
-          <span className="text-destructive">decrypt failed</span>
+          <span className="text-destructive">{t.decryptFailed}</span>
           <span className="text-muted-foreground tabular-nums">
             {new Date(row.createdAt).toISOString()}
           </span>
@@ -267,12 +322,12 @@ function FeedbackRow({ row }: { row: DecryptedRow }) {
           <span className="font-mono">{row.pagePath ?? '?'}</span>
         </div>
         {row.doingWell && (
-          <FieldRow label="What works well" value={row.doingWell} tone="positive" />
+          <FieldRow label={t.whatWorksWell} value={row.doingWell} tone="positive" />
         )}
         {row.doingPoorly && (
-          <FieldRow label="What could be better" value={row.doingPoorly} tone="negative" />
+          <FieldRow label={t.whatCouldBeBetter} value={row.doingPoorly} tone="negative" />
         )}
-        {row.wantToSee && <FieldRow label="Would like to see" value={row.wantToSee} tone="want" />}
+        {row.wantToSee && <FieldRow label={t.wouldLikeToSee} value={row.wantToSee} tone="want" />}
         {row.userAgent && (
           <p className="text-[10px] text-muted-foreground/70 font-mono">{row.userAgent}</p>
         )}

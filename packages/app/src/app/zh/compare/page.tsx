@@ -101,13 +101,33 @@ export default async function CompareIndexPageZh() {
             {formatModelList(modelsWithPairs)}
             。每个页面均包含延迟、吞吐量和成本指标的交互式图表，以及插值对比表格。
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap gap-3">
             <Link
               data-testid="compare-index-per-dollar-link-zh"
               href="/zh/compare-per-dollar"
               className="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-3 text-base lg:text-lg font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
             >
               GPU 每美元性能对比
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-precision-link-zh"
+              href="/zh/compare-precision"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              {'精度对比（FP8 vs BF16 等）'}
+              <span aria-hidden="true" className="text-lg lg:text-xl">
+                →
+              </span>
+            </Link>
+            <Link
+              data-testid="compare-index-spec-decode-link-zh"
+              href="/zh/compare-spec-decode"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              {'投机解码对比（MTP vs 关闭）'}
               <span aria-hidden="true" className="text-lg lg:text-xl">
                 →
               </span>

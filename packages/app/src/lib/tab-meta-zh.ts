@@ -9,11 +9,6 @@ export const LANDING_META_ZH = {
     '跨 GPU 与推理框架对比 AI 推理性能。基于 NVIDIA GB200、B200、AMD MI355X 等硬件的真实基准测试。免费、开源、持续更新。',
 };
 
-/**
- * Tabs that have a Chinese sibling page under /zh. Internal or feature-gated
- * tabs (ai-chart, current-inferencex-image, feedback) are intentionally not
- * mirrored — they are not indexable surfaces.
- */
 export const ZH_TAB_KEYS = [
   'inference',
   'evaluation',
@@ -23,6 +18,9 @@ export const ZH_TAB_KEYS = [
   'gpu-specs',
   'gpu-metrics',
   'submissions',
+  'ai-chart',
+  'current-inferencex-image',
+  'feedback',
 ] as const;
 
 export type ZhTabKey = (typeof ZH_TAB_KEYS)[number];
@@ -69,6 +67,19 @@ export const TAB_META_ZH: Record<ZhTabKey, { title: string; description: string 
     description:
       '提交到 InferenceX 的全部基准测试配置。查看各 GPU 厂商的提交历史、活动趋势与数据点数量。',
   },
+  'ai-chart': {
+    title: 'AI 驱动的图表生成',
+    description: '使用自然语言提示生成自定义推理基准测试图表。借助 AI 对比 GPU、成本与性能。',
+  },
+  'current-inferencex-image': {
+    title: 'InferenceX 当前镜像',
+    description:
+      '各模型、GPU SKU 和配置的当前 InferenceX Docker 镜像标签。对比已部署镜像与最新 vLLM 和 SGLang 发布版本，标记过期标签。',
+  },
+  feedback: {
+    title: '用户反馈',
+    description: '内部工具：解密并查看用户提交的反馈。',
+  },
 };
 
 /**
@@ -93,6 +104,12 @@ export const TAB_INTRO_ZH: Record<ZhTabKey, string> = {
     '本页面展示 GPU 功耗与能效指标（PowerX）：推理负载下的实测功耗、每瓦 token 数与每兆瓦 token 产出。',
   submissions:
     '本页面列出提交到 InferenceX 的全部基准测试配置：按 GPU 厂商查看提交历史、活动趋势与数据点数量。',
+  'ai-chart':
+    '本页面提供 AI 驱动的图表生成工具：用自然语言描述您想查看的图表，系统会根据 InferenceX 基准测试数据自动生成可视化结果。',
+  'current-inferencex-image':
+    '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、GPU SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
+  feedback:
+    '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
 };
 
 /** Chinese labels for the dashboard tab bar (TabNav) on /zh pages. */
@@ -105,6 +122,9 @@ export const TAB_LABELS_ZH: Record<string, string> = {
   'gpu-specs': 'GPU 规格',
   'gpu-metrics': 'GPU 功耗',
   submissions: '提交记录',
+  'ai-chart': 'AI 图表',
+  'current-inferencex-image': '镜像',
+  feedback: '反馈',
 };
 
 /** Chinese labels for the site header nav on /zh pages, keyed by English href. */

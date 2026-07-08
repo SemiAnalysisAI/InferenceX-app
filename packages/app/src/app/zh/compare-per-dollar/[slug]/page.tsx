@@ -117,7 +117,8 @@ export default async function ComparePerDollarPageZh({ params, searchParams }: P
   );
 
   const url = `${SITE_URL}/zh/compare-per-dollar/${canonical}`;
-  const imageUrl = `${url}/performance-per-dollar.png`;
+  // The PNG route exists only under the EN tree; zh JSON-LD references it there.
+  const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png`;
   const { oldest, newest } = dateRangeForPair(rows, parsed.a, parsed.b);
   const jsonLd = buildJsonLdZh(
     'per-dollar',

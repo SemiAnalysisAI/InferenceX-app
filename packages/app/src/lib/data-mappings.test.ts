@@ -156,12 +156,12 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
   });
 
-  it('returns false for non-deprecated model DeepSeek_R1', () => {
-    expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
+  it('returns true for deprecated model GptOss', () => {
+    expect(isModelDeprecated(Model.GptOss)).toBe(true);
   });
 
-  it('returns false for non-deprecated model GptOss', () => {
-    expect(isModelDeprecated(Model.GptOss)).toBe(false);
+  it('returns false for non-deprecated model DeepSeek_R1', () => {
+    expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
   });
 });
 
@@ -171,12 +171,12 @@ describe('isModelDeprecated', () => {
 describe('isModelMaintenance', () => {
   it('returns true for maintenance-mode models', () => {
     expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
-    expect(isModelMaintenance(Model.GptOss)).toBe(true);
   });
 
   it('keeps deprecated and default models out of maintenance mode', () => {
     expect(isModelMaintenance(Model.Llama3_3_70B)).toBe(false);
     expect(isModelMaintenance(Model.MiniMax_M2_5)).toBe(false);
+    expect(isModelMaintenance(Model.GptOss)).toBe(false);
   });
 });
 

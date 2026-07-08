@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 
 import type { ConversationStructure } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { compact, formatShare } from './format';
 import {
   buildRowOverlaps,
@@ -17,8 +18,6 @@ import {
   type VisibleRow,
 } from './trace-flamegraph-model';
 
-// Pure logic lives in trace-flamegraph-model.ts; re-exported here so this file
-// stays the module entry point for the flamegraph's public API.
 export {
   findRequestOverlapGroups,
   formatElapsedTime,
@@ -31,23 +30,41 @@ export type {
   TimedRequest,
 } from './trace-flamegraph-model';
 
-// Stacked-bar segment colors. Cached prefix vs uncached input vs output —
-// fixed hues (theme-independent) so the meaning is stable in light/dark.
 const SEG = {
-  cached: '#10b981', // emerald-500 — input served from prefix cache
-  uncached: '#f59e0b', // amber-500 — input that must be (re)computed
-  output: '#8b5cf6', // violet-500 — generated tokens
+  cached: '#10b981',
+  uncached: '#f59e0b',
+  output: '#8b5cf6',
 } as const;
 
-const LEGEND = [
-  { key: 'cached', label: 'Cached prefix', color: SEG.cached },
-  { key: 'uncached', label: 'Uncached input', color: SEG.uncached },
-  { key: 'output', label: 'Output', color: SEG.output },
-] as const;
+const STRINGS = {
+  en: {
+    cachedPrefix: 'Cached prefix',
+    uncachedInput: 'Uncached input',
+    output: 'Output',
+    parallelBracket: 'Bracketed rows ran in parallel',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
+    denseParallel: (max: number, overflow: number) =>
+      `Dense parallel region — bracket lanes capped at ${max}; ${overflow} further overlapping ${overflow === 1 ? 'group is' : 'groups are'} folded into the last lane.`,
+    cachedPct: 'Cached %',
+    fromStart: 'From start',
+    parallelWith: (n: number) => `Ran in parallel with ${n} other request${n === 1 ? '' : 's'}`,
+  },
+  zh: {
+    cachedPrefix: '缓存前缀',
+    uncachedInput: '未缓存输入',
+    output: '输出',
+    parallelBracket: '括号内行并行运行',
+    expandAll: '全部展开',
+    collapseAll: '全部折叠',
+    denseParallel: (max: number, overflow: number) =>
+      `密集并行区域——括号通道上限 ${max}；另有 ${overflow} 个重叠组折叠到最后通道。`,
+    cachedPct: '缓存 %',
+    fromStart: '距开始',
+    parallelWith: (n: number) => `与另外 ${n} 个请求并行运行`,
+  },
+} as const;
 
-// Width (px) of one parallel-group bracket lane in the left gutter. Overlapping
-// groups (non-transitive chains) get their own lane so their brackets sit
-// side-by-side instead of stacking visually.
 const LANE_W = 14;
 
 interface TooltipState {
@@ -56,12 +73,6 @@ interface TooltipState {
   row: VisibleRow;
 }
 
-/**
- * Per-conversation flamegraph driven by the precomputed `structure` JSONB.
- * One row per turn; subagent groups render a collapsible header with indented
- * children (collapsed by default). Each bar stacks cached-prefix + uncached
- * input + output, scaled to the widest visible turn.
- */
 export function TraceFlamegraph({
   structure,
   highlightTurn,
@@ -70,19 +81,21 @@ export function TraceFlamegraph({
   highlightAgentId,
 }: {
   structure: ConversationStructure;
-  /** Turn index to scroll to / highlight (from a request-timeline deep link). */
   highlightTurn?: number | null;
-  /** Raw Weka top-level request index to scroll to / highlight. */
   highlightRawIndex?: number | null;
-  /** Raw Weka nested request index under highlightRawIndex, for subagent children. */
   highlightInnerIndex?: number | null;
-  /** Subagent id when the highlighted turn is inside a subagent group. */
   highlightAgentId?: string | null;
 }) {
   const nodes = structure.nodes;
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
-  // Resolve the deep-link target to a row key (+ the group that must be open to
-  // show it). See resolveDeepLinkTarget for the matching rules.
+  const LEGEND = [
+    { key: 'cached', label: t.cachedPrefix, color: SEG.cached },
+    { key: 'uncached', label: t.uncachedInput, color: SEG.uncached },
+    { key: 'output', label: t.output, color: SEG.output },
+  ] as const;
+
   const target = useMemo(
     () =>
       resolveDeepLinkTarget(nodes, {
@@ -94,28 +107,17 @@ export function TraceFlamegraph({
     [nodes, highlightTurn, highlightRawIndex, highlightInnerIndex, highlightAgentId],
   );
 
-  // Subagent groups collapsed by default — except the deep-link target's group.
   const [expanded, setExpanded] = useState<Set<number>>(() =>
     typeof target?.expandGroup === 'number' ? new Set([target.expandGroup]) : new Set(),
   );
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Portal target only exists after mount (the tooltip is portaled to body so
-  // its position:fixed is viewport-relative, immune to ancestor transforms).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // The deep-link target row gets a state-driven highlight (ring + bg flash)
-  // that fades out — state-driven so a re-render can't clobber it, and so the
-  // fade is a real CSS transition rather than an abrupt classList removal.
   const [highlightKey, setHighlightKey] = useState<string | null>(target?.rowKey ?? null);
 
-  // When the deep-link target resolves/changes: expand its subagent group, then
-  // (after the row renders) scroll it into view and flash the highlight. Runs on
-  // first load and on any later target change (e.g. clicking another bar into
-  // the same conversation). The row query/scroll is deferred to the next frame
-  // so the just-expanded child row exists in the DOM.
   useEffect(() => {
     if (!target) return;
     if (typeof target.expandGroup === 'number') {
@@ -128,10 +130,10 @@ export function TraceFlamegraph({
         ?.querySelector<HTMLElement>(`[data-rowkey="${target.rowKey}"]`)
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });
-    const t = setTimeout(() => setHighlightKey(null), 2200);
+    const tm = setTimeout(() => setHighlightKey(null), 2200);
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(t);
+      clearTimeout(tm);
     };
   }, [target]);
 
@@ -162,11 +164,6 @@ export function TraceFlamegraph({
     [nodes, expanded, overlapsByRow],
   );
 
-  // Two scales: leaf turns/subturns share a per-turn axis (the primary signal —
-  // how cached/uncached evolves), while subagent group headers carry aggregates
-  // orders of magnitude larger, so they get their own axis to stay comparable to
-  // each other. Group bars render slim + muted, so the mixed scale reads as a
-  // distinct "group summary" track rather than a contradiction.
   const maxTotal = useMemo(
     () => Math.max(1, ...rows.filter((r) => !r.isGroup).map((r) => r.total)),
     [rows],
@@ -200,7 +197,7 @@ export function TraceFlamegraph({
               className="inline-block h-4 w-2 rounded-l-sm border-y-2 border-l-2"
               style={{ borderColor: OVERLAP_COLORS[0] }}
             />
-            <span className="text-muted-foreground">Bracketed rows ran in parallel</span>
+            <span className="text-muted-foreground">{t.parallelBracket}</span>
           </span>
         </div>
         {groupIndexes.length > 0 && (
@@ -213,7 +210,7 @@ export function TraceFlamegraph({
               }}
               className="rounded-md border border-border/40 px-2 py-1 text-xs hover:bg-accent"
             >
-              Expand all
+              {t.expandAll}
             </button>
             <button
               type="button"
@@ -223,7 +220,7 @@ export function TraceFlamegraph({
               }}
               className="rounded-md border border-border/40 px-2 py-1 text-xs hover:bg-accent"
             >
-              Collapse all
+              {t.collapseAll}
             </button>
           </div>
         )}
@@ -231,9 +228,7 @@ export function TraceFlamegraph({
 
       {braces.overflowLanes > 0 && (
         <p className="mb-2 text-[11px] text-muted-foreground">
-          Dense parallel region — bracket lanes capped at {MAX_LANES}; {braces.overflowLanes}{' '}
-          further overlapping {braces.overflowLanes === 1 ? 'group is' : 'groups are'} folded into
-          the last lane.
+          {t.denseParallel(MAX_LANES, braces.overflowLanes)}
         </p>
       )}
 
@@ -241,12 +236,8 @@ export function TraceFlamegraph({
         ref={scrollRef}
         className="max-h-[520px] overflow-y-auto overflow-x-hidden rounded-md border border-border/40 bg-muted/10 p-2"
       >
-        {/* gap-0 so the per-row bracket segments connect into a continuous
-            vertical rail across the rows of a parallel group. */}
         <div className="flex flex-col gap-0">
           {rows.map((row, idx) => {
-            // Group headers use the group axis; turns/subturns use the per-turn
-            // axis. Clamp to the track width either way.
             const denom = row.isGroup ? maxGroupTotal : maxTotal;
             const widthPct = Math.min(100, Math.max(0.5, (row.total / denom) * 100));
             const cw = row.total > 0 ? (row.cached / row.total) * 100 : 0;
@@ -262,11 +253,6 @@ export function TraceFlamegraph({
                   isHighlighted ? 'bg-primary/20 ring-2 ring-primary' : 'ring-0'
                 }`}
               >
-                {/* Parallel-group bracket gutter (only rendered when the
-                    conversation has any overlaps, so non-overlap traces keep a
-                    flush-left layout with no dead space). Segments are sparse and
-                    absolutely positioned per lane so a row only pays for the
-                    lanes it actually touches. */}
                 {braces.laneCount > 0 && (
                   <div
                     className="relative shrink-0 self-stretch"
@@ -288,13 +274,10 @@ export function TraceFlamegraph({
                             : {})}
                           title={
                             seg.isMember
-                              ? `Ran in parallel with ${seg.peerCount} other request${
-                                  seg.peerCount === 1 ? '' : 's'
-                                } (+${formatElapsedTime(seg.startS)}–${formatElapsedTime(seg.endS)})`
+                              ? `${t.parallelWith(seg.peerCount)} (+${formatElapsedTime(seg.startS)}–${formatElapsedTime(seg.endS)})`
                               : undefined
                           }
                         >
-                          {/* vertical rail */}
                           <div
                             className="absolute"
                             style={{
@@ -308,7 +291,6 @@ export function TraceFlamegraph({
                               borderBottomLeftRadius: seg.role === 'last' ? 3 : 0,
                             }}
                           />
-                          {/* right-pointing tick marking an actual member row */}
                           {seg.isMember && (
                             <div
                               className="absolute"
@@ -328,12 +310,10 @@ export function TraceFlamegraph({
                   </div>
                 )}
 
-                {/* row content (indented for subagent children) */}
                 <div
                   className="flex flex-1 items-center gap-2 py-0.5"
                   style={{ paddingLeft: row.indent * 20 }}
                 >
-                  {/* label / group toggle */}
                   <div className="flex w-52 shrink-0 items-center overflow-hidden">
                     {row.isGroup ? (
                       <button
@@ -356,7 +336,6 @@ export function TraceFlamegraph({
                     )}
                   </div>
 
-                  {/* Original interval, measured from conversation start. */}
                   <div
                     className="w-36 shrink-0 text-[11px] tabular-nums text-muted-foreground"
                     data-testid={`flamegraph-time-${row.key}`}
@@ -364,8 +343,6 @@ export function TraceFlamegraph({
                     {row.timeLabel ?? '—'}
                   </div>
 
-                  {/* stacked bar — group headers render as a slim muted summary
-                      strip so they read as aggregates, not individual turns. */}
                   <div
                     className="relative flex h-5 flex-1 items-center"
                     onMouseMove={(e) => onMove(e, row)}
@@ -383,7 +360,6 @@ export function TraceFlamegraph({
                     </div>
                   </div>
 
-                  {/* total */}
                   <div className="w-16 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                     {compact(row.total)}
                   </div>
@@ -410,23 +386,23 @@ export function TraceFlamegraph({
               ) : null}
             </div>
             <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-muted-foreground">
-              <span style={{ color: SEG.cached }}>Cached prefix</span>
+              <span style={{ color: SEG.cached }}>{t.cachedPrefix}</span>
               <span className="text-right tabular-nums text-foreground">
                 {compact(tooltip.row.cached)}
               </span>
-              <span style={{ color: SEG.uncached }}>Uncached input</span>
+              <span style={{ color: SEG.uncached }}>{t.uncachedInput}</span>
               <span className="text-right tabular-nums text-foreground">
                 {compact(tooltip.row.uncached)}
               </span>
-              <span style={{ color: SEG.output }}>Output</span>
+              <span style={{ color: SEG.output }}>{t.output}</span>
               <span className="text-right tabular-nums text-foreground">
                 {compact(tooltip.row.output)}
               </span>
-              <span>Cached %</span>
+              <span>{t.cachedPct}</span>
               <span className="text-right tabular-nums text-foreground">
                 {formatShare(tooltip.row.cached, tooltip.row.cached + tooltip.row.uncached)}
               </span>
-              <span>From start</span>
+              <span>{t.fromStart}</span>
               <span className="text-right tabular-nums text-foreground">
                 {tooltip.row.timeLabel ?? '—'}
               </span>

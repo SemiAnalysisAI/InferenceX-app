@@ -9,6 +9,43 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics';
 import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: {
+    prompts: 'Prompts',
+    promptsTitle: 'View per-sample prompts and responses',
+    promptsAriaLabel: (configLabel: string) =>
+      `View per-sample prompts and responses for ${configLabel}`,
+    precision: 'Precision',
+    score: 'Score',
+    min: 'Min',
+    max: 'Max',
+    conc: 'Conc',
+    benchmark: 'Benchmark',
+    date: 'Date',
+    unofficial: 'Unofficial',
+    unofficialTitle: 'Data from an unofficial / un-ingested workflow run',
+    prefill: 'prefill',
+    decode: 'decode',
+  },
+  zh: {
+    prompts: '提示词',
+    promptsTitle: '查看逐样本提示词与模型响应',
+    promptsAriaLabel: (configLabel: string) => `查看 ${configLabel} 的逐样本提示词与模型响应`,
+    precision: '精度',
+    score: '得分',
+    min: '最小',
+    max: '最大',
+    conc: '并发',
+    benchmark: '基准测试',
+    date: '日期',
+    unofficial: '非官方',
+    unofficialTitle: '来自非官方/未入库工作流运行的数据',
+    prefill: '预填充',
+    decode: '解码',
+  },
+} as const;
 
 interface EvaluationTableProps {
   data: EvaluationChartData[];
@@ -16,6 +53,8 @@ interface EvaluationTableProps {
 
 export default function EvaluationTable({ data }: EvaluationTableProps) {
   const { runIndexByUrl } = useUnofficialRun();
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
@@ -47,11 +86,11 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
               type="button"
               onClick={() => openDrawer(row)}
               className="inline-flex items-center gap-1 rounded-md border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-medium text-brand hover:border-brand/50 hover:bg-brand/20 transition-colors whitespace-nowrap"
-              aria-label={`View per-sample prompts and responses for ${row.configLabel}`}
-              title="View per-sample prompts and responses"
+              aria-label={t.promptsAriaLabel(row.configLabel)}
+              title={t.promptsTitle}
             >
               <MessageSquareText className="size-3.5" />
-              <span className="hidden sm:inline">Prompts</span>
+              <span className="hidden sm:inline">{t.prompts}</span>
             </button>
           ) : null;
         },
@@ -71,14 +110,14 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
               {isUnofficial && (
                 <span
                   className="inline-flex items-center gap-1 rounded-sm border border-red-600/50 bg-red-600/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-red-700 dark:text-red-400"
-                  title="Data from an unofficial / un-ingested workflow run"
+                  title={t.unofficialTitle}
                 >
                   <span
                     aria-hidden
                     className="inline-block size-1.5 rounded-full"
                     style={{ backgroundColor: overlayRunColor(runIdx) }}
                   />
-                  Unofficial
+                  {t.unofficial}
                 </span>
               )}
             </span>
@@ -88,27 +127,27 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         className: 'font-medium whitespace-nowrap',
       },
       {
-        header: 'Precision',
+        header: t.precision,
         cell: (row) => row.precision.toUpperCase(),
         sortValue: (row) => row.precision,
         className: 'whitespace-nowrap',
       },
       {
-        header: 'Score',
+        header: t.score,
         align: 'right',
         cell: (row) => row.score.toFixed(2),
         sortValue: (row) => row.score,
         className: 'tabular-nums',
       },
       {
-        header: 'Min',
+        header: t.min,
         align: 'right',
         cell: (row) => row.minScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.minScore ?? 0,
         className: 'tabular-nums',
       },
       {
-        header: 'Max',
+        header: t.max,
         align: 'right',
         cell: (row) => row.maxScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.maxScore ?? 0,
@@ -122,26 +161,26 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         className: 'tabular-nums',
       },
       {
-        header: 'Conc',
+        header: t.conc,
         align: 'right',
         cell: (row) => row.conc,
         sortValue: (row) => row.conc,
         className: 'tabular-nums',
       },
       {
-        header: 'Benchmark',
+        header: t.benchmark,
         cell: (row) => row.benchmark,
         sortValue: (row) => row.benchmark,
         className: 'whitespace-nowrap',
       },
       {
-        header: 'Date',
+        header: t.date,
         cell: (row) => row.date,
         sortValue: (row) => row.date,
         className: 'whitespace-nowrap',
       },
     ],
-    [runIndexByUrl],
+    [locale, runIndexByUrl],
   );
 
   return (
@@ -149,9 +188,9 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       {hasDisaggConfigs && (
         <div className="mt-2 mb-2 text-[11px] text-muted-foreground/80 leading-tight">
           <div>
-            <span className="font-mono">P(·/·/·/·)</span> prefill
+            <span className="font-mono">P(·/·/·/·)</span> {t.prefill}
             <span className="mx-1">·</span>
-            <span className="font-mono">D(·/·/·/·)</span> decode
+            <span className="font-mono">D(·/·/·/·)</span> {t.decode}
           </div>
           <div>
             slots: <span className="font-mono">tp/ep/dpa/nw</span>

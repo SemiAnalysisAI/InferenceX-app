@@ -18,6 +18,7 @@ import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
 import type { LatestImageRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import { getFrameworkLabel } from '@/lib/utils';
 import {
   AGE_MAX_RED_DAYS,
@@ -28,6 +29,79 @@ import {
   getActualLatestTag,
   isOutdated,
 } from './latest-image-utils';
+
+const STRINGS = {
+  en: {
+    title: 'Current InferenceX Image',
+    description: 'Docker image tags for each model and GPU configuration.',
+    loading: 'Loading...',
+    error: 'Failed to load image data.',
+    noMatch: 'No image data matches the selected filters.',
+    labelModel: 'Model',
+    tooltipModel: 'Filter by language model.',
+    labelPrecision: 'Precision',
+    tooltipPrecision: 'Numerical precision used for model weights.',
+    labelIslOsl: 'ISL / OSL',
+    tooltipIslOsl: 'Input Sequence Length / Output Sequence Length in tokens.',
+    labelSpecDecode: 'Spec Decode',
+    tooltipSpecDecode: 'Speculative decoding method. MTP = Multi-Token Prediction.',
+    labelGpuSku: 'GPU SKU',
+    tooltipGpuSku: 'Filter by GPU model (e.g. H200, MI300X, B200).',
+    labelNodeType: 'Node Type',
+    tooltipNodeType:
+      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
+    labelFramework: 'Framework',
+    tooltipFramework:
+      'Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks.',
+    allModels: 'All Models',
+    all: 'All',
+    singleNode: 'Single Node',
+    disagg: 'Disaggregated',
+    allFrameworks: 'All frameworks',
+    thModel: 'Model',
+    thPrecision: 'Precision',
+    thGpuSku: 'GPU SKU',
+    thSpecDecode: 'Spec Decode',
+    thCurrentTag: 'Current InferenceX Image Tag',
+    thActualLatest: 'Actual Latest Tag',
+    thDaysSince: 'Days Since Update',
+  },
+  zh: {
+    title: 'InferenceX 当前镜像',
+    description: '各模型与 GPU 配置的 Docker 镜像标签。',
+    loading: '加载中……',
+    error: '无法加载镜像数据。',
+    noMatch: '没有符合当前筛选条件的镜像数据。',
+    labelModel: '模型',
+    tooltipModel: '按语言模型筛选。',
+    labelPrecision: '精度',
+    tooltipPrecision: '模型权重使用的数值精度。',
+    labelIslOsl: 'ISL / OSL',
+    tooltipIslOsl: '输入序列长度 / 输出序列长度（token 数）。',
+    labelSpecDecode: '投机解码',
+    tooltipSpecDecode: '投机解码方式。MTP = 多 Token 预测。',
+    labelGpuSku: 'GPU SKU',
+    tooltipGpuSku: '按 GPU 型号筛选（如 H200、MI300X、B200）。',
+    labelNodeType: '节点类型',
+    tooltipNodeType:
+      '单节点 = 非分离式服务。分离式 = 使用独立预填充/解码池，包括 Dynamo、Mori 和 llm-d。',
+    labelFramework: '框架',
+    tooltipFramework:
+      '按推理引擎筛选（sglang、vllm、TensorRT、atom）。分离式框架变体归入基础引擎。留空 = 全部框架。',
+    allModels: '全部模型',
+    all: '全部',
+    singleNode: '单节点',
+    disagg: '分离式',
+    allFrameworks: '全部框架',
+    thModel: '模型',
+    thPrecision: '精度',
+    thGpuSku: 'GPU SKU',
+    thSpecDecode: '投机解码',
+    thCurrentTag: '当前 InferenceX 镜像标签',
+    thActualLatest: '实际最新标签',
+    thDaysSince: '距上次更新天数',
+  },
+} as const;
 
 type NodeType = 'single' | 'disagg' | 'all';
 
@@ -67,6 +141,8 @@ function formatSpecMethod(method: string) {
 export function CurrentImageContent() {
   const { data, isLoading, error } = useLatestImages();
   const { data: releases } = useFrameworkReleases();
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   const [selectedModel, setSelectedModel] = useState<string>('all');
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
@@ -125,17 +201,13 @@ export function CurrentImageContent() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Current InferenceX Image</h1>
-        <p className="mt-2 text-muted-foreground">
-          Docker image tags for each model and GPU configuration.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t.title}</h1>
+        <p className="mt-2 text-muted-foreground">{t.description}</p>
       </div>
 
-      {isLoading && <div className="py-12 text-center text-muted-foreground">Loading...</div>}
+      {isLoading && <div className="py-12 text-center text-muted-foreground">{t.loading}</div>}
 
-      {error && (
-        <div className="py-12 text-center text-destructive">Failed to load image data.</div>
-      )}
+      {error && <div className="py-12 text-center text-destructive">{t.error}</div>}
 
       {options && (
         <TooltipProvider delayDuration={0}>
@@ -143,8 +215,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-model-select"
-                label="Model"
-                tooltip="Filter by language model."
+                label={t.labelModel}
+                tooltip={t.tooltipModel}
               />
               <Select
                 value={selectedModel}
@@ -157,7 +229,7 @@ export function CurrentImageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Models</SelectItem>
+                  <SelectItem value="all">{t.allModels}</SelectItem>
                   {options.models.map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
@@ -170,8 +242,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-precision-select"
-                label="Precision"
-                tooltip="Numerical precision used for model weights."
+                label={t.labelPrecision}
+                tooltip={t.tooltipPrecision}
               />
               <Select
                 value={selectedPrecision}
@@ -184,7 +256,7 @@ export function CurrentImageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">{t.all}</SelectItem>
                   {options.precisions.map((p) => (
                     <SelectItem key={p} value={p}>
                       {p.toUpperCase()}
@@ -197,8 +269,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-sequence-select"
-                label="ISL / OSL"
-                tooltip="Input Sequence Length / Output Sequence Length in tokens."
+                label={t.labelIslOsl}
+                tooltip={t.tooltipIslOsl}
               />
               <Select
                 value={selectedSequence}
@@ -223,8 +295,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-spec-decode-select"
-                label="Spec Decode"
-                tooltip="Speculative decoding method. MTP = Multi-Token Prediction."
+                label={t.labelSpecDecode}
+                tooltip={t.tooltipSpecDecode}
               />
               <Select
                 value={selectedSpecMethod}
@@ -237,7 +309,7 @@ export function CurrentImageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">{t.all}</SelectItem>
                   {options.specMethods.map((m) => (
                     <SelectItem key={m} value={m}>
                       {formatSpecMethod(m)}
@@ -250,8 +322,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-hardware-select"
-                label="GPU SKU"
-                tooltip="Filter by GPU model (e.g. H200, MI300X, B200)."
+                label={t.labelGpuSku}
+                tooltip={t.tooltipGpuSku}
               />
               <Select
                 value={selectedHardware}
@@ -264,7 +336,7 @@ export function CurrentImageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">{t.all}</SelectItem>
                   {options.hardwares.map((h) => (
                     <SelectItem key={h} value={h}>
                       {h.toUpperCase()}
@@ -277,8 +349,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-node-type-select"
-                label="Node Type"
-                tooltip="Single node = non-disaggregated serving. Disagg = separate prefill/decode pools, including Dynamo, Mori, and llm-d."
+                label={t.labelNodeType}
+                tooltip={t.tooltipNodeType}
               />
               <Select
                 value={selectedNodeType}
@@ -291,9 +363,9 @@ export function CurrentImageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="single">Single Node</SelectItem>
-                  <SelectItem value="disagg">Disaggregated</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="single">{t.singleNode}</SelectItem>
+                  <SelectItem value="disagg">{t.disagg}</SelectItem>
+                  <SelectItem value="all">{t.all}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -301,8 +373,8 @@ export function CurrentImageContent() {
             <div className="flex flex-col space-y-1.5">
               <LabelWithTooltip
                 htmlFor="image-framework-multiselect"
-                label="Framework"
-                tooltip="Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks."
+                label={t.labelFramework}
+                tooltip={t.tooltipFramework}
               />
               <MultiSelect
                 triggerId="image-framework-multiselect"
@@ -318,7 +390,7 @@ export function CurrentImageContent() {
                   });
                   setSelectedFrameworks(v);
                 }}
-                placeholder="All frameworks"
+                placeholder={t.allFrameworks}
               />
             </div>
           </div>
@@ -326,9 +398,7 @@ export function CurrentImageContent() {
       )}
 
       {data && filtered.length === 0 && (
-        <div className="py-12 text-center text-muted-foreground">
-          No image data matches the selected filters.
-        </div>
+        <div className="py-12 text-center text-muted-foreground">{t.noMatch}</div>
       )}
 
       {filtered.length > 0 && (
@@ -336,19 +406,14 @@ export function CurrentImageContent() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-4 py-3 text-left text-sm font-semibold">Model</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Precision</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">GPU SKU</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Spec Decode</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Current InferenceX Image Tag
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Actual Latest Tag</th>
-                <th
-                  className="px-4 py-3 text-left text-sm font-semibold whitespace-nowrap"
-                  title="Whole days between today and the most recent benchmark submission for this config"
-                >
-                  Days Since Update
+                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thModel}</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thPrecision}</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thGpuSku}</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thSpecDecode}</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thCurrentTag}</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">{t.thActualLatest}</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold whitespace-nowrap">
+                  {t.thDaysSince}
                 </th>
               </tr>
             </thead>

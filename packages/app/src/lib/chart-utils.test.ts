@@ -17,6 +17,8 @@ import {
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
   paretoFrontUpperLeft,
+  metricTitle,
+  metricLabel,
 } from '@/lib/chart-utils';
 
 // mock constants so createChartDataPoint (also in this module) doesn't call
@@ -2293,5 +2295,68 @@ describe('paretoFrontLowerRight', () => {
     const input = [paretoPt(1, 1), paretoPt(3, 5), paretoPt(2, 3)];
     paretoFrontLowerRight(input);
     expect(input.map((p) => p.x)).toEqual([3, 2, 1]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// metricTitle / metricLabel
+// ---------------------------------------------------------------------------
+describe('metricTitle', () => {
+  const chartDef = {
+    chartType: 'interactivity',
+    heading: 'vs. Interactivity',
+    x: 'median_intvty',
+    x_label: 'Interactivity (tok/s/user)',
+    y: 'tput_per_gpu',
+    y_tpPerGpu_title: 'Token Throughput per GPU',
+    y_tpPerGpu_titleZh: '每 GPU token 吞吐量',
+    y_costh_title: 'Cost per Million Total Tokens (Owning - Hyperscaler)',
+  } as ChartDefinition;
+
+  it('returns English title for locale en', () => {
+    expect(metricTitle(chartDef, 'y_tpPerGpu', 'en')).toBe('Token Throughput per GPU');
+  });
+
+  it('returns Chinese title for locale zh', () => {
+    expect(metricTitle(chartDef, 'y_tpPerGpu', 'zh')).toBe('每 GPU token 吞吐量');
+  });
+
+  it('falls back to English when Zh field is missing', () => {
+    expect(metricTitle(chartDef, 'y_costh', 'zh')).toBe(
+      'Cost per Million Total Tokens (Owning - Hyperscaler)',
+    );
+  });
+
+  it('returns empty string for unknown metric', () => {
+    expect(metricTitle(chartDef, 'y_unknown', 'en')).toBe('');
+  });
+});
+
+describe('metricLabel', () => {
+  const chartDef = {
+    chartType: 'interactivity',
+    heading: 'vs. Interactivity',
+    x: 'median_intvty',
+    x_label: 'Interactivity (tok/s/user)',
+    y: 'tput_per_gpu',
+    y_tpPerGpu_label: 'Token Throughput per GPU (tok/s/gpu)',
+    y_tpPerGpu_labelZh: '每 GPU token 吞吐量（tok/s/gpu）',
+    y_costh_label: 'Cost per Million Total Tokens ($)',
+  } as ChartDefinition;
+
+  it('returns English label for locale en', () => {
+    expect(metricLabel(chartDef, 'y_tpPerGpu', 'en')).toBe('Token Throughput per GPU (tok/s/gpu)');
+  });
+
+  it('returns Chinese label for locale zh', () => {
+    expect(metricLabel(chartDef, 'y_tpPerGpu', 'zh')).toBe('每 GPU token 吞吐量（tok/s/gpu）');
+  });
+
+  it('falls back to English when Zh field is missing', () => {
+    expect(metricLabel(chartDef, 'y_costh', 'zh')).toBe('Cost per Million Total Tokens ($)');
+  });
+
+  it('returns empty string for unknown metric', () => {
+    expect(metricLabel(chartDef, 'y_unknown', 'en')).toBe('');
   });
 });

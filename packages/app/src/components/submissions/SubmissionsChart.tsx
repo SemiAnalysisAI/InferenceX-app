@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   D3Chart,
@@ -77,10 +78,17 @@ function generateTooltipContent(d: ChartPoint, isPinned: boolean): string {
     </div>`;
 }
 
+const SUBMISSIONS_STRINGS = {
+  en: { onChangeOnly: 'On-change only' },
+  zh: { onChangeOnly: '仅变更' },
+} as const;
+
 export default function SubmissionsChart({ volume, mode, caption }: SubmissionsChartProps) {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [enabledLines, setEnabledLines] = useState<Set<LineKey>>(new Set(LINE_KEYS));
   const [onChangeOnly, setOnChangeOnly] = useState(true);
+  const locale = useLocale();
+  const legendT = SUBMISSIONS_STRINGS[locale];
 
   const toggleLine = useCallback((name: string) => {
     setEnabledLines((prev) => {
@@ -292,7 +300,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
                 ? [
                     {
                       id: 'submissions-on-change-only',
-                      label: 'On-change only',
+                      label: legendT.onChangeOnly,
                       checked: onChangeOnly,
                       onCheckedChange: (checked) => {
                         setOnChangeOnly(checked);

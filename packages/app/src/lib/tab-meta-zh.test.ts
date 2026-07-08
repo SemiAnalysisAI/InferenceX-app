@@ -30,10 +30,10 @@ describe('ZH_TAB_KEYS', () => {
 });
 
 describe('isZhTab', () => {
-  it('accepts mirrored tabs and rejects unmirrored or unknown ones', () => {
+  it('accepts mirrored tabs and rejects unknown ones', () => {
     expect(isZhTab('inference')).toBe(true);
-    expect(isZhTab('ai-chart')).toBe(false);
-    expect(isZhTab('feedback')).toBe(false);
+    expect(isZhTab('ai-chart')).toBe(true);
+    expect(isZhTab('feedback')).toBe(true);
     expect(isZhTab('nonexistent')).toBe(false);
   });
 });

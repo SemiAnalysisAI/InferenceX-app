@@ -5,7 +5,23 @@ import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { ChartHover, type HoverItem } from '@/components/inference/agentic-point/chart-hover';
 import type { Distribution } from '@/hooks/api/use-datasets';
+import { useLocale } from '@/lib/use-locale';
 import { compact } from './format';
+
+const STRINGS = {
+  en: {
+    noData: 'No data',
+    logScale: 'log scale',
+    range: 'Range',
+    count: 'Count',
+  },
+  zh: {
+    noData: '暂无数据',
+    logScale: '对数刻度',
+    range: '范围',
+    count: '数量',
+  },
+} as const;
 
 interface DistributionCardProps {
   title: string;
@@ -13,7 +29,6 @@ interface DistributionCardProps {
   unit: string;
   distribution?: Distribution;
   scale?: 'log' | 'linear';
-  /** Format the x value (defaults to compact). e.g. percent for cached fraction. */
   formatValue?: (v: number) => string;
 }
 
@@ -21,12 +36,6 @@ const W = 720;
 const H = 240;
 const PAD = { top: 12, right: 16, bottom: 48, left: 52 };
 
-/**
- * Renders a precomputed histogram (bins + stats from datasets.chart_data) as a
- * themeable bar chart with p50/p75/p90/p95 guide lines and a hover tooltip. Bars are
- * drawn at equal visual width; for log-scaled bins the edge labels are already
- * log-spaced so the shape reads as a log histogram.
- */
 export function DistributionCard({
   title,
   subtitle,
@@ -35,6 +44,9 @@ export function DistributionCard({
   scale = 'linear',
   formatValue = compact,
 }: DistributionCardProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+
   const computed = useMemo(() => {
     const bins = distribution?.bins ?? [];
     if (bins.length === 0) return null;
@@ -43,9 +55,6 @@ export function DistributionCard({
     const innerH = H - PAD.top - PAD.bottom;
     const n = bins.length;
     const barW = innerW / n;
-    // Map a data value to an x pixel by locating its bin (positional — works for
-    // both linear and log bins since the edges are precomputed at ingest).
-    // Out-of-range values clamp to the first/last bin.
     const valueToX = (v: number): number => {
       for (let i = 0; i < n; i++) {
         if (v >= bins[i].x0 && (v < bins[i].x1 || i === n - 1)) {
@@ -63,7 +72,7 @@ export function DistributionCard({
       <Card className="p-4">
         <div className="mb-1 text-sm font-medium text-foreground">{title}</div>
         <div className="grid h-[240px] place-items-center text-xs text-muted-foreground">
-          No data
+          {t.noData}
         </div>
       </Card>
     );
@@ -85,7 +94,6 @@ export function DistributionCard({
       ]
     : [];
 
-  // X tick labels from a few bin edges.
   const tickIdxs = [0, Math.floor(n / 3), Math.floor((2 * n) / 3), n - 1];
 
   const resolve = (fraction: number) => {
@@ -94,10 +102,10 @@ export function DistributionCard({
     const items: HoverItem[] = [
       {
         color: 'currentColor',
-        label: 'Range',
+        label: t.range,
         value: `${formatValue(b.x0)}–${formatValue(b.x1)} ${unit}`,
       },
-      { color: 'currentColor', label: 'Count', value: b.count.toLocaleString() },
+      { color: 'currentColor', label: t.count, value: b.count.toLocaleString() },
     ];
     return { items };
   };
@@ -108,7 +116,7 @@ export function DistributionCard({
         <span className="text-sm font-medium text-foreground">{title}</span>
         {scale === 'log' && (
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            log scale
+            {t.logScale}
           </span>
         )}
       </div>

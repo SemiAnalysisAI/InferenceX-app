@@ -14,6 +14,7 @@ import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-marg
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useLocale } from '@/lib/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
@@ -73,6 +74,17 @@ function positionLabelPairs(
   apply(overlayLabels);
 }
 
+const RELIABILITY_STRINGS = {
+  en: {
+    highContrast: 'High Contrast',
+    resetFilter: 'Reset filter',
+  },
+  zh: {
+    highContrast: '高对比度',
+    resetFilter: '重置筛选',
+  },
+} as const;
+
 export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode }) {
   const hoveredBarXRef = useRef(0);
   const {
@@ -89,6 +101,8 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     isLegendExpanded,
     setIsLegendExpanded,
   } = useReliabilityContext();
+  const locale = useLocale();
+  const legendT = RELIABILITY_STRINGS[locale];
 
   const sortedModels = useMemo(
     () =>
@@ -297,7 +311,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             switches={[
               {
                 id: 'reliability-high-contrast',
-                label: 'High Contrast',
+                label: legendT.highContrast,
                 checked: highContrast,
                 onCheckedChange: (checked) => {
                   setHighContrast(checked);
@@ -310,7 +324,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
                 ? [
                     {
                       id: 'reliability-reset-filter',
-                      label: 'Reset filter',
+                      label: legendT.resetFilter,
                       onClick: () => {
                         selectAllModels();
                         track('reliability_filter_reset');

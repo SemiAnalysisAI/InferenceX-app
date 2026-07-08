@@ -48,11 +48,23 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/compare')).toBe(true);
     expect(hasZhSibling('/compare/deepseek-r1-h100-vs-h200')).toBe(true);
     expect(hasZhSibling('/compare-per-dollar/deepseek-r1-h100-vs-h200')).toBe(true);
+    expect(hasZhSibling('/compare-precision')).toBe(true);
+    expect(hasZhSibling('/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(true);
+    expect(hasZhSibling('/compare-spec-decode')).toBe(true);
+    expect(hasZhSibling('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(true);
   });
 
-  it('rejects unmirrored routes', () => {
-    expect(hasZhSibling('/datasets')).toBe(false);
-    expect(hasZhSibling('/feedback')).toBe(false);
+  it('matches datasets, gated tabs, and agentic detail pages', () => {
+    expect(hasZhSibling('/datasets')).toBe(true);
+    expect(hasZhSibling('/datasets/some-set/conversations/abc123')).toBe(true);
+    expect(hasZhSibling('/ai-chart')).toBe(true);
+    expect(hasZhSibling('/current-inferencex-image')).toBe(true);
+    expect(hasZhSibling('/feedback')).toBe(true);
+    expect(hasZhSibling('/inference/agentic/42')).toBe(true);
+  });
+
+  it('rejects unknown routes', () => {
+    expect(hasZhSibling('/nonexistent')).toBe(false);
   });
 });
 
@@ -74,10 +86,27 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/zh/compare-per-dollar/foo-vs-bar')).toBe(
       '/compare-per-dollar/foo-vs-bar',
     );
+    expect(switchLocalePath('/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(
+      '/zh/compare-precision/deepseek-r1-h100-fp8-vs-bf16',
+    );
+    expect(switchLocalePath('/zh/compare-precision/deepseek-r1-h100-fp8-vs-bf16')).toBe(
+      '/compare-precision/deepseek-r1-h100-fp8-vs-bf16',
+    );
+    expect(switchLocalePath('/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(
+      '/zh/compare-spec-decode/deepseek-r1-h100-mtp-vs-none',
+    );
+    expect(switchLocalePath('/zh/compare-spec-decode/deepseek-r1-h100-mtp-vs-none')).toBe(
+      '/compare-spec-decode/deepseek-r1-h100-mtp-vs-none',
+    );
+  });
+
+  it('switches datasets pages within the language trees', () => {
+    expect(switchLocalePath('/datasets')).toBe('/zh/datasets');
+    expect(switchLocalePath('/zh/datasets/some-set')).toBe('/datasets/some-set');
   });
 
   it('falls back to the other homepage for unmirrored paths', () => {
-    expect(switchLocalePath('/datasets')).toBe('/zh');
+    expect(switchLocalePath('/some-unknown-route')).toBe('/zh');
     expect(switchLocalePath('/zh/unknown-page')).toBe('/');
   });
 });

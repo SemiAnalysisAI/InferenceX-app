@@ -10,6 +10,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { getChartWatermark } from '@/lib/data-mappings';
 import { generateGpuDateColors } from '@/lib/dynamic-colors';
+import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
@@ -71,6 +72,27 @@ function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): str
   return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
+const GPU_STRINGS = {
+  en: {
+    logScale: 'Log Scale',
+    highContrast: 'High Contrast',
+    optimalOnly: 'Optimal Only',
+    labels: 'Labels',
+    parallelismLabels: 'Parallelism Labels',
+    lineLabels: 'Line Labels',
+    resetFilter: 'Reset filter',
+  },
+  zh: {
+    logScale: '对数缩放',
+    highContrast: '高对比度',
+    optimalOnly: '仅最优',
+    labels: '标签',
+    parallelismLabels: '并行配置标签',
+    lineLabels: '曲线标签',
+    resetFilter: '重置筛选',
+  },
+} as const;
+
 const GPUGraph = React.memo(
   ({
     chartId,
@@ -109,6 +131,8 @@ const GPUGraph = React.memo(
       showLineLabels,
       setShowLineLabels,
     } = useInference();
+    const locale = useLocale();
+    const legendT = GPU_STRINGS[locale];
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
 
@@ -314,12 +338,17 @@ const GPUGraph = React.memo(
         xScale,
         yScale,
         annotations: knownIssueAnnotations,
-        rightInset: measureLegendRightInset(
-          chartId,
-          ctx.layout.svg.node(),
-          ctx.layout.margin.left,
-          ctx.width,
-        ),
+        // Only measure the legend overlap when there are boxes to place —
+        // this runs on every zoom frame, and the measurement forces layout.
+        rightInset:
+          knownIssueAnnotations.length === 0
+            ? 0
+            : measureLegendRightInset(
+                chartId,
+                ctx.layout.svg.node(),
+                ctx.layout.margin.left,
+                ctx.width,
+              ),
         background: getCssColor('--background'),
         foreground: getCssColor('--foreground'),
         mutedForeground: getCssColor('--muted-foreground'),
@@ -517,7 +546,7 @@ const GPUGraph = React.memo(
             }
           }
 
-          zoomGroup
+          const llSel = zoomGroup
             .selectAll<SVGGElement, LineLabel>('.line-label')
             .data(lineLabels, (d) => d.key)
             .join(
@@ -542,20 +571,30 @@ const GPUGraph = React.memo(
             .attr('data-line-key', (d) => d.key)
             .attr('data-graph-id', (d) => d.graphId)
             .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
-            .style('opacity', (d) => (d.visible ? 0.95 : 0))
-            .each(function (d) {
-              const g = d3.select(this);
-              const text = g.select<SVGTextElement>('.ll-text').text(d.label);
-              const bbox = (text.node() as SVGTextElement).getBBox();
-              const px = 5;
-              const py = 3;
-              g.select('.ll-bg')
-                .attr('x', bbox.x - px)
-                .attr('y', bbox.y - py)
-                .attr('width', bbox.width + px * 2)
-                .attr('height', bbox.height + py * 2)
-                .attr('fill', d.color);
-            });
+            .style('opacity', (d) => (d.visible ? 0.95 : 0));
+
+          // Size each label's background to its text in two passes — write all
+          // texts, then measure all bboxes — so the batch forces one layout
+          // instead of one per label (mirrors ScatterGraph's label loops).
+          llSel.each(function (d) {
+            d3.select(this).select<SVGTextElement>('.ll-text').text(d.label);
+          });
+          const llMeasured: { node: SVGGElement; d: LineLabel; bbox: DOMRect }[] = [];
+          llSel.each(function (d) {
+            const text = this.querySelector<SVGTextElement>('.ll-text');
+            if (text) llMeasured.push({ node: this, d, bbox: text.getBBox() });
+          });
+          for (const { node, d, bbox } of llMeasured) {
+            const px = 5;
+            const py = 3;
+            d3.select(node)
+              .select('.ll-bg')
+              .attr('x', bbox.x - px)
+              .attr('y', bbox.y - py)
+              .attr('width', bbox.width + px * 2)
+              .attr('height', bbox.height + py * 2)
+              .attr('fill', d.color);
+          }
         },
         onZoom: (zoomGroup, ctx) => {
           if (!showLineLabels) return;
@@ -675,36 +714,31 @@ const GPUGraph = React.memo(
       chartRef.current?.dismissTooltip();
     }, [selectedPrecisions, selectedYAxisMetric, selectedGPUs, selectedDates, selectedDateRange]);
 
+    // Hover dimming animates via the inline `transition: opacity 150ms ease`
+    // onRender puts on dots and rooflines — a single style write per node. A
+    // d3 `.transition()` here would re-write opacity every animation frame,
+    // each write restarting the CSS transition (transitionrun/cancel per node
+    // per frame). Same rationale as ScatterGraph's hover handlers.
     const handleLegendHover = useCallback((seriesId: string) => {
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .transition('legend-hover')
-        .duration(150)
         .style('opacity', (d) => (`${d.date}_${d.hwKey}` === seriesId ? 1 : 0.15));
-      root
-        .selectAll<SVGPathElement, unknown>('.roofline-path')
-        .transition('legend-hover')
-        .duration(150)
-        .style('opacity', function () {
-          const key = (d3.select(this).datum() as { key: string } | null)?.key ?? '';
-          const series = key.slice(0, key.lastIndexOf('_'));
-          return series === seriesId ? null : '0.15';
-        });
+      root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
+        const key = (d3.select(this).datum() as { key: string } | null)?.key ?? '';
+        const series = key.slice(0, key.lastIndexOf('_'));
+        return series === seriesId ? null : '0.15';
+      });
     }, []);
 
     const handleLegendHoverEnd = useCallback(() => {
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
-      root.selectAll('.dot-group').transition('legend-hover').duration(150).style('opacity', null);
-      root
-        .selectAll('.roofline-path')
-        .transition('legend-hover')
-        .duration(150)
-        .style('opacity', null);
+      root.selectAll('.dot-group').style('opacity', null);
+      root.selectAll('.roofline-path').style('opacity', null);
     }, []);
 
     if (data.length === 0) {
@@ -876,6 +910,12 @@ const GPUGraph = React.memo(
           // Set foreground color on scatter point labels
           ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
 
+          // CSS transitions for smooth opacity animation on legend hover —
+          // the hover handlers write opacity once and let these animate.
+          ctx.layout.zoomGroup
+            .selectAll('.dot-group, .roofline-path')
+            .style('transition', 'opacity 150ms ease');
+
           // Offload halo: dashed ring on every point that used KV offload
           // (mirrors ScatterGraph so compare mode shows the same CPU-offload
           // indicator). The ring is a child of the dot-group, so it travels
@@ -928,7 +968,7 @@ const GPUGraph = React.memo(
             switches={[
               {
                 id: 'gpu-log-scale',
-                label: 'Log Scale',
+                label: legendT.logScale,
                 checked: logScale,
                 onCheckedChange: (c) => {
                   setLogScale(c);
@@ -937,7 +977,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-high-contrast',
-                label: 'High Contrast',
+                label: legendT.highContrast,
                 checked: highContrast,
                 onCheckedChange: (c) => {
                   setHighContrast(c);
@@ -946,7 +986,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-hide-non-optimal',
-                label: 'Optimal Only',
+                label: legendT.optimalOnly,
                 checked: hideNonOptimal,
                 onCheckedChange: (c) => {
                   setHideNonOptimal(c);
@@ -955,7 +995,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-point-labels',
-                label: 'Labels',
+                label: legendT.labels,
                 checked: showPointLabels,
                 onCheckedChange: (c) => {
                   setShowPointLabels(c);
@@ -964,7 +1004,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-parallelism-labels',
-                label: 'Parallelism Labels',
+                label: legendT.parallelismLabels,
                 checked: useAdvancedLabels,
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
@@ -976,7 +1016,7 @@ const GPUGraph = React.memo(
               },
               {
                 id: 'gpu-line-labels',
-                label: 'Line Labels',
+                label: legendT.lineLabels,
                 checked: showLineLabels,
                 onCheckedChange: (c) => {
                   setShowLineLabels(c);
@@ -987,7 +1027,7 @@ const GPUGraph = React.memo(
             actions={[
               {
                 id: 'gpu-reset-filter',
-                label: 'Reset filter',
+                label: legendT.resetFilter,
                 onClick: () => {
                   selectAllActiveDates();
                   track('gpu_timeseries_reset_filter');

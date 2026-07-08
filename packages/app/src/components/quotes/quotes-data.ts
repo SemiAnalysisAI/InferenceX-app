@@ -452,6 +452,26 @@ export const QUOTES: Quote[] = [
     logo: 'embeddedllm.webp',
     link: 'https://www.linkedin.com/in/tanpinsiang',
   },
+  {
+    text: 'Agentic workloads are where context caching starts to matter in a very concrete way. The same tools, instructions, documents, and conversation state get reused across many steps, and every recomputed prefix adds latency and GPU cost. Tensormesh is built to make that reuse visible and usable in production, whether teams run through an OpenAI-compatible API or on reserved capacity. InferenceX is useful because it tests these workloads the way they actually behave, with long sessions, repeated context, and enough cache pressure to show whether the serving system is doing the right thing.',
+    textZh:
+      '智能体工作负载让上下文缓存的价值以非常具体的方式显现出来。相同的工具、指令、文档和对话状态会在许多步骤中被反复使用，而每一次重新计算的前缀都会增加延迟和 GPU 成本。Tensormesh 的目标就是让这种复用在生产环境中可见、可用——无论团队是通过 OpenAI 兼容 API 还是在预留算力上运行。InferenceX 的价值在于它按照这些工作负载的真实行为进行测试：长会话、重复上下文，以及足够的缓存压力，足以检验服务系统是否做对了。',
+    name: 'Kuntai Du',
+    title: 'Chief Scientist at Tensormesh & Co-Creator of LMCache',
+    org: 'Tensormesh',
+    logo: 'tensormesh.svg',
+    link: 'https://www.linkedin.com/in/kuntai-du/',
+  },
+  {
+    text: 'LMCache started from a simple observation: KV cache should be managed by the serving system, not treated as disposable state inside one engine. Agentic traces make that especially clear. They create repeated prefixes, shared context, long conversations, and opportunities to move cache between GPU memory, host memory, storage, and other workers. InferenceX gives the community a way to measure those behaviors directly, including KV offload, cache sharing, and prefill efficiency, on workloads that look much closer to real agent use than a fixed prompt benchmark.',
+    textZh:
+      'LMCache 源于一个简单的观察：KV cache 应该由服务系统统一管理，而不是被当作单个引擎内部用完即弃的状态。智能体轨迹让这一点尤为清晰：它们会产生重复前缀、共享上下文、长对话，以及在 GPU 显存、主机内存、存储和其他 worker 之间迁移缓存的机会。InferenceX 让社区能够直接测量这些行为——包括 KV 卸载、缓存共享和预填充效率——而所用的工作负载远比固定提示词基准测试更接近真实的智能体使用场景。',
+    name: 'Yihua Cheng',
+    title: 'Co-Creator of LMCache & CTO at Tensormesh',
+    org: 'LMCache',
+    logo: 'lmcache.webp',
+    link: 'https://www.linkedin.com/in/yihuacheng-215133327/',
+  },
 ];
 
 /**

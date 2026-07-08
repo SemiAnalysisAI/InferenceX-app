@@ -10,6 +10,7 @@ import iwanthue from 'iwanthue';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
+import type { Locale } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // High-contrast color generation (iwanthue — k-means in CIELab)
@@ -858,4 +859,24 @@ export function markRooflinePoints(
     }
   }
   return finalProcessedData;
+}
+
+// ---------------------------------------------------------------------------
+// Locale-aware metric label/title helpers
+// ---------------------------------------------------------------------------
+
+export function metricTitle(chartDef: ChartDefinition, metricKey: string, locale: Locale): string {
+  if (locale === 'zh') {
+    const zh = chartDef[`${metricKey}_titleZh`];
+    if (typeof zh === 'string' && zh) return zh;
+  }
+  return (chartDef[`${metricKey}_title`] as string) || '';
+}
+
+export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale: Locale): string {
+  if (locale === 'zh') {
+    const zh = chartDef[`${metricKey}_labelZh`];
+    if (typeof zh === 'string' && zh) return zh;
+  }
+  return (chartDef[`${metricKey}_label`] as string) || '';
 }

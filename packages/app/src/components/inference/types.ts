@@ -339,6 +339,7 @@ export type YAxisMetricKey =
 export type InferenceChartType = 'e2e' | 'interactivity';
 
 export interface ChartDefinition {
+  [key: string]: string | number | undefined;
   chartType: InferenceChartType;
   heading: string;
   x: keyof AggDataEntry;

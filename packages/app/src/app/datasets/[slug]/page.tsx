@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { DatasetDetail } from '@/components/datasets/dataset-detail';
+import { languageAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 interface Props {
@@ -14,7 +15,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical: `${SITE_URL}/datasets/${slug}` },
+    alternates: {
+      canonical: `${SITE_URL}/datasets/${slug}`,
+      languages: languageAlternates(`/datasets/${slug}`),
+    },
     openGraph: { title: `${title} | InferenceX`, description, url: `${SITE_URL}/datasets/${slug}` },
     twitter: { title: `${title} | InferenceX`, description },
   };
