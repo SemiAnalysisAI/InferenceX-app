@@ -320,6 +320,7 @@ export interface LatestImageRow {
   framework: string;
   precision: string;
   spec_method: string;
+  disagg: boolean;
   isl: number;
   osl: number;
   image: string;

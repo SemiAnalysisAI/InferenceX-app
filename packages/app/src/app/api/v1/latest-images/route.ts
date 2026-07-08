@@ -7,7 +7,7 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedLatestImages = cachedQuery(() => getLatestImages(getDb()), 'latest-images', {
+const getCachedLatestImages = cachedQuery(() => getLatestImages(getDb()), 'latest-images-v2', {
   blobOnly: true,
 });
 

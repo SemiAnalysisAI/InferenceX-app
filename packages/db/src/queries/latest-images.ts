@@ -6,6 +6,7 @@ export interface LatestImageRow {
   framework: string;
   precision: string;
   spec_method: string;
+  disagg: boolean;
   isl: number;
   osl: number;
   image: string;
@@ -24,6 +25,7 @@ export async function getLatestImages(sql: DbClient): Promise<LatestImageRow[]> 
       c.framework,
       c.precision,
       c.spec_method,
+      c.disagg,
       lb.isl,
       lb.osl,
       lb.image,

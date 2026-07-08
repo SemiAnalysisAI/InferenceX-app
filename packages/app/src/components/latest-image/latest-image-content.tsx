@@ -23,30 +23,11 @@ import {
   AGE_MAX_RED_DAYS,
   ageColorStyle,
   ageRowStyle,
+  baseFramework,
   daysSince,
   getActualLatestTag,
   isOutdated,
 } from './latest-image-utils';
-
-/**
- * Disaggregated frameworks pair a separate prefill/decode pool — identified by
- * `dynamo-*` (NVIDIA Dynamo) or `mori-*` (AMD Mori) prefix on the framework key.
- */
-function isDisaggFramework(framework: string): boolean {
-  return framework.startsWith('dynamo-') || framework.startsWith('mori-');
-}
-
-/**
- * Strip the disagg prefix to get the base engine ID. `dynamo-trt` → `trt`,
- * `mori-sglang` → `sglang`, plain `vllm` stays `vllm`. Used by the framework
- * multi-select so users pick engines (sglang / vllm / trt / atom) without
- * having to think about whether they're disagg variants.
- */
-function baseFramework(framework: string): string {
-  if (framework.startsWith('dynamo-')) return framework.slice('dynamo-'.length);
-  if (framework.startsWith('mori-')) return framework.slice('mori-'.length);
-  return framework;
-}
 
 type NodeType = 'single' | 'disagg' | 'all';
 
@@ -116,7 +97,7 @@ export function CurrentImageContent() {
       if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
       if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
       if (selectedNodeType !== 'all') {
-        const disagg = isDisaggFramework(row.framework);
+        const disagg = row.disagg;
         if (selectedNodeType === 'single' && disagg) return false;
         if (selectedNodeType === 'disagg' && !disagg) return false;
       }
@@ -297,7 +278,7 @@ export function CurrentImageContent() {
               <LabelWithTooltip
                 htmlFor="image-node-type-select"
                 label="Node Type"
-                tooltip="Single node = vLLM/SGLang/TRTLLM. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools."
+                tooltip="Single node = non-disaggregated serving. Disagg = separate prefill/decode pools, including Dynamo, Mori, and llm-d."
               />
               <Select
                 value={selectedNodeType}
@@ -311,7 +292,7 @@ export function CurrentImageContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="single">Single Node</SelectItem>
-                  <SelectItem value="disagg">Disagg (Dynamo / Mori)</SelectItem>
+                  <SelectItem value="disagg">Disaggregated</SelectItem>
                   <SelectItem value="all">All</SelectItem>
                 </SelectContent>
               </Select>
@@ -321,7 +302,7 @@ export function CurrentImageContent() {
               <LabelWithTooltip
                 htmlFor="image-framework-multiselect"
                 label="Framework"
-                tooltip="Filter by inference engine (sglang, vllm, TensorRT, atom). Disagg variants (dynamo-*, mori-*) collapse into their base engine. Empty = all frameworks."
+                tooltip="Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks."
               />
               <MultiSelect
                 triggerId="image-framework-multiselect"
