@@ -58,7 +58,10 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chrome, firefox]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        # Cap at four shards per browser. Every shard repeats checkout, dependency
+        # installation, Cypress setup, and a full app build; beyond four, that
+        # duplicated fixed cost dominates and yields sharply diminishing returns.
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -117,11 +120,11 @@ jobs:
           CI: true
           E2E_FIXTURES: '1'
           # cypress-split picks the subset of specs for this shard.
-          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..16].
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..4].
           # SPLIT_FILE seeds the balance from observed timings;
           # SPLIT_OUTPUT_FILE redirects on-disk updates to a throwaway path
           # so CI never tries to mutate the committed timings.json.
-          SPLIT: 16
+          SPLIT: 4
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json

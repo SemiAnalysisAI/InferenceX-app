@@ -102,11 +102,13 @@ function avoidLabelCollisions(
     nLines: number;
     defaultFirstY: number;
   }
-  const labels: LabelInfo[] = [];
+  const pending: Omit<LabelInfo, 'w'>[] = [];
   const ASCENT = 9;
   const DESCENT = 3;
   const LINE_H = 11;
 
+  // Pass 1 — writes only: reset every label to its default position so prior
+  // positioning doesn't bias the measurement.
   zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
     const labelEl = this.querySelector<SVGTextElement>('.point-label');
     if (!labelEl) return;
@@ -120,20 +122,21 @@ function avoidLabelCollisions(
     const cy = parseFloat(m[2]);
     const nLines = tspans.length;
     const defaultFirstY = -(8 + (nLines - 1) * LINE_H); // last baseline 8px above point
-    // Reset to default before measuring so prior positioning doesn't bias bbox
     tspans[0].setAttribute('dy', `${defaultFirstY}px`);
     labelEl.style.opacity = '1';
-    const bbox = labelEl.getBBox();
-    labels.push({
+    pending.push({
       el: labelEl,
       firstTspan: tspans[0],
       cx,
       cy,
-      w: bbox.width,
       nLines,
       defaultFirstY,
     });
   });
+
+  // Pass 2 — reads only: measure after all writes so the whole batch costs a
+  // single forced layout instead of one per label.
+  const labels: LabelInfo[] = pending.map((lab) => ({ ...lab, w: lab.el.getBBox().width }));
 
   labels.sort((a, b) => a.cx - b.cx);
   const placed: { left: number; right: number; top: number; bottom: number }[] = [];
@@ -884,6 +887,13 @@ const ScatterGraph = React.memo(
     // restyle with the same layout/scales the chart was drawn with.
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
 
+    // Hover dimming animates via the inline `transition: opacity 150ms ease`
+    // the render path puts on dots, rooflines, and labels — a single style
+    // write per node. A d3 `.transition()` here would re-write opacity every
+    // animation frame, and each of those writes restarts the CSS transition:
+    // one hover used to emit transitionrun/transitioncancel per node per
+    // frame (tens of thousands of events per session) and feed the same
+    // mutation churn to the PostHog recorder.
     const handleLegendHover = useCallback(
       (hwKey: string) => {
         const svg = chartRef.current?.getSvgElement?.();
@@ -891,23 +901,15 @@ const ScatterGraph = React.memo(
         const root = d3.select(svg);
         root
           .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .transition('legend-hover')
-          .duration(150)
           .style('opacity', (d) =>
             isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
           );
-        root
-          .selectAll<SVGPathElement, unknown>('.roofline-path')
-          .transition('legend-hover')
-          .duration(150)
-          .style('opacity', function () {
-            if (!isRooflineVisible(this)) return 0;
-            return this.dataset.hwKey === hwKey ? null : '0.15';
-          });
+        root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
+          if (!isRooflineVisible(this)) return 0;
+          return this.dataset.hwKey === hwKey ? null : '0.15';
+        });
         root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
-          .transition('legend-hover')
-          .duration(150)
           .style('opacity', function () {
             return labelOpacityForHover((this as SVGGElement).dataset, hwKey);
           });
@@ -921,20 +923,12 @@ const ScatterGraph = React.memo(
       const root = d3.select(svg);
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .transition('legend-hover')
-        .duration(150)
         .style('opacity', (d) => (isPointVisible(d) ? 1 : 0));
-      root
-        .selectAll<SVGPathElement, unknown>('.roofline-path')
-        .transition('legend-hover')
-        .duration(150)
-        .style('opacity', function () {
-          return isRooflineVisible(this) ? 1 : 0;
-        });
+      root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
+        return isRooflineVisible(this) ? 1 : 0;
+      });
       root
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
-        .transition('legend-hover')
-        .duration(150)
         .style('opacity', function () {
           return labelOpacityForActiveState(
             (this as SVGGElement).dataset,
@@ -1257,7 +1251,7 @@ const ScatterGraph = React.memo(
             });
           }
 
-          zoomGroup
+          const plSel = zoomGroup
             .selectAll<SVGGElement, LabelSeg>('.parallelism-label')
             .data(labelSegments, (d) => d.segKey)
             .join(
@@ -1288,20 +1282,31 @@ const ScatterGraph = React.memo(
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
-            .style('opacity', (d) => (d.visible ? 1 : 0))
-            .each(function (d) {
-              const g = d3.select(this);
-              const text = g.select<SVGTextElement>('.pl-text').text(d.label);
-              const bbox = (text.node() as SVGTextElement).getBBox();
-              const px = 4;
-              const py = 2;
-              g.select('.pl-bg')
-                .attr('x', bbox.x - px)
-                .attr('y', bbox.y - py)
-                .attr('width', bbox.width + px * 2)
-                .attr('height', bbox.height + py * 2)
-                .attr('fill', d.color);
-            });
+            .style('transition', 'opacity 150ms ease')
+            .style('opacity', (d) => (d.visible ? 1 : 0));
+
+          // Size each label's background to its text in two passes — write all
+          // texts, then measure all bboxes — so the batch forces one layout
+          // instead of one per label.
+          plSel.each(function (d) {
+            d3.select(this).select<SVGTextElement>('.pl-text').text(d.label);
+          });
+          const plMeasured: { node: SVGGElement; d: LabelSeg; bbox: DOMRect }[] = [];
+          plSel.each(function (d) {
+            const text = this.querySelector<SVGTextElement>('.pl-text');
+            if (text) plMeasured.push({ node: this, d, bbox: text.getBBox() });
+          });
+          for (const { node, d, bbox } of plMeasured) {
+            const px = 4;
+            const py = 2;
+            d3.select(node)
+              .select('.pl-bg')
+              .attr('x', bbox.x - px)
+              .attr('y', bbox.y - py)
+              .attr('width', bbox.width + px * 2)
+              .attr('height', bbox.height + py * 2)
+              .attr('fill', d.color);
+          }
 
           // ── Line labels (run name along each roofline) ──
           interface LineLabel {
@@ -1554,7 +1559,7 @@ const ScatterGraph = React.memo(
             }
           }
 
-          zoomGroup
+          const llSel = zoomGroup
             .selectAll<SVGGElement, LineLabel>('.line-label')
             .data(lineLabels, (d) => d.key)
             .join(
@@ -1589,20 +1594,30 @@ const ScatterGraph = React.memo(
             // share the same `data-hw-key`. See GH #470.
             .attr('data-visible', (d) => (d.visible ? '1' : '0'))
             .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
-            .style('opacity', (d) => (d.visible ? 1 : 0))
-            .each(function (d) {
-              const g = d3.select(this);
-              const text = g.select<SVGTextElement>('.ll-text').text(d.label);
-              const bbox = (text.node() as SVGTextElement).getBBox();
-              const px = 5;
-              const py = 3;
-              g.select('.ll-bg')
-                .attr('x', bbox.x - px)
-                .attr('y', bbox.y - py)
-                .attr('width', bbox.width + px * 2)
-                .attr('height', bbox.height + py * 2)
-                .attr('fill', d.color);
-            });
+            .style('transition', 'opacity 150ms ease')
+            .style('opacity', (d) => (d.visible ? 1 : 0));
+
+          // Two-pass text/bbox sizing — same batching rationale as the
+          // parallelism labels above.
+          llSel.each(function (d) {
+            d3.select(this).select<SVGTextElement>('.ll-text').text(d.label);
+          });
+          const llMeasured: { node: SVGGElement; d: LineLabel; bbox: DOMRect }[] = [];
+          llSel.each(function (d) {
+            const text = this.querySelector<SVGTextElement>('.ll-text');
+            if (text) llMeasured.push({ node: this, d, bbox: text.getBBox() });
+          });
+          for (const { node, d, bbox } of llMeasured) {
+            const px = 5;
+            const py = 3;
+            d3.select(node)
+              .select('.ll-bg')
+              .attr('x', bbox.x - px)
+              .attr('y', bbox.y - py)
+              .attr('width', bbox.width + px * 2)
+              .attr('height', bbox.height + py * 2)
+              .attr('fill', d.color);
+          }
         },
         onZoom: (zoomGroup, ctx) => {
           const ir = interactionRef.current;
@@ -2201,12 +2216,17 @@ const ScatterGraph = React.memo(
           xScale,
           yScale,
           annotations: ir.knownIssueAnnotations,
-          rightInset: measureLegendRightInset(
-            chartId,
-            ctx.layout.svg.node(),
-            ctx.layout.margin.left,
-            ctx.width,
-          ),
+          // Only measure the legend overlap when there are boxes to place —
+          // this runs on every zoom frame, and the measurement forces layout.
+          rightInset:
+            ir.knownIssueAnnotations.length === 0
+              ? 0
+              : measureLegendRightInset(
+                  chartId,
+                  ctx.layout.svg.node(),
+                  ctx.layout.margin.left,
+                  ctx.width,
+                ),
           background: ir.getCssColor('--background'),
           foreground: ir.getCssColor('--foreground'),
           mutedForeground: ir.getCssColor('--muted-foreground'),
