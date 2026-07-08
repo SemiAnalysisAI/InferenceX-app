@@ -114,32 +114,29 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-run-conclusion"]').should('contain.text', `#${runId}`);
   });
 
-  it('presents the full matrix inventory in its own tab', () => {
-    cy.contains('[role="tab"]', 'Matrix case inventory').click();
-    cy.location('hash').should('eq', '#tab-inventory');
+  it('keeps the chart on top and presents the matrix inventory in the default tab', () => {
+    // The chart is not inside a tab: it stays visible alongside every tab.
+    cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
     cy.get('[data-testid="collectivex-inventory"]')
       .should('contain.text', 'Matrix case inventory')
       .and('contain.text', `${dataset.coverage.length} of ${dataset.coverage.length} cases`);
     cy.get('[data-testid="collectivex-inventory-table"]')
       .should('contain.text', 'H200-DGXC')
       .and('contain.text', 'B300-SXM');
-    // The graph tab is the default, so the inventory is hidden until requested.
-    cy.contains('[role="tab"]', 'EP results').click();
+    cy.contains('[role="tab"]', 'Selected matrix case').click();
     cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
+    cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
   });
 
   it('jumps to the selected matrix case tab when a case is inspected', () => {
-    cy.contains('[role="tab"]', 'Selected matrix case').click();
-    cy.get('[data-testid="collectivex-case-detail"]').should(
-      'contain.text',
-      'Selected matrix case',
-    );
-    cy.contains('[role="tab"]', 'Matrix case inventory').click();
     cy.get('[data-testid="collectivex-inventory-table"] button[aria-label^="Inspect"]')
       .last()
       .click();
     cy.location('hash').should('eq', '#tab-case');
-    cy.get('[data-testid="collectivex-case-detail"]').should('be.visible');
+    cy.get('[data-testid="collectivex-case-detail"]').should(
+      'contain.text',
+      'Selected matrix case',
+    );
   });
 
   it('exposes terminal coverage, retained attempts, and run provenance in Evidence', () => {
@@ -157,8 +154,8 @@ describe('CollectiveX neutral run view', () => {
   it('restores the active tab with browser history', () => {
     cy.contains('[role="tab"]', 'Evidence').click();
     cy.location('hash').should('eq', '#tab-evidence');
-    cy.contains('[role="tab"]', 'EP results').click();
-    cy.location('hash').should('eq', '#tab-results');
+    cy.contains('[role="tab"]', 'Matrix case inventory').click();
+    cy.location('hash').should('eq', '#tab-inventory');
     cy.go('back');
     cy.location('hash').should('eq', '#tab-evidence');
     cy.get('[data-testid="collectivex-provenance"]').should('be.visible');
