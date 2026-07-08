@@ -94,6 +94,18 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('not.exist');
   });
 
+  it('pins a compact tooltip on point click', () => {
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', 'Click elsewhere to dismiss')
+      .and('contain.text', 'Round trip (measured) p99:')
+      .and('contain.text', 'Latency p50 / p90 / p95 / p99')
+      .and('contain.text', 'Full diagnostics')
+      // Deep diagnostics moved to the "Selected matrix case" tab.
+      .and('not.contain.text', 'Expert CV')
+      .and('not.contain.text', 'evidence=');
+  });
+
   it('notes that isolated sum is derived and never drives throughput', () => {
     cy.get('[data-testid="collectivex-operation-select"]').click();
     cy.contains('[role="option"]', 'Isolated sum').click();
