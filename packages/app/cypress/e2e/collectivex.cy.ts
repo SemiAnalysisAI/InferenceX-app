@@ -114,17 +114,32 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-run-conclusion"]').should('contain.text', `#${runId}`);
   });
 
-  it('presents the full matrix inventory with a selected case detail', () => {
+  it('presents the full matrix inventory in its own tab', () => {
+    cy.contains('[role="tab"]', 'Matrix case inventory').click();
+    cy.location('hash').should('eq', '#tab-inventory');
     cy.get('[data-testid="collectivex-inventory"]')
       .should('contain.text', 'Matrix case inventory')
       .and('contain.text', `${dataset.coverage.length} of ${dataset.coverage.length} cases`);
     cy.get('[data-testid="collectivex-inventory-table"]')
       .should('contain.text', 'H200-DGXC')
       .and('contain.text', 'B300-SXM');
+    // The graph tab is the default, so the inventory is hidden until requested.
+    cy.contains('[role="tab"]', 'EP results').click();
+    cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
+  });
+
+  it('jumps to the selected matrix case tab when a case is inspected', () => {
+    cy.contains('[role="tab"]', 'Selected matrix case').click();
     cy.get('[data-testid="collectivex-case-detail"]').should(
       'contain.text',
       'Selected matrix case',
     );
+    cy.contains('[role="tab"]', 'Matrix case inventory').click();
+    cy.get('[data-testid="collectivex-inventory-table"] button[aria-label^="Inspect"]')
+      .last()
+      .click();
+    cy.location('hash').should('eq', '#tab-case');
+    cy.get('[data-testid="collectivex-case-detail"]').should('be.visible');
   });
 
   it('exposes terminal coverage, retained attempts, and run provenance in Evidence', () => {
@@ -188,12 +203,13 @@ describe('CollectiveX availability states', () => {
   });
 
   it('renders the loading state while the run resolves', () => {
+    // "slow" is a reserved alias word in Cypress 15.
     cy.intercept('GET', '/collectivex-data/1/latest.json', { body: dataset, delay: 500 }).as(
-      'slow',
+      'slowLatest',
     );
     cy.visit('/collectivex');
     cy.get('[data-testid="collectivex-loading"]').should('be.visible');
-    cy.wait('@slow');
+    cy.wait('@slowLatest');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 

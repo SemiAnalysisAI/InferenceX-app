@@ -52,7 +52,11 @@ export function collectiveXColorKey(series: CollectiveXSeries): string {
     ? `${series.eplb.planner ?? 'enabled'}-${series.eplb.mapping_sha256 ?? 'unmapped'}-${series.eplb.physical_experts ?? 'auto'}`
     : 'eplb-off';
   const units = `${series.resource.comm_units_kind ?? 'units'}-${series.resource.configured_units ?? 'default'}`;
+  // The vendor leads the key so the chart color system (getVendor splits on "_"
+  // and reads the first token) can place each series in its vendor hue zone —
+  // NVIDIA greens, AMD reds — matching the InferenceX charts.
   return [
+    series.system.vendor,
     series.system.sku,
     series.mode,
     `ep${series.system.ep_size}`,

@@ -22,7 +22,7 @@ import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
-import { CollectiveXInventory } from './CollectiveXInventory';
+import { CollectiveXCaseDetail, CollectiveXInventory } from './CollectiveXInventory';
 import { CollectiveXAttemptTable, CollectiveXCoverageTable } from './CollectiveXTables';
 import {
   collectiveXColorKey,
@@ -48,7 +48,7 @@ import {
   type CollectiveXYAxis,
 } from './types';
 
-type CollectiveXTab = 'results' | 'evidence';
+type CollectiveXTab = 'results' | 'inventory' | 'case' | 'evidence';
 interface SelectOption<T extends string | number> {
   value: T;
   label: string;
@@ -60,7 +60,7 @@ const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p95', label: 'p95' },
   { value: 'p99', label: 'p99' },
 ];
-const TAB_VALUES: CollectiveXTab[] = ['results', 'evidence'];
+const TAB_VALUES: CollectiveXTab[] = ['results', 'inventory', 'case', 'evidence'];
 // Neutral MVP: no promotion/cohort/eligibility layer. The view is the measured
 // series set for one run, filtered by the identity axes the neutral shard carries.
 // Strings that describe that retired decision layer are gone; the remaining zh
@@ -100,7 +100,13 @@ const STRINGS = {
       'activation-only': 'Activation-only combine',
       'gate-weighted': 'Gate-weighted combine',
     },
-    tabs: { results: 'EP results', evidence: 'Evidence' },
+    tabs: {
+      results: 'EP results',
+      inventory: 'Matrix case inventory',
+      case: 'Selected matrix case',
+      evidence: 'Evidence',
+    },
+    noCases: 'This run has no matrix cases to inspect.',
     all: 'All',
     loading: 'Resolving CollectiveX run...',
     unavailable: 'CollectiveX run unavailable',
@@ -222,7 +228,13 @@ const STRINGS = {
     },
     // English-only per the repository's temporary language override (no new
     // Chinese text); keys added for the neutral view mirror the en values.
-    tabs: { results: 'EP results', evidence: '证据' },
+    tabs: {
+      results: 'EP results',
+      inventory: 'Matrix case inventory',
+      case: 'Selected matrix case',
+      evidence: '证据',
+    },
+    noCases: 'This run has no matrix cases to inspect.',
     all: '全部',
     loading: 'Resolving CollectiveX run...',
     unavailable: 'CollectiveX run unavailable',
@@ -446,11 +458,24 @@ export default function CollectiveXDisplay() {
   }, [runsQuery.data, selectedRunId]);
   const tabOptions: { value: CollectiveXTab; label: string }[] = [
     { value: 'results', label: t.tabs.results },
+    { value: 'inventory', label: t.tabs.inventory },
+    { value: 'case', label: t.tabs.case },
     { value: 'evidence', label: t.tabs.evidence },
   ];
 
   const dataset = data?.dataset;
   const sourceSha = useMemo(() => runSourceSha(dataset?.series ?? []), [dataset?.series]);
+  // Selection for the "Selected matrix case" tab. Falls back to the first
+  // coverage row so the tab is never empty when the run has cases; a stale id
+  // (e.g. after pinning a different run) falls back the same way.
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const selectedCase = useMemo(
+    () =>
+      (dataset?.coverage ?? []).find((item) => item.case_id === selectedCaseId) ??
+      dataset?.coverage[0] ??
+      null,
+    [dataset?.coverage, selectedCaseId],
+  );
   const availableModes = useMemo(
     () =>
       [...new Set(dataset?.series.map((item) => item.mode))].toSorted((left, right) =>
@@ -621,6 +646,15 @@ export default function CollectiveXDisplay() {
     window.location.hash = `tab-${next}`;
     track('collectivex_tab_changed', { tab: next });
   }, []);
+  // Inspecting a case from the inventory jumps to the detail tab.
+  const handleInspectCase = useCallback(
+    (caseId: string) => {
+      setSelectedCaseId(caseId);
+      handleTab('case');
+      track('collectivex_case_inspected', { case: caseId });
+    },
+    [handleTab],
+  );
 
   if (isLoading) {
     return (
@@ -757,229 +791,6 @@ export default function CollectiveXDisplay() {
         </div>
       </Card>
 
-      <CollectiveXInventory dataset={dataset} />
-
-      <Card className="py-4 md:py-5">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          <SelectControl
-            label={t.version}
-            testId="collectivex-version-select"
-            value={version}
-            options={versionOptions}
-            onChange={(value) => {
-              setVersion(value);
-              track('collectivex_version_changed', { version: value });
-            }}
-          />
-          <ControlGroup label={t.runControl}>
-            {runsRequested ? (
-              runsQuery.isLoading ? (
-                <Button
-                  variant="outline"
-                  className="w-full justify-center"
-                  disabled
-                  data-testid="collectivex-runs-loading"
-                >
-                  <Loader2 className="size-4 animate-spin" />
-                  {t.loadingRuns}
-                </Button>
-              ) : runsQuery.error || !runsQuery.data ? (
-                <Button
-                  variant="outline"
-                  className="w-full justify-center"
-                  data-testid="collectivex-runs-retry"
-                  onClick={() => void runsQuery.refetch()}
-                >
-                  <RefreshCw className="size-4" />
-                  {t.retry}
-                </Button>
-              ) : (
-                <Select
-                  value={selectedRunId ?? 'latest'}
-                  onValueChange={(next) => {
-                    setSelectedRunId(next === 'latest' ? null : next);
-                    track('collectivex_run_selected', { version, run: next });
-                  }}
-                >
-                  <SelectTrigger data-testid="collectivex-run-select" className="min-w-0 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {runOptions.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full justify-center"
-                data-testid="collectivex-load-runs"
-                onClick={() => {
-                  setRunsRequested(true);
-                  track('collectivex_runs_requested', { version });
-                }}
-              >
-                {t.loadRuns}
-              </Button>
-            )}
-          </ControlGroup>
-          <ControlGroup label={t.modeControl}>
-            <SegmentedToggle
-              value={mode}
-              options={availableModes.map((value) => ({ value, label: t.mode[value] }))}
-              onValueChange={(value) => {
-                setMode(value);
-                if (value === 'low-latency') setPhase('decode');
-                track('collectivex_mode_changed', { mode: value });
-              }}
-              ariaLabel={t.modeAria}
-              testId="collectivex-mode-select"
-              className="flex w-full overflow-hidden"
-              buttonClassName="min-w-0 flex-1 justify-center px-1.5 whitespace-nowrap"
-            />
-          </ControlGroup>
-          <SelectControl
-            label={t.epControl}
-            testId="collectivex-ep-select"
-            value={String(epSize)}
-            options={availableEpSizes.map((value) => ({
-              value: String(value),
-              label: `EP${value}`,
-            }))}
-            onChange={(value) => {
-              setEpSize(Number(value));
-              track('collectivex_ep_changed', { ep: Number(value) });
-            }}
-          />
-          <ControlGroup label={t.fabricScopeControl}>
-            <SegmentedToggle
-              value={fabricScope}
-              options={fabricScopeOptions}
-              onValueChange={(value) => {
-                setFabricScope(value);
-                track('collectivex_fabric_scope_changed', { fabric_scope: value });
-              }}
-              ariaLabel={t.fabricScopeAria}
-              testId="collectivex-fabric-scope-toggle"
-              className="flex w-full overflow-hidden"
-              buttonClassName="min-w-0 flex-1 justify-center px-1.5 whitespace-nowrap"
-            />
-          </ControlGroup>
-          <SelectControl
-            label={t.operationControl}
-            testId="collectivex-operation-select"
-            value={operation}
-            options={operationOptions}
-            onChange={(next) => {
-              setOperation(next);
-              if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
-              if (
-                next === 'isolated-sum' &&
-                (yAxis === 'activation-rate' || yAxis === 'total-logical-rate')
-              )
-                setYAxis('latency');
-            }}
-          />
-          <ControlGroup label={t.phaseControl}>
-            <SegmentedToggle
-              value={phase}
-              options={phaseOptions}
-              onValueChange={setPhase}
-              ariaLabel={t.phaseAria}
-              testId="collectivex-phase-toggle"
-            />
-          </ControlGroup>
-          <ControlGroup label={t.latencyPercentile}>
-            <SegmentedToggle
-              value={percentile}
-              options={PERCENTILE_OPTIONS}
-              onValueChange={setPercentile}
-              ariaLabel={t.percentileAria}
-              testId="collectivex-percentile-toggle"
-            />
-          </ControlGroup>
-          <SelectControl
-            label={t.sku}
-            testId="collectivex-sku-select"
-            value={sku}
-            options={selectOptions(skuOptions, t.all, true)}
-            onChange={setSku}
-          />
-          <SelectControl
-            label={t.backend}
-            testId="collectivex-backend-select"
-            value={backend}
-            options={selectOptions(backendOptions, t.all)}
-            onChange={setBackend}
-          />
-          <SelectControl
-            label={t.routing}
-            testId="collectivex-routing-select"
-            value={routing}
-            options={selectOptions(routingOptions, t.all)}
-            onChange={setRouting}
-          />
-          <SelectControl
-            label={t.xAxisControl}
-            testId="collectivex-x-axis-select"
-            value={xAxis}
-            options={xAxisOptions}
-            onChange={setXAxis}
-          />
-          <ControlGroup label={t.xScale}>
-            <SegmentedToggle
-              value={xScale}
-              options={scaleOptions}
-              onValueChange={setXScale}
-              ariaLabel={t.xScaleAria}
-              testId="collectivex-x-scale-toggle"
-            />
-          </ControlGroup>
-          <SelectControl
-            label={t.yAxisControl}
-            testId="collectivex-y-axis-select"
-            value={yAxis}
-            onChange={setYAxis}
-            options={[
-              { value: 'latency', label: t.yAxis.latency },
-              ...(operation === 'roundtrip'
-                ? ([
-                    {
-                      value: 'tokens-per-second',
-                      label: t.tokenRateOption,
-                    },
-                  ] as const)
-                : []),
-              ...(operation === 'isolated-sum'
-                ? []
-                : ([
-                    {
-                      value: 'activation-rate',
-                      label: 'Activation-data rate at latency percentile',
-                    },
-                    {
-                      value: 'total-logical-rate',
-                      label: 'Total logical data rate at latency percentile',
-                    },
-                  ] as const)),
-            ]}
-          />
-          <ControlGroup label={t.yScale}>
-            <SegmentedToggle
-              value={yScale}
-              options={scaleOptions}
-              onValueChange={setYScale}
-              ariaLabel={t.yScaleAria}
-              testId="collectivex-y-scale-toggle"
-            />
-          </ControlGroup>
-        </div>
-      </Card>
-
       <Tabs value={tab} onValueChange={handleTab} className="gap-4">
         <TabsList data-testid="collectivex-tabs" className="overflow-x-auto">
           {tabOptions.map((item) => (
@@ -989,6 +800,229 @@ export default function CollectiveXDisplay() {
           ))}
         </TabsList>
         <TabsContent value="results" className="space-y-4">
+          <Card className="py-4 md:py-5">
+            <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              <SelectControl
+                label={t.version}
+                testId="collectivex-version-select"
+                value={version}
+                options={versionOptions}
+                onChange={(value) => {
+                  setVersion(value);
+                  track('collectivex_version_changed', { version: value });
+                }}
+              />
+              <ControlGroup label={t.runControl}>
+                {runsRequested ? (
+                  runsQuery.isLoading ? (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-center"
+                      disabled
+                      data-testid="collectivex-runs-loading"
+                    >
+                      <Loader2 className="size-4 animate-spin" />
+                      {t.loadingRuns}
+                    </Button>
+                  ) : runsQuery.error || !runsQuery.data ? (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-center"
+                      data-testid="collectivex-runs-retry"
+                      onClick={() => void runsQuery.refetch()}
+                    >
+                      <RefreshCw className="size-4" />
+                      {t.retry}
+                    </Button>
+                  ) : (
+                    <Select
+                      value={selectedRunId ?? 'latest'}
+                      onValueChange={(next) => {
+                        setSelectedRunId(next === 'latest' ? null : next);
+                        track('collectivex_run_selected', { version, run: next });
+                      }}
+                    >
+                      <SelectTrigger
+                        data-testid="collectivex-run-select"
+                        className="min-w-0 w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {runOptions.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                    data-testid="collectivex-load-runs"
+                    onClick={() => {
+                      setRunsRequested(true);
+                      track('collectivex_runs_requested', { version });
+                    }}
+                  >
+                    {t.loadRuns}
+                  </Button>
+                )}
+              </ControlGroup>
+              <ControlGroup label={t.modeControl}>
+                <SegmentedToggle
+                  value={mode}
+                  options={availableModes.map((value) => ({ value, label: t.mode[value] }))}
+                  onValueChange={(value) => {
+                    setMode(value);
+                    if (value === 'low-latency') setPhase('decode');
+                    track('collectivex_mode_changed', { mode: value });
+                  }}
+                  ariaLabel={t.modeAria}
+                  testId="collectivex-mode-select"
+                  className="flex w-full overflow-hidden"
+                  buttonClassName="min-w-0 flex-1 justify-center px-1.5 whitespace-nowrap"
+                />
+              </ControlGroup>
+              <SelectControl
+                label={t.epControl}
+                testId="collectivex-ep-select"
+                value={String(epSize)}
+                options={availableEpSizes.map((value) => ({
+                  value: String(value),
+                  label: `EP${value}`,
+                }))}
+                onChange={(value) => {
+                  setEpSize(Number(value));
+                  track('collectivex_ep_changed', { ep: Number(value) });
+                }}
+              />
+              <ControlGroup label={t.fabricScopeControl}>
+                <SegmentedToggle
+                  value={fabricScope}
+                  options={fabricScopeOptions}
+                  onValueChange={(value) => {
+                    setFabricScope(value);
+                    track('collectivex_fabric_scope_changed', { fabric_scope: value });
+                  }}
+                  ariaLabel={t.fabricScopeAria}
+                  testId="collectivex-fabric-scope-toggle"
+                  className="flex w-full overflow-hidden"
+                  buttonClassName="min-w-0 flex-1 justify-center px-1.5 whitespace-nowrap"
+                />
+              </ControlGroup>
+              <SelectControl
+                label={t.operationControl}
+                testId="collectivex-operation-select"
+                value={operation}
+                options={operationOptions}
+                onChange={(next) => {
+                  setOperation(next);
+                  if (next !== 'roundtrip' && yAxis === 'tokens-per-second') setYAxis('latency');
+                  if (
+                    next === 'isolated-sum' &&
+                    (yAxis === 'activation-rate' || yAxis === 'total-logical-rate')
+                  )
+                    setYAxis('latency');
+                }}
+              />
+              <ControlGroup label={t.phaseControl}>
+                <SegmentedToggle
+                  value={phase}
+                  options={phaseOptions}
+                  onValueChange={setPhase}
+                  ariaLabel={t.phaseAria}
+                  testId="collectivex-phase-toggle"
+                />
+              </ControlGroup>
+              <ControlGroup label={t.latencyPercentile}>
+                <SegmentedToggle
+                  value={percentile}
+                  options={PERCENTILE_OPTIONS}
+                  onValueChange={setPercentile}
+                  ariaLabel={t.percentileAria}
+                  testId="collectivex-percentile-toggle"
+                />
+              </ControlGroup>
+              <SelectControl
+                label={t.sku}
+                testId="collectivex-sku-select"
+                value={sku}
+                options={selectOptions(skuOptions, t.all, true)}
+                onChange={setSku}
+              />
+              <SelectControl
+                label={t.backend}
+                testId="collectivex-backend-select"
+                value={backend}
+                options={selectOptions(backendOptions, t.all)}
+                onChange={setBackend}
+              />
+              <SelectControl
+                label={t.routing}
+                testId="collectivex-routing-select"
+                value={routing}
+                options={selectOptions(routingOptions, t.all)}
+                onChange={setRouting}
+              />
+              <SelectControl
+                label={t.xAxisControl}
+                testId="collectivex-x-axis-select"
+                value={xAxis}
+                options={xAxisOptions}
+                onChange={setXAxis}
+              />
+              <ControlGroup label={t.xScale}>
+                <SegmentedToggle
+                  value={xScale}
+                  options={scaleOptions}
+                  onValueChange={setXScale}
+                  ariaLabel={t.xScaleAria}
+                  testId="collectivex-x-scale-toggle"
+                />
+              </ControlGroup>
+              <SelectControl
+                label={t.yAxisControl}
+                testId="collectivex-y-axis-select"
+                value={yAxis}
+                onChange={setYAxis}
+                options={[
+                  { value: 'latency', label: t.yAxis.latency },
+                  ...(operation === 'roundtrip'
+                    ? ([
+                        {
+                          value: 'tokens-per-second',
+                          label: t.tokenRateOption,
+                        },
+                      ] as const)
+                    : []),
+                  ...(operation === 'isolated-sum'
+                    ? []
+                    : ([
+                        {
+                          value: 'activation-rate',
+                          label: 'Activation-data rate at latency percentile',
+                        },
+                        {
+                          value: 'total-logical-rate',
+                          label: 'Total logical data rate at latency percentile',
+                        },
+                      ] as const)),
+                ]}
+              />
+              <ControlGroup label={t.yScale}>
+                <SegmentedToggle
+                  value={yScale}
+                  options={scaleOptions}
+                  onValueChange={setYScale}
+                  ariaLabel={t.yScaleAria}
+                  testId="collectivex-y-scale-toggle"
+                />
+              </ControlGroup>
+            </div>
+          </Card>
           {phaseSeries.length === 0 && (
             <Card data-testid="collectivex-empty-state" className="py-4">
               <p className="text-sm text-muted-foreground">{t.noSeries}</p>
@@ -1096,6 +1130,22 @@ export default function CollectiveXDisplay() {
               <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
             )}
           </Card>
+        </TabsContent>
+        <TabsContent value="inventory">
+          <CollectiveXInventory
+            dataset={dataset}
+            selectedCaseId={selectedCase?.case_id ?? ''}
+            onInspectCase={handleInspectCase}
+          />
+        </TabsContent>
+        <TabsContent value="case">
+          {selectedCase ? (
+            <CollectiveXCaseDetail dataset={dataset} item={selectedCase} />
+          ) : (
+            <Card data-testid="collectivex-case-empty" className="py-4">
+              <p className="text-sm text-muted-foreground">{t.noCases}</p>
+            </Card>
+          )}
         </TabsContent>
         <TabsContent value="evidence" className="space-y-4">
           <CollectiveXCoverageTable coverage={dataset.coverage} />

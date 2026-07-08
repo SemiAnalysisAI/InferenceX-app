@@ -60,6 +60,14 @@ describe('collectiveXColorKey', () => {
     const b = makeCollectiveXSeries({ ep: 16 });
     expect(collectiveXColorKey(a)).not.toBe(collectiveXColorKey(b));
   });
+
+  it('leads with the system vendor so getVendor places series in vendor hue zones', () => {
+    // The chart color system reads the first "_"-separated token to classify the
+    // vendor (NVIDIA greens, AMD reds), matching the InferenceX charts.
+    expect(collectiveXColorKey(scaleUp).split('_')[0]).toBe('nvidia');
+    const amd = makeCollectiveXSeries({ sku: 'mi355x-oam', vendor: 'amd' });
+    expect(collectiveXColorKey(amd).split('_')[0]).toBe('amd');
+  });
 });
 
 describe('seriesMatchesSelection', () => {

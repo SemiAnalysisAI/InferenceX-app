@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -253,7 +253,13 @@ function DetailValue({
   );
 }
 
-function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: CollectiveXCoverage }) {
+export function CollectiveXCaseDetail({
+  dataset,
+  item,
+}: {
+  dataset: CollectiveXDataset;
+  item: CollectiveXCoverage;
+}) {
   const seriesById = useMemo(
     () => new Map(dataset.series.map((series) => [series.series_id, series])),
     [dataset.series],
@@ -396,9 +402,16 @@ function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: Coll
   );
 }
 
-export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset }) {
+export function CollectiveXInventory({
+  dataset,
+  selectedCaseId,
+  onInspectCase,
+}: {
+  dataset: CollectiveXDataset;
+  selectedCaseId: string;
+  onInspectCase: (caseId: string) => void;
+}) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [selectedCaseId, setSelectedCaseId] = useState(dataset.coverage[0]?.case_id ?? '');
   const setFilter = (key: FilterKey, value: string) =>
     setFilters((previous) => ({ ...previous, [key]: value }));
   const options = useMemo(
@@ -456,12 +469,6 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
       ),
     [dataset.coverage, filters],
   );
-  useEffect(() => {
-    if (!filtered.some((item) => item.case_id === selectedCaseId)) {
-      setSelectedCaseId(filtered[0]?.case_id ?? '');
-    }
-  }, [filtered, selectedCaseId]);
-  const selected = filtered.find((item) => item.case_id === selectedCaseId) ?? null;
   const columns = useMemo<DataTableColumn<CollectiveXCoverage>[]>(
     () => [
       {
@@ -469,8 +476,9 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
         cell: (row) => (
           <button
             type="button"
-            onClick={() => setSelectedCaseId(row.case_id)}
-            className="flex min-w-56 items-center gap-2 text-left font-medium hover:underline"
+            onClick={() => onInspectCase(row.case_id)}
+            aria-current={row.case_id === selectedCaseId ? 'true' : undefined}
+            className={`flex min-w-56 items-center gap-2 text-left font-medium hover:underline ${row.case_id === selectedCaseId ? 'text-primary' : ''}`}
             aria-label={`Inspect ${row.label}`}
           >
             <ChevronRight className="size-4 shrink-0" />
@@ -539,119 +547,112 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
         className: 'min-w-44',
       },
     ],
-    [],
+    [onInspectCase, selectedCaseId],
   );
   const pointCounts = dataset.coverage.flatMap((item) => item.points);
 
   return (
-    <>
-      <Card
-        data-testid="collectivex-inventory"
-        className="min-w-0 w-full max-w-full overflow-hidden"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Matrix case inventory</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {filtered.length} of {dataset.coverage.length} cases · {dataset.run.measured_cases}{' '}
-              measured cases · {dataset.run.unsupported_cases} unsupported cases ·{' '}
-              {dataset.run.terminal_points}/{dataset.run.requested_points} terminal points ·{' '}
-              {pointCounts.filter((point) => point.terminal_status === 'measured').length} measured
-              points ·{' '}
-              {pointCounts.filter((point) => point.terminal_status === 'unsupported').length}{' '}
-              unsupported points
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFilters(EMPTY_FILTERS)}
-            disabled={Object.values(filters).every((value) => value === 'all')}
-          >
-            <RotateCcw className="size-4" />
-            Reset filters
-          </Button>
+    <Card data-testid="collectivex-inventory" className="min-w-0 w-full max-w-full overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Matrix case inventory</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {filtered.length} of {dataset.coverage.length} cases · {dataset.run.measured_cases}{' '}
+            measured cases · {dataset.run.unsupported_cases} unsupported cases ·{' '}
+            {dataset.run.terminal_points}/{dataset.run.requested_points} terminal points ·{' '}
+            {pointCounts.filter((point) => point.terminal_status === 'measured').length} measured
+            points · {pointCounts.filter((point) => point.terminal_status === 'unsupported').length}{' '}
+            unsupported points
+          </p>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          <FilterSelect
-            label="SKU"
-            testId="collectivex-inventory-sku"
-            value={filters.sku}
-            options={options.sku}
-            onChange={(value) => setFilter('sku', value)}
-          />
-          <FilterSelect
-            label="Backend / generation"
-            testId="collectivex-inventory-backend"
-            value={filters.backend}
-            options={options.backend}
-            onChange={(value) => setFilter('backend', value)}
-          />
-          <FilterSelect
-            label="EP"
-            testId="collectivex-inventory-ep"
-            value={filters.ep}
-            options={options.ep}
-            onChange={(value) => setFilter('ep', value)}
-          />
-          <FilterSelect
-            label="Mode"
-            testId="collectivex-inventory-mode"
-            value={filters.mode}
-            options={options.mode}
-            onChange={(value) => setFilter('mode', value)}
-          />
-          <FilterSelect
-            label="Phase"
-            testId="collectivex-inventory-phase"
-            value={filters.phase}
-            options={options.phase}
-            onChange={(value) => setFilter('phase', value)}
-          />
-          <FilterSelect
-            label="Routing / EPLB"
-            testId="collectivex-inventory-routing"
-            value={filters.routing}
-            options={options.routing}
-            onChange={(value) => setFilter('routing', value)}
-          />
-          <FilterSelect
-            label="Topology"
-            testId="collectivex-inventory-topology"
-            value={filters.topology}
-            options={options.topology}
-            onChange={(value) => setFilter('topology', value)}
-          />
-          <FilterSelect
-            label="Dispatch precision"
-            testId="collectivex-inventory-dispatch-precision"
-            value={filters.dispatchPrecision}
-            options={options.dispatchPrecision}
-            onChange={(value) => setFilter('dispatchPrecision', value)}
-          />
-          <FilterSelect
-            label="Combine precision"
-            testId="collectivex-inventory-combine-precision"
-            value={filters.combinePrecision}
-            options={options.combinePrecision}
-            onChange={(value) => setFilter('combinePrecision', value)}
-          />
-          <FilterSelect
-            label="Terminal disposition"
-            testId="collectivex-inventory-terminal"
-            value={filters.terminal}
-            options={options.terminal}
-            onChange={(value) => setFilter('terminal', value)}
-          />
-        </div>
-        <DataTable
-          data={filtered}
-          columns={columns}
-          testId="collectivex-inventory-table"
-          analyticsPrefix="collectivex_inventory"
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setFilters(EMPTY_FILTERS)}
+          disabled={Object.values(filters).every((value) => value === 'all')}
+        >
+          <RotateCcw className="size-4" />
+          Reset filters
+        </Button>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <FilterSelect
+          label="SKU"
+          testId="collectivex-inventory-sku"
+          value={filters.sku}
+          options={options.sku}
+          onChange={(value) => setFilter('sku', value)}
         />
-      </Card>
-      {selected && <CaseDetail dataset={dataset} item={selected} />}
-    </>
+        <FilterSelect
+          label="Backend / generation"
+          testId="collectivex-inventory-backend"
+          value={filters.backend}
+          options={options.backend}
+          onChange={(value) => setFilter('backend', value)}
+        />
+        <FilterSelect
+          label="EP"
+          testId="collectivex-inventory-ep"
+          value={filters.ep}
+          options={options.ep}
+          onChange={(value) => setFilter('ep', value)}
+        />
+        <FilterSelect
+          label="Mode"
+          testId="collectivex-inventory-mode"
+          value={filters.mode}
+          options={options.mode}
+          onChange={(value) => setFilter('mode', value)}
+        />
+        <FilterSelect
+          label="Phase"
+          testId="collectivex-inventory-phase"
+          value={filters.phase}
+          options={options.phase}
+          onChange={(value) => setFilter('phase', value)}
+        />
+        <FilterSelect
+          label="Routing / EPLB"
+          testId="collectivex-inventory-routing"
+          value={filters.routing}
+          options={options.routing}
+          onChange={(value) => setFilter('routing', value)}
+        />
+        <FilterSelect
+          label="Topology"
+          testId="collectivex-inventory-topology"
+          value={filters.topology}
+          options={options.topology}
+          onChange={(value) => setFilter('topology', value)}
+        />
+        <FilterSelect
+          label="Dispatch precision"
+          testId="collectivex-inventory-dispatch-precision"
+          value={filters.dispatchPrecision}
+          options={options.dispatchPrecision}
+          onChange={(value) => setFilter('dispatchPrecision', value)}
+        />
+        <FilterSelect
+          label="Combine precision"
+          testId="collectivex-inventory-combine-precision"
+          value={filters.combinePrecision}
+          options={options.combinePrecision}
+          onChange={(value) => setFilter('combinePrecision', value)}
+        />
+        <FilterSelect
+          label="Terminal disposition"
+          testId="collectivex-inventory-terminal"
+          value={filters.terminal}
+          options={options.terminal}
+          onChange={(value) => setFilter('terminal', value)}
+        />
+      </div>
+      <DataTable
+        data={filtered}
+        columns={columns}
+        testId="collectivex-inventory-table"
+        analyticsPrefix="collectivex_inventory"
+      />
+    </Card>
   );
 }

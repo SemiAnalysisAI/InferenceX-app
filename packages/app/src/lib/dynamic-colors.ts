@@ -20,6 +20,9 @@ export type Vendor = 'nvidia' | 'amd' | 'unknown';
 export function getVendor(hwKey: string): Vendor {
   // hwKey may have a framework suffix (e.g. "h100_vllm") — strip it to get the GPU base key
   const base = hwKey.split('_')[0];
+  // Keys whose dataset carries an explicit vendor (e.g. CollectiveX series) lead
+  // with the vendor name itself rather than a registered GPU key.
+  if (base === 'nvidia' || base === 'amd') return base;
   const vendor = GPU_VENDORS[base];
   if (vendor === 'NVIDIA') return 'nvidia';
   if (vendor === 'AMD') return 'amd';
