@@ -246,7 +246,7 @@ export function CollectiveXChart({
           return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; user-select: ${isPinned ? 'text' : 'none'}">
             ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
-            <div>${escapeHtml(OPERATION_LABELS[operation])} ${yAxis === 'latency' ? percentile : `at ${percentile} latency`}: <strong>${formatMetric(point.y, yAxis)}</strong> · ${escapeHtml(point.series.status)}</div>
+            <div>${escapeHtml(OPERATION_LABELS[operation])} ${yAxis === 'latency' ? percentile : `at ${percentile} latency`}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
             <div class="text-muted-foreground">${measurement.tokens_per_rank} tokens/rank · ${measurement.global_tokens} global tokens</div>
             <div class="mt-1 text-muted-foreground">Dispatch p50/p90/p95/p99: ${formatPercentiles(measurement.components.dispatch)}</div>
             <div class="text-muted-foreground">Stage p50/p90/p95/p99: ${formatPercentiles(measurement.components.stage)}</div>
@@ -254,7 +254,7 @@ export function CollectiveXChart({
             <div class="text-muted-foreground">Round trip p50/p90/p95/p99: ${formatPercentiles(measuredRoundtrip)}${measuredRoundtrip ? ' (measured)' : ''}</div>
             <div class="text-muted-foreground">Fan-out: ${measurement.routing.fanout_mean.toFixed(2)} · routed copies: ${measurement.routing.routed_copies} · recv max: ${measurement.routing.recv_tokens_max}</div>
             <div class="text-muted-foreground">Expert CV: ${measurement.routing.expert_load_cv.toFixed(3)} · rank CV: ${measurement.routing.payload_rank_cv.toFixed(3)} · hotspot: ${measurement.routing.hotspot_ratio.toFixed(2)}x · empty experts/ranks: ${measurement.routing.empty_expert_count}/${measurement.routing.empty_rank_count}</div>
-            <div class="text-muted-foreground">Correctness: semantic ${measurement.correctness.semantic_pass ? 'pass' : 'fail'} · precision ${measurement.correctness.precision.passed ? 'pass' : 'fail'} · EPLB: ${eplbDetails}</div>
+            <div class="text-muted-foreground">Correctness: ${measurement.correctness.passed ? 'pass' : 'fail'} · max rel err ${measurement.correctness.max_relative_error.toExponential(1)} · EPLB: ${eplbDetails}</div>
             ${measurement.anomalies.length > 0 ? `<div class="text-muted-foreground">Anomalies: ${measurement.anomalies.map(escapeHtml).join(' · ')}</div>` : ''}
             ${eplb.mapping_sha256 ? `<div class="text-muted-foreground" style="word-break: break-all;">EPLB mapping SHA-256: ${escapeHtml(eplb.mapping_sha256)}</div>` : ''}
             <div class="mt-1 text-muted-foreground">Mode: ${escapeHtml(point.series.mode)} · payload unit: ${escapeHtml(point.series.measurement.payload_unit)} · combine: ${escapeHtml(point.series.measurement.combine_semantics)}</div>

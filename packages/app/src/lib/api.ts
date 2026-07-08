@@ -4,10 +4,9 @@
  */
 
 import {
-  fetchCollectiveXByDigest,
-  fetchCollectiveXPublication,
+  fetchCollectiveXByRunId,
+  fetchCollectiveXLatest,
   fetchCollectiveXRuns,
-  type CollectiveXChannelName,
 } from '@/components/collectivex/reader';
 import {
   COLLECTIVEX_DEFAULT_VERSION,
@@ -310,15 +309,15 @@ export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
 
+/** Latest sweep run's neutral view dataset (default page view). */
 export function fetchCollectiveX(
-  channel: CollectiveXChannelName = 'dev-latest',
   signal?: AbortSignal,
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ) {
-  return fetchCollectiveXPublication(channel, signal, version);
+  return fetchCollectiveXLatest(signal, version);
 }
 
-/** JIT list of eligible ("tagged + success") publication runs for a version. */
+/** Recent sweep runs for the run picker, keyed by run_id + attempt. */
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,
@@ -326,13 +325,13 @@ export function fetchCollectiveXRunList(
   return fetchCollectiveXRuns(version, signal);
 }
 
-/** Resolve a specific run's promoted dataset by its content digest. */
+/** Resolve a specific sweep run's neutral view dataset by run_id. */
 export function fetchCollectiveXRun(
   version: CollectiveXVersion,
-  digest: string,
+  runId: string,
   signal?: AbortSignal,
 ) {
-  return fetchCollectiveXByDigest(version, digest, signal);
+  return fetchCollectiveXByRunId(version, runId, signal);
 }
 
 export interface FeedbackListRow {

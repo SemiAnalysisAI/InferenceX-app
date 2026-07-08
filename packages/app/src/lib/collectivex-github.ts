@@ -1,32 +1,42 @@
-import { createHash } from 'node:crypto';
-
 import AdmZip from 'adm-zip';
 
 import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { parseCollectiveXDatasetText } from '@/components/collectivex/reader';
-import type { CollectiveXDataset, CollectiveXVersion } from '@/components/collectivex/types';
+import {
+  buildDatasetFromNeutral,
+  buildRunSummary,
+  type CollectiveXNeutralRunMeta,
+} from '@/components/collectivex/reader';
+import type {
+  CollectiveXDataset,
+  CollectiveXRunSummary,
+  CollectiveXVersion,
+} from '@/components/collectivex/types';
 
 const BRANCH = 'collectivex';
 const WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
 const WORKFLOW_FILE = 'collectivex-sweep.yml';
 const WORKFLOW_NAME = 'CollectiveX Sweep';
 const RUNS_PER_PAGE = 100;
-// Keyed by the numeric release version. The filename regex keeps the frozen
-// data-format literal `collectivex_public_v1_` (schema-version, not the release).
-const PUBLICATION_POLICY: Record<CollectiveXVersion, { file: RegExp }> = {
-  1: {
-    file: /^collectivex_public_v1_(?<digest>[a-f0-9]{64})\.ndjson$/,
-  },
-};
-const MAX_PUBLICATION_BYTES = 32 * 1024 * 1024;
+const ARTIFACTS_PER_PAGE = 100;
+
+// The three neutral artifact families a sweep run uploads (via always()).
+const MATRIX_PREFIX = 'cxsweep-matrix-';
+const SHARD_PREFIX = 'cxshard-';
+const TERMINAL_PREFIX = 'cxunsupported-';
+
+const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
+const MAX_RUN_BYTES = 256 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_ATTEMPTS = 3;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const LATEST_TTL_MS = 60_000;
-const DIGEST_TTL_MS = 10 * 60_000;
+const RUN_TTL_MS = 10 * 60_000;
+// The picker lists a recent window; each listed run costs one artifact-bundle
+// download + build, so the fan-out stays bounded.
+const MAX_LISTED_RUNS = 8;
 
-type PublicationErrorCode = 'invalid' | 'not-found' | 'unavailable';
+type SweepErrorCode = 'invalid' | 'not-found' | 'unavailable';
 
 interface WorkflowRun {
   id: number;
@@ -37,6 +47,9 @@ interface WorkflowRun {
   status: string | null;
   conclusion: string | null;
   run_attempt: number;
+  run_started_at?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
 }
 
 interface GithubArtifact {
@@ -47,67 +60,28 @@ interface GithubArtifact {
   size_in_bytes?: number;
 }
 
-interface PublicationCandidate {
-  artifact: GithubArtifact;
-  run: WorkflowRun;
-}
+class CollectiveXSweepError extends Error {
+  readonly code: SweepErrorCode;
 
-export interface CollectiveXGithubPublication {
-  artifactId: number;
-  body: Uint8Array<ArrayBuffer>;
-  dataset: CollectiveXDataset;
-  digest: string;
-  runId: number;
-  runAttempt: number;
-  version: CollectiveXVersion;
-}
-
-/**
- * Lightweight descriptor of one eligible ("tagged + success") publication run —
- * enough for the frontend JIT picker to list runs and let the operator select
- * which one to display, without eagerly loading every dataset into the client.
- */
-export interface CollectiveXPublicationRun {
-  version: CollectiveXVersion;
-  runId: number;
-  runAttempt: number;
-  headSha: string;
-  digest: string;
-  generatedAt: string;
-  coverageScope: 'full' | 'partial';
-  coveredSkus: string[];
-  bytes: number;
-}
-
-// A version accumulates independent runs over time; the picker only needs a
-// recent window. Bounds the JIT fan-out (one artifact download per eligible run).
-const MAX_LISTED_RUNS = 40;
-
-class CollectiveXPublicationError extends Error {
-  readonly code: PublicationErrorCode;
-
-  constructor(code: PublicationErrorCode, message: string, options?: ErrorOptions) {
+  constructor(code: SweepErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = 'CollectiveXPublicationError';
+    this.name = 'CollectiveXSweepError';
     this.code = code;
   }
 }
 
-export function collectiveXPublicationErrorCode(error: unknown): PublicationErrorCode | null {
-  return error instanceof CollectiveXPublicationError ? error.code : null;
+export function collectiveXSweepErrorCode(error: unknown): SweepErrorCode | null {
+  return error instanceof CollectiveXSweepError ? error.code : null;
 }
 
-const digestCache = new Map<
-  string,
-  { expiresAt: number; publication: CollectiveXGithubPublication }
->();
+const runCache = new Map<string, { expiresAt: number; promise: Promise<CollectiveXDataset> }>();
 const latestCache = new Map<
   CollectiveXVersion,
-  { expiresAt: number; promise: Promise<CollectiveXGithubPublication> }
+  { expiresAt: number; promise: Promise<CollectiveXDataset> }
 >();
-const runsCache = new Map<
+const listCache = new Map<
   CollectiveXVersion,
-  { expiresAt: number; promise: Promise<CollectiveXPublicationRun[]> }
+  { expiresAt: number; promise: Promise<CollectiveXRunSummary[]> }
 >();
 
 function githubHeaders(token: string) {
@@ -148,226 +122,331 @@ async function githubFetch(url: string, token: string): Promise<Response> {
     }
     await waitBeforeRetry(attempt);
   }
-  throw new CollectiveXPublicationError('unavailable', 'GitHub request failed', {
-    cause: lastError,
-  });
+  throw new CollectiveXSweepError('unavailable', 'GitHub request failed', { cause: lastError });
 }
 
-async function* publicationCandidates(
-  version: CollectiveXVersion,
-  token: string,
-): AsyncGenerator<PublicationCandidate> {
-  let page = 1;
-  let visitedRuns = 0;
-  let totalRuns: number | null = null;
+function requireToken(): string {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new CollectiveXSweepError('unavailable', 'GITHUB_TOKEN is not configured');
+  return token;
+}
 
-  while (totalRuns === null || visitedRuns < totalRuns) {
+function isSweepRun(run: WorkflowRun): boolean {
+  return (
+    run.name === WORKFLOW_NAME &&
+    run.path === WORKFLOW_PATH &&
+    run.head_branch === BRANCH &&
+    Number.isSafeInteger(run.id) &&
+    run.id > 0 &&
+    Number.isSafeInteger(run.run_attempt) &&
+    run.run_attempt > 0
+  );
+}
+
+function runGeneratedAt(run: WorkflowRun): string {
+  return run.updated_at || run.run_started_at || run.created_at || '';
+}
+
+// Newest-first stream of completed sweep runs on the branch. Discovery never
+// gates on conclusion — a red or partial run still surfaces what it produced.
+async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
+  let page = 1;
+  let visited = 0;
+  let total: number | null = null;
+  while (total === null || visited < total) {
     const parameters = new URLSearchParams({
       branch: BRANCH,
       status: 'completed',
       per_page: String(RUNS_PER_PAGE),
       page: String(page),
     });
-    const runsResponse = await githubFetch(
+    const response = await githubFetch(
       `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/runs?${parameters}`,
       token,
     );
-    if (!runsResponse.ok) {
-      throw new CollectiveXPublicationError(
+    if (!response.ok) {
+      throw new CollectiveXSweepError(
         'unavailable',
-        `GitHub publication discovery failed (${runsResponse.status})`,
+        `GitHub run discovery failed (${response.status})`,
       );
     }
-    const payload = (await runsResponse.json()) as {
+    const payload = (await response.json()) as {
       total_count?: number;
       workflow_runs?: WorkflowRun[];
     };
     const runs = payload.workflow_runs ?? [];
     if (
-      totalRuns === null &&
+      total === null &&
       Number.isSafeInteger(payload.total_count) &&
       (payload.total_count ?? -1) >= 0
     ) {
-      totalRuns = payload.total_count!;
+      total = payload.total_count!;
     }
     if (runs.length === 0) break;
-    visitedRuns += runs.length;
-
-    for (const run of runs) {
-      if (
-        run.name !== WORKFLOW_NAME ||
-        run.path !== WORKFLOW_PATH ||
-        run.head_branch !== BRANCH ||
-        run.status !== 'completed' ||
-        run.conclusion !== 'success' ||
-        !Number.isSafeInteger(run.id) ||
-        run.id <= 0 ||
-        !Number.isSafeInteger(run.run_attempt) ||
-        run.run_attempt <= 0 ||
-        !/^[a-f0-9]{40}$/.test(run.head_sha)
-      ) {
-        continue;
-      }
-      const artifactsResponse = await githubFetch(
-        `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${run.id}/artifacts?per_page=100`,
-        token,
-      );
-      if (!artifactsResponse.ok) {
-        throw new CollectiveXPublicationError(
-          'unavailable',
-          `GitHub artifact discovery failed (${artifactsResponse.status})`,
-        );
-      }
-      const artifacts = ((await artifactsResponse.json()) as { artifacts?: GithubArtifact[] })
-        .artifacts;
-      const expectedName = `cxpublication-${version}-${run.id}-${run.run_attempt}`;
-      const matching = (artifacts ?? []).filter(
-        (artifact) => artifact.name === expectedName && !artifact.expired,
-      );
-      if (matching.length > 1) {
-        throw new CollectiveXPublicationError('invalid', 'publication run has duplicate artifacts');
-      }
-      if (matching[0]) yield { artifact: matching[0], run };
-    }
-
-    if (runs.length < RUNS_PER_PAGE || (totalRuns !== null && visitedRuns >= totalRuns)) break;
+    visited += runs.length;
+    for (const run of runs) if (isSweepRun(run)) yield run;
+    if (runs.length < RUNS_PER_PAGE || (total !== null && visited >= total)) break;
     page += 1;
   }
 }
 
-async function downloadPublication(
-  version: CollectiveXVersion,
-  candidate: PublicationCandidate,
-  token: string,
-): Promise<CollectiveXGithubPublication> {
-  const policy = PUBLICATION_POLICY[version];
-  if (
-    candidate.artifact.size_in_bytes !== undefined &&
-    candidate.artifact.size_in_bytes > MAX_PUBLICATION_BYTES
-  ) {
-    throw new CollectiveXPublicationError('invalid', 'publication artifact is oversized');
+async function listArtifacts(runId: number, token: string): Promise<GithubArtifact[]> {
+  const artifacts: GithubArtifact[] = [];
+  let page = 1;
+  let total: number | null = null;
+  while (total === null || artifacts.length < total) {
+    const response = await githubFetch(
+      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts?per_page=${ARTIFACTS_PER_PAGE}&page=${page}`,
+      token,
+    );
+    if (!response.ok) {
+      throw new CollectiveXSweepError(
+        'unavailable',
+        `GitHub artifact discovery failed (${response.status})`,
+      );
+    }
+    const payload = (await response.json()) as {
+      total_count?: number;
+      artifacts?: GithubArtifact[];
+    };
+    const page_artifacts = payload.artifacts ?? [];
+    if (
+      total === null &&
+      Number.isSafeInteger(payload.total_count) &&
+      (payload.total_count ?? -1) >= 0
+    ) {
+      total = payload.total_count!;
+    }
+    if (page_artifacts.length === 0) break;
+    artifacts.push(...page_artifacts);
+    if (page_artifacts.length < ARTIFACTS_PER_PAGE) break;
+    page += 1;
   }
-  const response = await githubFetch(candidate.artifact.archive_download_url, token);
+  return artifacts.filter((artifact) => !artifact.expired);
+}
+
+function hasMatrixArtifact(artifacts: GithubArtifact[]): boolean {
+  return artifacts.some((artifact) => artifact.name.startsWith(MATRIX_PREFIX));
+}
+
+async function collectDocs(artifact: GithubArtifact, token: string): Promise<unknown[]> {
+  if (artifact.size_in_bytes !== undefined && artifact.size_in_bytes > MAX_ARTIFACT_BYTES) {
+    throw new CollectiveXSweepError('invalid', `artifact ${artifact.name} is oversized`);
+  }
+  const response = await githubFetch(artifact.archive_download_url, token);
   if (!response.ok) {
-    throw new CollectiveXPublicationError(
+    throw new CollectiveXSweepError(
       'unavailable',
-      `GitHub publication download failed (${response.status})`,
+      `GitHub artifact download failed (${response.status})`,
     );
   }
-  const declaredBytes = Number(response.headers.get('Content-Length') ?? 0);
-  if (declaredBytes > MAX_PUBLICATION_BYTES) {
-    throw new CollectiveXPublicationError('invalid', 'publication archive is oversized');
-  }
   const archive = Buffer.from(await response.arrayBuffer());
-  if (archive.byteLength > MAX_PUBLICATION_BYTES) {
-    throw new CollectiveXPublicationError('invalid', 'publication archive is oversized');
+  if (archive.byteLength > MAX_ARTIFACT_BYTES) {
+    throw new CollectiveXSweepError('invalid', `artifact ${artifact.name} archive is oversized`);
   }
-
   let zip: AdmZip;
   try {
     zip = new AdmZip(archive);
   } catch (error) {
-    throw new CollectiveXPublicationError('invalid', 'publication artifact is not a ZIP', {
+    throw new CollectiveXSweepError('invalid', `artifact ${artifact.name} is not a ZIP`, {
       cause: error,
     });
   }
-  const entries = zip.getEntries().filter((entry) => !entry.isDirectory);
-  if (
-    entries.length !== 1 ||
-    entries[0].entryName.includes('/') ||
-    !policy.file.test(entries[0].entryName)
-  ) {
-    throw new CollectiveXPublicationError('invalid', 'publication archive layout is invalid');
+  const docs: unknown[] = [];
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory || !entry.entryName.endsWith('.json')) continue;
+    let text: string;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(entry.getData());
+    } catch (error) {
+      throw new CollectiveXSweepError('invalid', `artifact ${artifact.name} has non-UTF-8 entry`, {
+        cause: error,
+      });
+    }
+    try {
+      docs.push(JSON.parse(text));
+    } catch (error) {
+      throw new CollectiveXSweepError('invalid', `artifact ${artifact.name} has invalid JSON`, {
+        cause: error,
+      });
+    }
   }
-  if (entries[0].header.size > MAX_PUBLICATION_BYTES) {
-    throw new CollectiveXPublicationError('invalid', 'publication dataset is oversized');
+  return docs;
+}
+
+// A run's validated matrix, its selectable version tag, and the artifacts that
+// feed dataset assembly. Kept separate from assembly so run selection can read
+// the version tag cheaply (matrix docs are tiny) before committing to a build.
+interface MatrixCandidate {
+  matrixDoc: unknown;
+  version: number;
+  matrixArtifacts: GithubArtifact[];
+  resultArtifacts: GithubArtifact[];
+}
+
+function matrixVersion(doc: unknown): number | null {
+  const value = (doc as { version?: unknown } | null)?.version;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+// Download + structurally validate a run's matrix artifact and read its neutral
+// `version` tag. The format string (collectivex.matrix.v1) gates schema shape;
+// the numeric `version` field is the content axis the frontend selects on.
+async function loadMatrixCandidate(
+  artifacts: GithubArtifact[],
+  token: string,
+): Promise<MatrixCandidate> {
+  const matrixArtifacts = artifacts.filter((artifact) => artifact.name.startsWith(MATRIX_PREFIX));
+  if (matrixArtifacts.length === 0) {
+    throw new CollectiveXSweepError('not-found', 'sweep run has no matrix artifact');
   }
-  const bytes = entries[0].getData();
-  if (bytes.byteLength === 0 || bytes.byteLength > MAX_PUBLICATION_BYTES) {
-    throw new CollectiveXPublicationError('invalid', 'publication dataset size is invalid');
+  const matrixDocs: unknown[] = [];
+  for (const artifact of matrixArtifacts) matrixDocs.push(...(await collectDocs(artifact, token)));
+  const matrixCandidates = matrixDocs.filter(
+    (doc) => (doc as { format?: unknown } | null)?.format === 'collectivex.matrix.v1',
+  );
+  if (matrixCandidates.length !== 1) {
+    throw new CollectiveXSweepError('invalid', 'sweep run must carry exactly one matrix document');
+  }
+  const version = matrixVersion(matrixCandidates[0]);
+  if (version === null) {
+    throw new CollectiveXSweepError('invalid', 'matrix document has no valid version tag');
+  }
+  const resultArtifacts = artifacts.filter(
+    (artifact) =>
+      artifact.name.startsWith(SHARD_PREFIX) || artifact.name.startsWith(TERMINAL_PREFIX),
+  );
+  return { matrixDoc: matrixCandidates[0], version, matrixArtifacts, resultArtifacts };
+}
+
+async function assembleRun(
+  run: WorkflowRun,
+  candidate: MatrixCandidate,
+  token: string,
+): Promise<CollectiveXDataset> {
+  const generatedAt = runGeneratedAt(run);
+  if (!generatedAt) {
+    throw new CollectiveXSweepError('invalid', 'sweep run is missing a timestamp');
   }
 
-  let text: string;
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch (error) {
-    throw new CollectiveXPublicationError('invalid', 'publication dataset is not UTF-8', {
-      cause: error,
-    });
+  let totalBytes = 0;
+  for (const artifact of [...candidate.matrixArtifacts, ...candidate.resultArtifacts]) {
+    totalBytes += artifact.size_in_bytes ?? 0;
+    if (totalBytes > MAX_RUN_BYTES) {
+      throw new CollectiveXSweepError('invalid', 'sweep run artifacts exceed the size budget');
+    }
   }
-  const lines = text.split('\n');
-  if (lines.length !== 2 || lines[1] !== '' || lines[0].length === 0 || lines[0].includes('\r')) {
-    throw new CollectiveXPublicationError(
-      'invalid',
-      'publication artifact must contain exactly one NDJSON record',
-    );
+
+  const docs: unknown[] = [];
+  for (const artifact of candidate.resultArtifacts) {
+    docs.push(...(await collectDocs(artifact, token)));
   }
-  let dataset: CollectiveXDataset;
-  try {
-    dataset = parseCollectiveXDatasetText(lines[0]);
-  } catch (error) {
-    throw new CollectiveXPublicationError('invalid', 'publication dataset failed validation', {
-      cause: error,
-    });
-  }
-  if (dataset.promotion.status !== 'promoted') {
-    throw new CollectiveXPublicationError('invalid', 'publication dataset is not promoted');
-  }
-  const digest = createHash('sha256').update(bytes).digest('hex');
-  const namedDigest = policy.file.exec(entries[0].entryName)?.groups?.digest;
-  if (digest !== namedDigest) {
-    throw new CollectiveXPublicationError('invalid', 'publication filename digest differs');
-  }
-  return {
-    artifactId: candidate.artifact.id,
-    body: Uint8Array.from(bytes),
-    dataset,
-    digest,
-    runId: candidate.run.id,
-    runAttempt: candidate.run.run_attempt,
-    version,
+
+  const meta: CollectiveXNeutralRunMeta = {
+    run_id: String(run.id),
+    run_attempt: run.run_attempt,
+    generated_at: generatedAt,
+    conclusion: run.conclusion,
+    matrix_id: null,
+    source_bundle_ids: [...candidate.matrixArtifacts, ...candidate.resultArtifacts].map(
+      (artifact) => artifact.name,
+    ),
   };
-}
 
-async function fetchPublication(
-  version: CollectiveXVersion,
-  digest?: string,
-): Promise<CollectiveXGithubPublication> {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new CollectiveXPublicationError('unavailable', 'GITHUB_TOKEN is not configured');
-  }
-  let foundCandidate = false;
-  for await (const candidate of publicationCandidates(version, token)) {
-    foundCandidate = true;
-    const publication = await downloadPublication(version, candidate, token);
-    digestCache.set(`${version}:${publication.digest}`, {
-      expiresAt: Date.now() + DIGEST_TTL_MS,
-      publication,
+  try {
+    return buildDatasetFromNeutral(candidate.matrixDoc, docs, meta);
+  } catch (error) {
+    throw new CollectiveXSweepError('invalid', 'sweep run artifacts failed validation', {
+      cause: error,
     });
-    if (!digest || publication.digest === digest) return publication;
   }
-  if (!foundCandidate) {
-    throw new CollectiveXPublicationError('not-found', 'no CollectiveX publication artifact');
-  }
-  throw new CollectiveXPublicationError('not-found', 'CollectiveX publication digest not found');
 }
 
-export function loadCollectiveXPublication(
+async function fetchRunById(
   version: CollectiveXVersion,
-  digest?: string,
-): Promise<CollectiveXGithubPublication> {
+  runId: string,
+): Promise<CollectiveXDataset> {
+  const token = requireToken();
+  const numericId = Number(runId);
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) {
+    throw new CollectiveXSweepError('not-found', 'invalid run id');
+  }
+  const response = await githubFetch(
+    `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${numericId}`,
+    token,
+  );
+  if (response.status === 404) {
+    throw new CollectiveXSweepError('not-found', 'sweep run not found');
+  }
+  if (!response.ok) {
+    throw new CollectiveXSweepError('unavailable', `GitHub run lookup failed (${response.status})`);
+  }
+  const run = (await response.json()) as WorkflowRun;
+  if (!isSweepRun(run)) {
+    throw new CollectiveXSweepError('not-found', 'run is not a CollectiveX sweep');
+  }
+  const artifacts = await listArtifacts(run.id, token);
+  const candidate = await loadMatrixCandidate(artifacts, token);
+  if (candidate.version !== version) {
+    throw new CollectiveXSweepError('not-found', 'run does not match the requested version');
+  }
+  return assembleRun(run, candidate, token);
+}
+
+async function fetchLatestRun(version: CollectiveXVersion): Promise<CollectiveXDataset> {
+  const token = requireToken();
+  // Newest-wins within the requested version: skip runs tagged for another
+  // version rather than erroring, so a future vN rollout never breaks vN-1.
+  for await (const run of sweepRuns(token)) {
+    const artifacts = await listArtifacts(run.id, token);
+    if (!hasMatrixArtifact(artifacts)) continue;
+    const candidate = await loadMatrixCandidate(artifacts, token);
+    if (candidate.version !== version) continue;
+    return assembleRun(run, candidate, token);
+  }
+  throw new CollectiveXSweepError('not-found', 'no CollectiveX sweep run with artifacts');
+}
+
+async function fetchRunList(version: CollectiveXVersion): Promise<CollectiveXRunSummary[]> {
+  const token = requireToken();
+  const summaries: CollectiveXRunSummary[] = [];
+  for await (const run of sweepRuns(token)) {
+    const artifacts = await listArtifacts(run.id, token);
+    if (!hasMatrixArtifact(artifacts)) continue;
+    const candidate = await loadMatrixCandidate(artifacts, token);
+    if (candidate.version !== version) continue;
+    const cacheKey = `${version}:${run.id}`;
+    let datasetPromise = runCache.get(cacheKey)?.promise;
+    if (!datasetPromise) {
+      datasetPromise = assembleRun(run, candidate, token);
+      runCache.set(cacheKey, { expiresAt: Date.now() + RUN_TTL_MS, promise: datasetPromise });
+      datasetPromise.catch(() => runCache.delete(cacheKey));
+    }
+    summaries.push(buildRunSummary(await datasetPromise));
+    if (summaries.length >= MAX_LISTED_RUNS) break;
+  }
+  return summaries;
+}
+
+export function loadCollectiveXSweepRun(
+  version: CollectiveXVersion,
+  runId?: string,
+): Promise<CollectiveXDataset> {
   const now = Date.now();
-  if (digest) {
-    const cacheKey = `${version}:${digest}`;
-    const cached = digestCache.get(cacheKey);
-    if (cached && cached.expiresAt > now) return Promise.resolve(cached.publication);
-    digestCache.delete(cacheKey);
-    return fetchPublication(version, digest);
+  if (runId) {
+    const cacheKey = `${version}:${runId}`;
+    const cached = runCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) return cached.promise;
+    const promise = fetchRunById(version, runId).catch((error) => {
+      runCache.delete(cacheKey);
+      throw error;
+    });
+    runCache.set(cacheKey, { expiresAt: now + RUN_TTL_MS, promise });
+    return promise;
   }
   const cached = latestCache.get(version);
   if (cached && cached.expiresAt > now) return cached.promise;
-  const promise = fetchPublication(version).catch((error) => {
+  const promise = fetchLatestRun(version).catch((error) => {
     latestCache.delete(version);
     throw error;
   });
@@ -375,58 +454,22 @@ export function loadCollectiveXPublication(
   return promise;
 }
 
-async function fetchPublicationRuns(
+export function listCollectiveXSweepRuns(
   version: CollectiveXVersion,
-): Promise<CollectiveXPublicationRun[]> {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new CollectiveXPublicationError('unavailable', 'GITHUB_TOKEN is not configured');
-  }
-  const runs: CollectiveXPublicationRun[] = [];
-  for await (const candidate of publicationCandidates(version, token)) {
-    const publication = await downloadPublication(version, candidate, token);
-    digestCache.set(`${version}:${publication.digest}`, {
-      expiresAt: Date.now() + DIGEST_TTL_MS,
-      publication,
-    });
-    const promotion = publication.dataset.promotion;
-    runs.push({
-      version,
-      runId: publication.runId,
-      runAttempt: publication.runAttempt,
-      headSha: candidate.run.head_sha,
-      digest: publication.digest,
-      generatedAt: publication.dataset.generated_at,
-      coverageScope: promotion.coverage_scope ?? 'full',
-      coveredSkus:
-        promotion.covered_skus ??
-        [...new Set(publication.dataset.coverage.map((item) => item.sku))].toSorted(),
-      bytes: publication.body.byteLength,
-    });
-    if (runs.length >= MAX_LISTED_RUNS) break;
-  }
-  // Most recent first — the GitHub runs feed is already newest-first, but a run
-  // may re-emit a prior digest; de-duplicate on runId keeping the first (newest).
-  const seen = new Set<number>();
-  return runs.filter((run) => (seen.has(run.runId) ? false : (seen.add(run.runId), true)));
-}
-
-export function listCollectiveXPublications(
-  version: CollectiveXVersion,
-): Promise<CollectiveXPublicationRun[]> {
+): Promise<CollectiveXRunSummary[]> {
   const now = Date.now();
-  const cached = runsCache.get(version);
+  const cached = listCache.get(version);
   if (cached && cached.expiresAt > now) return cached.promise;
-  const promise = fetchPublicationRuns(version).catch((error) => {
-    runsCache.delete(version);
+  const promise = fetchRunList(version).catch((error) => {
+    listCache.delete(version);
     throw error;
   });
-  runsCache.set(version, { expiresAt: now + LATEST_TTL_MS, promise });
+  listCache.set(version, { expiresAt: now + LATEST_TTL_MS, promise });
   return promise;
 }
 
-export function clearCollectiveXPublicationCache(): void {
-  digestCache.clear();
+export function clearCollectiveXSweepCache(): void {
+  runCache.clear();
   latestCache.clear();
-  runsCache.clear();
+  listCache.clear();
 }

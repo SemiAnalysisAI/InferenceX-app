@@ -1,8 +1,6 @@
-import { createHash } from 'node:crypto';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { parseCollectiveXChannel, parseCollectiveXDataset } from '@/components/collectivex/reader';
+import { buildRunSummary, parseCollectiveXDataset } from '@/components/collectivex/reader';
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
 
 const github = vi.hoisted(() => ({
@@ -10,18 +8,20 @@ const github = vi.hoisted(() => ({
     error instanceof Error && 'code' in error ? (error.code as string) : null,
   ),
   load: vi.fn(),
+  list: vi.fn(),
 }));
 
 vi.mock('@/lib/collectivex-github', () => ({
-  collectiveXPublicationErrorCode: github.errorCode,
-  loadCollectiveXPublication: github.load,
+  collectiveXSweepErrorCode: github.errorCode,
+  loadCollectiveXSweepRun: github.load,
+  listCollectiveXSweepRuns: github.list,
 }));
 
 import { GET } from './route';
 
 const dataset = makeCollectiveXDataset();
-const body = Buffer.from(`${JSON.stringify(dataset)}\n`);
-const digest = createHash('sha256').update(body).digest('hex');
+const runId = dataset.run.run_id;
+const summary = buildRunSummary(dataset);
 
 function request(...segments: string[]) {
   return GET(new Request('http://localhost/collectivex-data/test'), {
@@ -31,73 +31,81 @@ function request(...segments: string[]) {
 
 beforeEach(() => {
   github.load.mockReset();
-  github.load.mockResolvedValue({
-    artifactId: 123,
-    body: Uint8Array.from(body),
-    dataset,
-    digest,
-    runId: 456,
-  });
+  github.list.mockReset();
+  github.load.mockResolvedValue(dataset);
+  github.list.mockResolvedValue([summary]);
 });
 
-describe('CollectiveX GitHub publication route', () => {
-  it('resolves dev-latest to the JIT-fetched publication', async () => {
-    const response = await request('1', 'channels', 'dev-latest.json');
-    const channel = parseCollectiveXChannel(await response.json());
+describe('CollectiveX sweep data route', () => {
+  it('serves the latest run dataset without a run id', async () => {
+    const response = await request('1', 'latest.json');
+    const served = parseCollectiveXDataset(await response.json());
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('s-maxage=60');
     expect(response.headers.get('x-collectivex-source')).toBe('github-actions');
-    expect(channel).toMatchObject({
-      channel: 'dev-latest',
-      dataset: { bytes: body.byteLength, sha256: digest },
-    });
+    expect(served).toEqual(dataset);
     expect(github.load).toHaveBeenCalledWith(1, undefined);
   });
 
-  it('serves the exact digest-addressed dataset bytes', async () => {
-    const response = await request('1', 'datasets', digest, 'dataset.json');
-    const served = Buffer.from(await response.arrayBuffer());
+  it('serves a specific run by id with an immutable cache window', async () => {
+    const response = await request('1', 'runs', `${runId}.json`);
+    const served = parseCollectiveXDataset(await response.json());
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toContain('immutable');
-    expect(served).toEqual(body);
-    expect(parseCollectiveXDataset(JSON.parse(served.toString('utf8')))).toEqual(dataset);
-    expect(github.load).toHaveBeenCalledWith(1, digest);
+    expect(response.headers.get('cache-control')).toContain('max-age=600');
+    expect(served).toEqual(dataset);
+    expect(github.load).toHaveBeenCalledWith(1, runId);
   });
 
-  it('does not expose the private latest-attempt channel', async () => {
-    const response = await request('1', 'channels', 'latest-attempt.json');
+  it('lists recent runs as a neutral run summary document', async () => {
+    const response = await request('1', 'runs.json');
+    const body = (await response.json()) as {
+      format: string;
+      version: number;
+      runs: unknown[];
+    };
 
-    expect(response.status).toBe(404);
-    expect(response.headers.get('x-collectivex-status')).toBeNull();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toContain('s-maxage=60');
+    expect(body.format).toBe('collectivex.runs.v1');
+    expect(body.version).toBe(1);
+    expect(body.runs).toHaveLength(1);
+    expect(github.list).toHaveBeenCalledWith(1);
     expect(github.load).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['not-found', 404, 'channel-unavailable'],
+    ['not-found', 404, 'runs-unavailable'],
     ['unavailable', 503, 'source-unavailable'],
     ['invalid', 502, null],
   ] as const)('maps %s source failures without exposing details', async (code, status, marker) => {
     github.load.mockRejectedValue(Object.assign(new Error('private upstream detail'), { code }));
 
-    const response = await request('1', 'channels', 'dev-latest.json');
+    const response = await request('1', 'latest.json');
 
     expect(response.status).toBe(status);
     expect(response.headers.get('x-collectivex-status')).toBe(marker);
     expect(await response.text()).toBe('');
   });
 
-  it('rejects unlisted paths before contacting GitHub', async () => {
-    const response = await request('private', 'bundle.json');
+  it('rejects a non-numeric run id before contacting the source', async () => {
+    const response = await request('1', 'runs', 'latest.json');
     expect(response.status).toBe(404);
     expect(github.load).not.toHaveBeenCalled();
   });
 
+  it('rejects unlisted paths before contacting the source', async () => {
+    const response = await request('private', 'bundle.json');
+    expect(response.status).toBe(404);
+    expect(github.load).not.toHaveBeenCalled();
+    expect(github.list).not.toHaveBeenCalled();
+  });
+
   it.each(['v1', '0', '99', '01'])(
-    'rejects the unknown version segment %s before contacting GitHub',
+    'rejects the unknown version segment %s before contacting the source',
     async (segment) => {
-      const response = await request(segment, 'channels', 'dev-latest.json');
+      const response = await request(segment, 'latest.json');
       expect(response.status).toBe(404);
       expect(github.load).not.toHaveBeenCalled();
     },

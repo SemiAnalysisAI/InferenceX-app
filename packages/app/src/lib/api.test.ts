@@ -5,11 +5,13 @@ import {
   fetchWorkflowInfo,
   fetchAvailability,
   fetchCollectiveX,
+  fetchCollectiveXRun,
+  fetchCollectiveXRunList,
   fetchReliability,
   fetchEvaluations,
 } from './api';
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
-import { collectiveXChannelUrl, sha256Hex } from '@/components/collectivex/reader';
+import { buildRunSummary } from '@/components/collectivex/reader';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -130,40 +132,52 @@ describe('fetchEvaluations', () => {
   });
 });
 
-describe('fetchCollectiveX', () => {
-  it('resolves the no-cache channel to a digest-addressed dataset', async () => {
-    const bytes = new TextEncoder().encode(JSON.stringify(makeCollectiveXDataset()));
-    const digest = await sha256Hex(bytes);
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        text: () =>
-          Promise.resolve(
-            JSON.stringify({
-              format: 'collectivex.channel.v1',
-              channel: 'dev-latest',
-              generated_at: '2026-07-04T01:00:00Z',
-              dataset: {
-                path: `datasets/${digest}/dataset.json`,
-                sha256: digest,
-                bytes: bytes.length,
-              },
-            }),
-          ),
-      })
-      .mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(bytes.buffer) });
+describe('CollectiveX reader delegation', () => {
+  const dataset = makeCollectiveXDataset();
+
+  function mockText(payload: unknown) {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve(typeof payload === 'string' ? payload : JSON.stringify(payload)),
+    });
+  }
+
+  it('fetches the latest run dataset without caching and resolves the run id', async () => {
+    mockText(dataset);
 
     const result = await fetchCollectiveX();
 
     expect(mockFetch).toHaveBeenCalledWith(
-      collectiveXChannelUrl('dev-latest'),
+      '/collectivex-data/1/latest.json',
       expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
     );
-    expect(mockFetch).toHaveBeenLastCalledWith(
-      `/collectivex-data/1/datasets/${digest}/dataset.json`,
+    expect(result.dataset.format).toBe('collectivex.view.v1');
+    expect(result.run_id).toBe(dataset.run.run_id);
+    expect(result.run_attempt).toBe(dataset.run.run_attempt);
+  });
+
+  it('fetches a specific run by id from the immutable path', async () => {
+    mockText(dataset);
+
+    const result = await fetchCollectiveXRun(1, dataset.run.run_id);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `/collectivex-data/1/runs/${dataset.run.run_id}.json`,
       expect.objectContaining({ cache: 'force-cache', credentials: 'same-origin' }),
     );
-    expect(result.dataset.format).toBe('collectivex.public.v1');
-    expect(result.digest).toBe(digest);
+    expect(result.run_id).toBe(dataset.run.run_id);
+  });
+
+  it('fetches the run list', async () => {
+    mockText({ format: 'collectivex.runs.v1', version: 1, runs: [buildRunSummary(dataset)] });
+
+    const runs = await fetchCollectiveXRunList(1);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/collectivex-data/1/runs.json',
+      expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
+    );
+    expect(runs).toHaveLength(1);
+    expect(runs[0].run_id).toBe(dataset.run.run_id);
   });
 });

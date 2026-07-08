@@ -1,8 +1,6 @@
 import type {
   CollectiveXChartPoint,
-  CollectiveXCohort,
   CollectiveXComponent,
-  CollectiveXMetric,
   CollectiveXMode,
   CollectiveXOperation,
   CollectiveXPercentile,
@@ -16,60 +14,11 @@ import type {
 
 export type CollectiveXFabricScope = 'all' | CollectiveXTopologyScope;
 
-export type CollectiveXEvidenceScope = 'controlled' | 'diagnostic';
-
-// Choose the landing scope for a freshly loaded dataset. Controlled (decision-grade
-// only) is the rigorous default, but on a partial-coverage publication — e.g. a
-// single-run v1 where the strict within-run trial gate leaves whole SKUs
-// diagnostic-tier — the controlled view would hide every series for those SKUs. When
-// any SKU with measured data at the landing phase has no decision-grade series there,
-// fall back to the full-evidence (diagnostic) scope so no working SKU is hidden by
-// default. When decision-grade coverage is complete, Controlled stays the default.
-export function collectiveXInitialScope(
-  series: CollectiveXSeries[],
-  phase: CollectiveXPhase,
-): CollectiveXEvidenceScope {
-  const atPhase = series.filter((item) => item.phase === phase);
-  if (atPhase.length === 0) return 'controlled';
-  const decisionGradeSkus = new Set(
-    atPhase.filter((item) => item.status === 'decision-grade').map((item) => item.system.sku),
-  );
-  const measuredSkus = new Set(atPhase.map((item) => item.system.sku));
-  for (const sku of measuredSkus) {
-    if (!decisionGradeSkus.has(sku)) return 'diagnostic';
-  }
-  return 'controlled';
-}
-
 export interface CollectiveXSeriesSelection {
   mode: CollectiveXMode;
   epSize: number;
   phase: CollectiveXPhase;
   fabricScope: CollectiveXFabricScope;
-}
-
-const DECISION_ORDER = {
-  phase: { decode: 0, prefill: 1 },
-  measure: {
-    latency_us: 0,
-    activation_data_rate_gbps_at_latency_percentile: 1,
-    total_logical_data_rate_gbps_at_latency_percentile: 2,
-  },
-  statistic: { p50: 0, p99: 1 },
-  objective: { min: 0, max: 1 },
-} as const;
-
-export function compareCollectiveXDecisionMetrics(
-  left: CollectiveXMetric,
-  right: CollectiveXMetric,
-): number {
-  return (
-    DECISION_ORDER.phase[left.phase] - DECISION_ORDER.phase[right.phase] ||
-    left.tokens_per_rank - right.tokens_per_rank ||
-    DECISION_ORDER.measure[left.measure] - DECISION_ORDER.measure[right.measure] ||
-    DECISION_ORDER.statistic[left.statistic] - DECISION_ORDER.statistic[right.statistic] ||
-    DECISION_ORDER.objective[left.objective] - DECISION_ORDER.objective[right.objective]
-  );
 }
 
 export function collectiveXTopologyLabel(
@@ -91,17 +40,16 @@ export function collectiveXTopologyLabel(
 
 export function collectiveXSeriesLabel(series: CollectiveXSeries): string {
   const version = series.backend.version ?? 'unversioned';
-  const build = series.build.implementation_contract_sha256.slice(0, 8);
+  const build = series.build.source_sha.slice(0, 8);
   const identity = series.series_id.slice(-8);
-  const tier = series.publication_tier === 'official' ? 'official' : 'experimental';
   const routing = `${series.workload.routing}${series.workload.eplb ? '+eplb' : ''}`;
-  return `${series.system.sku.toUpperCase()} EP${series.system.ep_size} · ${series.backend.label} · ${series.mode} · ${series.system.scope} · ${series.system.topology_class} · ${series.phase} · ${routing} · ${series.workload.precision_profile} · ${version} · ${series.resource.profile} · build ${build} · series ${identity} · ${tier}`;
+  return `${series.system.sku.toUpperCase()} EP${series.system.ep_size} · ${series.backend.label} · ${series.mode} · ${series.system.scope} · ${series.system.topology_class} · ${series.phase} · ${routing} · ${series.workload.precision_profile} · ${version} · ${series.resource.profile} · build ${build} · series ${identity}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries): string {
   const routing = `${series.workload.routing}${series.workload.eplb ? '-eplb' : ''}`;
   const eplb = series.eplb.enabled
-    ? `${series.eplb.planner ?? 'enabled'}-${series.eplb.mapping_sha256 ?? 'unmapped'}-${series.eplb.physical_experts}`
+    ? `${series.eplb.planner ?? 'enabled'}-${series.eplb.mapping_sha256 ?? 'unmapped'}-${series.eplb.physical_experts ?? 'auto'}`
     : 'eplb-off';
   const units = `${series.resource.comm_units_kind ?? 'units'}-${series.resource.configured_units ?? 'default'}`;
   return [
@@ -118,11 +66,6 @@ export function collectiveXColorKey(series: CollectiveXSeries): string {
     series.backend.id,
     series.backend.generation ?? 'default',
     series.backend.version ?? 'unversioned',
-    series.publication_tier,
-    series.build.implementation_contract_sha256,
-    series.build.public_config_sha256,
-    series.build.routing_control_sha256,
-    series.build.runtime_fingerprint_sha256,
     series.build.image_digest,
     series.build.source_sha,
     series.build.squash_sha256,
@@ -146,17 +89,6 @@ export function seriesMatchesSelection(
     series.phase === selection.phase &&
     (selection.fabricScope === 'all' || series.system.scope === selection.fabricScope)
   );
-}
-
-export function cohortMatchesSelection(
-  cohort: CollectiveXCohort,
-  seriesById: Map<string, CollectiveXSeries>,
-  selection: CollectiveXSeriesSelection,
-): boolean {
-  return cohort.series_ids.every((seriesId) => {
-    const series = seriesById.get(seriesId);
-    return series !== undefined && seriesMatchesSelection(series, selection);
-  });
 }
 
 function operationComponent(
@@ -223,7 +155,6 @@ export function comparisonDifferences(series: CollectiveXSeries[]): string[] {
   const checks: [string, (item: CollectiveXSeries) => unknown][] = [
     ['model', (item) => item.model],
     ['suite', (item) => item.suite],
-    ['publication tier', (item) => item.publication_tier],
     ['mode', (item) => item.mode],
     ['phase', (item) => item.phase],
     ['backend implementation', (item) => JSON.stringify(item.backend)],

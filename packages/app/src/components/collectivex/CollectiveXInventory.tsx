@@ -18,6 +18,7 @@ import {
 
 import { collectiveXTopologyLabel } from './data';
 import type {
+  CollectiveXAttempt,
   CollectiveXCommunicationAxis,
   CollectiveXComponent,
   CollectiveXCoverage,
@@ -38,7 +39,6 @@ type FilterKey =
   | 'topology'
   | 'dispatchPrecision'
   | 'combinePrecision'
-  | 'tier'
   | 'terminal';
 
 type Filters = Record<FilterKey, string>;
@@ -53,7 +53,6 @@ const EMPTY_FILTERS: Filters = {
   topology: 'all',
   dispatchPrecision: 'all',
   combinePrecision: 'all',
-  tier: 'all',
   terminal: 'all',
 };
 
@@ -63,6 +62,7 @@ const TERMINAL_ORDER: CollectiveXTerminalStatus[] = [
   'failed',
   'invalid',
   'diagnostic',
+  'pending',
 ];
 
 const STATUS_CLASS: Record<CollectiveXTerminalStatus, string> = {
@@ -71,17 +71,16 @@ const STATUS_CLASS: Record<CollectiveXTerminalStatus, string> = {
   failed: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
   invalid: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
   diagnostic: 'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  pending: 'border-zinc-500/40 bg-zinc-500/5 text-muted-foreground',
 };
 
-function axisKey(axis: CollectiveXCommunicationAxis): string {
-  return JSON.stringify(axis);
+function axisKey(axis: CollectiveXCommunicationAxis | null): string {
+  return axis ? JSON.stringify(axis) : 'none';
 }
 
-function axisLabel(axis: CollectiveXCommunicationAxis): string {
-  const scale = axis.scale_dtype
-    ? `${axis.scale_dtype}/${axis.scale_group_size ?? 'dynamic'}`
-    : 'no scale';
-  return `${axis.communication_format} · ${axis.quantization_origin} · ${axis.conversion_boundary} · ${scale}`;
+function axisLabel(axis: CollectiveXCommunicationAxis | null): string {
+  if (!axis) return 'n/a';
+  return `${axis.communication_format} · ${axis.quant_mode} · ${axis.semantics}`;
 }
 
 function backendKey(item: CollectiveXCoverage): string {
@@ -181,7 +180,7 @@ interface PointRow {
   catalog: CollectiveXCoveragePoint;
   series: CollectiveXSeries | null;
   point: CollectiveXPoint | null;
-  qualificationIndices: number[];
+  attempts: CollectiveXAttempt[];
 }
 
 function componentSummary(component: CollectiveXComponent | null): React.ReactNode {
@@ -196,13 +195,17 @@ function componentSummary(component: CollectiveXComponent | null): React.ReactNo
       </p>
       <p className="text-muted-foreground">
         {component.origin === 'measured'
-          ? `${component.sample_count}/512 samples`
+          ? `${component.sample_count ?? '-'} samples`
           : 'Derived, no samples'}
       </p>
-      <p className="text-muted-foreground">
-        bytes {bytes.activation_data_bytes.toLocaleString()} + {bytes.scale_bytes.toLocaleString()}{' '}
-        = {bytes.total_logical_bytes.toLocaleString()}
-      </p>
+      {bytes ? (
+        <p className="text-muted-foreground">
+          bytes {bytes.activation_data_bytes.toLocaleString()} +{' '}
+          {bytes.scale_bytes.toLocaleString()} = {bytes.total_logical_bytes.toLocaleString()}
+        </p>
+      ) : (
+        <p className="text-muted-foreground">no byte accounting</p>
+      )}
       <p className="text-muted-foreground">
         p99 A {activation?.toFixed(2) ?? '-'} · total {total?.toFixed(2) ?? '-'} GB/s
       </p>
@@ -217,47 +220,17 @@ function pointAnomalies(row: PointRow): string {
   return `expert CV ${routing.expert_load_cv.toFixed(3)} · rank CV ${routing.payload_rank_cv.toFixed(3)} · hotspot ${routing.hotspot_ratio.toFixed(2)}x · empty ${routing.empty_expert_count}/${routing.empty_rank_count}${anomalies ? ` · ${anomalies}` : ' · none declared'}`;
 }
 
-function trialDiagnosticsSummary(row: PointRow): React.ReactNode {
-  if (!row.point) return '-';
-  const diagnostics = row.point.trial_diagnostics;
-  const components = Object.entries(diagnostics.components).filter(
-    (entry): entry is [string, NonNullable<(typeof entry)[1]>] => entry[1] !== null,
-  );
-  return (
-    <div className="min-w-56 space-y-0.5 text-xs tabular-nums">
-      <p className={diagnostics.flagged ? 'text-amber-700 dark:text-amber-300' : ''}>
-        {diagnostics.flagged ? diagnostics.reasons.join(', ') : 'No trial flags'}
-      </p>
-      {components.map(([name, component]) => (
-        <p key={name} className="text-muted-foreground">
-          {name} {component.trial_count} trials · drift{' '}
-          {component.first_last_median_ratio.toFixed(3)}x · outliers{' '}
-          {(component.robust_outlier_fraction * 100).toFixed(1)}%
-        </p>
-      ))}
-    </div>
-  );
-}
-
 function correctnessSummary(row: PointRow): React.ReactNode {
   if (!row.point) return '-';
   const correctness = row.point.correctness;
-  const dispatch = correctness.precision.dispatch;
-  const combine = correctness.precision.combine;
   return (
     <div className="min-w-52 text-xs">
       <p>
-        Semantic {correctness.semantic_pass ? 'pass' : 'fail'} · precision{' '}
-        {correctness.precision.passed ? 'pass' : 'fail'}
+        Correctness {correctness.passed ? 'pass' : 'fail'} · max rel err{' '}
+        {correctness.max_relative_error.toExponential(1)}
       </p>
       <p className="text-muted-foreground">
-        Dispatch abs {dispatch.max_abs_error.toPrecision(3)} · rel{' '}
-        {dispatch.max_rel_error.toPrecision(3)} · saturation{' '}
-        {dispatch.saturation_rate.toPrecision(3)}
-      </p>
-      <p className="text-muted-foreground">
-        Combine abs {combine.max_abs_error.toPrecision(3)} · rel{' '}
-        {combine.max_rel_error.toPrecision(3)} · saturation {combine.saturation_rate.toPrecision(3)}
+        {correctness.contract} · {correctness.scope}
       </p>
     </div>
   );
@@ -293,20 +266,13 @@ function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: Coll
           catalog.point_id && series
             ? (series.points.find((candidate) => candidate.point_id === catalog.point_id) ?? null)
             : null;
-        const qualificationIndices = [
-          ...new Set(
-            dataset.attempts
-              .filter(
-                (attempt) =>
-                  attempt.case_id === item.case_id &&
-                  attempt.selected &&
-                  (!catalog.point_id ||
-                    attempt.evidence.some((evidence) => evidence.point_id === catalog.point_id)),
-              )
-              .map((attempt) => attempt.qualification_index),
-          ),
-        ].toSorted((left, right) => left - right);
-        return { catalog, series, point, qualificationIndices };
+        const attempts = dataset.attempts.filter(
+          (attempt) =>
+            attempt.case_id === item.case_id &&
+            (!catalog.point_id ||
+              attempt.evidence.some((evidence) => evidence.point_id === catalog.point_id)),
+        );
+        return { catalog, series, point, attempts };
       }),
     [dataset.attempts, item, seriesById],
   );
@@ -343,34 +309,28 @@ function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: Coll
         cell: correctnessSummary,
         sortValue: (row) =>
           row.point
-            ? `${row.point.correctness.semantic_pass} ${row.point.correctness.precision.passed}`
+            ? `${row.point.correctness.passed} ${row.point.correctness.max_relative_error}`
             : '',
       },
       {
         header: 'Evidence',
         cell: (row) => (
           <div className="min-w-32 text-xs">
-            <p>{row.qualificationIndices.length}/1 qualification run</p>
+            <p>
+              {row.attempts.length} attempt{row.attempts.length === 1 ? '' : 's'}
+            </p>
             <p className="text-muted-foreground">
-              {row.qualificationIndices.map((index) => `Q${index}`).join(' · ') || '-'} ·{' '}
+              {row.attempts.some((attempt) => attempt.selected) ? 'selected' : '—'} ·{' '}
               {row.point?.evidence_ids.length ?? 0} evidence IDs
             </p>
           </div>
         ),
-        sortValue: (row) => row.qualificationIndices.length,
+        sortValue: (row) => row.attempts.length,
       },
       {
         header: 'Anomalies',
         cell: (row) => <span className="block min-w-64 text-xs">{pointAnomalies(row)}</span>,
         sortValue: pointAnomalies,
-      },
-      {
-        header: 'Trial diagnostics',
-        cell: trialDiagnosticsSummary,
-        sortValue: (row) =>
-          row.point
-            ? `${row.point.trial_diagnostics.flagged} ${row.point.trial_diagnostics.reasons.join(' ')}`
-            : '',
       },
       {
         header: 'Dispatch',
@@ -420,10 +380,9 @@ function CaseDetail({ dataset, item }: { dataset: CollectiveXDataset; item: Coll
         />
         <DetailValue label="Dispatch precision" value={axisLabel(item.dispatch_precision)} />
         <DetailValue label="Combine precision" value={axisLabel(item.combine_precision)} />
-        <DetailValue label="Precision profile" value={item.precision_profile} mono />
+        <DetailValue label="Precision profile" value={item.precision_profile ?? 'n/a'} mono />
         <DetailValue label="Routing" value={routingKey(item)} />
         <DetailValue label="Backend" value={backendLabel(item)} />
-        <DetailValue label="Publication tier" value={item.publication_tier} />
       </dl>
       <h3 className="mt-5 font-semibold">Point terminal evidence</h3>
       <DataTable
@@ -473,7 +432,6 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
         (item) => axisKey(item.combine_precision),
         (item) => axisLabel(item.combine_precision),
       ),
-      tier: uniqueOptions(dataset.coverage, (item) => item.publication_tier),
       terminal: TERMINAL_ORDER.map((status) => ({ value: status, label: status })),
     }),
     [dataset.coverage],
@@ -493,7 +451,6 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
             axisKey(item.dispatch_precision) === filters.dispatchPrecision) &&
           (filters.combinePrecision === 'all' ||
             axisKey(item.combine_precision) === filters.combinePrecision) &&
-          (filters.tier === 'all' || item.publication_tier === filters.tier) &&
           (filters.terminal === 'all' ||
             item.points.some((point) => point.terminal_status === filters.terminal)),
       ),
@@ -570,12 +527,6 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
         className: 'min-w-52',
       },
       {
-        header: 'Tier',
-        cell: (row) => row.publication_tier,
-        sortValue: (row) => row.publication_tier,
-        className: 'whitespace-nowrap',
-      },
-      {
         header: 'Disposition',
         cell: (row) => `${row.disposition} · ${row.outcome}`,
         sortValue: (row) => `${row.disposition} ${row.outcome}`,
@@ -602,12 +553,11 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
           <div>
             <h2 className="text-lg font-semibold">Matrix case inventory</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {filtered.length} of {dataset.coverage.length} cases ·{' '}
-              {dataset.promotion.measured_cases} measured cases ·{' '}
-              {dataset.promotion.unsupported_cases} unsupported cases ·{' '}
-              {dataset.promotion.terminal_points}/{dataset.promotion.requested_points} terminal
-              points · {pointCounts.filter((point) => point.terminal_status === 'measured').length}{' '}
-              measured points ·{' '}
+              {filtered.length} of {dataset.coverage.length} cases · {dataset.run.measured_cases}{' '}
+              measured cases · {dataset.run.unsupported_cases} unsupported cases ·{' '}
+              {dataset.run.terminal_points}/{dataset.run.requested_points} terminal points ·{' '}
+              {pointCounts.filter((point) => point.terminal_status === 'measured').length} measured
+              points ·{' '}
               {pointCounts.filter((point) => point.terminal_status === 'unsupported').length}{' '}
               unsupported points
             </p>
@@ -685,13 +635,6 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
             value={filters.combinePrecision}
             options={options.combinePrecision}
             onChange={(value) => setFilter('combinePrecision', value)}
-          />
-          <FilterSelect
-            label="Publication tier"
-            testId="collectivex-inventory-tier"
-            value={filters.tier}
-            options={options.tier}
-            onChange={(value) => setFilter('tier', value)}
           />
           <FilterSelect
             label="Terminal disposition"

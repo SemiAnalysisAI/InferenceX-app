@@ -1,245 +1,155 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-
 import { describe, expect, it } from 'vitest';
 
 import {
   chartPoints,
-  cohortMatchesSelection,
-  compareCollectiveXDecisionMetrics,
   collectiveXColorKey,
-  collectiveXInitialScope,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   comparisonDifferences,
   metricValue,
+  seriesMatchesSelection,
+  type CollectiveXSeriesSelection,
 } from './data';
-import { makeCollectiveXDataset } from './test-fixture';
+import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
-describe('CollectiveX EP projections', () => {
-  it('covers the complete frozen eight-SKU V1 matrix catalog', () => {
-    const bytes = readFileSync(new URL('full-catalog.v1.json', import.meta.url));
-    const catalog = JSON.parse(bytes.toString()) as {
-      format: string;
-      schema_version: number;
-      matrix_sha256: string;
-      case_count: number;
-      point_count: number;
-      precision_profiles: Record<string, unknown>;
-      cases: {
-        case_id: string;
-        disposition: 'runnable' | 'unsupported';
-        points: unknown[];
-        precision_profile: string;
-        sku: string;
-      }[];
-    };
+const dataset = makeCollectiveXDataset();
+// series[0]: nccl-ep EP8 scale-up (nvlink, single node).
+// series[1]: deepep EP16 scale-out (nvlink scale-up + rdma scale-out, two nodes).
+const [scaleUp, scaleOut] = dataset.series;
 
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(
-      'b06a7f51e04d96e76444d8256d14ee475b4f267b27cc84a937a1dea010a9453e',
+describe('collectiveXTopologyLabel', () => {
+  it('shows only the scale-up transport when there is no scale-out fabric', () => {
+    expect(collectiveXTopologyLabel(scaleUp.system)).toBe(
+      '1x8 · domain 8 · nvlink · nvlink-domain',
     );
-    expect(catalog).toMatchObject({
-      format: 'collectivex.frontend-catalog.v1',
-      schema_version: 1,
-      matrix_sha256: '3048ef24d2d78751321aa5008dd6e2f83c0e6b881fe8d12811a3bfbda6419c9c',
-      case_count: 322,
-      point_count: 1314,
-    });
-    expect(new Set(catalog.cases.map(({ case_id }) => case_id)).size).toBe(322);
-    expect(catalog.cases.reduce((count, { points }) => count + points.length, 0)).toBe(1314);
-    expect(catalog.cases.filter(({ disposition }) => disposition === 'runnable')).toHaveLength(167);
-    expect(catalog.cases.filter(({ disposition }) => disposition === 'unsupported')).toHaveLength(
-      155,
+  });
+
+  it('joins scale-up and scale-out transports when a scale-out fabric is present', () => {
+    expect(collectiveXTopologyLabel(scaleOut.system)).toBe(
+      '2x8 · domain 8 · nvlink+rdma · multi-node',
     );
-    expect([...new Set(catalog.cases.map(({ sku }) => sku))].toSorted()).toEqual([
-      'b200-dgxc',
-      'b300',
-      'gb200',
-      'gb300',
-      'h100-dgxc',
-      'h200-dgxc',
-      'mi300x',
-      'mi355x',
-    ]);
-    expect(catalog.cases.some(({ sku }) => sku === 'mi325x')).toBe(false);
+  });
+});
+
+describe('collectiveXSeriesLabel', () => {
+  it('renders the identifying axes of a series', () => {
+    const label = collectiveXSeriesLabel(scaleUp);
+    expect(label.startsWith('H200-DGXC EP8 · nccl-ep · normal · scale-up')).toBe(true);
+    expect(label).toContain('decode');
+    expect(label).toContain('d-bf16.c-bf16');
+    expect(label).toContain('unversioned');
+    expect(label).toContain('build cccccccc');
+  });
+
+  it('shows the backend version when one is present', () => {
+    expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16');
+    expect(collectiveXSeriesLabel(scaleOut)).toContain('2.1');
+  });
+});
+
+describe('collectiveXColorKey', () => {
+  it('assigns the same key to two series with identical configuration', () => {
+    const a = makeCollectiveXSeries({ variant: 'a' });
+    const b = makeCollectiveXSeries({ variant: 'b' });
+    // The color key is configuration-derived and excludes the series id.
+    expect(collectiveXColorKey(a)).toBe(collectiveXColorKey(b));
+  });
+
+  it('assigns distinct keys to series differing in EP degree', () => {
+    const a = makeCollectiveXSeries({ ep: 8 });
+    const b = makeCollectiveXSeries({ ep: 16 });
+    expect(collectiveXColorKey(a)).not.toBe(collectiveXColorKey(b));
+  });
+});
+
+describe('seriesMatchesSelection', () => {
+  const base: CollectiveXSeriesSelection = {
+    mode: 'normal',
+    epSize: 8,
+    phase: 'decode',
+    fabricScope: 'all',
+  };
+
+  it('matches on mode, ep size, phase, and any fabric scope', () => {
+    expect(seriesMatchesSelection(scaleUp, base)).toBe(true);
+    expect(seriesMatchesSelection(scaleUp, { ...base, fabricScope: 'scale-up' })).toBe(true);
+  });
+
+  it('rejects a series whose scope, ep, mode, or phase differs from the selection', () => {
+    expect(seriesMatchesSelection(scaleUp, { ...base, fabricScope: 'scale-out' })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, epSize: 16 })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, mode: 'low-latency' })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, phase: 'prefill' })).toBe(false);
+  });
+});
+
+describe('metricValue', () => {
+  const point = scaleUp.points[0];
+
+  it('returns the latency percentile for the requested component', () => {
+    expect(metricValue(point, 'dispatch', 'p50', 'latency')).toBe(
+      point.components.dispatch?.latency_us.p50,
+    );
+  });
+
+  it('returns the roundtrip token rate only for the roundtrip operation', () => {
+    expect(metricValue(point, 'roundtrip', 'p50', 'tokens-per-second')).toBe(
+      point.roundtrip_token_rate_at_latency_percentile.p50,
+    );
+    expect(metricValue(point, 'dispatch', 'p50', 'tokens-per-second')).toBeNull();
+  });
+
+  it('returns the activation and total-logical data rates', () => {
+    expect(metricValue(point, 'dispatch', 'p50', 'activation-rate')).toBeGreaterThan(0);
+    expect(metricValue(point, 'dispatch', 'p50', 'total-logical-rate')).toBeGreaterThan(0);
+  });
+
+  it('returns null for an unavailable component', () => {
+    const unavailable = makeCollectiveXSeries({ rows: [{ stageUnavailable: true }] }).points[0];
+    expect(metricValue(unavailable, 'stage', 'p50', 'latency')).toBeNull();
+  });
+
+  it('returns null for a derived component with no byte accounting', () => {
+    expect(metricValue(point, 'isolated-sum', 'p50', 'activation-rate')).toBeNull();
+  });
+});
+
+describe('chartPoints', () => {
+  it('emits one point per token row with populated axes', () => {
+    const points = chartPoints([scaleUp], 'dispatch', 'p50', 'tokens-per-rank', 'latency');
+    expect(points).toHaveLength(scaleUp.points.length);
+    for (const point of points) {
+      expect(point.seriesId).toBe(scaleUp.series_id);
+      expect(point.colorKey).toBe(collectiveXColorKey(scaleUp));
+      expect(point.x).toBeGreaterThan(0);
+      expect(point.y).toBeGreaterThan(0);
+    }
+  });
+
+  it('drops points whose metric is unavailable', () => {
+    // Dispatch has no per-operation token rate, so tokens-per-second is null everywhere.
     expect(
-      [...new Set(catalog.cases.map(({ precision_profile }) => precision_profile))].toSorted(),
-    ).toEqual(Object.keys(catalog.precision_profiles).toSorted());
+      chartPoints([scaleUp], 'dispatch', 'p50', 'tokens-per-rank', 'tokens-per-second'),
+    ).toHaveLength(0);
   });
 
-  it('lands on controlled only when decision-grade covers every measured SKU at the phase', () => {
-    const dataset = makeCollectiveXDataset();
-    // Every fixture series is decision-grade, so the decision-grade set covers both
-    // measured SKUs (H100, B200) at decode: controlled is safe.
-    expect(collectiveXInitialScope(dataset.series, 'decode')).toBe('controlled');
+  it('keeps roundtrip token-rate points', () => {
+    const points = chartPoints([scaleUp], 'roundtrip', 'p50', 'global-tokens', 'tokens-per-second');
+    expect(points).toHaveLength(scaleUp.points.length);
+  });
+});
 
-    // Drop B200 out of the decision-grade set: it still has decode data, so the
-    // controlled view would hide it — fall back to the full-evidence scope.
-    const partial = dataset.series.map((series) =>
-      series.system.sku === 'b200' ? { ...series, status: 'diagnostic' as const } : series,
-    );
-    expect(collectiveXInitialScope(partial, 'decode')).toBe('diagnostic');
-
-    // No series at the phase: nothing to hide, keep the rigorous default.
-    expect(collectiveXInitialScope(dataset.series, 'prefill')).toBe('controlled');
+describe('comparisonDifferences', () => {
+  it('returns no warnings for a single series or a series compared with itself', () => {
+    expect(comparisonDifferences([scaleUp])).toEqual([]);
+    expect(comparisonDifferences([scaleUp, scaleUp])).toEqual([]);
   });
 
-  it('orders decision metrics by phase, token count, measure, and percentile', () => {
-    const base = makeCollectiveXDataset().rankings[0].metric;
-    const metrics = [
-      { ...base, phase: 'prefill' as const, tokens_per_rank: 512, statistic: 'p99' as const },
-      {
-        ...base,
-        measure: 'total_logical_data_rate_gbps_at_latency_percentile' as const,
-        objective: 'max' as const,
-        statistic: 'p50' as const,
-      },
-      { ...base, tokens_per_rank: 16, statistic: 'p99' as const },
-      { ...base, tokens_per_rank: 16, statistic: 'p50' as const },
-    ].toSorted(compareCollectiveXDecisionMetrics);
-
-    expect(
-      metrics.map(
-        (metric) =>
-          `${metric.phase}/${metric.tokens_per_rank}/${metric.measure}/${metric.statistic}`,
-      ),
-    ).toEqual([
-      'decode/16/latency_us/p50',
-      'decode/16/latency_us/p99',
-      'decode/128/total_logical_data_rate_gbps_at_latency_percentile/p50',
-      'prefill/512/latency_us/p99',
-    ]);
-  });
-
-  it('uses measured roundtrip without synthesizing nullable components', () => {
-    const dataset = makeCollectiveXDataset();
-    const pairedOnly = dataset.series[1].points[0];
-
-    expect(metricValue(pairedOnly, 'dispatch', 'p99', 'latency')).toBeNull();
-    expect(metricValue(pairedOnly, 'combine', 'p99', 'total-logical-rate')).toBeNull();
-    expect(metricValue(pairedOnly, 'roundtrip', 'p99', 'latency')).toBe(120);
-    expect(metricValue(pairedOnly, 'roundtrip', 'p99', 'tokens-per-second')).toBeCloseTo(
-      8_533_333.33,
-    );
-  });
-
-  it('uses publisher supplied activation and total logical rates', () => {
-    const point = makeCollectiveXDataset().series[0].points[0];
-    point.components.roundtrip!.activation_data_rate_gbps_at_latency_percentile!.p99 = 123.45;
-    point.components.roundtrip!.total_logical_data_rate_gbps_at_latency_percentile!.p99 = 125.67;
-
-    expect(metricValue(point, 'roundtrip', 'p99', 'activation-rate')).toBe(123.45);
-    expect(metricValue(point, 'roundtrip', 'p99', 'total-logical-rate')).toBe(125.67);
-    expect(metricValue(point, 'roundtrip', 'p95', 'total-logical-rate')).toBeGreaterThan(0);
-  });
-
-  it('omits unavailable series from a component projection', () => {
-    const series = makeCollectiveXDataset().series;
-
-    expect(chartPoints(series, 'dispatch', 'p99', 'tokens-per-rank', 'latency')).toHaveLength(1);
-    expect(chartPoints(series, 'stage', 'p99', 'tokens-per-rank', 'latency')).toHaveLength(1);
-    expect(chartPoints(series, 'roundtrip', 'p99', 'tokens-per-rank', 'latency')).toHaveLength(7);
-  });
-
-  it('reports mismatched diagnostic factors without deciding comparability', () => {
-    const series = makeCollectiveXDataset().series;
-    series[1].workload.routing = 'zipf';
-    series[1].system.topology_class = 'other-topology';
-
-    expect(comparisonDifferences(series)).toEqual(expect.arrayContaining(['routing', 'topology']));
-  });
-
-  it('reports implementation, transport, and resource differences', () => {
-    const base = makeCollectiveXDataset().series[0];
-    const different = structuredClone(base);
-    different.backend.version = '2.0.0';
-    different.build.image_digest = `sha256:${'f'.repeat(64)}`;
-    different.system.transport = 'pcie';
-    different.resource.configured_units = 12;
-
-    expect(comparisonDifferences([base, different])).toEqual(
-      expect.arrayContaining([
-        'backend implementation',
-        'implementation build',
-        'transport',
-        'resource profile',
-      ]),
-    );
-    expect(collectiveXColorKey(base)).not.toBe(collectiveXColorKey(different));
-    expect(collectiveXSeriesLabel(base)).toContain(
-      '1.0.0 · backend-default · build dddddddd · series 00000001',
-    );
-    expect(collectiveXSeriesLabel(base)).toContain('normal · scale-up · single-node-nvlink');
-    expect(collectiveXTopologyLabel(base.system)).toContain('1x8 · domain 8 · nvlink');
-  });
-
-  it('keeps publisher cohorts whole when applying mode, EP, phase, and fabric filters', () => {
-    const dataset = makeCollectiveXDataset();
-    const cohort = dataset.cohorts[0];
-    const seriesById = new Map(dataset.series.map((series) => [series.series_id, series]));
-    const selection = {
-      mode: 'normal' as const,
-      epSize: 8,
-      phase: 'decode' as const,
-      fabricScope: 'scale-up' as const,
-    };
-
-    expect(cohortMatchesSelection(cohort, seriesById, selection)).toBe(true);
-
-    const mixedMode = new Map(seriesById);
-    const changed = structuredClone(mixedMode.get(cohort.series_ids[0])!);
-    changed.mode = 'low-latency';
-    mixedMode.set(changed.series_id, changed);
-    expect(cohortMatchesSelection(cohort, mixedMode, selection)).toBe(false);
-
-    expect(
-      cohortMatchesSelection(cohort, seriesById, { ...selection, fabricScope: 'scale-out' }),
-    ).toBe(false);
-    expect(cohortMatchesSelection(cohort, seriesById, { ...selection, epSize: 16 })).toBe(false);
-    expect(cohortMatchesSelection(cohort, seriesById, { ...selection, phase: 'prefill' })).toBe(
-      false,
-    );
-  });
-
-  it('binds mode and exact topology into labels, colors, and mismatch warnings', () => {
-    const base = makeCollectiveXDataset().series[0];
-    const different = structuredClone(base);
-    different.mode = 'low-latency';
-    different.system.scope = 'scale-out';
-    different.system.nodes = 2;
-    different.system.scale_out_transport = 'rdma';
-    different.system.transport = 'nvlink-rdma';
-    different.system.topology_class = 'h100-nvlink-rdma';
-
-    expect(collectiveXColorKey(base)).not.toBe(collectiveXColorKey(different));
-    expect(collectiveXSeriesLabel(different)).toContain(
-      'low-latency · scale-out · h100-nvlink-rdma',
-    );
-    expect(comparisonDifferences([base, different])).toEqual(
-      expect.arrayContaining(['mode', 'fabric scope', 'topology']),
-    );
-  });
-
-  it('gives routing variants distinct visual identities', () => {
-    const [uniform, zipf] = makeCollectiveXDataset().series;
-    zipf.workload.routing = 'zipf';
-
-    expect(collectiveXColorKey(uniform)).not.toBe(collectiveXColorKey(zipf));
-    zipf.workload.eplb = true;
-    expect(collectiveXColorKey(zipf)).toContain('zipf-eplb');
-  });
-
-  it('keeps public config, routing-control, and runtime builds visually distinct', () => {
-    const base = makeCollectiveXDataset().series[0];
-    const publicConfig = structuredClone(base);
-    const routingControl = structuredClone(base);
-    const runtime = structuredClone(base);
-    publicConfig.build.public_config_sha256 = '0'.repeat(64);
-    routingControl.build.routing_control_sha256 = '9'.repeat(64);
-    runtime.build.runtime_fingerprint_sha256 = '6'.repeat(64);
-
-    expect(collectiveXColorKey(base)).not.toBe(collectiveXColorKey(publicConfig));
-    expect(collectiveXColorKey(base)).not.toBe(collectiveXColorKey(routingControl));
-    expect(collectiveXColorKey(base)).not.toBe(collectiveXColorKey(runtime));
+  it('flags the dimensions that differ across compared series', () => {
+    const warnings = comparisonDifferences([scaleUp, scaleOut]);
+    expect(warnings).toContain('EP degree');
+    expect(warnings).toContain('fabric scope');
+    expect(warnings).toContain('backend implementation');
+    expect(warnings).toContain('transport');
   });
 });

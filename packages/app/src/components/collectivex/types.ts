@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export type CollectiveXPhase = 'decode' | 'prefill';
 // The release version is a numeric, incrementable identity (1, 2, 3, ...), matching
-// the backend release marker's "version": N and the cxpublication-<N>-* artifact name.
-// It is NOT the frozen data-format literal "v1" (collectivex.public.v1, cx*-v1-*,
-// collectivex_public_v1_*.ndjson), which is schema-version and shared across releases.
+// the backend release marker's "version": N. It is NOT the frozen data-format literal
+// "v1" (cx*-v1-* ids, collectivex.*.v1 formats), which is the schema-version shared
+// across releases. The neutral MVP backend only emits schema_version 1.
 export const COLLECTIVEX_VERSIONS = [1] as const;
 export type CollectiveXVersion = (typeof COLLECTIVEX_VERSIONS)[number];
 export const COLLECTIVEX_DEFAULT_VERSION: CollectiveXVersion = Math.max(
@@ -30,9 +30,22 @@ export type CollectiveXYAxis =
   | 'total-logical-rate';
 export type CollectiveXScale = 'log' | 'linear';
 
+// ---------------------------------------------------------------------------
+// Shared primitives
+// ---------------------------------------------------------------------------
 const hex64 = z.string().regex(/^[a-f0-9]{64}$/);
 const sourceHash = z.string().regex(/^[a-f0-9]{40,64}$/);
-const typedId = (kind: string) => z.string().regex(new RegExp(`^cx${kind}-v1-[a-f0-9]{64}$`));
+// Accepts either the legacy content-hash id (`cx<kind>-v1-<hex64>`, still emitted by
+// the promotion-era artifacts the fixtures use) or the neutral MVP backend's
+// human-readable qualification id (e.g. `h200-dgxc-nccl-ep-deepseek-v3-normal-decode-
+// ep8-uniform-2abdb08869ae`, `…-a01`, `…-t1`). Both are globally unique; the human form
+// carries its own qualification-hash suffix. Kept as one helper so every id field keeps
+// a single, consistent contract.
+const typedId = (kind: string) =>
+  z
+    .string()
+    .max(200)
+    .regex(new RegExp(`^(?:cx${kind}-v1-[a-f0-9]{64}|[a-z0-9][a-z0-9_.-]*)$`));
 const safeId = z
   .string()
   .max(128)
@@ -46,9 +59,11 @@ const reason = reasonId.nullable();
 const timestamp = z.iso.datetime({ offset: true });
 const positiveInteger = z.number().int().safe().positive();
 const nonnegativeInteger = z.number().int().safe().nonnegative();
-const publicationTier = z.enum(['official', 'comparable-experimental']);
+const runId = z.string().regex(/^[1-9][0-9]*$/);
 const mode = z.enum(['normal', 'low-latency']);
 const topologyScope = z.enum(['scale-up', 'scale-out']);
+const routingKind = z.enum(['uniform', 'zipf']);
+const phase = z.enum(['decode', 'prefill']);
 const unique = <T>(schema: z.ZodType<T>) =>
   z.array(schema).refine((items) => new Set(items).size === items.length, 'duplicate values');
 const canonicalJson = (value: unknown): string =>
@@ -68,38 +83,6 @@ const uniqueObjects = <T>(schema: z.ZodType<T>) =>
     .array(schema)
     .refine((items) => new Set(items.map(canonicalJson)).size === items.length, 'duplicate values');
 
-export const collectiveXChannelSchema = z.strictObject({
-  format: z.literal('collectivex.channel.v1'),
-  channel: z.literal('dev-latest'),
-  generated_at: timestamp,
-  dataset: z.strictObject({
-    path: z.string().regex(/^datasets\/[a-f0-9]{64}\/dataset\.json$/),
-    sha256: hex64,
-    bytes: positiveInteger.max(32 * 1024 * 1024),
-  }),
-});
-
-// JIT listing of the eligible ("tagged + success") publication runs for a
-// version, backing the frontend multi-run picker. `collectivex.runs.v1` is a
-// frozen data-format literal (the shared schema-version, not the release).
-export const collectiveXRunSummarySchema = z.strictObject({
-  run_id: z.string().regex(/^[1-9][0-9]*$/),
-  run_attempt: positiveInteger,
-  head_sha: z.string().regex(/^[a-f0-9]{40}$/),
-  digest: hex64,
-  generated_at: timestamp,
-  coverage_scope: z.enum(['full', 'partial']),
-  covered_skus: unique(safeId),
-  bytes: positiveInteger.max(32 * 1024 * 1024),
-});
-export const collectiveXRunsSchema = z.strictObject({
-  format: z.literal('collectivex.runs.v1'),
-  version: positiveInteger,
-  runs: z.array(collectiveXRunSummarySchema),
-});
-export type CollectiveXRunSummary = z.infer<typeof collectiveXRunSummarySchema>;
-export type CollectiveXRuns = z.infer<typeof collectiveXRunsSchema>;
-
 const percentilesSchema = z.strictObject({
   p50: z.number().finite().positive(),
   p90: z.number().finite().positive(),
@@ -115,155 +98,62 @@ const ratePercentilesSchema = z.strictObject({
   p95: z.number().finite().nonnegative(),
   p99: z.number().finite().nonnegative(),
 });
-const communicationAxisSchema = z.strictObject({
-  alignment_contract: z.enum([
-    'native-bf16-vector-alignment',
-    'hidden-block-128',
-    'native-fp8-vector-alignment',
-    'value-block-64',
-  ]),
-  api_input_dtype: z.enum(['bf16', 'fp8-e4m3fn-with-f32-scale', 'fp8-e4m3fnuz-with-f32-scale']),
-  api_output_dtype: z.enum(['bf16', 'fp8-e4m3fn-with-f32-scale', 'fp8-e4m3fnuz-with-f32-scale']),
-  communication_format: z.enum(['bf16', 'fp8-e4m3fn', 'fp8-e4m3fnuz', 'logfmt10']),
-  conversion_boundary: z.enum([
-    'none',
-    'before-dispatch-timing',
-    'inside-dispatch-timing',
-    'inside-combine-timing',
-  ]),
-  padding_contract: z.enum(['none', 'right-zero-pad-hidden-to-128', 'right-zero-pad-values-to-64']),
-  quantization_origin: z.enum([
-    'none',
-    'caller-prequantized',
-    'backend-fused',
-    'backend-internal',
-    'backend-internal-direct-cast',
-  ]),
-  scale_dtype: z.enum(['f32', 'implicit-logfmt10']).nullable(),
-  scale_group_size: z.union([z.literal(64), z.literal(128)]).nullable(),
-  scale_layout: z.enum(['none', 'per-token-hidden-block', 'dynamic-per-64-values']),
-});
-const precisionProfileSchema = z.enum([
-  'd-bf16.c-bf16',
-  'd-fp8-e4m3fn-b128-f32-prequantized.c-bf16',
-  'd-fp8-e4m3fnuz-b128-f32-prequantized.c-bf16',
-  'd-fp8-e4m3fn-b128-f32-fused.c-bf16',
-  'd-bf16.c-logfmt10-dynamic64',
-  'd-fp8-e4m3fn-b128-f32-fused.c-logfmt10-dynamic64',
-  'd-bf16.c-fp8-e4m3fn-direct-cast-noscale',
-  'd-fp8-e4m3fn-b128-f32-prequantized.c-fp8-e4m3fn-direct-cast-noscale',
-  'd-bf16.c-fp8-e4m3fnuz-direct-cast-noscale',
-  'd-fp8-e4m3fnuz-b128-f32-prequantized.c-fp8-e4m3fnuz-direct-cast-noscale',
-]);
 const byteAccountingSchema = z.strictObject({
   accounting_contract: z.literal('activation-data-plus-scales-v1'),
   activation_data_bytes: nonnegativeInteger,
   scale_bytes: nonnegativeInteger,
   total_logical_bytes: nonnegativeInteger,
 });
-const componentSchema = z
-  .strictObject({
-    origin: z.enum(['measured', 'derived']),
-    latency_us: percentilesSchema,
-    byte_provenance: byteAccountingSchema,
-    activation_data_rate_gbps_at_latency_percentile: ratePercentilesSchema.nullable(),
-    total_logical_data_rate_gbps_at_latency_percentile: ratePercentilesSchema.nullable(),
-    sample_count: positiveInteger.nullable(),
-  })
-  .superRefine((value, context) => {
-    if (value.origin === 'measured' && value.sample_count !== 512) {
-      context.addIssue({
-        code: 'custom',
-        path: ['sample_count'],
-        message: 'measured components require exactly 512 samples',
-      });
-    }
-    if (value.origin === 'derived' && value.sample_count !== null) {
-      context.addIssue({
-        code: 'custom',
-        path: ['sample_count'],
-        message: 'derived components require a null sample count',
-      });
-    }
-  });
-const routingEvidenceSchema = z.strictObject({
+// The neutral shard carries only dtype/quant/semantics per communication axis —
+// the promotion-era 9-field communication axis and precision-profile enum are gone.
+const precisionAxisSchema = z.strictObject({
+  communication_format: safeId,
+  quant_mode: safeId,
+  semantics: safeId,
+});
+
+const outcome = z.enum(['success', 'unsupported', 'failed', 'invalid', 'diagnostic', 'pending']);
+const terminalStatus = z.enum([
+  'measured',
+  'unsupported',
+  'failed',
+  'invalid',
+  'diagnostic',
+  'pending',
+]);
+
+// ---------------------------------------------------------------------------
+// View model — series / points / components
+//
+// Reshaped-in-place from the retired promoted dataset: the same series → points →
+// components shape the chart/tables/inventory render, but every field is now something
+// the neutral cxshard/matrix artifacts actually carry (plus data rates the reader
+// derives from byte_provenance ÷ latency). No promotion, ranking, or eligibility layer.
+// ---------------------------------------------------------------------------
+const componentSchema = z.strictObject({
+  origin: z.enum(['measured', 'derived']),
+  latency_us: percentilesSchema,
+  // null for derived components (isolated_sum) — no byte accounting exists.
+  byte_provenance: byteAccountingSchema.nullable(),
+  activation_data_rate_gbps_at_latency_percentile: ratePercentilesSchema.nullable(),
+  total_logical_data_rate_gbps_at_latency_percentile: ratePercentilesSchema.nullable(),
+  sample_count: nonnegativeInteger.nullable(),
+});
+const routingSchema = z.strictObject({
   fanout_mean: z.number().finite().nonnegative(),
+  routed_copies: nonnegativeInteger,
   recv_tokens_max: nonnegativeInteger,
   expert_load_cv: z.number().finite().nonnegative(),
   payload_rank_cv: z.number().finite().nonnegative(),
   hotspot_ratio: z.number().finite().nonnegative(),
   empty_expert_count: nonnegativeInteger,
   empty_rank_count: nonnegativeInteger,
-  routed_copies: positiveInteger,
-});
-const precisionAxisEvidenceSchema = z.strictObject({
-  dequantized_semantics: z.boolean(),
-  encoded_payload_valid: z.boolean(),
-  max_abs_error: z.number().finite().nonnegative(),
-  max_rel_error: z.number().finite().nonnegative(),
-  passed: z.boolean(),
-  saturation_count: nonnegativeInteger,
-  saturation_rate: z.number().finite().min(0).max(1),
-  scales_finite: z.boolean().nullable(),
-  scales_positive: z.boolean().nullable(),
 });
 const pointCorrectnessSchema = z.strictObject({
-  semantic_pass: z.boolean(),
-  precision: z.strictObject({
-    combine: precisionAxisEvidenceSchema,
-    dispatch: precisionAxisEvidenceSchema,
-    passed: z.boolean(),
-    profile_id: precisionProfileSchema,
-  }),
-});
-const qualificationIndex = z.union([z.literal(1), z.literal(2), z.literal(3)]);
-const trialDiagnosticComponentSchema = z.strictObject({
-  drift_flagged: z.boolean(),
-  first_last_median_ratio: z.number().finite().min(1),
-  outlier_flagged: z.boolean(),
-  robust_outlier_fraction: z.number().finite().min(0).max(1),
-  trial_count: z.literal(64),
-});
-const trialDiagnosticsSchema = z
-  .strictObject({
-    flagged: z.boolean(),
-    reasons: unique(z.enum(['trial-drift', 'trial-outliers'])).max(2),
-    components: z.strictObject({
-      dispatch: trialDiagnosticComponentSchema.nullable(),
-      stage: trialDiagnosticComponentSchema.nullable(),
-      combine: trialDiagnosticComponentSchema.nullable(),
-      roundtrip: trialDiagnosticComponentSchema.nullable(),
-    }),
-  })
-  .refine((value) => value.flagged === value.reasons.length > 0, {
-    path: ['reasons'],
-    message: 'trial diagnostic reasons must be present exactly when flagged',
-  });
-const eligibilitySchema = z
-  .strictObject({
-    decision_grade: z.boolean(),
-    allocation_ids: unique(typedId('allocation')),
-    complete: z.boolean(),
-    correct: z.boolean(),
-    measured_roundtrip_p99: z.boolean(),
-    stable_ordering: z.boolean(),
-    reasons: unique(reason.unwrap()),
-  })
-  .refine((value) => value.decision_grade === (value.reasons.length === 0), {
-    path: ['reasons'],
-    message:
-      'decision-grade eligibility must have no reasons; diagnostic eligibility must have reasons',
-  });
-const coverageTopologySchema = z.strictObject({
-  ep_size: positiveInteger,
-  nodes: positiveInteger,
-  gpus_per_node: positiveInteger,
-  scale_up_domain: positiveInteger,
-  scope: topologyScope,
-  scale_up_transport: safeId,
-  scale_out_transport: safeId.nullable(),
-  transport: safeId,
-  topology_class: safeId,
+  passed: z.boolean(),
+  max_relative_error: z.number().finite().nonnegative(),
+  contract: safeId,
+  scope: safeId,
 });
 const pointSchema = z.strictObject({
   point_id: typedId('point'),
@@ -271,8 +161,7 @@ const pointSchema = z.strictObject({
   global_tokens: positiveInteger,
   anomalies: unique(reasonId).max(16),
   correctness: pointCorrectnessSchema,
-  trial_diagnostics: trialDiagnosticsSchema,
-  routing: routingEvidenceSchema,
+  routing: routingSchema,
   components: z.strictObject({
     dispatch: componentSchema.nullable(),
     stage: componentSchema.nullable(),
@@ -280,32 +169,24 @@ const pointSchema = z.strictObject({
     roundtrip: componentSchema.nullable(),
     isolated_sum: componentSchema.nullable(),
   }),
-  roundtrip_token_rate_at_latency_percentile: percentilesSchema,
-  evidence_ids: unique(typedId('evidence')).min(1).max(3),
+  roundtrip_token_rate_at_latency_percentile: ratePercentilesSchema,
+  evidence_ids: unique(typedId('evidence')).min(1),
 });
 const seriesSchema = z.strictObject({
   series_id: typedId('series'),
   label,
-  status: z.enum(['decision-grade', 'diagnostic']),
-  case_ids: unique(typedId('case')).min(1),
   allocation_ids: unique(typedId('allocation')).min(1),
   model: safeId,
   suite: safeId,
   mode,
-  publication_tier: publicationTier,
-  phase: z.enum(['decode', 'prefill']),
+  phase,
   backend: z.strictObject({
     id: safeId,
     label,
-    role: z.enum(['library', 'reference']),
     generation: label.nullable(),
     version: label.nullable(),
   }),
   build: z.strictObject({
-    implementation_contract_sha256: hex64,
-    public_config_sha256: hex64,
-    routing_control_sha256: hex64,
-    runtime_fingerprint_sha256: hex64,
     image_digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
     source_sha: sourceHash,
     squash_sha256: hex64,
@@ -324,88 +205,73 @@ const seriesSchema = z.strictObject({
     scale_up_domain: positiveInteger,
     world_size: positiveInteger,
     ep_size: positiveInteger,
-    placement: z.literal('packed'),
+    placement: safeId,
   }),
   workload: z.strictObject({
     workload_id: typedId('work'),
     hidden: positiveInteger,
     top_k: positiveInteger,
     experts: positiveInteger,
-    routing: z.enum(['uniform', 'zipf']),
+    routing: routingKind,
     eplb: z.boolean(),
-    precision_profile: precisionProfileSchema,
-    dispatch_precision: communicationAxisSchema,
-    combine_precision: communicationAxisSchema,
-    activation_profile: z.literal('canonical-counter-source-v4'),
+    precision_profile: safeId,
+    dispatch_precision: precisionAxisSchema,
+    combine_precision: precisionAxisSchema,
+    activation_profile: safeId,
   }),
-  eplb: z
-    .strictObject({
-      enabled: z.boolean(),
-      calibration_workload_id: typedId('work').nullable(),
-      calibration_trace_sha256: hex64.nullable(),
-      calibration_window: z.literal('collectivex-eplb-calibration-window-v1').nullable(),
-      calibration_token_offset: nonnegativeInteger.nullable(),
-      planner: label.nullable(),
-      mapping_sha256: hex64.nullable(),
-      logical_experts: positiveInteger,
-      physical_experts: positiveInteger,
-      redundant_experts: nonnegativeInteger,
-      reference_tokens_per_rank: positiveInteger.nullable(),
-      replicated_experts: nonnegativeInteger,
-      max_replicas: nonnegativeInteger.nullable(),
-      imbalance_before: z.number().finite().nonnegative().nullable(),
-      imbalance_after: z.number().finite().nonnegative().nullable(),
-    })
-    .superRefine((value, context) => {
-      const calibration = [
-        value.calibration_workload_id,
-        value.calibration_trace_sha256,
-        value.calibration_window,
-        value.calibration_token_offset,
-      ];
-      if (
-        value.enabled
-          ? calibration.some((item) => item === null)
-          : calibration.some((item) => item !== null)
-      ) {
-        context.addIssue({
-          code: 'custom',
-          path: ['calibration_workload_id'],
-          message: 'EPLB calibration fields must be present exactly when EPLB is enabled',
-        });
-      }
-    }),
+  eplb: z.strictObject({
+    enabled: z.boolean(),
+    planner: label.nullable(),
+    logical_experts: positiveInteger,
+    physical_experts: positiveInteger.nullable(),
+    redundant_experts: nonnegativeInteger,
+    reference_tokens_per_rank: positiveInteger.nullable(),
+    replicated_experts: nonnegativeInteger.nullable(),
+    max_replicas: nonnegativeInteger.nullable(),
+    imbalance_before: z.number().finite().nonnegative().nullable(),
+    imbalance_after: z.number().finite().nonnegative().nullable(),
+    mapping_sha256: hex64.nullable(),
+  }),
   resource: z.strictObject({
-    mode: z.literal('fixed-profile'),
+    mode: safeId,
     profile: safeId,
     comm_units_kind: label.nullable(),
     configured_units: positiveInteger.nullable(),
   }),
   measurement: z.strictObject({
-    contract: z.enum(['layout-and-dispatch-v1', 'expert-packed-weighted-combine-v1']),
-    component_order_contract: z.literal('qualification-hash-rotated-components-v1'),
-    combine_semantics: z.enum(['activation-only', 'gate-weighted']),
-    payload_unit: z.enum(['token-rank', 'token-expert']),
-    sampling_contract: z.literal('fixed-512-v1'),
-    iters: z.literal(8),
-    trials: z.literal(64),
-    warmups: z.literal(32),
-    samples_per_component: z.literal(512),
-    qualification_indices: unique(qualificationIndex).min(1).max(3),
-    headline_component: z.literal('roundtrip'),
-    headline_percentile: z.literal('p99'),
+    contract: safeId,
+    combine_semantics: safeId,
+    payload_unit: safeId,
+    iters: positiveInteger,
+    trials: positiveInteger,
+    warmups: nonnegativeInteger,
+    samples_per_component: positiveInteger,
   }),
   points: z.array(pointSchema).min(1),
-  eligibility: eligibilitySchema,
 });
-const outcome = z.enum(['success', 'unsupported', 'failed', 'invalid', 'diagnostic']);
+
+// ---------------------------------------------------------------------------
+// View model — coverage / attempts (one coverage row per requested matrix case)
+// ---------------------------------------------------------------------------
 const coverageResourceSchema = z.strictObject({
-  mode: z.literal('fixed-profile'),
+  // All nullable: unsupported/pending cases carry no resource profile (that lives
+  // only in a measured shard); measured coverage rows fill it from the shard.
+  mode: safeId.nullable(),
   profile: safeId.nullable(),
   comm_units_kind: label.nullable(),
   configured_units: positiveInteger.nullable(),
 });
-const terminalStatus = z.enum(['measured', 'unsupported', 'failed', 'invalid', 'diagnostic']);
+const coverageTopologySchema = z.strictObject({
+  ep_size: positiveInteger,
+  nodes: positiveInteger,
+  gpus_per_node: positiveInteger,
+  scale_up_domain: positiveInteger,
+  scope: topologyScope,
+  scale_up_transport: safeId,
+  scale_out_transport: safeId.nullable(),
+  transport: safeId,
+  topology_class: safeId,
+});
 const coveragePointSchema = z
   .strictObject({
     point_id: typedId('point').nullable(),
@@ -416,48 +282,50 @@ const coveragePointSchema = z
     reason,
   })
   .superRefine((value, context) => {
-    if (
-      (value.terminal_status === 'measured' &&
-        (value.point_id === null || value.series_id === null)) ||
-      (value.terminal_status === 'unsupported' &&
-        (value.point_id !== null || value.series_id !== null))
-    ) {
+    const measured = value.terminal_status === 'measured';
+    if (measured && (value.point_id === null || value.series_id === null)) {
       context.addIssue({
         code: 'custom',
         path: ['point_id'],
-        message: `${value.terminal_status} point references are inconsistent`,
+        message: 'measured points require point/series references',
       });
     }
-    if (
-      (value.terminal_status === 'measured' && value.reason !== null) ||
-      (['unsupported', 'failed', 'invalid'].includes(value.terminal_status) &&
-        value.reason === null)
-    ) {
+    if (!measured && (value.point_id !== null || value.series_id !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['point_id'],
+        message: 'non-measured points must not carry point/series references',
+      });
+    }
+    if (measured && value.reason !== null) {
       context.addIssue({
         code: 'custom',
         path: ['reason'],
-        message: `${value.terminal_status} point reason is inconsistent`,
+        message: 'measured points must not carry a reason',
+      });
+    }
+    if (!measured && value.reason === null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['reason'],
+        message: 'non-measured points require a reason',
       });
     }
   });
 const coverageSchema = z.strictObject({
   case_id: typedId('case'),
   label,
-  required: z.boolean(),
   disposition: z.enum(['runnable', 'unsupported']),
   sku: safeId,
-  suite: safeId,
-  workload: safeId,
-  publication_tier: publicationTier,
   backend: safeId,
   backend_generation: label.nullable(),
   mode,
-  phase: z.enum(['decode', 'prefill']),
-  routing: z.enum(['uniform', 'zipf']),
+  phase,
+  routing: routingKind,
   eplb: z.boolean(),
-  precision_profile: precisionProfileSchema,
-  dispatch_precision: communicationAxisSchema,
-  combine_precision: communicationAxisSchema,
+  precision_profile: safeId.nullable(),
+  dispatch_precision: precisionAxisSchema.nullable(),
+  combine_precision: precisionAxisSchema.nullable(),
   resource: coverageResourceSchema,
   topology: coverageTopologySchema,
   points: uniqueObjects(coveragePointSchema).min(1),
@@ -469,6 +337,15 @@ const coverageSchema = z.strictObject({
 });
 const attemptSchema = z.strictObject({
   attempt_id: typedId('attempt'),
+  case_id: typedId('case'),
+  allocation_id: typedId('allocation'),
+  run_id: runId,
+  run_attempt: positiveInteger,
+  attempt_index: positiveInteger,
+  outcome,
+  failure_mode: reason,
+  reason,
+  selected: z.boolean(),
   evidence: z
     .array(
       z.strictObject({
@@ -481,143 +358,319 @@ const attemptSchema = z.strictObject({
         new Set(items.map((item) => `${item.evidence_id}\0${item.point_id}`)).size === items.length,
       'duplicate evidence items',
     ),
-  case_id: typedId('case'),
-  allocation_id: typedId('allocation'),
-  run_id: z.string().regex(/^[1-9][0-9]*$/),
-  run_attempt: positiveInteger,
-  qualification_index: qualificationIndex,
-  attempt_index: positiveInteger,
-  outcome,
-  failure_mode: reason,
-  reason,
-  series_id: typedId('series').nullable(),
-  selected: z.boolean(),
-  completed_at: timestamp.nullable(),
-});
-const metricSchema = z.strictObject({
-  operation: z.literal('roundtrip'),
-  statistic: z.enum(['p50', 'p99']),
-  measure: z.enum([
-    'latency_us',
-    'activation_data_rate_gbps_at_latency_percentile',
-    'total_logical_data_rate_gbps_at_latency_percentile',
-  ]),
-  objective: z.enum(['min', 'max']),
-  tokens_per_rank: positiveInteger,
-  phase: z.enum(['decode', 'prefill']),
-});
-const cohortSchema = z.strictObject({
-  cohort_id: typedId('cohort'),
-  kind: z.enum([
-    'library',
-    'chip',
-    'system',
-    'routing',
-    'dispatch-precision',
-    'combine-precision',
-    'precision-pair',
-  ]),
-  label,
-  description: label,
-  publication_tier: publicationTier,
-  series_ids: unique(typedId('series')).min(2),
-  controlled_factors: unique(safeId).min(1),
-  varying_factors: unique(safeId).min(1),
-  eligibility: eligibilitySchema,
-});
-const rankingSchema = z.strictObject({
-  ranking_id: typedId('ranking'),
-  cohort_id: typedId('cohort'),
-  label,
-  publication_tier: publicationTier,
-  metric: metricSchema,
-  entries: z
-    .array(
-      z.strictObject({
-        rank: positiveInteger,
-        series_id: typedId('series'),
-        point_id: typedId('point'),
-        value: z.number().finite().positive(),
-        unit: z.enum(['us', 'GB/s']),
-      }),
-    )
-    .min(2),
-  eligibility: eligibilitySchema,
-});
-const recommendationSchema = z.strictObject({
-  recommendation_id: typedId('recommendation'),
-  cohort_id: typedId('cohort'),
-  label,
-  objective: z.enum([
-    'min-p50-latency',
-    'min-p99-latency',
-    'max-activation-data-rate-at-p50-latency',
-    'max-activation-data-rate-at-p99-latency',
-    'max-total-logical-data-rate-at-p50-latency',
-    'max-total-logical-data-rate-at-p99-latency',
-  ]),
-  publication_tier: z.literal('official'),
-  series_id: typedId('series'),
-  point_id: typedId('point'),
-  value: z.number().finite().positive(),
-  unit: z.enum(['us', 'GB/s']),
-  rationale: label,
-  eligibility: eligibilitySchema,
-});
-const sensitivitySchema = z.strictObject({
-  sensitivity_id: typedId('sensitivity'),
-  cohort_id: typedId('cohort'),
-  label,
-  publication_tier: publicationTier,
-  baseline_series_id: typedId('series'),
-  candidate_series_id: typedId('series'),
-  metric: metricSchema,
-  signed_change_ratio: z.number().finite(),
-  eligibility: eligibilitySchema,
 });
 
+// ---------------------------------------------------------------------------
+// Run metadata + dataset envelope
+// ---------------------------------------------------------------------------
+export const collectiveXRunSchema = z.strictObject({
+  run_id: runId,
+  run_attempt: positiveInteger,
+  generated_at: timestamp,
+  // GitHub Actions run conclusion; null while in progress. Discovery never gates on it.
+  conclusion: safeId.nullable(),
+  matrix_id: safeId.nullable(),
+  requested_cases: nonnegativeInteger,
+  terminal_cases: nonnegativeInteger,
+  measured_cases: nonnegativeInteger,
+  unsupported_cases: nonnegativeInteger,
+  failed_cases: nonnegativeInteger,
+  requested_points: nonnegativeInteger,
+  terminal_points: nonnegativeInteger,
+  measured_points: nonnegativeInteger,
+  allocation_count: nonnegativeInteger,
+  covered_skus: unique(safeId),
+});
 export const collectiveXDatasetSchema = z.strictObject({
-  format: z.literal('collectivex.public.v1'),
+  format: z.literal('collectivex.view.v1'),
   schema_version: z.literal(1),
   generated_at: timestamp,
-  source_bundle_ids: unique(hex64),
-  promotion: z.strictObject({
-    status: z.enum(['promoted', 'diagnostic', 'quarantined']),
-    reason,
-    matrix_id: hex64.nullable(),
-    allocation_ids: unique(typedId('allocation')),
-    required_allocations: z.literal(1),
-    qualification_indices: unique(z.literal(1)).max(1),
-    requested_cases: nonnegativeInteger,
-    terminal_cases: nonnegativeInteger,
-    measured_cases: nonnegativeInteger,
-    unsupported_cases: nonnegativeInteger,
-    requested_points: nonnegativeInteger,
-    terminal_points: nonnegativeInteger,
-    measured_points: nonnegativeInteger,
-    unsupported_points: nonnegativeInteger,
-    policy: z.literal('collectivex-decision-grade-v1'),
-    // Partial-coverage promotion ("tagged + success" over a SKU subset). Both are
-    // emitted by the publisher for full and partial runs alike; a full run reports
-    // coverage_scope 'full' with every canonical SKU. Optional so pre-partial
-    // datasets still parse.
-    coverage_scope: z.enum(['full', 'partial']).optional(),
-    covered_skus: unique(safeId).optional(),
-  }),
+  source_bundle_ids: unique(safeId),
+  run: collectiveXRunSchema,
   coverage: z.array(coverageSchema),
   attempts: z.array(attemptSchema),
   series: z.array(seriesSchema),
-  cohorts: z.array(cohortSchema),
-  rankings: z.array(rankingSchema),
-  recommendations: z.array(recommendationSchema),
-  sensitivities: z.array(sensitivitySchema),
 });
 
-export type CollectiveXChannel = z.infer<typeof collectiveXChannelSchema>;
+// Run picker listing — keyed by run_id + attempt (no content digest).
+export const collectiveXRunSummarySchema = z.strictObject({
+  run_id: runId,
+  run_attempt: positiveInteger,
+  generated_at: timestamp,
+  conclusion: safeId.nullable(),
+  covered_skus: unique(safeId),
+  terminal_counts: z.strictObject({
+    measured: nonnegativeInteger,
+    unsupported: nonnegativeInteger,
+    failed: nonnegativeInteger,
+  }),
+});
+export const collectiveXRunsSchema = z.strictObject({
+  format: z.literal('collectivex.runs.v1'),
+  version: positiveInteger,
+  runs: z.array(collectiveXRunSummarySchema),
+});
+
+// ---------------------------------------------------------------------------
+// Raw neutral artifact ingest schemas (server-side only, lenient).
+//
+// These validate the consumed subset of the three neutral artifact formats the
+// reader downloads. Plain z.object strips unknown keys, so the reader stays
+// tolerant of extra/future fields (e.g. a later top-level `version: N`).
+// ---------------------------------------------------------------------------
+const rawPercentilesSchema = z.object({
+  p50: z.number(),
+  p90: z.number(),
+  p95: z.number(),
+  p99: z.number(),
+});
+const rawCaseSchema = z.object({
+  case_id: z.string().optional(),
+  backend: z.string(),
+  ep: positiveInteger,
+  eplb: z.boolean(),
+  experts: positiveInteger,
+  gpus_per_node: positiveInteger,
+  hidden: positiveInteger,
+  topk: positiveInteger,
+  ladder: z.string(),
+  mode: z.string(),
+  nodes: positiveInteger,
+  phase: z.string(),
+  routing: z.string(),
+  scope: z.string(),
+  suite: z.string(),
+  workload: z.string(),
+  transport: z.string(),
+  topology_class: z.string(),
+  scale_up_domain: positiveInteger,
+  scale_up_transport: z.string(),
+  scale_out_transport: z.string().nullable(),
+});
+const rawProfileSchema = z.object({
+  dtype: z.string(),
+  combine_dtype: z.string(),
+  // Absent in the neutral MVP profile (fixed-BF16 path, quant not swept); the reader
+  // defaults it to 'none'. Present in legacy promotion-era profiles.
+  combine_quant_mode: z.string().optional(),
+  combine_semantics: z.string(),
+  payload_unit: z.string(),
+  activation_profile: z.string(),
+  eplb_planner: z.string().nullable().optional(),
+  eplb_redundant_experts: nonnegativeInteger.optional(),
+  eplb_reference_tokens_per_rank: positiveInteger.optional(),
+  resource_mode: z.string().optional(),
+});
+const rawTopologySchema = z.object({
+  device_product: z.string().optional(),
+  gpus_per_node: positiveInteger,
+  nodes: positiveInteger,
+  placement: z.string(),
+  scale_out_transport: z.string().nullable(),
+  scale_up_domain: positiveInteger,
+  scale_up_transport: z.string(),
+  scope: z.string(),
+  topology_class: z.string(),
+  transport: z.string(),
+  world_size: positiveInteger,
+});
+const rawImplementationSchema = z.object({
+  name: z.string(),
+  kernel_generation: z.string(),
+  provenance: z.object({
+    deepep_version: z.string().optional(),
+    deepep_commit: z.string().optional(),
+    backend_lineage: z.string().optional(),
+    mode: z.string().optional(),
+  }),
+  resource_profile: z.object({
+    comm_units_kind: z.string().nullable().optional(),
+    configured_units: positiveInteger.nullable().optional(),
+    conformance_class: z.string().optional(),
+    resource_class: z.string().optional(),
+  }),
+});
+const rawComponentSchema = z.object({
+  origin: z.string().nullable().optional(),
+  availability: z.string(),
+  // null for unavailable components (e.g. `stage` on a two-phase backend).
+  percentiles_us: rawPercentilesSchema.nullable(),
+  sample_count: nonnegativeInteger.optional(),
+});
+const rawByteAccountingSchema = z.object({
+  activation_data_bytes: nonnegativeInteger,
+  scale_bytes: nonnegativeInteger.optional(),
+  total_logical_bytes: nonnegativeInteger,
+});
+const rawRowSchema = z.object({
+  point_id: z.string(),
+  // Legacy shards carry a content-hash evidence id; neutral shards identify a row's
+  // evidence by its sample digest instead, so the reader synthesizes one from point_id.
+  evidence_id: z.string().optional(),
+  sample_sha256: z.string().optional(),
+  tokens_per_rank: positiveInteger,
+  global_tokens: positiveInteger,
+  // Legacy shards list anomalies as reason-id strings; neutral shards emit structured
+  // objects ({type, ...}). The reader slugifies both to reason ids.
+  anomalies: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
+  correctness: z.object({
+    passed: z.boolean(),
+    max_relative_error: z.number(),
+    contract: z.string(),
+    scope: z.string(),
+  }),
+  routing: z.object({
+    fanout_mean: z.number(),
+    routed_copies: nonnegativeInteger,
+    expert_load_cv: z.number(),
+    payload_rank_cv: z.number(),
+    hotspot_ratio: z.number(),
+    empty_expert_count: nonnegativeInteger,
+    empty_rank_count: nonnegativeInteger,
+  }),
+  receive: z.object({ max: nonnegativeInteger }),
+  token_rate_at_latency_percentile: rawPercentilesSchema,
+  components: z.record(z.string(), rawComponentSchema.nullable()),
+  byte_provenance: z.record(z.string(), rawByteAccountingSchema),
+});
+export const collectiveXRawCaseAttemptSchema = z.object({
+  format: z.literal('collectivex.ep.v1'),
+  record_type: z.literal('case-attempt'),
+  generated_at: z.string(),
+  identity: z.object({
+    // series_id/allocation_id/series_factors are legacy promotion-era fields. The neutral
+    // MVP backend omits them; the reader derives series identity from case_id and series
+    // factors from provenance/case below.
+    series_id: z.string().optional(),
+    case_id: z.string(),
+    allocation_id: z.string().optional(),
+    attempt_id: z.string(),
+    attempt_ordinal: positiveInteger,
+    series_factors: z
+      .object({
+        backend: z.string(),
+        source_sha: z.string(),
+        image_digest: z.string(),
+        squash_sha256: z.string(),
+        workload_id: z.string(),
+      })
+      .optional(),
+    case_factors: z.object({
+      sku: z.string(),
+      case: rawCaseSchema,
+      profile: rawProfileSchema,
+    }),
+    allocation_factors: z.object({
+      run_id: z.string(),
+      run_attempt: z.string(),
+      runner: z.string().optional(),
+      artifact: z.string().optional(),
+      // Neutral fallback source for a synthesized allocation id / build source_sha.
+      execution_id: z.string().optional(),
+      source_sha: z.string().optional(),
+    }),
+  }),
+  // Neutral shards carry image/source provenance the reader folds into series build
+  // factors (legacy shards carried these inside identity.series_factors instead).
+  provenance: z
+    .object({
+      image: z
+        .object({
+          digest: z.string().optional(),
+          squash_sha256: z.string().optional(),
+        })
+        .optional(),
+      git_run: z.object({ source_sha: z.string().optional() }).optional(),
+    })
+    .optional(),
+  topology: rawTopologySchema,
+  implementation: rawImplementationSchema,
+  runtime_fingerprint: z.object({ vendor: z.string() }),
+  measurement: z.object({
+    contract: z.string(),
+    sampling: z.object({
+      iterations_per_trial: positiveInteger,
+      trials: positiveInteger,
+      warmup_iterations: nonnegativeInteger,
+      samples_per_component: positiveInteger,
+    }),
+    rows: z.array(rawRowSchema).min(1),
+  }),
+  outcome: z.object({ status: z.string() }),
+});
+export const collectiveXRawTerminalSchema = z.object({
+  format: z.literal('collectivex.terminal.v1'),
+  record_type: z.literal('terminal-outcome'),
+  generated_at: z.string(),
+  identity: z.object({
+    case_id: z.string().optional(),
+    allocation_id: z.string().optional(),
+    attempt_id: z.string().optional(),
+    attempt_ordinal: positiveInteger.optional(),
+    case_factors: z
+      .object({
+        sku: z.string(),
+        case: rawCaseSchema.optional(),
+      })
+      .optional(),
+    allocation_factors: z
+      .object({
+        run_id: z.string().optional(),
+        run_attempt: z.string().optional(),
+      })
+      .optional(),
+  }),
+  outcome: z.object({
+    status: z.string(),
+    failure_mode: z.string().optional(),
+    reason: z.string().nullable().optional(),
+    return_code: z.number().int().optional(),
+  }),
+});
+const rawMatrixIncludeSchema = z.object({
+  id: z.string(),
+  sku: z.string(),
+  backend: z.string(),
+  n: nonnegativeInteger,
+  nodes: positiveInteger,
+  gpus_per_node: positiveInteger,
+  launcher: z.string(),
+  scope: z.string(),
+  topology_class: z.string(),
+  transport: z.string(),
+  scale_up_domain: positiveInteger.optional(),
+  scale_up_transport: z.string().nullable().optional(),
+  scale_out_transport: z.string().nullable().optional(),
+  case_ids: z.array(z.string()),
+  execution_weight: nonnegativeInteger.optional(),
+});
+const rawRequestedCaseSchema = z.object({
+  case: rawCaseSchema,
+  sku: z.string(),
+  disposition: z.enum(['runnable', 'unsupported']),
+  reason: z.string().nullable().optional(),
+  detail: z.string().nullable().optional(),
+});
+export const collectiveXRawMatrixSchema = z.object({
+  format: z.literal('collectivex.matrix.v1'),
+  schema_version: nonnegativeInteger.optional(),
+  include: z.array(rawMatrixIncludeSchema),
+  requested_cases: z.array(rawRequestedCaseSchema),
+});
+
+// ---------------------------------------------------------------------------
+// Inferred types
+// ---------------------------------------------------------------------------
+export type CollectiveXRunSummary = z.infer<typeof collectiveXRunSummarySchema>;
+export type CollectiveXRuns = z.infer<typeof collectiveXRunsSchema>;
+export type CollectiveXRun = z.infer<typeof collectiveXRunSchema>;
 export type CollectiveXDataset = z.infer<typeof collectiveXDatasetSchema>;
 export type CollectiveXComponent = z.infer<typeof componentSchema>;
-export type CollectiveXCommunicationAxis = z.infer<typeof communicationAxisSchema>;
-export type CollectiveXPrecisionProfile = z.infer<typeof precisionProfileSchema>;
+export type CollectiveXPrecisionAxis = z.infer<typeof precisionAxisSchema>;
+// Retained export name (shape slimmed to {communication_format, quant_mode, semantics}).
+export type CollectiveXCommunicationAxis = CollectiveXPrecisionAxis;
+export type CollectiveXPrecisionProfile = string;
+export type CollectiveXRouting = z.infer<typeof routingSchema>;
 export type CollectiveXPoint = z.infer<typeof pointSchema>;
 export type CollectiveXPointCorrectness = z.infer<typeof pointCorrectnessSchema>;
 export type CollectiveXSeries = z.infer<typeof seriesSchema>;
@@ -626,18 +679,19 @@ export type CollectiveXCoverageTopology = z.infer<typeof coverageTopologySchema>
 export type CollectiveXCoveragePoint = z.infer<typeof coveragePointSchema>;
 export type CollectiveXTerminalStatus = z.infer<typeof terminalStatus>;
 export type CollectiveXAttempt = z.infer<typeof attemptSchema>;
-export type CollectiveXEligibility = z.infer<typeof eligibilitySchema>;
-export type CollectiveXMetric = z.infer<typeof metricSchema>;
-export type CollectiveXCohort = z.infer<typeof cohortSchema>;
-export type CollectiveXRanking = z.infer<typeof rankingSchema>;
-export type CollectiveXRecommendation = z.infer<typeof recommendationSchema>;
-export type CollectiveXSensitivity = z.infer<typeof sensitivitySchema>;
 export type CollectiveXOutcome = z.infer<typeof outcome>;
-export type CollectiveXPublicationTier = z.infer<typeof publicationTier>;
+
+export type CollectiveXRawMatrix = z.infer<typeof collectiveXRawMatrixSchema>;
+export type CollectiveXRawCaseAttempt = z.infer<typeof collectiveXRawCaseAttemptSchema>;
+export type CollectiveXRawTerminal = z.infer<typeof collectiveXRawTerminalSchema>;
+export type CollectiveXRawCase = z.infer<typeof rawCaseSchema>;
+export type CollectiveXRawProfile = z.infer<typeof rawProfileSchema>;
+export type CollectiveXRawRow = z.infer<typeof rawRowSchema>;
+
 export interface CollectiveXResolvedDataset {
-  channel: CollectiveXChannel;
   dataset: CollectiveXDataset;
-  digest: string;
+  run_id: string;
+  run_attempt: number;
 }
 export interface CollectiveXChartPoint {
   seriesId: string;

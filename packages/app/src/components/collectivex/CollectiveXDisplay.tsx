@@ -1,13 +1,12 @@
 'use client';
 
 import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
-import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import {
   Select,
@@ -24,42 +23,32 @@ import { useLocale } from '@/lib/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXInventory } from './CollectiveXInventory';
-import { collectiveXAvailabilityReason } from './reader';
+import { CollectiveXAttemptTable, CollectiveXCoverageTable } from './CollectiveXTables';
 import {
-  CollectiveXAttemptTable,
-  collectiveXCohortLabel,
-  CollectiveXCoverageTable,
-  CollectiveXDecisionTables,
-  collectiveXReasonLabel,
-} from './CollectiveXTables';
-import {
-  cohortMatchesSelection,
   collectiveXColorKey,
-  collectiveXInitialScope,
   collectiveXSeriesLabel,
   collectiveXTopologyLabel,
   comparisonDifferences,
   seriesMatchesSelection,
   type CollectiveXFabricScope,
+  type CollectiveXSeriesSelection,
 } from './data';
+import { collectiveXAvailabilityReason } from './reader';
 import {
   COLLECTIVEX_VERSIONS,
   COLLECTIVEX_DEFAULT_VERSION,
   collectiveXVersionLabel,
-  type CollectiveXCohort,
   type CollectiveXMode,
   type CollectiveXOperation,
   type CollectiveXPercentile,
   type CollectiveXPhase,
   type CollectiveXScale,
-  type CollectiveXSeries,
   type CollectiveXVersion,
   type CollectiveXXAxis,
   type CollectiveXYAxis,
 } from './types';
 
-type EvidenceScope = 'controlled' | 'diagnostic';
-type CollectiveXTab = 'results' | 'decisions' | 'evidence';
+type CollectiveXTab = 'results' | 'evidence';
 interface SelectOption<T extends string | number> {
   value: T;
   label: string;
@@ -71,7 +60,12 @@ const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p95', label: 'p95' },
   { value: 'p99', label: 'p99' },
 ];
-const TAB_VALUES: CollectiveXTab[] = ['results', 'decisions', 'evidence'];
+const TAB_VALUES: CollectiveXTab[] = ['results', 'evidence'];
+// Neutral MVP: no promotion/cohort/eligibility layer. The view is the measured
+// series set for one run, filtered by the identity axes the neutral shard carries.
+// Strings that describe that retired decision layer are gone; the remaining zh
+// values are preserved verbatim, and keys added for the neutral view mirror their
+// en text until the repository's temporary language override is lifted.
 const STRINGS = {
   en: {
     operation: {
@@ -98,7 +92,6 @@ const STRINGS = {
       'tokens-per-second': 'Token rate at selected latency percentile',
       'payload-rate': 'Logical payload rate at selected latency percentile',
     },
-    evidenceScope: { controlled: 'Controlled', diagnostic: 'Diagnostics' },
     mode: { normal: 'Normal', 'low-latency': 'Low latency' },
     fabricScope: { all: 'All', 'scale-up': 'Scale-up', 'scale-out': 'Scale-out' },
     topologyScope: { 'scale-up': 'Scale-up', 'scale-out': 'Scale-out' },
@@ -107,62 +100,36 @@ const STRINGS = {
       'activation-only': 'Activation-only combine',
       'gate-weighted': 'Gate-weighted combine',
     },
-    channel: { 'dev-latest': 'Published', 'latest-attempt': 'Latest attempt' },
-    tabs: { results: 'EP results', decisions: 'Decisions', evidence: 'Evidence' },
-    promotion: { promoted: 'Promoted', diagnostic: 'diagnostic', quarantined: 'quarantined' },
+    tabs: { results: 'EP results', evidence: 'Evidence' },
     all: 'All',
-    loading: 'Resolving CollectiveX publication...',
-    unavailable: 'CollectiveX publication unavailable',
-    storeUnavailable: 'The isolated publication store is not attached to this deployment.',
-    artifactSourceUnavailable: 'The GitHub Actions publication source is temporarily unavailable.',
-    promotedUnavailable: 'No promoted CollectiveX publication is available yet.',
-    attemptUnavailable: 'No CollectiveX attempt has been published yet.',
-    failedValidation: 'The publication failed validation.',
-    publicationAria: 'CollectiveX publication channel',
+    loading: 'Resolving CollectiveX run...',
+    unavailable: 'CollectiveX run unavailable',
+    sourceUnavailable: 'The GitHub Actions run source is temporarily unavailable.',
+    runsErrorMessage: 'No CollectiveX run has been published yet.',
+    loadError: 'The CollectiveX dataset failed to load.',
     retry: 'Retry',
     description:
       'Expert-parallel latency and payload rate across collective libraries and systems.',
-    publicationReason: 'Publication reason',
     source: 'Source',
     methodology: 'Methodology',
-    sourceUnavailable: 'Source unavailable because publication revisions differ',
+    sourceLinkUnavailable: 'Source unavailable because measured series span different revisions',
     refresh: 'Refresh',
-    decisionSeries: 'Decision series',
-    controlledCohorts: 'Controlled cohorts',
+    seriesCount: 'Series',
+    measuredCases: 'Measured cases',
     terminalCases: 'Terminal cases',
     retainedAttempts: 'Retained attempts',
     allocations: 'Allocations',
     publishedUtc: 'Published (UTC)',
-    publication: 'Publication',
     version: 'Benchmark version',
     runControl: 'Run',
     loadRuns: 'Load runs',
     loadingRuns: 'Loading runs…',
     latestPublished: 'Latest published',
-    coverageFull: 'Full',
-    coveragePartial: 'Partial',
-    evidence: 'Evidence',
-    evidenceAria: 'CollectiveX evidence scope',
     modeControl: 'Mode',
     modeAria: 'CollectiveX mode',
     epControl: 'EP degree',
     fabricScopeControl: 'Fabric scope',
     fabricScopeAria: 'CollectiveX fabric scope',
-    controlledCohort: 'Controlled cohort',
-    diagnosticCohort: 'Diagnostic cohort',
-    cohortKind: {
-      library: 'Library comparisons',
-      chip: 'Platform comparisons',
-      system: 'Reference-system comparisons',
-      routing: 'Routing sensitivities',
-    },
-    searchCohorts: 'Search cohorts...',
-    searchCohortsAria: 'Search CollectiveX cohorts',
-    clearCohortSearch: 'Clear cohort search',
-    noMatchingCohorts: 'No matching cohorts',
-    allDiagnosticEvidence: 'All diagnostic evidence',
-    noEligibleCohort: 'No eligible cohort',
-    allDiagnostics: 'All diagnostics',
     operationControl: 'Operation',
     phaseControl: 'Phase',
     phaseAria: 'CollectiveX phase',
@@ -176,26 +143,18 @@ const STRINGS = {
     xScaleAria: 'CollectiveX x scale',
     yAxisControl: 'Y axis',
     tokenRateOption: 'Token rate at latency percentile',
-    payloadRateOption: 'Payload rate at latency percentile',
     yScale: 'Y scale',
     yScaleAria: 'CollectiveX y scale',
-    noControlledSeries: 'No decision-grade series in this cohort and phase.',
-    noDiagnosticSeries: 'No diagnostic series match these filters.',
-    diagnosticEvidence: 'Diagnostic evidence',
+    noSeries: 'No measured series match these filters.',
     highContrast: 'High Contrast',
     resetFilter: 'Reset filter',
-    diagnosticWarning:
-      'Showing all measured series. Only decision-grade series inform rankings, recommendations, and regression claims — switch to Controlled to see that subset.',
-    excluded: 'Excluded',
     stableOrdering: 'stable ordering passed',
-    unstableOrdering: 'stable ordering not passed',
     samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
       `${trials}×${iterations} = ${samples} samples/component · ${warmups} synchronized warmups`,
     selectedFactorsDiffer: 'Selected factors differ',
     differenceLabels: {
       model: 'model',
       suite: 'suite',
-      'publication tier': 'publication tier',
       mode: 'mode',
       phase: 'phase',
       'backend implementation': 'backend implementation',
@@ -219,15 +178,13 @@ const STRINGS = {
       correctness: 'correctness',
     },
     missingComponents: 'Unavailable components remain null and are omitted.',
-    isolatedNote: 'Isolated sum is derived and never drives throughput or recommendations.',
+    isolatedNote: 'Isolated sum is derived and never drives throughput.',
     payloadNote:
       'Payload rate is derived at the selected latency percentile and is not physical link bandwidth.',
-    unpromotedEvidence: 'Unpromoted evidence',
-    unpromotedNote: 'Latest-attempt evidence does not drive rankings or recommendations.',
-    provenance: 'Publication provenance',
-    channelLabel: 'Channel',
-    datasetDigest: 'Dataset SHA-256',
-    matrixDigest: 'Matrix SHA-256',
+    provenance: 'Run provenance',
+    runLabel: 'Run',
+    attemptLabel: 'Attempt',
+    matrixLabel: 'Matrix',
     sourceBundles: 'Source bundles',
   },
   zh: {
@@ -255,7 +212,6 @@ const STRINGS = {
       'tokens-per-second': '所选延迟分位点的 token 速率',
       'payload-rate': '所选延迟分位点的逻辑载荷速率',
     },
-    evidenceScope: { controlled: '受控对比', diagnostic: '诊断' },
     mode: { normal: '常规', 'low-latency': '低延迟' },
     fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },
     topologyScope: { 'scale-up': '域内（scale-up）', 'scale-out': '跨域（scale-out）' },
@@ -264,63 +220,37 @@ const STRINGS = {
       'activation-only': '仅激活值合并',
       'gate-weighted': '门控加权合并',
     },
-    channel: { 'dev-latest': '已发布', 'latest-attempt': '最新尝试' },
-    tabs: { results: 'EP 结果', decisions: '决策', evidence: '证据' },
-    promotion: { promoted: '已发布', diagnostic: '诊断', quarantined: '已隔离' },
+    // English-only per the repository's temporary language override (no new
+    // Chinese text); keys added for the neutral view mirror the en values.
+    tabs: { results: 'EP results', evidence: '证据' },
     all: '全部',
-    loading: '正在解析 CollectiveX 发布数据...',
-    unavailable: 'CollectiveX 发布数据不可用',
-    storeUnavailable: '此部署未连接隔离式 CollectiveX 发布存储。',
-    artifactSourceUnavailable: 'GitHub Actions 发布数据源暂时不可用。',
-    promotedUnavailable: '尚无已发布的 CollectiveX 数据。',
-    attemptUnavailable: '尚无 CollectiveX 运行尝试。',
-    failedValidation: '发布数据未通过验证。',
-    publicationAria: 'CollectiveX 发布通道',
+    loading: 'Resolving CollectiveX run...',
+    unavailable: 'CollectiveX run unavailable',
+    sourceUnavailable: 'The GitHub Actions run source is temporarily unavailable.',
+    runsErrorMessage: 'No CollectiveX run has been published yet.',
+    loadError: 'The CollectiveX dataset failed to load.',
     retry: '重试',
     description: '对比集合通信库与系统的专家并行（EP）延迟和逻辑载荷速率。',
-    publicationReason: '发布状态原因',
     source: '源代码',
     methodology: '测试方法',
-    sourceUnavailable: '发布数据包含不同代码版本，无法提供单一源代码链接',
+    sourceLinkUnavailable: 'Source unavailable because measured series span different revisions',
     refresh: '刷新',
-    decisionSeries: '决策级序列',
-    controlledCohorts: '受控队列',
+    seriesCount: 'Series',
+    measuredCases: 'Measured cases',
     terminalCases: '已终结用例',
     retainedAttempts: '保留尝试',
     allocations: '独立分配',
     publishedUtc: '发布时间（UTC）',
-    publication: '发布数据',
     version: '基准版本',
-    // English-only per the repository's temporary language override (no new
-    // Chinese text); these mirror the en values until the override is lifted.
     runControl: 'Run',
     loadRuns: 'Load runs',
     loadingRuns: 'Loading runs…',
     latestPublished: 'Latest published',
-    coverageFull: 'Full',
-    coveragePartial: 'Partial',
-    evidence: '证据范围',
-    evidenceAria: 'CollectiveX 证据范围',
     modeControl: '模式',
     modeAria: 'CollectiveX 模式',
     epControl: 'EP 并行度',
     fabricScopeControl: '互联范围',
     fabricScopeAria: 'CollectiveX 互联范围',
-    controlledCohort: '受控队列',
-    diagnosticCohort: '诊断队列',
-    cohortKind: {
-      library: '通信库对比',
-      chip: '平台对比',
-      system: '参考系统对比',
-      routing: '路由敏感性',
-    },
-    searchCohorts: '搜索队列…',
-    searchCohortsAria: '搜索 CollectiveX 队列',
-    clearCohortSearch: '清除队列搜索',
-    noMatchingCohorts: '无匹配队列',
-    allDiagnosticEvidence: '全部诊断证据',
-    noEligibleCohort: '无符合条件的队列',
-    allDiagnostics: '全部诊断证据',
     operationControl: '操作',
     phaseControl: '阶段',
     phaseAria: 'CollectiveX 阶段',
@@ -334,25 +264,18 @@ const STRINGS = {
     xScaleAria: 'CollectiveX X 轴刻度',
     yAxisControl: 'Y 轴',
     tokenRateOption: '延迟分位点对应的 token 速率',
-    payloadRateOption: '延迟分位点对应的逻辑载荷速率',
     yScale: 'Y 轴刻度',
     yScaleAria: 'CollectiveX Y 轴刻度',
-    noControlledSeries: '该队列和阶段没有决策级序列。',
-    noDiagnosticSeries: '没有符合当前筛选条件的诊断序列。',
-    diagnosticEvidence: '诊断证据',
+    noSeries: 'No measured series match these filters.',
     highContrast: '高对比度',
     resetFilter: '重置筛选',
-    diagnosticWarning: '诊断证据不会用于排名、推荐或回归结论。',
-    excluded: '排除原因',
     stableOrdering: '排名顺序稳定性已通过',
-    unstableOrdering: '排名顺序稳定性未通过',
     samplingContract: (trials: number, iterations: number, samples: number, warmups: number) =>
       `${trials}×${iterations} = 每个分项 ${samples} 个样本 · ${warmups} 次同步预热`,
     selectedFactorsDiffer: '所选配置存在差异',
     differenceLabels: {
       model: '模型',
       suite: '测试套件',
-      'publication tier': '发布级别',
       mode: '模式',
       phase: '阶段',
       'backend implementation': '后端实现',
@@ -376,38 +299,21 @@ const STRINGS = {
       correctness: '正确性',
     },
     missingComponents: '不可用的测量分项保持为空，并从图表中省略。',
-    isolatedNote: '分项之和为派生值，不用于计算吞吐量或生成推荐。',
+    isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
-    unpromotedEvidence: '未发布证据',
-    unpromotedNote: '最新尝试中的证据不会用于排名或推荐。',
     provenance: '发布数据溯源',
-    channelLabel: '通道',
-    datasetDigest: '数据集 SHA-256',
-    matrixDigest: '矩阵 SHA-256',
+    runLabel: 'Run',
+    attemptLabel: 'Attempt',
+    matrixLabel: 'Matrix',
     sourceBundles: '源产物包',
   },
 } as const;
-const PROMOTION_CLASSES = {
-  promoted: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  diagnostic: 'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  quarantined: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
+const CONCLUSION_CLASSES: Record<string, string> = {
+  success: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  failure: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
 };
-const COHORT_KIND_ORDER: Record<CollectiveXCohort['kind'], number> = {
-  library: 0,
-  chip: 1,
-  system: 2,
-  routing: 3,
-  'dispatch-precision': 4,
-  'combine-precision': 5,
-  'precision-pair': 6,
-};
-
-function precisionCohortKindLabel(kind: CollectiveXCohort['kind']): string | null {
-  if (kind === 'dispatch-precision') return 'Dispatch precision';
-  if (kind === 'combine-precision') return 'Combine precision';
-  if (kind === 'precision-pair') return 'Precision pairs';
-  return null;
-}
+const CONCLUSION_FALLBACK_CLASS =
+  'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
 
 function formatDate(value: string, locale: 'en' | 'zh'): string {
   return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
@@ -437,13 +343,9 @@ function selectOptions(
   }));
 }
 
-function cohortSeries(cohort: CollectiveXCohort | null, series: CollectiveXSeries[]) {
-  if (cohort === null) return [];
-  const ids = new Set(cohort.series_ids);
-  return series.filter((item) => ids.has(item.series_id));
-}
-
-function publicationSourceSha(series: CollectiveXSeries[]): string | null {
+// A single source link is only meaningful when every measured series was built
+// from the same revision; a run that mixes revisions has no canonical source.
+function runSourceSha(series: { build: { source_sha: string } }[]): string | null {
   const sourceSha = series[0]?.build.source_sha;
   return sourceSha && series.every((item) => item.build.source_sha === sourceSha)
     ? sourceSha
@@ -454,31 +356,22 @@ export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
-  // JIT run picker: `runsRequested` gates the eligible-run listing behind the
-  // "Load runs" button; `selectedDigest` (null = the dev-latest channel) pins
-  // the view to one specific published run's dataset.
+  // JIT run picker: `runsRequested` gates the run listing behind the "Load runs"
+  // button; `selectedRunId` (null = the latest published run) pins the view to one
+  // specific run's dataset. Runs are keyed by their GitHub Actions run id.
   const [runsRequested, setRunsRequested] = useState(false);
-  const [selectedDigest, setSelectedDigest] = useState<string | null>(null);
-  const channelQuery = useCollectiveX('dev-latest', version);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const latestQuery = useCollectiveX(version);
   const runsQuery = useCollectiveXRuns(version, runsRequested);
-  const runQuery = useCollectiveXRun(version, selectedDigest);
-  // A pinned run overrides the dev-latest channel; both resolve to the same
-  // { channel, dataset, digest } shape the rest of the view consumes.
-  const activeQuery = selectedDigest === null ? channelQuery : runQuery;
+  const runQuery = useCollectiveXRun(version, selectedRunId);
+  // A pinned run overrides latest; both resolve to the same
+  // { dataset, run_id, run_attempt } shape the rest of the view consumes.
+  const activeQuery = selectedRunId === null ? latestQuery : runQuery;
   const { data, error, isLoading, isFetching } = activeQuery;
   const [tab, setTab] = useState<CollectiveXTab>('results');
-  // Landing scope is chosen per dataset by `collectiveXInitialScope` (see the effect
-  // below): Controlled (decision-grade only) when that set already covers every SKU
-  // measured at the landing phase, otherwise the full-evidence (diagnostic) scope so
-  // partial-coverage publications — e.g. a single-run v1 where the strict trial gate
-  // leaves whole SKUs diagnostic-tier — still show every working SKU by default. A
-  // user toggle persists until the underlying dataset changes.
-  const [evidenceScope, setEvidenceScope] = useState<EvidenceScope>('controlled');
   const [mode, setMode] = useState<CollectiveXMode>('normal');
   const [epSize, setEpSize] = useState(8);
   const [fabricScope, setFabricScope] = useState<CollectiveXFabricScope>('all');
-  const [controlledCohortId, setControlledCohortId] = useState('');
-  const [diagnosticCohortId, setDiagnosticCohortId] = useState('all');
   const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
   const [percentile, setPercentile] = useState<CollectiveXPercentile>('p99');
@@ -514,10 +407,6 @@ export default function CollectiveXDisplay() {
     { value: 'tokens-per-rank', label: t.xAxis['tokens-per-rank'] },
     { value: 'global-tokens', label: t.xAxis['global-tokens'] },
   ];
-  const evidenceScopeOptions: SegmentedToggleOption<EvidenceScope>[] = [
-    { value: 'controlled', label: t.evidenceScope.controlled },
-    { value: 'diagnostic', label: t.evidenceScope.diagnostic },
-  ];
   const fabricScopeOptions: SegmentedToggleOption<CollectiveXFabricScope>[] = [
     { value: 'all', label: t.fabricScope.all },
     { value: 'scale-up', label: t.fabricScope['scale-up'] },
@@ -532,45 +421,36 @@ export default function CollectiveXDisplay() {
     () => [
       { value: 'latest', label: t.latestPublished },
       ...runList.map((run) => ({
-        value: run.digest,
-        label: `#${run.run_id} · ${
-          run.coverage_scope === 'partial'
-            ? `${t.coveragePartial} · ${run.covered_skus.length} SKU`
-            : t.coverageFull
-        } · ${formatDate(run.generated_at, locale)}`,
+        value: run.run_id,
+        label: `#${run.run_id} · ${run.conclusion ?? 'pending'} · ${run.covered_skus.length} SKU · ${formatDate(run.generated_at, locale)}`,
       })),
     ],
-    [locale, runList, t.coverageFull, t.coveragePartial, t.latestPublished],
+    [locale, runList, t.latestPublished],
   );
   // Runs are per-version; changing the version drops any pinned run and folds
   // the picker back to its JIT button.
   useEffect(() => {
-    setSelectedDigest(null);
+    setSelectedRunId(null);
     setRunsRequested(false);
   }, [version]);
   // If a refreshed listing no longer carries the pinned run, fall back to the
-  // dev-latest channel rather than a dangling digest.
+  // latest run rather than a dangling id.
   useEffect(() => {
     if (
-      selectedDigest !== null &&
+      selectedRunId !== null &&
       runsQuery.data &&
-      !runsQuery.data.some((run) => run.digest === selectedDigest)
+      !runsQuery.data.some((run) => run.run_id === selectedRunId)
     ) {
-      setSelectedDigest(null);
+      setSelectedRunId(null);
     }
-  }, [runsQuery.data, selectedDigest]);
+  }, [runsQuery.data, selectedRunId]);
   const tabOptions: { value: CollectiveXTab; label: string }[] = [
     { value: 'results', label: t.tabs.results },
-    { value: 'decisions', label: t.tabs.decisions },
     { value: 'evidence', label: t.tabs.evidence },
   ];
 
   const dataset = data?.dataset;
-  const sourceSha = useMemo(() => publicationSourceSha(dataset?.series ?? []), [dataset?.series]);
-  const seriesById = useMemo(
-    () => new Map(dataset?.series.map((item) => [item.series_id, item])),
-    [dataset?.series],
-  );
+  const sourceSha = useMemo(() => runSourceSha(dataset?.series ?? []), [dataset?.series]);
   const availableModes = useMemo(
     () =>
       [...new Set(dataset?.series.map((item) => item.mode))].toSorted((left, right) =>
@@ -593,104 +473,53 @@ export default function CollectiveXDisplay() {
       setEpSize(availableEpSizes[0]);
     }
   }, [availableEpSizes, availableModes, epSize, mode]);
-  // Pick the landing scope once per loaded dataset, keyed by content digest so a
-  // version/run switch re-evaluates while an in-session user toggle is preserved.
-  // 'decode' is the initial phase; the discriminator hides no working SKU behind the
-  // controlled gate on partial-coverage publications (see collectiveXInitialScope).
-  const initialScope = useMemo(
-    () => collectiveXInitialScope(dataset?.series ?? [], 'decode'),
-    [dataset?.series],
-  );
-  const scopeInitDigestRef = useRef<string | null>(null);
-  useEffect(() => {
-    const digest = data?.digest ?? null;
-    if (digest !== null && scopeInitDigestRef.current !== digest) {
-      scopeInitDigestRef.current = digest;
-      setEvidenceScope(initialScope);
-    }
-  }, [data?.digest, initialScope]);
-  const seriesSelection = useMemo(
+  const seriesSelection = useMemo<CollectiveXSeriesSelection>(
     () => ({ mode, epSize, phase, fabricScope }),
     [epSize, fabricScope, mode, phase],
   );
-  const eligibleCohorts = useMemo(
-    () =>
-      dataset?.cohorts
-        .filter((item) => item.eligibility.decision_grade)
-        .toSorted(
-          (left, right) =>
-            COHORT_KIND_ORDER[left.kind] - COHORT_KIND_ORDER[right.kind] ||
-            left.label.localeCompare(right.label),
-        ) ?? [],
-    [dataset?.cohorts],
+  // The neutral view is the full measured series set for the run, narrowed by the
+  // identity axes the shard carries: mode, EP degree, phase, and fabric scope.
+  const matchedSeries = useMemo(
+    () => (dataset?.series ?? []).filter((item) => seriesMatchesSelection(item, seriesSelection)),
+    [dataset?.series, seriesSelection],
   );
-  const allDiagnosticCohorts = useMemo(
-    () =>
-      dataset?.cohorts
-        .filter((item) => !item.eligibility.decision_grade)
-        .toSorted((left, right) => left.label.localeCompare(right.label)) ?? [],
-    [dataset?.cohorts],
+  const skuOptions = useMemo(
+    () => ['all', ...new Set(matchedSeries.map((item) => item.system.sku))],
+    [matchedSeries],
   );
-  const controlledCohorts = useMemo(
-    () =>
-      eligibleCohorts.filter((cohort) =>
-        cohortMatchesSelection(cohort, seriesById, seriesSelection),
+  const backendOptions = useMemo(
+    () => ['all', ...new Set(matchedSeries.map((item) => item.backend.label))],
+    [matchedSeries],
+  );
+  const routingOptions = useMemo(
+    () => [
+      'all',
+      ...new Set(
+        matchedSeries.map((item) => `${item.workload.routing}${item.workload.eplb ? '+eplb' : ''}`),
       ),
-    [eligibleCohorts, seriesById, seriesSelection],
+    ],
+    [matchedSeries],
   );
-  const diagnosticCohorts = useMemo(
-    () =>
-      allDiagnosticCohorts.filter((cohort) =>
-        cohortMatchesSelection(cohort, seriesById, seriesSelection),
-      ),
-    [allDiagnosticCohorts, seriesById, seriesSelection],
-  );
-  const selectedControlledCohort = useMemo(
-    () =>
-      controlledCohorts.find((item) => item.cohort_id === controlledCohortId) ??
-      controlledCohorts[0] ??
-      null,
-    [controlledCohortId, controlledCohorts],
-  );
-  const selectedDiagnosticCohort = useMemo(
-    () => diagnosticCohorts.find((item) => item.cohort_id === diagnosticCohortId) ?? null,
-    [diagnosticCohortId, diagnosticCohorts],
-  );
-  const cohortGroups = useMemo<SearchableSelectGroup[]>(() => {
-    const cohorts = evidenceScope === 'controlled' ? controlledCohorts : diagnosticCohorts;
-    const groups = (Object.keys(COHORT_KIND_ORDER) as CollectiveXCohort['kind'][]).flatMap(
-      (kind) => {
-        const options = cohorts
-          .filter((item) => item.kind === kind)
-          .map((item) => ({
-            value: item.cohort_id,
-            label: collectiveXCohortLabel(item, seriesById, locale),
-          }));
-        return options.length === 0
-          ? []
-          : [
-              {
-                label: `${precisionCohortKindLabel(kind) ?? t.cohortKind[kind as keyof typeof t.cohortKind]} (${options.length})`,
-                options,
-              },
-            ];
-      },
-    );
-    return evidenceScope === 'controlled'
-      ? groups
-      : [
-          {
-            label: t.diagnosticEvidence,
-            options: [{ value: 'all', label: t.allDiagnosticEvidence }],
-          },
-          ...groups,
-        ];
-  }, [controlledCohorts, diagnosticCohorts, evidenceScope, locale, seriesById, t]);
   useEffect(() => {
-    if (selectedControlledCohort && selectedControlledCohort.cohort_id !== controlledCohortId) {
-      setControlledCohortId(selectedControlledCohort.cohort_id);
-    }
-  }, [controlledCohortId, selectedControlledCohort]);
+    if (!skuOptions.includes(sku)) setSku('all');
+    if (!backendOptions.includes(backend)) setBackend('all');
+    if (!routingOptions.includes(routing)) setRouting('all');
+  }, [backend, backendOptions, routing, routingOptions, sku, skuOptions]);
+  const phaseSeries = useMemo(
+    () =>
+      matchedSeries.filter(
+        (item) =>
+          (sku === 'all' || item.system.sku === sku) &&
+          (backend === 'all' || item.backend.label === backend) &&
+          (routing === 'all' ||
+            `${item.workload.routing}${item.workload.eplb ? '+eplb' : ''}` === routing),
+      ),
+    [backend, matchedSeries, routing, sku],
+  );
+
+  useEffect(() => {
+    setActiveSeriesIds(new Set(phaseSeries.map((item) => item.series_id)));
+  }, [phaseSeries]);
 
   useEffect(() => {
     const readHash = () => {
@@ -705,89 +534,6 @@ export default function CollectiveXDisplay() {
       window.removeEventListener('popstate', readHash);
     };
   }, []);
-
-  // The diagnostic scope is the full-evidence view: every measured series across all
-  // SKUs — both decision-grade and diagnostic-tier — badged by status. This keeps the
-  // best (decision-grade) series visible alongside the rest instead of hiding them,
-  // and drives the SKU/backend/routing dropdowns off the complete dataset. Controlled
-  // scope narrows to the decision-grade cohorts (rankings, recommendations).
-  const diagnosticSeries = useMemo(() => dataset?.series ?? [], [dataset?.series]);
-  const filteredDiagnosticSeries = useMemo(
-    () => diagnosticSeries.filter((item) => seriesMatchesSelection(item, seriesSelection)),
-    [diagnosticSeries, seriesSelection],
-  );
-  const skuOptions = useMemo(
-    () => ['all', ...new Set(filteredDiagnosticSeries.map((item) => item.system.sku))],
-    [filteredDiagnosticSeries],
-  );
-  const backendOptions = useMemo(
-    () => ['all', ...new Set(filteredDiagnosticSeries.map((item) => item.backend.label))],
-    [filteredDiagnosticSeries],
-  );
-  const routingOptions = useMemo(
-    () => [
-      'all',
-      ...new Set(
-        filteredDiagnosticSeries.map(
-          (item) => `${item.workload.routing}${item.workload.eplb ? '+eplb' : ''}`,
-        ),
-      ),
-    ],
-    [filteredDiagnosticSeries],
-  );
-  useEffect(() => {
-    if (
-      diagnosticCohortId !== 'all' &&
-      !diagnosticCohorts.some((cohort) => cohort.cohort_id === diagnosticCohortId)
-    ) {
-      setDiagnosticCohortId('all');
-    }
-    if (!skuOptions.includes(sku)) setSku('all');
-    if (!backendOptions.includes(backend)) setBackend('all');
-    if (!routingOptions.includes(routing)) setRouting('all');
-  }, [
-    backend,
-    backendOptions,
-    diagnosticCohortId,
-    diagnosticCohorts,
-    routing,
-    routingOptions,
-    sku,
-    skuOptions,
-  ]);
-  const scopedSeries = useMemo(() => {
-    if (!dataset) return [];
-    if (evidenceScope === 'controlled') {
-      return cohortSeries(selectedControlledCohort, dataset.series);
-    }
-    if (selectedDiagnosticCohort) {
-      return cohortSeries(selectedDiagnosticCohort, dataset.series);
-    }
-    return filteredDiagnosticSeries.filter(
-      (item) =>
-        (sku === 'all' || item.system.sku === sku) &&
-        (backend === 'all' || item.backend.label === backend) &&
-        (routing === 'all' ||
-          `${item.workload.routing}${item.workload.eplb ? '+eplb' : ''}` === routing),
-    );
-  }, [
-    backend,
-    dataset,
-    evidenceScope,
-    filteredDiagnosticSeries,
-    routing,
-    selectedControlledCohort,
-    selectedDiagnosticCohort,
-    sku,
-  ]);
-  const phaseSeries = useMemo(
-    () => scopedSeries.filter((item) => item.phase === phase),
-    [phase, scopedSeries],
-  );
-
-  useEffect(() => {
-    setActiveSeriesIds(new Set(phaseSeries.map((item) => item.series_id)));
-  }, [phaseSeries]);
 
   const activeSeries = useMemo(
     () => phaseSeries.filter((item) => activeSeriesIds.has(item.series_id)),
@@ -814,7 +560,7 @@ export default function CollectiveXDisplay() {
         label: collectiveXSeriesLabel(item),
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         isActive: activeSeriesIds.has(item.series_id),
-        title: `${item.status} · ${item.mode} · EP${item.system.ep_size} · ${item.system.scope} · ${collectiveXTopologyLabel(item.system)} · ${item.workload.workload_id}`,
+        title: `${item.mode} · EP${item.system.ep_size} · ${item.system.scope} · ${collectiveXTopologyLabel(item.system)} · ${item.workload.workload_id}`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);
@@ -827,21 +573,7 @@ export default function CollectiveXDisplay() {
       })),
     [activeSeriesIds, colors, phaseSeries],
   );
-  const warnings = useMemo(
-    () => (evidenceScope === 'diagnostic' ? comparisonDifferences(activeSeries) : []),
-    [activeSeries, evidenceScope],
-  );
-  // In free-form "all diagnostics" mode (no cohort pinned) the per-cohort reason
-  // line does not apply, so surface why the revealed series were flagged: the
-  // distinct eligibility reasons across the active diagnostic series. Series that
-  // are decision-grade cohort members carry no reasons and drop out.
-  const diagnosticSeriesReasons = useMemo(
-    () =>
-      evidenceScope !== 'diagnostic' || selectedDiagnosticCohort
-        ? []
-        : [...new Set(activeSeries.flatMap((item) => item.eligibility.reasons))].toSorted(),
-    [activeSeries, evidenceScope, selectedDiagnosticCohort],
-  );
+  const warnings = useMemo(() => comparisonDifferences(activeSeries), [activeSeries]);
   const missingComponents = activeSeries.some((item) =>
     item.points.some((point) =>
       operation === 'isolated-sum'
@@ -858,10 +590,10 @@ export default function CollectiveXDisplay() {
       .map((item) => t.topologyScope[item])
       .join(' / ');
     const payload = [...new Set(phaseSeries.map((item) => item.measurement.payload_unit))]
-      .map((item) => t.payloadUnit[item])
+      .map((item) => t.payloadUnit[item as keyof typeof t.payloadUnit] ?? item)
       .join(' / ');
     const combine = [...new Set(phaseSeries.map((item) => item.measurement.combine_semantics))]
-      .map((item) => t.combineSemantics[item])
+      .map((item) => t.combineSemantics[item as keyof typeof t.combineSemantics] ?? item)
       .join(' / ');
     const sampling = [
       ...new Set(
@@ -902,12 +634,12 @@ export default function CollectiveXDisplay() {
     const availabilityReason = collectiveXAvailabilityReason(error);
     const message =
       availabilityReason === 'source-unavailable'
-        ? t.artifactSourceUnavailable
-        : availabilityReason === 'channel-unavailable'
-          ? t.promotedUnavailable
+        ? t.sourceUnavailable
+        : availabilityReason === 'runs-unavailable'
+          ? t.runsErrorMessage
           : error instanceof Error
             ? error.message
-            : t.failedValidation;
+            : t.loadError;
     return (
       <Card
         data-testid="collectivex-error"
@@ -933,11 +665,11 @@ export default function CollectiveXDisplay() {
               onChange={setVersion}
             />
           </div>
-          {selectedDigest !== null && (
+          {selectedRunId !== null && (
             <Button
               variant="outline"
               data-testid="collectivex-error-latest"
-              onClick={() => setSelectedDigest(null)}
+              onClick={() => setSelectedRunId(null)}
             >
               {t.latestPublished}
             </Button>
@@ -951,6 +683,10 @@ export default function CollectiveXDisplay() {
     );
   }
 
+  const run = dataset.run;
+  const conclusionClass =
+    (run.conclusion && CONCLUSION_CLASSES[run.conclusion]) ?? CONCLUSION_FALLBACK_CLASS;
+
   return (
     <section data-testid="collectivex-display" className="flex flex-col gap-4">
       <Card>
@@ -959,20 +695,13 @@ export default function CollectiveXDisplay() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-semibold">CollectiveX</h1>
               <span
-                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${PROMOTION_CLASSES[dataset.promotion.status]}`}
+                data-testid="collectivex-run-conclusion"
+                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${conclusionClass}`}
               >
-                {t.promotion[dataset.promotion.status]}
+                #{run.run_id} · {run.conclusion ?? 'pending'}
               </span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{t.description}</p>
-            {dataset.promotion.reason && (
-              <p
-                data-testid="collectivex-promotion-reason"
-                className="mt-2 text-sm text-destructive"
-              >
-                {t.publicationReason}: {collectiveXReasonLabel(dataset.promotion.reason, locale)}
-              </p>
-            )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {sourceSha ? (
@@ -1002,7 +731,7 @@ export default function CollectiveXDisplay() {
               <span
                 data-testid="collectivex-source-link"
                 aria-disabled="true"
-                title={t.sourceUnavailable}
+                title={t.sourceLinkUnavailable}
                 className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-md border px-3 text-sm font-medium text-muted-foreground opacity-50"
               >
                 {t.source} <ExternalLink className="size-3.5" />
@@ -1019,17 +748,11 @@ export default function CollectiveXDisplay() {
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <Stat
-            value={dataset.series.filter((item) => item.status === 'decision-grade').length}
-            label={t.decisionSeries}
-          />
-          <Stat value={eligibleCohorts.length} label={t.controlledCohorts} />
-          <Stat
-            value={`${dataset.promotion.terminal_cases}/${dataset.promotion.requested_cases}`}
-            label={t.terminalCases}
-          />
+          <Stat value={dataset.series.length} label={t.seriesCount} />
+          <Stat value={`${run.measured_cases}/${run.requested_cases}`} label={t.measuredCases} />
+          <Stat value={`${run.terminal_cases}/${run.requested_cases}`} label={t.terminalCases} />
           <Stat value={dataset.attempts.length} label={t.retainedAttempts} />
-          <Stat value={dataset.promotion.allocation_ids.length} label={t.allocations} />
+          <Stat value={run.allocation_count} label={t.allocations} />
           <Stat value={formatDate(dataset.generated_at, locale)} label={t.publishedUtc} compact />
         </div>
       </Card>
@@ -1072,9 +795,9 @@ export default function CollectiveXDisplay() {
                 </Button>
               ) : (
                 <Select
-                  value={selectedDigest ?? 'latest'}
+                  value={selectedRunId ?? 'latest'}
                   onValueChange={(next) => {
-                    setSelectedDigest(next === 'latest' ? null : next);
+                    setSelectedRunId(next === 'latest' ? null : next);
                     track('collectivex_run_selected', { version, run: next });
                   }}
                 >
@@ -1103,18 +826,6 @@ export default function CollectiveXDisplay() {
                 {t.loadRuns}
               </Button>
             )}
-          </ControlGroup>
-          <ControlGroup label={t.evidence}>
-            <SegmentedToggle
-              value={evidenceScope}
-              options={evidenceScopeOptions}
-              onValueChange={(value) => {
-                setEvidenceScope(value);
-                track('collectivex_evidence_scope_changed', { scope: value });
-              }}
-              ariaLabel={t.evidenceAria}
-              testId="collectivex-scope-toggle"
-            />
           </ControlGroup>
           <ControlGroup label={t.modeControl}>
             <SegmentedToggle
@@ -1158,34 +869,6 @@ export default function CollectiveXDisplay() {
               buttonClassName="min-w-0 flex-1 justify-center px-1.5 whitespace-nowrap"
             />
           </ControlGroup>
-          <div className="min-w-0 sm:col-span-2">
-            <SearchableSelectControl
-              label={evidenceScope === 'controlled' ? t.controlledCohort : t.diagnosticCohort}
-              testId="collectivex-cohort-select"
-              value={
-                evidenceScope === 'controlled'
-                  ? (selectedControlledCohort?.cohort_id ?? '')
-                  : diagnosticCohortId
-              }
-              onChange={(value) => {
-                if (evidenceScope === 'controlled') setControlledCohortId(value);
-                else {
-                  setDiagnosticCohortId(value);
-                  if (value !== 'all') {
-                    setSku('all');
-                    setBackend('all');
-                    setRouting('all');
-                  }
-                }
-              }}
-              groups={cohortGroups}
-              placeholder={evidenceScope === 'controlled' ? t.noEligibleCohort : t.allDiagnostics}
-              searchPlaceholder={t.searchCohorts}
-              searchAriaLabel={t.searchCohortsAria}
-              clearSearchLabel={t.clearCohortSearch}
-              noResultsLabel={t.noMatchingCohorts}
-            />
-          </div>
           <SelectControl
             label={t.operationControl}
             testId="collectivex-operation-select"
@@ -1219,31 +902,27 @@ export default function CollectiveXDisplay() {
               testId="collectivex-percentile-toggle"
             />
           </ControlGroup>
-          {evidenceScope === 'diagnostic' && diagnosticCohortId === 'all' && (
-            <>
-              <SelectControl
-                label={t.sku}
-                testId="collectivex-sku-select"
-                value={sku}
-                options={selectOptions(skuOptions, t.all, true)}
-                onChange={setSku}
-              />
-              <SelectControl
-                label={t.backend}
-                testId="collectivex-backend-select"
-                value={backend}
-                options={selectOptions(backendOptions, t.all)}
-                onChange={setBackend}
-              />
-              <SelectControl
-                label={t.routing}
-                testId="collectivex-routing-select"
-                value={routing}
-                options={selectOptions(routingOptions, t.all)}
-                onChange={setRouting}
-              />
-            </>
-          )}
+          <SelectControl
+            label={t.sku}
+            testId="collectivex-sku-select"
+            value={sku}
+            options={selectOptions(skuOptions, t.all, true)}
+            onChange={setSku}
+          />
+          <SelectControl
+            label={t.backend}
+            testId="collectivex-backend-select"
+            value={backend}
+            options={selectOptions(backendOptions, t.all)}
+            onChange={setBackend}
+          />
+          <SelectControl
+            label={t.routing}
+            testId="collectivex-routing-select"
+            value={routing}
+            options={selectOptions(routingOptions, t.all)}
+            onChange={setRouting}
+          />
           <SelectControl
             label={t.xAxisControl}
             testId="collectivex-x-axis-select"
@@ -1312,9 +991,7 @@ export default function CollectiveXDisplay() {
         <TabsContent value="results" className="space-y-4">
           {phaseSeries.length === 0 && (
             <Card data-testid="collectivex-empty-state" className="py-4">
-              <p className="text-sm text-muted-foreground">
-                {evidenceScope === 'controlled' ? t.noControlledSeries : t.noDiagnosticSeries}
-              </p>
+              <p className="text-sm text-muted-foreground">{t.noSeries}</p>
             </Card>
           )}
           <Card data-testid="collectivex-main-chart" className="relative">
@@ -1341,13 +1018,6 @@ export default function CollectiveXDisplay() {
                         : `at ${percentile} latency`}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    {evidenceScope === 'controlled'
-                      ? selectedControlledCohort &&
-                        collectiveXCohortLabel(selectedControlledCohort, seriesById, locale)
-                      : selectedDiagnosticCohort
-                        ? collectiveXCohortLabel(selectedDiagnosticCohort, seriesById, locale)
-                        : t.diagnosticEvidence}{' '}
-                    ·{' '}
                     {yAxis === 'activation-rate'
                       ? 'Activation-data rate at selected latency percentile'
                       : yAxis === 'total-logical-rate'
@@ -1401,51 +1071,6 @@ export default function CollectiveXDisplay() {
                 />
               }
             />
-            {evidenceScope === 'diagnostic' && (
-              <p
-                data-testid="collectivex-diagnostic-warning"
-                className="mt-3 border-l-2 border-amber-500 bg-amber-500/5 py-1 pl-2 text-xs text-muted-foreground"
-              >
-                {t.diagnosticWarning}
-              </p>
-            )}
-            {evidenceScope === 'diagnostic' && selectedDiagnosticCohort && (
-              <p
-                data-testid="collectivex-diagnostic-cohort-reasons"
-                className="mt-2 text-xs text-muted-foreground"
-              >
-                {t.excluded}:{' '}
-                {selectedDiagnosticCohort.eligibility.reasons
-                  .map((reason) => collectiveXReasonLabel(reason, locale))
-                  .join(', ')}
-                .
-              </p>
-            )}
-            {evidenceScope === 'diagnostic' &&
-              !selectedDiagnosticCohort &&
-              diagnosticSeriesReasons.length > 0 && (
-                <p
-                  data-testid="collectivex-diagnostic-series-reasons"
-                  className="mt-2 text-xs text-muted-foreground"
-                >
-                  {t.excluded}:{' '}
-                  {diagnosticSeriesReasons
-                    .map((reason) => collectiveXReasonLabel(reason, locale))
-                    .join(', ')}
-                  .
-                </p>
-              )}
-            {evidenceScope === 'controlled' && selectedControlledCohort && (
-              <p
-                data-testid="collectivex-controlled-stability"
-                className="mt-2 text-xs text-muted-foreground"
-              >
-                {selectedControlledCohort.eligibility.stable_ordering
-                  ? t.stableOrdering
-                  : t.unstableOrdering}
-                .
-              </p>
-            )}
             {warnings.length > 0 && (
               <p
                 data-testid="collectivex-comparison-warning"
@@ -1472,18 +1097,15 @@ export default function CollectiveXDisplay() {
             )}
           </Card>
         </TabsContent>
-        <TabsContent value="decisions" className="space-y-4">
-          <CollectiveXDecisionTables dataset={dataset} cohort={selectedControlledCohort} />
-        </TabsContent>
         <TabsContent value="evidence" className="space-y-4">
           <CollectiveXCoverageTable coverage={dataset.coverage} />
           <CollectiveXAttemptTable attempts={dataset.attempts} coverage={dataset.coverage} />
           <Card data-testid="collectivex-provenance">
             <h2 className="text-lg font-semibold">{t.provenance}</h2>
             <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <Provenance label={t.channelLabel} value={data.channel.channel} />
-              <Provenance label={t.datasetDigest} value={data.digest} mono />
-              <Provenance label={t.matrixDigest} value={dataset.promotion.matrix_id ?? '-'} mono />
+              <Provenance label={t.runLabel} value={`#${data.run_id}`} mono />
+              <Provenance label={t.attemptLabel} value={String(data.run_attempt)} mono />
+              <Provenance label={t.matrixLabel} value={run.matrix_id ?? '-'} mono />
               <Provenance
                 label={t.sourceBundles}
                 value={dataset.source_bundle_ids.join(' · ') || '-'}
@@ -1551,47 +1173,6 @@ function SelectControl<T extends string | number>({
           ))}
         </SelectContent>
       </Select>
-    </ControlGroup>
-  );
-}
-
-function SearchableSelectControl({
-  label,
-  testId,
-  value,
-  groups,
-  onChange,
-  placeholder,
-  searchPlaceholder,
-  searchAriaLabel,
-  clearSearchLabel,
-  noResultsLabel,
-}: {
-  label: string;
-  testId: string;
-  value: string;
-  groups: SearchableSelectGroup[];
-  onChange: (value: string) => void;
-  placeholder: string;
-  searchPlaceholder: string;
-  searchAriaLabel: string;
-  clearSearchLabel: string;
-  noResultsLabel: string;
-}) {
-  return (
-    <ControlGroup label={label}>
-      <SearchableSelect
-        groups={groups}
-        value={value}
-        onValueChange={onChange}
-        placeholder={placeholder}
-        triggerTestId={testId}
-        searchPlaceholder={searchPlaceholder}
-        searchAriaLabel={searchAriaLabel}
-        clearSearchLabel={clearSearchLabel}
-        noResultsLabel={noResultsLabel}
-        trackPrefix="collectivex_cohort"
-      />
     </ControlGroup>
   );
 }
