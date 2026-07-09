@@ -113,8 +113,8 @@ describe('isOutdated', () => {
 });
 
 describe('baseFramework', () => {
-  it('collapses llm-d-vllm into the vLLM engine family', () => {
-    expect(baseFramework('llm-d-vllm')).toBe('vllm');
+  it('collapses llmd-vllm into the vLLM engine family', () => {
+    expect(baseFramework('llmd-vllm')).toBe('vllm');
   });
 
   it.each([
@@ -136,9 +136,9 @@ describe('getActualLatestTag', () => {
     expect(getActualLatestTag('mori-sglang', releases)).toBe('v0.5.12');
   });
 
-  it('uses the vLLM release stream for llm-d-vllm', () => {
+  it('uses the vLLM release stream for llmd-vllm', () => {
     const releases = { vllm: 'v0.21.0', sglang: 'v0.5.12' };
-    expect(getActualLatestTag('llm-d-vllm', releases)).toBe('v0.21.0');
+    expect(getActualLatestTag('llmd-vllm', releases)).toBe('v0.21.0');
   });
 
   it('returns null when releases is undefined (API still loading)', () => {

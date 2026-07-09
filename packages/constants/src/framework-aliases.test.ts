@@ -18,8 +18,8 @@ describe('FRAMEWORK_LABELS', () => {
     expect(FRAMEWORK_LABELS['atom-disagg']).toBe('Mooncake ATOMesh¹');
   });
 
-  it('labels the canonical llm-d-vllm framework "llm-d vLLM"', () => {
-    expect(FRAMEWORK_LABELS['llm-d-vllm']).toBe('llm-d vLLM');
+  it('labels the canonical llmd-vllm framework "llm-d vLLM"', () => {
+    expect(FRAMEWORK_LABELS['llmd-vllm']).toBe('llm-d vLLM');
   });
 });
 

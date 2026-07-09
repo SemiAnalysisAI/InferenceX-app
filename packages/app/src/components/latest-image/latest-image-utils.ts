@@ -7,7 +7,7 @@ export const FRAMEWORK_TO_BASE: Record<string, string> = {
   vllm: 'vllm',
   sglang: 'sglang',
   'dynamo-sglang': 'sglang',
-  'llm-d-vllm': 'vllm',
+  'llmd-vllm': 'vllm',
   'mori-sglang': 'sglang',
 };
 
