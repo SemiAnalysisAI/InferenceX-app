@@ -152,6 +152,12 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
   });
 
+  it('defaults to parallelism labels without line labels for the agentic view', () => {
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
+  });
+
   it('switches the x-axis to TTFT and updates the heading', () => {
     cy.get('[data-testid="x-axis-mode-ttft"]').click();
     cy.get('[data-testid="x-axis-mode-ttft"]').should('have.attr', 'aria-selected', 'true');

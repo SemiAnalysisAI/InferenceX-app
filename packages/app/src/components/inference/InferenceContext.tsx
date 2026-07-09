@@ -64,6 +64,7 @@ import {
   type XAxisMode,
 } from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
+import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import {
   EMPTY_QUICK_FILTERS,
   type DisaggMode,
@@ -244,30 +245,24 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  const [showPointLabels, setShowPointLabels] = useState(() => {
-    // Legacy `?i_nolabel=1` from before the rename: keep hiding point labels.
-    if (getUrlParam('i_nolabel') === '1') return false;
-    if (getUrlParam('i_label') === '0') return false;
-    if (getUrlParam('i_label') === '1') return true;
-    // Advanced (parallelism) labels are a richer form of point label; a share
-    // link that requests them must auto-enable point labels so they actually
-    // render (mirrors the runtime toggle coupling in ScatterGraph). A later
-    // explicit i_nolabel=1 still wins — it is checked first above.
-    if (getUrlParam('i_advlabel') === '1') return true;
-    // Default off: per-point labels (TP + concurrency) clutter the chart; the
-    // per-line hardware labels (on by default) are the primary annotation.
-    return false;
-  });
-  const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
-  // Parallelism labels default off (?i_advlabel=1 overrides on).
-  const [useAdvancedLabels, setUseAdvancedLabels] = useState(
-    () => getUrlParam('i_advlabel') === '1',
+  const labelScenarioKind = sequenceKind(effectiveSequence);
+  const initialLabelState = useMemo(
+    () =>
+      resolveLabelState('fixed-seq', {
+        i_label: getUrlParam('i_label'),
+        i_nolabel: getUrlParam('i_nolabel'),
+        i_advlabel: getUrlParam('i_advlabel'),
+        i_linelabel: getUrlParam('i_linelabel'),
+      }),
+    [getUrlParam],
   );
+  const [showPointLabels, setShowPointLabels] = useState(initialLabelState.showPointLabels);
+  const [logScale, setLogScale] = useState(() => getUrlParam('i_log') === '1');
+  const [useAdvancedLabels, setUseAdvancedLabels] = useState(initialLabelState.useAdvancedLabels);
   const [showGradientLabels, setShowGradientLabels] = useState(
     () => getUrlParam('i_gradlabel') === '1',
   );
-  // Line labels default on (?i_linelabel=0 overrides off).
-  const [showLineLabels, setShowLineLabels] = useState(() => getUrlParam('i_linelabel') !== '0');
+  const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
   const [showSpeedOverlay, setShowSpeedOverlay] = useState(() => getUrlParam('i_speed') === '1');
   const [showMinecraftOverlay, setShowMinecraftOverlay] = useState(
     () => getUrlParam('i_mc') === '1',
@@ -539,6 +534,19 @@ export function InferenceProvider({
   useEffect(() => {
     setTrackedConfigs((prev) => (prev.length > 0 ? [] : prev));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
+
+  useEffect(() => {
+    if (!sequenceResolved) return;
+    const labelState = resolveLabelState(labelScenarioKind, {
+      i_label: getUrlParam('i_label'),
+      i_nolabel: getUrlParam('i_nolabel'),
+      i_advlabel: getUrlParam('i_advlabel'),
+      i_linelabel: getUrlParam('i_linelabel'),
+    });
+    setShowPointLabels(labelState.showPointLabels);
+    setUseAdvancedLabels(labelState.useAdvancedLabels);
+    setShowLineLabels(labelState.showLineLabels);
+  }, [labelScenarioKind, sequenceResolved, getUrlParam]);
 
   // Reconcile the x-axis mode with the scenario kind:
   //  - On mount with no `i_xmode` URL param: snap to the kind's natural default
@@ -1034,6 +1042,12 @@ export function InferenceProvider({
     return [...activeHwTypes].toSorted().join(',');
   }, [activeHwTypes, hwTypesWithData]);
 
+  const serializedLabelState = serializeLabelState(labelScenarioKind, {
+    showPointLabels,
+    useAdvancedLabels,
+    showLineLabels,
+  });
+
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
@@ -1043,7 +1057,7 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
-      i_label: showPointLabels ? '1' : '',
+      i_label: serializedLabelState.i_label,
       i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
       i_xmetric: selectedXAxisMetric || '',
@@ -1051,9 +1065,9 @@ export function InferenceProvider({
       i_xmode: selectedXAxisMode,
       i_scale: scaleType,
       i_legend: isLegendExpanded ? '' : '0',
-      i_advlabel: useAdvancedLabels ? '1' : '',
+      i_advlabel: serializedLabelState.i_advlabel,
       i_gradlabel: showGradientLabels ? '1' : '',
-      i_linelabel: showLineLabels ? '' : '0',
+      i_linelabel: serializedLabelState.i_linelabel,
       i_speed: showSpeedOverlay ? '1' : '',
       i_mc: showMinecraftOverlay ? '1' : '',
       i_active: iActiveStr,
