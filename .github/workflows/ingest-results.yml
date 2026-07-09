@@ -6,7 +6,7 @@ on:
 
 jobs:
   ingest:
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,6 +15,34 @@ jobs:
         run: sleep 300
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Resolve source and ingest runs
+        id: runs
+        env:
+          SOURCE_RUN_ID: ${{ github.event.client_payload.run-id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || '1' }}
+          INGEST_RUN_ID: ${{ github.event.client_payload.ingest-run-id }}
+          INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.ingest-run-attempt || '1' }}
+        run: |
+          ingest_run_id="${INGEST_RUN_ID:-$SOURCE_RUN_ID}"
+          if [ -n "$INGEST_RUN_ID" ]; then
+            ingest_run_attempt="$INGEST_RUN_ATTEMPT"
+          else
+            ingest_run_attempt="$SOURCE_RUN_ATTEMPT"
+          fi
+
+          {
+            echo "source-run-id=$SOURCE_RUN_ID"
+            echo "source-run-attempt=$SOURCE_RUN_ATTEMPT"
+            echo "ingest-run-id=$ingest_run_id"
+            echo "ingest-run-attempt=$ingest_run_attempt"
+            if [ "$SOURCE_RUN_ID" != "$ingest_run_id" ]; then
+              echo "reused=true"
+            else
+              echo "reused=false"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -33,42 +61,80 @@ jobs:
       - name: Download artifacts from InferenceX run
         env:
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          RUN_ID: ${{ github.event.client_payload.run-id }}
+          SOURCE_RUN_ID: ${{ steps.runs.outputs.source-run-id }}
+          METADATA_RUN_ID: ${{ steps.runs.outputs.ingest-run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
         run: |
           mkdir -p "$ARTIFACTS_PATH"
 
-          # Download all artifacts for the run, deduplicated by name (keep latest).
-          gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}/artifacts" --paginate \
+          download_artifact() {
+            local name="$1"
+            local url="$2"
+            local ok=false
+
+            echo "Downloading artifact: ${name}"
+            for attempt in 1 2 3; do
+              if gh api "${url}" > "$RUNNER_TEMP/artifact.zip"; then
+                ok=true
+                break
+              fi
+              echo "  Attempt ${attempt}/3 failed, retrying in ${attempt}s..."
+              sleep "$attempt"
+            done
+            if [ "$ok" = false ]; then
+              rm -f "$RUNNER_TEMP/artifact.zip"
+              return 1
+            fi
+
+            mkdir -p "${ARTIFACTS_PATH}/${name}"
+            if ! unzip -o "$RUNNER_TEMP/artifact.zip" -d "${ARTIFACTS_PATH}/${name}"; then
+              rm -rf "${ARTIFACTS_PATH:?}/${name}"
+              rm -f "$RUNNER_TEMP/artifact.zip"
+              return 1
+            fi
+            rm -f "$RUNNER_TEMP/artifact.zip"
+          }
+
+          # Select ingest artifacts before downloading. Retried runner jobs use
+          # different suffixes, so keep only the newest artifact per logical job.
+          gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/${SOURCE_RUN_ID}/artifacts?per_page=100" --paginate --slurp \
             | jq -r '
-                [.artifacts[]]
-                | group_by(.name) | map(sort_by(.created_at) | last)[]
+                [.[].artifacts[]
+                  | select(
+                      .name == "results_bmk" or
+                      .name == "eval_results_all" or
+                      .name == "run-stats" or
+                      .name == "reused-ingest-artifacts" or
+                      (.name | startswith("bmk_")) or
+                      (.name | startswith("eval_")) or
+                      (.name | startswith("agentic_")) or
+                      (.name | startswith("server_logs_")) or
+                      (.name | startswith("multinode_server_logs_"))
+                    )
+                  | . + {logical_name: (.name | sub("_[A-Za-z][A-Za-z0-9.-]*_[0-9]+$"; ""))}
+                ]
+                | group_by(.logical_name) | map(sort_by(.created_at) | last)[]
                 | "\(.name)\t\(.archive_download_url)"' \
             | while IFS=$'\t' read -r name url; do
-                echo "Downloading artifact: ${name}"
-                ok=false
-                for attempt in 1 2 3; do
-                  if gh api "${url}" > artifact.zip; then
-                    ok=true
-                    break
-                  fi
-                  echo "  Attempt ${attempt}/3 failed, retrying in ${attempt}s..."
-                  sleep "$attempt"
-                done
-                if [ "$ok" = false ]; then
+                if ! download_artifact "$name" "$url"; then
                   echo "::warning::Failed to download artifact after 3 attempts: ${name} — skipping"
-                  rm -f artifact.zip
-                  echo "$name" >> "$ARTIFACTS_PATH/.failures"
-                  continue
-                fi
-                mkdir -p "${ARTIFACTS_PATH}/${name}"
-                if ! unzip -o artifact.zip -d "${ARTIFACTS_PATH}/${name}"; then
-                  echo "::warning::Failed to extract artifact: ${name} — skipping"
-                  rm -rf "${ARTIFACTS_PATH:?}/${name}"
                   echo "$name" >> "$ARTIFACTS_PATH/.failures"
                 fi
-                rm -f artifact.zip
               done
+
+          # Changelog metadata belongs to the merge run, while benchmark rows
+          # and public links continue to point at the source PR sweep.
+          changelog=$(gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/${METADATA_RUN_ID}/artifacts?per_page=100" --paginate --slurp \
+            | jq -r '[.[].artifacts[] | select(.name == "changelog-metadata")] | sort_by(.created_at) | last | "\(.name)\t\(.archive_download_url)"')
+          if [ -z "$changelog" ] || [ "$changelog" = $'null\tnull' ]; then
+            echo "::error::No changelog-metadata artifact found on run ${METADATA_RUN_ID}"
+            exit 1
+          fi
+          IFS=$'\t' read -r changelog_name changelog_url <<< "$changelog"
+          if ! download_artifact "$changelog_name" "$changelog_url"; then
+            echo "::error::Failed to download changelog metadata from run ${METADATA_RUN_ID}"
+            exit 1
+          fi
 
           if [ -f "$ARTIFACTS_PATH/.failures" ]; then
             count=$(wc -l < "$ARTIFACTS_PATH/.failures")
@@ -80,7 +146,7 @@ jobs:
           ls "$ARTIFACTS_PATH/"
 
           if [ -z "$(ls -A "$ARTIFACTS_PATH")" ]; then
-            echo "::error::No artifacts could be downloaded from run ${RUN_ID}"
+            echo "::error::No artifacts could be downloaded from run ${SOURCE_RUN_ID}"
             exit 1
           fi
 
@@ -112,12 +178,59 @@ jobs:
           echo "Artifacts after flattening:"
           ls "$ARTIFACTS_PATH/"
 
+      - name: Record reused source run
+        if: steps.runs.outputs.reused == 'true'
+        env:
+          SOURCE_RUN_ID: ${{ steps.runs.outputs.source-run-id }}
+          SOURCE_RUN_ATTEMPT: ${{ steps.runs.outputs.source-run-attempt }}
+          INGEST_RUN_ID: ${{ steps.runs.outputs.ingest-run-id }}
+          INGEST_RUN_ATTEMPT: ${{ steps.runs.outputs.ingest-run-attempt }}
+          SOURCE_PR_NUMBER: ${{ github.event.client_payload.source-pr-number }}
+          SOURCE_HEAD_SHA: ${{ github.event.client_payload.source-head-sha }}
+          ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+        run: |
+          mkdir -p "$ARTIFACTS_PATH/reused-ingest-metadata"
+          jq -n \
+            --arg source_run_id "$SOURCE_RUN_ID" \
+            --arg source_run_attempt "$SOURCE_RUN_ATTEMPT" \
+            --arg source_run_url "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/$SOURCE_RUN_ID" \
+            --arg source_pr_number "$SOURCE_PR_NUMBER" \
+            --arg source_head_sha "$SOURCE_HEAD_SHA" \
+            --arg ingest_run_id "$INGEST_RUN_ID" \
+            --arg ingest_run_attempt "$INGEST_RUN_ATTEMPT" \
+            --arg ingest_run_url "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/$INGEST_RUN_ID" \
+            '{
+              source_run_id: $source_run_id,
+              source_run_attempt: $source_run_attempt,
+              source_run_url: $source_run_url,
+              source_pr_number: $source_pr_number,
+              source_head_sha: $source_head_sha,
+              ingest_run_id: $ingest_run_id,
+              ingest_run_attempt: $ingest_run_attempt,
+              ingest_run_url: $ingest_run_url
+            }' > "$ARTIFACTS_PATH/reused-ingest-metadata/reuse_source_run.json"
+
+      - name: Checkout InferenceX validator
+        if: steps.runs.outputs.reused == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: SemiAnalysisAI/InferenceX
+          ref: ${{ github.event.client_payload.validation-ref || 'main' }}
+          token: ${{ secrets.INFX_MAIN_PAT }}
+          path: inferencex-source
+
+      - name: Validate reusable artifacts
+        if: steps.runs.outputs.reused == 'true'
+        run: |
+          python3 inferencex-source/utils/validate_reusable_sweep_artifacts.py \
+            --artifacts-dir "${{ github.workspace }}/artifacts"
+
       - name: Ingest results to DB
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          INGEST_RUN_ID: ${{ github.event.client_payload.run-id }}
-          INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt }}
+          INGEST_RUN_ID: ${{ steps.runs.outputs.ingest-run-id }}
+          INGEST_RUN_ATTEMPT: ${{ steps.runs.outputs.ingest-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
