@@ -123,9 +123,22 @@ const agenticBenchmarks = agenticGpus.flatMap((g) =>
   })),
 );
 
+const fixedSequenceBenchmarks = agenticBenchmarks.map((row, index) => ({
+  ...row,
+  id: 910000 + index,
+  isl: 8192,
+  osl: 1024,
+  benchmark_type: 'single_turn',
+}));
+
 const interceptAgenticData = () => {
   cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('benchmarks');
+};
+
+const interceptFixedSequenceData = () => {
+  cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
 describe('X-Axis Mode Toggle (inference chart)', () => {
@@ -156,6 +169,20 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
+  });
+
+  it('honors explicit label URL overrides for the agentic view', () => {
+    interceptAgenticData();
+    cy.visit('/inference?i_label=0&i_advlabel=0&i_linelabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic Traces');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
   it('switches the x-axis to TTFT and updates the heading', () => {
@@ -204,6 +231,34 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'true',
     );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+  });
+});
+
+describe('Label defaults for fixed-sequence scenarios', () => {
+  it('keeps parallelism labels off and line labels on by default', () => {
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+  });
+
+  it('honors explicit label URL overrides', () => {
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k&i_label=1&i_advlabel=1&i_linelabel=0', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
   });
 });
 

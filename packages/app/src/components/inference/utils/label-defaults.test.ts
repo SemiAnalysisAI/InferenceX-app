@@ -56,4 +56,23 @@ describe('serializeLabelState', () => {
       i_linelabel: '1',
     });
   });
+
+  it('preserves fixed-sequence defaults and serializes their deviations', () => {
+    expect(serializeLabelState('fixed-seq', resolveLabelState('fixed-seq', {}))).toEqual({
+      i_label: '',
+      i_advlabel: '',
+      i_linelabel: '',
+    });
+    expect(
+      serializeLabelState('fixed-seq', {
+        showPointLabels: true,
+        useAdvancedLabels: true,
+        showLineLabels: false,
+      }),
+    ).toEqual({
+      i_label: '1',
+      i_advlabel: '1',
+      i_linelabel: '0',
+    });
+  });
 });
