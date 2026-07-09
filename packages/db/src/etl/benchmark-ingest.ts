@@ -101,32 +101,36 @@ export async function insertServerLog(
 ): Promise<void> {
   if (benchmarkResultIds.length === 0) return;
 
-  // Only link rows that don't already have a server log
-  const unlinked = await sql<{ id: number }[]>`
-    select id from benchmark_results
-    where id = any(${sql.array(benchmarkResultIds)}::bigint[])
-      and server_log_id is null
-  `;
-  if (unlinked.length === 0) return;
+  await sql.begin(async (tx) => {
+    // Lock before the check so concurrent config workers cannot create an
+    // unreferenced duplicate server_logs row for the same benchmark result.
+    const unlinked = await tx<{ id: number }[]>`
+      select id from benchmark_results
+      where id = any(${tx.array(benchmarkResultIds)}::bigint[])
+        and server_log_id is null
+      for update
+    `;
+    if (unlinked.length === 0) return;
 
-  const [{ id: logId }] = await sql<{ id: number }[]>`
-    insert into server_logs (server_log) values (${serverLog})
-    returning id
-  `;
-  // Derive the KV-cache pool size (tokens) from the log's authoritative
-  // "GPU KV cache size: N tokens" line(s) and stash it on the result's metrics
-  // JSON, mirroring how trace-replay-ingest derives cache-hit rates. The
-  // scraped vllm:cache_config_info metric can't reconstruct this for MLA models.
-  const kvCachePoolTokens = kvCachePoolTokensFromServerLog(serverLog);
-  await sql`
-    update benchmark_results
-    set server_log_id = ${logId}${
-      kvCachePoolTokens === null
-        ? sql``
-        : sql`, metrics = jsonb_set(metrics, '{kv_cache_pool_tokens}', to_jsonb(${kvCachePoolTokens}::bigint))`
-    }
-    where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
-  `;
+    const [{ id: logId }] = await tx<{ id: number }[]>`
+      insert into server_logs (server_log) values (${serverLog})
+      returning id
+    `;
+    // Derive the KV-cache pool size (tokens) from the log's authoritative
+    // "GPU KV cache size: N tokens" line(s) and stash it on the result's metrics
+    // JSON, mirroring how trace-replay-ingest derives cache-hit rates. The
+    // scraped vllm:cache_config_info metric can't reconstruct this for MLA models.
+    const kvCachePoolTokens = kvCachePoolTokensFromServerLog(serverLog);
+    await tx`
+      update benchmark_results
+      set server_log_id = ${logId}${
+        kvCachePoolTokens === null
+          ? tx``
+          : tx`, metrics = jsonb_set(metrics, '{kv_cache_pool_tokens}', to_jsonb(${kvCachePoolTokens}::bigint))`
+      }
+      where id = any(${tx.array(unlinked.map((r) => r.id))}::bigint[])
+    `;
+  });
 }
 
 /**

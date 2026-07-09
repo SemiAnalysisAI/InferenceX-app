@@ -12,9 +12,9 @@ import { gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
-import { computeAggregateStats } from './compute-aggregate-stats.js';
-import { computeChartSeries } from './compute-chart-series.js';
-import { computeRequestTimeline } from './compute-request-timeline.js';
+import { computeAggregateStats, type AggregateStats } from './compute-aggregate-stats';
+import { computeChartSeries, type ChartSeries } from './compute-chart-series';
+import { computeRequestTimeline, type RequestTimeline } from './compute-request-timeline';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -22,6 +22,20 @@ type Sql = ReturnType<typeof postgres>;
 export interface TraceReplayIngestOptions {
   metricsContext?: ServerMetricsContext;
   progressLabel?: string;
+}
+
+export interface PreparedTraceReplay {
+  profileGz: Buffer | null;
+  profileSize: number | null;
+  serverMetricsCsv: Buffer | null;
+  csvSize: number | null;
+  metricsJsonGz: Buffer | null;
+  metricsJsonSize: number | null;
+  aggregateStats: AggregateStats;
+  chartSeries: ChartSeries | null;
+  requestTimeline: RequestTimeline | null;
+  gzipMs: number;
+  computeMs: number;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -36,6 +50,52 @@ function formatBytes(bytes: number | null | undefined): string {
 
 function elapsed(startMs: number): string {
   return `${((Date.now() - startMs) / 1000).toFixed(1)}s`;
+}
+
+export async function findUnlinkedTraceReplayBenchmarkIds(
+  sql: Sql,
+  benchmarkResultIds: number[],
+): Promise<number[]> {
+  if (benchmarkResultIds.length === 0) return [];
+  const rows = await sql<{ id: number }[]>`
+    select id from benchmark_results
+    where id = any(${sql.array(benchmarkResultIds)}::bigint[])
+      and trace_replay_id is null
+  `;
+  return rows.map((row) => row.id);
+}
+
+export async function prepareTraceReplay(
+  profileExportJsonl: Buffer | null,
+  serverMetricsCsv: Buffer | null,
+  serverMetricsJson: Buffer | null,
+  metricsContext: ServerMetricsContext = {},
+): Promise<PreparedTraceReplay> {
+  const gzipStart = Date.now();
+  const profileGz = profileExportJsonl ? gzipSync(profileExportJsonl) : null;
+  const metricsJsonGz = serverMetricsJson ? gzipSync(serverMetricsJson) : null;
+  const gzipMs = Date.now() - gzipStart;
+
+  const computeStart = Date.now();
+  const [aggregateStats, chartSeries, requestTimeline] = await Promise.all([
+    computeAggregateStats({ profileBlob: profileGz, serverBlob: metricsJsonGz }),
+    computeChartSeries(metricsJsonGz, metricsContext),
+    Promise.resolve(computeRequestTimeline(profileGz)),
+  ]);
+
+  return {
+    profileGz,
+    profileSize: profileExportJsonl?.length ?? null,
+    serverMetricsCsv,
+    csvSize: serverMetricsCsv?.length ?? null,
+    metricsJsonGz,
+    metricsJsonSize: serverMetricsJson?.length ?? null,
+    aggregateStats,
+    chartSeries,
+    requestTimeline,
+    gzipMs,
+    computeMs: Date.now() - computeStart,
+  };
 }
 
 /**
@@ -72,133 +132,146 @@ export async function insertTraceReplay(
   if (benchmarkResultIds.length === 0) return;
   if (!profileExportJsonl && !serverMetricsCsv && !serverMetricsJson) return;
 
-  // Only link rows that don't already point at a trace_replay row — keeps
-  // re-ingest from inserting duplicate sibling blobs.
   const linkStart = Date.now();
   log(`checking ${benchmarkResultIds.length} benchmark row(s) for existing links`);
-  const unlinked = await sql<{ id: number }[]>`
-    select id from benchmark_results
-    where id = any(${sql.array(benchmarkResultIds)}::bigint[])
-      and trace_replay_id is null
-  `;
-  log(`found ${unlinked.length} unlinked row(s) (${elapsed(linkStart)})`);
-  if (unlinked.length === 0) {
+  const unlinkedIds = await findUnlinkedTraceReplayBenchmarkIds(sql, benchmarkResultIds);
+  log(`found ${unlinkedIds.length} unlinked row(s) (${elapsed(linkStart)})`);
+  if (unlinkedIds.length === 0) {
     log('skipping blob insert; all benchmark rows already linked');
     return;
   }
 
-  const gzipStart = Date.now();
   log(
     `compressing profile=${formatBytes(profileExportJsonl?.length)}, ` +
       `server_csv=${formatBytes(serverMetricsCsv?.length)}, ` +
       `server_json=${formatBytes(serverMetricsJson?.length)}`,
   );
-  const profileGz = profileExportJsonl ? gzipSync(profileExportJsonl) : null;
-  const profileSize = profileExportJsonl ? profileExportJsonl.length : null;
-  const csvSize = serverMetricsCsv ? serverMetricsCsv.length : null;
-  const metricsJsonGz = serverMetricsJson ? gzipSync(serverMetricsJson) : null;
-  const metricsJsonSize = serverMetricsJson ? serverMetricsJson.length : null;
+  const prepared = await prepareTraceReplay(
+    profileExportJsonl,
+    serverMetricsCsv,
+    serverMetricsJson,
+    metricsContext,
+  );
   log(
-    `compressed profile=${formatBytes(profileGz?.length)}, ` +
-      `server_json=${formatBytes(metricsJsonGz?.length)} (${elapsed(gzipStart)})`,
+    `compressed profile=${formatBytes(prepared.profileGz?.length)}, ` +
+      `server_json=${formatBytes(prepared.metricsJsonGz?.length)} ` +
+      `(${(prepared.gzipMs / 1000).toFixed(1)}s)`,
+  );
+  log(
+    `computed derived JSON: chart_windows=${prepared.chartSeries?.timeslicesCount ?? 0}, ` +
+      `timeline_requests=${prepared.requestTimeline?.requests.length ?? 0} ` +
+      `(${(prepared.computeMs / 1000).toFixed(1)}s)`,
   );
 
-  // Pre-compute aggregate stats + chart-ready time-series + per-request
-  // timeline so the detail page doesn't have to re-parse these blobs on
-  // every request. Each helper tolerates a null blob and falls back to
-  // a streaming parser for oversized server_metrics blobs.
-  const computeStart = Date.now();
-  log('computing aggregate stats, chart series, and request timeline');
-  const [aggregateStats, chartSeries, requestTimeline] = await Promise.all([
-    computeAggregateStats({ profileBlob: profileGz, serverBlob: metricsJsonGz }),
-    computeChartSeries(metricsJsonGz, metricsContext),
-    Promise.resolve(computeRequestTimeline(profileGz)),
-  ]);
-  log(
-    `computed derived JSON: chart_windows=${chartSeries?.timeslicesCount ?? 0}, ` +
-      `timeline_requests=${requestTimeline?.requests.length ?? 0} (${elapsed(computeStart)})`,
-  );
+  await insertPreparedTraceReplay(sql, benchmarkResultIds, prepared, options);
+}
 
-  const insertStart = Date.now();
-  log('inserting trace_replay blob row');
-  const [{ id: traceReplayId }] = await sql<{ id: number }[]>`
-    insert into agentic_trace_replay (
-      profile_export_jsonl_gz,
-      profile_export_uncompressed_size,
-      server_metrics_csv,
-      server_metrics_csv_size,
-      server_metrics_json_gz,
-      server_metrics_json_uncompressed_size,
-      aggregate_stats,
-      chart_series,
-      request_timeline
-    )
-    values (
-      ${profileGz},
-      ${profileSize},
-      ${serverMetricsCsv},
-      ${csvSize},
-      ${metricsJsonGz},
-      ${metricsJsonSize},
-      ${sql.json(structuredClone(aggregateStats) as unknown as Parameters<typeof sql.json>[0])},
-      ${chartSeries === null ? null : sql.json(structuredClone(chartSeries) as unknown as Parameters<typeof sql.json>[0])},
-      ${requestTimeline === null ? null : sql.json(structuredClone(requestTimeline) as unknown as Parameters<typeof sql.json>[0])}
-    )
-    returning id
-  `;
-  log(`inserted trace_replay_id=${traceReplayId} (${elapsed(insertStart)})`);
+export async function insertPreparedTraceReplay(
+  sql: Sql,
+  benchmarkResultIds: number[],
+  prepared: PreparedTraceReplay,
+  options: TraceReplayIngestOptions = {},
+): Promise<void> {
+  const { progressLabel } = options;
+  const log = (message: string): void => {
+    if (progressLabel) console.log(`    trace_replay ${progressLabel}: ${message}`);
+  };
 
-  const updateStart = Date.now();
-  log(`linking trace_replay_id=${traceReplayId} to ${unlinked.length} benchmark row(s)`);
-  await sql`
-    update benchmark_results
-    set trace_replay_id = ${traceReplayId}
-    where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
-  `;
-  log(`linked benchmark rows (${elapsed(updateStart)})`);
-
-  // Derive lifetime GPU + CPU cache hit rates from chart_series. SGLang
-  // runs don't populate these in the harness JSON; vLLM runs do but only
-  // for GPU. We always recompute to keep the derivation consistent with
-  // what the detail-page charts plot — overwriting any pre-existing value.
-  //
-  // Source label naming differs by framework / cache topology:
-  //   SGLang hicache: 'cache hit (HBM)' + 'cache hit (CPU offload)'
-  //   SGLang older:   'cache hit'      (no tier breakdown)
-  //   vLLM LMCache:   'local_cache_hit' + 'external_kv_transfer'  (+ 'local_compute' for miss)
-  //   vLLM single:    falls back to prefixCacheHitsTps total (= local cache only)
-  if (chartSeries && chartSeries.prefillTps.length > 0) {
-    const sumPrompts = chartSeries.prefillTps.reduce((s, p) => s + p.value, 0);
-    if (sumPrompts > 0) {
-      const sumOf = (name: string): number =>
-        (chartSeries.promptTokensBySource[name] ?? []).reduce((s, p) => s + p.value, 0);
-      // CPU-offload hits: SGLang hicache + vLLM LMCache external transfer.
-      const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
-      // GPU/HBM hits from source breakdown, summed across known aliases.
-      const hbmFromBreakdown =
-        sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
-      // If the source breakdown has any GPU entry, use it. Otherwise fall back
-      // to total prefixCacheHitsTps sum (single-source vLLM path with no
-      // by_source metric — equals the lone cache counter's lifetime).
-      const gpuHits =
-        hbmFromBreakdown > 0
-          ? hbmFromBreakdown
-          : chartSeries.prefixCacheHitsTps.reduce((s, p) => s + p.value, 0);
-      const gpuRate = gpuHits / sumPrompts;
-      const cpuRate = cpuHits > 0 ? cpuHits / sumPrompts : null;
-      await sql`
-        update benchmark_results
-        set metrics = jsonb_set(
-          case when ${cpuRate}::numeric is not null
-            then jsonb_set(metrics, '{server_cpu_cache_hit_rate}', to_jsonb(${cpuRate}::numeric))
-            else metrics
-          end,
-          '{server_gpu_cache_hit_rate}',
-          to_jsonb(${gpuRate}::numeric)
-        )
-        where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
-      `;
-      log('updated cache-hit metrics from chart series');
+  await sql.begin(async (tx) => {
+    // Row locks make the check-and-link atomic when multiple config workers
+    // converge on the same idempotency key.
+    const unlinked = await tx<{ id: number }[]>`
+      select id from benchmark_results
+      where id = any(${tx.array(benchmarkResultIds)}::bigint[])
+        and trace_replay_id is null
+      for update
+    `;
+    if (unlinked.length === 0) {
+      log('skipping blob insert; all benchmark rows already linked');
+      return;
     }
-  }
+
+    const insertStart = Date.now();
+    log('inserting trace_replay blob row');
+    const [{ id: traceReplayId }] = await tx<{ id: number }[]>`
+      insert into agentic_trace_replay (
+        profile_export_jsonl_gz,
+        profile_export_uncompressed_size,
+        server_metrics_csv,
+        server_metrics_csv_size,
+        server_metrics_json_gz,
+        server_metrics_json_uncompressed_size,
+        aggregate_stats,
+        chart_series,
+        request_timeline
+      )
+      values (
+        ${prepared.profileGz},
+        ${prepared.profileSize},
+        ${prepared.serverMetricsCsv},
+        ${prepared.csvSize},
+        ${prepared.metricsJsonGz},
+        ${prepared.metricsJsonSize},
+        ${tx.json(structuredClone(prepared.aggregateStats) as unknown as Parameters<typeof tx.json>[0])},
+        ${prepared.chartSeries === null ? null : tx.json(structuredClone(prepared.chartSeries) as unknown as Parameters<typeof tx.json>[0])},
+        ${prepared.requestTimeline === null ? null : tx.json(structuredClone(prepared.requestTimeline) as unknown as Parameters<typeof tx.json>[0])}
+      )
+      returning id
+    `;
+    log(`inserted trace_replay_id=${traceReplayId} (${elapsed(insertStart)})`);
+
+    const updateStart = Date.now();
+    log(`linking trace_replay_id=${traceReplayId} to ${unlinked.length} benchmark row(s)`);
+    await tx`
+      update benchmark_results
+      set trace_replay_id = ${traceReplayId}
+      where id = any(${tx.array(unlinked.map((r) => r.id))}::bigint[])
+    `;
+    log(`linked benchmark rows (${elapsed(updateStart)})`);
+
+    // Derive lifetime GPU + CPU cache hit rates from chart_series. SGLang
+    // runs don't populate these in the harness JSON; vLLM runs do but only
+    // for GPU. We always recompute to keep the derivation consistent with
+    // what the detail-page charts plot — overwriting any pre-existing value.
+    //
+    // Source label naming differs by framework / cache topology:
+    //   SGLang hicache: 'cache hit (HBM)' + 'cache hit (CPU offload)'
+    //   SGLang older:   'cache hit'      (no tier breakdown)
+    //   vLLM LMCache:   'local_cache_hit' + 'external_kv_transfer'  (+ 'local_compute' for miss)
+    //   vLLM single:    falls back to prefixCacheHitsTps total (= local cache only)
+    if (prepared.chartSeries && prepared.chartSeries.prefillTps.length > 0) {
+      const sumPrompts = prepared.chartSeries.prefillTps.reduce((s, p) => s + p.value, 0);
+      if (sumPrompts > 0) {
+        const sumOf = (name: string): number =>
+          (prepared.chartSeries?.promptTokensBySource[name] ?? []).reduce((s, p) => s + p.value, 0);
+        // CPU-offload hits: SGLang hicache + vLLM LMCache external transfer.
+        const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
+        // GPU/HBM hits from source breakdown, summed across known aliases.
+        const hbmFromBreakdown =
+          sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
+        // If the source breakdown has any GPU entry, use it. Otherwise fall back
+        // to total prefixCacheHitsTps sum (single-source vLLM path with no
+        // by_source metric — equals the lone cache counter's lifetime).
+        const gpuHits =
+          hbmFromBreakdown > 0
+            ? hbmFromBreakdown
+            : prepared.chartSeries.prefixCacheHitsTps.reduce((s, p) => s + p.value, 0);
+        const gpuRate = gpuHits / sumPrompts;
+        const cpuRate = cpuHits > 0 ? cpuHits / sumPrompts : null;
+        await tx`
+          update benchmark_results
+          set metrics = jsonb_set(
+            case when ${cpuRate}::numeric is not null
+              then jsonb_set(metrics, '{server_cpu_cache_hit_rate}', to_jsonb(${cpuRate}::numeric))
+              else metrics
+            end,
+            '{server_gpu_cache_hit_rate}',
+            to_jsonb(${gpuRate}::numeric)
+          )
+          where id = any(${tx.array(unlinked.map((r) => r.id))}::bigint[])
+        `;
+        log('updated cache-hit metrics from chart series');
+      }
+    }
+  });
 }

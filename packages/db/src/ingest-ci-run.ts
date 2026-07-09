@@ -50,7 +50,11 @@ import {
   bulkUpsertAvailability,
   insertServerLog,
 } from './etl/benchmark-ingest';
-import { insertTraceReplay } from './etl/trace-replay-ingest';
+import {
+  findUnlinkedTraceReplayBenchmarkIds,
+  insertPreparedTraceReplay,
+} from './etl/trace-replay-ingest';
+import { TraceReplayWorkerPool } from './etl/trace-replay-worker-pool';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
@@ -221,6 +225,21 @@ function findJsonFiles(dir: string): string[] {
     .readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => path.join(dir, f));
+}
+
+async function forEachConcurrent<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      await worker(items[index]!, index);
+    }
+  });
+  await Promise.all(runners);
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -428,156 +447,180 @@ async function main(): Promise<void> {
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
-    for (const [fileIndex, file] of allBmkFiles.entries()) {
-      const fileStart = Date.now();
-      const relativeFile = path.relative(artifactsDir, file);
-      console.log(
-        `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
-      );
-      const data = readJson(file);
-      if (!data) {
-        console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
-        continue;
-      }
+    const configuredConcurrency = Number.parseInt(process.env.INGEST_CONFIG_CONCURRENCY ?? '', 10);
+    const configConcurrency = Number.isFinite(configuredConcurrency)
+      ? Math.max(1, Math.min(4, configuredConcurrency))
+      : Math.max(1, Math.min(3, os.availableParallelism()));
+    console.log(`  Processing up to ${configConcurrency} benchmark configs concurrently`);
+    const traceReplayPool =
+      traceReplayPaths.size > 0 ? new TraceReplayWorkerPool(configConcurrency) : null;
 
-      const rawRows: Record<string, any>[] = Array.isArray(data)
-        ? data
-        : [data as Record<string, any>];
-      console.log(`    raw rows: ${rawRows.length}`);
-
-      for (const rawRow of rawRows) {
-        if (!rawRow || typeof rawRow !== 'object') continue;
-        const datasetSlug = datasetSlugFromBenchmarkRow(rawRow);
-        if (datasetSlug) datasetSlugs.add(datasetSlug);
-      }
-
-      const rows = rawRows
-        .filter((r) => typeof r === 'object' && r !== null)
-        .map((r) => mapBenchmarkRow(r, tracker))
-        .filter((r): r is NonNullable<typeof r> => r !== null);
-
-      console.log(`    mapped rows: ${rows.length}`);
-      if (rows.length === 0) {
-        console.log(`    skipped; no mappable rows (${elapsed(fileStart)})`);
-        continue;
-      }
-
-      const toInsert = [];
-      for (const row of rows) {
-        try {
-          const configId = await getOrCreateConfig(row.config);
-          toInsert.push({ ...row, configId });
-        } catch (error: any) {
-          tracker.recordDbError(`config for ${path.basename(file)}`, error);
+    try {
+      await forEachConcurrent(allBmkFiles, configConcurrency, async (file, fileIndex) => {
+        const fileStart = Date.now();
+        const relativeFile = path.relative(artifactsDir, file);
+        console.log(
+          `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
+        );
+        const data = readJson(file);
+        if (!data) {
+          console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
+          return;
         }
-      }
-      console.log(`    rows with resolved configs: ${toInsert.length}`);
 
-      if (toInsert.length > 0) {
-        try {
-          const insertStart = Date.now();
-          const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
-            sql,
-            toInsert,
-            workflowRunId,
-            date,
-          );
-          console.log(
-            `    benchmark rows: +${newCount} new, ${dupCount} dup, ` +
-              `${insertedIds.length} id(s) (${elapsed(insertStart)})`,
-          );
-          totalNewBmk += newCount;
-          totalDupBmk += dupCount;
+        const rawRows: Record<string, any>[] = Array.isArray(data)
+          ? data
+          : [data as Record<string, any>];
+        console.log(`    raw rows: ${rawRows.length}`);
 
-          // Build availability only after successful insert
-          for (const r of toInsert) {
-            availRows.push({
-              model: r.config.model,
-              isl: r.isl,
-              osl: r.osl,
-              precision: r.config.precision,
-              hardware: r.config.hardware,
-              framework: r.config.framework,
-              specMethod: r.config.specMethod,
-              disagg: r.config.disagg,
-              benchmarkType: r.benchmarkType,
-            });
+        for (const rawRow of rawRows) {
+          if (!rawRow || typeof rawRow !== 'object') continue;
+          const datasetSlug = datasetSlugFromBenchmarkRow(rawRow);
+          if (datasetSlug) datasetSlugs.add(datasetSlug);
+        }
+
+        const rows = rawRows
+          .filter((r) => typeof r === 'object' && r !== null)
+          .map((r) => mapBenchmarkRow(r, tracker))
+          .filter((r): r is NonNullable<typeof r> => r !== null);
+
+        console.log(`    mapped rows: ${rows.length}`);
+        if (rows.length === 0) {
+          console.log(`    skipped; no mappable rows (${elapsed(fileStart)})`);
+          return;
+        }
+
+        const toInsert = [];
+        for (const row of rows) {
+          try {
+            const configId = await getOrCreateConfig(row.config);
+            toInsert.push({ ...row, configId });
+          } catch (error: any) {
+            tracker.recordDbError(`config for ${path.basename(file)}`, error);
           }
+        }
+        console.log(`    rows with resolved configs: ${toInsert.length}`);
 
-          const parentDir = path.basename(path.dirname(file));
-          if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
-            // Single-turn artifacts are `bmk_<key>` paired with
-            // `server_logs_<key>`. Agentic artifacts are `bmk_agentic_<key>`
-            // but the server log is still `server_logs_<key>` (no `agentic_`
-            // prefix), so fall back to the fully-stripped suffix — otherwise
-            // agentic rows never get their server log (and KV-pool size) linked.
-            const configKey = parentDir.replace(/^bmk_/u, '');
-            const logPath =
-              serverLogPaths.get(configKey) ??
-              serverLogPaths.get(stripBmkAndAgenticPrefix(parentDir));
-            if (logPath) {
-              try {
-                const serverLogStart = Date.now();
-                console.log(
-                  `    server_log ${path.basename(logPath)} (${formatBytes(fileSize(logPath))})`,
-                );
-                const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
-                await insertServerLog(sql, insertedIds, serverLog);
-                console.log(`    server_log linked (${elapsed(serverLogStart)})`);
-              } catch (error: any) {
-                tracker.recordDbError(`server_log for ${configKey}`, error);
+        if (toInsert.length > 0) {
+          try {
+            const insertStart = Date.now();
+            const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
+              sql,
+              toInsert,
+              workflowRunId,
+              date,
+            );
+            console.log(
+              `    benchmark rows: +${newCount} new, ${dupCount} dup, ` +
+                `${insertedIds.length} id(s) (${elapsed(insertStart)})`,
+            );
+            totalNewBmk += newCount;
+            totalDupBmk += dupCount;
+
+            // Build availability only after successful insert
+            for (const r of toInsert) {
+              availRows.push({
+                model: r.config.model,
+                isl: r.isl,
+                osl: r.osl,
+                precision: r.config.precision,
+                hardware: r.config.hardware,
+                framework: r.config.framework,
+                specMethod: r.config.specMethod,
+                disagg: r.config.disagg,
+                benchmarkType: r.benchmarkType,
+              });
+            }
+
+            const parentDir = path.basename(path.dirname(file));
+            if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
+              // Single-turn artifacts are `bmk_<key>` paired with
+              // `server_logs_<key>`. Agentic artifacts are `bmk_agentic_<key>`
+              // but the server log is still `server_logs_<key>` (no `agentic_`
+              // prefix), so fall back to the fully-stripped suffix — otherwise
+              // agentic rows never get their server log (and KV-pool size) linked.
+              const configKey = parentDir.replace(/^bmk_/u, '');
+              const logPath =
+                serverLogPaths.get(configKey) ??
+                serverLogPaths.get(stripBmkAndAgenticPrefix(parentDir));
+              if (logPath) {
+                try {
+                  const serverLogStart = Date.now();
+                  console.log(
+                    `    server_log ${path.basename(logPath)} (${formatBytes(fileSize(logPath))})`,
+                  );
+                  const serverLog = fs.readFileSync(logPath, 'utf8').replaceAll('\u0000', '');
+                  await insertServerLog(sql, insertedIds, serverLog);
+                  console.log(`    server_log linked (${elapsed(serverLogStart)})`);
+                } catch (error: any) {
+                  tracker.recordDbError(`server_log for ${configKey}`, error);
+                }
               }
             }
-          }
 
-          // Trace-replay sibling lookup for agentic points only. The aiperf
-          // harness emits `agentic_<suffix>/trace_replay/...` next to the
-          // `bmk_agentic_<suffix>` artifact we just ingested.
-          if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
-            const suffix = stripBmkAndAgenticPrefix(parentDir);
-            const concMatch = path.basename(file).match(/_conc(?<conc>\d+)\.json$/u);
-            const trace =
-              (concMatch?.groups?.conc
-                ? traceReplayPaths.get(`${suffix}|${concMatch.groups.conc}`)
-                : undefined) ?? traceReplayPaths.get(suffix);
-            if (trace) {
-              try {
-                const traceStart = Date.now();
-                console.log(
-                  `    trace_replay ${suffix}: ` +
-                    `profile=${formatBytes(fileSize(trace.profileJsonl))}, ` +
-                    `server_csv=${formatBytes(fileSize(trace.serverMetricsCsv))}, ` +
-                    `server_json=${formatBytes(fileSize(trace.serverMetricsJson))}`,
-                );
-                const profile = trace.profileJsonl ? fs.readFileSync(trace.profileJsonl) : null;
-                const metrics = trace.serverMetricsCsv
-                  ? fs.readFileSync(trace.serverMetricsCsv)
-                  : null;
-                const metricsJson = trace.serverMetricsJson
-                  ? fs.readFileSync(trace.serverMetricsJson)
-                  : null;
-                await insertTraceReplay(sql, insertedIds, profile, metrics, metricsJson, {
-                  metricsContext: {
-                    framework: toInsert[0]?.config.framework,
-                    disagg: toInsert[0]?.config.disagg,
-                  },
-                  progressLabel: suffix,
-                });
-                totalTraceReplayLinked += insertedIds.length;
-                console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
-              } catch (error: any) {
-                tracker.recordDbError(`trace_replay for ${suffix}`, error);
+            // Trace-replay sibling lookup for agentic points only. The aiperf
+            // harness emits `agentic_<suffix>/trace_replay/...` next to the
+            // `bmk_agentic_<suffix>` artifact we just ingested.
+            if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
+              const suffix = stripBmkAndAgenticPrefix(parentDir);
+              const concMatch = path.basename(file).match(/_conc(?<conc>\d+)\.json$/u);
+              const trace =
+                (concMatch?.groups?.conc
+                  ? traceReplayPaths.get(`${suffix}|${concMatch.groups.conc}`)
+                  : undefined) ?? traceReplayPaths.get(suffix);
+              if (trace) {
+                try {
+                  const traceStart = Date.now();
+                  console.log(
+                    `    trace_replay ${suffix}: ` +
+                      `profile=${formatBytes(fileSize(trace.profileJsonl))}, ` +
+                      `server_csv=${formatBytes(fileSize(trace.serverMetricsCsv))}, ` +
+                      `server_json=${formatBytes(fileSize(trace.serverMetricsJson))}`,
+                  );
+                  const options = {
+                    metricsContext: {
+                      framework: toInsert[0]?.config.framework,
+                      disagg: toInsert[0]?.config.disagg,
+                    },
+                    progressLabel: suffix,
+                  };
+                  const unlinkedIds = await findUnlinkedTraceReplayBenchmarkIds(sql, insertedIds);
+                  if (unlinkedIds.length === 0) {
+                    console.log(
+                      `    trace_replay ${suffix}: skipping; benchmark rows already linked`,
+                    );
+                  } else {
+                    const prepared = await traceReplayPool!.prepare({
+                      profilePath: trace.profileJsonl ?? null,
+                      serverMetricsCsvPath: trace.serverMetricsCsv ?? null,
+                      serverMetricsJsonPath: trace.serverMetricsJson ?? null,
+                      metricsContext: options.metricsContext,
+                    });
+                    console.log(
+                      `    trace_replay ${suffix}: prepared in ` +
+                        `${((prepared.gzipMs + prepared.computeMs) / 1000).toFixed(1)}s ` +
+                        `(worker CPU)`,
+                    );
+                    await insertPreparedTraceReplay(sql, insertedIds, prepared, options);
+                  }
+                  totalTraceReplayLinked += insertedIds.length;
+                  console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
+                } catch (error: any) {
+                  tracker.recordDbError(`trace_replay for ${suffix}`, error);
+                }
+              } else {
+                console.log(`    trace_replay ${suffix}: missing sibling artifact`);
+                tracker.skips.traceReplayMissing++;
               }
-            } else {
-              console.log(`    trace_replay ${suffix}: missing sibling artifact`);
-              tracker.skips.traceReplayMissing++;
             }
+          } catch (error: any) {
+            tracker.recordDbError(path.basename(file), error);
           }
-        } catch (error: any) {
-          tracker.recordDbError(path.basename(file), error);
         }
-      }
-      console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
+        console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
+      });
+    } finally {
+      await traceReplayPool?.close();
     }
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
