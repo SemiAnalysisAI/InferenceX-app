@@ -49,7 +49,9 @@ jobs:
   ingest:
     # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
     # far longer than a fixed-seq-len ingest.
-    timeout-minutes: 60
+    # Large recovered sweeps can spend ~20m extracting artifacts and ~40m
+    # ingesting trace-replay sidecars, so one hour is not enough.
+    timeout-minutes: 180
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
