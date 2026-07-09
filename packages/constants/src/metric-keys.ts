@@ -112,6 +112,8 @@ export const METRIC_KEYS = new Set([
   // profiling window (agentic aiperf; flat in v2 artifacts, mapped from
   // server_metrics.kv_cache.gpu_usage_pct in v3)
   'gpu_kv_cache_usage_pct',
+  // Deployment-wide KV-cache capacity emitted by InferenceX agentic processing.
+  'kv_cache_pool_tokens',
   // measured power / energy (emitted by runner's aggregate_power.py)
   // avg_power_w:             mean per-GPU draw (W) during the load window
   // joules_per_output_token: energy / total_output_tokens. CLUSTER-WIDE on

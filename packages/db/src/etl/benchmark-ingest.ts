@@ -4,7 +4,6 @@
 
 import type postgres from 'postgres';
 import type { BenchmarkParams } from './benchmark-mapper';
-import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -74,12 +73,16 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(workersJsons)}::jsonb[])
     on conflict (workflow_run_id, config_id, benchmark_type, isl, osl, conc, offload_mode)
     do update set
-      -- Replace metrics with the fresh artifact values, but carry over
-      -- kv_cache_pool_tokens: it is derived from the server log at
-      -- insertServerLog time (not present in any artifact JSON), so a later
-      -- upsert from the aggregated results_bmk artifact would silently wipe it.
+      -- Producer artifacts now carry kv_cache_pool_tokens. Preserve an existing
+      -- backfill only when replaying a legacy artifact that predates the field.
       metrics = excluded.metrics || jsonb_strip_nulls(
-        jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
+        jsonb_build_object(
+          'kv_cache_pool_tokens',
+          coalesce(
+            excluded.metrics->'kv_cache_pool_tokens',
+            benchmark_results.metrics->'kv_cache_pool_tokens'
+          )
+        )
       ),
       image = excluded.image,
       workers = excluded.workers
@@ -113,18 +116,9 @@ export async function insertServerLog(
     insert into server_logs (server_log) values (${serverLog})
     returning id
   `;
-  // Derive the KV-cache pool size (tokens) from the log's authoritative
-  // "GPU KV cache size: N tokens" line(s) and stash it on the result's metrics
-  // JSON, mirroring how trace-replay-ingest derives cache-hit rates. The
-  // scraped vllm:cache_config_info metric can't reconstruct this for MLA models.
-  const kvCachePoolTokens = kvCachePoolTokensFromServerLog(serverLog);
   await sql`
     update benchmark_results
-    set server_log_id = ${logId}${
-      kvCachePoolTokens === null
-        ? sql``
-        : sql`, metrics = jsonb_set(metrics, '{kv_cache_pool_tokens}', to_jsonb(${kvCachePoolTokens}::bigint))`
-    }
+    set server_log_id = ${logId}
     where id = any(${sql.array(unlinked.map((r) => r.id))}::bigint[])
   `;
 }
