@@ -253,6 +253,12 @@ describe('computeChartSeries', () => {
       { t: 0, value: 0.25 },
       { t: 1, value: 0.5 },
     ]);
+    expect(cs!.kvCacheUsageByEngine.map(({ engineLabel }) => engineLabel)).toEqual([
+      '0',
+      '1',
+      '2',
+      '3',
+    ]);
     // prefillTps = Σ rates = 4 × 100 = 400; then 4 × 200 = 800
     expect(cs!.prefillTps).toEqual([
       { t: 0, value: 400 },
@@ -261,6 +267,29 @@ describe('computeChartSeries', () => {
     expect(cs!.decodeTps).toEqual([
       { t: 0, value: 200 },
       { t: 1, value: 300 },
+    ]);
+  });
+
+  it('uses dp_rank when engine labels repeat across DEP ranks', async () => {
+    const engines = [0, 1, 2, 3].map((dpRank) => ({
+      labels: { engine: '0', dp_rank: String(dpRank) },
+      timeslices: [{ start_ns: 0, end_ns: 1e9, avg: 0.1 + dpRank * 0.1 }],
+    }));
+    const blob = gzipSync(
+      Buffer.from(
+        JSON.stringify({
+          metrics: { 'vllm:kv_cache_usage_perc': { series: engines } },
+        }),
+      ),
+    );
+
+    const series = await computeChartSeries(blob);
+
+    expect(series?.kvCacheUsageByEngine.map(({ engineLabel }) => engineLabel)).toEqual([
+      '0',
+      '1',
+      '2',
+      '3',
     ]);
   });
 
