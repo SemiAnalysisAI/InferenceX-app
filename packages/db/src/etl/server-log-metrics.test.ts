@@ -40,4 +40,29 @@ describe('kvCachePoolTokensFromServerLog', () => {
     const log = `INFO GPU KV cache size: 1,234,567 tokens`;
     expect(kvCachePoolTokensFromServerLog(log)).toBe(1_234_567);
   });
+
+  it('reads an SGLang single-scheduler pool size', () => {
+    const log = `
+[2026-07-08 15:44:52] server_args=ServerArgs(tp_size=8, dp_size=1, moe_dp_size=1)
+[2026-07-08 15:55:55 DP0 TP0 EP0] max_total_num_tokens=2,301,440, chunked_prefill_size=4096
+`;
+    expect(kvCachePoolTokensFromServerLog(log)).toBe(2_301_440);
+  });
+
+  it('multiplies an SGLang per-scheduler pool by data-parallel size', () => {
+    const log = `
+[2026-07-08 16:43:35] server_args=ServerArgs(tp_size=4, dp_size=4, moe_dp_size=1)
+[2026-07-08 16:49:59 DP0 TP0 EP0] max_total_num_tokens=3219456, chunked_prefill_size=4096
+`;
+    expect(kvCachePoolTokensFromServerLog(log)).toBe(3_219_456 * 4);
+  });
+
+  it('dedups repeated SGLang startup summaries', () => {
+    const log = `
+[2026-07-08 16:43:35] server_args=ServerArgs(dp_size=8, moe_dp_size=1)
+[2026-07-08 16:49:59 DP0 TP0 EP0] max_total_num_tokens=2301440
+[2026-07-08 16:49:59 DP0 TP0 EP0] max_total_num_tokens=2301440
+`;
+    expect(kvCachePoolTokensFromServerLog(log)).toBe(2_301_440 * 8);
+  });
 });

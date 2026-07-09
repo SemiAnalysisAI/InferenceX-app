@@ -416,7 +416,7 @@ export function InflightUniqueTokensCard({
 }: {
   phaseTimeline: RequestTimeline | null;
   timelineLoading: boolean;
-  /** KV-cache pool size in tokens (vLLM only) — drawn as a constant ceiling. */
+  /** KV-cache pool size in tokens (vLLM/SGLang) — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
   return (
