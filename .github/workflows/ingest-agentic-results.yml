@@ -206,6 +206,7 @@ jobs:
                       .name == "results_bmk" or
                       .name == "eval_results_all" or
                       .name == "run-stats" or
+                      .name == "reused-ingest-artifacts" or
                       (.name | startswith("bmk_")) or
                       (.name | startswith("eval_")) or
                       (.name | startswith("agentic_")) or
