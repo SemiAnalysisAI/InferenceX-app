@@ -1,4 +1,5 @@
 import {
+  FRAMEWORK_LABELS,
   resolveFrameworkAliasesInString,
   resolveFrameworkPartLabel,
 } from '@semianalysisai/inferencex-constants';
@@ -43,13 +44,28 @@ export function formatConfigKeys(key: string) {
   const model = parts[0];
   const precision = parts[1];
   const gpu = parts[2];
-  const framework = parts.slice(3).join('-');
-  // Strip -mtp suffix before lookup; MTP is shown separately
-  const isMtp = framework.endsWith('-mtp');
-  const baseFramework = isMtp ? framework.slice(0, -4) : framework;
-  const baseLabel = getFrameworkLabel(baseFramework);
-  // M3's `mtp` spec token renders as "EAGLE"; every other model keeps "MTP".
-  const mtpLabel = resolveFrameworkPartLabel(MODEL_PREFIX_MAPPING[model], 'mtp');
-  const frameworkLabel = isMtp ? `${baseLabel}, ${mtpLabel}` : baseLabel;
+  // Canonicalize legacy framework substrings first (sglang-disagg → mori-sglang, …)
+  // so the tail matches the same FRAMEWORK_LABELS mapping the legend uses.
+  const tokens = resolveFrameworkAliasesInString(parts.slice(3).join('-')).split('-');
+  // Config-key tails can carry extra descriptors after the framework
+  // (e.g. `sglang-agentic-hicache`), and frameworks themselves can be
+  // multi-token (`dynamo-sglang`, `llmd-vllm`). Greedy longest-prefix match
+  // against the known framework labels splits the two apart.
+  // No prefix match → treat the whole tail as the framework (legacy fallback).
+  let fwTokens = tokens.length;
+  for (let n = tokens.length; n >= 1; n--) {
+    if (FRAMEWORK_LABELS[tokens.slice(0, n).join('-')]) {
+      fwTokens = n;
+      break;
+    }
+  }
+  const baseLabel = getFrameworkLabel(tokens.slice(0, fwTokens).join('-'));
+  // Trailing descriptors keep their spec-method labels (M3's `mtp` renders as
+  // "EAGLE"); anything unknown is title-cased instead of shouted in caps.
+  const suffixLabels = tokens.slice(fwTokens).map((t) => {
+    if (t === 'mtp') return resolveFrameworkPartLabel(MODEL_PREFIX_MAPPING[model], 'mtp');
+    return FRAMEWORK_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1);
+  });
+  const frameworkLabel = [baseLabel, ...suffixLabels].join(', ');
   return `${gpu.toUpperCase()} (${frameworkLabel}) ${MODEL_PREFIX_MAPPING[model]} ${getPrecisionLabel(precision as Precision)}`;
 }
