@@ -50,7 +50,7 @@ jobs:
     # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
     # far longer than a fixed-seq-len ingest.
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
     steps:
