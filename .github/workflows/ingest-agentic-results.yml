@@ -43,7 +43,6 @@ on:
         options:
           - production
           - dev
-          - agentx-v1
 
 jobs:
   ingest:
@@ -74,7 +73,6 @@ jobs:
           REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
           DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
           DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
-          DATABASE_WRITE_URL_AGENTX_V1: ${{ secrets.DATABASE_AGENTX_V1_WRITE_URL }}
         run: |
           case "$REQUESTED_DATABASE_TARGET" in
             production)
@@ -83,10 +81,6 @@ jobs:
               ;;
             dev)
               database_write_url="$DATABASE_WRITE_URL_DEV"
-              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
-              ;;
-            agentx-v1)
-              database_write_url="$DATABASE_WRITE_URL_AGENTX_V1"
               cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
               ;;
             *)
