@@ -200,11 +200,14 @@ async function purge(wrIds: number[]): Promise<void> {
       `;
     }
 
-    // Orphaned availability rows
+    // Orphaned availability rows. NULL-safe on isl/osl (`IS NOT DISTINCT FROM`)
+    // so agentic rows are matched too: agentic_traces availability has isl/osl
+    // NULL, and a row-value `IN` / `=` never matches NULL — which previously
+    // left agentic availability rows behind after a purge.
     if (availKeys.length > 0) {
       const models = availKeys.map((r) => r.model as string);
-      const isls = availKeys.map((r) => r.isl as number);
-      const osls = availKeys.map((r) => r.osl as number);
+      const isls = availKeys.map((r) => r.isl as number | null);
+      const osls = availKeys.map((r) => r.osl as number | null);
       const precisions = availKeys.map((r) => r.precision as string);
       const hardwares = availKeys.map((r) => r.hardware as string);
       const frameworks = availKeys.map((r) => r.framework as string);
@@ -214,20 +217,27 @@ async function purge(wrIds: number[]): Promise<void> {
 
       await tx`
         DELETE FROM availability a
-        WHERE (a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.date)
-          IN (
-            SELECT t.model, t.isl::int, t.osl::int, t.precision, t.hardware,
-                   t.framework, t.spec_method, t.disagg::boolean, t.date::date
-            FROM unnest(
-              ${models}::text[], ${isls}::int[], ${osls}::int[],
-              ${precisions}::text[], ${hardwares}::text[], ${frameworks}::text[],
-              ${specMethods}::text[], ${disaggs}::text[], ${dates}::text[]
-            ) AS t(model, isl, osl, precision, hardware, framework, spec_method, disagg, date)
-          )
+        USING (
+          SELECT t.model, t.isl::int AS isl, t.osl::int AS osl, t.precision, t.hardware,
+                 t.framework, t.spec_method, t.disagg::boolean AS disagg, t.date::date AS date
+          FROM unnest(
+            ${models}::text[], ${isls}::int[], ${osls}::int[],
+            ${precisions}::text[], ${hardwares}::text[], ${frameworks}::text[],
+            ${specMethods}::text[], ${disaggs}::text[], ${dates}::text[]
+          ) AS t(model, isl, osl, precision, hardware, framework, spec_method, disagg, date)
+        ) k
+        WHERE a.model = k.model
+          AND a.isl IS NOT DISTINCT FROM k.isl
+          AND a.osl IS NOT DISTINCT FROM k.osl
+          AND a.precision = k.precision AND a.hardware = k.hardware
+          AND a.framework = k.framework AND a.spec_method = k.spec_method
+          AND a.disagg = k.disagg AND a.date = k.date
           AND NOT EXISTS (
             SELECT 1 FROM benchmark_results br
             JOIN configs c ON c.id = br.config_id
-            WHERE c.model = a.model AND br.isl = a.isl AND br.osl = a.osl
+            WHERE c.model = a.model
+              AND br.isl IS NOT DISTINCT FROM a.isl
+              AND br.osl IS NOT DISTINCT FROM a.osl
               AND c.precision = a.precision AND c.hardware = a.hardware
               AND c.framework = a.framework AND c.spec_method = a.spec_method
               AND c.disagg = a.disagg AND br.date = a.date AND br.error IS NULL
