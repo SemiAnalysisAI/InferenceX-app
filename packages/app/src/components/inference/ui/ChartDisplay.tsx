@@ -344,6 +344,8 @@ export default function ChartDisplay() {
     isUnofficialRun,
     activeOverlayHwTypes,
     setActiveOverlayHwTypes,
+    localOfficialOverride,
+    setLocalOfficialOverride,
   } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
@@ -428,12 +430,10 @@ export default function ChartDisplay() {
   ]);
 
   const overlayScope = useMemo(() => {
-    const allKeys = new Set<string>();
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
       for (const point of overlay?.data ?? []) {
         const key = String(point.hwKey);
-        allKeys.add(key);
         if (
           selectedPrecisions.includes(point.precision) &&
           matchesQuickFilters(point, quickFilters)
@@ -442,15 +442,13 @@ export default function ChartDisplay() {
         }
       }
     }
-    return { eligibleKeys, dataKey: [...allKeys].toSorted().join(',') };
+    return eligibleKeys;
   }, [overlayDataByChartType, selectedPrecisions, quickFilters]);
   const officialScope = useMemo(() => {
-    const allKeys = new Set<string>();
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
       for (const point of graph.data) {
         const key = String(point.hwKey);
-        allKeys.add(key);
         if (
           selectedPrecisions.includes(point.precision) &&
           matchesQuickFilters(point, quickFilters)
@@ -459,27 +457,26 @@ export default function ChartDisplay() {
         }
       }
     }
-    return { eligibleKeys, dataKey: [...allKeys].toSorted().join(',') };
+    return eligibleKeys;
   }, [graphs, selectedPrecisions, quickFilters]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
-  )}|${unofficialRunInfos.map((run) => run.url).join(',')}|${officialScope.dataKey}|${
-    overlayScope.dataKey
-  }`;
+  )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
   const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
   const overlayRowsScopeChanged = appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
+  const selectedOfficialHwTypes =
+    overlayRowsScopeChanged || localOfficialOverride === null
+      ? activeHwTypes
+      : localOfficialOverride;
   const resolvedScopedOverlayHwTypes = useMemo(() => {
     const activeOfficialKeys = new Set(
-      [...activeHwTypes].filter((key) => officialScope.eligibleKeys.has(key)),
+      [...selectedOfficialHwTypes].filter((key) => officialScope.has(key)),
     );
-    const officialKeys =
-      activeOfficialKeys.size > 0 ? activeOfficialKeys : officialScope.eligibleKeys;
+    const officialKeys = activeOfficialKeys;
     const activeScopedOverlayKeys = new Set(
-      [...activeOverlayHwTypes].filter((key) => overlayScope.eligibleKeys.has(key)),
+      [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
     );
-    const overlayKeys = overlayRowsScopeChanged
-      ? overlayScope.eligibleKeys
-      : activeScopedOverlayKeys;
+    const overlayKeys = overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
     const proposed = new Set(officialKeys);
     overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
     const previous = new Set(activeOfficialKeys);
@@ -491,7 +488,7 @@ export default function ChartDisplay() {
     }
     return overlay;
   }, [
-    activeHwTypes,
+    selectedOfficialHwTypes,
     activeOverlayHwTypes,
     officialScope,
     overlayScope,
@@ -500,7 +497,7 @@ export default function ChartDisplay() {
   ]);
   useEffect(() => {
     const merged = new Set(activeOverlayHwTypes);
-    overlayScope.eligibleKeys.forEach((key) => merged.delete(key));
+    overlayScope.forEach((key) => merged.delete(key));
     resolvedScopedOverlayHwTypes.forEach((key) => merged.add(key));
     let selectionChanged = merged.size !== activeOverlayHwTypes.size;
     if (!selectionChanged) {
@@ -512,6 +509,9 @@ export default function ChartDisplay() {
       }
     }
     if (selectionChanged) setActiveOverlayHwTypes(merged);
+    if (overlayRowsScopeChanged && localOfficialOverride !== null) {
+      setLocalOfficialOverride(null);
+    }
     if (overlayRowsScopeChanged) setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
   }, [
     overlayRowsScopeChanged,
@@ -520,6 +520,8 @@ export default function ChartDisplay() {
     overlayScope,
     resolvedScopedOverlayHwTypes,
     setActiveOverlayHwTypes,
+    localOfficialOverride,
+    setLocalOfficialOverride,
   ]);
 
   const visibleComparisonRows = useCallback(
@@ -537,12 +539,12 @@ export default function ChartDisplay() {
       );
       const availableOverlayKeys = new Set(eligibleOverlayRows.map((point) => String(point.hwKey)));
       const activeOfficialKeys = new Set(
-        [...activeHwTypes].filter((key) => availableOfficialKeys.has(key)),
+        [...selectedOfficialHwTypes].filter((key) => availableOfficialKeys.has(key)),
       );
       const activeScopedOverlayKeys = new Set(
         [...activeOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
       );
-      const officialKeys = activeOfficialKeys.size > 0 ? activeOfficialKeys : availableOfficialKeys;
+      const officialKeys = activeOfficialKeys;
       const overlayKeys = new Set(
         [...resolvedScopedOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
       );
@@ -562,7 +564,7 @@ export default function ChartDisplay() {
     [
       selectedPrecisions,
       quickFilters,
-      activeHwTypes,
+      selectedOfficialHwTypes,
       activeOverlayHwTypes,
       resolvedScopedOverlayHwTypes,
       resolveComparisonSelection,
@@ -749,12 +751,9 @@ export default function ChartDisplay() {
                         : undefined
                     }
                     onExportCsv={() => {
-                      const candidateVisibleData = graph.data.filter((d) =>
-                        isTimelineMode
-                          ? activeDates.has(`${d.date}_${d.hwKey}`)
-                          : activeHwTypes.has(d.hwKey as string) &&
-                            selectedPrecisions.includes(d.precision),
-                      );
+                      const candidateVisibleData = isTimelineMode
+                        ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
+                        : graph.data;
                       const overlay = selectUnofficialOverlayForMode(
                         selectedXAxisMode,
                         graph.chartDefinition.chartType,

@@ -466,6 +466,43 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
   });
 
+  it('keeps an explicitly empty official legend out of table mode', () => {
+    const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
+    const row = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+    });
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_V4_Pro,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: [row],
+          },
+        ],
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      },
+      unofficial: { localOfficialOverride: new Set() },
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.contains('No data available for the current filters.').should('be.visible');
+    cy.get('[data-testid="inference-results-table"]').should('not.exist');
+  });
+
   it('commits a new table overlay scope and preserves an explicit empty selection', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const exclusion = buildExclusion([
