@@ -395,12 +395,21 @@ export function InferenceProvider({
   );
 
   // The picker list: the changelog/precision-scoped runs, further restricted to
-  // the ones that shipped data for the selected scenario. Falls back to the
-  // changelog-scoped list when coverage data is unavailable (old dates / JSON
-  // mode) so the selector always renders.
+  // the ones that shipped data for the selected scenario. When the date has
+  // coverage rows but none for this scenario (e.g. only single_turn sweeps ran
+  // that day while viewing Agentic Traces) the picker hides (null) rather than
+  // listing other-scenario runs; only when coverage data is unavailable
+  // altogether (old dates / JSON snapshots) does it fall back to the
+  // changelog-scoped list so the selector still renders.
   const filteredAvailableRuns = useMemo(
-    () => restrictRunsToScenario(changelogFilteredRuns, availableRuns, scenarioRunIds),
-    [changelogFilteredRuns, availableRuns, scenarioRunIds],
+    () =>
+      restrictRunsToScenario(
+        changelogFilteredRuns,
+        availableRuns,
+        scenarioRunIds,
+        runConfigs.length > 0,
+      ),
+    [changelogFilteredRuns, availableRuns, scenarioRunIds, runConfigs],
   );
 
   const effectiveSelectedRunId = useMemo(() => {

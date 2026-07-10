@@ -550,13 +550,23 @@ describe('restrictRunsToScenario', () => {
   };
 
   it('keeps only runs present in the scenario coverage set', () => {
-    const result = restrictRunsToScenario(runs, runs, new Set(['10']));
+    const result = restrictRunsToScenario(runs, runs, new Set(['10']), true);
     expect(Object.keys(result!)).toEqual(['10']);
   });
 
-  it('falls back to the changelog-scoped list when coverage is empty', () => {
-    const result = restrictRunsToScenario(runs, runs, new Set());
+  it('falls back to the changelog-scoped list when coverage data is unavailable', () => {
+    // Old dates / JSON snapshots without per-run coverage rows: we can't say
+    // anything about scenarios, so the picker keeps the changelog-scoped list.
+    const result = restrictRunsToScenario(runs, runs, new Set(), false);
     expect(result).toBe(runs);
+  });
+
+  it('hides the picker when coverage exists but the scenario has no runs that date', () => {
+    // Repro: 2026-07-02 / 2026-07-04 had only single_turn runs; on the Agentic
+    // Traces scenario the picker must show NO runs (null), not fall back to
+    // listing the single_turn runs.
+    const result = restrictRunsToScenario(runs, runs, new Set(), true);
+    expect(result).toBeNull();
   });
 
   it('pulls a scenario run from the raw map when the changelog list omits it', () => {
@@ -564,24 +574,26 @@ describe('restrictRunsToScenario', () => {
     // it, but it is still a valid scenario run the picker must show.
     const changelogFiltered = { '10': runs['10'] };
     const allRuns = runs;
-    const result = restrictRunsToScenario(changelogFiltered, allRuns, new Set(['10', '20']));
+    const result = restrictRunsToScenario(changelogFiltered, allRuns, new Set(['10', '20']), true);
     expect(Object.keys(result!).toSorted()).toEqual(['10', '20']);
     expect(result!['20']).toBe(runs['20']);
   });
 
   it('prefers the changelog-scoped entry over the raw one', () => {
     const scoped = makeRun([['dsv4-fp4-b200-sglang']], { runId: '10', conclusion: 'scoped' });
-    const result = restrictRunsToScenario({ '10': scoped }, runs, new Set(['10']));
+    const result = restrictRunsToScenario({ '10': scoped }, runs, new Set(['10']), true);
     expect(result!['10']).toBe(scoped);
   });
 
-  it('falls back to the changelog list when no scenario run survives', () => {
-    const result = restrictRunsToScenario(runs, runs, new Set(['999']));
-    expect(result).toBe(runs);
+  it('returns null when no scenario run survives the restriction', () => {
+    // Scenario runs exist in coverage but none resolve to a listable RunInfo
+    // (e.g. still in progress, so absent from the workflow-runs map).
+    const result = restrictRunsToScenario(runs, runs, new Set(['999']), true);
+    expect(result).toBeNull();
   });
 
-  it('returns null changelog list unchanged', () => {
-    expect(restrictRunsToScenario(null, null, new Set(['10']))).toBeNull();
+  it('returns null changelog list unchanged when coverage is unavailable', () => {
+    expect(restrictRunsToScenario(null, null, new Set(), false)).toBeNull();
   });
 });
 

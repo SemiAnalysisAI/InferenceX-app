@@ -300,25 +300,33 @@ export function filterRunsByModel(
  * entry, so `filterRunsByModel` may omit it while it is still a legitimate
  * scenario run the user must be able to select.
  *
- * Fallbacks that keep the selector rendering:
- *  - `scenarioRunIds` empty → no coverage data (dates predating per-run
- *    coverage, or JSON/fixtures mode): return the changelog-scoped list
- *    unchanged rather than blanking the picker.
- *  - Non-empty coverage but zero surviving runs (shouldn't happen in practice)
- *    → also fall back to the changelog-scoped list.
+ * `coverageKnown` says whether per-(run, config) coverage rows exist for the
+ * date at all (`runConfigs.length > 0`). It distinguishes two very different
+ * "empty `scenarioRunIds`" cases:
+ *  - `coverageKnown === false` → no coverage data (dates predating per-run
+ *    coverage, or JSON/fixtures snapshots without it): we can't say anything
+ *    about scenarios, so return the changelog-scoped list unchanged rather
+ *    than blanking the picker.
+ *  - `coverageKnown === true` and no scenario run survives → the date has
+ *    benchmark data but NONE for this scenario (e.g. only single_turn sweeps
+ *    ran that day while the user views Agentic Traces). Return null so the
+ *    picker hides instead of listing other-scenario runs — showing them is
+ *    exactly the leak this helper exists to prevent, and selecting one would
+ *    constrain an already-empty chart to a meaningless "as of run" cutoff.
  */
 export function restrictRunsToScenario(
   changelogFiltered: Record<string, RunInfo> | null,
   allRuns: Record<string, RunInfo> | null,
   scenarioRunIds: Set<string>,
+  coverageKnown: boolean,
 ): Record<string, RunInfo> | null {
-  if (scenarioRunIds.size === 0) return changelogFiltered;
+  if (!coverageKnown) return changelogFiltered;
   const restricted: Record<string, RunInfo> = {};
   for (const runId of scenarioRunIds) {
     const info = changelogFiltered?.[runId] ?? allRuns?.[runId];
     if (info) restricted[runId] = info;
   }
-  return Object.keys(restricted).length > 0 ? restricted : changelogFiltered;
+  return Object.keys(restricted).length > 0 ? restricted : null;
 }
 
 /**
