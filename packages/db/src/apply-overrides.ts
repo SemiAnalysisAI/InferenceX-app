@@ -162,6 +162,10 @@ async function purge(wrIds: number[]): Promise<void> {
       SELECT DISTINCT server_log_id AS id FROM benchmark_results
       WHERE workflow_run_id = ANY(${wrIds}) AND server_log_id IS NOT NULL
     `;
+    const traceRows = await tx`
+      SELECT DISTINCT trace_replay_id AS id FROM benchmark_results
+      WHERE workflow_run_id = ANY(${wrIds}) AND trace_replay_id IS NOT NULL
+    `;
 
     // Children first
     await tx`DELETE FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})`;
@@ -177,6 +181,21 @@ async function purge(wrIds: number[]): Promise<void> {
         WHERE id = ANY(${sIds})
           AND NOT EXISTS (
             SELECT 1 FROM benchmark_results br WHERE br.server_log_id = server_logs.id
+          )
+      `;
+    }
+
+    // Orphaned agentic_trace_replay sidecars (profile-export + server-metrics
+    // blobs). benchmark_results.trace_replay_id has no ON DELETE cascade, so
+    // deleting the run's rows above leaves these behind — clear any that are no
+    // longer referenced by a surviving benchmark_results row.
+    const trIds = traceRows.map((r) => r.id as number);
+    if (trIds.length > 0) {
+      await tx`
+        DELETE FROM agentic_trace_replay
+        WHERE id = ANY(${trIds})
+          AND NOT EXISTS (
+            SELECT 1 FROM benchmark_results br WHERE br.trace_replay_id = agentic_trace_replay.id
           )
       `;
     }
