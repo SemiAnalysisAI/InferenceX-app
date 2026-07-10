@@ -22,12 +22,12 @@ const interceptDerivedMetrics = () => {
 
 // This spec exercises the agentic x-axis modes, which only exist when the
 // selected model resolves to the Agentic Traces scenario. The default e2e
-// fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, so
-// after the availability-gated effectiveSequence fix the bare-/inference default
-// correctly resolves to a fixed-seq scenario. We therefore inject agentic
-// availability + benchmark rows for the default model VIA SPEC-SCOPED INTERCEPTS
-// (not the shared fixtures) so this test — and only this test — sees the agentic
-// view. Scoping to intercepts keeps every other spec's default fixed-seq.
+// fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, and
+// the app default scenario is 8K/1K, so bare /inference always resolves to a
+// fixed-seq scenario. We therefore inject agentic availability + benchmark rows
+// for the default model VIA SPEC-SCOPED INTERCEPTS (not the shared fixtures) and
+// visit with an explicit ?i_seq=agentic-traces so this test — and only this
+// test — sees the agentic view.
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro is the default model
 const AGENTIC_DATE = '2026-06-12';
 
@@ -66,8 +66,8 @@ const agenticGpus = [
   { hardware: 'b300', framework: 'vllm', disagg: false },
 ];
 
-// Availability: default model has BOTH agentic and fixed-seq, so the default
-// resolves to agentic (the product-intended, agentic-preferred behavior).
+// Availability: default model has BOTH agentic and fixed-seq. The agentic view
+// is selected explicitly via ?i_seq=agentic-traces (the app default is 8K/1K).
 const agenticAvailability = [
   ...agenticGpus.map((g) => ({
     model: DEFAULT_MODEL_DB_KEY,
@@ -144,7 +144,7 @@ const interceptFixedSequenceData = () => {
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
-    cy.visit('/inference', {
+    cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -173,7 +173,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
 
   it('honors explicit label URL overrides for the agentic view', () => {
     interceptAgenticData();
-    cy.visit('/inference?i_label=0&i_advlabel=0&i_linelabel=1', {
+    cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -231,6 +231,21 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'true',
     );
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+  });
+});
+
+describe('Default scenario', () => {
+  it('bare /inference defaults to 8K / 1K even when the model has agentic data', () => {
+    // Availability contains BOTH agentic and fixed-seq rows for the default
+    // model; the default selection must still resolve to 8K/1K, not agentic.
+    interceptFixedSequenceData();
+    cy.visit('/inference', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 });
 
@@ -325,7 +340,7 @@ const interceptAgenticDataWithOverlay = () => {
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
-    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}`, {
+    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);

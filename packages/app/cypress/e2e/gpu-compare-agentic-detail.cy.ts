@@ -4,10 +4,10 @@ import { unlockAgenticGate } from '../support/e2e';
 // Spec-scoped fixture helpers
 //
 // The shared cypress/fixtures/api/*.json files contain ZERO agentic_traces rows
-// (by design — adding them flips the bare /inference default to the agentic
-// scenario and regresses other specs). This spec therefore injects minimal
-// agentic data via spec-scoped cy.intercept overrides that shadow the fixture
-// server, following the same pattern used in ttft-x-axis-toggle.cy.ts.
+// (by design — agentic coverage is injected per-spec so fixed-seq specs stay
+// lean). This spec therefore injects minimal agentic data via spec-scoped
+// cy.intercept overrides that shadow the fixture server, following the same
+// pattern used in ttft-x-axis-toggle.cy.ts.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro

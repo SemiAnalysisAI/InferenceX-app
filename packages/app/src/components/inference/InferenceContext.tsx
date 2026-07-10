@@ -469,10 +469,10 @@ export function InferenceProvider({
     userPowers,
     effectiveRunDate,
     // Gate benchmark fetching on sequenceResolved: before availability loads we
-    // don't yet know the model's real sequence, and the selectedSequence default
-    // is AgenticTraces. Fetching now would fire the agentic data path for a
-    // fixed-seq-only model, then refetch once availability snaps the sequence.
-    // The chart's normal loading state covers this brief window.
+    // don't yet know the model's real sequence, and the selection (e.g. an
+    // agentic `?i_seq=` link) may be a scenario the model doesn't have. Fetching
+    // now would fire the wrong data path, then refetch once availability snaps
+    // the sequence. The chart's normal loading state covers this brief window.
     isActive && sequenceResolved,
     latestDate,
     selectedPercentile,

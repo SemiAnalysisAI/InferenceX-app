@@ -315,7 +315,8 @@ export function ScenarioSelector({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {/* Agentic first — preferred default scenario when available. */}
+          {/* Agentic group listed first when available (display order only —
+              the app default scenario is 8K/1K). */}
           {agentic.length > 0 && (
             <SelectGroup>
               <SelectLabel>Agentic</SelectLabel>
