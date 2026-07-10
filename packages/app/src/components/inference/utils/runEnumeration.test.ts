@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { RunConfigRow } from '@/lib/api';
 
-import { dataRunsForDate } from './runEnumeration';
+import { dataRunsForDate, scenarioRunIdsForDate } from './runEnumeration';
 
 function rc(over: Partial<RunConfigRow>): RunConfigRow {
   return {
@@ -16,8 +16,22 @@ function rc(over: Partial<RunConfigRow>): RunConfigRow {
     framework: 'vllm',
     spec_method: 'none',
     disagg: false,
+    // Defaults to a single_turn 8k/1k row; agentic tests override these.
+    benchmark_type: 'single_turn',
+    isl: 8192,
+    osl: 1024,
     ...over,
   };
+}
+
+/** A single_turn (fixed-seq) run config for the given isl/osl. */
+function single(over: Partial<RunConfigRow>): RunConfigRow {
+  return rc({ benchmark_type: 'single_turn', isl: 8192, osl: 1024, ...over });
+}
+
+/** An agentic_traces run config (null isl/osl, as ingested for agentic rows). */
+function agentic(over: Partial<RunConfigRow>): RunConfigRow {
+  return rc({ benchmark_type: 'agentic_traces', isl: null, osl: null, ...over });
 }
 
 const SCOPE = {
@@ -105,5 +119,68 @@ describe('dataRunsForDate', () => {
   it('returns nothing when no run matches the selection', () => {
     expect(dataRunsForDate([], SCOPE)).toEqual([]);
     expect(dataRunsForDate([rc({ model: 'dsr1' })], SCOPE)).toEqual([]);
+  });
+});
+
+// Mirrors the repro: on one date the same model has a single_turn run and an
+// agentic run; each scenario must list ONLY its own run.
+const ids = (rows: RunConfigRow[], model: string[], seq: string, prec: string[] = []) =>
+  [...scenarioRunIdsForDate(rows, model, seq, prec)].toSorted();
+
+describe('scenarioRunIdsForDate', () => {
+  it('agentic scenario excludes runs that only produced single_turn data', () => {
+    const rows = [
+      agentic({ github_run_id: 28955639528, model: 'dsv4' }), // dsv4 agentic
+      single({ github_run_id: 28900000001, model: 'dsv4' }), // dsv4 single_turn (leaks today)
+      single({ github_run_id: 28900000002, model: 'glm5' }), // other model
+    ];
+    expect(ids(rows, ['dsv4'], 'agentic-traces')).toEqual(['28955639528']);
+  });
+
+  it('single_turn scenario excludes agentic-only runs', () => {
+    const rows = [
+      agentic({ github_run_id: 1, model: 'dsv4' }),
+      single({ github_run_id: 2, model: 'dsv4' }),
+    ];
+    expect(ids(rows, ['dsv4'], '8k/1k')).toEqual(['2']);
+  });
+
+  it('lists a run that produced data for both scenarios under each scenario', () => {
+    const rows = [
+      agentic({ github_run_id: 42, model: 'dsv4' }),
+      single({ github_run_id: 42, model: 'dsv4' }), // same run, both types
+    ];
+    expect(ids(rows, ['dsv4'], 'agentic-traces')).toEqual(['42']);
+    expect(ids(rows, ['dsv4'], '8k/1k')).toEqual(['42']);
+  });
+
+  it('scopes to the selected model DB keys', () => {
+    const rows = [
+      agentic({ github_run_id: 1, model: 'dsv4' }),
+      agentic({ github_run_id: 2, model: 'glm5' }),
+    ];
+    expect(ids(rows, ['dsv4'], 'agentic-traces')).toEqual(['1']);
+  });
+
+  it('respects precision scoping when precisions are provided', () => {
+    const rows = [
+      agentic({ github_run_id: 1, model: 'dsv4', precision: 'fp4' }),
+      agentic({ github_run_id: 2, model: 'dsv4', precision: 'fp8' }),
+    ];
+    expect(ids(rows, ['dsv4'], 'agentic-traces', ['fp4'])).toEqual(['1']);
+    // Empty precisions = no precision constraint.
+    expect(ids(rows, ['dsv4'], 'agentic-traces')).toEqual(['1', '2']);
+  });
+
+  it('dedupes a run appearing across multiple matching configs', () => {
+    const rows = [
+      agentic({ github_run_id: 7, model: 'dsv4', hardware: 'b200' }),
+      agentic({ github_run_id: 7, model: 'dsv4', hardware: 'gb200' }),
+    ];
+    expect(ids(rows, ['dsv4'], 'agentic-traces')).toEqual(['7']);
+  });
+
+  it('returns an empty set when there is no coverage data', () => {
+    expect(scenarioRunIdsForDate([], ['dsv4'], 'agentic-traces').size).toBe(0);
   });
 });

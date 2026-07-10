@@ -289,6 +289,39 @@ export function filterRunsByModel(
 }
 
 /**
+ * Restrict the run-picker list to the runs that actually produced data for the
+ * currently selected scenario, given `scenarioRunIds` (the run ids with coverage
+ * for the selected model + scenario, from `scenarioRunIdsForDate`).
+ *
+ * `changelogFiltered` is the model/precision-scoped list (`filterRunsByModel`);
+ * `allRuns` is the raw, date-wide map. For each scenario run we prefer the
+ * changelog-scoped entry (its changelog is already precision-filtered) and fall
+ * back to the raw entry — a run can ship benchmark data without a changelog
+ * entry, so `filterRunsByModel` may omit it while it is still a legitimate
+ * scenario run the user must be able to select.
+ *
+ * Fallbacks that keep the selector rendering:
+ *  - `scenarioRunIds` empty → no coverage data (dates predating per-run
+ *    coverage, or JSON/fixtures mode): return the changelog-scoped list
+ *    unchanged rather than blanking the picker.
+ *  - Non-empty coverage but zero surviving runs (shouldn't happen in practice)
+ *    → also fall back to the changelog-scoped list.
+ */
+export function restrictRunsToScenario(
+  changelogFiltered: Record<string, RunInfo> | null,
+  allRuns: Record<string, RunInfo> | null,
+  scenarioRunIds: Set<string>,
+): Record<string, RunInfo> | null {
+  if (scenarioRunIds.size === 0) return changelogFiltered;
+  const restricted: Record<string, RunInfo> = {};
+  for (const runId of scenarioRunIds) {
+    const info = changelogFiltered?.[runId] ?? allRuns?.[runId];
+    if (info) restricted[runId] = info;
+  }
+  return Object.keys(restricted).length > 0 ? restricted : changelogFiltered;
+}
+
+/**
  * Computes missing energy fields (jTotal, jOutput, jInput) at runtime.
  * This handles backwards compatibility with historical data that doesn't have these fields.
  *

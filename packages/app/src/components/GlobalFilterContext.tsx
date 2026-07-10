@@ -36,7 +36,7 @@ import {
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
-import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+import type { AvailabilityRow, RunConfigRow, WorkflowInfoResponse } from '@/lib/api';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -107,6 +107,14 @@ export interface GlobalFilterContextType {
   // Workflow info
   workflowInfo: { runInfoBySequence: Record<string, RunInfo> }[] | null;
   availableRuns: Record<string, RunInfo>;
+  /**
+   * Per-(run, config) coverage for the current date — which workflow runs
+   * produced benchmark data for which model / scenario / precision. Data-driven
+   * (from the benchmark rows), so it enumerates every run on the date including
+   * ones without a changelog entry. The run picker uses this to scope its list
+   * to the selected model + scenario (see `scenarioRunIdsForDate`).
+   */
+  runConfigs: RunConfigRow[];
   workflowLoading: boolean;
   workflowError: string | null;
 }
@@ -442,6 +450,8 @@ export function GlobalFilterProvider({
     [workflowData],
   );
 
+  const runConfigs = useMemo(() => workflowData?.runConfigs ?? [], [workflowData]);
+
   const workflowInfo = useMemo(
     () => (Object.keys(availableRuns).length > 0 ? [{ runInfoBySequence: availableRuns }] : null),
     [availableRuns],
@@ -530,6 +540,7 @@ export function GlobalFilterProvider({
       availabilityRows,
       workflowInfo,
       availableRuns,
+      runConfigs,
       workflowLoading,
       workflowError,
     }),
@@ -551,6 +562,7 @@ export function GlobalFilterProvider({
       availabilityRows,
       workflowInfo,
       availableRuns,
+      runConfigs,
       workflowLoading,
       workflowError,
     ],

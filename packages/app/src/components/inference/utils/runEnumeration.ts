@@ -15,6 +15,8 @@
  * chart keys them.
  */
 
+import { rowToSequence } from '@semianalysisai/inferencex-constants';
+
 import type { AggDataEntry } from '@/components/inference/types';
 import type { RunConfigRow } from '@/lib/api';
 import { getHardwareKey } from '@/lib/chart-utils';
@@ -77,4 +79,39 @@ export function dataRunsForDate(runConfigs: RunConfigRow[], scope: RunScope): Da
   }
 
   return [...byRun.values()].toSorted((a, b) => a.runStartedAt.localeCompare(b.runStartedAt));
+}
+
+/**
+ * GitHub run ids (as strings) that produced benchmark data for the given model
+ * DB keys + scenario (sequence) — and, when `precisions` is non-empty, only for
+ * those precisions — on a date. Derived from per-(run, config) coverage
+ * ({@link RunConfigRow}, i.e. the benchmark rows themselves), so a run that
+ * shipped data without a changelog entry still counts.
+ *
+ * The run picker uses this to list ONLY the runs that actually produced data for
+ * the currently selected model + scenario. `/api/v1/workflow-info` returns every
+ * run on a date across all models and scenarios, so without this scoping a
+ * same-day run for a different scenario (e.g. a `single_turn` sweep while the
+ * user is viewing Agentic Traces) leaks into the picker — and selecting it
+ * poisons the "as of run" cutoff, blanking the chart.
+ *
+ * Scenario matching mirrors the chart's own row filter (`rowToSequence(row) ===
+ * selectedSequence` in useChartData), so the picker and the plotted data always
+ * agree on which runs are relevant.
+ */
+export function scenarioRunIdsForDate(
+  runConfigs: RunConfigRow[],
+  modelDbKeys: string[],
+  sequence: string,
+  precisions: string[] = [],
+): Set<string> {
+  const precSet = precisions.length > 0 ? new Set(precisions) : null;
+  const ids = new Set<string>();
+  for (const rc of runConfigs) {
+    if (!modelDbKeys.includes(rc.model)) continue;
+    if (precSet && !precSet.has(rc.precision)) continue;
+    if (rowToSequence(rc) !== sequence) continue;
+    ids.add(String(rc.github_run_id));
+  }
+  return ids;
 }

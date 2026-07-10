@@ -10,6 +10,7 @@ import {
   computeOutputCostFields,
   computeInputCostFields,
   filterRunsByModel,
+  restrictRunsToScenario,
   getFrameworkLabel,
   getHardwareLabel,
   getDisplayLabel,
@@ -536,6 +537,51 @@ describe('filterRunsByModel', () => {
     };
     const result = filterRunsByModel(runs, ['dsr1'], ['fp8'], []);
     expect(result!['123'].changelog!.entries).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// restrictRunsToScenario
+// ---------------------------------------------------------------------------
+describe('restrictRunsToScenario', () => {
+  const runs = {
+    '10': makeRun([['dsv4-fp4-b200-sglang']], { runId: '10' }), // agentic run
+    '20': makeRun([['dsv4-fp4-b200-trt']], { runId: '20' }), // single_turn run
+  };
+
+  it('keeps only runs present in the scenario coverage set', () => {
+    const result = restrictRunsToScenario(runs, runs, new Set(['10']));
+    expect(Object.keys(result!)).toEqual(['10']);
+  });
+
+  it('falls back to the changelog-scoped list when coverage is empty', () => {
+    const result = restrictRunsToScenario(runs, runs, new Set());
+    expect(result).toBe(runs);
+  });
+
+  it('pulls a scenario run from the raw map when the changelog list omits it', () => {
+    // A run that shipped data without a changelog entry: filterRunsByModel drops
+    // it, but it is still a valid scenario run the picker must show.
+    const changelogFiltered = { '10': runs['10'] };
+    const allRuns = runs;
+    const result = restrictRunsToScenario(changelogFiltered, allRuns, new Set(['10', '20']));
+    expect(Object.keys(result!).toSorted()).toEqual(['10', '20']);
+    expect(result!['20']).toBe(runs['20']);
+  });
+
+  it('prefers the changelog-scoped entry over the raw one', () => {
+    const scoped = makeRun([['dsv4-fp4-b200-sglang']], { runId: '10', conclusion: 'scoped' });
+    const result = restrictRunsToScenario({ '10': scoped }, runs, new Set(['10']));
+    expect(result!['10']).toBe(scoped);
+  });
+
+  it('falls back to the changelog list when no scenario run survives', () => {
+    const result = restrictRunsToScenario(runs, runs, new Set(['999']));
+    expect(result).toBe(runs);
+  });
+
+  it('returns null changelog list unchanged', () => {
+    expect(restrictRunsToScenario(null, null, new Set(['10']))).toBeNull();
   });
 });
 

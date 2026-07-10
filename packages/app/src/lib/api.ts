@@ -96,6 +96,12 @@ export interface RunConfigRow {
   framework: string;
   spec_method: string;
   disagg: boolean;
+  /** Benchmark scenario: `single_turn` (fixed-seq isl/osl) or `agentic_traces`. */
+  benchmark_type: string;
+  /** ISL in tokens — null for agentic_traces. With osl + benchmark_type this maps to a sequence. */
+  isl: number | null;
+  /** OSL in tokens — null for agentic_traces. */
+  osl: number | null;
 }
 
 export interface WorkflowInfoResponse {
