@@ -45,6 +45,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   25603981395, // 2026-05-09 | Reason: not enough successful points on pareto
   28505258231, // 2026-07-01 | Reason: cross-layer indexer top-k sharing (--hf-overrides index_topk_freq=4); skips FLOPs
   28507173993, // 2026-07-01 | Reason: cross-layer indexer top-k sharing (--hf-overrides index_topk_freq=4); skips FLOPs
+  29089300938, // 2026-07-10 | Reason: reverting due to rule to disallow any patching
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
