@@ -58,6 +58,7 @@ import {
 import {
   buildExclusion,
   effectiveLegendItems,
+  exclusionResolutionFamilies,
   resolveExclusionGroups,
   resolveExclusionToggle,
   type ExclusionConflictPolicy,
@@ -137,7 +138,7 @@ export function InferenceProvider({
     workflowError,
   } = useGlobalFilters();
 
-  const { getUrlParam } = useUrlState();
+  const { getUrlParam, setUrlParam } = useUrlState();
 
   const exclusion = useMemo(() => {
     const modelSpecs = getModelExclusion(selectedModel);
@@ -166,25 +167,52 @@ export function InferenceProvider({
   const [isCheckingAvailableDates] = useState(false);
   const [showDateRangeDialog, setShowDateRangeDialog] = useState(false);
 
+  // --- Cross-engine comparison conflict toast state ---
+  const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
+  const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
+
   // ── Inference-specific filter state ─────────────────────────────────────────
-  const [selectedGpuState, setSelectedGpuState] = useState<string[]>(() => {
-    const urlGpus = getUrlParam('i_gpus');
-    return urlGpus ? urlGpus.split(',').filter(Boolean) : [];
-  });
-  const selectedGPUs = useMemo(() => {
-    if (!sequenceResolved || !exclusion || selectedGpuState.length < 2) return selectedGpuState;
-    const resolved = [
-      ...resolveExclusionGroups(new Set(selectedGpuState), new Set(), exclusion, exclusionPolicy)
-        .result,
-    ];
-    return resolved.length === selectedGpuState.length &&
-      resolved.every((gpu, index) => gpu === selectedGpuState[index])
-      ? selectedGpuState
-      : resolved;
-  }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy]);
+  // Defer URL restoration until after mount so the first client render matches SSR.
+  const [selectedGpuState, setSelectedGpuState] = useState<string[]>([]);
+  const [gpuUrlHydrated, setGpuUrlHydrated] = useState(false);
   useEffect(() => {
-    if (selectedGPUs !== selectedGpuState) setSelectedGpuState(selectedGPUs);
-  }, [selectedGPUs, selectedGpuState]);
+    const urlGpus = getUrlParam('i_gpus');
+    if (urlGpus) setSelectedGpuState(urlGpus.split(',').filter(Boolean));
+    setGpuUrlHydrated(true);
+  }, [getUrlParam]);
+  const selectedGpuResolution = useMemo(() => {
+    if (!sequenceResolved || !exclusion || selectedGpuState.length < 2) return null;
+    const resolution = resolveExclusionGroups(
+      new Set(selectedGpuState),
+      new Set(),
+      exclusion,
+      exclusionPolicy,
+    );
+    const selection = [...resolution.result];
+    if (
+      selection.length === selectedGpuState.length &&
+      selection.every((gpu, index) => gpu === selectedGpuState[index])
+    ) {
+      return null;
+    }
+    return {
+      selection,
+      ...exclusionResolutionFamilies(selectedGpuState, resolution.result, exclusion),
+    };
+  }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy]);
+  const selectedGPUs = selectedGpuResolution?.selection ?? selectedGpuState;
+  useEffect(() => {
+    if (!selectedGpuResolution) return;
+    setSelectedGpuState(selectedGpuResolution.selection);
+    setUrlParam('i_gpus', selectedGpuResolution.selection.join(','));
+    if (selectedGpuResolution.dropped.length > 0) {
+      setEngineConflict({
+        kind: 'resolved',
+        kept: selectedGpuResolution.kept,
+        dropped: selectedGpuResolution.dropped,
+      });
+    }
+  }, [selectedGpuResolution, setUrlParam]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
     () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
   );
@@ -325,10 +353,6 @@ export function InferenceProvider({
     }
     return null;
   });
-
-  // --- Cross-engine comparison conflict toast state ---
-  const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
-  const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
@@ -710,7 +734,7 @@ export function InferenceProvider({
         return;
       }
 
-      const { result, keptGroup, droppedGroups } = resolveExclusionGroups(
+      const { result, droppedGroups } = resolveExclusionGroups(
         proposed,
         previous,
         exclusion,
@@ -718,7 +742,10 @@ export function InferenceProvider({
       );
       setSelectedGpuState([...result]);
       if (droppedGroups.length > 0) {
-        setEngineConflict({ kind: 'resolved', kept: keptGroup, dropped: droppedGroups });
+        setEngineConflict({
+          kind: 'resolved',
+          ...exclusionResolutionFamilies(proposed, result, exclusion),
+        });
       }
       clearPresetOnChange();
     },
@@ -926,13 +953,13 @@ export function InferenceProvider({
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
     if (exclusion) {
-      const { result, keptGroup, droppedGroups } = resolveHwSelection(
-        hwTypesWithData,
-        activeHwTypes,
-      );
+      const { result, droppedGroups } = resolveHwSelection(hwTypesWithData, activeHwTypes);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
-        setEngineConflict({ kind: 'resolved', kept: keptGroup, dropped: droppedGroups });
+        setEngineConflict({
+          kind: 'resolved',
+          ...exclusionResolutionFamilies(hwTypesWithData, result, exclusion),
+        });
       }
       return;
     }
@@ -985,13 +1012,13 @@ export function InferenceProvider({
     // or every referenced key disappeared) falls back to all available configs.
     if (restored.size === 0) restored = hwTypesWithData;
     if (exclusion) {
+      const proposed = restored;
       const resolved = resolveHwSelection(restored, new Set());
       restored = resolved.result;
       if (resolved.droppedGroups.length > 0) {
         setEngineConflict({
           kind: 'resolved',
-          kept: resolved.keptGroup,
-          dropped: resolved.droppedGroups,
+          ...exclusionResolutionFamilies(proposed, resolved.result, exclusion),
         });
       }
     }
@@ -1032,10 +1059,13 @@ export function InferenceProvider({
       // Automatic resets must never surface multiple incomparable engine groups.
       // AgentX keeps one sticky group so its chart remains useful; variant-only
       // rules retain the existing clear-all behavior.
-      const { result, keptGroup, droppedGroups } = resolveHwSelection(hwTypesWithData);
+      const { result, droppedGroups } = resolveHwSelection(hwTypesWithData);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
-        setEngineConflict({ kind: 'resolved', kept: keptGroup, dropped: droppedGroups });
+        setEngineConflict({
+          kind: 'resolved',
+          ...exclusionResolutionFamilies(hwTypesWithData, result, exclusion),
+        });
       }
       return;
     }
@@ -1059,12 +1089,13 @@ export function InferenceProvider({
   }, [availableGPUs]);
 
   useEffect(() => {
+    if (!gpuUrlHydrated) return;
     if (selectedGPUs.length === 0) {
       setSelectedDateRange({ startDate: '', endDate: '' });
       setSelectedDates([]);
       setUserCosts(null);
     }
-  }, [selectedGPUs]);
+  }, [gpuUrlHydrated, selectedGPUs]);
 
   // Reset date range when selected dates are no longer available (e.g. precision change)
   useEffect(() => {

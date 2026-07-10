@@ -242,6 +242,22 @@ export function resolveExclusionGroups(
   return { ...cleared, keptGroup: null };
 }
 
+/** Literal engine families retained and removed by an exclusion resolution. */
+export function exclusionResolutionFamilies(
+  proposed: Iterable<string>,
+  result: ReadonlySet<string>,
+  ex: Exclusion,
+): { kept: string[]; dropped: string[] } {
+  const kept = new Set<string>();
+  const dropped = new Set<string>();
+  for (const key of proposed) {
+    const family = ex.familyOf(key);
+    if (!family) continue;
+    (result.has(key) ? kept : dropped).add(family);
+  }
+  return { kept: [...kept].toSorted(), dropped: [...dropped].toSorted() };
+}
+
 /**
  * Decision for a single hw-toggle action under an exclusion rule.
  *

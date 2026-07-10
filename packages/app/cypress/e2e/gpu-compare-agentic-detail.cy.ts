@@ -13,10 +13,11 @@ import { unlockAgenticGate } from '../support/e2e';
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro
 const AGENTIC_DATE = '2026-06-12';
 
-// Two GPUs with agentic + single_turn entries so the scenario selector resolves
+// Three configs with agentic + single_turn entries so the scenario selector resolves
 // to agentic (agentic preferred when both types exist for the same model).
 const AGENTIC_HARDWARE = [
   { hardware: 'b200', framework: 'vllm', disagg: false },
+  { hardware: 'b200', framework: 'sglang', disagg: false },
   { hardware: 'b300', framework: 'vllm', disagg: false },
 ];
 
@@ -184,5 +185,30 @@ describe('GPU comparison agentic point detail', () => {
         expect($link.attr('href')).to.match(/^\/inference\/agentic\/\d+$/u);
       });
     cy.location('pathname').should('eq', '/inference');
+  });
+
+  it('surfaces automatic resolution of conflicting GPU URL state', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
+      'agenticAvailability',
+    );
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
+
+    cy.visit(
+      '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+
+    cy.get('[data-testid="engine-comparison-conflict-toast"]')
+      .should('be.visible')
+      .and('contain.text', 'Kept SGLang and removed vLLM configs');
+    cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
+      .should('contain.text', 'SGLang')
+      .and('not.contain.text', 'vLLM');
+    cy.contains('button', 'Jun 12, 2026').should('be.visible');
   });
 });

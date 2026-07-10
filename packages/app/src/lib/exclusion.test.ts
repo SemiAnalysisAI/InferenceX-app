@@ -6,6 +6,7 @@ import {
   buildExclusion,
   clearAllExclusionGroups,
   effectiveLegendItems,
+  exclusionResolutionFamilies,
   pickStickyGroup,
   resolveExclusionGroups,
   resolveExclusionToggle,
@@ -83,6 +84,18 @@ describe('buildExclusion — groupOf', () => {
     const eagle = buildExclusion([{ suffix: '_eagle' }]);
     expect(eagle.groupOf('h100_vllm_eagle')).toBe('vllm');
     expect(eagle.groupOf('h100_vllm_mtp')).toBeNull();
+  });
+});
+
+describe('exclusionResolutionFamilies', () => {
+  it('reports literal aliased families rather than comparability group ids', () => {
+    const proposed = new Set(['mi355x_atom_mtp', 'gb300_sglang_mtp', 'h100_vllm_mtp', 'h100_vllm']);
+    const result = new Set(['mi355x_atom_mtp', 'gb300_sglang_mtp', 'h100_vllm']);
+
+    expect(exclusionResolutionFamilies(proposed, result, ex)).toEqual({
+      kept: ['atom', 'sglang'],
+      dropped: ['vllm'],
+    });
   });
 });
 

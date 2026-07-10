@@ -17,7 +17,7 @@ import { BottomToast } from '@/components/ui/bottom-toast';
  */
 export type EngineComparisonConflictDetail =
   | { kind: 'blocked'; attempted: string; existing: string | null }
-  | { kind: 'resolved'; kept: string | null; dropped: string[] };
+  | { kind: 'resolved'; kept: string[]; dropped: string[] };
 
 function familyLabel(family: string): string {
   return FRAMEWORK_LABELS[family] ?? family;
@@ -47,9 +47,10 @@ function describe(detail: EngineComparisonConflictDetail, locale: Locale): strin
     }
     return `${attempted} can't be enabled while another engine family is active. Remove the existing configs first.`;
   }
+  const kept = [...detail.kept].toSorted().map(familyLabel);
   const dropped = [...detail.dropped].toSorted().map(familyLabel);
-  if (detail.kept) {
-    return `Only one engine family can be shown at a time in this view. Kept ${familyLabel(detail.kept)} and removed ${joinList(dropped)} configs.`;
+  if (kept.length > 0) {
+    return `Only compatible engine families can be shown together in this view. Kept ${joinList(kept)} and removed ${joinList(dropped)} configs.`;
   }
   if (dropped.length === 0) {
     return `Configs from different engine families can't be shown on the same graph in this view.`;
@@ -66,9 +67,10 @@ function describeZh(detail: EngineComparisonConflictDetail): string {
     }
     return `另一个引擎系列处于启用状态时，无法启用 ${attempted}。请先移除现有配置。`;
   }
+  const kept = [...detail.kept].toSorted().map(familyLabel);
   const dropped = [...detail.dropped].toSorted().map(familyLabel);
-  if (detail.kept) {
-    return `此视图一次只能显示一个引擎系列。已保留 ${familyLabel(detail.kept)}，并移除 ${joinListZh(dropped)} 配置。`;
+  if (kept.length > 0) {
+    return `此视图只能同时显示相互兼容的引擎系列。已保留 ${joinListZh(kept)}，并移除 ${joinListZh(dropped)} 配置。`;
   }
   if (dropped.length === 0) {
     return '此视图无法在同一图表上显示不同引擎系列的配置。';
