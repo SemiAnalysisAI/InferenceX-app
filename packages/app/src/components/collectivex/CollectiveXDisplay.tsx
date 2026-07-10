@@ -90,7 +90,6 @@ const STRINGS = {
     yAxis: {
       latency: 'Latency',
       'tokens-per-second': 'Token rate at selected latency percentile',
-      'payload-rate': 'Logical payload rate at selected latency percentile',
     },
     mode: { normal: 'Normal', 'low-latency': 'Low latency' },
     fabricScope: { all: 'All', 'scale-up': 'Scale-up', 'scale-out': 'Scale-out' },
@@ -215,7 +214,6 @@ const STRINGS = {
     yAxis: {
       latency: '延迟',
       'tokens-per-second': '所选延迟分位点的 token 速率',
-      'payload-rate': '所选延迟分位点的逻辑载荷速率',
     },
     mode: { normal: '常规', 'low-latency': '低延迟' },
     fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },

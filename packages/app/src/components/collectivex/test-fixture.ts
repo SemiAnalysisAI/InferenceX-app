@@ -1,12 +1,15 @@
 // Neutral-format test fixtures.
 //
-// The CollectiveX frontend consumes three neutral GitHub-artifact formats
-// (collectivex.matrix.v1, collectivex.ep.v1, collectivex.terminal.v1) and assembles
-// the served view dataset with `buildDatasetFromNeutral`. These builders emit those
-// raw artifacts and run them through the real assembler, so a fixture dataset exercises
-// the exact ingest → synthesis → strict-view-validation path the route uses. Building on
-// the real pipeline also guarantees every returned CollectiveXSeries / CollectiveXDataset
-// is view-schema-valid, which is what the data-helper tests operate on.
+// The CollectiveX frontend consumes the neutral GitHub artifacts a sweep run uploads: one
+// matrix document (identified structurally) plus `case-attempt` records (discriminated by
+// `record_type`), and assembles the served view dataset with `buildDatasetFromNeutral`.
+// These builders emit those raw artifacts in the current neutral shape (no `format` tags, no
+// retired EPLB/provenance/resource fields) and run them through the real assembler, so a
+// fixture dataset exercises the exact ingest → synthesis → strict-view-validation path the
+// route uses. A non-success case-attempt (`status: 'invalid'`) carries its terminal outcome
+// in-band; the backend no longer emits standalone terminal-outcome documents. Building on the
+// real pipeline also guarantees every returned CollectiveXSeries / CollectiveXDataset is
+// view-schema-valid, which is what the data-helper tests operate on.
 
 import { buildDatasetFromNeutral, type CollectiveXNeutralRunMeta } from './reader';
 import type { CollectiveXDataset, CollectiveXSeries } from './types';
@@ -68,17 +71,15 @@ export interface ShardOverrides {
   squashSha256?: string;
   dtype?: string;
   combineDtype?: string;
-  combineQuantMode?: string;
   combineSemantics?: string;
   payloadUnit?: string;
   activationProfile?: string;
-  resourceMode?: string;
   resourceClass?: string;
   commUnitsKind?: string | null;
   configuredUnits?: number | null;
-  eplbPlanner?: string | null;
-  eplbRedundant?: number;
   status?: string;
+  // In-band failure reasons for a non-success (`invalid`) case-attempt.
+  reasons?: string[];
   rows?: RowOverrides[];
   // Emit the retired promotion-era identity fields so the legacy-passthrough path is
   // covered (series_id / allocation_id / series_factors present).
@@ -100,14 +101,13 @@ function component(base: number, sampleCount = 512, origin = 'measured'): Json {
 
 function bytes(activation: number): Json {
   return {
-    accounting_contract: 'activation-data-plus-scales-v1',
     activation_data_bytes: activation,
     scale_bytes: 0,
     total_logical_bytes: activation,
   };
 }
 
-function makeRawRow(caseId: string, index: number, row: RowOverrides): Json {
+function makeRawRow(index: number, row: RowOverrides): Json {
   const tokensPerRank = row.tokensPerRank ?? 128 * (index + 1);
   const components: Json = {
     dispatch: component(417 + index),
@@ -131,15 +131,12 @@ function makeRawRow(caseId: string, index: number, row: RowOverrides): Json {
     byteProvenance.stage = row.stageZeroBytes ? bytes(0) : bytes(192381952);
   }
   return {
-    point_id: `${caseId}-t${index + 1}`,
     tokens_per_rank: tokensPerRank,
     global_tokens: row.globalTokens ?? tokensPerRank * 8,
     anomalies: row.anomalies,
     correctness: {
       passed: row.correctnessPassed ?? true,
       max_relative_error: row.maxRelativeError ?? 0.004,
-      contract: 'allclose-v1',
-      scope: 'per-rank',
     },
     routing: {
       fanout_mean: 6.55,
@@ -158,11 +155,10 @@ function makeRawRow(caseId: string, index: number, row: RowOverrides): Json {
 }
 
 function makeRawCase(o: ShardOverrides, caseId: string): Json {
-  return {
+  const kase: Json = {
     case_id: caseId,
-    backend: o.backend ?? 'nccl-ep',
+    backend: o.backend ?? 'deepep-v2',
     ep: o.ep ?? 8,
-    eplb: o.eplb ?? false,
     experts: o.experts ?? 256,
     gpus_per_node: o.gpusPerNode ?? 8,
     hidden: o.hidden ?? 7168,
@@ -181,12 +177,16 @@ function makeRawCase(o: ShardOverrides, caseId: string): Json {
     scale_up_transport: o.scaleUpTransport ?? 'nvlink',
     scale_out_transport: o.scaleOutTransport ?? null,
   };
+  // `eplb` was retired from the neutral case; emit it only for the legacy-passthrough path
+  // or when a test sets it explicitly, to prove the reader still tolerates it.
+  if (o.legacyIdentity || o.eplb !== undefined) kase.eplb = o.eplb ?? false;
+  return kase;
 }
 
 export function caseIdOf(o: ShardOverrides = {}): string {
   if (o.caseId) return o.caseId;
   const sku = o.sku ?? 'h200-dgxc';
-  const backend = o.backend ?? 'nccl-ep';
+  const backend = o.backend ?? 'deepep-v2';
   const workload = o.workload ?? 'deepseek-v3';
   const mode = o.mode ?? 'normal';
   const phase = o.phase ?? 'decode';
@@ -199,37 +199,21 @@ export function caseIdOf(o: ShardOverrides = {}): string {
 export function makeRawShard(o: ShardOverrides = {}): Json {
   const caseId = caseIdOf(o);
   const sku = o.sku ?? 'h200-dgxc';
-  const backend = o.backend ?? 'nccl-ep';
+  const backend = o.backend ?? 'deepep-v2';
   const runId = o.runId ?? '160';
   const runAttempt = o.runAttempt ?? '1';
-  const attemptId = `${caseId}-a0${o.attemptOrdinal ?? 1}`;
   const rowSpecs = o.rows ?? [{}, {}];
 
   const identity: Json = {
     case_id: caseId,
-    attempt_id: attemptId,
     attempt_ordinal: o.attemptOrdinal ?? 1,
     case_factors: {
       sku,
-      case: makeRawCase(o, caseId),
-      profile: {
-        dtype: o.dtype ?? 'bf16',
-        combine_dtype: o.combineDtype ?? 'bf16',
-        combine_quant_mode: o.combineQuantMode,
-        combine_semantics: o.combineSemantics ?? 'weighted-sum',
-        payload_unit: o.payloadUnit ?? 'tokens',
-        activation_profile: o.activationProfile ?? 'balanced',
-        eplb_planner: o.eplbPlanner ?? null,
-        eplb_redundant_experts: o.eplbRedundant ?? 0,
-        resource_mode: o.resourceMode ?? 'fixed-profile',
-      },
+      case: makeRawCase({ ...o, backend }, caseId),
     },
     allocation_factors: {
       run_id: runId,
       run_attempt: runAttempt,
-      runner: 'gha-runner',
-      artifact: `cxshard-${caseId}`,
-      execution_id: `exec-${runId}`,
       source_sha: o.sourceSha ?? SOURCE_SHA,
     },
   };
@@ -247,17 +231,10 @@ export function makeRawShard(o: ShardOverrides = {}): Json {
   }
 
   return {
-    format: 'collectivex.ep.v1',
     record_type: 'case-attempt',
     generated_at: '2026-07-08T12:18:11Z',
     identity,
-    provenance: {
-      image: {
-        digest: o.imageDigest ?? IMAGE_DIGEST,
-        squash_sha256: o.squashSha256 ?? SQUASH_SHA256,
-      },
-      git_run: { source_sha: o.sourceSha ?? SOURCE_SHA },
-    },
+    provenance: { image: o.imageDigest ?? IMAGE_DIGEST, source_sha: o.sourceSha ?? SOURCE_SHA },
     topology: {
       device_product: o.deviceProduct,
       gpus_per_node: o.gpusPerNode ?? 8,
@@ -285,63 +262,50 @@ export function makeRawShard(o: ShardOverrides = {}): Json {
         resource_class: o.resourceClass ?? 'fixed-profile',
       },
     },
-    runtime_fingerprint: { vendor: o.vendor ?? 'nvidia' },
+    runtime: { vendor: o.vendor ?? 'nvidia' },
+    // The neutral backend emits `workload: { cross_rank_consistent }` with no
+    // activation_profile; only legacy shards (or an explicit override) carry it. Default to the
+    // real shape so the ingest path is exercised as the backend actually emits it.
+    workload:
+      o.activationProfile !== undefined || o.legacyIdentity
+        ? { cross_rank_consistent: true, activation_profile: o.activationProfile ?? 'balanced' }
+        : { cross_rank_consistent: true },
     measurement: {
-      contract: 'layout-and-dispatch-v1',
+      dispatch_dtype: o.dtype ?? 'bf16',
+      combine_dtype: o.combineDtype ?? 'bf16',
+      combine_semantics: o.combineSemantics ?? 'weighted-sum',
+      payload_unit: o.payloadUnit ?? 'tokens',
       sampling: {
         iterations_per_trial: 64,
         trials: 8,
         warmup_iterations: 16,
         samples_per_component: 512,
       },
-      rows: rowSpecs.map((row, index) => makeRawRow(caseId, index, row)),
+      rows: rowSpecs.map((row, index) => makeRawRow(index, row)),
     },
-    outcome: { status: o.status ?? 'success' },
-  };
-}
-
-export interface TerminalOverrides {
-  caseId?: string;
-  sku?: string;
-  status?: string;
-  failureMode?: string;
-  reason?: string | null;
-  returnCode?: number;
-  runId?: string;
-  runAttempt?: string;
-  // Emit full-format attempt identity so a terminal attempt row is produced.
-  withAttempt?: boolean;
-}
-
-export function makeRawTerminal(o: TerminalOverrides = {}): Json {
-  const caseId = o.caseId ?? 'b300-sxm-deepep-deepseek-v3-normal-decode-ep8-uniform';
-  const identity: Json = {
-    case_id: caseId,
-    allocation_factors: { run_id: o.runId ?? '160', run_attempt: o.runAttempt ?? '1' },
-  };
-  if (o.withAttempt) {
-    identity.allocation_id = `alloc-${o.runId ?? '160'}-${o.runAttempt ?? '1'}`;
-    identity.attempt_id = `${caseId}-a01`;
-    identity.attempt_ordinal = 1;
-  }
-  return {
-    format: 'collectivex.terminal.v1',
-    record_type: 'terminal-outcome',
-    generated_at: '2026-07-08T12:18:11Z',
-    identity,
     outcome: {
-      status: o.status ?? 'unsupported',
-      failure_mode: o.failureMode,
-      reason: o.reason ?? 'capability-gate',
-      return_code: o.returnCode ?? 42,
+      status: o.status ?? 'success',
+      // In-band failure reasons for a non-success (`invalid`/`failed`) case-attempt.
+      ...(o.reasons ? { reasons: o.reasons } : {}),
     },
   };
+}
+
+// A non-success case-attempt. The backend no longer emits a standalone terminal-outcome
+// document; a failed/invalid/unsupported case now carries its terminal outcome in-band on a
+// `record_type: 'case-attempt'` doc whose `outcome.status !== 'success'` and whose
+// `outcome.reasons` lists the failure reasons. Defaults to `invalid`. The raw schema still
+// requires >= 1 measurement row, so the row block is present, but the reader ignores it for a
+// non-success attempt. Overrides flow straight through to `makeRawShard`.
+export function makeInvalidCaseAttempt(o: ShardOverrides = {}): Json {
+  return makeRawShard({ status: 'invalid', reasons: ['capability-gate'], ...o });
 }
 
 interface RequestedCaseSpec {
   caseId: string;
   sku: string;
   disposition?: 'runnable' | 'unsupported';
+  reason?: string;
   case: Json;
 }
 
@@ -356,16 +320,18 @@ function requestedFromShard(shard: Json): RequestedCaseSpec {
   };
 }
 
+// The neutral matrix carries no `format`/`schema_version`; it is identified structurally by
+// its `requested_cases[]` + `include[]` arrays and its numeric `version` (collectivex-github.ts).
 export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json {
   return {
-    format: 'collectivex.matrix.v1',
-    schema_version: 1,
     version,
     include: [],
     requested_cases: requested.map((entry) => ({
       case: entry.case,
       sku: entry.sku,
       disposition: entry.disposition ?? 'runnable',
+      reason: entry.reason ?? null,
+      detail: entry.reason ? 'unsupported by the selected backend/platform' : null,
     })),
   };
 }
@@ -386,20 +352,20 @@ export function makeRunMeta(
 
 export interface BuildDatasetOptions {
   shards?: Json[];
-  terminals?: Json[];
   // Extra requested cases beyond those derived from the shards (e.g. a pending case).
   requestedCases?: RequestedCaseSpec[];
   meta?: Partial<CollectiveXNeutralRunMeta>;
 }
 
 // Assemble a view dataset through the real neutral → view builder. Requested matrix
-// cases default to one runnable case per shard so measured coverage is populated.
+// cases default to one runnable case per shard so measured coverage is populated. Every
+// shard is a `record_type: 'case-attempt'` doc — success shards and in-band non-success
+// (invalid/failed) attempts alike flow through the same channel.
 export function buildDataset(options: BuildDatasetOptions = {}): CollectiveXDataset {
   const shards = options.shards ?? [makeRawShard()];
-  const terminals = options.terminals ?? [];
   const requested = [...shards.map(requestedFromShard), ...(options.requestedCases ?? [])];
   const matrix = makeRawMatrix(requested);
-  return buildDatasetFromNeutral(matrix, [...shards, ...terminals], makeRunMeta(options.meta));
+  return buildDatasetFromNeutral(matrix, shards, makeRunMeta(options.meta));
 }
 
 // A single view series, assembled from one measured shard.
@@ -411,7 +377,7 @@ export function makeCollectiveXSeries(overrides: ShardOverrides = {}): Collectiv
 // one unsupported terminal case, and one pending case. Exercises series/coverage/attempt
 // assembly plus every terminal disposition the run summary counts.
 export function makeCollectiveXDataset(): CollectiveXDataset {
-  const shardA = makeRawShard({ backend: 'nccl-ep', ep: 8 });
+  const shardA = makeRawShard({ backend: 'deepep-v2', ep: 8 });
   const shardB = makeRawShard({
     sku: 'h200-dgxc',
     backend: 'deepep',
@@ -429,16 +395,11 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
   });
 
   const unsupportedCaseId = 'b300-sxm-deepep-hybrid-deepseek-v3-normal-decode-ep8-uniform';
-  const unsupported = makeRawTerminal({
-    caseId: unsupportedCaseId,
-    sku: 'b300-sxm',
-    status: 'unsupported',
-    reason: 'capability-gate',
-  });
   const unsupportedCase: RequestedCaseSpec = {
     caseId: unsupportedCaseId,
     sku: 'b300-sxm',
     disposition: 'unsupported',
+    reason: 'capability-gate',
     case: makeRawCase(
       { backend: 'deepep-hybrid', sku: 'b300-sxm', nodes: 1, gpusPerNode: 8 },
       unsupportedCaseId,
@@ -458,7 +419,6 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
 
   return buildDataset({
     shards: [shardA, shardB],
-    terminals: [unsupported],
     requestedCases: [unsupportedCase, pendingCase],
   });
 }

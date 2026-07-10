@@ -43,7 +43,7 @@ export function collectiveXSeriesLabel(series: CollectiveXSeries): string {
   const build = series.build.source_sha.slice(0, 8);
   const identity = series.series_id.slice(-8);
   const routing = `${series.workload.routing}${series.workload.eplb ? '+eplb' : ''}`;
-  return `${series.system.sku.toUpperCase()} EP${series.system.ep_size} · ${series.backend.label} · ${series.mode} · ${series.system.scope} · ${series.system.topology_class} · ${series.phase} · ${routing} · ${series.workload.precision_profile} · ${version} · ${series.resource.profile} · build ${build} · series ${identity}`;
+  return `${series.system.sku.toUpperCase()} EP${series.system.ep_size} · ${series.backend.label} · ${series.mode} · ${series.system.scope} · ${series.system.topology_class} · ${series.phase} · ${routing} · ${version} · build ${build} · series ${identity}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries): string {
@@ -70,15 +70,13 @@ export function collectiveXColorKey(series: CollectiveXSeries): string {
     series.backend.id,
     series.backend.generation ?? 'default',
     series.backend.version ?? 'unversioned',
-    series.build.image_digest,
+    series.build.image,
     series.build.source_sha,
     series.build.squash_sha256,
     routing,
-    series.workload.precision_profile,
     JSON.stringify(series.workload.dispatch_precision),
     JSON.stringify(series.workload.combine_precision),
     eplb,
-    series.resource.profile,
     units,
   ].join('_');
 }
@@ -181,7 +179,7 @@ export function comparisonDifferences(series: CollectiveXSeries[]): string[] {
     [
       'dtypes',
       (item) =>
-        `${item.workload.precision_profile}/${JSON.stringify(item.workload.dispatch_precision)}/${JSON.stringify(item.workload.combine_precision)}`,
+        `${JSON.stringify(item.workload.dispatch_precision)}/${JSON.stringify(item.workload.combine_precision)}`,
     ],
     ['resource profile', (item) => JSON.stringify(item.resource)],
     ['measurement', (item) => JSON.stringify(item.measurement)],

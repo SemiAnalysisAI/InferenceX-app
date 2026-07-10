@@ -4,7 +4,6 @@ import {
   collectiveXDatasetSchema,
   collectiveXRawCaseAttemptSchema,
   collectiveXRawMatrixSchema,
-  collectiveXRawTerminalSchema,
   collectiveXRunsSchema,
   COLLECTIVEX_DEFAULT_VERSION,
   type CollectiveXAttempt,
@@ -17,9 +16,7 @@ import {
   type CollectiveXPrecisionAxis,
   type CollectiveXRawCase,
   type CollectiveXRawCaseAttempt,
-  type CollectiveXRawProfile,
   type CollectiveXRawRow,
-  type CollectiveXRawTerminal,
   type CollectiveXResolvedDataset,
   type CollectiveXRuns,
   type CollectiveXRunSummary,
@@ -167,12 +164,13 @@ export function parseCollectiveXRuns(value: unknown, version: CollectiveXVersion
 // ---------------------------------------------------------------------------
 // Neutral → view builder
 //
-// Runs server-side (route.ts) over the raw docs collectivex-github.ts downloaded:
-// one collectivex.matrix.v1 doc, plus every collectivex.ep.v1 (case-attempt) and
-// collectivex.terminal.v1 (terminal-outcome) doc from the run's shard/unsupported
-// artifacts. Assembles the neutral view dataset, deriving the data-rate fields the
-// retired publisher used to store. The assembled dataset is validated against the
-// view schema before it is returned, so the served JSON is always schema-valid.
+// Runs server-side (route.ts) over the raw docs collectivex-github.ts downloaded: one matrix
+// doc (identified structurally) plus every `case-attempt` document from the run's shard
+// artifacts, discriminated by `record_type`. `samples` documents are ignored. The backend no
+// longer emits separate terminal-outcome documents; a non-success (`invalid`) case-attempt
+// carries its own terminal outcome in-band. Assembles the neutral view dataset, deriving the
+// data-rate fields the retired publisher used to store. The assembled dataset is validated
+// against the view schema before it is returned, so the served JSON is always schema-valid.
 // ---------------------------------------------------------------------------
 export interface CollectiveXNeutralRunMeta {
   run_id: string;
@@ -182,8 +180,6 @@ export interface CollectiveXNeutralRunMeta {
   matrix_id: string | null;
   source_bundle_ids: string[];
 }
-
-const ACTIVATION_ACCOUNTING = 'activation-data-plus-scales-v1' as const;
 
 function toOutcome(status: string): CollectiveXOutcome {
   switch (status) {
@@ -237,7 +233,6 @@ function mapComponent(
     };
   }
   const byte_provenance = {
-    accounting_contract: ACTIVATION_ACCOUNTING,
     activation_data_bytes: bytes.activation_data_bytes,
     scale_bytes: bytes.scale_bytes ?? 0,
     total_logical_bytes: bytes.total_logical_bytes,
@@ -258,19 +253,23 @@ function mapComponent(
   };
 }
 
-function precisionProfileId(profile: CollectiveXRawProfile): string {
-  return `d-${profile.dtype}.c-${profile.combine_dtype}`;
-}
-
-function dispatchPrecision(profile: CollectiveXRawProfile): CollectiveXPrecisionAxis {
-  return { communication_format: profile.dtype, quant_mode: 'none', semantics: 'dispatch' };
-}
-
-function combinePrecision(profile: CollectiveXRawProfile): CollectiveXPrecisionAxis {
+function dispatchPrecision(
+  measurement: CollectiveXRawCaseAttempt['measurement'],
+): CollectiveXPrecisionAxis {
   return {
-    communication_format: profile.combine_dtype,
-    quant_mode: profile.combine_quant_mode ?? 'none',
-    semantics: profile.combine_semantics,
+    communication_format: measurement.dispatch_dtype,
+    quant_mode: 'none',
+    semantics: 'dispatch',
+  };
+}
+
+function combinePrecision(
+  measurement: CollectiveXRawCaseAttempt['measurement'],
+): CollectiveXPrecisionAxis {
+  return {
+    communication_format: measurement.combine_dtype,
+    quant_mode: 'none',
+    semantics: measurement.combine_semantics,
   };
 }
 
@@ -299,22 +298,24 @@ function allocationIdOf(shard: CollectiveXRawCaseAttempt): string {
   return `alloc-${allocation_factors.run_id}-${allocation_factors.run_attempt}`;
 }
 
-function evidenceIdOf(row: CollectiveXRawRow): string {
-  // point_id is unique per row, so it yields a unique, safe evidence id.
-  return row.evidence_id ?? `ev-${row.point_id}`;
+function pointIdOf(caseId: string, row: CollectiveXRawRow): string {
+  return row.point_id ?? `${caseId}-t${row.tokens_per_rank}`;
+}
+
+function evidenceIdOf(caseId: string, row: CollectiveXRawRow): string {
+  return row.evidence_id ?? `ev-${pointIdOf(caseId, row)}`;
 }
 
 function seriesBuild(shard: CollectiveXRawCaseAttempt): CollectiveXSeries['build'] {
   const factors = shard.identity.series_factors;
-  const image = shard.provenance?.image;
   return {
-    image_digest: factors?.image_digest ?? image?.digest ?? '',
+    image: factors?.image_digest ?? shard.provenance.image ?? '',
     source_sha:
       factors?.source_sha ??
       shard.identity.allocation_factors.source_sha ??
-      shard.provenance?.git_run?.source_sha ??
+      shard.provenance.source_sha ??
       '',
-    squash_sha256: factors?.squash_sha256 ?? image?.squash_sha256 ?? '',
+    squash_sha256: factors?.squash_sha256 ?? '',
   };
 }
 
@@ -343,17 +344,15 @@ function mapAnomalies(anomalies: CollectiveXRawRow['anomalies']): string[] {
   return [...seen];
 }
 
-function mapPoint(row: CollectiveXRawRow): CollectiveXPoint {
+function mapPoint(caseId: string, row: CollectiveXRawRow): CollectiveXPoint {
   return {
-    point_id: row.point_id,
+    point_id: pointIdOf(caseId, row),
     tokens_per_rank: row.tokens_per_rank,
     global_tokens: row.global_tokens,
     anomalies: mapAnomalies(row.anomalies),
     correctness: {
       passed: row.correctness.passed,
       max_relative_error: row.correctness.max_relative_error,
-      contract: row.correctness.contract,
-      scope: row.correctness.scope,
     },
     routing: {
       fanout_mean: row.routing.fanout_mean,
@@ -373,16 +372,15 @@ function mapPoint(row: CollectiveXRawRow): CollectiveXPoint {
       isolated_sum: mapComponent(row.components.isolated_sum, row.byte_provenance.isolated_sum),
     },
     roundtrip_token_rate_at_latency_percentile: row.token_rate_at_latency_percentile,
-    evidence_ids: [evidenceIdOf(row)],
+    evidence_ids: [evidenceIdOf(caseId, row)],
   };
 }
 
 function buildSeries(shard: CollectiveXRawCaseAttempt): CollectiveXSeries {
-  const { identity, topology, implementation, measurement, runtime_fingerprint } = shard;
+  const { identity, topology, implementation, measurement, runtime } = shard;
   const kase = identity.case_factors.case;
-  const profile = identity.case_factors.profile;
   const sku = identity.case_factors.sku;
-  const vendor = runtime_fingerprint.vendor === 'amd' ? 'amd' : 'nvidia';
+  const vendor = runtime.vendor === 'amd' ? 'amd' : 'nvidia';
   return {
     series_id: seriesKeyOf(shard),
     label: caseLabel(sku, kase.backend, kase.phase, kase.ep),
@@ -394,8 +392,9 @@ function buildSeries(shard: CollectiveXRawCaseAttempt): CollectiveXSeries {
     backend: {
       id: identity.series_factors?.backend ?? kase.backend,
       label: implementation.name,
-      generation: implementation.provenance.backend_lineage ?? null,
-      version: implementation.provenance.deepep_version ?? null,
+      // provenance was retired with EPLB; legacy shards still carry it, the neutral MVP omits it.
+      generation: implementation.provenance?.backend_lineage ?? null,
+      version: implementation.provenance?.deepep_version ?? null,
     },
     build: seriesBuild(shard),
     system: {
@@ -420,19 +419,20 @@ function buildSeries(shard: CollectiveXRawCaseAttempt): CollectiveXSeries {
       top_k: kase.topk,
       experts: kase.experts,
       routing: kase.routing === 'zipf' ? 'zipf' : 'uniform',
-      eplb: kase.eplb,
-      precision_profile: precisionProfileId(profile),
-      dispatch_precision: dispatchPrecision(profile),
-      combine_precision: combinePrecision(profile),
-      activation_profile: profile.activation_profile,
+      // eplb / activation_profile were retired from the neutral backend; default when absent
+      // (activation_profile feeds a required safeId in the view schema, so use a valid slug).
+      eplb: kase.eplb ?? false,
+      dispatch_precision: dispatchPrecision(measurement),
+      combine_precision: combinePrecision(measurement),
+      activation_profile: shard.workload.activation_profile ?? 'fixed-profile',
     },
     eplb: {
-      enabled: kase.eplb,
-      planner: profile.eplb_planner ?? null,
+      enabled: kase.eplb ?? false,
+      planner: null,
       logical_experts: kase.experts,
       physical_experts: null,
-      redundant_experts: profile.eplb_redundant_experts ?? 0,
-      reference_tokens_per_rank: profile.eplb_reference_tokens_per_rank ?? null,
+      redundant_experts: 0,
+      reference_tokens_per_rank: null,
       replicated_experts: null,
       max_replicas: null,
       imbalance_before: null,
@@ -440,28 +440,28 @@ function buildSeries(shard: CollectiveXRawCaseAttempt): CollectiveXSeries {
       mapping_sha256: null,
     },
     resource: {
-      mode: profile.resource_mode ?? 'fixed-profile',
-      profile: implementation.resource_profile.resource_class ?? 'fixed-profile',
-      comm_units_kind: implementation.resource_profile.comm_units_kind ?? null,
-      configured_units: implementation.resource_profile.configured_units ?? null,
+      // resource_profile was retired with EPLB; the neutral MVP pins one fixed profile.
+      mode: 'fixed-profile',
+      comm_units_kind: implementation.resource_profile?.comm_units_kind ?? null,
+      configured_units: implementation.resource_profile?.configured_units ?? null,
     },
     measurement: {
-      contract: measurement.contract,
-      combine_semantics: profile.combine_semantics,
-      payload_unit: profile.payload_unit,
+      combine_semantics: measurement.combine_semantics,
+      payload_unit: measurement.payload_unit,
       iters: measurement.sampling.iterations_per_trial,
       trials: measurement.sampling.trials,
       warmups: measurement.sampling.warmup_iterations,
       samples_per_component: measurement.sampling.samples_per_component,
     },
-    points: measurement.rows.map((row) => mapPoint(row)),
+    points: measurement.rows.map((row) => mapPoint(identity.case_id, row)),
   };
 }
 
 function successAttempt(shard: CollectiveXRawCaseAttempt): CollectiveXAttempt {
   const { identity } = shard;
+  const attemptId = `${identity.case_id}-a${String(identity.attempt_ordinal).padStart(2, '0')}`;
   return {
-    attempt_id: identity.attempt_id,
+    attempt_id: attemptId,
     case_id: identity.case_id,
     allocation_id: allocationIdOf(shard),
     run_id: identity.allocation_factors.run_id,
@@ -472,32 +472,28 @@ function successAttempt(shard: CollectiveXRawCaseAttempt): CollectiveXAttempt {
     reason: null,
     selected: true,
     evidence: shard.measurement.rows.map((row) => ({
-      evidence_id: evidenceIdOf(row),
-      point_id: row.point_id,
+      evidence_id: evidenceIdOf(identity.case_id, row),
+      point_id: pointIdOf(identity.case_id, row),
     })),
   };
 }
 
-function terminalAttempt(doc: CollectiveXRawTerminal): CollectiveXAttempt | null {
-  const { identity, outcome } = doc;
-  const attemptId = identity.attempt_id;
-  const caseId = identity.case_id;
-  const allocationId = identity.allocation_id;
-  const runId = identity.allocation_factors?.run_id;
-  // Terminal docs from the capability resolver carry full-format IDs; only emit an
-  // attempt when they are all present, otherwise the coverage row records the outcome.
-  if (!attemptId || !caseId || !allocationId || !runId) return null;
-  const mapped = toOutcome(outcome.status);
+// The backend no longer emits standalone terminal-outcome docs; a non-success case-attempt
+// (outcome.status !== 'success') carries its terminal outcome in-band. Its identity has the
+// same full-format ids as a success shard, so the attempt is built the same way with the
+// mapped outcome, no measured evidence, and the first in-band reason.
+function caseAttemptTerminal(shard: CollectiveXRawCaseAttempt): CollectiveXAttempt {
+  const { identity, outcome } = shard;
   return {
-    attempt_id: attemptId,
-    case_id: caseId,
-    allocation_id: allocationId,
-    run_id: runId,
-    run_attempt: Number(identity.allocation_factors?.run_attempt) || 1,
-    attempt_index: identity.attempt_ordinal ?? 1,
-    outcome: mapped,
-    failure_mode: outcome.failure_mode ?? null,
-    reason: outcome.reason ?? outcome.failure_mode ?? null,
+    attempt_id: `${identity.case_id}-a${String(identity.attempt_ordinal).padStart(2, '0')}`,
+    case_id: identity.case_id,
+    allocation_id: allocationIdOf(shard),
+    run_id: identity.allocation_factors.run_id,
+    run_attempt: Number(identity.allocation_factors.run_attempt) || 1,
+    attempt_index: identity.attempt_ordinal,
+    outcome: toOutcome(outcome.status),
+    failure_mode: null,
+    reason: outcome.reasons?.[0] ?? null,
     selected: true,
     evidence: [],
   };
@@ -514,7 +510,7 @@ function ladderTokens(kase: CollectiveXRawCase): number[] {
 
 function measuredCoveragePoints(shard: CollectiveXRawCaseAttempt): CollectiveXCoveragePoint[] {
   return shard.measurement.rows.map((row) => ({
-    point_id: row.point_id,
+    point_id: pointIdOf(shard.identity.case_id, row),
     series_id: seriesKeyOf(shard),
     tokens_per_rank: row.tokens_per_rank,
     global_tokens: row.global_tokens,
@@ -546,29 +542,30 @@ export function buildDatasetFromNeutral(
 ): CollectiveXDataset {
   const matrix = parseWith(collectiveXRawMatrixSchema, matrixRaw, 'matrix');
 
+  // Discriminate by record_type: only `case-attempt` docs are ingested. `samples` dumps and
+  // any other record type are ignored, as is the matrix doc (handled above).
   const shards: CollectiveXRawCaseAttempt[] = [];
-  const terminals: CollectiveXRawTerminal[] = [];
   for (const doc of docs) {
-    const format = (doc as { format?: unknown } | null)?.format;
-    if (format === 'collectivex.ep.v1') {
+    const recordType = (doc as { record_type?: unknown } | null)?.record_type;
+    if (recordType === 'case-attempt') {
       shards.push(parseWith(collectiveXRawCaseAttemptSchema, doc, 'shard'));
-    } else if (format === 'collectivex.terminal.v1') {
-      terminals.push(parseWith(collectiveXRawTerminalSchema, doc, 'terminal'));
     }
-    // Other formats (e.g. collectivex.samples.v1 raw sample dumps) are ignored.
   }
 
   const successShards = shards.filter((shard) => shard.outcome.status === 'success');
+  const nonSuccessShards = shards.filter((shard) => shard.outcome.status !== 'success');
   const seriesByCaseId = new Map<string, CollectiveXRawCaseAttempt>();
   for (const shard of successShards) {
     if (!seriesByCaseId.has(shard.identity.case_id)) {
       seriesByCaseId.set(shard.identity.case_id, shard);
     }
   }
-  const terminalsByCaseId = new Map<string, CollectiveXRawTerminal>();
-  for (const doc of terminals) {
-    const caseId = doc.identity.case_id;
-    if (caseId && !terminalsByCaseId.has(caseId)) terminalsByCaseId.set(caseId, doc);
+  // Non-success case-attempts stand in for the retired terminal-outcome docs: a case with no
+  // successful shard but an `invalid`/`failed` attempt records that terminal outcome.
+  const nonSuccessByCaseId = new Map<string, CollectiveXRawCaseAttempt>();
+  for (const shard of nonSuccessShards) {
+    const caseId = shard.identity.case_id;
+    if (!nonSuccessByCaseId.has(caseId)) nonSuccessByCaseId.set(caseId, shard);
   }
 
   // Series: one per distinct successful series key (retries of a case share it).
@@ -580,13 +577,10 @@ export function buildDatasetFromNeutral(
     }
   }
 
-  // Attempts: every success shard and every terminal doc with full-format IDs.
+  // Attempts: every success shard and every non-success case-attempt.
   const attempts: CollectiveXAttempt[] = [];
   for (const shard of successShards) attempts.push(successAttempt(shard));
-  for (const doc of terminals) {
-    const attempt = terminalAttempt(doc);
-    if (attempt) attempts.push(attempt);
-  }
+  for (const shard of nonSuccessShards) attempts.push(caseAttemptTerminal(shard));
   const attemptsByCaseId = new Map<string, CollectiveXAttempt[]>();
   for (const attempt of attempts) {
     attemptsByCaseId.set(attempt.case_id, [
@@ -602,56 +596,56 @@ export function buildDatasetFromNeutral(
     const caseId = kase.case_id;
     if (!caseId) continue;
     const shard = seriesByCaseId.get(caseId);
-    const terminal = terminalsByCaseId.get(caseId);
+    const nonSuccess = nonSuccessByCaseId.get(caseId);
     const caseAttempts = attemptsByCaseId.get(caseId) ?? [];
     const attemptIds = caseAttempts.map((attempt) => attempt.attempt_id);
 
+    // failure_mode is not part of the current backend contract (no failure
+    // taxonomy is emitted), so it is always null here.
+    const failureMode: string | null = null;
     let outcome: CollectiveXOutcome;
     let points: CollectiveXCoveragePoint[];
-    let selectedAttemptId: string | null;
-    let failureMode: string | null;
+    let selectedAttemptId: string | null = null;
     let reason: string | null;
 
     if (shard) {
       outcome = 'success';
       points = measuredCoveragePoints(shard);
-      selectedAttemptId = shard.identity.attempt_id;
-      failureMode = null;
+      selectedAttemptId = `${caseId}-a${String(shard.identity.attempt_ordinal).padStart(2, '0')}`;
       reason = null;
-    } else if (terminal) {
-      outcome = toOutcome(terminal.outcome.status);
-      reason = terminal.outcome.reason ?? terminal.outcome.failure_mode ?? 'unspecified';
+    } else if (nonSuccess) {
+      outcome = toOutcome(nonSuccess.outcome.status);
+      reason = nonSuccess.outcome.reasons?.[0] ?? 'invalid';
       points = terminalCoveragePoints(kase, toTerminalStatus(outcome), reason);
-      selectedAttemptId = terminal.identity.attempt_id ?? null;
-      failureMode = terminal.outcome.failure_mode ?? null;
+      selectedAttemptId = `${caseId}-a${String(nonSuccess.identity.attempt_ordinal).padStart(2, '0')}`;
+    } else if (requested.disposition === 'unsupported') {
+      outcome = 'unsupported';
+      reason = requested.reason ?? 'unsupported';
+      points = terminalCoveragePoints(kase, 'unsupported', reason);
     } else {
       outcome = 'pending';
       reason = 'pending';
       points = terminalCoveragePoints(kase, 'pending', reason);
-      selectedAttemptId = null;
-      failureMode = null;
     }
 
-    const profile = shard?.identity.case_factors.profile;
+    const measurement = shard?.measurement;
     coverage.push({
       case_id: caseId,
       label: caseLabel(requested.sku, kase.backend, kase.phase, kase.ep),
       disposition: requested.disposition,
       sku: requested.sku,
       backend: kase.backend,
-      backend_generation: shard?.implementation.provenance.backend_lineage ?? null,
+      backend_generation: shard?.implementation.provenance?.backend_lineage ?? null,
       mode: kase.mode === 'low-latency' ? 'low-latency' : 'normal',
       phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
       routing: kase.routing === 'zipf' ? 'zipf' : 'uniform',
-      eplb: kase.eplb,
-      precision_profile: profile ? precisionProfileId(profile) : null,
-      dispatch_precision: profile ? dispatchPrecision(profile) : null,
-      combine_precision: profile ? combinePrecision(profile) : null,
+      eplb: kase.eplb ?? false,
+      dispatch_precision: measurement ? dispatchPrecision(measurement) : null,
+      combine_precision: measurement ? combinePrecision(measurement) : null,
       resource: {
-        mode: profile?.resource_mode ?? null,
-        profile: shard?.implementation.resource_profile.resource_class ?? null,
-        comm_units_kind: shard?.implementation.resource_profile.comm_units_kind ?? null,
-        configured_units: shard?.implementation.resource_profile.configured_units ?? null,
+        mode: shard ? 'fixed-profile' : null,
+        comm_units_kind: shard?.implementation.resource_profile?.comm_units_kind ?? null,
+        configured_units: shard?.implementation.resource_profile?.configured_units ?? null,
       },
       topology: {
         ep_size: kase.ep,

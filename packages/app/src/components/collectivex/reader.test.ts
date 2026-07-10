@@ -18,14 +18,13 @@ import {
   buildDataset,
   makeCollectiveXDataset,
   makeCollectiveXSeries,
+  makeInvalidCaseAttempt,
   makeRawMatrix,
   makeRawShard,
-  makeRawTerminal,
   makeRunMeta,
 } from './test-fixture';
 
 const IMAGE_DIGEST = `sha256:${'a'.repeat(64)}`;
-const SQUASH_SHA256 = 'b'.repeat(64);
 const SOURCE_SHA = 'c'.repeat(40);
 
 function fakeResponse(body: string, status = 200): Response {
@@ -44,7 +43,7 @@ describe('CollectiveX neutral → view assembly', () => {
     const dataset = makeCollectiveXDataset();
     expect(dataset.format).toBe('collectivex.view.v1');
     expect(dataset.schema_version).toBe(1);
-    // Two measured series (nccl-ep EP8 scale-up + deepep EP16 scale-out).
+    // Two measured series (deepep-v2 EP8 scale-up + deepep EP16 scale-out).
     expect(dataset.series).toHaveLength(2);
     // Four requested coverage rows: two measured, one unsupported terminal, one pending.
     expect(dataset.coverage).toHaveLength(4);
@@ -71,12 +70,55 @@ describe('CollectiveX neutral → view assembly', () => {
     expect(run.requested_points).toBe(8);
   });
 
-  it('emits one attempt per measured shard and none for an id-less terminal doc', () => {
+  it('emits one attempt per measured shard', () => {
     const dataset = makeCollectiveXDataset();
     expect(dataset.attempts).toHaveLength(2);
     expect(dataset.attempts.every((attempt) => attempt.outcome === 'success')).toBe(true);
     // Both success shards share one GHA run+attempt, so one allocation.
     expect(dataset.run.allocation_count).toBe(1);
+  });
+
+  // Feed the assembler exactly what a run's shard artifact carries: the matrix, a
+  // current-backend case-attempt, and a co-located `samples` dump the reader must drop.
+  interface ShardIdentity {
+    case_id: string;
+    case_factors: { sku: string; case: Record<string, unknown> };
+  }
+  const requestedOf = (shard: Record<string, unknown>) => {
+    const { case_id: caseId, case_factors } = shard.identity as ShardIdentity;
+    return {
+      caseId,
+      sku: case_factors.sku,
+      disposition: 'runnable' as const,
+      case: case_factors.case,
+    };
+  };
+
+  it('assembles measured coverage from a matrix + success case-attempt and ignores a samples doc', () => {
+    const shard = makeRawShard({ backend: 'deepep-v2' });
+    const matrix = makeRawMatrix([requestedOf(shard)]);
+    const samples = { record_type: 'samples', identity: shard.identity, rows: [] };
+    const dataset = buildDatasetFromNeutral(matrix, [shard, samples], makeRunMeta());
+
+    expect(dataset.series).toHaveLength(1);
+    expect(dataset.coverage).toHaveLength(1);
+    expect(dataset.coverage[0].outcome).toBe('success');
+    expect(dataset.coverage[0].points.every((point) => point.terminal_status === 'measured')).toBe(
+      true,
+    );
+  });
+
+  it('surfaces an invalid case-attempt as an invalid coverage outcome, not pending', () => {
+    const shard = makeInvalidCaseAttempt({ backend: 'deepep-v2' });
+    const dataset = buildDatasetFromNeutral(
+      makeRawMatrix([requestedOf(shard)]),
+      [shard],
+      makeRunMeta(),
+    );
+
+    expect(dataset.series).toHaveLength(0);
+    expect(dataset.coverage[0].outcome).toBe('invalid');
+    expect(dataset.attempts[0].outcome).toBe('invalid');
   });
 });
 
@@ -88,16 +130,16 @@ describe('CollectiveX neutral field synthesis', () => {
     const dataset = buildDataset({ shards: [makeRawShard({ runId: '208', runAttempt: '2' })] });
     const series = dataset.series[0];
     // No series_id emitted → series key falls back to case_id.
-    expect(series.series_id).toBe('h200-dgxc-nccl-ep-deepseek-v3-normal-decode-ep8-uniform');
+    expect(series.series_id).toBe('h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform');
     expect(series.allocation_ids).toEqual(['alloc-208-2']);
     expect(series.points[0].evidence_ids).toEqual([`ev-${series.points[0].point_id}`]);
   });
 
   it('folds provenance into the build and defaults combine quant mode to none', () => {
     const series = makeCollectiveXSeries();
-    expect(series.build.image_digest).toBe(IMAGE_DIGEST);
+    expect(series.build.image).toBe(IMAGE_DIGEST);
     expect(series.build.source_sha).toBe(SOURCE_SHA);
-    expect(series.build.squash_sha256).toBe(SQUASH_SHA256);
+    expect(series.build.squash_sha256).toBe('');
     expect(series.workload.workload_id).toBe('deepseek-v3');
     expect(series.workload.combine_precision.quant_mode).toBe('none');
   });
@@ -167,33 +209,19 @@ describe('CollectiveX terminal coverage', () => {
     expect(pending?.attempt_ids).toEqual([]);
   });
 
-  it('emits a terminal attempt when the doc carries full-format ids', () => {
-    const caseId = 'h100-dgxc-nccl-ep-deepseek-v3-normal-decode-ep8-uniform';
-    const terminal = makeRawTerminal({
-      caseId,
-      sku: 'h100-dgxc',
-      status: 'failed',
-      withAttempt: true,
-    });
+  it('surfaces a non-success case-attempt as an in-band invalid outcome, not pending', () => {
+    // The retired terminal-outcome doc is now a `record_type: 'case-attempt'` whose
+    // outcome.status is non-success; it stands in for the case's terminal result.
     const dataset = buildDataset({
-      shards: [],
-      terminals: [terminal],
-      requestedCases: [
-        {
-          caseId,
-          sku: 'h100-dgxc',
-          disposition: 'runnable',
-          case: (
-            makeRawShard({ caseId, sku: 'h100-dgxc' }).identity as {
-              case_factors: { case: Record<string, unknown> };
-            }
-          ).case_factors.case,
-        },
-      ],
+      shards: [makeInvalidCaseAttempt({ sku: 'h100-dgxc', reasons: ['kernel-timeout'] })],
     });
     expect(dataset.attempts).toHaveLength(1);
-    expect(dataset.attempts[0].outcome).toBe('failed');
-    expect(dataset.coverage[0].outcome).toBe('failed');
+    expect(dataset.attempts[0].outcome).toBe('invalid');
+    expect(dataset.coverage).toHaveLength(1);
+    expect(dataset.coverage[0].outcome).toBe('invalid');
+    expect(dataset.coverage[0].reason).toBe('kernel-timeout');
+    // No successful shard → no series is assembled.
+    expect(dataset.series).toHaveLength(0);
   });
 });
 
@@ -213,7 +241,7 @@ describe('CollectiveX run summary', () => {
 // Raw ingest rejections
 // ---------------------------------------------------------------------------
 describe('CollectiveX raw ingest rejections', () => {
-  it('rejects a matrix doc with the wrong format', () => {
+  it('rejects a matrix doc missing its required arrays', () => {
     expect(() => buildDatasetFromNeutral({ format: 'nope' }, [], makeRunMeta())).toThrow(/matrix/);
   });
 
@@ -224,10 +252,10 @@ describe('CollectiveX raw ingest rejections', () => {
     expect(() => buildDatasetFromNeutral(matrix, [shard], makeRunMeta())).toThrow(/shard/);
   });
 
-  it('ignores raw docs whose format is neither ep nor terminal', () => {
+  it('ignores docs whose record_type is not case-attempt (e.g. samples)', () => {
     const dataset = buildDatasetFromNeutral(
       makeRawMatrix([]),
-      [{ format: 'collectivex.samples.v1' }],
+      [{ record_type: 'samples', rows: [] }],
       makeRunMeta(),
     );
     expect(dataset.series).toHaveLength(0);

@@ -13,7 +13,7 @@ import {
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
-// series[0]: nccl-ep EP8 scale-up (nvlink, single node).
+// series[0]: deepep-v2 EP8 scale-up (nvlink, single node).
 // series[1]: deepep EP16 scale-out (nvlink scale-up + rdma scale-out, two nodes).
 const [scaleUp, scaleOut] = dataset.series;
 
@@ -34,9 +34,8 @@ describe('collectiveXTopologyLabel', () => {
 describe('collectiveXSeriesLabel', () => {
   it('renders the identifying axes of a series', () => {
     const label = collectiveXSeriesLabel(scaleUp);
-    expect(label.startsWith('H200-DGXC EP8 · nccl-ep · normal · scale-up')).toBe(true);
+    expect(label.startsWith('H200-DGXC EP8 · deepep-v2 · normal · scale-up')).toBe(true);
     expect(label).toContain('decode');
-    expect(label).toContain('d-bf16.c-bf16');
     expect(label).toContain('unversioned');
     expect(label).toContain('build cccccccc');
   });

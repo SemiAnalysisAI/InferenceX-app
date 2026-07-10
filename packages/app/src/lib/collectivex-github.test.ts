@@ -14,7 +14,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 // The two measured shards a canonical sweep run uploads (scale-up EP8 + scale-out EP16).
-const shardA = makeRawShard({ backend: 'nccl-ep', ep: 8 });
+const shardA = makeRawShard({ backend: 'deepep-v2', ep: 8 });
 const shardB = makeRawShard({
   backend: 'deepep',
   implName: 'deepep',
@@ -57,8 +57,8 @@ function zipDocs(...docs: unknown[]): ArrayBuffer {
 const matrixZip = zipDocs(matrix);
 const shardZip = zipDocs(shardA, shardB);
 
-// A second-generation matrix (numeric version 2) that shares the format tag but
-// declares a different content version. Requesting version 1 must skip it.
+// A second-generation matrix (numeric version 2): the same structural shape but a
+// different content `version`. Requesting version 1 must skip it.
 const matrixV2 = makeRawMatrix([requestedOf(shardA), requestedOf(shardB)], 2);
 const matrixZipV2 = zipDocs(matrixV2);
 

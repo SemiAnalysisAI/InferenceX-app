@@ -20,7 +20,10 @@ const WORKFLOW_NAME = 'CollectiveX Sweep';
 const RUNS_PER_PAGE = 100;
 const ARTIFACTS_PER_PAGE = 100;
 
-// The three neutral artifact families a sweep run uploads (via always()).
+// Neutral artifact families a sweep run uploads (via always()). A current run ships the
+// matrix + per-case shards; the `cxunsupported-` terminal family was retired (non-success
+// outcomes now ride in-band on a `case-attempt` shard) but is still matched so older runs
+// with that artifact family remain readable.
 const MATRIX_PREFIX = 'cxsweep-matrix-';
 const SHARD_PREFIX = 'cxshard-';
 const TERMINAL_PREFIX = 'cxunsupported-';
@@ -290,8 +293,18 @@ function matrixVersion(doc: unknown): number | null {
 }
 
 // Download + structurally validate a run's matrix artifact and read its neutral
-// `version` tag. The format string (collectivex.matrix.v1) gates schema shape;
-// the numeric `version` field is the content axis the frontend selects on.
+// `version` tag. The matrix doc no longer carries a `format`/`record_type` tag, so it
+// is identified structurally by its requested_cases[] + include[] arrays and a valid
+// numeric `version`; that `version` field is the content axis the frontend selects on.
+function isMatrixDoc(doc: unknown): boolean {
+  const candidate = doc as { requested_cases?: unknown; include?: unknown } | null;
+  return (
+    Array.isArray(candidate?.requested_cases) &&
+    Array.isArray(candidate?.include) &&
+    matrixVersion(doc) !== null
+  );
+}
+
 async function loadMatrixCandidate(
   artifacts: GithubArtifact[],
   token: string,
@@ -302,9 +315,7 @@ async function loadMatrixCandidate(
   }
   const matrixDocs: unknown[] = [];
   for (const artifact of matrixArtifacts) matrixDocs.push(...(await collectDocs(artifact, token)));
-  const matrixCandidates = matrixDocs.filter(
-    (doc) => (doc as { format?: unknown } | null)?.format === 'collectivex.matrix.v1',
-  );
+  const matrixCandidates = matrixDocs.filter((doc) => isMatrixDoc(doc));
   if (matrixCandidates.length !== 1) {
     throw new CollectiveXSweepError('invalid', 'sweep run must carry exactly one matrix document');
   }

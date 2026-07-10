@@ -229,9 +229,6 @@ function correctnessSummary(row: PointRow): React.ReactNode {
         Correctness {correctness.passed ? 'pass' : 'fail'} · max rel err{' '}
         {correctness.max_relative_error.toExponential(1)}
       </p>
-      <p className="text-muted-foreground">
-        {correctness.contract} · {correctness.scope}
-      </p>
     </div>
   );
 }
@@ -378,7 +375,7 @@ export function CollectiveXCaseDetail({
       <dl className="mt-4 grid gap-4 border-y py-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <DetailValue
           label="Resource"
-          value={`${item.resource.profile ?? 'unconfigured'} · ${item.resource.configured_units ?? '-'} ${item.resource.comm_units_kind ?? 'units'}`}
+          value={`${item.resource.configured_units ?? '-'} ${item.resource.comm_units_kind ?? 'units'}`}
         />
         <DetailValue
           label="Topology"
@@ -386,7 +383,6 @@ export function CollectiveXCaseDetail({
         />
         <DetailValue label="Dispatch precision" value={axisLabel(item.dispatch_precision)} />
         <DetailValue label="Combine precision" value={axisLabel(item.combine_precision)} />
-        <DetailValue label="Precision profile" value={item.precision_profile ?? 'n/a'} mono />
         <DetailValue label="Routing" value={routingKey(item)} />
         <DetailValue label="Backend" value={backendLabel(item)} />
       </dl>
