@@ -67,8 +67,12 @@ import {
  * warmup block are unaffected. (v11 was a short-lived, since-reverted attempt to
  * carry kvCachePoolTokens in chart_series; that value now lives in
  * benchmark_results.metrics, derived from the server log — unrelated to this.)
+ *
+ * v13: prefer `dp_rank` over the per-rank-local `engine` label when naming
+ * KV-cache series. Some DEP exports report engine=0 for every rank, which
+ * made every legend entry read "DP 0" despite distinct dp_rank labels.
  */
-export const CHART_SERIES_VERSION = 12;
+export const CHART_SERIES_VERSION = 13;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -348,11 +352,11 @@ function buildSeriesFromMetrics(
   // the cluster-average line.
   const kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[] = [];
   if (kvSeries && kvSeries.length > 1) {
-    // Sort by numeric engine label when present so rank 0..N renders in
-    // order; fall back to series-array index otherwise.
+    // Sort by numeric DP rank when present so rank 0..N renders in order;
+    // fall back to the engine label, then series-array index otherwise.
     const decorated = kvSeries.map((s, idx) => {
       const raw =
-        s.labels?.['engine'] ?? s.labels?.['engine_idx'] ?? s.labels?.['dp_rank'] ?? String(idx);
+        s.labels?.['dp_rank'] ?? s.labels?.['engine'] ?? s.labels?.['engine_idx'] ?? String(idx);
       const numeric = Number(raw);
       return { series: s, idx, label: raw, sortKey: Number.isFinite(numeric) ? numeric : idx };
     });
