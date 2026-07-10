@@ -10,6 +10,8 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review]
 
+permissions: {}
+
 # Single source of truth for the models. Bumping either is a one-line change.
 env:
   CLAUDE_MODEL: claude-opus-4-8
@@ -155,11 +157,11 @@ jobs:
       DATABASE_DRIVER: neon
       DATABASE_SSL: 'true'
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: read
-      id-token: write
+      contents: write # Commit and push implementation changes
+      pull-requests: write # Update pull requests and progress
+      issues: write # Update issue comments and progress
+      actions: read # Inspect workflow runs and checks
+      id-token: write # Authenticate the Claude Code action with OIDC
     # Serialize @claude runs on the same issue/PR (incl. reviews — shared group with the
     # review job) so back-to-back triggers don't clobber each other.
     concurrency:
@@ -172,6 +174,8 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT }}
+          # The implementation agent commits and pushes its changes.
+          persist-credentials: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -358,9 +362,9 @@ jobs:
       DATABASE_SSL: 'true'
     permissions:
       contents: read
-      pull-requests: write
-      actions: read
-      id-token: write
+      pull-requests: write # Post pull-request review comments
+      actions: read # Inspect workflow runs and checks
+      id-token: write # Authenticate the Claude Code action with OIDC
     concurrency:
       group: claude-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: false

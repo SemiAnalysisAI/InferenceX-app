@@ -1,9 +1,16 @@
-name: 'Lint & Format'
+name: Zizmor
 
 on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, ready_for_review]
+    paths:
+      - '.github/dependabot.yml'
+      - '.github/zizmor.yml'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'action.yml'
+      - 'action.yaml'
 
 permissions: {}
 
@@ -12,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  oxc:
-    name: Lint and format
+  zizmor:
+    name: Audit GitHub Actions
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 5
     runs-on: ubuntu-latest
@@ -23,16 +30,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: '24'
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Lint
-        run: pnpm lint
-      - name: Format check
-        run: pnpm fmt
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Audit workflows
+        run: uvx --exclude-newer P1D zizmor@latest --strict-collection --pedantic --no-ignores .
