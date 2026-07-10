@@ -704,6 +704,17 @@ export interface InferenceChartContextType {
   toggleHwType: (hw: string) => void;
   removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
+  /** Resolve automatic official + `overlay:` hardware selections under the active scope rule. */
+  resolveComparisonSelection: (
+    proposed: Set<string>,
+    prev?: Set<string>,
+  ) => { result: Set<string>; keptGroup: string | null; droppedGroups: string[] };
+  /** Apply one official/overlay toggle; returns null when a cross-engine add is blocked. */
+  toggleComparisonSelection: (
+    prev: Set<string>,
+    item: string,
+    allItems: Set<string>,
+  ) => Set<string> | null;
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
   selectedModel: Model;

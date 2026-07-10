@@ -1,11 +1,13 @@
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
+import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
 import {
   createMockInferenceData,
   createMockChartDefinition,
   createMockHardwareConfig,
 } from '../support/mock-data';
-import { Precision } from '@/lib/data-mappings';
+import { Model, Precision, Sequence } from '@/lib/data-mappings';
+import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
 
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
@@ -330,5 +332,130 @@ describe('ScatterGraph', () => {
       .should('contain.text', 'EAGLE');
     // No label should show the generic MTP token for M3.
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
+  });
+
+  it('removes a cross-engine AgentX STP overlay before rendering', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const officialData = [8, 16, 32].map((x, index) =>
+      createMockInferenceData({
+        hwKey: 'b200_sglang',
+        x,
+        y: 320 - index * 40,
+        precision: Precision.FP4,
+      }),
+    );
+    const runUrl = 'https://github.com/x/y/actions/runs/agentx-vllm';
+    const overlayData = {
+      data: [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey: 'h100_vllm',
+          x,
+          y: 260 - index * 40,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ),
+      hardwareConfig: hwConfig,
+      label: 'agentx-vllm',
+      runUrl,
+    };
+    const exclusion = buildExclusion([
+      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+    ]);
+    const namespacedExclusion = {
+      familyOf: (key: string) =>
+        exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      groupOf: (key: string) =>
+        exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-agentx-engine-guard"
+          modelLabel="DeepSeek V4 Pro"
+          data={officialData}
+          xLabel="Concurrency"
+          yLabel="Throughput / GPU (tok/s)"
+          chartDefinition={chartDefinition}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang']),
+          selectedModel: Model.DeepSeek_V4_Pro,
+          selectedSequence: Sequence.AgenticTraces,
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+          resolveComparisonSelection: (proposed, prev = new Set()) =>
+            resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky'),
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+        },
+      },
+    );
+
+    cy.get('#test-scatter-agentx-engine-guard svg .roofline-path').should('exist');
+    cy.get('#test-scatter-agentx-engine-guard svg .overlay-roofline-path').should('not.exist');
+    cy.get('@setActiveOverlayHwTypes').should('have.been.called');
+  });
+});
+
+describe('ChartDisplay engine comparison guard', () => {
+  it('keeps cross-engine AgentX STP rows out of table mode', () => {
+    const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
+    const sglangRow = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      hw: 'Official SGLang',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+    });
+    const vllmRow = createMockInferenceData({
+      hwKey: 'h100_vllm',
+      hw: 'Official vLLM',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+    });
+    const exclusion = buildExclusion([
+      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+    ]);
+    const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
+      resolveExclusionGroups(proposed, prev, exclusion, 'keep-sticky');
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_V4_Pro,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: [sglangRow, vllmRow],
+          },
+        ],
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+        resolveComparisonSelection: resolveSelection,
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      },
+      unofficial: {},
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
   });
 });

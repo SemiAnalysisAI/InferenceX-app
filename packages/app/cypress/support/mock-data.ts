@@ -15,6 +15,7 @@ import type {
 } from '@/components/reliability/types';
 import type { GlobalFilterContextType } from '@/components/GlobalFilterContext';
 import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
+import { computeToggle } from '@/hooks/useTogglableSet';
 import { Model, Sequence, Precision } from '@/lib/data-mappings';
 import React from 'react';
 
@@ -165,6 +166,12 @@ export function createMockInferenceContext(
     toggleHwType: namedStub('toggleHwType'),
     removeHwType: namedStub('removeHwType'),
     selectAllHwTypes: namedStub('selectAllHwTypes'),
+    resolveComparisonSelection: (proposed) => ({
+      result: proposed,
+      keptGroup: null,
+      droppedGroups: [],
+    }),
+    toggleComparisonSelection: (prev, item, allItems) => computeToggle(prev, item, allItems),
     toggleActiveDate: namedStub('toggleActiveDate'),
     removeActiveDate: namedStub('removeActiveDate'),
     selectAllActiveDates: namedStub('selectAllActiveDates'),

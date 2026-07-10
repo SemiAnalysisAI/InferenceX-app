@@ -42,18 +42,25 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import { getModelExclusion, MODEL_PREFIX_MAPPING, sequenceKind } from '@/lib/data-mappings';
 import {
-  MtpEngineConflictToast,
-  type MtpEngineConflictDetail,
-} from '@/components/mtp-engine-conflict-toast';
+  getModelExclusion,
+  getSequenceExclusion,
+  MODEL_PREFIX_MAPPING,
+  sequenceKind,
+} from '@/lib/data-mappings';
+import {
+  EngineComparisonConflictToast,
+  type EngineComparisonConflictDetail,
+} from '@/components/engine-comparison-conflict-toast';
 import {
   buildExclusion,
-  clearAllExclusionGroups,
   effectiveLegendItems,
+  resolveExclusionGroups,
   resolveExclusionToggle,
+  type ExclusionConflictPolicy,
 } from '@/lib/exclusion';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
@@ -132,6 +139,17 @@ export function InferenceProvider({
 
   const { getUrlParam } = useUrlState();
 
+  const exclusion = useMemo(() => {
+    const modelSpecs = getModelExclusion(selectedModel);
+    const sequenceSpecs = getSequenceExclusion(effectiveSequence);
+    if (modelSpecs.length === 0 && sequenceSpecs.length === 0) return null;
+    if (modelSpecs.length === 0) return buildExclusion(sequenceSpecs);
+    if (sequenceSpecs.length === 0) return buildExclusion(modelSpecs);
+    return buildExclusion([...modelSpecs, ...sequenceSpecs]);
+  }, [selectedModel, effectiveSequence]);
+  const exclusionPolicy: ExclusionConflictPolicy =
+    sequenceKind(effectiveSequence) === 'agentic' ? 'keep-sticky' : 'clear-all';
+
   // ── GPU comparison state (owned by inference, not global) ─────────────────
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
     const urlDates = getUrlParam('i_dates');
@@ -149,10 +167,24 @@ export function InferenceProvider({
   const [showDateRangeDialog, setShowDateRangeDialog] = useState(false);
 
   // ── Inference-specific filter state ─────────────────────────────────────────
-  const [selectedGPUs, setSelectedGPUs] = useState<string[]>(() => {
+  const [selectedGpuState, setSelectedGpuState] = useState<string[]>(() => {
     const urlGpus = getUrlParam('i_gpus');
     return urlGpus ? urlGpus.split(',').filter(Boolean) : [];
   });
+  const selectedGPUs = useMemo(() => {
+    if (!sequenceResolved || !exclusion || selectedGpuState.length < 2) return selectedGpuState;
+    const resolved = [
+      ...resolveExclusionGroups(new Set(selectedGpuState), new Set(), exclusion, exclusionPolicy)
+        .result,
+    ];
+    return resolved.length === selectedGpuState.length &&
+      resolved.every((gpu, index) => gpu === selectedGpuState[index])
+      ? selectedGpuState
+      : resolved;
+  }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy]);
+  useEffect(() => {
+    if (selectedGPUs !== selectedGpuState) setSelectedGpuState(selectedGPUs);
+  }, [selectedGPUs, selectedGpuState]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(
     () => getUrlParam('i_metric') || initialYAxisMetric || 'y_tpPerGpu',
   );
@@ -294,9 +326,9 @@ export function InferenceProvider({
     return null;
   });
 
-  // --- MTP cross-engine conflict toast state ---
-  const [mtpConflict, setMtpConflict] = useState<MtpEngineConflictDetail | null>(null);
-  const dismissMtpConflict = useCallback(() => setMtpConflict(null), []);
+  // --- Cross-engine comparison conflict toast state ---
+  const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
+  const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
@@ -640,11 +672,57 @@ export function InferenceProvider({
     [setSelectedYAxisMetric, clearPresetOnChange],
   );
   const setSelectedGPUsAndClear = useCallback(
-    (v: string[]) => {
-      setSelectedGPUs(v);
+    (next: string[]) => {
+      if (!exclusion) {
+        setSelectedGpuState(next);
+        clearPresetOnChange();
+        return;
+      }
+
+      const previous = new Set(selectedGPUs);
+      const proposed = new Set(next);
+      const added = [...proposed].filter((gpu) => !previous.has(gpu));
+      if (added.length === 1) {
+        const available = new Set([...availableGPUs.map((gpu) => gpu.value), ...proposed]);
+        const decision = resolveExclusionToggle(
+          previous,
+          added[0],
+          available,
+          exclusion,
+          exclusionPolicy,
+        );
+        if (decision.kind === 'block') {
+          setEngineConflict({
+            kind: 'blocked',
+            attempted: decision.attempted,
+            existing: decision.existing,
+          });
+          clearPresetOnChange();
+          return;
+        }
+        if (decision.kind === 'silent-resolve') {
+          setSelectedGpuState([...decision.result]);
+          clearPresetOnChange();
+          return;
+        }
+        setSelectedGpuState(next);
+        clearPresetOnChange();
+        return;
+      }
+
+      const { result, keptGroup, droppedGroups } = resolveExclusionGroups(
+        proposed,
+        previous,
+        exclusion,
+        exclusionPolicy,
+      );
+      setSelectedGpuState([...result]);
+      if (droppedGroups.length > 0) {
+        setEngineConflict({ kind: 'resolved', kept: keptGroup, dropped: droppedGroups });
+      }
       clearPresetOnChange();
     },
-    [setSelectedGPUs, clearPresetOnChange],
+    [selectedGPUs, availableGPUs, exclusion, exclusionPolicy, clearPresetOnChange],
   );
   const setSelectedDatesAndClear = useCallback(
     // Accept a React state updater (value OR function) so callers adding several
@@ -672,7 +750,6 @@ export function InferenceProvider({
   const {
     activeSet: activeHwTypes,
     setActiveSet: setActiveHwTypes,
-    toggle: toggleHwRaw,
     selectAll: selectAllHwRaw,
     remove: removeHwRaw,
   } = useChartToggleSet();
@@ -692,6 +769,65 @@ export function InferenceProvider({
     [graphs, effectivePrecisions],
   );
   const extractHwKey = useCallback((point: InferenceData) => point.hwKey as string, []);
+
+  const comparisonExclusion = useMemo(
+    () =>
+      exclusion
+        ? {
+            familyOf: (key: string) =>
+              exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+            groupOf: (key: string) =>
+              exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+          }
+        : null,
+    [exclusion],
+  );
+  const activeHwTypesRef = useRef(activeHwTypes);
+  activeHwTypesRef.current = activeHwTypes;
+  const exclusionRef = useRef(comparisonExclusion);
+  exclusionRef.current = comparisonExclusion;
+  const exclusionPolicyRef = useRef(exclusionPolicy);
+  exclusionPolicyRef.current = exclusionPolicy;
+  const resolveHwSelection = useCallback((proposed: Set<string>, prev?: Set<string>) => {
+    const currentExclusion = exclusionRef.current;
+    if (!currentExclusion) {
+      return { result: proposed, keptGroup: null, droppedGroups: [] };
+    }
+    return resolveExclusionGroups(
+      proposed,
+      prev ?? activeHwTypesRef.current,
+      currentExclusion,
+      exclusionPolicyRef.current,
+    );
+  }, []);
+  const toggleComparisonSelection = useCallback(
+    (prev: Set<string>, item: string, allItems: Set<string>): Set<string> | null => {
+      const currentExclusion = exclusionRef.current;
+      const toggleUniverse = currentExclusion
+        ? effectiveLegendItems(allItems, prev, currentExclusion)
+        : allItems;
+      if (currentExclusion) {
+        const decision = resolveExclusionToggle(
+          prev,
+          item,
+          toggleUniverse,
+          currentExclusion,
+          exclusionPolicyRef.current,
+        );
+        if (decision.kind === 'block') {
+          setEngineConflict({
+            kind: 'blocked',
+            attempted: decision.attempted,
+            existing: decision.existing,
+          });
+          return null;
+        }
+        if (decision.kind === 'silent-resolve') return decision.result;
+      }
+      return computeToggle(prev, item, toggleUniverse);
+    },
+    [],
+  );
 
   // Wrap setActiveHwTypes to intercept resets and apply pendingHwFilter atomically.
   // Without this, useChartDataFilter resets to "all GPUs" in one render and the
@@ -713,7 +849,10 @@ export function InferenceProvider({
     (update: Set<string> | ((prev: Set<string>) => Set<string>)) => {
       const filter = pendingHwFilterRef.current;
       if (!filter) {
-        setActiveHwTypesDispatch(update);
+        setActiveHwTypesDispatch((prev) => {
+          const proposed = typeof update === 'function' ? update(prev) : update;
+          return resolveHwSelection(proposed, prev).result;
+        });
         return;
       }
       // Preset filter is active: evaluate updater to get all available items, then filter.
@@ -723,13 +862,13 @@ export function InferenceProvider({
         [...base].filter((k) => matchesPresetHwFilter(k, filter, selectedModelRef.current)),
       );
       if (filtered.size > 0) {
-        setActiveHwTypes(filtered);
+        setActiveHwTypes(resolveHwSelection(filtered).result);
         setPendingHwFilter(null);
       } else {
-        setActiveHwTypes(base);
+        setActiveHwTypes(resolveHwSelection(base).result);
       }
     },
-    [setActiveHwTypes, setActiveHwTypesDispatch],
+    [resolveHwSelection, setActiveHwTypes, setActiveHwTypesDispatch],
   );
 
   const hwTypesWithData = useChartDataFilter(
@@ -746,46 +885,20 @@ export function InferenceProvider({
       [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, pendingHwFilter, selectedModel)),
     );
     if (filtered.size > 0) {
-      setActiveHwTypes(filtered);
+      setActiveHwTypes(resolveHwSelection(filtered).result);
       setPendingHwFilter(null);
     }
-  }, [pendingHwFilter, hwTypesWithData, setActiveHwTypes]);
+  }, [pendingHwFilter, hwTypesWithData, selectedModel, resolveHwSelection, setActiveHwTypes]);
 
-  const exclusion = useMemo(() => {
-    const specs = getModelExclusion(selectedModel);
-    return specs.length > 0 ? buildExclusion(specs) : null;
-  }, [selectedModel]);
   const toggleHwType = useCallback(
     (hw: string) => {
-      // Under exclusion, hide participating keys from inactive groups when
-      // computing the toggle "universe". This makes the default-deselected
-      // state (DSv4 MTP on first load) count as "all selected", so clicking a
-      // legend entry solos it instead of just removing it.
-      const toggleUniverse = exclusion
-        ? effectiveLegendItems(hwTypesWithData, activeHwTypes, exclusion)
-        : hwTypesWithData;
-      if (exclusion) {
-        const decision = resolveExclusionToggle(activeHwTypes, hw, toggleUniverse, exclusion);
-        if (decision.kind === 'block') {
-          setMtpConflict({
-            kind: 'blocked',
-            attempted: decision.attempted,
-            existing: decision.existing,
-          });
-          return;
-        }
-        if (decision.kind === 'silent-disable-all') {
-          setActiveHwTypes(decision.result);
-          setActivePresetId(null);
-          presetHwFilterRef.current = null;
-          return;
-        }
-      }
-      toggleHwRaw(hw, toggleUniverse);
+      const next = toggleComparisonSelection(activeHwTypes, hw, hwTypesWithData);
+      if (!next) return;
+      setActiveHwTypes(next);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [toggleHwRaw, hwTypesWithData, exclusion, activeHwTypes, setActiveHwTypes],
+    [activeHwTypes, hwTypesWithData, setActiveHwTypes, toggleComparisonSelection],
   );
 
   const removeHwType = useCallback(
@@ -813,15 +926,25 @@ export function InferenceProvider({
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
     if (exclusion) {
-      const { result, droppedGroups } = clearAllExclusionGroups(hwTypesWithData, exclusion);
+      const { result, keptGroup, droppedGroups } = resolveHwSelection(
+        hwTypesWithData,
+        activeHwTypes,
+      );
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
-        setMtpConflict({ kind: 'cleared', families: droppedGroups });
+        setEngineConflict({ kind: 'resolved', kept: keptGroup, dropped: droppedGroups });
       }
       return;
     }
     selectAllHwRaw(hwTypesWithData);
-  }, [selectAllHwRaw, hwTypesWithData, exclusion, setActiveHwTypes]);
+  }, [
+    selectAllHwRaw,
+    hwTypesWithData,
+    activeHwTypes,
+    exclusion,
+    resolveHwSelection,
+    setActiveHwTypes,
+  ]);
   const selectAllActiveDates = useCallback(
     () => selectAllDatesRaw(allDateIds),
     [selectAllDatesRaw, allDateIds],
@@ -842,9 +965,8 @@ export function InferenceProvider({
 
   // Restore legend-active selection from URL on first availability of
   // hwTypesWithData. Sets lastHwResetKeyRef so the reset effect below treats
-  // the current key as already-applied and bails. Empty intersection (e.g.
-  // shared GPUs no longer in availability) falls back to "all available".
-  // Multi-family MTP keys are cleared the same way as the auto-reset path.
+  // the current key as already-applied and bails. Empty intersections fall back
+  // to all available configs before the active exclusion policy is applied.
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
     if (pendingHwFilterRef.current) return;
@@ -860,15 +982,17 @@ export function InferenceProvider({
       ),
     );
     // Empty intersection (e.g. URL referenced GPUs no longer in availability,
-    // or the URL only contained multi-family MTP keys that get sanitized away)
-    // → fall back to the default "all available" set. MTP sanitization is then
-    // applied below so the fallback itself is engine-exclusion safe.
+    // or every referenced key disappeared) falls back to all available configs.
     if (restored.size === 0) restored = hwTypesWithData;
     if (exclusion) {
-      const cleared = clearAllExclusionGroups(restored, exclusion);
-      restored = cleared.result;
-      if (cleared.droppedGroups.length > 0) {
-        setMtpConflict({ kind: 'cleared', families: cleared.droppedGroups });
+      const resolved = resolveHwSelection(restored, new Set());
+      restored = resolved.result;
+      if (resolved.droppedGroups.length > 0) {
+        setEngineConflict({
+          kind: 'resolved',
+          kept: resolved.keptGroup,
+          dropped: resolved.droppedGroups,
+        });
       }
     }
     setActiveHwTypes(restored);
@@ -881,6 +1005,7 @@ export function InferenceProvider({
     selectedModel,
     effectiveSequence,
     precisionsKey,
+    resolveHwSelection,
     setActiveHwTypes,
   ]);
 
@@ -897,23 +1022,20 @@ export function InferenceProvider({
         [...hwTypesWithData].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
       );
       if (filtered.size > 0) {
-        // Presets explicitly chose hw configs — respect their picks. The
-        // matcher already excludes rule-suffix keys under bare prefixes for
-        // models with an exclusion rule, so we don't fall through to
-        // clearAllExclusionGroups (which would fire the toast). The legend
-        // toggle guard still blocks adding a second comparability group later.
-        setActiveHwTypes(filtered);
+        // Presets explicitly choose configs. Resolve any engine conflict
+        // silently so loading a preset never flashes an invalid comparison.
+        setActiveHwTypes(resolveHwSelection(filtered).result);
         return;
       }
     }
     if (exclusion) {
-      // When multiple comparability groups have data, disable them all by
-      // default and surface a toast. The user has to opt into one group
-      // explicitly — never multiple at once.
-      const { result, droppedGroups } = clearAllExclusionGroups(hwTypesWithData, exclusion);
+      // Automatic resets must never surface multiple incomparable engine groups.
+      // AgentX keeps one sticky group so its chart remains useful; variant-only
+      // rules retain the existing clear-all behavior.
+      const { result, keptGroup, droppedGroups } = resolveHwSelection(hwTypesWithData);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
-        setMtpConflict({ kind: 'cleared', families: droppedGroups });
+        setEngineConflict({ kind: 'resolved', kept: keptGroup, dropped: droppedGroups });
       }
       return;
     }
@@ -925,6 +1047,7 @@ export function InferenceProvider({
     hwTypesWithData,
     exclusion,
     pendingActiveHwTypes,
+    resolveHwSelection,
   ]);
 
   // Remove selected GPUs that no longer have data for current filters
@@ -932,7 +1055,7 @@ export function InferenceProvider({
     if (selectedGPUs.length === 0 || availableGPUs.length === 0) return;
     const validKeys = new Set(availableGPUs.map((g) => g.value));
     const valid = selectedGPUs.filter((g) => validKeys.has(g));
-    if (valid.length !== selectedGPUs.length) setSelectedGPUs(valid);
+    if (valid.length !== selectedGPUs.length) setSelectedGpuState(valid);
   }, [availableGPUs]);
 
   useEffect(() => {
@@ -1144,7 +1267,7 @@ export function InferenceProvider({
       setActivePresetId(preset.id);
       setHighContrast(true);
       if (config.gpus && config.gpus.length > 0) {
-        setSelectedGPUs(config.gpus);
+        setSelectedGpuState(config.gpus);
         if (config.useDateRange) {
           setSelectedDateRange({ startDate: '', endDate: '' });
           setSelectedDates([]);
@@ -1155,7 +1278,7 @@ export function InferenceProvider({
           setSelectedDates([]);
         }
       } else {
-        setSelectedGPUs([]);
+        setSelectedGpuState([]);
         setSelectedDateRange({ startDate: '', endDate: '' });
         setSelectedDates([]);
       }
@@ -1171,7 +1294,7 @@ export function InferenceProvider({
       setSelectedSequence,
       setSelectedPrecisions,
       setSelectedYAxisMetric,
-      setSelectedGPUs,
+      setSelectedGpuState,
       setSelectedDates,
       setSelectedDateRange,
       setActivePresetId,
@@ -1223,6 +1346,8 @@ export function InferenceProvider({
       toggleHwType,
       removeHwType,
       selectAllHwTypes,
+      resolveComparisonSelection: resolveHwSelection,
+      toggleComparisonSelection,
       hardwareConfig,
       graphs,
       selectedModel,
@@ -1315,6 +1440,9 @@ export function InferenceProvider({
       toggleHwType,
       removeHwType,
       selectAllHwTypes,
+      resolveHwSelection,
+      toggleComparisonSelection,
+
       hardwareConfig,
       graphs,
       loading,
@@ -1371,7 +1499,7 @@ export function InferenceProvider({
   return (
     <InferenceContext.Provider value={value}>
       {children}
-      <MtpEngineConflictToast detail={mtpConflict} onDismiss={dismissMtpConflict} />
+      <EngineComparisonConflictToast detail={engineConflict} onDismiss={dismissEngineConflict} />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>
