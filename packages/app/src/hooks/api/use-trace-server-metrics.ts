@@ -78,8 +78,8 @@ export interface TraceServerMetrics {
    */
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
   /**
-   * Total KV-cache pool size in tokens (num_gpu_blocks × block_size, summed
-   * across engines). vLLM only — null for SGLang/TRT or older rows.
+   * Deployment-wide KV-cache pool size in tokens emitted by InferenceX.
+   * Available for vLLM/SGLang agentic rows; null for unsupported or older rows.
    */
   kvCachePoolTokens: number | null;
   /** Orchestrator-normalized metrics grouped by endpoint/worker. */
