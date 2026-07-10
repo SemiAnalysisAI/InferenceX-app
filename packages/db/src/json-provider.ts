@@ -913,7 +913,8 @@ export function getRunConfigsByDate(date: string): RunConfigRow[] {
     const c = s.configs.get(br.config_id);
     if (!c) continue;
 
-    const key = `${wr.github_run_id}|${c.model}|${c.precision}|${c.hardware}|${c.framework}|${c.spec_method}|${c.disagg}`;
+    const benchmarkType = br.benchmark_type ?? 'single_turn';
+    const key = `${wr.github_run_id}|${c.model}|${c.precision}|${c.hardware}|${c.framework}|${c.spec_method}|${c.disagg}|${benchmarkType}|${br.isl}|${br.osl}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -928,6 +929,9 @@ export function getRunConfigsByDate(date: string): RunConfigRow[] {
       framework: c.framework,
       spec_method: c.spec_method,
       disagg: c.disagg,
+      benchmark_type: benchmarkType,
+      isl: br.isl,
+      osl: br.osl,
     });
   }
 

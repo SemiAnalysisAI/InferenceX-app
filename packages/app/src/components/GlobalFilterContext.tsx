@@ -36,6 +36,8 @@ import {
 import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
+import { scenarioRunIdsForDate } from '@/lib/run-configs';
+import { resolveRunDate } from '@/lib/run-date';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -411,14 +413,10 @@ export function GlobalFilterProvider({
     setSelectedRunDateRev((v) => v + 1);
   }, []);
 
-  const effectiveRunDate = useMemo(() => {
-    if (availableDates.length === 0) return selectedRunDate;
-    const latest = availableDates.at(-1)!;
-    if (userPickedDateRef.current && selectedRunDate && availableDates.includes(selectedRunDate)) {
-      return selectedRunDate;
-    }
-    return latest;
-  }, [availableDates, selectedRunDate]);
+  const effectiveRunDate = useMemo(
+    () => resolveRunDate(availableDates, selectedRunDate, userPickedDateRef.current),
+    [availableDates, selectedRunDate],
+  );
 
   // Sync selectedRunDate state when effectiveRunDate changes
   useEffect(() => {
@@ -437,15 +435,32 @@ export function GlobalFilterProvider({
 
   const workflowError = workflowQueryError ? workflowQueryError.message : null;
 
-  const availableRuns = useMemo(
-    () => (workflowData ? buildRunInfo(workflowData) : {}),
-    [workflowData],
-  );
+  const dateRuns = useMemo(() => (workflowData ? buildRunInfo(workflowData) : {}), [workflowData]);
+
+  const runConfigs = useMemo(() => workflowData?.runConfigs ?? [], [workflowData]);
+
+  // Keep run selection and g_runid scenario-safe at their source. Filtering
+  // later in InferenceContext leaves the global single-turn run ID alive.
+  const availableRuns = useMemo(() => {
+    const runIds = scenarioRunIdsForDate(
+      runConfigs,
+      dbModelKeys,
+      effectiveSequence,
+      effectivePrecisions,
+    );
+    return Object.fromEntries(Object.entries(dateRuns).filter(([runId]) => runIds.has(runId)));
+  }, [dateRuns, runConfigs, dbModelKeys, effectiveSequence, effectivePrecisions]);
 
   const workflowInfo = useMemo(
     () => (Object.keys(availableRuns).length > 0 ? [{ runInfoBySequence: availableRuns }] : null),
     [availableRuns],
   );
+
+  const effectiveSelectedRunId = useMemo(() => {
+    const runIds = Object.keys(availableRuns);
+    if (runIds.includes(selectedRunId)) return selectedRunId;
+    return runIds.reduce((latest, runId) => (runId > latest ? runId : latest), '');
+  }, [availableRuns, selectedRunId]);
 
   // Auto-select latest run ID when availableRuns change
   const urlInitRef = useRef({ runIdApplied: false });
@@ -484,8 +499,10 @@ export function GlobalFilterProvider({
     }
     setUrlParams({
       g_model: selectedModel,
-      g_rundate: selectedRunDate,
-      g_runid: selectedRunId,
+      // Never write a stale URL date after model/scenario availability has
+      // already resolved it to a valid date (e.g. Agentic + 2026-07-04).
+      g_rundate: effectiveRunDate,
+      g_runid: effectiveSelectedRunId,
       // Don't pin the sequence to the URL until it's resolved from real
       // availability — writing the pre-load placeholder (8k/1k) would clobber a
       // shared `?i_seq=agentic-traces` link before the model's availability
@@ -497,8 +514,8 @@ export function GlobalFilterProvider({
     });
   }, [
     selectedModel,
-    selectedRunDate,
-    selectedRunId,
+    effectiveRunDate,
+    effectiveSelectedRunId,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -520,7 +537,7 @@ export function GlobalFilterProvider({
       selectedRunDate: effectiveRunDate,
       setSelectedRunDate: setSelectedRunDateManual,
       selectedRunDateRev,
-      selectedRunId,
+      selectedRunId: effectiveSelectedRunId,
       setSelectedRunId,
       availableModels,
       availableSequences,
@@ -543,7 +560,7 @@ export function GlobalFilterProvider({
       effectiveRunDate,
       setSelectedRunDateManual,
       selectedRunDateRev,
-      selectedRunId,
+      effectiveSelectedRunId,
       availableModels,
       availableSequences,
       availablePrecisions,

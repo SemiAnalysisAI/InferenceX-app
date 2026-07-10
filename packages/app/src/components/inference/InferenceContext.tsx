@@ -374,7 +374,7 @@ export function InferenceProvider({
   );
 
   const effectiveSelectedRunId = useMemo(() => {
-    if (!filteredAvailableRuns) return selectedRunId;
+    if (!filteredAvailableRuns) return '';
     const filteredRunIds = Object.keys(filteredAvailableRuns);
     if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
     return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);

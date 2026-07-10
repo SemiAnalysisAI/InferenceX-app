@@ -16,6 +16,10 @@ function rc(over: Partial<RunConfigRow>): RunConfigRow {
     framework: 'vllm',
     spec_method: 'none',
     disagg: false,
+    // Defaults to a single_turn 8k/1k row; agentic tests override these.
+    benchmark_type: 'single_turn',
+    isl: 8192,
+    osl: 1024,
     ...over,
   };
 }

@@ -31,7 +31,7 @@ const getCachedWorkflowInfo = cachedQuery(async (date: string) => {
     getRunConfigsByDate(sql, date),
   ]);
   return { runs, changelogs, configs, runConfigs };
-}, 'workflow-info');
+}, 'workflow-info-v2');
 
 export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get('date') ?? '';
