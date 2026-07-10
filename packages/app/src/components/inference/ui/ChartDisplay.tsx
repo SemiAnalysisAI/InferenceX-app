@@ -343,6 +343,7 @@ export default function ChartDisplay() {
     getOverlayData,
     isUnofficialRun,
     activeOverlayHwTypes,
+    setActiveOverlayHwTypes,
   } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
@@ -426,14 +427,100 @@ export default function ChartDisplay() {
     compareGpuPair,
   ]);
 
-  const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${unofficialRunInfos
-    .map((run) => run.url)
-    .join(',')}`;
-  const previousOverlayRowsScopeRef = useRef<string | null>(null);
-  const overlayRowsScopeChanged = previousOverlayRowsScopeRef.current !== overlayRowsScopeKey;
+  const overlayScope = useMemo(() => {
+    const allKeys = new Set<string>();
+    const eligibleKeys = new Set<string>();
+    for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
+      for (const point of overlay?.data ?? []) {
+        const key = String(point.hwKey);
+        allKeys.add(key);
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          eligibleKeys.add(key);
+        }
+      }
+    }
+    return { eligibleKeys, dataKey: [...allKeys].toSorted().join(',') };
+  }, [overlayDataByChartType, selectedPrecisions, quickFilters]);
+  const officialScope = useMemo(() => {
+    const allKeys = new Set<string>();
+    const eligibleKeys = new Set<string>();
+    for (const graph of graphs) {
+      for (const point of graph.data) {
+        const key = String(point.hwKey);
+        allKeys.add(key);
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          eligibleKeys.add(key);
+        }
+      }
+    }
+    return { eligibleKeys, dataKey: [...allKeys].toSorted().join(',') };
+  }, [graphs, selectedPrecisions, quickFilters]);
+  const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
+    ',',
+  )}|${unofficialRunInfos.map((run) => run.url).join(',')}|${officialScope.dataKey}|${
+    overlayScope.dataKey
+  }`;
+  const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
+  const overlayRowsScopeChanged = appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
+  const resolvedScopedOverlayHwTypes = useMemo(() => {
+    const activeOfficialKeys = new Set(
+      [...activeHwTypes].filter((key) => officialScope.eligibleKeys.has(key)),
+    );
+    const officialKeys =
+      activeOfficialKeys.size > 0 ? activeOfficialKeys : officialScope.eligibleKeys;
+    const activeScopedOverlayKeys = new Set(
+      [...activeOverlayHwTypes].filter((key) => overlayScope.eligibleKeys.has(key)),
+    );
+    const overlayKeys = overlayRowsScopeChanged
+      ? overlayScope.eligibleKeys
+      : activeScopedOverlayKeys;
+    const proposed = new Set(officialKeys);
+    overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
+    const previous = new Set(activeOfficialKeys);
+    activeScopedOverlayKeys.forEach((key) => previous.add(`overlay:${key}`));
+    const resolved = resolveComparisonSelection(proposed, previous).result;
+    const overlay = new Set<string>();
+    for (const key of resolved) {
+      if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
+    }
+    return overlay;
+  }, [
+    activeHwTypes,
+    activeOverlayHwTypes,
+    officialScope,
+    overlayScope,
+    overlayRowsScopeChanged,
+    resolveComparisonSelection,
+  ]);
   useEffect(() => {
-    previousOverlayRowsScopeRef.current = overlayRowsScopeKey;
-  }, [overlayRowsScopeKey]);
+    const merged = new Set(activeOverlayHwTypes);
+    overlayScope.eligibleKeys.forEach((key) => merged.delete(key));
+    resolvedScopedOverlayHwTypes.forEach((key) => merged.add(key));
+    let selectionChanged = merged.size !== activeOverlayHwTypes.size;
+    if (!selectionChanged) {
+      for (const key of merged) {
+        if (!activeOverlayHwTypes.has(key)) {
+          selectionChanged = true;
+          break;
+        }
+      }
+    }
+    if (selectionChanged) setActiveOverlayHwTypes(merged);
+    if (overlayRowsScopeChanged) setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
+  }, [
+    overlayRowsScopeChanged,
+    overlayRowsScopeKey,
+    activeOverlayHwTypes,
+    overlayScope,
+    resolvedScopedOverlayHwTypes,
+    setActiveOverlayHwTypes,
+  ]);
 
   const visibleComparisonRows = useCallback(
     (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => {
@@ -456,7 +543,9 @@ export default function ChartDisplay() {
         [...activeOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
       );
       const officialKeys = activeOfficialKeys.size > 0 ? activeOfficialKeys : availableOfficialKeys;
-      const overlayKeys = overlayRowsScopeChanged ? availableOverlayKeys : activeScopedOverlayKeys;
+      const overlayKeys = new Set(
+        [...resolvedScopedOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
+      );
       const proposed = new Set(officialKeys);
       overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
       const previous = new Set(activeOfficialKeys);
@@ -475,7 +564,7 @@ export default function ChartDisplay() {
       quickFilters,
       activeHwTypes,
       activeOverlayHwTypes,
-      overlayRowsScopeChanged,
+      resolvedScopedOverlayHwTypes,
       resolveComparisonSelection,
     ],
   );

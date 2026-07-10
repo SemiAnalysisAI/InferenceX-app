@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { GlobalFilterContext } from '@/components/GlobalFilterContext';
+import { InferenceContext } from '@/components/inference/InferenceContext';
+import { UnofficialRunContext } from '@/components/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
@@ -5,6 +9,9 @@ import {
   createMockInferenceData,
   createMockChartDefinition,
   createMockHardwareConfig,
+  createMockGlobalFilterContext,
+  createMockInferenceContext,
+  createMockUnofficialRunContext,
 } from '../support/mock-data';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
 import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
@@ -457,5 +464,137 @@ describe('ChartDisplay engine comparison guard', () => {
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+  });
+
+  it('commits a new table overlay scope and preserves an explicit empty selection', () => {
+    const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
+    const exclusion = buildExclusion([
+      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+    ]);
+    const namespacedExclusion = {
+      familyOf: (key: string) =>
+        exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      groupOf: (key: string) =>
+        exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+    };
+    const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
+      resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky');
+    const runInfo = {
+      id: 123,
+      name: 'agentx-scope-test',
+      branch: 'agentx-scope-test',
+      sha: 'abc123',
+      createdAt: '2026-07-10T00:00:00Z',
+      url: 'https://github.com/x/y/actions/runs/123',
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+    const baseInference = createMockInferenceContext();
+    const baseGlobalFilters = createMockGlobalFilterContext();
+    const baseUnofficial = createMockUnofficialRunContext();
+
+    function OverlayScopeHarness() {
+      const [secondScope, setSecondScope] = useState(false);
+      const [activeOverlayKeys, setActiveOverlayKeys] = useState(new Set(['h100_sglang']));
+      const [, setRenderVersion] = useState(0);
+      const model = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;
+      const officialKey = secondScope ? 'h100_vllm' : 'b200_sglang';
+      const overlayKeys = secondScope
+        ? ['b200_vllm', 'h200_sglang']
+        : ['h100_sglang', 'h200_sglang'];
+      const officialRows = [
+        createMockInferenceData({
+          hwKey: officialKey,
+          model,
+          precision: Precision.FP4,
+        }),
+      ];
+      const overlayRows = overlayKeys.map((hwKey, index) =>
+        createMockInferenceData({
+          hwKey,
+          model,
+          precision: Precision.FP4,
+          x: 8 + index * 8,
+          run_url: runInfo.url,
+        }),
+      );
+      const inference = {
+        ...baseInference,
+        graphs: [
+          {
+            model,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: officialRows,
+          },
+        ],
+        selectedModel: model,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity' as const,
+        selectedXAxisMetric: 'p90_ttft',
+        activeHwTypes: new Set([officialKey]),
+        hwTypesWithData: new Set([officialKey]),
+        resolveComparisonSelection: resolveSelection,
+      };
+      const globalFilters = {
+        ...baseGlobalFilters,
+        selectedModel: model,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      };
+      const unofficial = {
+        ...baseUnofficial,
+        isUnofficialRun: true,
+        unofficialRunInfo: runInfo,
+        unofficialRunInfos: [runInfo],
+        runIndexByUrl: { [runInfo.url]: 0, [String(runInfo.id)]: 0 },
+        getOverlayData: () => ({ data: overlayRows, hardwareConfig: hwConfig }),
+        activeOverlayHwTypes: activeOverlayKeys,
+        setActiveOverlayHwTypes: setActiveOverlayKeys,
+        allOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang', 'b200_vllm']),
+      };
+
+      return (
+        <GlobalFilterContext.Provider value={globalFilters}>
+          <UnofficialRunContext.Provider value={unofficial}>
+            <InferenceContext.Provider value={inference}>
+              <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
+                Change scope
+              </button>
+              <button
+                data-testid="clear-overlay-scope"
+                onClick={() => setActiveOverlayKeys(new Set())}
+              >
+                Clear overlays
+              </button>
+              <button
+                data-testid="rerender-overlay-scope"
+                onClick={() => setRenderVersion((version) => version + 1)}
+              >
+                Rerender
+              </button>
+              <ChartDisplay />
+            </InferenceContext.Provider>
+          </UnofficialRunContext.Provider>
+        </GlobalFilterContext.Provider>
+      );
+    }
+
+    mountWithProviders(<OverlayScopeHarness />);
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
+
+    cy.get('[data-testid="change-overlay-scope"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
+    cy.get('[data-testid="rerender-overlay-scope"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
+
+    cy.get('[data-testid="clear-overlay-scope"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="rerender-overlay-scope"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-chart-view-btn"]').click();
+    cy.get('#chart-0 svg .unofficial-overlay-pt').should('not.exist');
   });
 });

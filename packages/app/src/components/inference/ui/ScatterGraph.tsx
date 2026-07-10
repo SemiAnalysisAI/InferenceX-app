@@ -461,15 +461,23 @@ const ScatterGraph = React.memo(
         ).result,
       [rawUnifiedSelection, rawOfficialHwTypes, resolveComparisonSelection],
     );
-    const { effectiveOfficialHwTypes, activeOverlayHwTypes } = useMemo(() => {
+    const resolvedHwTypes = useMemo(() => {
       const official = new Set<string>();
       const overlay = new Set<string>();
       for (const key of resolvedUnifiedSelection) {
         if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
         else official.add(key);
       }
-      return { effectiveOfficialHwTypes: official, activeOverlayHwTypes: overlay };
+      return { official, overlay };
     }, [resolvedUnifiedSelection]);
+    const effectiveOfficialHwTypes = resolvedHwTypes.official;
+    // Official-only toggles must not rebuild the D3 overlay layer. Preserve the
+    // overlay Set identity when its contents did not change.
+    const activeOverlayHwTypesRef = useRef(resolvedHwTypes.overlay);
+    if (!setsEqual(activeOverlayHwTypesRef.current, resolvedHwTypes.overlay)) {
+      activeOverlayHwTypesRef.current = resolvedHwTypes.overlay;
+    }
+    const activeOverlayHwTypes = activeOverlayHwTypesRef.current;
     const mergeScopedOverlaySelection = useCallback(
       (scopedSelection: Set<string>) => {
         const merged = new Set(providerActiveOverlayHwTypes);
