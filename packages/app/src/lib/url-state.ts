@@ -74,12 +74,13 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
-  // No strippable default: the UI default scenario (gate-unlocked) is
-  // AgenticTraces, not 8k/1k, so an '8k/1k' default here would strip an explicit
-  // 8K/1K selection from the URL — on reload the empty i_seq resolves back to the
-  // agentic default. Empty means the resolved scenario is ALWAYS written
-  // explicitly (effectiveSequence is never ''), so a shared/reloaded link keeps
-  // whatever the user picked. The no-param case still resolves via availability.
+  // No strippable default: per-route `initialSequence` seeds (e.g. the /compare
+  // pages) make the no-param resolution route-dependent, so stripping '8k/1k'
+  // (the global default) would revert an explicit 8K/1K pick back to the route's
+  // seeded scenario on reload. Empty means the resolved scenario is ALWAYS
+  // written explicitly (effectiveSequence is never ''), so a shared/reloaded
+  // link keeps whatever the user picked. The no-param case still resolves via
+  // availability.
   i_seq: '',
   // No strippable default: precision is only written to the URL once chosen
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a

@@ -4,6 +4,8 @@ import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
   getModelLabel,
+  getModelExclusion,
+  getSequenceExclusion,
   getSequenceLabel,
   getPrecisionLabel,
   getEvalBenchmarkLabel,
@@ -194,6 +196,19 @@ describe('isSequenceDeprecated', () => {
 
   it('returns false for non-deprecated sequence EightK_OneK', () => {
     expect(isSequenceDeprecated(Sequence.EightK_OneK)).toBe(false);
+  });
+});
+
+describe('comparison exclusions', () => {
+  it('keeps the existing DeepSeek V4 MTP rule model-scoped', () => {
+    expect(getModelExclusion(Model.DeepSeek_V4_Pro).map((spec) => spec.suffix)).toEqual(['_mtp']);
+    expect(getModelExclusion(Model.DeepSeek_R1)).toEqual([]);
+  });
+
+  it('applies the unsuffixed STP rule only to Agentic Traces', () => {
+    expect(getSequenceExclusion(Sequence.AgenticTraces).map((spec) => spec.suffix)).toEqual([null]);
+    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual([]);
+    expect(getSequenceExclusion(Sequence.OneK_OneK)).toEqual([]);
   });
 });
 

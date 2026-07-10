@@ -1,10 +1,10 @@
 ---
 name: ingest
-description: Ingest a benchmark run from GitHub Actions into the Neon DB used by the feat/agentx deployment. The target DB write URL must be provided in the invocation. Handles standard ingest, delete+reingest, and changelog entries. Invoke when the user asks to ingest a workflow run URL.
+description: Ingest a benchmark run from GitHub Actions into the Neon DB backing this dashboard. The target DB write URL must be provided in the invocation. Handles standard ingest, delete+reingest, and changelog entries. Invoke when the user asks to ingest a workflow run URL.
 tools: Bash, Read, Edit, Write
 ---
 
-You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into the Neon branch used by the `feat/agentx` deployment of this dashboard. Operate on `/Users/quilicic/InferenceX-app`.
+You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into the Neon DB backing this dashboard. All benchmark types — including agentic — live in the main production DB (the separate agentx-v1 staging DB was retired on 2026-07-10 after its data was migrated to production). Operate on `/Users/quilicic/InferenceX-app`.
 
 ## Environment
 
@@ -13,7 +13,7 @@ You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into t
   - Use the **direct (non-pooled)** host for ingest/migrations — no `-pooler` in the hostname.
   - For psql diagnostics you may use the same URL directly: `psql "$DATABASE_WRITE_URL" -c "..."`.
 - **Local dev server**: usually `http://localhost:3002` (port 3000 is a different project on this machine — never purge port 3000)
-- **Preview URL**: `https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app`
+- **Production URL**: `https://inferencex.semianalysis.com`
 - **INVALIDATE_SECRET** lives in repo root `.env` under that key.
 - **GitHub auth**: `gh auth token` for `gh` calls and the GITHUB_TOKEN env var.
 
@@ -35,13 +35,8 @@ Then refresh the materialized view (the script's auto-refresh sometimes races):
 SECRET=$(grep "^INVALIDATE_SECRET" /Users/quilicic/InferenceX-app/.env | cut -d= -f2 | tr -d '"')
 # Localhost (port 3002, NOT 3000)
 curl -s -X POST -H "Authorization: Bearer $SECRET" http://localhost:3002/api/v1/invalidate
-# Preview
-mkdir -p /tmp/vp && cd /tmp/vp \
-  && vercel link --project inferencemax-app --scope semianalysisai --yes >/dev/null 2>&1 \
-  && vercel curl /api/v1/invalidate \
-       --deployment https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app \
-       --yes -- -sS -X POST -H "Authorization: Bearer $SECRET"
-rm -rf /tmp/vp
+# Production
+curl -sS -X POST -H "Authorization: Bearer $SECRET" https://inferencex.semianalysis.com/api/v1/invalidate
 ```
 
 ## Delete + reingest (use only when user explicitly says "delete and reingest" OR when the run supersedes prior data with the same (model, hw, framework, precision))
@@ -171,7 +166,7 @@ If the user doesn't specify a description, DO NOT skip the entry and DO NOT bloc
 3. **Ingest** via the standard path. Do NOT use AIPerf tagging unless the user explicitly asks for a separate legend line.
 4. **Refresh materialized view**.
 5. **Add changelog entry — ALWAYS, MANDATORY.** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"). Use the user's text if given (substituting `<SKU>`); otherwise derive one from the run name and add it anyway. Never skip this step.
-6. **Purge both caches** (localhost 3002 + preview — never port 3000).
+6. **Purge both caches** (localhost 3002 + production — never port 3000).
 7. **Report** the row count, date, hardware, run id, and the changelog id (always present).
 
 ## Related: ingesting agentic _datasets_ (not benchmark runs)

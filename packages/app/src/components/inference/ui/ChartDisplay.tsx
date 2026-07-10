@@ -5,7 +5,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2, X } from 'lucide-react';
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
@@ -26,6 +26,7 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
+import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { Card } from '@/components/ui/card';
@@ -253,6 +254,8 @@ export default function ChartDisplay() {
     compareGpuPair,
     selectedXAxisMode,
     setSelectedXAxisMode,
+    quickFilters,
+    resolveComparisonSelection,
   } = useInference();
 
   const {
@@ -340,6 +343,9 @@ export default function ChartDisplay() {
     getOverlayData,
     isUnofficialRun,
     activeOverlayHwTypes,
+    setActiveOverlayHwTypes,
+    localOfficialOverride,
+    setLocalOfficialOverride,
   } = useUnofficialRun();
 
   // Compute overlay data for each chart type — must match useChartData processing
@@ -422,6 +428,148 @@ export default function ChartDisplay() {
     selectedE2eXAxisMetric,
     compareGpuPair,
   ]);
+
+  const overlayScope = useMemo(() => {
+    const eligibleKeys = new Set<string>();
+    for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
+      for (const point of overlay?.data ?? []) {
+        const key = String(point.hwKey);
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          eligibleKeys.add(key);
+        }
+      }
+    }
+    return eligibleKeys;
+  }, [overlayDataByChartType, selectedPrecisions, quickFilters]);
+  const officialScope = useMemo(() => {
+    const eligibleKeys = new Set<string>();
+    for (const graph of graphs) {
+      for (const point of graph.data) {
+        const key = String(point.hwKey);
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          eligibleKeys.add(key);
+        }
+      }
+    }
+    return eligibleKeys;
+  }, [graphs, selectedPrecisions, quickFilters]);
+  const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
+    ',',
+  )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
+  const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
+  const overlayRowsScopeChanged = appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
+  const selectedOfficialHwTypes =
+    overlayRowsScopeChanged || localOfficialOverride === null
+      ? activeHwTypes
+      : localOfficialOverride;
+  const resolvedScopedOverlayHwTypes = useMemo(() => {
+    const activeOfficialKeys = new Set(
+      [...selectedOfficialHwTypes].filter((key) => officialScope.has(key)),
+    );
+    const officialKeys = activeOfficialKeys;
+    const activeScopedOverlayKeys = new Set(
+      [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
+    );
+    const overlayKeys = overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
+    const proposed = new Set(officialKeys);
+    overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
+    const previous = new Set(activeOfficialKeys);
+    activeScopedOverlayKeys.forEach((key) => previous.add(`overlay:${key}`));
+    const resolved = resolveComparisonSelection(proposed, previous).result;
+    const overlay = new Set<string>();
+    for (const key of resolved) {
+      if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
+    }
+    return overlay;
+  }, [
+    selectedOfficialHwTypes,
+    activeOverlayHwTypes,
+    officialScope,
+    overlayScope,
+    overlayRowsScopeChanged,
+    resolveComparisonSelection,
+  ]);
+  useEffect(() => {
+    const merged = new Set(activeOverlayHwTypes);
+    overlayScope.forEach((key) => merged.delete(key));
+    resolvedScopedOverlayHwTypes.forEach((key) => merged.add(key));
+    let selectionChanged = merged.size !== activeOverlayHwTypes.size;
+    if (!selectionChanged) {
+      for (const key of merged) {
+        if (!activeOverlayHwTypes.has(key)) {
+          selectionChanged = true;
+          break;
+        }
+      }
+    }
+    if (selectionChanged) setActiveOverlayHwTypes(merged);
+    if (overlayRowsScopeChanged && localOfficialOverride !== null) {
+      setLocalOfficialOverride(null);
+    }
+    if (overlayRowsScopeChanged) setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
+  }, [
+    overlayRowsScopeChanged,
+    overlayRowsScopeKey,
+    activeOverlayHwTypes,
+    overlayScope,
+    resolvedScopedOverlayHwTypes,
+    setActiveOverlayHwTypes,
+    localOfficialOverride,
+    setLocalOfficialOverride,
+  ]);
+
+  const visibleComparisonRows = useCallback(
+    (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => {
+      const eligibleOfficialRows = officialRows.filter(
+        (point) =>
+          selectedPrecisions.includes(point.precision) && matchesQuickFilters(point, quickFilters),
+      );
+      const eligibleOverlayRows = (overlay?.data ?? []).filter(
+        (point) =>
+          selectedPrecisions.includes(point.precision) && matchesQuickFilters(point, quickFilters),
+      );
+      const availableOfficialKeys = new Set(
+        eligibleOfficialRows.map((point) => String(point.hwKey)),
+      );
+      const availableOverlayKeys = new Set(eligibleOverlayRows.map((point) => String(point.hwKey)));
+      const activeOfficialKeys = new Set(
+        [...selectedOfficialHwTypes].filter((key) => availableOfficialKeys.has(key)),
+      );
+      const activeScopedOverlayKeys = new Set(
+        [...activeOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
+      );
+      const officialKeys = activeOfficialKeys;
+      const overlayKeys = new Set(
+        [...resolvedScopedOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
+      );
+      const proposed = new Set(officialKeys);
+      overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
+      const previous = new Set(activeOfficialKeys);
+      activeScopedOverlayKeys.forEach((key) => previous.add(`overlay:${key}`));
+      const resolved = resolveComparisonSelection(proposed, previous).result;
+
+      return {
+        officialRows: eligibleOfficialRows.filter((point) => resolved.has(String(point.hwKey))),
+        overlayRows: eligibleOverlayRows.filter((point) =>
+          resolved.has(`overlay:${String(point.hwKey)}`),
+        ),
+      };
+    },
+    [
+      selectedPrecisions,
+      quickFilters,
+      selectedOfficialHwTypes,
+      activeOverlayHwTypes,
+      resolvedScopedOverlayHwTypes,
+      resolveComparisonSelection,
+    ],
+  );
 
   // Resolve x-axis field per chart type for trend data
   const xAxisFieldByChartType = useMemo(() => {
@@ -603,12 +751,20 @@ export default function ChartDisplay() {
                         : undefined
                     }
                     onExportCsv={() => {
-                      const visibleData = graph.data.filter((d) =>
-                        isTimelineMode
-                          ? activeDates.has(`${d.date}_${d.hwKey}`)
-                          : activeHwTypes.has(d.hwKey as string) &&
-                            selectedPrecisions.includes(d.precision),
+                      const candidateVisibleData = isTimelineMode
+                        ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
+                        : graph.data;
+                      const overlay = selectUnofficialOverlayForMode(
+                        selectedXAxisMode,
+                        graph.chartDefinition.chartType,
+                        overlayDataByChartType,
                       );
+                      const {
+                        officialRows: visibleData,
+                        overlayRows: visibleOverlayRowsForExport,
+                      } = isTimelineMode
+                        ? { officialRows: candidateVisibleData, overlayRows: [] }
+                        : visibleComparisonRows(candidateVisibleData, overlay);
                       const { headers, rows } = inferenceChartToCsv(
                         visibleData,
                         graph.model,
@@ -616,21 +772,9 @@ export default function ChartDisplay() {
                       );
                       // Match warnings against the same series the chart annotates,
                       // including visible unofficial-run overlay series.
-                      const overlay = selectUnofficialOverlayForMode(
-                        selectedXAxisMode,
-                        graph.chartDefinition.chartType,
-                        overlayDataByChartType,
-                      );
-                      const visibleOverlayRows = isTimelineMode
-                        ? []
-                        : (overlay?.data ?? []).filter(
-                            (p) =>
-                              activeOverlayHwTypes.has(p.hwKey as string) &&
-                              selectedPrecisions.includes(p.precision),
-                          );
                       const issueNotes = matchKnownConfigIssues(graph.model, [
                         ...visibleData,
-                        ...visibleOverlayRows,
+                        ...visibleOverlayRowsForExport,
                       ]).map((issue) =>
                         knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
                       );
@@ -740,18 +884,15 @@ export default function ChartDisplay() {
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
-                        const overlayRows = (overlay?.data ?? []).filter((p) =>
-                          selectedPrecisions.includes(p.precision),
+                        const { officialRows, overlayRows } = visibleComparisonRows(
+                          graph.data,
+                          overlay,
                         );
                         return (
                           <>
                             {chartCaption}
                             <InferenceTable
-                              data={
-                                overlayRows.length > 0
-                                  ? [...graph.data, ...overlayRows]
-                                  : graph.data
-                              }
+                              data={[...officialRows, ...overlayRows]}
                               chartDefinition={graph.chartDefinition}
                               selectedYAxisMetric={selectedYAxisMetric}
                             />

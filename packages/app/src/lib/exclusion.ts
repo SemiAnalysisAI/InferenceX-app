@@ -1,28 +1,33 @@
+import { SPEC_METHOD_KEYS } from '@semianalysisai/inferencex-constants';
+
 import { computeToggle } from '@/hooks/useTogglableSet';
 
 /**
  * Data-driven config exclusion.
  *
- * Some models can't show certain config variants on the same graph because the
- * numbers aren't directly comparable. The first case is dsv4 MTP: different
- * engines force speculative acceptance differently, so two engines' MTP curves
- * mean different things side by side.
+ * Some models or scenarios can't show certain config variants on the same graph
+ * because the numbers aren't directly comparable. DeepSeek V4 MTP configs use
+ * engine-specific acceptance forcing; AgentX also keeps standard-token (STP)
+ * results from different engines separate while the benchmark is new.
  *
- * The rule is expressed as DATA — an `ExclusionSpec[]` declared on the model
- * (see `data-mappings.ts`) — then compiled into resolvers by `buildExclusion`.
- * Every helper here operates on a compiled `Exclusion`, so adding a new
- * exclusivity rule means adding data, not code.
+ * Rules are expressed as DATA — `ExclusionSpec[]` values declared by model or
+ * sequence in `data-mappings.ts` — then compiled into resolvers by
+ * `buildExclusion`. Every helper here operates on a compiled `Exclusion`, so
+ * adding an exclusivity rule means adding data, not branching UI code.
  *
- * Model: participating keys are partitioned into comparability GROUPS. Keys in
- * the same group may be active together; keys in different groups are mutually
- * exclusive — at most one group active at a time. (For dsv4 MTP, ATOM and SGLang
- * share the upstream ROCm path → one group; vLLM is its own group.)
+ * Participating keys are partitioned into comparability GROUPS. Keys in the
+ * same group may be active together; keys in different groups are mutually
+ * exclusive — at most one group active at a time. ATOM and SGLang may share a
+ * group while vLLM remains separate.
  */
 
 /** Data params defining one exclusion rule. */
 export interface ExclusionSpec {
-  /** Only hwKeys ending in this suffix participate in the rule (e.g. `_mtp`). */
-  suffix: string;
+  /**
+   * Non-empty hwKey suffix for a variant (for example `_mtp`), or `null` for
+   * standard-token configs whose hwKeys have no speculative-method suffix.
+   */
+  suffix: string | null;
   /**
    * Engine-family prefixes stripped from the framework segment before grouping
    * (e.g. `dynamo-`, `mori-`), so `h100_dynamo-vllm_mtp` resolves to `vllm`.
@@ -36,7 +41,7 @@ export interface ExclusionSpec {
   groupAliases?: Record<string, string>;
 }
 
-/** Compiled resolvers for a model's exclusion specs. */
+/** Compiled resolvers for model- or sequence-scoped exclusion specs. */
 export interface Exclusion {
   /** Literal engine family of a participating key (for display), else null. */
   familyOf: (hwKey: string) => string | null;
@@ -44,14 +49,25 @@ export interface Exclusion {
   groupOf: (hwKey: string) => string | null;
 }
 
+const ACTIVE_SPEC_SUFFIXES = [...SPEC_METHOD_KEYS]
+  .filter((method) => method !== 'none')
+  .map((method) => `_${method}`);
+
 /**
  * Extract the literal engine family for `hwKey` under a single spec: strip the
- * trailing suffix, drop the leading GPU segment, then strip any configured
- * engine-family prefix. Returns null if the key doesn't participate.
+ * configured variant suffix (or require an unsuffixed STP key), drop the leading
+ * GPU segment, then strip any configured engine-family prefix. Returns null if
+ * the key doesn't participate.
  */
 function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
-  if (!hwKey.endsWith(spec.suffix)) return null;
-  const head = hwKey.slice(0, -spec.suffix.length);
+  let head: string;
+  if (spec.suffix === null) {
+    if (ACTIVE_SPEC_SUFFIXES.some((suffix) => hwKey.endsWith(suffix))) return null;
+    head = hwKey;
+  } else {
+    if (spec.suffix.length === 0 || !hwKey.endsWith(spec.suffix)) return null;
+    head = hwKey.slice(0, -spec.suffix.length);
+  }
   const firstUnderscore = head.indexOf('_');
   if (firstUnderscore === -1) return null;
   let framework = head.slice(firstUnderscore + 1);
@@ -66,10 +82,10 @@ function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
 
 /**
  * Compile a list of `ExclusionSpec`s into `familyOf` / `groupOf` resolvers.
- * The first spec that matches a key wins (specs are expected to be disjoint by
- * suffix in practice).
+ * The first spec that matches a key wins; variant-specific suffixes and the
+ * unsuffixed STP matcher are disjoint.
  */
-export function buildExclusion(specs: ExclusionSpec[]): Exclusion {
+export function buildExclusion(specs: readonly ExclusionSpec[]): Exclusion {
   return {
     familyOf(hwKey: string): string | null {
       for (const spec of specs) {
@@ -206,6 +222,42 @@ export function clearAllExclusionGroups(
   return { result, droppedGroups: [...byGroup.keys()] };
 }
 
+export type ExclusionConflictPolicy = 'clear-all' | 'keep-sticky';
+
+export interface ExclusionResolution {
+  result: Set<string>;
+  keptGroup: string | null;
+  droppedGroups: string[];
+}
+
+/** Resolve a multi-group set according to the view's default-selection policy. */
+export function resolveExclusionGroups(
+  proposed: Set<string>,
+  prev: Set<string>,
+  ex: Exclusion,
+  policy: ExclusionConflictPolicy = 'clear-all',
+): ExclusionResolution {
+  if (policy === 'keep-sticky') return pickStickyGroup(proposed, prev, ex);
+  const cleared = clearAllExclusionGroups(proposed, ex);
+  return { ...cleared, keptGroup: null };
+}
+
+/** Literal engine families retained and removed by an exclusion resolution. */
+export function exclusionResolutionFamilies(
+  proposed: Iterable<string>,
+  result: ReadonlySet<string>,
+  ex: Exclusion,
+): { kept: string[]; dropped: string[] } {
+  const kept = new Set<string>();
+  const dropped = new Set<string>();
+  for (const key of proposed) {
+    const family = ex.familyOf(key);
+    if (!family) continue;
+    (result.has(key) ? kept : dropped).add(family);
+  }
+  return { kept: [...kept].toSorted(), dropped: [...dropped].toSorted() };
+}
+
 /**
  * Decision for a single hw-toggle action under an exclusion rule.
  *
@@ -213,14 +265,14 @@ export function clearAllExclusionGroups(
  *    the group already active. The provider should refuse the toggle (no state
  *    change) and surface a toast. `attempted` / `existing` name the literal
  *    engine families for display.
- *  - `silent-disable-all`: the toggle would surface multiple groups (e.g. via
- *    solo→restore-all). Replace the active set with `result` and don't show a
- *    toast — the user didn't explicitly try to add anything.
+ *  - `silent-resolve`: the toggle would surface multiple groups (e.g. via
+ *    solo→restore-all). Replace the active set with the policy-resolved `result`
+ *    and don't show a toast — the user didn't explicitly try to add anything.
  *  - `fallthrough`: the toggle is fine, run the normal toggle path.
  */
 export type ExclusionToggleDecision =
   | { kind: 'block'; attempted: string; existing: string | null }
-  | { kind: 'silent-disable-all'; result: Set<string> }
+  | { kind: 'silent-resolve'; result: Set<string> }
   | { kind: 'fallthrough' };
 
 export function resolveExclusionToggle(
@@ -228,6 +280,7 @@ export function resolveExclusionToggle(
   hw: string,
   allItems: Set<string>,
   ex: Exclusion,
+  policy: ExclusionConflictPolicy = 'clear-all',
 ): ExclusionToggleDecision {
   const proposed = computeToggle(prev, hw, allItems);
   const wasActive = prev.has(hw);
@@ -247,11 +300,11 @@ export function resolveExclusionToggle(
     }
   }
 
-  // Other paths (e.g. solo→restore-all surfacing a hidden second group) —
-  // disable every group silently.
-  const cleared = clearAllExclusionGroups(proposed, ex);
-  if (cleared.droppedGroups.length > 0) {
-    return { kind: 'silent-disable-all', result: cleared.result };
+  // Other paths (e.g. solo→restore-all surfacing a hidden second group) are
+  // normalized silently because the user didn't explicitly add a conflict.
+  const resolved = resolveExclusionGroups(proposed, prev, ex, policy);
+  if (resolved.droppedGroups.length > 0) {
+    return { kind: 'silent-resolve', result: resolved.result };
   }
 
   return { kind: 'fallthrough' };

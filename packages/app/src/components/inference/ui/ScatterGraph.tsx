@@ -14,7 +14,6 @@ import {
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
   getChartWatermark,
@@ -239,6 +238,14 @@ const pointLabelText = (d: InferenceData, advanced: boolean): string =>
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
 
+function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
+}
+
 /** Which legend series' points table is open (per-series drill-down dialog). */
 type LegendPointsTarget =
   | { kind: 'official'; hwKey: string }
@@ -341,6 +348,8 @@ const ScatterGraph = React.memo(
       toggleHwType,
       removeHwType,
       hwTypesWithData,
+      resolveComparisonSelection,
+      toggleComparisonSelection,
       selectedPrecisions,
       selectedYAxisMetric,
       availableRuns,
@@ -372,6 +381,7 @@ const ScatterGraph = React.memo(
       removeTrackedConfig,
       selectedXAxisMode,
       selectedSequence,
+      selectedModel,
       quickFilters,
     } = useInference();
     const locale = useLocale();
@@ -379,11 +389,8 @@ const ScatterGraph = React.memo(
 
     const {
       isUnofficialRun,
-      activeOverlayHwTypes,
+      activeOverlayHwTypes: providerActiveOverlayHwTypes,
       setActiveOverlayHwTypes,
-      allOverlayHwTypes,
-      toggleOverlayHwType: _toggleOverlayHwType,
-      resetOverlayHwTypes,
       localOfficialOverride,
       setLocalOfficialOverride,
       runIndexByUrl,
@@ -396,41 +403,166 @@ const ScatterGraph = React.memo(
     // replay animation. Only read/written when `pinLineLabels` is true.
     const lineLabelAnchorRef = useRef<Map<string, number>>(new Map());
 
-    // Effective active hw types for rendering — shared override when present, else global
-    const effectiveOfficialHwTypes = localOfficialOverride ?? activeHwTypes;
+    const scopedOverlayHwTypes = useMemo(() => {
+      const keys = new Set<string>();
+      for (const point of overlayData?.data ?? []) {
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          keys.add(String(point.hwKey));
+        }
+      }
+      return keys;
+    }, [overlayData, selectedPrecisions, quickFilters]);
+    const overlayScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(',')}`;
+    const previousOverlayScopeRef = useRef(overlayScopeKey);
+    const overlayScopeChanged = previousOverlayScopeRef.current !== overlayScopeKey;
 
-    // Unified toggle across official + overlay items (shared via context)
+    const localOfficialOverrideIsStale = useMemo(() => {
+      if (localOfficialOverride === null) return false;
+      if (overlayScopeChanged) return true;
+      if (localOfficialOverride.size === 0) return false;
+      for (const key of localOfficialOverride) {
+        if (hwTypesWithData.has(key)) return false;
+      }
+      return true;
+    }, [localOfficialOverride, overlayScopeChanged, hwTypesWithData]);
+    const rawOfficialHwTypes = useMemo(() => {
+      const source = localOfficialOverrideIsStale
+        ? activeHwTypes
+        : (localOfficialOverride ?? activeHwTypes);
+      return new Set([...source].filter((key) => hwTypesWithData.has(key)));
+    }, [activeHwTypes, hwTypesWithData, localOfficialOverride, localOfficialOverrideIsStale]);
+    const rawOverlayHwTypes = useMemo(
+      () =>
+        overlayScopeChanged
+          ? scopedOverlayHwTypes
+          : new Set(
+              [...providerActiveOverlayHwTypes].filter((key) => scopedOverlayHwTypes.has(key)),
+            ),
+      [overlayScopeChanged, providerActiveOverlayHwTypes, scopedOverlayHwTypes],
+    );
     const allUnifiedHwTypes = useMemo(() => {
-      const all = new Set<string>();
-      hwTypesWithData.forEach((k) => all.add(k));
-      allOverlayHwTypes.forEach((k) => all.add(`overlay:${k}`));
+      const all = new Set(hwTypesWithData);
+      scopedOverlayHwTypes.forEach((key) => all.add(`overlay:${key}`));
       return all;
-    }, [hwTypesWithData, allOverlayHwTypes]);
+    }, [hwTypesWithData, scopedOverlayHwTypes]);
+    const rawUnifiedSelection = useMemo(() => {
+      const combined = new Set(rawOfficialHwTypes);
+      rawOverlayHwTypes.forEach((key) => combined.add(`overlay:${key}`));
+      return combined;
+    }, [rawOfficialHwTypes, rawOverlayHwTypes]);
+    const resolvedUnifiedSelection = useMemo(
+      () =>
+        resolveComparisonSelection(
+          rawUnifiedSelection,
+          rawOfficialHwTypes.size > 0 ? rawOfficialHwTypes : rawUnifiedSelection,
+        ).result,
+      [rawUnifiedSelection, rawOfficialHwTypes, resolveComparisonSelection],
+    );
+    const resolvedHwTypes = useMemo(() => {
+      const official = new Set<string>();
+      const overlay = new Set<string>();
+      for (const key of resolvedUnifiedSelection) {
+        if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
+        else official.add(key);
+      }
+      return { official, overlay };
+    }, [resolvedUnifiedSelection]);
+    const effectiveOfficialHwTypes = resolvedHwTypes.official;
+    // Official-only toggles must not rebuild the D3 overlay layer. Preserve the
+    // overlay Set identity when its contents did not change.
+    const activeOverlayHwTypesRef = useRef(resolvedHwTypes.overlay);
+    if (!setsEqual(activeOverlayHwTypesRef.current, resolvedHwTypes.overlay)) {
+      activeOverlayHwTypesRef.current = resolvedHwTypes.overlay;
+    }
+    const activeOverlayHwTypes = activeOverlayHwTypesRef.current;
+    const mergeScopedOverlaySelection = useCallback(
+      (scopedSelection: Set<string>) => {
+        const merged = new Set(providerActiveOverlayHwTypes);
+        scopedOverlayHwTypes.forEach((key) => merged.delete(key));
+        scopedSelection.forEach((key) => merged.add(key));
+        return merged;
+      },
+      [providerActiveOverlayHwTypes, scopedOverlayHwTypes],
+    );
 
+    useEffect(() => {
+      if (!overlayData) return;
+      previousOverlayScopeRef.current = overlayScopeKey;
+      if (localOfficialOverrideIsStale) {
+        setLocalOfficialOverride(null);
+      } else if (
+        localOfficialOverride !== null &&
+        !setsEqual(localOfficialOverride, effectiveOfficialHwTypes)
+      ) {
+        setLocalOfficialOverride(effectiveOfficialHwTypes);
+      }
+      const mergedOverlaySelection = mergeScopedOverlaySelection(activeOverlayHwTypes);
+      if (!setsEqual(providerActiveOverlayHwTypes, mergedOverlaySelection)) {
+        setActiveOverlayHwTypes(mergedOverlaySelection);
+      }
+    }, [
+      overlayData,
+      overlayScopeKey,
+      localOfficialOverride,
+      localOfficialOverrideIsStale,
+      effectiveOfficialHwTypes,
+      activeOverlayHwTypes,
+      providerActiveOverlayHwTypes,
+      setLocalOfficialOverride,
+      setActiveOverlayHwTypes,
+      mergeScopedOverlaySelection,
+    ]);
+
+    const commitUnifiedSelection = useCallback(
+      (selection: Set<string>) => {
+        const official = new Set<string>();
+        const overlay = new Set<string>();
+        for (const key of selection) {
+          if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
+          else official.add(key);
+        }
+        setLocalOfficialOverride(official);
+        setActiveOverlayHwTypes(mergeScopedOverlaySelection(overlay));
+      },
+      [setLocalOfficialOverride, setActiveOverlayHwTypes, mergeScopedOverlaySelection],
+    );
     const unifiedToggle = useCallback(
       (key: string, isOverlay: boolean) => {
         const prefixedKey = isOverlay ? `overlay:${key}` : key;
-        const prev = new Set<string>();
-        effectiveOfficialHwTypes.forEach((k) => prev.add(k));
-        activeOverlayHwTypes.forEach((k) => prev.add(`overlay:${k}`));
-        const next = computeToggle(prev, prefixedKey, allUnifiedHwTypes);
-        const nextOfficial = new Set<string>();
-        const nextOverlay = new Set<string>();
-        for (const k of next) {
-          if (k.startsWith('overlay:')) nextOverlay.add(k.slice(8));
-          else nextOfficial.add(k);
-        }
-        setLocalOfficialOverride(nextOfficial);
-        setActiveOverlayHwTypes(nextOverlay);
+        const next = toggleComparisonSelection(
+          resolvedUnifiedSelection,
+          prefixedKey,
+          allUnifiedHwTypes,
+        );
+        if (next) commitUnifiedSelection(next);
       },
       [
-        effectiveOfficialHwTypes,
-        activeOverlayHwTypes,
+        resolvedUnifiedSelection,
         allUnifiedHwTypes,
-        setLocalOfficialOverride,
-        setActiveOverlayHwTypes,
+        toggleComparisonSelection,
+        commitUnifiedSelection,
       ],
     );
+    const resetUnifiedSelection = useCallback(() => {
+      selectAllHwTypes();
+      if (!overlayData) {
+        setLocalOfficialOverride(null);
+        return;
+      }
+      const resolved = resolveComparisonSelection(allUnifiedHwTypes, effectiveOfficialHwTypes);
+      commitUnifiedSelection(resolved.result);
+    }, [
+      selectAllHwTypes,
+      overlayData,
+      setLocalOfficialOverride,
+      allUnifiedHwTypes,
+      effectiveOfficialHwTypes,
+      resolveComparisonSelection,
+      commitUnifiedSelection,
+    ]);
 
     // When no overlay data, delegate to context's toggleHwType (preserves setActivePresetId)
     const handleToggleHwType = useCallback(
@@ -442,7 +574,7 @@ const ScatterGraph = React.memo(
     const hardwareConfig = hardwareConfigOverride || contextHardwareConfig;
     const activeHwKeys = useMemo(() => {
       const keys = [...effectiveOfficialHwTypes];
-      activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
+      activeOverlayHwTypes.forEach((key) => keys.push(`overlay:${key}`));
       return keys;
     }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
     const activeOfficialKeys = useMemo(
@@ -580,12 +712,15 @@ const ScatterGraph = React.memo(
       // precision changes — it feeds the `layers` memo, and a new identity
       // there forces a full chart rebuild.
       if (!overlayData?.data) return EMPTY_OVERLAY_DATA;
-      // Mirror the official path's quick filters (vendor / agg-disagg / mtp-stp)
-      // so overlay points obey the same coarse filters the user picked.
+      // Mirror the official path's precision/quick filters and remove inactive
+      // overlay hardware before any points or rooflines are constructed.
       return overlayData.data.filter(
-        (p) => selectedPrecisions.includes(p.precision) && matchesQuickFilters(p, quickFilters),
+        (point) =>
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeOverlayHwTypes.has(String(point.hwKey)),
       );
-    }, [overlayData, selectedPrecisions, quickFilters]);
+    }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
 
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the
@@ -2826,15 +2961,13 @@ const ScatterGraph = React.memo(
               }}
               actions={
                 effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < allOverlayHwTypes.size
+                activeOverlayHwTypes.size < scopedOverlayHwTypes.size
                   ? [
                       {
                         id: 'scatter-reset-filter',
                         label: legendT.resetFilter,
                         onClick: () => {
-                          selectAllHwTypes();
-                          setLocalOfficialOverride(null);
-                          resetOverlayHwTypes();
+                          resetUnifiedSelection();
                           track('latency_legend_filter_reset');
                         },
                       },

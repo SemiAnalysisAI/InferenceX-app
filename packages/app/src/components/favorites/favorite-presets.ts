@@ -38,7 +38,9 @@ export function matchesPresetHwFilter(
   filter: string[],
   model: Model | string | null | undefined,
 ): boolean {
-  const excludedSuffixes = getModelExclusion(model).map((spec) => spec.suffix);
+  const excludedSuffixes = getModelExclusion(model)
+    .map((spec) => spec.suffix)
+    .filter((suffix): suffix is string => suffix !== null);
   const isExcludedVariant = excludedSuffixes.some((suffix) => hwKey.endsWith(suffix));
   return filter.some(
     (f) => hwKey === f || (!f.includes('_') && hwKey.startsWith(`${f}_`) && !isExcludedVariant),

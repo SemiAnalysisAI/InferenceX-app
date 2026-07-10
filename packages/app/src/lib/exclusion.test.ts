@@ -6,7 +6,9 @@ import {
   buildExclusion,
   clearAllExclusionGroups,
   effectiveLegendItems,
+  exclusionResolutionFamilies,
   pickStickyGroup,
+  resolveExclusionGroups,
   resolveExclusionToggle,
   type ExclusionSpec,
 } from './exclusion';
@@ -14,9 +16,27 @@ import {
 // The dsv4 MTP rule: `*_mtp` keys participate, dynamo-/mori- prefixes are
 // stripped, and ATOM shares SGLang's comparability group.
 const MTP_SPEC: ExclusionSpec[] = [
-  { suffix: '_mtp', stripPrefixes: ['dynamo-', 'mori-'], groupAliases: { atom: 'sglang' } },
+  {
+    suffix: '_mtp',
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+  },
 ];
 const ex = buildExclusion(MTP_SPEC);
+const STP_SPEC: ExclusionSpec[] = [
+  {
+    suffix: null,
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+  },
+];
+const agenticEx = buildExclusion([...MTP_SPEC, ...STP_SPEC]);
+const namespacedAgenticEx = {
+  familyOf: (key: string) =>
+    agenticEx.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+  groupOf: (key: string) =>
+    agenticEx.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+};
 
 describe('buildExclusion — familyOf', () => {
   it('returns null for non-participating keys', () => {
@@ -38,6 +58,8 @@ describe('buildExclusion — familyOf', () => {
     expect(ex.familyOf('gb300_dynamo-sglang_mtp')).toBe('sglang');
     expect(ex.familyOf('h100_dynamo-trt_mtp')).toBe('trt');
     expect(ex.familyOf('mi355x_mori-sglang_mtp')).toBe('sglang');
+    expect(ex.familyOf('b300_llmd-vllm_mtp')).toBe('vllm');
+    expect(ex.familyOf('mi355x_mooncake-atom_mtp')).toBe('atom');
   });
 });
 
@@ -62,6 +84,86 @@ describe('buildExclusion — groupOf', () => {
     const eagle = buildExclusion([{ suffix: '_eagle' }]);
     expect(eagle.groupOf('h100_vllm_eagle')).toBe('vllm');
     expect(eagle.groupOf('h100_vllm_mtp')).toBeNull();
+  });
+});
+
+describe('exclusionResolutionFamilies', () => {
+  it('reports literal aliased families rather than comparability group ids', () => {
+    const proposed = new Set(['mi355x_atom_mtp', 'gb300_sglang_mtp', 'h100_vllm_mtp', 'h100_vllm']);
+    const result = new Set(['mi355x_atom_mtp', 'gb300_sglang_mtp', 'h100_vllm']);
+
+    expect(exclusionResolutionFamilies(proposed, result, ex)).toEqual({
+      kept: ['atom', 'sglang'],
+      dropped: ['vllm'],
+    });
+  });
+});
+
+describe('AgentX STP engine exclusion', () => {
+  it('classifies unsuffixed STP keys without capturing speculative variants', () => {
+    const stpEx = buildExclusion(STP_SPEC);
+    expect(stpEx.familyOf('b300_vllm')).toBe('vllm');
+    expect(stpEx.familyOf('gb300_dynamo-sglang')).toBe('sglang');
+    expect(stpEx.groupOf('mi355x_atom')).toBe('sglang');
+    expect(stpEx.familyOf('b300_vllm_mtp')).toBeNull();
+    expect(stpEx.familyOf('b300_llmd-vllm')).toBe('vllm');
+    expect(stpEx.groupOf('mi355x_mooncake-atom')).toBe('sglang');
+  });
+
+  it('blocks adding vLLM STP while SGLang STP is active', () => {
+    const prev = new Set(['b300_sglang']);
+    const all = new Set(['b300_sglang', 'b300_vllm']);
+    expect(resolveExclusionToggle(prev, 'b300_vllm', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'block',
+      attempted: 'vllm',
+      existing: 'sglang',
+    });
+  });
+
+  it('allows STP and MTP configs from the same engine family', () => {
+    const prev = new Set(['b300_vllm']);
+    const all = new Set(['b300_vllm', 'b300_vllm_mtp']);
+    expect(resolveExclusionToggle(prev, 'b300_vllm_mtp', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'fallthrough',
+    });
+  });
+
+  it('keeps the active engine during automatic AgentX selection resolution', () => {
+    const proposed = new Set(['b300_sglang', 'b300_vllm', 'b300_vllm_mtp']);
+    const resolved = resolveExclusionGroups(
+      proposed,
+      new Set(['b300_vllm']),
+      agenticEx,
+      'keep-sticky',
+    );
+    expect([...resolved.result].toSorted()).toEqual(['b300_vllm', 'b300_vllm_mtp']);
+    expect(resolved.keptGroup).toBe('vllm');
+    expect(resolved.droppedGroups).toEqual(['sglang']);
+  });
+
+  it('blocks cross-engine adds across official and overlay namespaces', () => {
+    const prev = new Set(['overlay:b300_sglang']);
+    const all = new Set(['overlay:b300_sglang', 'b300_vllm']);
+    expect(
+      resolveExclusionToggle(prev, 'b300_vllm', all, namespacedAgenticEx, 'keep-sticky'),
+    ).toEqual({
+      kind: 'block',
+      attempted: 'vllm',
+      existing: 'sglang',
+    });
+  });
+
+  it('keeps the official engine when an automatic overlay load conflicts', () => {
+    const proposed = new Set(['b300_sglang', 'overlay:b300_vllm']);
+    const resolved = resolveExclusionGroups(
+      proposed,
+      new Set(['b300_sglang']),
+      namespacedAgenticEx,
+      'keep-sticky',
+    );
+    expect([...resolved.result]).toEqual(['b300_sglang']);
+    expect(resolved.keptGroup).toBe('sglang');
+    expect(resolved.droppedGroups).toEqual(['vllm']);
   });
 });
 
@@ -274,14 +376,14 @@ describe('resolveExclusionToggle', () => {
     });
   });
 
-  it('silent-disable-all when solo→restore would surface multiple groups', () => {
+  it('silently resolves when solo→restore would surface multiple groups', () => {
     // prev is a single non-MTP item; toggling it triggers "restore all", which
     // would surface all items including two groups.
     const prev = new Set(['h100_vllm']);
     const all = new Set(['h100_vllm', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
     const decision = resolveExclusionToggle(prev, 'h100_vllm', all, ex);
-    expect(decision.kind).toBe('silent-disable-all');
-    if (decision.kind !== 'silent-disable-all') return;
+    expect(decision.kind).toBe('silent-resolve');
+    if (decision.kind !== 'silent-resolve') return;
     expect([...decision.result].toSorted()).toEqual(['h100_vllm']);
   });
 

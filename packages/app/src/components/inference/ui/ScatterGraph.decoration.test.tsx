@@ -16,6 +16,7 @@ import * as d3 from 'd3';
 import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 
+import { computeToggle } from '@/hooks/useTogglableSet';
 // ── Module mocks ───────────────────────────────────────────────────────────
 vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
@@ -79,6 +80,13 @@ function baseInferenceState() {
     toggleHwType: noop,
     removeHwType: noop,
     hwTypesWithData: new Set(['h100', 'b200']),
+    resolveComparisonSelection: (proposed: Set<string>) => ({
+      result: proposed,
+      keptGroup: null,
+      droppedGroups: [],
+    }),
+    toggleComparisonSelection: (prev: Set<string>, item: string, allItems: Set<string>) =>
+      computeToggle(prev, item, allItems),
     selectedPrecisions: ['fp8'],
     selectedYAxisMetric: 'y',
     quickFilters: { vendors: [], frameworks: [], disagg: [], spec: [] },

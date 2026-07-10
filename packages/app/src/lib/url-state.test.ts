@@ -31,10 +31,11 @@ describe('PARAM_DEFAULTS', () => {
   });
 
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
-    // The UI default scenario (gate-unlocked) is AgenticTraces, not 8k/1k. An
-    // '8k/1k' default would strip an explicit 8K/1K selection from the URL, which
-    // then resolves back to the agentic default on reload/share. Empty means no
-    // scenario value ever matches the default, so it's always persisted.
+    // Per-route `initialSequence` seeds (e.g. /compare pages) make the no-param
+    // resolution route-dependent. An '8k/1k' default would strip an explicit
+    // 8K/1K selection from the URL, which then resolves back to the route's
+    // seeded scenario on reload/share. Empty means no scenario value ever
+    // matches the default, so it's always persisted.
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
@@ -190,8 +191,9 @@ describe('writeUrlParams + buildShareUrl', () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
 
-    // Picking the fixed-seq scenario must survive into the share URL; before the
-    // fix this matched the '8k/1k' default and was dropped, reverting to agentic.
+    // Picking the fixed-seq scenario must survive into the share URL; on routes
+    // seeded with a different initialSequence (e.g. /compare pages), stripping
+    // it would revert the pick back to the seeded scenario on reload.
     writeUrlParams({ i_seq: '8k/1k' });
     await vi.advanceTimersByTimeAsync(200);
 

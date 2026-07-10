@@ -45,8 +45,8 @@ const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 // before availability has loaded. It must be a fixed-seq scenario — never
 // AgenticTraces — so the scenario selector doesn't flash "Agentic Traces" for a
 // fixed-seq-only model while the chart shows its loading skeleton. `8k/1k` is
-// the pre-agentic default for non-agentic models. Consumers that must not act on
-// an unresolved sequence gate on `sequenceResolved` instead.
+// the app default scenario. Consumers that must not act on an unresolved
+// sequence gate on `sequenceResolved` instead.
 // (Declared after the import block so it never references `Sequence` above its import.)
 const PRE_AVAILABILITY_SEQUENCE = Sequence.EightK_OneK;
 
@@ -170,9 +170,9 @@ export function GlobalFilterProvider({
     if (initialSequence) return initialSequence;
     const urlSeq = getUrlParam('i_seq');
     if (urlSeq && Object.values(Sequence).includes(urlSeq as Sequence)) return urlSeq as Sequence;
-    // Prefer Agentic Traces by default when the selected model has it; the
-    // effectiveSequence fallback below handles models without agentic data.
-    return Sequence.AgenticTraces;
+    // Default to the 8K/1K fixed-seq scenario; the effectiveSequence fallback
+    // below handles models that lack it (e.g. agentic-only models).
+    return Sequence.EightK_OneK;
   });
 
   const initialValidPrecisions = useMemo(
@@ -311,9 +311,10 @@ export function GlobalFilterProvider({
   // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run
   // (`unofficialAvailable` for this model) — either source lets us resolve a
   // trustworthy effectiveSequence. Until then `availableSequences` is the static
-  // SEQUENCE_OPTIONS fallback (which contains AgenticTraces), so resolving
-  // eagerly would fetch + label an agentic scenario for fixed-seq-only models,
-  // then snap once availability lands (flash + wasted request).
+  // SEQUENCE_OPTIONS fallback (which contains every scenario), so resolving
+  // eagerly would honor a selection the model may not have (e.g. agentic-traces
+  // from a shared link on a fixed-seq-only model), fetch it, then snap once
+  // availability lands (flash + wasted request).
   const availabilityLoaded = useMemo(
     () =>
       availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),

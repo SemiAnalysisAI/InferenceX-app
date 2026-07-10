@@ -59,7 +59,24 @@ interface ModelConfig {
  * comparability group; vLLM is its own group.
  */
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
-  { suffix: '_mtp', stripPrefixes: ['dynamo-', 'mori-'], groupAliases: { atom: 'sglang' } },
+  {
+    suffix: '_mtp',
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+  },
+];
+
+/**
+ * AgentX STP exclusion: unsuffixed standard-token configs from different engine
+ * families can't be active together. Fixed-sequence STP comparisons remain
+ * available; this rule is attached only to the Agentic Traces sequence.
+ */
+const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+  {
+    suffix: null,
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+  },
 ];
 
 // Total parameter counts appended to each label so users can compare model
@@ -193,10 +210,15 @@ export function sequenceKind(seq: Sequence): ScenarioKind {
   return seq === Sequence.AgenticTraces ? 'agentic' : 'fixed-seq';
 }
 
-const SEQUENCE_CONFIG: Record<
-  Sequence,
-  { label: string; compact: string; category: CategoryTag; kind: ScenarioKind }
-> = {
+interface SequenceConfig {
+  label: string;
+  compact: string;
+  category: CategoryTag;
+  kind: ScenarioKind;
+  exclusion?: ExclusionSpec[];
+}
+
+const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
   [Sequence.OneK_OneK]: {
     label: '1K / 1K',
     compact: '1k1k',
@@ -220,8 +242,17 @@ const SEQUENCE_CONFIG: Record<
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
+    exclusion: AGENTIC_STP_ENGINE_EXCLUSION,
   },
 };
+
+/** Exclusion specs configured for a sequence. Empty when no rule applies. */
+export function getSequenceExclusion(
+  sequence: Sequence | string | null | undefined,
+): ExclusionSpec[] {
+  if (!sequence) return [];
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+}
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
 
