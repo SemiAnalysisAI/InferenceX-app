@@ -447,7 +447,6 @@ export function createMockGlobalFilterContext(
     availabilityRows: undefined,
     workflowInfo: null,
     availableRuns: {},
-    runConfigs: [],
     workflowLoading: false,
     workflowError: null,
     ...overrides,

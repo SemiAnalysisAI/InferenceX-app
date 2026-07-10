@@ -63,7 +63,7 @@ import {
   resolveExclusionToggle,
   type ExclusionConflictPolicy,
 } from '@/lib/exclusion';
-import { filterRunsByModel, getDisplayLabel, restrictRunsToScenario } from '@/lib/utils';
+import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
 
 import {
   isAgenticOnlyXAxisMode,
@@ -72,7 +72,6 @@ import {
   type XAxisMode,
 } from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
-import { scenarioRunIdsForDate } from './utils/runEnumeration';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import {
   EMPTY_QUICK_FILTERS,
@@ -136,7 +135,6 @@ export function InferenceProvider({
     availabilityRows,
     workflowInfo,
     availableRuns,
-    runConfigs,
     workflowError,
   } = useGlobalFilters();
 
@@ -370,50 +368,13 @@ export function InferenceProvider({
     [selectedModel],
   );
 
-  // DB model keys for the selected display model (e.g. ['dsv4']). Used both by
-  // the scenario run scoping below and the GPU comparison date picker further down.
-  const dbModelKeys = useMemo<string[]>(
-    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
-    [selectedModel],
-  );
-
-  const changelogFilteredRuns = useMemo(
+  const filteredAvailableRuns = useMemo(
     () => filterRunsByModel(availableRuns, modelPrefixes, [...effectivePrecisions]),
     [availableRuns, modelPrefixes, effectivePrecisions],
   );
 
-  // Run ids that actually produced data for the selected model + scenario on the
-  // date, derived from per-(run, config) coverage (independent of the chart's
-  // "as of run" query, so no circular dependency). `/api/v1/workflow-info`
-  // returns every run on a date across all models/scenarios, so without this a
-  // same-day run for a different scenario (e.g. a single_turn sweep while viewing
-  // Agentic Traces) would leak into the picker and poison the "as of run" cutoff.
-  const scenarioRunIds = useMemo(
-    () =>
-      scenarioRunIdsForDate(runConfigs, dbModelKeys, effectiveSequence, [...effectivePrecisions]),
-    [runConfigs, dbModelKeys, effectiveSequence, effectivePrecisions],
-  );
-
-  // The picker list: the changelog/precision-scoped runs, further restricted to
-  // the ones that shipped data for the selected scenario. When the date has
-  // coverage rows but none for this scenario (e.g. only single_turn sweeps ran
-  // that day while viewing Agentic Traces) the picker hides (null) rather than
-  // listing other-scenario runs; only when coverage data is unavailable
-  // altogether (old dates / JSON snapshots) does it fall back to the
-  // changelog-scoped list so the selector still renders.
-  const filteredAvailableRuns = useMemo(
-    () =>
-      restrictRunsToScenario(
-        changelogFilteredRuns,
-        availableRuns,
-        scenarioRunIds,
-        runConfigs.length > 0,
-      ),
-    [changelogFilteredRuns, availableRuns, scenarioRunIds, runConfigs],
-  );
-
   const effectiveSelectedRunId = useMemo(() => {
-    if (!filteredAvailableRuns) return selectedRunId;
+    if (!filteredAvailableRuns) return '';
     const filteredRunIds = Object.keys(filteredAvailableRuns);
     if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
     return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
@@ -523,6 +484,11 @@ export function InferenceProvider({
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
+  const dbModelKeys = useMemo<string[]>(
+    () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
+    [selectedModel],
+  );
+
   const dateRangeAvailableDates = useMemo(() => {
     if (selectedGPUs.length === 0) return availableDates;
     if (!availabilityRows) return availableDates;

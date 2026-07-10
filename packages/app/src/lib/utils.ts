@@ -289,47 +289,6 @@ export function filterRunsByModel(
 }
 
 /**
- * Restrict the run-picker list to the runs that actually produced data for the
- * currently selected scenario, given `scenarioRunIds` (the run ids with coverage
- * for the selected model + scenario, from `scenarioRunIdsForDate`).
- *
- * `changelogFiltered` is the model/precision-scoped list (`filterRunsByModel`);
- * `allRuns` is the raw, date-wide map. For each scenario run we prefer the
- * changelog-scoped entry (its changelog is already precision-filtered) and fall
- * back to the raw entry — a run can ship benchmark data without a changelog
- * entry, so `filterRunsByModel` may omit it while it is still a legitimate
- * scenario run the user must be able to select.
- *
- * `coverageKnown` says whether per-(run, config) coverage rows exist for the
- * date at all (`runConfigs.length > 0`). It distinguishes two very different
- * "empty `scenarioRunIds`" cases:
- *  - `coverageKnown === false` → no coverage data (dates predating per-run
- *    coverage, or JSON/fixtures snapshots without it): we can't say anything
- *    about scenarios, so return the changelog-scoped list unchanged rather
- *    than blanking the picker.
- *  - `coverageKnown === true` and no scenario run survives → the date has
- *    benchmark data but NONE for this scenario (e.g. only single_turn sweeps
- *    ran that day while the user views Agentic Traces). Return null so the
- *    picker hides instead of listing other-scenario runs — showing them is
- *    exactly the leak this helper exists to prevent, and selecting one would
- *    constrain an already-empty chart to a meaningless "as of run" cutoff.
- */
-export function restrictRunsToScenario(
-  changelogFiltered: Record<string, RunInfo> | null,
-  allRuns: Record<string, RunInfo> | null,
-  scenarioRunIds: Set<string>,
-  coverageKnown: boolean,
-): Record<string, RunInfo> | null {
-  if (!coverageKnown) return changelogFiltered;
-  const restricted: Record<string, RunInfo> = {};
-  for (const runId of scenarioRunIds) {
-    const info = changelogFiltered?.[runId] ?? allRuns?.[runId];
-    if (info) restricted[runId] = info;
-  }
-  return Object.keys(restricted).length > 0 ? restricted : null;
-}
-
-/**
  * Computes missing energy fields (jTotal, jOutput, jInput) at runtime.
  * This handles backwards compatibility with historical data that doesn't have these fields.
  *
