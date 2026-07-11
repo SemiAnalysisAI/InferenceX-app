@@ -25,18 +25,19 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: |
           set -euo pipefail
-          DUMP_FILE="inferencex-$(date -u +%Y-%m-%d).dump"
+          DUMP_FILE="inferencex-$(date -u +%Y-%m-%d).dump.xz"
 
           docker run --rm --env DATABASE_URL \
             postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15 \
             sh -ceu 'exec pg_dump \
               --dbname="$DATABASE_URL" \
               --format=custom \
-              --compress=zstd:9 \
+              --compress=none \
               --no-owner \
               --no-privileges \
               --exclude-table-data=public.user_feedback \
               --verbose' \
+            | xz -v -T0 --memlimit-compress=99% --lzma2=preset=9e,dict=192MiB \
             | split -b 1900m -d -a 2 - "${DUMP_FILE}.part"
 
           echo "DUMP_FILE=${DUMP_FILE}" >> "$GITHUB_ENV"
@@ -50,5 +51,5 @@ jobs:
           # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
           gh release create "$TAG" $DUMP_GLOB \
             --title "DB Dump $(date -u +%Y-%m-%d)" \
-            --notes 'Weekly PostgreSQL custom-format archive (zstd-compressed, split into parts under 2 GiB). Reassemble: `cat *.dump.part* > inferencex.dump`. Restore to Neon or PostgreSQL: `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`.' \
+            --notes 'Weekly PostgreSQL custom-format archive (xz-compressed, split into parts under 2 GiB). Reassemble and decompress: `cat *.dump.xz.part* | xz -d > inferencex.dump`. Restore to Neon or PostgreSQL: `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`.' \
             --latest=false
