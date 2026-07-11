@@ -119,6 +119,8 @@ pnpm dev
 以下脚本用于数据库与缓存的管理维护，常规开发中一般不需要。
 不过在改动数据库或 API 路由后，将 `pnpm admin:cache:invalidate` 指向本地开发服务器进行测试会很有用。
 
+合并到 `main` 或 `master` 的 `packages/db/src/etl/run-overrides.ts` 变更会由 CI 自动应用到生产数据库，随后执行数据库校验、缓存失效和缓存预热。覆盖命令仍可用于本地预览和手动恢复。
+
 | 脚本                                | 说明                           |
 | ----------------------------------- | ------------------------------ |
 | `pnpm admin:db:migrate`             | 运行数据库迁移                 |
@@ -126,7 +128,7 @@ pnpm dev
 | `pnpm admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）    |
 | `pnpm admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据        |
 | `pnpm admin:db:ingest:supplemental` | 摄取补充数据                   |
-| `pnpm admin:db:apply-overrides`     | 应用数据覆盖                   |
+| `pnpm admin:db:apply-overrides`     | 手动预览或应用数据覆盖         |
 | `pnpm admin:db:reset`               | 重置数据库                     |
 | `pnpm admin:db:verify`              | 校验数据库完整性               |
 | `pnpm admin:cache:invalidate`       | 失效 API 缓存                  |

@@ -78,7 +78,7 @@ Vercel-Cache-Tag: db
 
 ### /api/v1/invalidate
 
-`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header (compared with `timingSafeEqual` to prevent timing attacks). On success it calls `purgeAll()` — which clears blob storage, bumps the cache-version timestamp, and revalidates the `'db'` tag — then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipeline after each benchmark run completes.
+`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header (compared with `timingSafeEqual` to prevent timing attacks). On success it calls `purgeAll()` — which clears blob storage, bumps the cache-version timestamp, and revalidates the `'db'` tag — then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipelines after benchmark runs and by the run-override pipeline after it applies and verifies merged override changes.
 
 ## React Query Configuration
 

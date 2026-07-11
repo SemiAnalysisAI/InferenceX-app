@@ -9,6 +9,9 @@
  * Usage:
  *   pnpm db:apply-overrides            # preview + confirm
  *   pnpm db:apply-overrides --yes      # skip confirmation
+ *
+ * Commits to run-overrides.ts are applied to production automatically after merge.
+ * Use this command directly only for local preview or manual recovery.
  */
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
@@ -328,7 +331,8 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
-  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
+  console.log('  Manual runs: invalidate the API cache with pnpm admin:cache:invalidate');
+  console.log('  Merged run-overrides changes: production cache refresh is handled by CI.');
 }
 
 main()

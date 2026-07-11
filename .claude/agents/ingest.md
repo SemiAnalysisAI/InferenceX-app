@@ -29,7 +29,12 @@ pnpm exec tsx src/ingest-ci-run.ts --download <RUN_ID> SemiAnalysisAI/InferenceX
 Then refresh the materialized view (the script's auto-refresh sometimes races):
 `REFRESH MATERIALIZED VIEW latest_benchmarks;`
 
-## Cache purge (always do after any DB mutation)
+## Cache refresh
+
+For manual ingests or direct DB mutations, purge localhost and production after the write. For
+registry-only changes to `packages/db/src/etl/run-overrides.ts`, do not apply the production
+override or refresh production manually: after merge, CI applies the overrides, verifies the
+database, invalidates production, and warms production automatically.
 
 ```bash
 SECRET=$(grep "^INVALIDATE_SECRET" /Users/quilicic/InferenceX-app/.env | cut -d= -f2 | tr -d '"')
@@ -166,7 +171,7 @@ If the user doesn't specify a description, DO NOT skip the entry and DO NOT bloc
 3. **Ingest** via the standard path. Do NOT use AIPerf tagging unless the user explicitly asks for a separate legend line.
 4. **Refresh materialized view**.
 5. **Add changelog entry — ALWAYS, MANDATORY.** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"). Use the user's text if given (substituting `<SKU>`); otherwise derive one from the run name and add it anyway. Never skip this step.
-6. **Purge both caches** (localhost 3002 + production — never port 3000).
+6. **Refresh both caches for manual ingests** (localhost 3002 + production — never port 3000). Override-only commits are handled by CI after merge.
 7. **Report** the row count, date, hardware, run id, and the changelog id (always present).
 
 ## Related: ingesting agentic _datasets_ (not benchmark runs)

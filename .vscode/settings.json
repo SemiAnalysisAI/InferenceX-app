@@ -15,6 +15,7 @@
     "catmull",
     "CDNA",
     "chenglou",
+    "cooldown",
     "costh",
     "costhi",
     "costn",
@@ -88,6 +89,7 @@
     "vllm",
     "worktrees",
     "yaxis",
+    "zizmor",
     "zoomable"
   ]
 }

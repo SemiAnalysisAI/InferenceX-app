@@ -119,18 +119,20 @@ Some of these may require additional setup or environment variables.
 These are meant to be used for database and cache management and maintenance tasks, and should not be necessary during regular development.
 However, using `pnpm admin:cache:invalidate` pointed at your local development server can be useful to test after making changes to the database or API routes.
 
-| Script                              | Description                            |
-| ----------------------------------- | -------------------------------------- |
-| `pnpm admin:db:migrate`             | Run database migrations                |
-| `pnpm admin:db:ingest:run`          | Ingest benchmark data from GitHub runs |
-| `pnpm admin:db:ingest:ci`           | Ingest benchmark data (CI mode)        |
-| `pnpm admin:db:ingest:gcs`          | Ingest benchmark data from GCS         |
-| `pnpm admin:db:ingest:supplemental` | Ingest supplemental data               |
-| `pnpm admin:db:apply-overrides`     | Apply data overrides                   |
-| `pnpm admin:db:reset`               | Reset the database                     |
-| `pnpm admin:db:verify`              | Verify database integrity              |
-| `pnpm admin:cache:invalidate`       | Invalidate API cache                   |
-| `pnpm admin:cache:warmup`           | Warm up API cache                      |
+Changes to `packages/db/src/etl/run-overrides.ts` that reach `main` or `master` are applied to the production database automatically by CI, followed by database verification, cache invalidation, and cache warmup. The override command remains available for local previews and manual recovery.
+
+| Script                              | Description                              |
+| ----------------------------------- | ---------------------------------------- |
+| `pnpm admin:db:migrate`             | Run database migrations                  |
+| `pnpm admin:db:ingest:run`          | Ingest benchmark data from GitHub runs   |
+| `pnpm admin:db:ingest:ci`           | Ingest benchmark data (CI mode)          |
+| `pnpm admin:db:ingest:gcs`          | Ingest benchmark data from GCS           |
+| `pnpm admin:db:ingest:supplemental` | Ingest supplemental data                 |
+| `pnpm admin:db:apply-overrides`     | Preview or apply data overrides manually |
+| `pnpm admin:db:reset`               | Reset the database                       |
+| `pnpm admin:db:verify`              | Verify database integrity                |
+| `pnpm admin:cache:invalidate`       | Invalidate API cache                     |
+| `pnpm admin:cache:warmup`           | Warm up API cache                        |
 
 ## Deployment
 

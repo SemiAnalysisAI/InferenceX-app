@@ -1,0 +1,57 @@
+name: Apply Run Overrides
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'packages/db/src/etl/run-overrides.ts'
+      - '.github/workflows/apply-run-overrides.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: apply-run-overrides-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply production run overrides
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies
+        run: >-
+          pnpm install --frozen-lockfile
+          --filter @semianalysisai/inferencex-db...
+          --filter @semianalysisai/inferencex-app...
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Apply run overrides
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: pnpm admin:db:apply-overrides --yes
+
+      - name: Verify database
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: pnpm admin:db:verify
+
+      - name: Invalidate production cache
+        env:
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: pnpm admin:cache:invalidate https://inferencex.semianalysis.com
+
+      - name: Warm production cache
+        run: pnpm admin:cache:warmup https://inferencex.semianalysis.com
