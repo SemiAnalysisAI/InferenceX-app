@@ -50,5 +50,5 @@ jobs:
           # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
           gh release create "$TAG" $DUMP_GLOB \
             --title "DB Dump $(date -u +%Y-%m-%d)" \
-            --notes 'Weekly PostgreSQL custom-format archive (zstd-compressed, split into parts under 2 GiB). Reassemble: `cat *.dump.part* > inferencex.dump`. Restore to Neon or PostgreSQL: `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="$DATABASE_WRITE_URL" inferencex.dump`.' \
+            --notes 'Weekly PostgreSQL custom-format archive (zstd-compressed, split into parts under 2 GiB). Reassemble: `cat *.dump.part* > inferencex.dump`. Restore to Neon or PostgreSQL: `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`.' \
             --latest=false
