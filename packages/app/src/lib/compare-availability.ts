@@ -12,8 +12,8 @@
  * is purely an indexing/navigation concern, not a hard gate.
  */
 
-import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   type AvailabilityRow,
   getAvailabilityData,
@@ -30,7 +30,7 @@ import {
 /** Cached availability query — shared with compare-variant-availability.ts. */
 export const getCachedAvailability = cachedQuery(() => {
   if (FIXTURES_MODE) return Promise.resolve(loadFixture<AvailabilityRow[]>('availability'));
-  if (JSON_MODE) return Promise.resolve(jsonProvider.getAvailabilityData());
+
   return getAvailabilityData(getDb());
 }, 'availability');
 

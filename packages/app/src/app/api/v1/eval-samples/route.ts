@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
 import { getEvalSamples } from '@semianalysisai/inferencex-db/queries/eval-samples';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
@@ -13,14 +13,8 @@ const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
 
 const getCachedEvalSamples = cachedQuery(
-  (evalResultId: number, filter: 'all' | 'passed' | 'failed', offset: number, limit: number) => {
-    if (JSON_MODE) {
-      // JSON dump mode has no eval_samples — return an empty result so the UI
-      // renders cleanly when run against a static build.
-      return Promise.resolve({ samples: [], total: 0, passedTotal: 0, failedTotal: 0 });
-    }
-    return getEvalSamples(getDb(), evalResultId, filter, offset, limit);
-  },
+  (evalResultId: number, filter: 'all' | 'passed' | 'failed', offset: number, limit: number) =>
+    getEvalSamples(getDb(), evalResultId, filter, offset, limit),
   'eval-samples',
 );
 

@@ -14,7 +14,6 @@ import { describe, expect, it, vi } from 'vitest';
 // in the blob cache — stub both so importing the route is side-effect-free.
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   getDb: vi.fn(() => 'mock-sql'),
-  JSON_MODE: false,
   FIXTURES_MODE: false,
 }));
 

@@ -7,7 +7,6 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  JSON_MODE: false,
   FIXTURES_MODE: false,
 }));
 

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   listConversations,
   type ConversationList,
@@ -28,7 +28,7 @@ const getCachedConversations = cachedQuery(
       offset,
       sort: sort as ListConversationsOpts['sort'],
     };
-    if (JSON_MODE) return Promise.resolve(jsonProvider.listConversations(slug, opts));
+
     return listConversations(getDb(), slug, opts);
   },
   'dataset-conversations',

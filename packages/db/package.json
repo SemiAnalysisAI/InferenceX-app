@@ -7,7 +7,6 @@
   "exports": {
     "./connection": "./src/connection.ts",
     "./etl/*": "./src/etl/*.ts",
-    "./json-provider": "./src/json-provider.ts",
     "./lib/*": "./src/lib/*.ts",
     "./migrate": "./src/migrate.ts",
     "./queries/*": "./src/queries/*.ts"
@@ -23,8 +22,6 @@
     "db:backfill-chart-series": "dotenv -e ../../.env -- tsx src/backfill-chart-series.ts",
     "db:backfill-dataset-stats": "dotenv -e ../../.env -- tsx src/backfill-dataset-stats.ts",
     "db:backfill-request-timeline": "dotenv -e ../../.env -- tsx src/backfill-request-timeline.ts",
-    "db:dump": "dotenv -e ../../.env -- tsx src/dump-db.ts",
-    "db:load-dump": "dotenv -e ../../.env -- tsx src/load-dump.ts",
     "db:reset": "dotenv -e ../../.env -- tsx src/reset-db.ts",
     "db:verify": "dotenv -e ../../.env -- tsx src/verify-db.ts",
     "test:unit": "vitest run",

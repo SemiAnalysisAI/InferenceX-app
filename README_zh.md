@@ -55,30 +55,37 @@ cd InferenceX-app
 pnpm install
 ```
 
-### 2. 配置数据源
+### 2. 配置数据库
 
-仪表板可以对接实时数据库，也可以使用静态 JSON dump。JSON dump 方式无需配置数据库，是最简单的上手方式。
+仪表板需要实时 PostgreSQL 数据库。在 `.env` 中设置 `DATABASE_READONLY_URL`；应用同时支持标准 PostgreSQL 服务器和 Neon。
 
-#### 方式 A：JSON Dump（无需数据库，仅限本地开发）
+#### 方式 A：标准 PostgreSQL
 
-从 [GitHub Releases](https://github.com/SemiAnalysisAI/InferenceX-app/releases) 下载最新的数据库 dump，解包后将 `DUMP_DIR` 指向该目录。dump 以 xz 压缩并拆分为一个或多个 `.tar.xz.part*` 文件；用 `cat` 管道接 `xz` 重新组装。此方式仅适用于 `pnpm dev`；生产构建需要实时数据库。
+本地或远程托管的 PostgreSQL 服务器使用 `postgres` 驱动：
 
 ```bash
 cp .env.example .env
-
-# 下载并解包最新 dump（需要 xz；macOS 上执行 `brew install xz`）
-gh release download db-dump/2026-03-30 -p 'inferencex-dump-*.tar.xz.part*'
-cat inferencex-dump-2026-03-30.tar.xz.part* | xz -d -T0 | tar -x
-
-# 写入 .env
-echo 'DUMP_DIR=./inferencex-dump-2026-03-30' >> .env
+cat >> .env <<'EOF'
+DATABASE_READONLY_URL=postgresql://postgres:postgres@localhost:5432/postgres
+DATABASE_DRIVER=postgres
+DATABASE_SSL=false
+EOF
 ```
 
-确保 `.env` 中没有设置（或已注释掉）`DATABASE_READONLY_URL`。
+远程 PostgreSQL 服务器默认使用 TLS。除非服务器明确要求禁用 TLS，否则请省略 `DATABASE_SSL`。
 
-#### 方式 B：实时数据库
+#### 方式 B：Neon
 
-在 `.env` 中将 `DATABASE_READONLY_URL` 设为 Neon PostgreSQL 连接串。详见 [`.env.example`](.env.example)。
+将 `DATABASE_READONLY_URL` 设为 Neon PostgreSQL 连接串。Neon 主机会自动使用无服务器 HTTP 驱动；也可以显式设置 `DATABASE_DRIVER=neon`。
+
+```bash
+cp .env.example .env
+cat >> .env <<'EOF'
+DATABASE_READONLY_URL=postgresql://user:password@ep-example.us-east-1.aws.neon.tech/database
+DATABASE_DRIVER=neon
+DATABASE_SSL=true
+EOF
+```
 
 ### 3. 启动开发服务器
 

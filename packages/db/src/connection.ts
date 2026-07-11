@@ -10,9 +10,6 @@ export type DbClient = (
   ...values: unknown[]
 ) => Promise<Record<string, unknown>[]>;
 
-/** True when running off a JSON dump directory instead of a live database (local dev only). */
-export const JSON_MODE = !process.env.DATABASE_READONLY_URL && Boolean(process.env.DUMP_DIR);
-
 /**
  * Server-side fixtures mode for cypress e2e: every API route returns a
  * pre-captured fixture instead of querying. Set via E2E_FIXTURES=1 in the
@@ -87,11 +84,7 @@ function makeDbClient(url: string): DbClient {
     : wrapPostgres(postgres(url, postgresOptionsForUrl(url)));
 }
 
-/**
- * Read-only SQL client for API routes.
- * Throws if DATABASE_READONLY_URL is not set — callers in JSON_MODE
- * should skip this and use the json-provider instead.
- */
+/** Read-only SQL client for API routes. Requires DATABASE_READONLY_URL. */
 export function getDb(): DbClient {
   if (g.__dbClient) return g.__dbClient;
   const url = process.env.DATABASE_READONLY_URL;

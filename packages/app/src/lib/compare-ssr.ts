@@ -5,7 +5,7 @@
  *
  *   - a single `getCachedBenchmarks` blob slot keyed by dbKeys (one cache
  *     entry per model bucket regardless of which route triggered the fetch),
- *   - the same FIXTURES_MODE / JSON_MODE / Neon ladder,
+ *   - the same fixtures / live-database ladder,
  *   - the same summary, GPUDataPoint construction, interpolation pipeline,
  *     and JSON-LD shape — with a `variant` knob that swaps the headline
  *     framing between the latency+throughput view and the per-dollar view.
@@ -17,8 +17,8 @@ import {
   SITE_URL,
   sequenceToIslOsl,
 } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   type BenchmarkRow,
   getLatestBenchmarks,
@@ -49,7 +49,7 @@ import { loadFixture } from '@/lib/test-fixtures';
 export const getCachedBenchmarks = cachedQuery(
   (dbModelKeys: string[]) => {
     if (FIXTURES_MODE) return Promise.resolve(loadFixture<BenchmarkRow[]>('benchmarks'));
-    if (JSON_MODE) return Promise.resolve(jsonProvider.getLatestBenchmarks(dbModelKeys));
+
     return getLatestBenchmarks(getDb(), dbModelKeys);
   },
   'benchmarks',

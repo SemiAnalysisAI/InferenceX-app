@@ -19,37 +19,27 @@ jobs:
     permissions:
       contents: write # Create the database dump release
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: '24'
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --filter @semianalysisai/inferencex-db...
+      - name: Dump and split database
         env:
-          CYPRESS_INSTALL_BINARY: '0'
-
-      - name: Dump database
-        env:
-          DATABASE_READONLY_URL: ${{ secrets.DATABASE_READONLY_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: |
           set -euo pipefail
-          DUMP_DIR="inferencex-dump-$(date -u +%Y-%m-%d)"
-          pnpm admin:db:dump "$DUMP_DIR"
-          echo "DUMP_DIR=${DUMP_DIR}" >> "$GITHUB_ENV"
+          DUMP_FILE="inferencex-$(date -u +%Y-%m-%d).dump"
+
+          docker run --rm --env DATABASE_URL \
+            postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15 \
+            sh -ceu 'exec pg_dump \
+              --dbname="$DATABASE_URL" \
+              --format=custom \
+              --compress=zstd:9 \
+              --no-owner \
+              --no-privileges \
+              --verbose' \
+            | split -b 1900m -d -a 2 - "${DUMP_FILE}.part"
+
+          echo "DUMP_FILE=${DUMP_FILE}" >> "$GITHUB_ENV"
+          echo "DUMP_GLOB=${DUMP_FILE}.part*" >> "$GITHUB_ENV"
           echo "TAG=db-dump/$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-
-      - name: Compress and split dump
-        run: |
-          set -euo pipefail
-          ( cd packages/db
-            tar -cf - "$DUMP_DIR" \
-              | xz -v -T0 --memlimit-compress=99% --lzma2=preset=9e,dict=192MiB \
-              | split -b 1900m -d -a 2 - "${GITHUB_WORKSPACE}/${DUMP_DIR}.tar.xz.part" )
-          echo "DUMP_GLOB=${DUMP_DIR}.tar.xz.part*" >> "$GITHUB_ENV"
 
       - name: Create release
         env:
@@ -58,5 +48,5 @@ jobs:
           # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
           gh release create "$TAG" $DUMP_GLOB \
             --title "DB Dump $(date -u +%Y-%m-%d)" \
-            --notes 'Weekly full database dump (xz-compressed, split into parts under 2 GiB). Reassemble: `cat *.tar.xz.part* | xz -d | tar -x`' \
+            --notes 'Weekly PostgreSQL custom-format archive (zstd-compressed, split into parts under 2 GiB). Reassemble: `cat *.dump.part* > inferencex.dump`. Restore to Neon or PostgreSQL: `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="$DATABASE_WRITE_URL" inferencex.dump`.' \
             --latest=false

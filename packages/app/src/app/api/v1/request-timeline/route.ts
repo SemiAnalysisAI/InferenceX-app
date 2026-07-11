@@ -1,6 +1,6 @@
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   getRequestTimeline,
   type RequestTimeline,
@@ -20,10 +20,7 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `request-timeline-v${REQUEST_TIMELINE_VERSION}`;
 
 const getCachedRequestTimeline = cachedQuery(
-  (id: number): Promise<RequestTimeline | null> => {
-    if (JSON_MODE) return Promise.resolve(jsonProvider.getRequestTimeline(id));
-    return getRequestTimeline(getDb(), id);
-  },
+  (id: number): Promise<RequestTimeline | null> => getRequestTimeline(getDb(), id),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

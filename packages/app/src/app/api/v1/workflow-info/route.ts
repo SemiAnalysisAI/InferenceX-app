@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   getChangelogByDate,
   getDateConfigs,
@@ -15,14 +15,6 @@ import { loadFixture } from '@/lib/test-fixtures';
 export const dynamic = 'force-dynamic';
 
 const getCachedWorkflowInfo = cachedQuery(async (date: string) => {
-  if (JSON_MODE) {
-    return {
-      runs: jsonProvider.getWorkflowRunsByDate(date),
-      changelogs: jsonProvider.getChangelogByDate(date),
-      configs: jsonProvider.getDateConfigs(date),
-      runConfigs: jsonProvider.getRunConfigsByDate(date),
-    };
-  }
   const sql = getDb();
   const [runs, changelogs, configs, runConfigs] = await Promise.all([
     getWorkflowRunsByDate(sql, date),
