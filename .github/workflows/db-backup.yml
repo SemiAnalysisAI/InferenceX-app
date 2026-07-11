@@ -12,21 +12,87 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  backup:
-    name: Back up database
+  preflight:
+    name: Preflight
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # Tag-collision check
+    outputs:
+      dump-file: ${{ steps.names.outputs.dump-file }}
+      tag: ${{ steps.names.outputs.tag }}
+      date: ${{ steps.names.outputs.date }}
+    steps:
+      # Names are computed exactly once and passed to the other jobs: if each
+      # job stamped its own date, a run straddling midnight UTC would dump
+      # under one date and release under another.
+      - name: Compute dump name and release tag
+        id: names
+        run: |
+          set -euo pipefail
+          DATE="$(date -u +%Y-%m-%d)"
+          {
+            echo "date=${DATE}"
+            echo "dump-file=inferencex-${DATE}.dump.zst"
+            echo "tag=db-dump/${DATE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Fail fast if the release tag already exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.names.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists; delete it first to re-dump for the same date."
+            exit 1
+          fi
+
+  dump:
+    name: Dump and compress
+    needs: preflight
     timeout-minutes: 120
     runs-on: blacksmith-32vcpu-ubuntu-2404
-    permissions:
-      contents: write # Create the database dump release
+    # No permissions: this job holds the database credential and must not also
+    # hold repo write. Publishing happens in the release job, which holds repo
+    # write and no database credential.
     steps:
-      - name: Dump and split database
+      - name: Environment (forensics)
+        run: |
+          set -euo pipefail
+          nproc
+          free -h
+          df -h .
+
+      # pg_dump streams through zstd into split without ever materializing the
+      # uncompressed dump, so dump and compress stay one step: a job boundary
+      # between them would force uploading and re-downloading the full
+      # uncompressed database (tens of GB) as an artifact.
+      #
+      # Compressor: zstd -19 --long=31, not xz. The previous `xz -T0 -9e
+      # --dict=192MiB --memlimit-compress=99%` compressed at only ~5 MiB/s
+      # (near single-threaded -- 9e can't fill its 576 MiB blocks fast enough
+      # to parallelize on a pipe), so a multi-GB dump ran for hours and the
+      # weekly job was cancelled/timed out.
+      #
+      # Settings chosen from a benchmark on a real 3 GiB dump sample (the
+      # ratios below are conservative -- the sample loses cross-region matches
+      # the contiguous stream has):
+      #   zstd -12 --long=27  24.4x @ 377 MiB/s   (too weak)
+      #   zstd -19 --long=31  36.7x @  27 MiB/s   <- chosen: the knee
+      #   xz -9e dict=192MiB  35.8x @   5 MiB/s   (worse ratio AND 5x slower)
+      #   zstd -22 --ultra    38.9x @   8 MiB/s   (+6% only, and ~130 min on
+      #                                            the current DB -> would time out)
+      # -19 beats old xz on ratio, runs ~5x faster (~40 min on ~60 GB, well
+      # under the 120 min timeout), uses a bounded window (a few GiB across all
+      # threads -- no OOM), and -T0 costs no ratio vs single-thread here.
+      - name: Dump, compress, and split database
         env:
           # Use primary; replica recovery can cancel long pg_dump snapshots.
           DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
         run: |
           set -euo pipefail
-          DUMP_FILE="inferencex-$(date -u +%Y-%m-%d).dump.xz"
-
           docker run --rm --env DATABASE_URL \
             postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15 \
             sh -ceu 'exec pg_dump \
@@ -37,29 +103,79 @@ jobs:
               --no-privileges \
               --exclude-table-data=public.user_feedback \
               --verbose' \
-            | xz -v -T0 --memlimit-compress=99% --lzma2=preset=9e,dict=192MiB \
+            | zstd -v -T0 -19 --long=31 \
             | split -b 1900m -d -a 2 - "${DUMP_FILE}.part"
 
-          echo "DUMP_FILE=${DUMP_FILE}" >> "$GITHUB_ENV"
-          echo "DUMP_GLOB=${DUMP_FILE}.part*" >> "$GITHUB_ENV"
-          echo "TAG=db-dump/$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+      # One fast read pass catches a truncated/corrupt stream now, while a
+      # re-run is still cheap -- not after someone tries to restore it.
+      - name: Verify compressed stream
+        env:
+          DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
+        run: |
+          set -euo pipefail
+          cat "${DUMP_FILE}".part* | zstd -t --long=31
+
+      - name: Checksum parts
+        env:
+          DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
+        run: |
+          set -euo pipefail
+          sha256sum "${DUMP_FILE}".part* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload dump parts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: db-dump-parts
+          path: |
+            inferencex-*.dump.zst.part*
+            SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1 # The release is the durable home; this artifact is only the job handoff.
+          compression-level: 0 # Parts are already zstd'd; zipping them again wastes CPU for ~0 gain.
+
+  release:
+    name: Create release
+    needs: [preflight, dump]
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Create the database dump release
+    steps:
+      - name: Download dump parts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: db-dump-parts
+
+      - name: Verify checksums
+        run: |
+          set -euo pipefail
+          sha256sum -c SHA256SUMS
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+          DATE: ${{ needs.preflight.outputs.date }}
+          DUMP_GLOB: ${{ needs.preflight.outputs.dump-file }}.part*
         run: |
+          set -euo pipefail
           cat > release-notes.md <<'EOF'
           Weekly InferenceX database dump.
 
+          Verify (optional):
+          `sha256sum -c SHA256SUMS`
+
           Reassemble and decompress:
-          `cat *.dump.xz.part* | xz -d > inferencex.dump`
+          `cat *.dump.zst.part* | zstd -d --long=31 > inferencex.dump`
 
           Restore to PostgreSQL or Neon:
           `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`
           EOF
 
           # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
-          gh release create "$TAG" $DUMP_GLOB \
-            --title "DB Dump $(date -u +%Y-%m-%d)" \
+          gh release create "$TAG" $DUMP_GLOB SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "DB Dump $DATE" \
             --notes-file release-notes.md \
             --latest=false
