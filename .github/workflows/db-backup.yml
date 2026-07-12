@@ -69,26 +69,29 @@ jobs:
       # between them would force uploading and re-downloading the full
       # uncompressed database (tens of GB) as an artifact.
       #
-      # Compressor: zstd -19 --long=31, not xz. The previous `xz -T0 -9e
-      # --dict=192MiB --memlimit-compress=99%` compressed at only ~5 MiB/s
-      # (near single-threaded -- 9e can't fill its 576 MiB blocks fast enough
-      # to parallelize on a pipe), so a multi-GB dump ran for hours and the
-      # weekly job was cancelled/timed out.
+      # Compressor: zstd -19 --long=27, not xz. The previous `xz -T0 -9e
+      # --dict=192MiB` compressed at only ~5 MiB/s (9e can't fill its 576 MiB
+      # blocks fast enough to parallelize on a pipe), so the weekly job ran for
+      # hours and timed out.
       #
-      # Settings chosen from a benchmark on a real 3 GiB dump sample (the
-      # ratios below are conservative -- the sample loses cross-region matches
-      # the contiguous stream has):
-      #   zstd -12 --long=27  24.4x @ 377 MiB/s   (too weak)
-      #   zstd -19 --long=31  36.7x @  27 MiB/s   <- chosen: the knee
-      #   xz -9e dict=192MiB  35.8x @   5 MiB/s   (worse ratio AND 5x slower)
-      #   zstd -22 --ultra    38.9x @   8 MiB/s   (+6% only, and ~130 min on
-      #                                            the current DB -> would time out)
-      # -19 beats old xz on ratio and, unlike 9e, actually parallelizes on a
-      # pipe; it uses a bounded window (a few GiB across all threads -- no OOM),
-      # so it no longer needs a high-memory runner (sized down to 8 vCPU).
-      # -T0 costs no ratio vs single-thread here. The forensics header + the
-      # zstd -v rate on the first real run confirm it stays within the 120 min
-      # timeout as the DB grows.
+      # Ratios from a benchmark on a real dump sample:
+      #   zstd -12 --long=27  24.4x   (too weak)
+      #   zstd -19 --long=27  32.4x   <- chosen: strong ratio, bounded memory
+      #   xz -9e dict=192MiB  35.8x   (worse ratio, and 5x slower)
+      #   zstd -19 --long=31  36.7x   (best practical ratio -- but see MEMORY)
+      #   zstd -22 --ultra    38.9x   (+6% only, and would exceed the timeout)
+      #
+      # MEMORY: zstd's window is 2^N bytes (--long=27 -> 128 MiB, --long=31 ->
+      # 2 GiB), and multithreaded memory scales with windowSize x thread count
+      # (each -T0 worker buffers ~window-sized jobs; single-thread uses far
+      # less). --long=31's 2 GiB window across 8 workers exhausted this 30 GiB
+      # runner once eval_samples began streaming and the OOM killer took zstd --
+      # a small ratio sample never reaches that steady-state high-water, which
+      # is why the benchmark missed it. --long=27's 128 MiB window stays bounded
+      # to a few GiB regardless of thread count (and needs no flag to decompress
+      # -- <=27 is within zstd's default 128 MiB decompressor limit). To reclaim
+      # the ~36.7x of --long=31 later: cap threads (fewer workers = less memory;
+      # MT never improves ratio) or use a high-memory runner.
       - name: Dump, compress, and split database
         env:
           # Use primary; replica recovery can cancel long pg_dump snapshots.
@@ -106,7 +109,7 @@ jobs:
               --no-privileges \
               --exclude-table-data=public.user_feedback \
               --verbose' \
-            | zstd -v -T0 -19 --long=31 \
+            | zstd -v -T0 -19 --long=27 \
             | split -b 1900m -d -a 2 - "${DUMP_FILE}.part"
 
       # One fast read pass catches a truncated/corrupt stream now, while a
@@ -116,7 +119,7 @@ jobs:
           DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
         run: |
           set -euo pipefail
-          cat "${DUMP_FILE}".part* | zstd -t --long=31
+          cat "${DUMP_FILE}".part* | zstd -t --long=27
 
       - name: Checksum parts
         env:
@@ -170,7 +173,7 @@ jobs:
           `sha256sum -c SHA256SUMS`
 
           Reassemble and decompress:
-          `cat *.dump.zst.part* | zstd -d --long=31 > inferencex.dump`
+          `cat *.dump.zst.part* | zstd -d --long=27 > inferencex.dump`
 
           Restore to PostgreSQL or Neon:
           `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`
