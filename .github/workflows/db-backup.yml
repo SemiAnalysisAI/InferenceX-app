@@ -52,7 +52,7 @@ jobs:
     name: Dump and compress
     needs: preflight
     timeout-minutes: 120
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: blacksmith-32vcpu-ubuntu-2404
     # No permissions: this job holds the database credential and must not also
     # hold repo write. Publishing happens in the release job, which holds repo
     # write and no database credential.
@@ -81,17 +81,17 @@ jobs:
       #   zstd -19 --long=31  36.7x   (best practical ratio -- but see MEMORY)
       #   zstd -22 --ultra    38.9x   (+6% only, and would exceed the timeout)
       #
-      # MEMORY: zstd's window is 2^N bytes (--long=27 -> 128 MiB, --long=31 ->
-      # 2 GiB), and multithreaded memory scales with windowSize x thread count
-      # (each -T0 worker buffers ~window-sized jobs; single-thread uses far
-      # less). --long=31's 2 GiB window across 8 workers exhausted this 30 GiB
-      # runner once eval_samples began streaming and the OOM killer took zstd --
-      # a small ratio sample never reaches that steady-state high-water, which
-      # is why the benchmark missed it. --long=27's 128 MiB window stays bounded
-      # to a few GiB regardless of thread count (and needs no flag to decompress
-      # -- <=27 is within zstd's default 128 MiB decompressor limit). To reclaim
-      # the ~36.7x of --long=31 later: cap threads (fewer workers = less memory;
-      # MT never improves ratio) or use a high-memory runner.
+      # MEMORY: the sampler below proved the pipeline is NOT the memory hog --
+      # pg_dump ~75 MiB, zstd ~1.5 GiB (bounded). The 30 GiB 8-vCPU runner was
+      # OOM-killed by blacksmithd (the Blacksmith runner daemon) sitting at
+      # ~28 GiB and driving free memory to ~0. The historical 32-vCPU/128 GiB
+      # runner had headroom for it, which is why this only broke after the
+      # downsize -- so we are back on 32 vCPU. (The ~28 GiB daemon is likely a
+      # Blacksmith bug; there is no workflow toggle to disable the cache -- that
+      # needs a support ticket.) zstd stays at --long=27 for now to keep its
+      # footprint tiny while we confirm the runner fix in isolation; --long=31
+      # (36.7x) can be restored once green -- note windowLog >27 also requires
+      # --long=31 on decompress.
       - name: Dump, compress, and split database
         env:
           # Use primary; replica recovery can cancel long pg_dump snapshots.
@@ -100,18 +100,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          # [TEMP DIAGNOSTIC] Two prior runs died mid-dump on a big-blob table
-          # (eval_samples / benchmark_server_logs) with no OOM line -- the VM
-          # was terminated, and --long=27 (128 MiB window) ruled out zstd as the
-          # memory hog. Sample total memory + the top RSS processes every 3s so
-          # the log shows the curve and which process (postgres/pg_dump vs zstd)
-          # owns it just before the kill. Remove once the cause is confirmed.
+          # [TEMP DIAGNOSTIC] The sampler proved blacksmithd (the runner daemon)
+          # is the ~28 GiB memory hog, not the pipeline. Kept + expanded to
+          # confirm the 32-vCPU runner has headroom: log mem+swap, tmpfs usage
+          # (in case the transparent cache is memory-backed), and the top RSS
+          # processes with full argv, every 3s. Remove once the runner fix is
+          # confirmed green.
+          echo "[diag] blacksmithd processes at start:"
+          pgrep -af blacksmith || true
           ( set +e
             while true; do
               printf '[mem %s] %s' "$(date -u +%H:%M:%S)" \
-                "$(free -m | awk '/Mem:/{printf "used=%sMi avail=%sMi", $3, $7}')"
-              ps -eo rss,comm --sort=-rss 2>/dev/null \
-                | awk 'NR>1 && NR<=6 {printf " | %s=%dMi", $2, $1/1024}'
+                "$(free -m | awk '/Mem:/{printf "mem_used=%sMi avail=%sMi", $3, $7} /Swap:/{printf " swap_used=%sMi", $3}')"
+              printf ' tmpfs=[%s]' "$(df -m --output=target,used 2>/dev/null | awk '/^\/(dev\/shm|run|tmp)/{printf "%s:%sMi ", $1, $2}')"
+              ps -eo rss,args --sort=-rss 2>/dev/null \
+                | awk 'NR>1 && NR<=6 {c=$2; printf " | %dMi:%s", $1/1024, substr(c,1,18)}'
               printf '\n'
               sleep 3
             done ) &
