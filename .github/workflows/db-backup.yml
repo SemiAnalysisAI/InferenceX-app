@@ -52,7 +52,7 @@ jobs:
     name: Dump and compress
     needs: preflight
     timeout-minutes: 120
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     # No permissions: this job holds the database credential and must not also
     # hold repo write. Publishing happens in the release job, which holds repo
     # write and no database credential.
@@ -83,9 +83,12 @@ jobs:
       #   xz -9e dict=192MiB  35.8x @   5 MiB/s   (worse ratio AND 5x slower)
       #   zstd -22 --ultra    38.9x @   8 MiB/s   (+6% only, and ~130 min on
       #                                            the current DB -> would time out)
-      # -19 beats old xz on ratio, runs ~5x faster (~40 min on ~60 GB, well
-      # under the 120 min timeout), uses a bounded window (a few GiB across all
-      # threads -- no OOM), and -T0 costs no ratio vs single-thread here.
+      # -19 beats old xz on ratio and, unlike 9e, actually parallelizes on a
+      # pipe; it uses a bounded window (a few GiB across all threads -- no OOM),
+      # so it no longer needs a high-memory runner (sized down to 8 vCPU).
+      # -T0 costs no ratio vs single-thread here. The forensics header + the
+      # zstd -v rate on the first real run confirm it stays within the 120 min
+      # timeout as the DB grows.
       - name: Dump, compress, and split database
         env:
           # Use primary; replica recovery can cancel long pg_dump snapshots.
