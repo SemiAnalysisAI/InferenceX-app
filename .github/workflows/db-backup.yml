@@ -2,7 +2,7 @@ name: Database Dump
 
 on:
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: '0 0 * * 1' # Every Monday at midnight UTC
   workflow_dispatch:
 
 permissions: {}
