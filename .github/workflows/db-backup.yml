@@ -57,13 +57,6 @@ jobs:
     # hold repo write. Publishing happens in the release job, which holds repo
     # write and no database credential.
     steps:
-      - name: Environment (forensics)
-        run: |
-          set -euo pipefail
-          nproc
-          free -h
-          df -h .
-
       # pg_dump streams through zstd into split without ever materializing the
       # uncompressed dump, so dump and compress stay one step: a job boundary
       # between them would force uploading and re-downloading the full
@@ -81,17 +74,16 @@ jobs:
       #   zstd -19 --long=31  36.7x   (best practical ratio -- but see MEMORY)
       #   zstd -22 --ultra    38.9x   (+6% only, and would exceed the timeout)
       #
-      # MEMORY / RUNNER: the sampler proved the pipeline is NOT the hog --
-      # pg_dump ~75 MiB, zstd ~1.5 GiB (bounded). The killer is blacksmithd (the
-      # Blacksmith runner daemon), which grows to consume the WHOLE VM
-      # regardless of size: ~28 GiB on a 30 GiB runner, ~110 GiB on a 115 GiB
-      # runner, then OOM. A bigger Blacksmith VM can't fix it, and the cache
-      # can't be disabled from the workflow (support ticket only). So the dump
-      # runs on a GitHub-hosted ubuntu-latest, which has no blacksmithd -- our
-      # <2 GiB job fits its 16 GiB easily. zstd stays at --long=27 here (its
-      # footprint fits 16 GiB with margin; --long=31 -T0 could approach the
-      # limit on 4 cores, so reclaim its 36.7x later with capped threads, and
-      # note windowLog >27 also needs --long=31 on decompress).
+      # MEMORY / RUNNER: the pipeline is tiny -- pg_dump ~75 MiB, zstd ~1.5 GiB
+      # (bounded). This runs on a GitHub-hosted ubuntu-latest rather than a
+      # Blacksmith runner: on Blacksmith the runner daemon (blacksmithd) grew to
+      # consume the whole VM regardless of size (~28 GiB on a 30 GiB runner,
+      # ~110 GiB on a 115 GiB runner) and OOM-killed the dump mid-stream; a
+      # bigger VM didn't help and its cache has no workflow-level disable. The
+      # <2 GiB job fits ubuntu-latest's 16 GiB with wide margin. zstd stays at
+      # --long=27 (footprint fits with margin; --long=31 -T0 could approach the
+      # limit on 4 cores, so reclaim its 36.7x later with capped threads -- note
+      # windowLog >27 also needs --long=31 on decompress).
       - name: Dump, compress, and split database
         env:
           # Use primary; replica recovery can cancel long pg_dump snapshots.
@@ -99,27 +91,6 @@ jobs:
           DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
         run: |
           set -euo pipefail
-
-          # [TEMP DIAGNOSTIC] The sampler proved blacksmithd (the runner daemon)
-          # is the ~28 GiB memory hog, not the pipeline. Kept + expanded to
-          # confirm the 32-vCPU runner has headroom: log mem+swap, tmpfs usage
-          # (in case the transparent cache is memory-backed), and the top RSS
-          # processes with full argv, every 3s. Remove once the runner fix is
-          # confirmed green.
-          echo "[diag] blacksmithd processes at start:"
-          pgrep -af blacksmith || true
-          ( set +e
-            while true; do
-              printf '[mem %s] %s' "$(date -u +%H:%M:%S)" \
-                "$(free -m | awk '/Mem:/{printf "mem_used=%sMi avail=%sMi", $3, $7} /Swap:/{printf " swap_used=%sMi", $3}')"
-              printf ' tmpfs=[%s]' "$(df -m --output=target,used 2>/dev/null | awk '/^\/(dev\/shm|run|tmp)/{printf "%s:%sMi ", $1, $2}')"
-              ps -eo rss,args --sort=-rss 2>/dev/null \
-                | awk 'NR>1 && NR<=6 {c=$2; printf " | %dMi:%s", $1/1024, substr(c,1,18)}'
-              printf '\n'
-              sleep 3
-            done ) &
-          trap 'kill "$!" 2>/dev/null || true' EXIT
-
           docker run --rm --env DATABASE_URL \
             postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15 \
             sh -ceu 'exec pg_dump \
