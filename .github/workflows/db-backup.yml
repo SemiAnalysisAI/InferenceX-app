@@ -99,6 +99,24 @@ jobs:
           DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
         run: |
           set -euo pipefail
+
+          # [TEMP DIAGNOSTIC] Two prior runs died mid-dump on a big-blob table
+          # (eval_samples / benchmark_server_logs) with no OOM line -- the VM
+          # was terminated, and --long=27 (128 MiB window) ruled out zstd as the
+          # memory hog. Sample total memory + the top RSS processes every 3s so
+          # the log shows the curve and which process (postgres/pg_dump vs zstd)
+          # owns it just before the kill. Remove once the cause is confirmed.
+          ( set +e
+            while true; do
+              printf '[mem %s] %s' "$(date -u +%H:%M:%S)" \
+                "$(free -m | awk '/Mem:/{printf "used=%sMi avail=%sMi", $3, $7}')"
+              ps -eo rss,comm --sort=-rss 2>/dev/null \
+                | awk 'NR>1 && NR<=6 {printf " | %s=%dMi", $2, $1/1024}'
+              printf '\n'
+              sleep 3
+            done ) &
+          trap 'kill "$!" 2>/dev/null || true' EXIT
+
           docker run --rm --env DATABASE_URL \
             postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15 \
             sh -ceu 'exec pg_dump \
