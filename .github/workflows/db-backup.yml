@@ -2,7 +2,7 @@ name: Database Dump
 
 on:
   schedule:
-    - cron: '0 0 * * 1' # Every Monday at midnight UTC
+    - cron: '0 0 * * 1'
   workflow_dispatch:
 
 permissions: {}
@@ -23,9 +23,6 @@ jobs:
       tag: ${{ steps.names.outputs.tag }}
       date: ${{ steps.names.outputs.date }}
     steps:
-      # Names are computed exactly once and passed to the other jobs: if each
-      # job stamped its own date, a run straddling midnight UTC would dump
-      # under one date and release under another.
       - name: Compute dump name and release tag
         id: names
         run: |
@@ -53,40 +50,9 @@ jobs:
     needs: preflight
     timeout-minutes: 180
     runs-on: ubuntu-latest
-    # No permissions: this job holds the database credential and must not also
-    # hold repo write. Publishing happens in the release job, which holds repo
-    # write and no database credential.
     steps:
-      # pg_dump streams through zstd into split without ever materializing the
-      # uncompressed dump, so dump and compress stay one step: a job boundary
-      # between them would force uploading and re-downloading the full
-      # uncompressed database (tens of GB) as an artifact.
-      #
-      # Compressor: zstd -19 --long=27, not xz. The previous `xz -T0 -9e
-      # --dict=192MiB` compressed at only ~5 MiB/s (9e can't fill its 576 MiB
-      # blocks fast enough to parallelize on a pipe), so the weekly job ran for
-      # hours and timed out.
-      #
-      # Ratios from a benchmark on a real dump sample:
-      #   zstd -12 --long=27  24.4x   (too weak)
-      #   zstd -19 --long=27  32.4x   <- chosen: strong ratio, bounded memory
-      #   xz -9e dict=192MiB  35.8x   (worse ratio, and 5x slower)
-      #   zstd -19 --long=31  36.7x   (best practical ratio -- but see MEMORY)
-      #   zstd -22 --ultra    38.9x   (+6% only, and would exceed the timeout)
-      #
-      # MEMORY / RUNNER: the pipeline is tiny -- pg_dump ~75 MiB, zstd ~1.5 GiB
-      # (bounded). This runs on a GitHub-hosted ubuntu-latest rather than a
-      # Blacksmith runner: on Blacksmith the runner daemon (blacksmithd) grew to
-      # consume the whole VM regardless of size (~28 GiB on a 30 GiB runner,
-      # ~110 GiB on a 115 GiB runner) and OOM-killed the dump mid-stream; a
-      # bigger VM didn't help and its cache has no workflow-level disable. The
-      # <2 GiB job fits ubuntu-latest's 16 GiB with wide margin. zstd stays at
-      # --long=27 (footprint fits with margin; --long=31 -T0 could approach the
-      # limit on 4 cores, so reclaim its 36.7x later with capped threads -- note
-      # windowLog >27 also needs --long=31 on decompress).
       - name: Dump, compress, and split database
         env:
-          # Use primary; replica recovery can cancel long pg_dump snapshots.
           DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
         run: |
@@ -104,8 +70,6 @@ jobs:
             | zstd -v -T0 -19 --long=27 \
             | split -b 1900m -d -a 2 - "${DUMP_FILE}.part"
 
-      # One fast read pass catches a truncated/corrupt stream now, while a
-      # re-run is still cheap -- not after someone tries to restore it.
       - name: Verify compressed stream
         env:
           DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
@@ -129,8 +93,8 @@ jobs:
             inferencex-*.dump.zst.part*
             SHA256SUMS
           if-no-files-found: error
-          retention-days: 1 # The release is the durable home; this artifact is only the job handoff.
-          compression-level: 0 # Parts are already zstd'd; zipping them again wastes CPU for ~0 gain.
+          retention-days: 1
+          compression-level: 0
 
   release:
     name: Create release
@@ -171,7 +135,7 @@ jobs:
           `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`
           EOF
 
-          # $DUMP_GLOB is intentionally unquoted so the shell expands it to every part file.
+          # shellcheck disable=SC2086
           gh release create "$TAG" $DUMP_GLOB SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --title "DB Dump $DATE" \
