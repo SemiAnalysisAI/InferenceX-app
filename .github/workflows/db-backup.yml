@@ -51,8 +51,8 @@ jobs:
   dump:
     name: Dump and compress
     needs: preflight
-    timeout-minutes: 120
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    timeout-minutes: 180
+    runs-on: ubuntu-latest
     # No permissions: this job holds the database credential and must not also
     # hold repo write. Publishing happens in the release job, which holds repo
     # write and no database credential.
@@ -81,17 +81,17 @@ jobs:
       #   zstd -19 --long=31  36.7x   (best practical ratio -- but see MEMORY)
       #   zstd -22 --ultra    38.9x   (+6% only, and would exceed the timeout)
       #
-      # MEMORY: the sampler below proved the pipeline is NOT the memory hog --
-      # pg_dump ~75 MiB, zstd ~1.5 GiB (bounded). The 30 GiB 8-vCPU runner was
-      # OOM-killed by blacksmithd (the Blacksmith runner daemon) sitting at
-      # ~28 GiB and driving free memory to ~0. The historical 32-vCPU/128 GiB
-      # runner had headroom for it, which is why this only broke after the
-      # downsize -- so we are back on 32 vCPU. (The ~28 GiB daemon is likely a
-      # Blacksmith bug; there is no workflow toggle to disable the cache -- that
-      # needs a support ticket.) zstd stays at --long=27 for now to keep its
-      # footprint tiny while we confirm the runner fix in isolation; --long=31
-      # (36.7x) can be restored once green -- note windowLog >27 also requires
-      # --long=31 on decompress.
+      # MEMORY / RUNNER: the sampler proved the pipeline is NOT the hog --
+      # pg_dump ~75 MiB, zstd ~1.5 GiB (bounded). The killer is blacksmithd (the
+      # Blacksmith runner daemon), which grows to consume the WHOLE VM
+      # regardless of size: ~28 GiB on a 30 GiB runner, ~110 GiB on a 115 GiB
+      # runner, then OOM. A bigger Blacksmith VM can't fix it, and the cache
+      # can't be disabled from the workflow (support ticket only). So the dump
+      # runs on a GitHub-hosted ubuntu-latest, which has no blacksmithd -- our
+      # <2 GiB job fits its 16 GiB easily. zstd stays at --long=27 here (its
+      # footprint fits 16 GiB with margin; --long=31 -T0 could approach the
+      # limit on 4 cores, so reclaim its 36.7x later with capped threads, and
+      # note windowLog >27 also needs --long=31 on decompress).
       - name: Dump, compress, and split database
         env:
           # Use primary; replica recovery can cancel long pg_dump snapshots.
