@@ -5,15 +5,12 @@ import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 
-import { sparseLogTicks } from './axis';
 import { chartPoints, collectiveXColorKey } from './data';
 import type {
   CollectiveXChartPoint,
   CollectiveXOperation,
   CollectiveXPercentile,
   CollectiveXSeries,
-  CollectiveXScale,
-  CollectiveXXAxis,
   CollectiveXYAxis,
 } from './types';
 
@@ -23,10 +20,7 @@ interface CollectiveXChartProps {
   colors: Record<string, string>;
   operation: CollectiveXOperation;
   percentile: CollectiveXPercentile;
-  xAxis: CollectiveXXAxis;
   yAxis: CollectiveXYAxis;
-  xScaleType: CollectiveXScale;
-  yScaleType: CollectiveXScale;
   caption?: React.ReactNode;
   legendElement?: React.ReactNode;
   testId?: string;
@@ -37,33 +31,19 @@ const OPERATION_LABELS: Record<CollectiveXOperation, string> = {
   stage: 'Stage',
   combine: 'Combine',
   roundtrip: 'Round trip (measured)',
-  'isolated-sum': 'Isolated sum (Σp, not measured)',
-};
-
-const X_AXIS_LABELS: Record<CollectiveXXAxis, string> = {
-  'tokens-per-rank': 'Source tokens / rank',
-  'global-tokens': 'Global source tokens',
 };
 
 const Y_AXIS_LABELS: Record<CollectiveXYAxis, string> = {
   latency: 'Latency (µs)',
   'tokens-per-second': 'Token rate at selected latency percentile (tokens/s)',
   'activation-rate': 'Activation-data rate at selected latency percentile (GB/s)',
-  'total-logical-rate': 'Total logical data rate at selected latency percentile (GB/s)',
 };
 
-function paddedDomain(values: number[], scaleType: CollectiveXScale): [number, number] {
-  if (values.length === 0) return scaleType === 'log' ? [1, 10] : [0, 1];
-  const min = d3.min(values) ?? 0;
+function paddedDomain(values: number[]): [number, number] {
+  if (values.length === 0) return [1, 10];
+  const min = d3.min(values) ?? 1;
   const max = d3.max(values) ?? 1;
-  if (min === max) {
-    if (scaleType === 'log') return [Math.max(min / 2, Number.MIN_VALUE), max * 2];
-    const padding = Math.max(Math.abs(min) * 0.1, 1);
-    return [min - padding, max + padding];
-  }
-  if (scaleType === 'log') return [min / 1.08, max * 1.08];
-  const padding = (max - min) * 0.06;
-  return [Math.max(0, min - padding), max + padding];
+  return min === max ? [min / 2, max * 2] : [min / 1.08, max * 1.08];
 }
 
 function formatCompact(value: number): string {
@@ -107,17 +87,14 @@ export function CollectiveXChart({
   colors,
   operation,
   percentile,
-  xAxis,
   yAxis,
-  xScaleType,
-  yScaleType,
   caption,
   legendElement,
   testId,
 }: CollectiveXChartProps) {
   const points = useMemo(
-    () => chartPoints(series, operation, percentile, xAxis, yAxis),
-    [series, operation, percentile, xAxis, yAxis],
+    () => chartPoints(series, operation, percentile, yAxis),
+    [series, operation, percentile, yAxis],
   );
   const seriesById = useMemo(() => new Map(series.map((item) => [item.series_id, item])), [series]);
   const lines = useMemo(() => {
@@ -131,22 +108,8 @@ export function CollectiveXChart({
     return result;
   }, [points]);
 
-  const xDomain = useMemo(
-    () =>
-      paddedDomain(
-        points.map((point) => point.x),
-        xScaleType,
-      ),
-    [points, xScaleType],
-  );
-  const yDomain = useMemo(
-    () =>
-      paddedDomain(
-        points.map((point) => point.y),
-        yScaleType,
-      ),
-    [points, yScaleType],
-  );
+  const xDomain = useMemo(() => paddedDomain(points.map((point) => point.x)), [points]);
+  const yDomain = useMemo(() => paddedDomain(points.map((point) => point.y)), [points]);
   const xTickValues = useMemo(
     () => [...new Set(points.map((point) => point.x))].toSorted((a, b) => a - b),
     [points],
@@ -173,14 +136,10 @@ export function CollectiveXChart({
       testId={testId}
       grabCursor
       instructions="Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip"
-      xScale={
-        xScaleType === 'log'
-          ? { type: 'log', domain: xDomain, nice: false }
-          : { type: 'linear', domain: xDomain, nice: true }
-      }
-      yScale={{ type: yScaleType, domain: yDomain, nice: yScaleType === 'linear' }}
+      xScale={{ type: 'log', domain: xDomain, nice: false }}
+      yScale={{ type: 'log', domain: yDomain, nice: false }}
       xAxis={{
-        label: `${X_AXIS_LABELS[xAxis]}${xScaleType === 'log' ? ' (log)' : ''}`,
+        label: 'Source tokens / rank (log)',
         tickCount: 8,
         tickValues: xTickValues,
         tickFormat: (value) => formatTokenCount(Number(value)),
@@ -188,10 +147,6 @@ export function CollectiveXChart({
       yAxis={{
         label: Y_AXIS_LABELS[yAxis],
         tickCount: 5,
-        tickValues:
-          yScaleType === 'log'
-            ? (scale) => sparseLogTicks(scale.domain().map(Number), 5)
-            : undefined,
         tickFormat: (value) => formatCompact(Number(value)),
       }}
       layers={[
@@ -235,9 +190,6 @@ export function CollectiveXChart({
       tooltip={{
         rulerType: 'crosshair',
         attachToLayer: 1,
-        // Compact by design: identity, the selected metric, and the component
-        // latency ladder. Full per-point diagnostics (routing stats, correctness,
-        // EPLB, provenance) live in the "Selected matrix case" tab.
         content: (point, isPinned) => {
           const color = colors[point.colorKey] ?? '#888';
           const measurement = point.point;
@@ -252,8 +204,6 @@ export function CollectiveXChart({
             <div class="text-muted-foreground">Stage: ${formatPercentiles(measurement.components.stage)}</div>
             <div class="text-muted-foreground">Combine: ${formatPercentiles(measurement.components.combine)}</div>
             <div class="text-muted-foreground">Round trip: ${formatPercentiles(measuredRoundtrip)}${measuredRoundtrip ? ' (measured)' : ''}</div>
-            ${measurement.anomalies.length > 0 ? `<div class="mt-1 text-muted-foreground">Anomalies: ${measurement.anomalies.map(escapeHtml).join(' · ')}</div>` : ''}
-            ${isPinned ? '<div class="mt-1 text-muted-foreground" style="font-size: 10px;">Full diagnostics: "Selected matrix case" tab</div>' : ''}
           </div>`;
         },
         getRulerX: (point, scale) =>

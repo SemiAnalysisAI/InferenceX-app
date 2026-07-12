@@ -44,6 +44,7 @@ export function useCollectiveXRun(version: CollectiveXVersion, runId: string | n
     queryKey: ['collectivex-run', version, runId],
     queryFn: ({ signal }) => fetchCollectiveXRun(version, runId!, signal),
     enabled: runId !== null,
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }

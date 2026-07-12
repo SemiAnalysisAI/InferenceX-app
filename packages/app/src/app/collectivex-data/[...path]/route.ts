@@ -13,12 +13,8 @@ const RUNS = new RegExp(`^(?<version>${VERSION_PATTERN})/runs\\.json$`);
 const LATEST = new RegExp(`^(?<version>${VERSION_PATTERN})/latest\\.json$`);
 const RUN = new RegExp(`^(?<version>${VERSION_PATTERN})/runs/(?<runId>[1-9][0-9]*)\\.json$`);
 
-type AvailabilityStatus = 'runs-unavailable' | 'source-unavailable';
-
-function unavailable(status: number, availability?: AvailabilityStatus) {
-  const headers: Record<string, string> = { 'Cache-Control': 'no-store' };
-  if (availability) headers['X-CollectiveX-Status'] = availability;
-  return new Response(null, { status, headers });
+function unavailable(status: number) {
+  return new Response(null, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
 function json(body: BodyInit, cacheControl: string) {
@@ -49,28 +45,24 @@ export async function GET(_request: Request, context: { params: Promise<{ path: 
     try {
       const listing = await listCollectiveXSweepRuns(version);
       return json(
-        `${JSON.stringify({ format: 'collectivex.runs.v1', version, runs: listing })}\n`,
+        `${JSON.stringify({ version, runs: listing })}\n`,
         'public, s-maxage=60, stale-while-revalidate=300',
       );
     } catch (error) {
       const code = collectiveXSweepErrorCode(error);
-      if (code === 'not-found') return unavailable(404, 'runs-unavailable');
-      if (code === 'unavailable') return unavailable(503, 'source-unavailable');
+      if (code === 'not-found') return unavailable(404);
+      if (code === 'unavailable') return unavailable(503);
       return unavailable(502);
     }
   }
 
   try {
     const dataset = await loadCollectiveXSweepRun(version, run?.groups?.runId);
-    // A specific run is content-stable; the latest pointer is short-lived.
-    const cacheControl = run
-      ? 'public, max-age=600, stale-while-revalidate=3600'
-      : 'public, s-maxage=60, stale-while-revalidate=300';
-    return json(`${JSON.stringify(dataset)}\n`, cacheControl);
+    return json(`${JSON.stringify(dataset)}\n`, 'public, s-maxage=60, stale-while-revalidate=300');
   } catch (error) {
     const code = collectiveXSweepErrorCode(error);
-    if (code === 'not-found') return unavailable(404, 'runs-unavailable');
-    if (code === 'unavailable') return unavailable(503, 'source-unavailable');
+    if (code === 'not-found') return unavailable(404);
+    if (code === 'unavailable') return unavailable(503);
     return unavailable(502);
   }
 }

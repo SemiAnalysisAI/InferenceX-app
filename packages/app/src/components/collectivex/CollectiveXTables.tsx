@@ -9,7 +9,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { collectiveXTopologyLabel } from './data';
 
-import type { CollectiveXAttempt, CollectiveXCoverage, CollectiveXOutcome } from './types';
+import type { CollectiveXCoverage, CollectiveXOutcome } from './types';
 
 const OUTCOME_CLASSES = {
   success: 'border-emerald-600/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
@@ -103,8 +103,6 @@ const STRINGS = {
   },
 } as const;
 
-type TableStrings = (typeof STRINGS)[keyof typeof STRINGS];
-
 const REASON_LABELS = {
   zh: {
     'artifact-validation-failed': '产物校验失败',
@@ -167,18 +165,6 @@ export function collectiveXReasonLabel(value: string, locale: 'en' | 'zh'): stri
   return REASON_LABELS.zh[value as keyof typeof REASON_LABELS.zh] ?? value;
 }
 
-function attemptRoleLabel(
-  attempt: CollectiveXAttempt,
-  terminalAttemptIds: Set<string>,
-  t: TableStrings,
-): string {
-  const roles = [
-    ...(terminalAttemptIds.has(attempt.attempt_id) ? [t.terminalRole] : []),
-    ...(attempt.selected ? [t.allocationRole] : []),
-  ];
-  return roles.length > 0 ? roles.join(' · ') : t.retainedRole;
-}
-
 function OutcomeBadge({ outcome }: { outcome: CollectiveXOutcome }) {
   const t = STRINGS[useLocale()];
   return (
@@ -225,20 +211,9 @@ export function CollectiveXCoverageTable({ coverage }: { coverage: CollectiveXCo
         sortValue: (row) => t.phase[row.phase],
       },
       {
-        header: t.modeHeader,
-        cell: (row) => t.mode[row.mode],
-        sortValue: (row) => t.mode[row.mode],
-      },
-      {
         header: t.epHeader,
         cell: (row) => `EP${row.topology.ep_size}`,
         sortValue: (row) => row.topology.ep_size,
-      },
-      {
-        header: t.scopeHeader,
-        cell: (row) => t.scope[row.topology.scope],
-        sortValue: (row) => t.scope[row.topology.scope],
-        className: 'whitespace-nowrap',
       },
       {
         header: t.topologyHeader,
@@ -255,30 +230,6 @@ export function CollectiveXCoverageTable({ coverage }: { coverage: CollectiveXCo
         header: t.outcomeHeader,
         cell: (row) => <OutcomeBadge outcome={row.outcome} />,
         sortValue: (row) => t.outcome[row.outcome],
-      },
-      {
-        header: t.attempts,
-        align: 'right',
-        cell: (row) => row.attempt_ids.length,
-        sortValue: (row) => row.attempt_ids.length,
-        className: 'tabular-nums',
-      },
-      {
-        header: t.selected,
-        cell: (row) => (
-          <span title={row.selected_attempt_id ?? undefined} className="font-mono text-xs">
-            {shortId(row.selected_attempt_id)}
-          </span>
-        ),
-        sortValue: (row) => row.selected_attempt_id ?? '',
-      },
-      {
-        header: t.failureMode,
-        cell: (row) => (row.failure_mode ? collectiveXReasonLabel(row.failure_mode, locale) : '-'),
-        sortValue: (row) =>
-          row.failure_mode
-            ? `${collectiveXReasonLabel(row.failure_mode, locale)} ${row.failure_mode}`
-            : '',
       },
       {
         header: t.reason,
@@ -298,151 +249,6 @@ export function CollectiveXCoverageTable({ coverage }: { coverage: CollectiveXCo
         columns={columns}
         testId="collectivex-coverage-table"
         analyticsPrefix="collectivex_coverage_table"
-      />
-    </Card>
-  );
-}
-
-export function CollectiveXAttemptTable({
-  attempts,
-  coverage,
-}: {
-  attempts: CollectiveXAttempt[];
-  coverage: CollectiveXCoverage[];
-}) {
-  const locale = useLocale();
-  const t = STRINGS[locale];
-  const coverageByCase = useMemo(
-    () => new Map(coverage.map((item) => [item.case_id, item])),
-    [coverage],
-  );
-  const terminalAttemptIds = useMemo(
-    () =>
-      new Set(
-        coverage.flatMap((item) =>
-          item.selected_attempt_id === null ? [] : [item.selected_attempt_id],
-        ),
-      ),
-    [coverage],
-  );
-  const columns = useMemo<DataTableColumn<CollectiveXAttempt>[]>(
-    () => [
-      {
-        header: t.case,
-        cell: (row) => (
-          <div title={`${t.caseId}: ${row.case_id}`}>
-            <p className="font-medium whitespace-nowrap">
-              {coverageByCase.get(row.case_id)?.label ?? shortId(row.case_id)}
-            </p>
-            <p className="font-mono text-[11px] text-muted-foreground">{shortId(row.case_id)}</p>
-          </div>
-        ),
-        sortValue: (row) => `${coverageByCase.get(row.case_id)?.label ?? ''} ${row.case_id}`,
-      },
-      {
-        header: t.attemptId,
-        cell: (row) => (
-          <span title={row.attempt_id} className="font-mono text-xs">
-            {shortId(row.attempt_id)}
-          </span>
-        ),
-        sortValue: (row) => row.attempt_id,
-      },
-      {
-        header: t.allocation,
-        cell: (row) => (
-          <span title={row.allocation_id} className="font-mono text-xs">
-            {shortId(row.allocation_id)}
-          </span>
-        ),
-        sortValue: (row) => row.allocation_id,
-      },
-      {
-        header: t.run,
-        cell: (row) => `${row.run_id}.${row.run_attempt}`,
-        sortValue: (row) =>
-          `${row.run_id.padStart(20, '0')}.${String(row.run_attempt).padStart(10, '0')}`,
-        className: 'font-mono text-xs',
-      },
-      {
-        header: t.attempt,
-        align: 'right',
-        cell: (row) => row.attempt_index,
-        sortValue: (row) => row.attempt_index,
-        className: 'tabular-nums',
-      },
-      {
-        header: t.outcomeHeader,
-        cell: (row) => <OutcomeBadge outcome={row.outcome} />,
-        sortValue: (row) => t.outcome[row.outcome],
-      },
-      {
-        header: t.role,
-        cell: (row) => attemptRoleLabel(row, terminalAttemptIds, t),
-        sortValue: (row) => attemptRoleLabel(row, terminalAttemptIds, t),
-      },
-      {
-        header: t.evidence,
-        align: 'right',
-        cell: (row) => (
-          <details className="font-mono text-xs">
-            <summary
-              aria-label={`${t.evidence}: ${row.evidence.length}`}
-              title={row.evidence
-                .map((item) => `${item.evidence_id} -> ${item.point_id}`)
-                .join('\n')}
-              className="cursor-pointer list-none whitespace-nowrap [&::-webkit-details-marker]:hidden"
-            >
-              {row.evidence.length}
-              {row.evidence.length > 0 &&
-                ` · ${row.evidence.map((item) => shortId(item.evidence_id)).join(' · ')}`}
-            </summary>
-            {row.evidence.length > 0 && (
-              <div className="mt-2 max-w-[36rem] space-y-1 text-left text-[10px] leading-4 break-all">
-                {row.evidence.map((item) => (
-                  <p key={`${item.evidence_id}:${item.point_id}`}>
-                    <span data-testid="collectivex-evidence-id">{item.evidence_id}</span>
-                    <span aria-hidden="true"> -&gt; </span>
-                    <span>{item.point_id}</span>
-                  </p>
-                ))}
-              </div>
-            )}
-          </details>
-        ),
-        sortValue: (row) =>
-          [
-            String(row.evidence.length).padStart(8, '0'),
-            ...row.evidence.flatMap((item) => [item.evidence_id, item.point_id]),
-          ].join(' '),
-        className: 'tabular-nums',
-      },
-      {
-        header: t.failureMode,
-        cell: (row) => (row.failure_mode ? collectiveXReasonLabel(row.failure_mode, locale) : '-'),
-        sortValue: (row) =>
-          row.failure_mode
-            ? `${collectiveXReasonLabel(row.failure_mode, locale)} ${row.failure_mode}`
-            : '',
-      },
-      {
-        header: t.reason,
-        cell: (row) => (row.reason ? collectiveXReasonLabel(row.reason, locale) : '-'),
-        sortValue: (row) =>
-          row.reason ? `${collectiveXReasonLabel(row.reason, locale)} ${row.reason}` : '',
-      },
-    ],
-    [coverageByCase, locale, t, terminalAttemptIds],
-  );
-
-  return (
-    <Card data-testid="collectivex-attempts">
-      <h2 className="text-lg font-semibold">{t.retainedAttempts}</h2>
-      <DataTable
-        data={attempts}
-        columns={columns}
-        testId="collectivex-attempts-table"
-        analyticsPrefix="collectivex_attempts_table"
       />
     </Card>
   );

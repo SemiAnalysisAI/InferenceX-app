@@ -1,5 +1,9 @@
 import { buildRunSummary } from '@/components/collectivex/reader';
-import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
+import {
+  buildDataset,
+  makeCollectiveXDataset,
+  makeRawShard,
+} from '@/components/collectivex/test-fixture';
 import type { CollectiveXDataset } from '@/components/collectivex/types';
 
 // The neutral view: one run's measured series plus its full case coverage. The route
@@ -15,7 +19,7 @@ function installLatest(body: CollectiveXDataset | Record<string, unknown> = data
 
 function installRuns() {
   cy.intercept('GET', '/collectivex-data/1/runs.json', {
-    body: { format: 'collectivex.runs.v1', version: 1, runs: [buildRunSummary(dataset)] },
+    body: { version: 1, runs: [buildRunSummary(dataset)] },
   }).as('runs');
 }
 
@@ -60,30 +64,38 @@ describe('CollectiveX neutral run view', () => {
   it('renders the default decode round-trip chart for the EP8 scale-up series', () => {
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', 'Round trip (measured) · decode · p99')
-      .and('contain.text', 'nccl-ep');
+      .and('contain.text', 'deepep-v2');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
-  it('selects the EP16 scale-out series through the identity controls', () => {
+  it('only exposes dimensions that vary in the current matrix', () => {
+    cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
+    cy.get('[data-testid="collectivex-phase-toggle"]').should('be.visible');
+    cy.get('[data-testid="collectivex-sku-select"]').should('be.visible');
+    cy.get('[data-testid="collectivex-backend-select"]').should('be.visible');
+    cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-fabric-scope-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
+  });
+
+  it('selects the EP16 series through the identity controls', () => {
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP16').click();
-    cy.get('[data-testid="collectivex-fabric-scope-toggle"]')
-      .contains('button', 'Scale-out')
-      .click();
 
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'deepep')
+      .should('contain.text', 'mori')
       .and('contain.text', 'EP16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
-  it('shows the empty state when no series matches the identity selection', () => {
-    // The only EP8 series is scale-up, so a scale-out filter at EP8 matches nothing.
-    cy.get('[data-testid="collectivex-fabric-scope-toggle"]')
-      .contains('button', 'Scale-out')
-      .click();
-    cy.get('[data-testid="collectivex-empty-state"]').should('be.visible');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('not.exist');
+  it('selects the available phase when a partial run only measured prefill', () => {
+    const prefill = buildDataset({ shards: [makeRawShard({ phase: 'prefill' })] });
+    installLatest(prefill);
+    cy.reload();
+    cy.wait('@latest');
+    cy.get('[data-testid="collectivex-phase-toggle"]').should('contain.text', 'Prefill');
+    cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'prefill');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
   it('clears the chart when the sole series is toggled off in the legend', () => {
@@ -100,19 +112,8 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'Click elsewhere to dismiss')
       .and('contain.text', 'Round trip (measured) p99:')
       .and('contain.text', 'Latency p50 / p90 / p95 / p99')
-      .and('contain.text', 'Full diagnostics')
-      // Deep diagnostics moved to the "Selected matrix case" tab.
       .and('not.contain.text', 'Expert CV')
       .and('not.contain.text', 'evidence=');
-  });
-
-  it('notes that isolated sum is derived and never drives throughput', () => {
-    cy.get('[data-testid="collectivex-operation-select"]').click();
-    cy.contains('[role="option"]', 'Isolated sum').click();
-    cy.get('[data-testid="collectivex-main-chart"]').should(
-      'contain.text',
-      'Isolated sum is derived',
-    );
   });
 
   it('lists runs on demand and pins a specific run by id', () => {
@@ -126,67 +127,19 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-run-conclusion"]').should('contain.text', `#${runId}`);
   });
 
-  it('keeps the chart on top and presents the matrix inventory in the default tab', () => {
-    // The chart is not inside a tab: it stays visible alongside every tab.
+  it('keeps the chart on top and presents the matrix inventory', () => {
     cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
     cy.get('[data-testid="collectivex-inventory"]')
       .should('contain.text', 'Matrix case inventory')
-      .and('contain.text', `${dataset.coverage.length} of ${dataset.coverage.length} cases`);
+      .and('contain.text', `${dataset.coverage.length} cases`);
     cy.get('[data-testid="collectivex-inventory-table"]')
       .should('contain.text', 'H200-DGXC')
-      .and('contain.text', 'B300-SXM');
-    cy.contains('[role="tab"]', 'Selected matrix case').click();
-    cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
-    cy.get('[data-testid="collectivex-main-chart"]').should('be.visible');
-  });
-
-  it('jumps to the selected matrix case tab when a case is inspected', () => {
-    cy.get('[data-testid="collectivex-inventory-table"] button[aria-label^="Inspect"]')
-      .last()
-      .click();
-    cy.location('hash').should('eq', '#tab-case');
-    cy.get('[data-testid="collectivex-case-detail"]').should(
-      'contain.text',
-      'Selected matrix case',
-    );
-  });
-
-  it('exposes terminal coverage, retained attempts, and run provenance in Evidence', () => {
-    cy.contains('[role="tab"]', 'Evidence').click();
-    cy.get('[data-testid="collectivex-coverage-table"]')
-      .should('contain.text', 'nccl-ep')
-      .and('contain.text', 'deepep')
-      .and('contain.text', 'unsupported');
-    cy.get('[data-testid="collectivex-attempts-table"]').should('be.visible');
-    cy.get('[data-testid="collectivex-provenance"]')
-      .should('contain.text', `#${runId}`)
-      .and('contain.text', 'Source bundles');
-  });
-
-  it('restores the active tab with browser history', () => {
-    cy.contains('[role="tab"]', 'Evidence').click();
-    cy.location('hash').should('eq', '#tab-evidence');
-    cy.contains('[role="tab"]', 'Matrix case inventory').click();
-    cy.location('hash').should('eq', '#tab-inventory');
-    cy.go('back');
-    cy.location('hash').should('eq', '#tab-evidence');
-    cy.get('[data-testid="collectivex-provenance"]').should('be.visible');
-  });
-
-  it('disables source navigation when measured series span different revisions', () => {
-    const mixed = makeCollectiveXDataset();
-    mixed.series[1].build.source_sha = 'd'.repeat(40);
-    installLatest(mixed);
-    cy.reload();
-    cy.wait('@latest');
-    cy.get('[data-testid="collectivex-source-link"]')
-      .should('have.attr', 'aria-disabled', 'true')
-      .and('not.have.attr', 'href');
+      .and('contain.text', 'B300');
   });
 });
 
 describe('CollectiveX availability states', () => {
-  it('reports a missing run listing as no published run', () => {
+  it('reports a missing run', () => {
     cy.intercept('GET', '/collectivex-data/1/latest.json', {
       statusCode: 404,
       headers: { 'X-CollectiveX-Status': 'runs-unavailable' },
@@ -195,11 +148,11 @@ describe('CollectiveX availability states', () => {
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'No CollectiveX run has been published yet.');
+      .and('contain.text', 'CollectiveX request failed (404).');
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
 
-  it('reports an unavailable GitHub source as a temporary outage', () => {
+  it('reports an unavailable GitHub source', () => {
     cy.intercept('GET', '/collectivex-data/1/latest.json', {
       statusCode: 503,
       headers: { 'X-CollectiveX-Status': 'source-unavailable' },
@@ -208,7 +161,7 @@ describe('CollectiveX availability states', () => {
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'The GitHub Actions run source is temporarily unavailable.');
+      .and('contain.text', 'CollectiveX request failed (503).');
   });
 
   it('renders the loading state while the run resolves', () => {

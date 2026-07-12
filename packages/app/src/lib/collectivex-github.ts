@@ -20,13 +20,9 @@ const WORKFLOW_NAME = 'CollectiveX Sweep';
 const RUNS_PER_PAGE = 100;
 const ARTIFACTS_PER_PAGE = 100;
 
-// Neutral artifact families a sweep run uploads (via always()). A current run ships the
-// matrix + per-case shards; the `cxunsupported-` terminal family was retired (non-success
-// outcomes now ride in-band on a `case-attempt` shard) but is still matched so older runs
-// with that artifact family remain readable.
+// Artifact families uploaded by the current sweep.
 const MATRIX_PREFIX = 'cxsweep-matrix-';
 const SHARD_PREFIX = 'cxshard-';
-const TERMINAL_PREFIX = 'cxunsupported-';
 
 const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const MAX_RUN_BYTES = 256 * 1024 * 1024;
@@ -34,7 +30,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_ATTEMPTS = 3;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const LATEST_TTL_MS = 60_000;
-const RUN_TTL_MS = 10 * 60_000;
+const RUN_TTL_MS = 60_000;
 // The picker lists a recent window; each listed run costs one artifact-bundle
 // download + build, so the fan-out stays bounded.
 const MAX_LISTED_RUNS = 8;
@@ -228,8 +224,8 @@ async function listArtifacts(runId: number, token: string): Promise<GithubArtifa
   return artifacts.filter((artifact) => !artifact.expired);
 }
 
-function hasMatrixArtifact(artifacts: GithubArtifact[]): boolean {
-  return artifacts.some((artifact) => artifact.name.startsWith(MATRIX_PREFIX));
+function hasMatrixArtifact(artifacts: GithubArtifact[], run: WorkflowRun): boolean {
+  return artifacts.some((artifact) => artifact.name === `${MATRIX_PREFIX}${run.id}`);
 }
 
 async function collectDocs(artifact: GithubArtifact, token: string): Promise<unknown[]> {
@@ -287,6 +283,28 @@ interface MatrixCandidate {
   resultArtifacts: GithubArtifact[];
 }
 
+function resultArtifactsForRun(artifacts: GithubArtifact[], run: WorkflowRun): GithubArtifact[] {
+  const suffix = new RegExp(`^${SHARD_PREFIX}(.+)-${run.id}-([1-9][0-9]*)$`);
+  const selected = new Map<string, { artifact: GithubArtifact; attempt: number }>();
+  for (const artifact of artifacts) {
+    const match = suffix.exec(artifact.name);
+    if (!match) continue;
+    const attempt = Number(match[2]);
+    if (attempt > run.run_attempt) continue;
+    const previous = selected.get(match[1]);
+    if (
+      !previous ||
+      attempt > previous.attempt ||
+      (attempt === previous.attempt && artifact.id > previous.artifact.id)
+    ) {
+      selected.set(match[1], { artifact, attempt });
+    }
+  }
+  return [...selected.values()]
+    .map(({ artifact }) => artifact)
+    .toSorted((left, right) => left.name.localeCompare(right.name));
+}
+
 function matrixVersion(doc: unknown): number | null {
   const value = (doc as { version?: unknown } | null)?.version;
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
@@ -308,8 +326,12 @@ function isMatrixDoc(doc: unknown): boolean {
 async function loadMatrixCandidate(
   artifacts: GithubArtifact[],
   token: string,
+  run: WorkflowRun,
 ): Promise<MatrixCandidate> {
-  const matrixArtifacts = artifacts.filter((artifact) => artifact.name.startsWith(MATRIX_PREFIX));
+  const matrixArtifacts = artifacts
+    .filter((artifact) => artifact.name === `${MATRIX_PREFIX}${run.id}`)
+    .toSorted((left, right) => right.id - left.id)
+    .slice(0, 1);
   if (matrixArtifacts.length === 0) {
     throw new CollectiveXSweepError('not-found', 'sweep run has no matrix artifact');
   }
@@ -323,10 +345,7 @@ async function loadMatrixCandidate(
   if (version === null) {
     throw new CollectiveXSweepError('invalid', 'matrix document has no valid version tag');
   }
-  const resultArtifacts = artifacts.filter(
-    (artifact) =>
-      artifact.name.startsWith(SHARD_PREFIX) || artifact.name.startsWith(TERMINAL_PREFIX),
-  );
+  const resultArtifacts = resultArtifactsForRun(artifacts, run);
   return { matrixDoc: matrixCandidates[0], version, matrixArtifacts, resultArtifacts };
 }
 
@@ -358,10 +377,7 @@ async function assembleRun(
     run_attempt: run.run_attempt,
     generated_at: generatedAt,
     conclusion: run.conclusion,
-    matrix_id: null,
-    source_bundle_ids: [...candidate.matrixArtifacts, ...candidate.resultArtifacts].map(
-      (artifact) => artifact.name,
-    ),
+    source_sha: run.head_sha,
   };
 
   try {
@@ -397,7 +413,7 @@ async function fetchRunById(
     throw new CollectiveXSweepError('not-found', 'run is not a CollectiveX sweep');
   }
   const artifacts = await listArtifacts(run.id, token);
-  const candidate = await loadMatrixCandidate(artifacts, token);
+  const candidate = await loadMatrixCandidate(artifacts, token, run);
   if (candidate.version !== version) {
     throw new CollectiveXSweepError('not-found', 'run does not match the requested version');
   }
@@ -410,8 +426,8 @@ async function fetchLatestRun(version: CollectiveXVersion): Promise<CollectiveXD
   // version rather than erroring, so a future vN rollout never breaks vN-1.
   for await (const run of sweepRuns(token)) {
     const artifacts = await listArtifacts(run.id, token);
-    if (!hasMatrixArtifact(artifacts)) continue;
-    const candidate = await loadMatrixCandidate(artifacts, token);
+    if (!hasMatrixArtifact(artifacts, run)) continue;
+    const candidate = await loadMatrixCandidate(artifacts, token, run);
     if (candidate.version !== version) continue;
     return assembleRun(run, candidate, token);
   }
@@ -423,11 +439,12 @@ async function fetchRunList(version: CollectiveXVersion): Promise<CollectiveXRun
   const summaries: CollectiveXRunSummary[] = [];
   for await (const run of sweepRuns(token)) {
     const artifacts = await listArtifacts(run.id, token);
-    if (!hasMatrixArtifact(artifacts)) continue;
-    const candidate = await loadMatrixCandidate(artifacts, token);
+    if (!hasMatrixArtifact(artifacts, run)) continue;
+    const candidate = await loadMatrixCandidate(artifacts, token, run);
     if (candidate.version !== version) continue;
     const cacheKey = `${version}:${run.id}`;
-    let datasetPromise = runCache.get(cacheKey)?.promise;
+    const cached = runCache.get(cacheKey);
+    let datasetPromise = cached && cached.expiresAt > Date.now() ? cached.promise : undefined;
     if (!datasetPromise) {
       datasetPromise = assembleRun(run, candidate, token);
       runCache.set(cacheKey, { expiresAt: Date.now() + RUN_TTL_MS, promise: datasetPromise });

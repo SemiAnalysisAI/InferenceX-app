@@ -1,19 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import {
-  buildDatasetFromNeutral,
-  buildRunSummary,
-  collectiveXAvailabilityReason,
-  collectiveXLatestUrl,
-  collectiveXRunUrl,
-  collectiveXRunsUrl,
-  fetchCollectiveXByRunId,
-  fetchCollectiveXLatest,
-  fetchCollectiveXRuns,
-  parseCollectiveXDataset,
-  parseCollectiveXDatasetText,
-  parseCollectiveXRuns,
-} from './reader';
+import { buildDatasetFromNeutral } from './reader';
 import {
   buildDataset,
   makeCollectiveXDataset,
@@ -24,358 +11,115 @@ import {
   makeRunMeta,
 } from './test-fixture';
 
-const IMAGE_DIGEST = `sha256:${'a'.repeat(64)}`;
-const SOURCE_SHA = 'c'.repeat(40);
-
-function fakeResponse(body: string, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    text: () => Promise.resolve(body),
-  } as unknown as Response;
-}
-
-// ---------------------------------------------------------------------------
-// Neutral → view assembly
-// ---------------------------------------------------------------------------
-describe('CollectiveX neutral → view assembly', () => {
-  it('assembles a schema-valid view dataset from matrix + shard docs', () => {
-    const dataset = makeCollectiveXDataset();
-    expect(dataset.format).toBe('collectivex.view.v1');
-    expect(dataset.schema_version).toBe(1);
-    // Two measured series (deepep-v2 EP8 scale-up + deepep EP16 scale-out).
-    expect(dataset.series).toHaveLength(2);
-    // Four requested coverage rows: two measured, one unsupported terminal, one pending.
-    expect(dataset.coverage).toHaveLength(4);
-  });
-
-  it('counts terminal dispositions across the run envelope', () => {
-    const { run } = makeCollectiveXDataset();
-    expect(run.requested_cases).toBe(4);
-    expect(run.measured_cases).toBe(2);
-    expect(run.unsupported_cases).toBe(1);
-    expect(run.failed_cases).toBe(0);
-    // terminal = every non-pending case (2 measured + 1 unsupported).
-    expect(run.terminal_cases).toBe(3);
-    expect(run.covered_skus).toEqual(['b300-sxm', 'h200-dgxc', 'mi355x-oam']);
-  });
-
-  it('counts measured, terminal, and requested points', () => {
-    const { run } = makeCollectiveXDataset();
-    // Two measured series × two token rows each.
-    expect(run.measured_points).toBe(4);
-    // measured (4) + unsupported ladder (128, 256).
-    expect(run.terminal_points).toBe(6);
-    // measured (4) + unsupported (2) + pending (2).
-    expect(run.requested_points).toBe(8);
-  });
-
-  it('emits one attempt per measured shard', () => {
-    const dataset = makeCollectiveXDataset();
-    expect(dataset.attempts).toHaveLength(2);
-    expect(dataset.attempts.every((attempt) => attempt.outcome === 'success')).toBe(true);
-    // Both success shards share one GHA run+attempt, so one allocation.
-    expect(dataset.run.allocation_count).toBe(1);
-  });
-
-  // Feed the assembler exactly what a run's shard artifact carries: the matrix, a
-  // current-backend case-attempt, and a co-located `samples` dump the reader must drop.
-  interface ShardIdentity {
+function requestedOf(shard: Record<string, unknown>) {
+  const identity = shard.identity as {
     case_id: string;
     case_factors: { sku: string; case: Record<string, unknown> };
-  }
-  const requestedOf = (shard: Record<string, unknown>) => {
-    const { case_id: caseId, case_factors } = shard.identity as ShardIdentity;
-    return {
-      caseId,
-      sku: case_factors.sku,
-      disposition: 'runnable' as const,
-      case: case_factors.case,
-    };
   };
-
-  it('assembles measured coverage from a matrix + success case-attempt and ignores a samples doc', () => {
-    const shard = makeRawShard({ backend: 'deepep-v2' });
-    const matrix = makeRawMatrix([requestedOf(shard)]);
-    const samples = { record_type: 'samples', identity: shard.identity, rows: [] };
-    const dataset = buildDatasetFromNeutral(matrix, [shard, samples], makeRunMeta());
-
-    expect(dataset.series).toHaveLength(1);
-    expect(dataset.coverage).toHaveLength(1);
-    expect(dataset.coverage[0].outcome).toBe('success');
-    expect(dataset.coverage[0].points.every((point) => point.terminal_status === 'measured')).toBe(
-      true,
-    );
-  });
-
-  it('surfaces an invalid case-attempt as an invalid coverage outcome, not pending', () => {
-    const shard = makeInvalidCaseAttempt({ backend: 'deepep-v2' });
-    const dataset = buildDatasetFromNeutral(
-      makeRawMatrix([requestedOf(shard)]),
-      [shard],
-      makeRunMeta(),
-    );
-
-    expect(dataset.series).toHaveLength(0);
-    expect(dataset.coverage[0].outcome).toBe('invalid');
-    expect(dataset.attempts[0].outcome).toBe('invalid');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Neutral field synthesis (series_id, allocation_id, evidence, build, anomalies)
-// ---------------------------------------------------------------------------
-describe('CollectiveX neutral field synthesis', () => {
-  it('derives series id, allocation id, and evidence id when omitted', () => {
-    const dataset = buildDataset({ shards: [makeRawShard({ runId: '208', runAttempt: '2' })] });
-    const series = dataset.series[0];
-    // No series_id emitted → series key falls back to case_id.
-    expect(series.series_id).toBe('h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform');
-    expect(series.allocation_ids).toEqual(['alloc-208-2']);
-    expect(series.points[0].evidence_ids).toEqual([`ev-${series.points[0].point_id}`]);
-  });
-
-  it('folds provenance into the build and defaults combine quant mode to none', () => {
-    const series = makeCollectiveXSeries();
-    expect(series.build.image).toBe(IMAGE_DIGEST);
-    expect(series.build.source_sha).toBe(SOURCE_SHA);
-    expect(series.build.squash_sha256).toBe('');
-    expect(series.workload.workload_id).toBe('deepseek-v3');
-    expect(series.workload.combine_precision.quant_mode).toBe('none');
-  });
-
-  it('slugifies string and object anomalies into reason ids', () => {
-    const series = makeCollectiveXSeries({
-      rows: [{ anomalies: [{ type: 'Correctness_Drift' }, 'kernel-timeout'] }],
-    });
-    expect(series.points[0].anomalies).toEqual(['correctness-drift', 'kernel-timeout']);
-  });
-
-  it('passes legacy promotion-era identity fields through unchanged', () => {
-    const series = makeCollectiveXSeries({ legacyIdentity: true });
-    expect(series.series_id).toBe(`cxseries-v1-${'d'.repeat(64)}`);
-    expect(series.allocation_ids).toEqual([`cxalloc-v1-${'e'.repeat(64)}`]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Component mapping (host-staging zero bytes, unavailable components)
-// ---------------------------------------------------------------------------
-describe('CollectiveX component mapping', () => {
-  it('maps a measured host-staging component with zero logical bytes to a zero rate', () => {
-    const series = makeCollectiveXSeries({ rows: [{ stageZeroBytes: true }] });
-    const stage = series.points[0].components.stage;
-    expect(stage).not.toBeNull();
-    expect(stage?.byte_provenance?.total_logical_bytes).toBe(0);
-    expect(stage?.total_logical_data_rate_gbps_at_latency_percentile?.p50).toBe(0);
-    // Latency stays strictly positive even when the rate collapses to zero.
-    expect(stage?.latency_us.p50).toBeGreaterThan(0);
-  });
-
-  it('drops an unavailable component to null', () => {
-    const series = makeCollectiveXSeries({ rows: [{ stageUnavailable: true }] });
-    expect(series.points[0].components.stage).toBeNull();
-    expect(series.points[0].components.dispatch).not.toBeNull();
-  });
-
-  it('derives isolated_sum with no byte accounting', () => {
-    const series = makeCollectiveXSeries();
-    const isolated = series.points[0].components.isolated_sum;
-    expect(isolated?.origin).toBe('derived');
-    expect(isolated?.byte_provenance).toBeNull();
-    expect(isolated?.activation_data_rate_gbps_at_latency_percentile).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Terminal / pending coverage
-// ---------------------------------------------------------------------------
-describe('CollectiveX terminal coverage', () => {
-  it('records an unsupported terminal outcome with a reason', () => {
-    const dataset = makeCollectiveXDataset();
-    const unsupported = dataset.coverage.find((row) => row.sku === 'b300-sxm');
-    expect(unsupported?.outcome).toBe('unsupported');
-    expect(unsupported?.reason).toBe('capability-gate');
-    expect(unsupported?.points.every((point) => point.terminal_status === 'unsupported')).toBe(
-      true,
-    );
-  });
-
-  it('records a pending case for a requested case with no shard or terminal doc', () => {
-    const dataset = makeCollectiveXDataset();
-    const pending = dataset.coverage.find((row) => row.sku === 'mi355x-oam');
-    expect(pending?.outcome).toBe('pending');
-    expect(pending?.selected_attempt_id).toBeNull();
-    expect(pending?.attempt_ids).toEqual([]);
-  });
-
-  it('surfaces a non-success case-attempt as an in-band invalid outcome, not pending', () => {
-    // The retired terminal-outcome doc is now a `record_type: 'case-attempt'` whose
-    // outcome.status is non-success; it stands in for the case's terminal result.
-    const dataset = buildDataset({
-      shards: [makeInvalidCaseAttempt({ sku: 'h100-dgxc', reasons: ['kernel-timeout'] })],
-    });
-    expect(dataset.attempts).toHaveLength(1);
-    expect(dataset.attempts[0].outcome).toBe('invalid');
-    expect(dataset.coverage).toHaveLength(1);
-    expect(dataset.coverage[0].outcome).toBe('invalid');
-    expect(dataset.coverage[0].reason).toBe('kernel-timeout');
-    // No successful shard → no series is assembled.
-    expect(dataset.series).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Run summary
-// ---------------------------------------------------------------------------
-describe('CollectiveX run summary', () => {
-  it('projects the case-level terminal counts', () => {
-    const summary = buildRunSummary(makeCollectiveXDataset());
-    expect(summary.run_id).toBe('160');
-    expect(summary.terminal_counts).toEqual({ measured: 2, unsupported: 1, failed: 0 });
-    expect(summary.covered_skus).toEqual(['b300-sxm', 'h200-dgxc', 'mi355x-oam']);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Raw ingest rejections
-// ---------------------------------------------------------------------------
-describe('CollectiveX raw ingest rejections', () => {
-  it('rejects a matrix doc missing its required arrays', () => {
-    expect(() => buildDatasetFromNeutral({ format: 'nope' }, [], makeRunMeta())).toThrow(/matrix/);
-  });
-
-  it('rejects a shard doc missing a required section', () => {
-    const shard = makeRawShard();
-    delete (shard as Record<string, unknown>).topology;
-    const matrix = makeRawMatrix([]);
-    expect(() => buildDatasetFromNeutral(matrix, [shard], makeRunMeta())).toThrow(/shard/);
-  });
-
-  it('ignores docs whose record_type is not case-attempt (e.g. samples)', () => {
-    const dataset = buildDatasetFromNeutral(
-      makeRawMatrix([]),
-      [{ record_type: 'samples', rows: [] }],
-      makeRunMeta(),
-    );
-    expect(dataset.series).toHaveLength(0);
-    expect(dataset.coverage).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// View dataset parsing
-// ---------------------------------------------------------------------------
-describe('CollectiveX view dataset parsing', () => {
-  it('accepts a well-formed view dataset', () => {
-    const dataset = makeCollectiveXDataset();
-    expect(parseCollectiveXDataset(dataset).run.run_id).toBe('160');
-  });
-
-  it('rejects an unknown top-level field', () => {
-    const dataset = { ...makeCollectiveXDataset(), surprise: true };
-    expect(() => parseCollectiveXDataset(dataset)).toThrow(/contains unknown field surprise/);
-  });
-
-  it('rejects duplicate JSON keys before schema validation', () => {
-    expect(() => parseCollectiveXDatasetText('{"format":"a","format":"b"}')).toThrow(
-      /contains duplicate key format/,
-    );
-  });
-
-  it('rejects text that is not valid JSON', () => {
-    expect(() => parseCollectiveXDatasetText('{ not json')).toThrow(/not valid JSON/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Runs listing parsing
-// ---------------------------------------------------------------------------
-function runsListing(version = 1) {
   return {
-    format: 'collectivex.runs.v1' as const,
-    version,
-    runs: [buildRunSummary(makeCollectiveXDataset())],
+    caseId: identity.case_id,
+    sku: identity.case_factors.sku,
+    disposition: 'runnable' as const,
+    case: identity.case_factors.case,
   };
 }
 
-describe('CollectiveX runs listing parsing', () => {
-  it('accepts a well-formed runs listing for the requested version', () => {
-    const runs = parseCollectiveXRuns(runsListing(1), 1);
-    expect(runs.runs).toHaveLength(1);
-    expect(runs.runs[0].run_id).toBe('160');
+describe('CollectiveX artifact assembly', () => {
+  it('builds the current view from matrix cases and result shards', () => {
+    const dataset = makeCollectiveXDataset();
+    expect(dataset.version).toBe(1);
+    expect(dataset.series).toHaveLength(2);
+    expect(dataset.coverage).toHaveLength(4);
+    expect(dataset.run).toMatchObject({
+      requested_cases: 4,
+      measured_cases: 2,
+      unsupported_cases: 1,
+      terminal_cases: 3,
+      measured_points: 20,
+      terminal_points: 30,
+      requested_points: 40,
+    });
   });
 
-  it('rejects a version mismatch', () => {
-    expect(() => parseCollectiveXRuns(runsListing(2), 1)).toThrow(
-      /does not match the requested version/,
+  it('maps series identity and points', () => {
+    const series = makeCollectiveXSeries();
+    expect(series.series_id).toBe('h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform');
+    expect(series.backend).toBe('deepep-v2');
+    expect(series.points).toHaveLength(10);
+  });
+
+  it('ignores non-result documents', () => {
+    const shard = makeRawShard();
+    const dataset = buildDatasetFromNeutral(
+      makeRawMatrix([requestedOf(shard)]),
+      [shard, { record_type: 'samples', rows: [] }],
+      makeRunMeta(),
     );
+    expect(dataset.series).toHaveLength(1);
   });
 
-  it('rejects a duplicate run id', () => {
-    const listing = runsListing(1);
-    listing.runs = [listing.runs[0], listing.runs[0]];
-    expect(() => parseCollectiveXRuns(listing, 1)).toThrow(/contains duplicate run 160/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Client fetch helpers
-// ---------------------------------------------------------------------------
-describe('CollectiveX fetch helpers', () => {
-  const fetchMock = vi.fn();
-
-  beforeEach(() => {
-    vi.stubGlobal('fetch', fetchMock);
-    fetchMock.mockReset();
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
+  it('normalizes in-band failure reasons', () => {
+    const dataset = buildDataset({
+      shards: [
+        makeInvalidCaseAttempt({ reasons: ['semantic correctness or routing identity failed'] }),
+      ],
+    });
+    expect(dataset.series).toHaveLength(0);
+    expect(dataset.coverage[0]).toMatchObject({
+      outcome: 'invalid',
+      reason: 'semantic-correctness-or-routing-identity-failed',
+    });
   });
 
-  it('fetches the latest view dataset with no-store caching', async () => {
-    fetchMock.mockResolvedValue(fakeResponse(JSON.stringify(makeCollectiveXDataset())));
-    const resolved = await fetchCollectiveXLatest();
-    expect(resolved.run_id).toBe('160');
-    expect(fetchMock).toHaveBeenCalledWith(
-      collectiveXLatestUrl(1),
-      expect.objectContaining({ cache: 'no-store' }),
-    );
+  it('keeps capacity-limited points omitted by a successful backend', () => {
+    const dataset = buildDataset({
+      shards: [
+        makeRawShard({
+          phase: 'prefill',
+          rows: [{ tokensPerRank: 256 }, { tokensPerRank: 512 }],
+        }),
+      ],
+    });
+    expect(dataset.coverage[0].points.map((point) => point.terminal_status)).toEqual([
+      'measured',
+      'measured',
+      'unsupported',
+      'unsupported',
+    ]);
+    expect(dataset.coverage[0].points.at(-1)).toMatchObject({
+      tokens_per_rank: 2048,
+      reason: 'backend-token-capacity',
+    });
   });
 
-  it('fetches a run-scoped dataset with force-cache caching', async () => {
-    fetchMock.mockResolvedValue(fakeResponse(JSON.stringify(makeCollectiveXDataset())));
-    await fetchCollectiveXByRunId(1, '160');
-    expect(fetchMock).toHaveBeenCalledWith(
-      collectiveXRunUrl(1, '160'),
-      expect.objectContaining({ cache: 'force-cache' }),
-    );
+  it('keeps unsupported and pending cases distinct', () => {
+    const dataset = makeCollectiveXDataset();
+    expect(dataset.coverage.find((row) => row.sku === 'b300')).toMatchObject({
+      outcome: 'unsupported',
+      reason: 'backend-platform-unsupported',
+      detail: 'unsupported by the selected backend/platform',
+    });
+    expect(dataset.coverage.find((row) => row.sku === 'b200-dgxc')).toMatchObject({
+      outcome: 'pending',
+      reason: 'pending',
+    });
   });
 
-  it('rejects a non-integer run id before fetching', async () => {
-    await expect(fetchCollectiveXByRunId(1, 'latest')).rejects.toThrow(/positive integer/);
-    expect(fetchMock).not.toHaveBeenCalled();
+  it('does not invent rates for zero-byte or unavailable components', () => {
+    const zeroStage = makeCollectiveXSeries({ rows: [{ stageZeroBytes: true }] }).points[0]
+      .components.stage;
+    expect(zeroStage?.activation_data_rate_gbps_at_latency_percentile?.p50).toBe(0);
+    expect(
+      makeCollectiveXSeries({ rows: [{ stageUnavailable: true }] }).points[0].components.stage,
+    ).toBeNull();
   });
 
-  it('maps a 503 to a source-unavailable reason', async () => {
-    fetchMock.mockResolvedValue(fakeResponse('', 503));
-    const captured = await fetchCollectiveXLatest().catch((error: unknown) => error);
-    expect(collectiveXAvailabilityReason(captured)).toBe('source-unavailable');
-  });
-
-  it('maps a 404 to a runs-unavailable reason', async () => {
-    fetchMock.mockResolvedValue(fakeResponse('', 404));
-    const captured = await fetchCollectiveXRuns().catch((error: unknown) => error);
-    expect(collectiveXAvailabilityReason(captured)).toBe('runs-unavailable');
-  });
-
-  it('fetches and parses the runs listing', async () => {
-    fetchMock.mockResolvedValue(fakeResponse(JSON.stringify(runsListing(1))));
-    const runs = await fetchCollectiveXRuns();
-    expect(runs).toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledWith(
-      collectiveXRunsUrl(1),
-      expect.objectContaining({ cache: 'no-store' }),
-    );
+  it('rejects malformed and cross-version artifacts', () => {
+    expect(() => buildDatasetFromNeutral({}, [], makeRunMeta())).toThrow(/matrix/);
+    const shard = makeRawShard();
+    shard.version = 2;
+    expect(() =>
+      buildDatasetFromNeutral(makeRawMatrix([requestedOf(shard)]), [shard], makeRunMeta()),
+    ).toThrow(/version/);
   });
 });

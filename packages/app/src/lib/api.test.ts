@@ -135,15 +135,15 @@ describe('fetchEvaluations', () => {
 describe('CollectiveX reader delegation', () => {
   const dataset = makeCollectiveXDataset();
 
-  function mockText(payload: unknown) {
+  function mockJson(payload: unknown) {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      text: () => Promise.resolve(typeof payload === 'string' ? payload : JSON.stringify(payload)),
+      json: () => Promise.resolve(payload),
     });
   }
 
-  it('fetches the latest run dataset without caching and resolves the run id', async () => {
-    mockText(dataset);
+  it('fetches the latest run dataset without caching', async () => {
+    mockJson(dataset);
 
     const result = await fetchCollectiveX();
 
@@ -151,25 +151,24 @@ describe('CollectiveX reader delegation', () => {
       '/collectivex-data/1/latest.json',
       expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
     );
-    expect(result.dataset.format).toBe('collectivex.view.v1');
-    expect(result.run_id).toBe(dataset.run.run_id);
-    expect(result.run_attempt).toBe(dataset.run.run_attempt);
+    expect(result.version).toBe(1);
+    expect(result.run.run_id).toBe(dataset.run.run_id);
   });
 
-  it('fetches a specific run by id from the immutable path', async () => {
-    mockText(dataset);
+  it('fetches a specific run by id without caching a stale rerun', async () => {
+    mockJson(dataset);
 
     const result = await fetchCollectiveXRun(1, dataset.run.run_id);
 
     expect(mockFetch).toHaveBeenCalledWith(
       `/collectivex-data/1/runs/${dataset.run.run_id}.json`,
-      expect.objectContaining({ cache: 'force-cache', credentials: 'same-origin' }),
+      expect.objectContaining({ cache: 'no-store', credentials: 'same-origin' }),
     );
-    expect(result.run_id).toBe(dataset.run.run_id);
+    expect(result.run.run_id).toBe(dataset.run.run_id);
   });
 
   it('fetches the run list', async () => {
-    mockText({ format: 'collectivex.runs.v1', version: 1, runs: [buildRunSummary(dataset)] });
+    mockJson({ version: 1, runs: [buildRunSummary(dataset)] });
 
     const runs = await fetchCollectiveXRunList(1);
 

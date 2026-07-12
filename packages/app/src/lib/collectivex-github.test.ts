@@ -13,18 +13,17 @@ import {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-// The two measured shards a canonical sweep run uploads (scale-up EP8 + scale-out EP16).
+// Two current matrix shards: NVIDIA scale-up EP8 + AMD scale-out EP16.
 const shardA = makeRawShard({ backend: 'deepep-v2', ep: 8 });
 const shardB = makeRawShard({
-  backend: 'deepep',
-  implName: 'deepep',
-  deepepVersion: '2.1',
-  backendLineage: 'deepep-v2',
+  sku: 'mi355x',
+  backend: 'mori',
+  implName: 'mori',
+  vendor: 'amd',
   ep: 16,
-  scope: 'scale-out',
+  scaleUpTransport: 'xgmi',
   scaleOutTransport: 'rdma',
-  transport: 'rdma',
-  topologyClass: 'multi-node',
+  topologyClass: 'mi355x-xgmi-rdma',
   nodes: 2,
   gpusPerNode: 8,
   scaleUpDomain: 8,
@@ -77,19 +76,19 @@ function runObject(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function artifactsBody() {
+function artifactsBody(runId = 160, runAttempt = 1) {
   return {
     total_count: 2,
     artifacts: [
       {
         id: 1,
-        name: 'cxsweep-matrix-160',
+        name: `cxsweep-matrix-${runId}`,
         archive_download_url: 'https://example.test/matrix.zip',
         expired: false,
       },
       {
         id: 2,
-        name: 'cxshard-cases',
+        name: `cxshard-cases-${runId}-${runAttempt}`,
         archive_download_url: 'https://example.test/shards.zip',
         expired: false,
       },
@@ -125,7 +124,7 @@ describe('CollectiveX GitHub sweep loader', () => {
     const first = await loadCollectiveXSweepRun(1);
     const second = await loadCollectiveXSweepRun(1);
 
-    expect(first.format).toBe('collectivex.view.v1');
+    expect(first.version).toBe(1);
     expect(first.run.run_id).toBe('160');
     expect(first.run.conclusion).toBe('success');
     expect(first.series).toHaveLength(2);
@@ -147,6 +146,63 @@ describe('CollectiveX GitHub sweep loader', () => {
     expect(mockFetch.mock.calls[0][0]).toContain('/actions/runs/160');
   });
 
+  it('uses the newest artifact per shard when only failed jobs are rerun', async () => {
+    const retriedShard = makeRawShard({
+      sku: 'mi355x',
+      backend: 'mori',
+      implName: 'mori',
+      vendor: 'amd',
+      ep: 16,
+      scaleUpTransport: 'xgmi',
+      scaleOutTransport: 'rdma',
+      topologyClass: 'mi355x-xgmi-rdma',
+      nodes: 2,
+      status: 'invalid',
+      reasons: ['retry-failed'],
+    });
+    mockFetch
+      .mockResolvedValueOnce(Response.json(runObject({ run_attempt: 2 })))
+      .mockResolvedValueOnce(
+        Response.json({
+          total_count: 4,
+          artifacts: [
+            {
+              id: 1,
+              name: 'cxsweep-matrix-160',
+              archive_download_url: 'https://example.test/matrix.zip',
+            },
+            {
+              id: 2,
+              name: 'cxshard-a-160-1',
+              archive_download_url: 'https://example.test/a1.zip',
+            },
+            {
+              id: 3,
+              name: 'cxshard-b-160-1',
+              archive_download_url: 'https://example.test/b1.zip',
+            },
+            {
+              id: 4,
+              name: 'cxshard-b-160-2',
+              archive_download_url: 'https://example.test/b2.zip',
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(new Response(matrixZip))
+      .mockResolvedValueOnce(new Response(zipDocs(shardA)))
+      .mockResolvedValueOnce(new Response(zipDocs(retriedShard)));
+
+    const dataset = await loadCollectiveXSweepRun(1, '160');
+
+    expect(dataset.series.map((series) => series.backend)).toEqual(['deepep-v2']);
+    expect(dataset.coverage.find((item) => item.backend === 'mori')).toMatchObject({
+      outcome: 'invalid',
+      reason: 'retry-failed',
+    });
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/b1.zip'))).toBe(false);
+  });
+
   it('lists recent runs as run summaries', async () => {
     mockFetch
       .mockResolvedValueOnce(Response.json({ total_count: 1, workflow_runs: [runObject()] }))
@@ -158,6 +214,34 @@ describe('CollectiveX GitHub sweep loader', () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0].run_id).toBe('160');
     expect(summaries[0].terminal_counts.measured).toBeGreaterThan(0);
+  });
+
+  it('refreshes an expired run cache entry when listing a rerun', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-07-08T12:20:00Z'));
+      mockFetch
+        .mockResolvedValueOnce(Response.json(runObject()))
+        .mockResolvedValueOnce(Response.json(artifactsBody()));
+      installArtifactDownloads();
+      await loadCollectiveXSweepRun(1, '160');
+
+      vi.setSystemTime(new Date('2026-07-08T12:21:01Z'));
+      mockFetch
+        .mockResolvedValueOnce(
+          Response.json({
+            total_count: 1,
+            workflow_runs: [runObject({ run_attempt: 2 })],
+          }),
+        )
+        .mockResolvedValueOnce(Response.json(artifactsBody(160, 2)));
+      installArtifactDownloads();
+
+      const summaries = await listCollectiveXSweepRuns(1);
+      expect(summaries[0].run_attempt).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fails as unavailable without a server-side GitHub token', async () => {
@@ -210,7 +294,7 @@ describe('CollectiveX GitHub sweep loader', () => {
           workflow_runs: [runObject({ id: 161 }), runObject({ id: 160 })],
         }),
       )
-      .mockResolvedValueOnce(Response.json(artifactsBody()))
+      .mockResolvedValueOnce(Response.json(artifactsBody(161)))
       .mockResolvedValueOnce(new Response(matrixZipV2))
       .mockResolvedValueOnce(Response.json(artifactsBody()))
       .mockResolvedValueOnce(new Response(matrixZip))

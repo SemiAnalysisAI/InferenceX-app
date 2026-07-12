@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildRunSummary, parseCollectiveXDataset } from '@/components/collectivex/reader';
+import { buildRunSummary } from '@/components/collectivex/reader';
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
 
 const github = vi.hoisted(() => ({
@@ -39,7 +39,7 @@ beforeEach(() => {
 describe('CollectiveX sweep data route', () => {
   it('serves the latest run dataset without a run id', async () => {
     const response = await request('1', 'latest.json');
-    const served = parseCollectiveXDataset(await response.json());
+    const served = await response.json();
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('s-maxage=60');
@@ -48,12 +48,12 @@ describe('CollectiveX sweep data route', () => {
     expect(github.load).toHaveBeenCalledWith(1, undefined);
   });
 
-  it('serves a specific run by id with an immutable cache window', async () => {
+  it('serves a specific run by id with a short rerun-safe cache window', async () => {
     const response = await request('1', 'runs', `${runId}.json`);
-    const served = parseCollectiveXDataset(await response.json());
+    const served = await response.json();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toContain('max-age=600');
+    expect(response.headers.get('cache-control')).toContain('s-maxage=60');
     expect(served).toEqual(dataset);
     expect(github.load).toHaveBeenCalledWith(1, runId);
   });
@@ -61,14 +61,12 @@ describe('CollectiveX sweep data route', () => {
   it('lists recent runs as a neutral run summary document', async () => {
     const response = await request('1', 'runs.json');
     const body = (await response.json()) as {
-      format: string;
       version: number;
       runs: unknown[];
     };
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('s-maxage=60');
-    expect(body.format).toBe('collectivex.runs.v1');
     expect(body.version).toBe(1);
     expect(body.runs).toHaveLength(1);
     expect(github.list).toHaveBeenCalledWith(1);
@@ -76,16 +74,15 @@ describe('CollectiveX sweep data route', () => {
   });
 
   it.each([
-    ['not-found', 404, 'runs-unavailable'],
-    ['unavailable', 503, 'source-unavailable'],
-    ['invalid', 502, null],
-  ] as const)('maps %s source failures without exposing details', async (code, status, marker) => {
+    ['not-found', 404],
+    ['unavailable', 503],
+    ['invalid', 502],
+  ] as const)('maps %s source failures without exposing details', async (code, status) => {
     github.load.mockRejectedValue(Object.assign(new Error('private upstream detail'), { code }));
 
     const response = await request('1', 'latest.json');
 
     expect(response.status).toBe(status);
-    expect(response.headers.get('x-collectivex-status')).toBe(marker);
     expect(await response.text()).toBe('');
   });
 
