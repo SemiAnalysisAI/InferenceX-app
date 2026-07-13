@@ -83,7 +83,7 @@ interface DataTableProps<T> {
   watermark?: boolean;
 }
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500] as const;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250, 500] as const;
 
 const ALIGN_CLASSES = {
   left: 'text-left',
@@ -107,7 +107,7 @@ export function DataTable<T>({
   const locale = useLocale();
   const t = STRINGS[locale];
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(25);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);

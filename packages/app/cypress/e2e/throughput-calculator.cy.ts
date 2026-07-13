@@ -262,15 +262,22 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"]').should('be.visible');
     });
 
-    it('table row count matches bar count', () => {
+    it('table total matches bar count (first page caps at 10 rows)', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar')
         .its('length')
         .then((barCount) => {
           cy.get('[data-testid="calculator-table-view-btn"]').click();
           cy.get('[data-testid="calculator-results-table"] tbody tr').should(
             'have.length',
-            barCount,
+            Math.min(barCount, 10),
           );
+          if (barCount > 10) {
+            // The pagination footer carries the full result count
+            cy.get('[data-testid="calculator-chart-section"]').should(
+              'contain.text',
+              `of ${barCount}`,
+            );
+          }
         });
     });
 
