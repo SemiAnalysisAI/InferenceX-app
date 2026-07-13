@@ -1045,6 +1045,7 @@ function ThroughputCalculatorInner() {
           costProvider={costProvider}
           costType={costType}
           targetValue={targetValue}
+          visibleHwKeys={visibleHwKeys}
         />
       )}
     </div>

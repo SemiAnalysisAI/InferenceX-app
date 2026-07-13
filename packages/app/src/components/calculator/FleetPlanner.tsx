@@ -29,6 +29,9 @@ interface FleetPlannerProps {
   costType: CostType;
   /** Current target interactivity (tok/s/user) the results were interpolated at. */
   targetValue: number;
+  /** Legend visibility by base hwKey — the cost-cap card must not depend on
+   * `results`, which is filtered at the current slider target. */
+  visibleHwKeys: Set<string>;
 }
 
 const STRINGS = {
@@ -145,6 +148,7 @@ export default function FleetPlanner({
   costProvider,
   costType,
   targetValue,
+  visibleHwKeys,
 }: FleetPlannerProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -192,23 +196,37 @@ export default function FleetPlanner({
     return rows;
   }, [mw, results, costProvider, costType, targetValue]);
 
+  // Groups shown in the target-independent card: gated ONLY by the legend's
+  // hw visibility — never by `results`, which is filtered at the current
+  // slider target (a GPU with zero interpolated throughput at an extreme
+  // target must still appear here, since its frontier is unchanged).
+  const visibleGroupKeys = useMemo(
+    () =>
+      new Set(
+        Object.keys(gpuDataByGroupKey).filter((groupKey) =>
+          visibleHwKeys.has(groupKey.includes('__') ? groupKey.split('__')[0] : groupKey),
+        ),
+      ),
+    [gpuDataByGroupKey, visibleHwKeys],
+  );
+
   // Any visible group containing a disagg config taints both tables' per-GPU
   // numbers (fleet sizing AND cost-cap interactivity), so check the raw points
   // rather than only the fleet rows' bracketing frontier points.
-  const hasDisagg = useMemo(() => {
-    const visibleResultKeys = new Set(results.map((r) => r.resultKey));
-    return Object.entries(gpuDataByGroupKey).some(
-      ([groupKey, points]) => visibleResultKeys.has(groupKey) && points.some((p) => p.disagg),
-    );
-  }, [results, gpuDataByGroupKey]);
+  const hasDisagg = useMemo(
+    () =>
+      Object.entries(gpuDataByGroupKey).some(
+        ([groupKey, points]) => visibleGroupKeys.has(groupKey) && points.some((p) => p.disagg),
+      ),
+    [visibleGroupKeys, gpuDataByGroupKey],
+  );
 
   // ---- Cost-cap rows (independent of target interactivity) ----
   const costCapRows = useMemo<CostCapRow[]>(() => {
     if (!costCap) return [];
-    const visibleResultKeys = new Set(results.map((r) => r.resultKey));
     const rows: CostCapRow[] = [];
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
-      if (!visibleResultKeys.has(groupKey)) continue;
+      if (!visibleGroupKeys.has(groupKey)) continue;
       const hwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
       const precision = groupKey.includes('__') ? groupKey.split('__')[1] : undefined;
 
@@ -252,7 +270,7 @@ export default function FleetPlanner({
     return rows.toSorted(
       (a, b) => (b.maxInteractivity ?? -Infinity) - (a.maxInteractivity ?? -Infinity),
     );
-  }, [costCap, results, gpuDataByGroupKey, costProvider, costType, mw]);
+  }, [costCap, visibleGroupKeys, gpuDataByGroupKey, costProvider, costType, mw]);
 
   const tokenTypeLabel =
     costType === 'input'

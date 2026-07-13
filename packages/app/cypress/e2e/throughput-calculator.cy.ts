@@ -629,5 +629,24 @@ describe('TCO Calculator', () => {
         .and('contain.text', 'Enter a facility power budget');
       cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
     });
+
+    it('cost-cap table follows legend visibility (soloing a GPU filters its rows)', () => {
+      cy.get('[data-testid="calc-costcap-input"]').clear();
+      cy.get('[data-testid="calc-costcap-input"]').type('100');
+      cy.get('[data-testid="calculator-costcap-table"] tbody tr').then(($rows) => {
+        const fullCount = $rows.length;
+        // Clicking a legend item while all GPUs are visible solos it
+        cy.get('.sidebar-legend label').first().click();
+        cy.get('[data-testid="calculator-costcap-table"] tbody tr')
+          .should('have.length.lessThan', fullCount)
+          .and('have.length.greaterThan', 0);
+        // Clicking the solo GPU again restores all
+        cy.get('.sidebar-legend label').first().click();
+        cy.get('[data-testid="calculator-costcap-table"] tbody tr').should(
+          'have.length',
+          fullCount,
+        );
+      });
+    });
   });
 });
