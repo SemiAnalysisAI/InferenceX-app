@@ -98,6 +98,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
+    env:
+      REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
     steps:
       - name: Wait for source run to finish
         if: >-
@@ -120,7 +122,6 @@ jobs:
 
       - name: Select ingest target
         env:
-          REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
           DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
           DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
@@ -289,7 +290,7 @@ jobs:
           fi
 
       - name: Notify Slack on unmapped entities
-        if: steps.unmapped.outputs.found == 'true' && env.INGEST_DATABASE_TARGET != 'staging'
+        if: steps.unmapped.outputs.found == 'true' && env.REQUESTED_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -300,7 +301,7 @@ jobs:
             }
 
       - name: Notify Slack on failure
-        if: failure() && env.INGEST_DATABASE_TARGET != 'staging'
+        if: failure() && env.REQUESTED_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
