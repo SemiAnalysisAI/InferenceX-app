@@ -1,6 +1,20 @@
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobGet, blobPurge, blobSet } from './blob-cache';
 
+function cacheNamespace(): string {
+  return process.env.CACHE_NAMESPACE?.trim() ?? '';
+}
+
+function cacheKey(keyPrefix: string): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${namespace}:${keyPrefix}` : keyPrefix;
+}
+
+function cacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `db:${namespace}` : 'db';
+}
+
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
@@ -28,22 +42,24 @@ export function cachedQuery<T, Args extends unknown[]>(
     };
   }
 
-  const nextCached = unstable_cache(fn, [keyPrefix], { tags: ['db'] });
+  const nextCached = unstable_cache(fn, [cacheKey(keyPrefix)], { tags: [cacheTag()] });
   return (...args: Args): Promise<T> => nextCached(...args);
 }
 
 /** Purge both unstable_cache (via revalidateTag) and blob storage. */
 export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge();
-  revalidateTag('db', { expire: 0 });
+  revalidateTag(cacheTag(), { expire: 0 });
   return deleted;
 }
 
-/** 1 day. Purged on demand via revalidateTag('db'). */
-const CDN_HEADERS = {
-  'Cache-Control': 'public, max-age=0, s-maxage=86400',
-  'Vercel-Cache-Tag': 'db',
-};
+/** 1 day. Purged on demand via the environment-scoped database cache tag. */
+function cdnHeaders(): Record<string, string> {
+  return {
+    'Cache-Control': 'public, max-age=0, s-maxage=86400',
+    'Vercel-Cache-Tag': cacheTag(),
+  };
+}
 
 /** CDN-cached streamed + gzip-compressed JSON response — supports up to 20 MB on Vercel CDN. */
 export function cachedJson<T>(data: T): Response {
@@ -62,7 +78,7 @@ export function cachedJson<T>(data: T): Response {
     headers: {
       'Content-Type': 'application/json',
       'Content-Encoding': 'gzip',
-      ...CDN_HEADERS,
+      ...cdnHeaders(),
     },
   });
 }
