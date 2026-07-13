@@ -549,20 +549,20 @@ async function main(): Promise<void> {
                     `server_csv=${formatBytes(fileSize(trace.serverMetricsCsv))}, ` +
                     `server_json=${formatBytes(fileSize(trace.serverMetricsJson))}`,
                 );
-                const profile = trace.profileJsonl ? fs.readFileSync(trace.profileJsonl) : null;
-                const metrics = trace.serverMetricsCsv
-                  ? fs.readFileSync(trace.serverMetricsCsv)
-                  : null;
-                const metricsJson = trace.serverMetricsJson
-                  ? fs.readFileSync(trace.serverMetricsJson)
-                  : null;
-                await insertTraceReplay(sql, insertedIds, profile, metrics, metricsJson, {
-                  metricsContext: {
-                    framework: toInsert[0]?.config.framework,
-                    disagg: toInsert[0]?.config.disagg,
+                await insertTraceReplay(
+                  sql,
+                  insertedIds,
+                  trace.profileJsonl,
+                  trace.serverMetricsCsv,
+                  trace.serverMetricsJson,
+                  {
+                    metricsContext: {
+                      framework: toInsert[0]?.config.framework,
+                      disagg: toInsert[0]?.config.disagg,
+                    },
+                    progressLabel: suffix,
                   },
-                  progressLabel: suffix,
-                });
+                );
                 totalTraceReplayLinked += insertedIds.length;
                 console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
               } catch (error: any) {

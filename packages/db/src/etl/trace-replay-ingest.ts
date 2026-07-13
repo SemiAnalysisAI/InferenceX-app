@@ -8,7 +8,9 @@
  * duplicate the sibling blob.
  */
 
-import { gzipSync } from 'node:zlib';
+import { createReadStream } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
@@ -18,6 +20,13 @@ import { computeRequestTimeline } from './compute-request-timeline.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
+
+export type TraceReplayInput = Buffer | string | null;
+
+export interface PreparedTraceReplayInput {
+  data: Buffer | null;
+  sourceSize: number | null;
+}
 
 /**
  * Keep each postgres.js Bind message comfortably below the large payload that
@@ -59,6 +68,36 @@ function jsonBuffer(value: unknown | null): Buffer | null {
 }
 
 /**
+ * Gzip a trace input without materializing file-backed GiB-scale exports in
+ * Node's heap. Buffer inputs remain supported for callers and unit tests.
+ */
+export async function gzipTraceReplayInput(
+  input: TraceReplayInput,
+): Promise<PreparedTraceReplayInput> {
+  if (input === null) return { data: null, sourceSize: null };
+  if (Buffer.isBuffer(input)) {
+    return { data: gzipSync(input), sourceSize: input.length };
+  }
+
+  const { size } = await stat(input);
+  const chunks: Buffer[] = [];
+  const stream = createReadStream(input, { highWaterMark: 1024 * 1024 }).pipe(
+    createGzip({ chunkSize: 1024 * 1024 }),
+  );
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return { data: Buffer.concat(chunks), sourceSize: size };
+}
+
+async function readTraceReplayInput(input: TraceReplayInput): Promise<PreparedTraceReplayInput> {
+  if (input === null) return { data: null, sourceSize: null };
+  if (Buffer.isBuffer(input)) return { data: input, sourceSize: input.length };
+  const data = await readFile(input);
+  return { data, sourceSize: data.length };
+}
+
+/**
  * Upload one trace-replay value as bounded binary parameters. The caller must
  * create `pg_temp.trace_replay_upload_parts` in the same transaction first.
  */
@@ -89,22 +128,22 @@ export async function uploadTraceReplayPayloadChunks(
  *                            the same `bmk_agentic_<suffix>` artifact whose
  *                            sibling `agentic_<suffix>` directory holds these
  *                            trace files.
- * @param profileExportJsonl  Raw bytes of `profile_export.jsonl`, or null.
- *                            Gzipped before storage.
- * @param serverMetricsCsv    Raw bytes of `server_metrics_export.csv`, or null.
+ * @param profileExportJsonl  Raw bytes or a file path for `profile_export.jsonl`.
+ *                            Gzipped before storage; file paths stream from disk.
+ * @param serverMetricsCsv    Raw bytes or a file path for `server_metrics_export.csv`.
  *                            Stored as-is.
- * @param serverMetricsJson   Raw bytes of `server_metrics_export.json` —
+ * @param serverMetricsJson   Raw bytes or a file path for `server_metrics_export.json` —
  *                            per-scrape time-series of every Prometheus metric.
- *                            Optional, gzipped before storage (~42x ratio).
+ *                            Optional, streamed and gzipped before storage (~42x ratio).
  * @param options             Canonical framework/disagg context plus optional
  *                            progress label for CI logs.
  */
 export async function insertTraceReplay(
   sql: Sql,
   benchmarkResultIds: number[],
-  profileExportJsonl: Buffer | null,
-  serverMetricsCsv: Buffer | null,
-  serverMetricsJson: Buffer | null = null,
+  profileExportJsonl: TraceReplayInput,
+  serverMetricsCsv: TraceReplayInput,
+  serverMetricsJson: TraceReplayInput = null,
   options: TraceReplayIngestOptions = {},
 ): Promise<void> {
   const { metricsContext = {}, progressLabel } = options;
@@ -131,19 +170,23 @@ export async function insertTraceReplay(
   }
 
   const gzipStart = Date.now();
+  log('reading and compressing trace inputs');
+  const [profile, csv, metricsJson] = await Promise.all([
+    gzipTraceReplayInput(profileExportJsonl),
+    readTraceReplayInput(serverMetricsCsv),
+    gzipTraceReplayInput(serverMetricsJson),
+  ]);
+  const profileGz = profile.data;
+  const profileSize = profile.sourceSize;
+  const serverMetricsCsvData = csv.data;
+  const csvSize = csv.sourceSize;
+  const metricsJsonGz = metricsJson.data;
+  const metricsJsonSize = metricsJson.sourceSize;
   log(
-    `compressing profile=${formatBytes(profileExportJsonl?.length)}, ` +
-      `server_csv=${formatBytes(serverMetricsCsv?.length)}, ` +
-      `server_json=${formatBytes(serverMetricsJson?.length)}`,
-  );
-  const profileGz = profileExportJsonl ? gzipSync(profileExportJsonl) : null;
-  const profileSize = profileExportJsonl ? profileExportJsonl.length : null;
-  const csvSize = serverMetricsCsv ? serverMetricsCsv.length : null;
-  const metricsJsonGz = serverMetricsJson ? gzipSync(serverMetricsJson) : null;
-  const metricsJsonSize = serverMetricsJson ? serverMetricsJson.length : null;
-  log(
-    `compressed profile=${formatBytes(profileGz?.length)}, ` +
-      `server_json=${formatBytes(metricsJsonGz?.length)} (${elapsed(gzipStart)})`,
+    `compressed profile=${formatBytes(profileSize)} -> ${formatBytes(profileGz?.length)}, ` +
+      `server_csv=${formatBytes(csvSize)}, ` +
+      `server_json=${formatBytes(metricsJsonSize)} -> ${formatBytes(metricsJsonGz?.length)} ` +
+      `(${elapsed(gzipStart)})`,
   );
 
   // Pre-compute aggregate stats + chart-ready time-series + per-request
@@ -180,7 +223,7 @@ export async function insertTraceReplay(
 
     const payloads: [TraceReplayUploadField, Buffer | null][] = [
       ['profile_export_jsonl_gz', profileGz],
-      ['server_metrics_csv', serverMetricsCsv],
+      ['server_metrics_csv', serverMetricsCsvData],
       ['server_metrics_json_gz', metricsJsonGz],
       ['aggregate_stats', aggregateStatsJson],
       ['chart_series', chartSeriesJson],
