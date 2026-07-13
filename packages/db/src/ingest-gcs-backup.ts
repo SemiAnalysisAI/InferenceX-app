@@ -694,7 +694,7 @@ async function main(): Promise<void> {
 
     for (const { baseRef, headRef, entries } of result.changelogs) {
       try {
-        const inserted = await ingestChangelogEntries(
+        const written = await ingestChangelogEntries(
           sql,
           workflowRunId,
           result.dateDir,
@@ -702,7 +702,7 @@ async function main(): Promise<void> {
           headRef,
           entries,
         );
-        wr.changelogs += inserted;
+        wr.changelogs += written;
       } catch (error: any) {
         tracker.recordDbError('changelog', error);
       }
@@ -828,7 +828,7 @@ async function main(): Promise<void> {
   );
   console.log(`  Eval results:      ${totalEvals} new`);
   console.log(`  Eval samples:      ${totalEvalSamples} new`);
-  console.log(`  Changelog entries: ${totalChangelogs} new`);
+  console.log(`  Changelog entries: ${totalChangelogs} written`);
   console.log(`\n  DB totals:`);
   console.log(`    configs           ${configCount.n}`);
   console.log(`    benchmark_results ${resultCount.n}`);

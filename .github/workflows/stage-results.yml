@@ -168,6 +168,8 @@ jobs:
           fi
 
           payload=$(jq -cn --arg source_branch_id "$source_branch_id" '{source_branch_id: $source_branch_id}')
+          # This destructive refresh removes the previous unofficial staging ingest.
+          # Every request therefore starts with production data and replaces the shared staged run.
           curl --retry 3 --retry-all-errors -sSf -X POST \
             -H "Authorization: Bearer $NEON_API_KEY" \
             -H "Content-Type: application/json" \
