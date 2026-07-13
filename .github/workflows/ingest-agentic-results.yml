@@ -40,6 +40,31 @@ on:
         required: false
         default: production
         type: string
+    secrets:
+      DATABASE_WRITE_URL:
+        description: Production database write connection for direct ingests
+        required: false
+      DATABASE_DEV_WRITE_URL:
+        description: Development database write connection for direct ingests
+        required: false
+      DATABASE_STAGING_WRITE_URL:
+        description: Neon staging branch write connection
+        required: true
+      VERCEL_INVALIDATE_SECRET:
+        description: Production and development cache invalidation bearer token
+        required: false
+      VERCEL_STAGING_INVALIDATE_SECRET:
+        description: Staging cache invalidation bearer token
+        required: true
+      VERCEL_STAGING_BYPASS_SECRET:
+        description: Vercel protection automation bypass token
+        required: true
+      INFX_MAIN_PAT:
+        description: Token used to download InferenceX artifacts
+        required: true
+      SLACK_WEBHOOK_URL:
+        description: Optional failure and unmapped-entity notifications
+        required: false
   workflow_dispatch:
     inputs:
       run-id:

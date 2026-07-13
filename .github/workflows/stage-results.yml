@@ -94,7 +94,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Point the shared staging Git branch at master
     steps:
       - name: Point staging at master
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -201,7 +201,12 @@ jobs:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}
       database-target: staging
-    secrets: inherit
+    secrets:
+      DATABASE_STAGING_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+      VERCEL_STAGING_INVALIDATE_SECRET: ${{ secrets.VERCEL_STAGING_INVALIDATE_SECRET }}
+      VERCEL_STAGING_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
+      INFX_MAIN_PAT: ${{ secrets.INFX_MAIN_PAT }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   report:
     name: Report staging result
