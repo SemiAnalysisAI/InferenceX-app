@@ -159,6 +159,80 @@ export function getCostField(
 }
 
 /**
+ * Given a set of data points for a single GPU, find the maximum interactivity
+ * (tok/s/user) whose interpolated cost per million tokens stays at or below
+ * `targetCost`, using the same Pareto frontier + monotone spline as
+ * interpolateForGPU.
+ *
+ * Total-token cost is monotonically increasing in interactivity along the
+ * frontier (throughput strictly decreases, so cost = rate/tput increases),
+ * but input/output-token costs need not be — so the search is a dense scan
+ * over the spline followed by a bisection refinement of the crossing segment
+ * rather than a single bisection.
+ *
+ * Returns null when no interactivity on the frontier fits the budget.
+ */
+export function maxInteractivityAtCost(
+  points: GPUDataPoint[],
+  targetCost: number,
+  costProvider: CostProvider,
+  costType: 'total' | 'input' | 'output',
+): number | null {
+  if (points.length === 0 || targetCost <= 0) return null;
+
+  const frontier = paretoFrontUpperLeft(
+    points,
+    (p) => p.interactivity,
+    (p) => p.throughput,
+  );
+  if (frontier.length === 0) return null;
+
+  const sorted = [...frontier].toSorted((a, b) => a.interactivity - b.interactivity);
+  const getCost = (p: GPUDataPoint) => getCostField(p, costProvider, costType);
+
+  if (sorted.length === 1) {
+    return getCost(sorted[0]) <= targetCost ? sorted[0].interactivity : null;
+  }
+
+  const xs = sorted.map((p) => p.interactivity);
+  const ys = sorted.map(getCost);
+  const slopes = monotoneSlopes(xs, ys);
+  // Same overshoot clamp as interpolateForGPU's buildMetric
+  const lo = Math.min(...ys);
+  const hi = Math.max(...ys);
+  const costAt = (x: number) => Math.max(lo, Math.min(hi, hermiteInterpolate(xs, ys, slopes, x)));
+
+  const minX = xs[0];
+  const maxX = xs.at(-1)!;
+
+  // Whole frontier affordable — the max interactivity is reachable.
+  if (costAt(maxX) <= targetCost) return maxX;
+
+  // Dense scan from high to low interactivity for the first affordable sample.
+  const STEPS = 512;
+  const step = (maxX - minX) / STEPS;
+  let below = -1; // highest scanned x with cost <= target
+  for (let i = STEPS - 1; i >= 0; i--) {
+    const x = minX + i * step;
+    if (costAt(x) <= targetCost) {
+      below = x;
+      break;
+    }
+  }
+  if (below < 0) return null;
+
+  // Refine within (below, below + step): bisect for the crossing point.
+  let loX = below;
+  let hiX = Math.min(below + step, maxX);
+  for (let iter = 0; iter < 40; iter++) {
+    const mid = (loX + hiX) / 2;
+    if (costAt(mid) <= targetCost) loX = mid;
+    else hiX = mid;
+  }
+  return loX;
+}
+
+/**
  * Given a set of data points for a single GPU, apply pareto front filtering
  * and then use monotone cubic Hermite spline interpolation (matching the main
  * inference chart's roofline curve) to find values at a given target.

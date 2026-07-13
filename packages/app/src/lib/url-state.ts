@@ -8,6 +8,7 @@
  *   i_ = inference chart
  *   e_ = evaluation chart
  *   r_ = reliability chart
+ *   c_ = TCO calculator
  *
  * Only non-default values are written to keep URLs short.
  */
@@ -64,6 +65,9 @@ const URL_STATE_KEYS = [
   'r_hc',
   'r_legend',
   'r_active',
+  // Calculator (fleet planner)
+  'c_mw',
+  'c_costcap',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -123,6 +127,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_hc: '',
   r_legend: '',
   r_active: '',
+  c_mw: '',
+  c_costcap: '',
 };
 
 /** Which param prefixes are relevant per tab. */
@@ -130,6 +136,9 @@ const TAB_PARAM_PREFIXES: Record<string, string[]> = {
   inference: ['g_', 'i_'],
   evaluation: ['g_', 'e_'],
   reliability: ['r_'],
+  // The calculator reuses the global model + inference sequence/precision
+  // params, plus its own c_ scope (fleet planner MW / cost cap).
+  calculator: ['g_', 'i_', 'c_'],
 };
 
 /** In-memory store of current param values (kept in sync via writeUrlParams). */

@@ -5,6 +5,7 @@ import {
   getCostField,
   hermiteInterpolate,
   interpolateForGPU,
+  maxInteractivityAtCost,
   monotoneSlopes,
   paretoFrontUpperLeft,
   sign,
@@ -863,5 +864,110 @@ describe('paretoFrontUpperLeft — additional edge cases', () => {
       expect(result[i].x).toBeGreaterThan(result[i - 1].x);
       expect(result[i].y).toBeLessThan(result[i - 1].y);
     }
+  });
+});
+
+// =========================================================================
+// maxInteractivityAtCost()
+// =========================================================================
+
+describe('maxInteractivityAtCost', () => {
+  // Strictly decreasing throughput as interactivity rises — every point is on
+  // the frontier — with total-token hyperscaler cost rising alongside.
+  const monotonePoints = [
+    makePoint({ interactivity: 10, throughput: 1000, costh: 0.2, costn: 0.3, costhi: 1 }),
+    makePoint({ interactivity: 20, throughput: 800, costh: 0.4, costn: 0.6, costhi: 0.5 }),
+    makePoint({ interactivity: 30, throughput: 500, costh: 0.8, costn: 1.2, costhi: 1.5 }),
+    makePoint({ interactivity: 40, throughput: 200, costh: 2, costn: 3, costhi: 0.9 }),
+  ];
+
+  it('returns null for empty input', () => {
+    expect(maxInteractivityAtCost([], 1, 'costh', 'total')).toBeNull();
+  });
+
+  it('returns null for a non-positive cost target', () => {
+    expect(maxInteractivityAtCost(monotonePoints, 0, 'costh', 'total')).toBeNull();
+    expect(maxInteractivityAtCost(monotonePoints, -1, 'costh', 'total')).toBeNull();
+  });
+
+  it('returns the single point interactivity when affordable, null otherwise', () => {
+    const single = [makePoint({ interactivity: 25, throughput: 600, costh: 0.5 })];
+    expect(maxInteractivityAtCost(single, 0.5, 'costh', 'total')).toBe(25);
+    expect(maxInteractivityAtCost(single, 0.4, 'costh', 'total')).toBeNull();
+  });
+
+  it('returns the frontier max when the whole curve is affordable', () => {
+    expect(maxInteractivityAtCost(monotonePoints, 2, 'costh', 'total')).toBe(40);
+    expect(maxInteractivityAtCost(monotonePoints, 100, 'costh', 'total')).toBe(40);
+  });
+
+  it('returns null when even the cheapest operating point exceeds the target', () => {
+    expect(maxInteractivityAtCost(monotonePoints, 0.1, 'costh', 'total')).toBeNull();
+  });
+
+  it('finds the crossing interactivity on a monotone cost curve', () => {
+    // Cost hits 0.4 exactly at the iv=20 knot; anything above costs more.
+    const iv = maxInteractivityAtCost(monotonePoints, 0.4, 'costh', 'total');
+    expect(iv).not.toBeNull();
+    expect(iv!).toBeCloseTo(20, 1);
+  });
+
+  it('returns an interactivity between the bracketing knots for an intermediate target', () => {
+    const iv = maxInteractivityAtCost(monotonePoints, 0.3, 'costh', 'total');
+    expect(iv).not.toBeNull();
+    expect(iv!).toBeGreaterThan(10);
+    expect(iv!).toBeLessThan(20);
+  });
+
+  it('is consistent with interpolateForGPU: cost at the returned iv stays within budget', () => {
+    const target = 0.6;
+    const iv = maxInteractivityAtCost(monotonePoints, target, 'costh', 'total');
+    expect(iv).not.toBeNull();
+    const at = interpolateForGPU(monotonePoints, iv!, 'interactivity_to_throughput', 'costh');
+    expect(at).not.toBeNull();
+    expect(at!.cost).toBeLessThanOrEqual(target + 1e-6);
+    // A point just above the returned iv should exceed the budget.
+    const above = interpolateForGPU(
+      monotonePoints,
+      iv! + 0.5,
+      'interactivity_to_throughput',
+      'costh',
+    );
+    expect(above!.cost).toBeGreaterThan(target);
+  });
+
+  it('respects the cost provider', () => {
+    // Neocloud is pricier across the board, so the affordable iv is lower.
+    const ivH = maxInteractivityAtCost(monotonePoints, 0.8, 'costh', 'total');
+    const ivN = maxInteractivityAtCost(monotonePoints, 0.8, 'costn', 'total');
+    expect(ivH).not.toBeNull();
+    expect(ivN).not.toBeNull();
+    expect(ivN!).toBeLessThan(ivH!);
+  });
+
+  it('handles non-monotone cost curves (input-token cost) by returning the highest affordable iv', () => {
+    // costhi dips at iv=20 (0.5) then spikes at iv=30 (1.5) and eases at iv=40 (0.9).
+    // With a 0.95 budget the frontier max (iv=40, cost 0.9) is affordable.
+    expect(maxInteractivityAtCost(monotonePoints, 0.95, 'costh', 'input')).toBe(40);
+
+    // With a 0.6 budget, iv=40 (0.9) is out, and the crossing sits above the
+    // iv=20 dip — the result must land in (20, 30), not fall back to the dip's
+    // left edge.
+    const iv = maxInteractivityAtCost(monotonePoints, 0.6, 'costh', 'input');
+    expect(iv).not.toBeNull();
+    expect(iv!).toBeGreaterThanOrEqual(20);
+    expect(iv!).toBeLessThan(30);
+  });
+
+  it('only considers frontier points (dominated points are ignored)', () => {
+    const withDominated = [
+      ...monotonePoints,
+      // Dominated: lower throughput than the iv=10 point at lower interactivity
+      // — would make the curve look cheaper at iv=15 if it were included.
+      makePoint({ interactivity: 15, throughput: 700, costh: 0.05 }),
+    ];
+    // Even though the dominated point is dirt cheap, it is off the frontier,
+    // so a 0.1 budget still fits nothing.
+    expect(maxInteractivityAtCost(withDominated, 0.1, 'costh', 'total')).toBeNull();
   });
 });
