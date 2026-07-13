@@ -52,6 +52,7 @@ const STRINGS = {
     fleetEmpty: 'Enter a facility power budget to project fleet capacity and cost.',
     fleetTooSmall:
       'This power budget is too small to power a single GPU of the shown hardware — try a larger value.',
+    fleetNoGpus: 'No GPUs are visible to project — enable hardware in the chart legend.',
     costCapTitle: 'Interactivity Within a Cost Target',
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each GPU can serve without exceeding it.',
@@ -63,6 +64,7 @@ const STRINGS = {
     colTputAtIv: 'Throughput (tok/s/gpu)',
     notReachable: 'Not reachable',
     costCapEmpty: 'Enter a cost target to find the serveable interactivity per GPU.',
+    costCapNoGpus: 'No GPUs are visible to evaluate — enable hardware in the chart legend.',
     note: 'Note:',
     disaggFleet:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report throughput per decode GPU or per prefill GPU, rather than per total GPU count — fleet sizes and costs for those configs are not an apples-to-apples comparison with aggregated configs.',
@@ -89,6 +91,7 @@ const STRINGS = {
     colCostMo: '集群 $/mo',
     fleetEmpty: '输入设施功率预算以测算集群容量与成本。',
     fleetTooSmall: '该功率预算不足以为所示任一 GPU 供电——请尝试更大的数值。',
+    fleetNoGpus: '当前无可见 GPU 可测算——请在图表图例中启用硬件。',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
       '设定每百万 token 的成本上限，查看每款 GPU 在不超支前提下可提供的最高交互性。',
@@ -100,6 +103,7 @@ const STRINGS = {
     colTputAtIv: '吞吐量 (tok/s/gpu)',
     notReachable: '无法达到',
     costCapEmpty: '输入成本上限以查看每款 GPU 可提供的交互性。',
+    costCapNoGpus: '当前无可见 GPU 可评估——请在图表图例中启用硬件。',
     note: '注意：',
     disaggFleet:
       '解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码 GPU 或预填充 GPU 报告吞吐量，而非按 GPU 总数——这类配置的集群规模与成本和聚合配置并非同类比较。',
@@ -440,7 +444,9 @@ export default function FleetPlanner({
               </>
             ) : (
               <p className="text-sm text-muted-foreground" data-testid="calculator-fleet-empty">
-                {mw ? t.fleetTooSmall : t.fleetEmpty}
+                {/* Empty with MW set has two causes: nothing visible to project
+                    (legend/slider filtered everything) vs. a budget below one GPU. */}
+                {mw ? (results.length > 0 ? t.fleetTooSmall : t.fleetNoGpus) : t.fleetEmpty}
               </p>
             )}
           </div>
@@ -486,7 +492,9 @@ export default function FleetPlanner({
               </>
             ) : (
               <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
-                {t.costCapEmpty}
+                {/* With a valid target set, empty means nothing is legend-visible
+                    (unreachable GPUs still produce rows). */}
+                {costCap ? t.costCapNoGpus : t.costCapEmpty}
               </p>
             )}
           </div>
