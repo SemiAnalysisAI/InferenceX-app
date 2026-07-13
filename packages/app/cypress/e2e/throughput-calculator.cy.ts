@@ -613,9 +613,20 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-costcap-table"]').should('contain.text', 'Not reachable');
     });
 
+    it('a budget too small for one GPU shows a dedicated message, not the enter-a-value prompt', () => {
+      cy.get('[data-testid="calc-fleet-mw-input"]').clear();
+      cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
+      cy.get('[data-testid="calculator-fleet-empty"]')
+        .should('be.visible')
+        .and('contain.text', 'too small to power a single GPU');
+      cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
+    });
+
     it('clearing the MW input restores the empty state', () => {
       cy.get('[data-testid="calc-fleet-mw-input"]').clear();
-      cy.get('[data-testid="calculator-fleet-empty"]').should('be.visible');
+      cy.get('[data-testid="calculator-fleet-empty"]')
+        .should('be.visible')
+        .and('contain.text', 'Enter a facility power budget');
       cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
     });
   });

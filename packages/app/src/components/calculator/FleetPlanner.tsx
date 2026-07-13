@@ -47,6 +47,8 @@ const STRINGS = {
     colCostHr: 'Fleet $/hr',
     colCostMo: 'Fleet $/mo',
     fleetEmpty: 'Enter a facility power budget to project fleet capacity and cost.',
+    fleetTooSmall:
+      'This power budget is too small to power a single GPU of the shown hardware — try a larger value.',
     costCapTitle: 'Interactivity Within a Cost Target',
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each GPU can serve without exceeding it.',
@@ -83,6 +85,7 @@ const STRINGS = {
     colCostHr: '集群 $/hr',
     colCostMo: '集群 $/mo',
     fleetEmpty: '输入设施功率预算以测算集群容量与成本。',
+    fleetTooSmall: '该功率预算不足以为所示任一 GPU 供电——请尝试更大的数值。',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
       '设定每百万 token 的成本上限，查看每款 GPU 在不超支前提下可提供的最高交互性。',
@@ -189,10 +192,15 @@ export default function FleetPlanner({
     return rows;
   }, [mw, results, costProvider, costType, targetValue]);
 
-  const hasDisagg = useMemo(
-    () => results.some((r) => r.nearestPoints.some((p) => p.disagg)),
-    [results],
-  );
+  // Any visible group containing a disagg config taints both tables' per-GPU
+  // numbers (fleet sizing AND cost-cap interactivity), so check the raw points
+  // rather than only the fleet rows' bracketing frontier points.
+  const hasDisagg = useMemo(() => {
+    const visibleResultKeys = new Set(results.map((r) => r.resultKey));
+    return Object.entries(gpuDataByGroupKey).some(
+      ([groupKey, points]) => visibleResultKeys.has(groupKey) && points.some((p) => p.disagg),
+    );
+  }, [results, gpuDataByGroupKey]);
 
   // ---- Cost-cap rows (independent of target interactivity) ----
   const costCapRows = useMemo<CostCapRow[]>(() => {
@@ -340,6 +348,13 @@ export default function FleetPlanner({
     return columns;
   }, [hardwareConfig, t, mw]);
 
+  const disaggBanner = hasDisagg && (
+    <p className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+      <strong>{t.note}</strong>
+      {t.disaggFleet}
+    </p>
+  );
+
   const assumptionsFooter = (
     <>
       <p className="text-xs text-muted-foreground mt-3">
@@ -402,17 +417,12 @@ export default function FleetPlanner({
                   testId="calculator-fleet-table"
                   analyticsPrefix="calculator_fleet_table"
                 />
-                {hasDisagg && (
-                  <p className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                    <strong>{t.note}</strong>
-                    {t.disaggFleet}
-                  </p>
-                )}
+                {disaggBanner}
                 {assumptionsFooter}
               </>
             ) : (
               <p className="text-sm text-muted-foreground" data-testid="calculator-fleet-empty">
-                {t.fleetEmpty}
+                {mw ? t.fleetTooSmall : t.fleetEmpty}
               </p>
             )}
           </div>
@@ -453,6 +463,7 @@ export default function FleetPlanner({
                   testId="calculator-costcap-table"
                   analyticsPrefix="calculator_costcap_table"
                 />
+                {disaggBanner}
                 {assumptionsFooter}
               </>
             ) : (
