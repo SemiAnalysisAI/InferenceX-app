@@ -196,6 +196,8 @@ jobs:
   ingest:
     name: Ingest selected run
     needs: [validate, refresh-staging-database]
+    permissions:
+      contents: read
     uses: ./.github/workflows/ingest-agentic-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
