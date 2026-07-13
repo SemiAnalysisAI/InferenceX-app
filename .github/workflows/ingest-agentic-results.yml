@@ -94,7 +94,9 @@ jobs:
     name: Ingest agentic benchmark results
     # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
     # far longer than a fixed-seq-len ingest.
-    timeout-minutes: 60
+    # High-concurrency rows also precompute request timelines from GiB-scale
+    # artifacts, so retain enough headroom for a complete recovered sweep.
+    timeout-minutes: 180
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
