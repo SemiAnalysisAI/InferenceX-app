@@ -26,6 +26,7 @@ const STRINGS = {
     more: 'More',
     gpuReliability: 'GPU Reliability',
     perfPerDollar: 'Performance per Dollar',
+    glossary: 'AI Inference Glossary',
     languageLink: '中文版',
     languageHref: '/zh',
     languageHrefLang: 'zh-CN',
@@ -49,6 +50,7 @@ const STRINGS = {
     more: '更多',
     gpuReliability: 'GPU 可靠性',
     perfPerDollar: '每美元性能',
+    glossary: 'AI 推理术语表',
     languageLink: 'English',
     languageHref: '/',
     languageHrefLang: 'en',
@@ -190,6 +192,13 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {t.perfPerDollar}
+              </Link>
+              <Link
+                data-testid="footer-link-glossary"
+                href={`${prefix}/glossary`}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t.glossary}
               </Link>
               <Link
                 data-testid="footer-link-zh"

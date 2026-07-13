@@ -51,6 +51,13 @@ export default async function BlogPage({
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
               Insights on AI inference benchmarking, GPU performance, and ML infrastructure.
             </p>
+            <p className="text-sm text-muted-foreground">
+              New to the terminology?{' '}
+              <Link href="/glossary" className="font-medium text-brand hover:underline">
+                Browse the AI inference glossary
+              </Link>
+              .
+            </p>
             {allTags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-4">
                 <Link

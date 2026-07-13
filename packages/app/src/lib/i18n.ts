@@ -56,6 +56,7 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/compare-precision' },
   { path: '/compare-spec-decode' },
   { path: '/blog' },
+  { path: '/glossary' },
   { path: '/datasets' },
 ];
 
