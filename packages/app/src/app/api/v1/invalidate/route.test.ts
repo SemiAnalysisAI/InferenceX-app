@@ -11,11 +11,17 @@ vi.mock('@/lib/api-cache', () => ({
 import { POST } from './route';
 
 let origSecret: string | undefined;
+let origVercelEnv: string | undefined;
+let origVercelGitCommitRef: string | undefined;
 
 beforeEach(() => {
   vi.clearAllMocks();
   origSecret = process.env.INVALIDATE_SECRET;
+  origVercelEnv = process.env.VERCEL_ENV;
+  origVercelGitCommitRef = process.env.VERCEL_GIT_COMMIT_REF;
   process.env.INVALIDATE_SECRET = 'test-secret-123';
+  delete process.env.VERCEL_ENV;
+  delete process.env.VERCEL_GIT_COMMIT_REF;
 });
 
 afterEach(() => {
@@ -23,6 +29,16 @@ afterEach(() => {
     delete process.env.INVALIDATE_SECRET;
   } else {
     process.env.INVALIDATE_SECRET = origSecret;
+  }
+  if (origVercelEnv === undefined) {
+    delete process.env.VERCEL_ENV;
+  } else {
+    process.env.VERCEL_ENV = origVercelEnv;
+  }
+  if (origVercelGitCommitRef === undefined) {
+    delete process.env.VERCEL_GIT_COMMIT_REF;
+  } else {
+    process.env.VERCEL_GIT_COMMIT_REF = origVercelGitCommitRef;
   }
 });
 
@@ -56,6 +72,38 @@ describe('POST /api/v1/invalidate', () => {
   it('returns 401 for length mismatch (timing-safe)', async () => {
     const res = await POST(postReq({ Authorization: 'Bearer short' }));
     expect(res.status).toBe(401);
+  });
+
+  it('allows the Vercel-protected staging branch with an automation bypass', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_GIT_COMMIT_REF = 'staging';
+    mockPurgeAll.mockResolvedValueOnce(4);
+
+    const res = await POST(postReq({ 'x-vercel-protection-bypass': 'opaque-bypass' }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ invalidated: true, blobsDeleted: 4 });
+    expect(mockPurgeAll).toHaveBeenCalledOnce();
+  });
+
+  it('still requires app auth for non-staging preview branches', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_GIT_COMMIT_REF = 'feature-branch';
+
+    const res = await POST(postReq({ 'x-vercel-protection-bypass': 'opaque-bypass' }));
+
+    expect(res.status).toBe(401);
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('still requires app auth when staging has no automation bypass header', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_GIT_COMMIT_REF = 'staging';
+
+    const res = await POST(postReq());
+
+    expect(res.status).toBe(401);
+    expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 
   it('invalidates cache with correct auth', async () => {

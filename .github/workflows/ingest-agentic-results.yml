@@ -53,9 +53,6 @@ on:
       VERCEL_INVALIDATE_SECRET:
         description: Production and development cache invalidation bearer token
         required: false
-      VERCEL_STAGING_INVALIDATE_SECRET:
-        description: Staging cache invalidation bearer token
-        required: true
       VERCEL_STAGING_BYPASS_SECRET:
         description: Vercel protection automation bypass token
         required: true
@@ -128,7 +125,6 @@ jobs:
           DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-          INVALIDATE_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_INVALIDATE_SECRET }}
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
           STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL || 'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
         run: |
@@ -146,7 +142,6 @@ jobs:
             staging)
               database_write_url="$DATABASE_WRITE_URL_STAGING"
               cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
-              cache_invalidate_secret="$INVALIDATE_SECRET_STAGING"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
               ;;
             *)
@@ -159,7 +154,7 @@ jobs:
             echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
-          if [ -z "$cache_invalidate_secret" ]; then
+          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ -z "$cache_invalidate_secret" ]; then
             echo "::error::Cache invalidation secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
@@ -169,7 +164,9 @@ jobs:
           fi
 
           echo "::add-mask::$database_write_url"
-          echo "::add-mask::$cache_invalidate_secret"
+          if [ -n "$cache_invalidate_secret" ]; then
+            echo "::add-mask::$cache_invalidate_secret"
+          fi
           if [ -n "$protection_bypass_secret" ]; then
             echo "::add-mask::$protection_bypass_secret"
           fi
@@ -259,8 +256,7 @@ jobs:
       - name: Invalidate Vercel cache
         run: |
           if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
-            curl --retry 12 --retry-delay 10 --retry-all-errors -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET" \
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
               -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
           else
             curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
@@ -293,7 +289,7 @@ jobs:
           fi
 
       - name: Notify Slack on unmapped entities
-        if: steps.unmapped.outputs.found == 'true'
+        if: steps.unmapped.outputs.found == 'true' && env.INGEST_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -304,7 +300,7 @@ jobs:
             }
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() && env.INGEST_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

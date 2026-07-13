@@ -216,7 +216,6 @@ jobs:
       database-target: staging
     secrets:
       DATABASE_STAGING_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
-      VERCEL_STAGING_INVALIDATE_SECRET: ${{ secrets.VERCEL_STAGING_INVALIDATE_SECRET }}
       VERCEL_STAGING_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
       INFX_MAIN_PAT: ${{ secrets.INFX_MAIN_PAT }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -238,7 +237,7 @@ jobs:
           COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
           STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['refresh-staging-database'].result == 'success' && needs.ingest.result == 'success' }}
         with:
-          github-token: ${{ secrets.INFX_MAIN_PAT }}
+          github-token: ${{ secrets.PAT }}
           script: |
             await github.rest.repos.createDispatchEvent({
               owner: 'SemiAnalysisAI',
