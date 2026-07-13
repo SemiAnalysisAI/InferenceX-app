@@ -28,6 +28,10 @@ on:
         description: GitHub login that requested staging
         required: true
         type: string
+      comment-id:
+        description: Existing InferenceX acknowledgment comment to update
+        required: false
+        type: string
 
 permissions: {}
 
@@ -45,6 +49,7 @@ jobs:
       run-date: ${{ steps.request.outputs.run-date }}
       pr-number: ${{ steps.request.outputs.pr-number }}
       requested-by: ${{ steps.request.outputs.requested-by }}
+      comment-id: ${{ steps.request.outputs.comment-id }}
     steps:
       - name: Validate request payload
         id: request
@@ -54,6 +59,7 @@ jobs:
           RUN_DATE: ${{ github.event.client_payload.run-date || inputs.run-date }}
           PR_NUMBER: ${{ github.event.client_payload.pr-number || inputs.pr-number }}
           REQUESTED_BY: ${{ github.event.client_payload.requested-by || inputs.requested-by }}
+          COMMENT_ID: ${{ github.event.client_payload.comment-id || inputs.comment-id }}
           SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || 'SemiAnalysisAI/InferenceX' }}
         run: |
           if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
@@ -76,6 +82,10 @@ jobs:
             echo "::error::requested-by is not a valid GitHub login"
             exit 1
           fi
+          if [ -n "$COMMENT_ID" ] && [[ ! "$COMMENT_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::comment-id must be numeric when provided"
+            exit 1
+          fi
           if [ "$SOURCE_REPOSITORY" != "SemiAnalysisAI/InferenceX" ]; then
             echo "::error::Unsupported source repository: $SOURCE_REPOSITORY"
             exit 1
@@ -87,6 +97,7 @@ jobs:
             echo "run-date=$RUN_DATE"
             echo "pr-number=$PR_NUMBER"
             echo "requested-by=$REQUESTED_BY"
+            echo "comment-id=$COMMENT_ID"
           } >> "$GITHUB_OUTPUT"
 
   sync-staging-branch:
@@ -217,41 +228,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - name: Comment on source pull request
+      - name: Dispatch result to source repository
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RUN_ID: ${{ needs.validate.outputs.run-id }}
           RUN_DATE: ${{ needs.validate.outputs.run-date }}
           PR_NUMBER: ${{ needs.validate.outputs.pr-number }}
           REQUESTED_BY: ${{ needs.validate.outputs.requested-by }}
-          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL || 'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
+          COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
           STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['refresh-staging-database'].result == 'success' && needs.ingest.result == 'success' }}
         with:
           github-token: ${{ secrets.INFX_MAIN_PAT }}
           script: |
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const site = process.env.STAGING_SITE_URL.replace(/\/$/u, '');
-            const entry = encodeURIComponent(`${process.env.RUN_DATE}~r${process.env.RUN_ID}`);
-            const chartUrl = `${site}/inference?i_dates=${entry}`;
-            const success = process.env.STAGE_SUCCEEDED === 'true';
-            const body = success
-              ? [
-                  `@${process.env.REQUESTED_BY} staged run ${process.env.RUN_ID}: ${chartUrl}`,
-                  '',
-                  `This shared staging slot remains available until the next \`/stage-results\` request. [Staging workflow](${runUrl})`,
-                  '',
-                  `@${process.env.REQUESTED_BY} 已将运行 ${process.env.RUN_ID} 发布到预发布环境：${chartUrl}`,
-                  '',
-                  `该共享预发布环境会保留到下一次 \`/stage-results\` 请求。[预发布工作流](${runUrl})`,
-                ].join('\n')
-              : [
-                  `@${process.env.REQUESTED_BY} staging run ${process.env.RUN_ID} failed. [Inspect the staging workflow](${runUrl}).`,
-                  '',
-                  `@${process.env.REQUESTED_BY} 预发布运行 ${process.env.RUN_ID} 失败。[查看预发布工作流](${runUrl})。`,
-                ].join('\n');
-            await github.rest.issues.createComment({
+            await github.rest.repos.createDispatchEvent({
               owner: 'SemiAnalysisAI',
               repo: 'InferenceX',
-              issue_number: Number(process.env.PR_NUMBER),
-              body,
+              event_type: 'stage-results-completed',
+              client_payload: {
+                'source-repository': `${context.repo.owner}/${context.repo.repo}`,
+                'pr-number': process.env.PR_NUMBER,
+                'run-id': process.env.RUN_ID,
+                'run-date': process.env.RUN_DATE,
+                'requested-by': process.env.REQUESTED_BY,
+                'comment-id': process.env.COMMENT_ID,
+                'stage-succeeded': process.env.STAGE_SUCCEEDED,
+                'app-run-id': String(context.runId),
+              },
             });
