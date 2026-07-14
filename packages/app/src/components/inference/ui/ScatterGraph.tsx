@@ -453,13 +453,22 @@ const ScatterGraph = React.memo(
       rawOverlayHwTypes.forEach((key) => combined.add(`overlay:${key}`));
       return combined;
     }, [rawOfficialHwTypes, rawOverlayHwTypes]);
+    // Sticky preference for cross-engine exclusion resolution. An unofficial
+    // run loaded via `?unofficialrun=` exists to be seen, so when its configs
+    // conflict with the official engine family the run wins and the conflicting
+    // official series are deselected — the reverse would leave the overlay
+    // permanently hidden with no legend affordance to surface it (the run's
+    // legend entry is not a toggle). Officials stay restorable by dismissing
+    // the run. Without overlay points the official selection is sticky as before.
+    const exclusionStickySet = useMemo(() => {
+      if (rawOverlayHwTypes.size > 0) {
+        return new Set([...rawOverlayHwTypes].map((key) => `overlay:${key}`));
+      }
+      return rawOfficialHwTypes.size > 0 ? rawOfficialHwTypes : rawUnifiedSelection;
+    }, [rawOverlayHwTypes, rawOfficialHwTypes, rawUnifiedSelection]);
     const resolvedUnifiedSelection = useMemo(
-      () =>
-        resolveComparisonSelection(
-          rawUnifiedSelection,
-          rawOfficialHwTypes.size > 0 ? rawOfficialHwTypes : rawUnifiedSelection,
-        ).result,
-      [rawUnifiedSelection, rawOfficialHwTypes, resolveComparisonSelection],
+      () => resolveComparisonSelection(rawUnifiedSelection, exclusionStickySet).result,
+      [rawUnifiedSelection, exclusionStickySet, resolveComparisonSelection],
     );
     const resolvedHwTypes = useMemo(() => {
       const official = new Set<string>();
@@ -552,14 +561,17 @@ const ScatterGraph = React.memo(
         setLocalOfficialOverride(null);
         return;
       }
-      const resolved = resolveComparisonSelection(allUnifiedHwTypes, effectiveOfficialHwTypes);
+      // Same sticky preference as the render-time resolution: keep the overlay
+      // run's engine family so a reset doesn't flip the chart back to the
+      // conflicting official family and re-hide the loaded run.
+      const resolved = resolveComparisonSelection(allUnifiedHwTypes, exclusionStickySet);
       commitUnifiedSelection(resolved.result);
     }, [
       selectAllHwTypes,
       overlayData,
       setLocalOfficialOverride,
       allUnifiedHwTypes,
-      effectiveOfficialHwTypes,
+      exclusionStickySet,
       resolveComparisonSelection,
       commitUnifiedSelection,
     ]);

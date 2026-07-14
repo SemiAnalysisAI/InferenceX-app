@@ -341,7 +341,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
 
-  it('removes a cross-engine AgentX STP overlay before rendering', () => {
+  it('prefers a cross-engine AgentX STP overlay over the conflicting official series', () => {
     const chartDefinition = createMockChartDefinition({
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
@@ -410,9 +410,97 @@ describe('ScatterGraph', () => {
       },
     );
 
-    cy.get('#test-scatter-agentx-engine-guard svg .roofline-path').should('exist');
-    cy.get('#test-scatter-agentx-engine-guard svg .overlay-roofline-path').should('not.exist');
-    cy.get('@setActiveOverlayHwTypes').should('have.been.called');
+    // The unofficial run was loaded to be seen: its engine family wins the
+    // cross-engine exclusion, so the overlay renders and the conflicting
+    // official SGLang series is deselected (restorable by dismissing the run).
+    // Official rooflines stay in the DOM when deselected — they hide via opacity.
+    cy.get('#test-scatter-agentx-engine-guard svg .overlay-roofline-path').should('exist');
+    cy.get('#test-scatter-agentx-engine-guard svg .roofline-path').should(
+      'have.css',
+      'opacity',
+      '0',
+    );
+    // No reconciliation write-back: the provider's overlay selection already
+    // matches the resolved selection.
+    cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
+  });
+
+  it('renders both official and overlay AgentX STP series from the same engine family', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const officialData = [8, 16, 32].map((x, index) =>
+      createMockInferenceData({
+        hwKey: 'b200_vllm',
+        x,
+        y: 320 - index * 40,
+        precision: Precision.FP4,
+      }),
+    );
+    const runUrl = 'https://github.com/x/y/actions/runs/agentx-vllm-same-family';
+    const overlayData = {
+      data: [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey: 'h100_vllm',
+          x,
+          y: 260 - index * 40,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ),
+      hardwareConfig: hwConfig,
+      label: 'agentx-vllm-same-family',
+      runUrl,
+    };
+    const exclusion = buildExclusion([
+      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+    ]);
+    const namespacedExclusion = {
+      familyOf: (key: string) =>
+        exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      groupOf: (key: string) =>
+        exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-agentx-same-family"
+          modelLabel="DeepSeek V4 Pro"
+          data={officialData}
+          xLabel="Concurrency"
+          yLabel="Throughput / GPU (tok/s)"
+          chartDefinition={chartDefinition}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_vllm']),
+          hwTypesWithData: new Set(['b200_vllm']),
+          selectedModel: Model.DeepSeek_V4_Pro,
+          selectedSequence: Sequence.AgenticTraces,
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+          resolveComparisonSelection: (proposed, prev = new Set()) =>
+            resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky'),
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+        },
+      },
+    );
+
+    // Same engine family: no exclusion applies, both series render.
+    cy.get('#test-scatter-agentx-same-family svg .overlay-roofline-path').should('exist');
+    cy.get('#test-scatter-agentx-same-family svg .roofline-path').should(
+      'have.css',
+      'opacity',
+      '1',
+    );
   });
 });
 
@@ -464,6 +552,88 @@ describe('ChartDisplay engine comparison guard', () => {
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+  });
+
+  it('keeps a cross-engine unofficial overlay in table mode and drops the conflicting official', () => {
+    const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
+    const sglangRow = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      hw: 'Official SGLang',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+    });
+    const runUrl = 'https://github.com/x/y/actions/runs/456';
+    const overlayRow = createMockInferenceData({
+      hwKey: 'h100_vllm',
+      hw: 'Unofficial vLLM',
+      model: Model.DeepSeek_V4_Pro,
+      precision: Precision.FP4,
+      run_url: runUrl,
+    });
+    const exclusion = buildExclusion([
+      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+    ]);
+    const namespacedExclusion = {
+      familyOf: (key: string) =>
+        exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      groupOf: (key: string) =>
+        exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+    };
+    const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
+      resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky');
+    const runInfo = {
+      id: 456,
+      name: 'agentx-vllm-overlay',
+      branch: 'agentx-vllm-overlay',
+      sha: 'def456',
+      createdAt: '2026-07-10T00:00:00Z',
+      url: runUrl,
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_V4_Pro,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: [sglangRow],
+          },
+        ],
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity',
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+        resolveComparisonSelection: resolveSelection,
+      },
+      globalFilters: {
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      },
+      unofficial: {
+        isUnofficialRun: true,
+        unofficialRunInfo: runInfo,
+        unofficialRunInfos: [runInfo],
+        runIndexByUrl: { [runUrl]: 0, '456': 0 },
+        getOverlayData: () => ({ data: [overlayRow], hardwareConfig: hwConfig }),
+        activeOverlayHwTypes: new Set(['h100_vllm']),
+        allOverlayHwTypes: new Set(['h100_vllm']),
+      },
+    });
+
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    // The unofficial run's engine family wins the cross-engine exclusion: the
+    // overlay row stays and the conflicting official SGLang row is dropped.
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
+    cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('not.exist');
+    // The reconciliation effect must not strip the run's hw types from the provider.
+    cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
   });
 
   it('keeps an explicitly empty official legend out of table mode', () => {
