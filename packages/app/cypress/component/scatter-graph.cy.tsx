@@ -663,6 +663,78 @@ describe('ScatterGraph', () => {
 });
 
 describe('ChartDisplay engine comparison guard', () => {
+  it('keeps official table rows synchronized with legend state after a scope change', () => {
+    const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
+    const baseInference = createMockInferenceContext();
+    const baseGlobalFilters = createMockGlobalFilterContext();
+
+    function OfficialRowsScopeHarness() {
+      const [secondScope, setSecondScope] = useState(false);
+      const [activeKeys, setActiveKeys] = useState(new Set(['b200_sglang']));
+      const model = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;
+      const rows = (secondScope ? ['b200_sglang', 'h100_vllm'] : ['b200_sglang']).map((hwKey) =>
+        createMockInferenceData({
+          hwKey,
+          model,
+          precision: Precision.FP4,
+        }),
+      );
+      const inference = {
+        ...baseInference,
+        graphs: [
+          {
+            model,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition,
+            data: rows,
+          },
+        ],
+        selectedModel: model,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedXAxisMode: 'interactivity' as const,
+        activeHwTypes: activeKeys,
+        hwTypesWithData: new Set(rows.map((row) => String(row.hwKey))),
+      };
+      const globalFilters = {
+        ...baseGlobalFilters,
+        selectedModel: model,
+        selectedSequence: Sequence.AgenticTraces,
+        effectiveSequence: Sequence.AgenticTraces,
+      };
+
+      return (
+        <GlobalFilterContext.Provider value={globalFilters}>
+          <InferenceContext.Provider value={inference}>
+            <button data-testid="change-official-table-scope" onClick={() => setSecondScope(true)}>
+              Change scope
+            </button>
+            <button
+              data-testid="select-official-vllm"
+              onClick={() => setActiveKeys(new Set(['h100_vllm']))}
+            >
+              Select vLLM
+            </button>
+            <ChartDisplay />
+          </InferenceContext.Provider>
+        </GlobalFilterContext.Provider>
+      );
+    }
+
+    mountWithProviders(<OfficialRowsScopeHarness />, { unofficial: {} });
+    cy.get('[data-testid="inference-table-view-btn"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+
+    cy.get('[data-testid="change-official-table-scope"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('exist');
+
+    cy.get('[data-testid="select-official-vllm"]').click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
+    cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('not.exist');
+    cy.get('@setLocalOfficialOverride').should('not.have.been.called');
+  });
+
   it('keeps cross-engine AgentX STP rows out of table mode', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const sglangRow = createMockInferenceData({
@@ -821,7 +893,7 @@ describe('ChartDisplay engine comparison guard', () => {
         selectedSequence: Sequence.AgenticTraces,
         effectiveSequence: Sequence.AgenticTraces,
       },
-      unofficial: { localOfficialOverride: new Set() },
+      unofficial: { isUnofficialRun: true, localOfficialOverride: new Set() },
     });
 
     cy.get('[data-testid="inference-table-view-btn"]').click();

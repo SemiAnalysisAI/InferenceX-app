@@ -461,12 +461,13 @@ export default function ChartDisplay() {
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
   const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
-  const overlayRowsScopeChanged = appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
+  const overlayRowsScopeChanged =
+    isUnofficialRun && appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
   const selectedOfficialHwTypes = overlayRowsScopeChanged
     ? officialScope
-    : localOfficialOverride === null
-      ? activeHwTypes
-      : localOfficialOverride;
+    : isUnofficialRun
+      ? (localOfficialOverride ?? activeHwTypes)
+      : activeHwTypes;
   // Preview tables follow the same policy as ScatterGraph: preserve every
   // active engine family instead of applying the production comparison guard.
   const scopedActiveOverlayHwTypes = useMemo(() => {
