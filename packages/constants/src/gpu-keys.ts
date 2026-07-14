@@ -9,7 +9,8 @@ export interface HwEntry {
   sort: number;
   /** Thermal design power in watts */
   tdp: number;
-  /** kW per GPU (for energy calculations) */
+  /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
+   * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
   power: number;
   /** $/GPU/hr — hyperscaler tier */
   costh: number;
@@ -27,7 +28,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'H100',
     sort: 7,
     tdp: 700,
-    power: 1.73,
+    power: 1.37,
     costh: 1.3,
     costn: 1.69,
     costr: 1.3,
@@ -38,7 +39,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'H200',
     sort: 5,
     tdp: 700,
-    power: 1.73,
+    power: 1.37,
     costh: 1.41,
     costn: 1.74,
     costr: 1.6,
@@ -49,7 +50,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'B200',
     sort: 3,
     tdp: 1000,
-    power: 2.17,
+    power: 1.71,
     costh: 1.95,
     costn: 2.34,
     costr: 2.9,
@@ -61,7 +62,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'B300',
     sort: 2,
     tdp: 1200,
-    power: 2.17,
+    power: 1.9,
     costh: 2.34,
     costn: 2.808,
     costr: 3.48,
@@ -72,7 +73,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'GB200 NVL72',
     sort: 1,
     tdp: 1200,
-    power: 2.1,
+    power: 1.87,
     costh: 2.21,
     costn: 2.75,
     costr: 3.3,
@@ -84,7 +85,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'GB300 NVL72',
     sort: 0,
     tdp: 1400,
-    power: 2.1,
+    power: 2.12,
     costh: 2.652,
     costn: 3.3,
     costr: 3.96,
@@ -95,7 +96,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'MI300X',
     sort: 8,
     tdp: 750,
-    power: 1.79,
+    power: 1.39,
     costh: 1.12,
     costn: 1.4,
     costr: 1.55,
@@ -106,7 +107,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'MI325X',
     sort: 6,
     tdp: 1000,
-    power: 2.18,
+    power: 1.69,
     costh: 1.28,
     costn: 1.59,
     costr: 1.8,
@@ -117,7 +118,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'MI355X',
     sort: 4,
     tdp: 1400,
-    power: 2.65,
+    power: 2.09,
     costh: 1.48,
     costn: 1.9,
     costr: 2.1,

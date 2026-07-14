@@ -112,7 +112,7 @@ export const GPU_SPECS: GpuSpec[] = [
   {
     name: 'B300 SXM',
     vendor: 'nvidia',
-    memory: '268 GB',
+    memory: '288 GB',
     memoryType: 'HBM3e',
     memoryBandwidth: '8 TB/s',
     fp4: 13500,
@@ -219,7 +219,7 @@ export const GPU_SPECS: GpuSpec[] = [
     fp8: 5033,
     bf16: 2516,
     scaleUpTech: '5th Gen Infinity Fabric',
-    scaleUpBandwidth: '576 GB/s',
+    scaleUpBandwidth: '538 GB/s',
     scaleUpWorldSize: 8,
     scaleOutBandwidth: '400 Gbit/s',
     scaleOutTech: 'RoCEv2 Ethernet',
