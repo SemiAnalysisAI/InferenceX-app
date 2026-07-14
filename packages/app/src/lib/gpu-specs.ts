@@ -14,7 +14,12 @@ export interface GpuSpec {
   name: string;
   /** Vendor: 'nvidia' or 'amd' */
   vendor: 'nvidia' | 'amd';
-  /** GPU memory capacity */
+  /**
+   * GPU memory capacity — USABLE (driver-addressable, what nvidia-smi /
+   * rocm-smi report), not the physical stack total. The two differ on SKUs
+   * with yield holdback: H200 144→141, B200 192→180, GB200 192→186,
+   * GB300 288→278.
+   */
   memory: string;
   /** Memory type (e.g. HBM3, HBM3e) */
   memoryType: string;
@@ -132,7 +137,8 @@ export const GPU_SPECS: GpuSpec[] = [
   {
     name: 'GB200 NVL72',
     vendor: 'nvidia',
-    memory: '192 GB',
+    // 192 GB physical; nvidia-smi reports 189,471 MiB (185.0 GiB) usable
+    memory: '186 GB',
     memoryType: 'HBM3e',
     memoryBandwidth: '8 TB/s',
     fp4: 10000,
@@ -152,7 +158,8 @@ export const GPU_SPECS: GpuSpec[] = [
   {
     name: 'GB300 NVL72',
     vendor: 'nvidia',
-    memory: '288 GB',
+    // 288 GB physical; nvidia-smi reports 284,208 MiB (277.5 GiB) usable
+    memory: '278 GB',
     memoryType: 'HBM3e',
     memoryBandwidth: '8 TB/s',
     fp4: 15000,
