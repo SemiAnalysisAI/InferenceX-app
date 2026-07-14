@@ -341,18 +341,20 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
 
-  it('prefers a cross-engine AgentX STP overlay over the conflicting official series', () => {
+  it('renders cross-engine official and unofficial AgentX STP series together in preview mode', () => {
     const chartDefinition = createMockChartDefinition({
       chartType: 'interactivity',
       y_tpPerGpu_roofline: 'upper_left',
     });
-    const officialData = [8, 16, 32].map((x, index) =>
-      createMockInferenceData({
-        hwKey: 'b200_sglang',
-        x,
-        y: 320 - index * 40,
-        precision: Precision.FP4,
-      }),
+    const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
+      [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey,
+          x,
+          y: 320 - hwIndex * 20 - index * 40,
+          precision: Precision.FP4,
+        }),
+      ),
     );
     const runUrl = 'https://github.com/x/y/actions/runs/agentx-vllm';
     const overlayData = {
@@ -378,6 +380,7 @@ describe('ScatterGraph', () => {
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
+    const blockedToggle = cy.stub().as('blockedComparisonToggle').returns(null);
 
     mountWithProviders(
       <div style={{ width: 800, height: 600 }}>
@@ -395,13 +398,14 @@ describe('ScatterGraph', () => {
         inference: {
           hardwareConfig: hwConfig,
           activeHwTypes: new Set(['b200_sglang']),
-          hwTypesWithData: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
           selectedModel: Model.DeepSeek_V4_Pro,
           selectedSequence: Sequence.AgenticTraces,
           selectedPrecisions: [Precision.FP4],
           showLineLabels: true,
           resolveComparisonSelection: (proposed, prev = new Set()) =>
             resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky'),
+          toggleComparisonSelection: blockedToggle,
         },
         unofficial: {
           activeOverlayHwTypes: new Set(['h100_vllm']),
@@ -410,19 +414,24 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // The unofficial run was loaded to be seen: its engine family wins the
-    // cross-engine exclusion, so the overlay renders and the conflicting
-    // official SGLang series is deselected (restorable by dismissing the run).
-    // Official rooflines stay in the DOM when deselected — they hide via opacity.
+    // Preview mode is diagnostic, so cross-engine official and unofficial
+    // results remain visible together instead of choosing one engine family.
     cy.get('#test-scatter-agentx-engine-guard svg .overlay-roofline-path').should('exist');
-    cy.get('#test-scatter-agentx-engine-guard svg .roofline-path').should(
-      'have.css',
-      'opacity',
-      '0',
-    );
-    // No reconciliation write-back: the provider's overlay selection already
-    // matches the resolved selection.
+    cy.get(
+      '#test-scatter-agentx-engine-guard svg .roofline-path[data-hw-key="b200_sglang"]',
+    ).should('have.css', 'opacity', '1');
+    // The exclusion resolver must be bypassed rather than resolving in favor of
+    // either the official or overlay engine family.
     cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
+
+    // An additional official engine can also be selected while the preview is
+    // loaded; the production-only conflict toggle must not be consulted.
+    cy.get('label[for="checkbox-h100_vllm"]').click();
+    cy.get('@blockedComparisonToggle').should('not.have.been.called');
+    cy.get('@setLocalOfficialOverride').should((setOverride) => {
+      const selection = setOverride.lastCall.args[0] as Set<string>;
+      expect([...selection]).to.have.members(['b200_sglang', 'h100_vllm']);
+    });
   });
 
   it('renders both official and overlay AgentX STP series from the same engine family', () => {
@@ -554,7 +563,7 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
   });
 
-  it('keeps a cross-engine unofficial overlay in table mode and drops the conflicting official', () => {
+  it('keeps cross-engine official and unofficial rows together in preview table mode', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const sglangRow = createMockInferenceData({
       hwKey: 'b200_sglang',
@@ -627,11 +636,9 @@ describe('ChartDisplay engine comparison guard', () => {
     });
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
-    // The unofficial run's engine family wins the cross-engine exclusion: the
-    // overlay row stays and the conflicting official SGLang row is dropped.
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
-    cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('not.exist');
+    cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('exist');
     // The reconciliation effect must not strip the run's hw types from the provider.
     cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
   });
@@ -793,9 +800,9 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
 
     cy.get('[data-testid="change-overlay-scope"]').click();
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 3);
     cy.get('[data-testid="rerender-overlay-scope"]').click();
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 3);
 
     cy.get('[data-testid="clear-overlay-scope"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);

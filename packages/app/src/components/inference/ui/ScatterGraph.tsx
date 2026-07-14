@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { computeToggle } from '@/hooks/useTogglableSet';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import {
   labelOpacityForActiveState,
@@ -349,7 +350,6 @@ const ScatterGraph = React.memo(
       removeHwType,
       hwTypesWithData,
       resolveComparisonSelection,
-      toggleComparisonSelection,
       selectedPrecisions,
       selectedYAxisMetric,
       availableRuns,
@@ -453,22 +453,18 @@ const ScatterGraph = React.memo(
       rawOverlayHwTypes.forEach((key) => combined.add(`overlay:${key}`));
       return combined;
     }, [rawOfficialHwTypes, rawOverlayHwTypes]);
-    // Sticky preference for cross-engine exclusion resolution. An unofficial
-    // run loaded via `?unofficialrun=` exists to be seen, so when its configs
-    // conflict with the official engine family the run wins and the conflicting
-    // official series are deselected — the reverse would leave the overlay
-    // permanently hidden with no legend affordance to surface it (the run's
-    // legend entry is not a toggle). Officials stay restorable by dismissing
-    // the run. Without overlay points the official selection is sticky as before.
-    const exclusionStickySet = useMemo(() => {
-      if (rawOverlayHwTypes.size > 0) {
-        return new Set([...rawOverlayHwTypes].map((key) => `overlay:${key}`));
-      }
-      return rawOfficialHwTypes.size > 0 ? rawOfficialHwTypes : rawUnifiedSelection;
-    }, [rawOverlayHwTypes, rawOfficialHwTypes, rawUnifiedSelection]);
+    // Preview mode is diagnostic: official and unofficial runs may use different
+    // engines, and all of them must remain comparable on the same graph. Keep the
+    // production cross-engine guard only when no unofficial overlay is present.
     const resolvedUnifiedSelection = useMemo(
-      () => resolveComparisonSelection(rawUnifiedSelection, exclusionStickySet).result,
-      [rawUnifiedSelection, exclusionStickySet, resolveComparisonSelection],
+      () =>
+        overlayData
+          ? rawUnifiedSelection
+          : resolveComparisonSelection(
+              rawUnifiedSelection,
+              rawOfficialHwTypes.size > 0 ? rawOfficialHwTypes : rawUnifiedSelection,
+            ).result,
+      [overlayData, rawUnifiedSelection, rawOfficialHwTypes, resolveComparisonSelection],
     );
     const resolvedHwTypes = useMemo(() => {
       const official = new Set<string>();
@@ -541,19 +537,11 @@ const ScatterGraph = React.memo(
     const unifiedToggle = useCallback(
       (key: string, isOverlay: boolean) => {
         const prefixedKey = isOverlay ? `overlay:${key}` : key;
-        const next = toggleComparisonSelection(
-          resolvedUnifiedSelection,
-          prefixedKey,
-          allUnifiedHwTypes,
+        commitUnifiedSelection(
+          computeToggle(resolvedUnifiedSelection, prefixedKey, allUnifiedHwTypes),
         );
-        if (next) commitUnifiedSelection(next);
       },
-      [
-        resolvedUnifiedSelection,
-        allUnifiedHwTypes,
-        toggleComparisonSelection,
-        commitUnifiedSelection,
-      ],
+      [resolvedUnifiedSelection, allUnifiedHwTypes, commitUnifiedSelection],
     );
     const resetUnifiedSelection = useCallback(() => {
       selectAllHwTypes();
@@ -561,18 +549,12 @@ const ScatterGraph = React.memo(
         setLocalOfficialOverride(null);
         return;
       }
-      // Same sticky preference as the render-time resolution: keep the overlay
-      // run's engine family so a reset doesn't flip the chart back to the
-      // conflicting official family and re-hide the loaded run.
-      const resolved = resolveComparisonSelection(allUnifiedHwTypes, exclusionStickySet);
-      commitUnifiedSelection(resolved.result);
+      commitUnifiedSelection(allUnifiedHwTypes);
     }, [
       selectAllHwTypes,
       overlayData,
       setLocalOfficialOverride,
       allUnifiedHwTypes,
-      exclusionStickySet,
-      resolveComparisonSelection,
       commitUnifiedSelection,
     ]);
 
