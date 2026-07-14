@@ -443,13 +443,28 @@ export default function ChartDisplay() {
     }
     return eligibleKeys;
   }, [overlayDataByChartType, selectedPrecisions, quickFilters]);
+  const officialScope = useMemo(() => {
+    const eligibleKeys = new Set<string>();
+    for (const graph of graphs) {
+      for (const point of graph.data) {
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          eligibleKeys.add(String(point.hwKey));
+        }
+      }
+    }
+    return eligibleKeys;
+  }, [graphs, selectedPrecisions, quickFilters]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
   const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
   const overlayRowsScopeChanged = appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
-  const selectedOfficialHwTypes =
-    overlayRowsScopeChanged || localOfficialOverride === null
+  const selectedOfficialHwTypes = overlayRowsScopeChanged
+    ? officialScope
+    : localOfficialOverride === null
       ? activeHwTypes
       : localOfficialOverride;
   // Preview tables follow the same policy as ScatterGraph: preserve every
@@ -474,18 +489,18 @@ export default function ChartDisplay() {
       }
     }
     if (selectionChanged) setActiveOverlayHwTypes(merged);
-    if (overlayRowsScopeChanged && localOfficialOverride !== null) {
-      setLocalOfficialOverride(null);
+    if (overlayRowsScopeChanged) {
+      setLocalOfficialOverride(officialScope);
+      setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
     }
-    if (overlayRowsScopeChanged) setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
   }, [
     overlayRowsScopeChanged,
     overlayRowsScopeKey,
     activeOverlayHwTypes,
+    officialScope,
     overlayScope,
     scopedActiveOverlayHwTypes,
     setActiveOverlayHwTypes,
-    localOfficialOverride,
     setLocalOfficialOverride,
   ]);
 

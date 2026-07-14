@@ -711,19 +711,20 @@ describe('ChartDisplay engine comparison guard', () => {
     function OverlayScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
       const [activeOverlayKeys, setActiveOverlayKeys] = useState(new Set(['h100_sglang']));
+      const [officialOverride, setOfficialOverride] = useState<Set<string> | null>(null);
       const [, setRenderVersion] = useState(0);
       const model = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;
-      const officialKey = secondScope ? 'h100_vllm' : 'b200_sglang';
+      const officialKeys = secondScope ? ['h100_vllm', 'b200_sglang'] : ['b200_sglang'];
       const overlayKeys = secondScope
         ? ['b200_vllm', 'h200_sglang']
         : ['h100_sglang', 'h200_sglang'];
-      const officialRows = [
+      const officialRows = officialKeys.map((hwKey) =>
         createMockInferenceData({
-          hwKey: officialKey,
+          hwKey,
           model,
           precision: Precision.FP4,
         }),
-      ];
+      );
       const overlayRows = overlayKeys.map((hwKey, index) =>
         createMockInferenceData({
           hwKey,
@@ -747,8 +748,8 @@ describe('ChartDisplay engine comparison guard', () => {
         selectedSequence: Sequence.AgenticTraces,
         selectedXAxisMode: 'interactivity' as const,
         selectedXAxisMetric: 'p90_ttft',
-        activeHwTypes: new Set([officialKey]),
-        hwTypesWithData: new Set([officialKey]),
+        activeHwTypes: new Set([officialKeys[0]]),
+        hwTypesWithData: new Set(officialKeys),
         resolveComparisonSelection: resolveSelection,
       };
       const globalFilters = {
@@ -767,6 +768,8 @@ describe('ChartDisplay engine comparison guard', () => {
         activeOverlayHwTypes: activeOverlayKeys,
         setActiveOverlayHwTypes: setActiveOverlayKeys,
         allOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang', 'b200_vllm']),
+        localOfficialOverride: officialOverride,
+        setLocalOfficialOverride: setOfficialOverride,
       };
 
       return (
@@ -800,14 +803,14 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
 
     cy.get('[data-testid="change-overlay-scope"]').click();
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 3);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
     cy.get('[data-testid="rerender-overlay-scope"]').click();
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 3);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
 
     cy.get('[data-testid="clear-overlay-scope"]').click();
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="rerender-overlay-scope"]').click();
-    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 1);
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="inference-chart-view-btn"]').click();
     cy.get('#chart-0 svg .unofficial-overlay-pt').should('not.exist');
   });

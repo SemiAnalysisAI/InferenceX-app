@@ -429,11 +429,19 @@ const ScatterGraph = React.memo(
       return true;
     }, [localOfficialOverride, overlayScopeChanged, hwTypesWithData]);
     const rawOfficialHwTypes = useMemo(() => {
-      const source = localOfficialOverrideIsStale
-        ? activeHwTypes
-        : (localOfficialOverride ?? activeHwTypes);
+      const source = overlayScopeChanged
+        ? hwTypesWithData
+        : localOfficialOverrideIsStale
+          ? activeHwTypes
+          : (localOfficialOverride ?? activeHwTypes);
       return new Set([...source].filter((key) => hwTypesWithData.has(key)));
-    }, [activeHwTypes, hwTypesWithData, localOfficialOverride, localOfficialOverrideIsStale]);
+    }, [
+      activeHwTypes,
+      hwTypesWithData,
+      localOfficialOverride,
+      localOfficialOverrideIsStale,
+      overlayScopeChanged,
+    ]);
     const rawOverlayHwTypes = useMemo(
       () =>
         overlayScopeChanged
@@ -496,9 +504,13 @@ const ScatterGraph = React.memo(
     useEffect(() => {
       if (!overlayData) return;
       previousOverlayScopeRef.current = overlayScopeKey;
-      if (localOfficialOverrideIsStale) {
+      // ChartDisplay seeds the new preview scope with every eligible official
+      // series. Avoid replacing it with the production-filtered active set while
+      // that parent update is being committed.
+      if (localOfficialOverrideIsStale && !overlayScopeChanged) {
         setLocalOfficialOverride(null);
       } else if (
+        !overlayScopeChanged &&
         localOfficialOverride !== null &&
         !setsEqual(localOfficialOverride, effectiveOfficialHwTypes)
       ) {
@@ -511,6 +523,7 @@ const ScatterGraph = React.memo(
     }, [
       overlayData,
       overlayScopeKey,
+      overlayScopeChanged,
       localOfficialOverride,
       localOfficialOverrideIsStale,
       effectiveOfficialHwTypes,
