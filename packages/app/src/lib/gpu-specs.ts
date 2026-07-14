@@ -18,7 +18,7 @@ export interface GpuSpec {
    * GPU memory capacity — USABLE (driver-addressable, what nvidia-smi /
    * rocm-smi report), not the physical stack total. The two differ on SKUs
    * with yield holdback: H200 144→141, B200 192→180, GB200 192→186,
-   * GB300 288→278.
+   * B300 288→268, GB300 288→278.
    */
   memory: string;
   /** Memory type (e.g. HBM3, HBM3e) */
@@ -117,7 +117,8 @@ export const GPU_SPECS: GpuSpec[] = [
   {
     name: 'B300 SXM',
     vendor: 'nvidia',
-    memory: '288 GB',
+    // 288 GB physical; nvidia-smi reports 275,040 MiB (268.6 GiB) usable
+    memory: '268 GB',
     memoryType: 'HBM3e',
     memoryBandwidth: '8 TB/s',
     fp4: 13500,

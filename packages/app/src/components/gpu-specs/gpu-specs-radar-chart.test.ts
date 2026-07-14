@@ -108,11 +108,15 @@ describe('normalizeGpuData', () => {
     expect(h100!.values[memIdx]).toBeGreaterThan(0);
     expect(h100!.values[memIdx]).toBeLessThan(1);
 
-    // GB300 NVL72 has 288 GB (one of the highest)
+    // MI355X's 288 GB is the fleet max, so it normalizes to 1.0
+    const mi355x = result.find((r) => r.gpu.name === 'MI355X');
+    expect(mi355x).toBeDefined();
+    expect(mi355x!.values[memIdx]).toBeCloseTo(1, 5);
+
+    // GB300 NVL72 carries 278 GB usable (288 physical)
     const gb300 = result.find((r) => r.gpu.name === 'GB300 NVL72');
     expect(gb300).toBeDefined();
-    // MI355X also has 288 GB, so both should be 1.0
-    expect(gb300!.values[memIdx]).toBeCloseTo(1, 5);
+    expect(gb300!.values[memIdx]).toBeCloseTo(278 / 288, 5);
   });
 
   it('computes correct relative values for FP8', () => {

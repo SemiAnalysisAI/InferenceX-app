@@ -82,7 +82,7 @@ describe('GPU_SPECS', () => {
   });
 
   it('Blackwell Ultra memory is usable capacity, not the 288 GB physical total', () => {
-    expect(findGpu('B300 SXM').memory).toBe('288 GB');
+    expect(findGpu('B300 SXM').memory).toBe('268 GB');
     expect(findGpu('GB300 NVL72').memory).toBe('278 GB');
   });
 
@@ -377,8 +377,8 @@ describe('getScaleUpDomainMemory', () => {
   });
 
   it('computes B300 SXM domain memory correctly', () => {
-    const spec = { memory: '288 GB', scaleUpWorldSize: 8 } as GpuSpec;
-    expect(getScaleUpDomainMemory(spec)).toBe('2.3 TB');
+    const spec = { memory: '268 GB', scaleUpWorldSize: 8 } as GpuSpec;
+    expect(getScaleUpDomainMemory(spec)).toBe('2.14 TB');
   });
 
   it('computes GB300 NVL72 domain memory correctly', () => {
