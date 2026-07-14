@@ -61,6 +61,19 @@ function cdnHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * CDN-cached plain-text response (e.g. CSV) with the same cache headers and
+ * purge tag as cachedJson. Uncompressed — use only for small payloads.
+ */
+export function cachedText(data: string, contentType: string): Response {
+  return new Response(data, {
+    headers: {
+      'Content-Type': contentType,
+      ...cdnHeaders(),
+    },
+  });
+}
+
 /** CDN-cached streamed + gzip-compressed JSON response — supports up to 20 MB on Vercel CDN. */
 export function cachedJson<T>(data: T): Response {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
