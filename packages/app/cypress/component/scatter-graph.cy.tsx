@@ -199,6 +199,116 @@ describe('ScatterGraph', () => {
     );
   });
 
+  it('keeps a preview scope pending until official data arrives', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const baseInference = createMockInferenceContext();
+    const baseUnofficial = createMockUnofficialRunContext();
+
+    function DelayedOfficialScopeHarness() {
+      const [secondScope, setSecondScope] = useState(false);
+      const [secondScopeLoaded, setSecondScopeLoaded] = useState(false);
+      const [activeOverlayKeys, setActiveOverlayKeys] = useState(new Set(['h100_vllm']));
+      const [officialOverride, setOfficialOverride] = useState<Set<string> | null>(
+        new Set(['h100_sglang']),
+      );
+      const model = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;
+      const officialKeys = secondScope ? ['b200_sglang', 'h100_vllm'] : ['h100_sglang'];
+      const visibleOfficialKeys = secondScope && !secondScopeLoaded ? [] : officialKeys;
+      const officialRows = visibleOfficialKeys.flatMap((hwKey, hwIndex) =>
+        [8, 16, 32].map((x, index) =>
+          createMockInferenceData({
+            hwKey,
+            model,
+            x,
+            y: 320 - hwIndex * 20 - index * 40,
+            precision: Precision.FP4,
+          }),
+        ),
+      );
+      const overlayKey = secondScope ? 'b200_vllm' : 'h100_vllm';
+      const overlayData = {
+        data: [8, 16, 32].map((x, index) =>
+          createMockInferenceData({
+            hwKey: overlayKey,
+            model,
+            x,
+            y: 260 - index * 40,
+            precision: Precision.FP4,
+          }),
+        ),
+        hardwareConfig: hwConfig,
+        label: 'delayed-official-scope',
+      };
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set([officialKeys[0]]),
+        hwTypesWithData: new Set(visibleOfficialKeys),
+        loading: secondScope && !secondScopeLoaded,
+        selectedModel: model,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+      };
+      const unofficial = {
+        ...baseUnofficial,
+        isUnofficialRun: true,
+        activeOverlayHwTypes: activeOverlayKeys,
+        setActiveOverlayHwTypes: setActiveOverlayKeys,
+        allOverlayHwTypes: new Set(['h100_vllm', 'b200_vllm']),
+        localOfficialOverride: officialOverride,
+        setLocalOfficialOverride: setOfficialOverride,
+      };
+
+      return (
+        <UnofficialRunContext.Provider value={unofficial}>
+          <InferenceContext.Provider value={inference}>
+            <button data-testid="change-delayed-chart-scope" onClick={() => setSecondScope(true)}>
+              Change scope
+            </button>
+            <button
+              data-testid="load-delayed-chart-scope"
+              onClick={() => {
+                setOfficialOverride(new Set(officialKeys));
+                setSecondScopeLoaded(true);
+              }}
+            >
+              Load official data
+            </button>
+            <output data-testid="official-preview-override">
+              {officialOverride === null ? 'none' : [...officialOverride].join(',')}
+            </output>
+            <div style={{ width: 800, height: 600 }}>
+              <ScatterGraph
+                chartId="test-scatter-delayed-official-scope"
+                modelLabel={model}
+                data={officialRows}
+                xLabel="Concurrency"
+                yLabel="Throughput / GPU (tok/s)"
+                chartDefinition={chartDefinition}
+                overlayData={overlayData}
+              />
+            </div>
+          </InferenceContext.Provider>
+        </UnofficialRunContext.Provider>
+      );
+    }
+
+    mountWithProviders(<DelayedOfficialScopeHarness />);
+    cy.get('[data-testid="change-delayed-chart-scope"]').click();
+    cy.get('[data-testid="official-preview-override"]').should('have.text', 'h100_sglang');
+
+    cy.get('[data-testid="load-delayed-chart-scope"]').click();
+    cy.get(
+      '#test-scatter-delayed-official-scope svg .roofline-path[data-hw-key="b200_sglang"]',
+    ).should('have.css', 'opacity', '1');
+    cy.get(
+      '#test-scatter-delayed-official-scope svg .roofline-path[data-hw-key="h100_vllm"]',
+    ).should('have.css', 'opacity', '1');
+  });
+
   it('renders legend with hardware items', () => {
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),

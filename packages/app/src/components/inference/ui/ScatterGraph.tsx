@@ -383,6 +383,7 @@ const ScatterGraph = React.memo(
       selectedSequence,
       selectedModel,
       quickFilters,
+      loading,
     } = useInference();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
@@ -507,7 +508,13 @@ const ScatterGraph = React.memo(
 
     useEffect(() => {
       if (!overlayData) return;
-      previousOverlayScopeRef.current = overlayScopeKey;
+      // Keep the scope pending while the official query is between scopes.
+      // ChartDisplay uses the same readiness rule before seeding the full
+      // mixed-engine override, so a rerender from overlay reconciliation cannot
+      // fall back to the production-filtered active set in the meantime.
+      if (!overlayScopeChanged || !loading || hwTypesWithData.size > 0) {
+        previousOverlayScopeRef.current = overlayScopeKey;
+      }
       // ChartDisplay seeds the new preview scope with every eligible official
       // series. Avoid replacing it with the production-filtered active set while
       // that parent update is being committed.
@@ -528,6 +535,8 @@ const ScatterGraph = React.memo(
       overlayData,
       overlayScopeKey,
       overlayScopeChanged,
+      loading,
+      hwTypesWithData,
       localOfficialOverride,
       localOfficialOverrideIsStale,
       effectiveOfficialHwTypes,
