@@ -783,6 +783,7 @@ describe('ChartDisplay engine comparison guard', () => {
 
     function OverlayScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
+      const [secondScopeLoaded, setSecondScopeLoaded] = useState(false);
       const [activeOverlayKeys, setActiveOverlayKeys] = useState(new Set(['h100_sglang']));
       const [officialOverride, setOfficialOverride] = useState<Set<string> | null>(null);
       const [, setRenderVersion] = useState(0);
@@ -791,13 +792,16 @@ describe('ChartDisplay engine comparison guard', () => {
       const overlayKeys = secondScope
         ? ['b200_vllm', 'h200_sglang']
         : ['h100_sglang', 'h200_sglang'];
-      const officialRows = officialKeys.map((hwKey) =>
-        createMockInferenceData({
-          hwKey,
-          model,
-          precision: Precision.FP4,
-        }),
-      );
+      const officialRows =
+        secondScope && !secondScopeLoaded
+          ? []
+          : officialKeys.map((hwKey) =>
+              createMockInferenceData({
+                hwKey,
+                model,
+                precision: Precision.FP4,
+              }),
+            );
       const overlayRows = overlayKeys.map((hwKey, index) =>
         createMockInferenceData({
           hwKey,
@@ -817,6 +821,7 @@ describe('ChartDisplay engine comparison guard', () => {
             data: officialRows,
           },
         ],
+        loading: secondScope && !secondScopeLoaded,
         selectedModel: model,
         selectedSequence: Sequence.AgenticTraces,
         selectedXAxisMode: 'interactivity' as const,
@@ -852,6 +857,9 @@ describe('ChartDisplay engine comparison guard', () => {
               <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
                 Change scope
               </button>
+              <button data-testid="load-official-scope" onClick={() => setSecondScopeLoaded(true)}>
+                Load official scope
+              </button>
               <button
                 data-testid="clear-overlay-scope"
                 onClick={() => setActiveOverlayKeys(new Set())}
@@ -876,6 +884,10 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
 
     cy.get('[data-testid="change-overlay-scope"]').click();
+    // The new overlay scope can arrive before the official query. Its empty
+    // graph must not be persisted as an intentional empty official selection.
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
+    cy.get('[data-testid="load-official-scope"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
     cy.get('[data-testid="rerender-overlay-scope"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);

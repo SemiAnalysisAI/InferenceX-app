@@ -489,7 +489,9 @@ export default function ChartDisplay() {
       }
     }
     if (selectionChanged) setActiveOverlayHwTypes(merged);
-    if (overlayRowsScopeChanged) {
+    // A scope change can render once before its official graphs arrive. Do not
+    // persist that transient empty set as an intentional legend selection.
+    if (overlayRowsScopeChanged && (!loading || officialScope.size > 0)) {
       setLocalOfficialOverride(officialScope);
       setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
     }
@@ -497,6 +499,7 @@ export default function ChartDisplay() {
     overlayRowsScopeChanged,
     overlayRowsScopeKey,
     activeOverlayHwTypes,
+    loading,
     officialScope,
     overlayScope,
     scopedActiveOverlayHwTypes,
