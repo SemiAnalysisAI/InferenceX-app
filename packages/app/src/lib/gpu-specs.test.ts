@@ -81,8 +81,8 @@ describe('GPU_SPECS', () => {
     expect(findGpu('GB200 NVL72').memory).toBe('192 GB');
   });
 
-  it('B300 SXM and GB300 NVL72 have different memory capacities', () => {
-    expect(findGpu('B300 SXM').memory).toBe('268 GB');
+  it('B300 SXM and GB300 NVL72 both carry 288 GB (Blackwell Ultra HBM3e)', () => {
+    expect(findGpu('B300 SXM').memory).toBe('288 GB');
     expect(findGpu('GB300 NVL72').memory).toBe('288 GB');
   });
 
@@ -191,10 +191,10 @@ describe('GPU_SPECS', () => {
     expect(findGpu('GB200 NVL72').scaleUpBandwidth).toBe('900 GB/s');
     expect(findGpu('GB300 NVL72').scaleUpBandwidth).toBe('900 GB/s');
 
-    // AMD Infinity Fabric: MI300X/MI325X = 448 GB/s, MI355X = 576 GB/s (5th Gen IF)
+    // AMD Infinity Fabric: MI300X/MI325X = 448 GB/s, MI355X = 538 GB/s (5th Gen IF)
     expect(findGpu('MI300X').scaleUpBandwidth).toBe('448 GB/s');
     expect(findGpu('MI325X').scaleUpBandwidth).toBe('448 GB/s');
-    expect(findGpu('MI355X').scaleUpBandwidth).toBe('576 GB/s');
+    expect(findGpu('MI355X').scaleUpBandwidth).toBe('538 GB/s');
   });
 
   it('MI355X has higher scale-up bandwidth than MI300X/MI325X (5th Gen IF)', () => {
@@ -377,8 +377,8 @@ describe('getScaleUpDomainMemory', () => {
   });
 
   it('computes B300 SXM domain memory correctly', () => {
-    const spec = { memory: '268 GB', scaleUpWorldSize: 8 } as GpuSpec;
-    expect(getScaleUpDomainMemory(spec)).toBe('2.14 TB');
+    const spec = { memory: '288 GB', scaleUpWorldSize: 8 } as GpuSpec;
+    expect(getScaleUpDomainMemory(spec)).toBe('2.3 TB');
   });
 
   it('computes GB300 NVL72 domain memory correctly', () => {
@@ -609,7 +609,7 @@ describe('getScaleUpTopologyConfig', () => {
     const config = getScaleUpTopologyConfig(mi355);
     expect(config.type).toBe('mesh');
     expect(config.techName).toBe('5th Gen Infinity Fabric');
-    expect(config.totalBandwidth).toBe('576 GB/s');
+    expect(config.totalBandwidth).toBe('538 GB/s');
   });
 
   it('all GPUs return a valid scale-up topology config', () => {
@@ -754,7 +754,7 @@ describe('GPU_CHART_METRICS', () => {
     const mi355x = GPU_SPECS.find((s) => s.name === 'MI355X')!;
     expect(metric.getValue(h100)).toBe(450);
     expect(metric.getValue(b200)).toBe(900);
-    expect(metric.getValue(mi355x)).toBe(576);
+    expect(metric.getValue(mi355x)).toBe(538);
   });
 
   it('all metrics return a number (not null) for at least some GPUs', () => {

@@ -153,17 +153,31 @@ describe('AgentX STP engine exclusion', () => {
     });
   });
 
-  it('keeps the official engine when an automatic overlay load conflicts', () => {
+  it('keeps whichever engine family the sticky set names when a load conflicts', () => {
     const proposed = new Set(['b300_sglang', 'overlay:b300_vllm']);
-    const resolved = resolveExclusionGroups(
+
+    // Official-sticky prev: the official engine wins, overlay dropped.
+    const officialSticky = resolveExclusionGroups(
       proposed,
       new Set(['b300_sglang']),
       namespacedAgenticEx,
       'keep-sticky',
     );
-    expect([...resolved.result]).toEqual(['b300_sglang']);
-    expect(resolved.keptGroup).toBe('sglang');
-    expect(resolved.droppedGroups).toEqual(['vllm']);
+    expect([...officialSticky.result]).toEqual(['b300_sglang']);
+    expect(officialSticky.keptGroup).toBe('sglang');
+    expect(officialSticky.droppedGroups).toEqual(['vllm']);
+
+    // Overlay-sticky prev (what ScatterGraph passes while an unofficial run is
+    // loaded): the run's engine wins and the official series is dropped.
+    const overlaySticky = resolveExclusionGroups(
+      proposed,
+      new Set(['overlay:b300_vllm']),
+      namespacedAgenticEx,
+      'keep-sticky',
+    );
+    expect([...overlaySticky.result]).toEqual(['overlay:b300_vllm']);
+    expect(overlaySticky.keptGroup).toBe('vllm');
+    expect(overlaySticky.droppedGroups).toEqual(['sglang']);
   });
 });
 

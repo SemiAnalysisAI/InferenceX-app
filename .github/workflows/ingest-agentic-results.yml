@@ -24,6 +24,44 @@ name: Ingest Agentic Benchmark Results
 on:
   repository_dispatch:
     types: [ingest-agentic-results]
+  workflow_call:
+    inputs:
+      run-id:
+        description: InferenceX Actions run ID to ingest
+        required: true
+        type: string
+      run-attempt:
+        description: InferenceX Actions run attempt to ingest
+        required: false
+        default: '1'
+        type: string
+      database-target:
+        description: Database/cache target for the ingest
+        required: false
+        default: production
+        type: string
+    secrets:
+      DATABASE_WRITE_URL:
+        description: Production database write connection for direct ingests
+        required: false
+      DATABASE_DEV_WRITE_URL:
+        description: Development database write connection for direct ingests
+        required: false
+      DATABASE_STAGING_WRITE_URL:
+        description: Neon staging branch write connection
+        required: true
+      VERCEL_INVALIDATE_SECRET:
+        description: Production and development cache invalidation bearer token
+        required: false
+      VERCEL_STAGING_BYPASS_SECRET:
+        description: Vercel protection automation bypass token
+        required: true
+      INFX_MAIN_PAT:
+        description: Token used to download InferenceX artifacts
+        required: true
+      SLACK_WEBHOOK_URL:
+        description: Optional failure and unmapped-entity notifications
+        required: false
   workflow_dispatch:
     inputs:
       run-id:
@@ -43,6 +81,7 @@ on:
         options:
           - production
           - dev
+          - staging
 
 permissions: {}
 
@@ -55,13 +94,19 @@ jobs:
     name: Ingest agentic benchmark results
     # Blob-heavy: uploading trace-replay sidecars for a ~20-point sweep takes
     # far longer than a fixed-seq-len ingest.
-    timeout-minutes: 60
+    # High-concurrency rows also precompute request timelines from GiB-scale
+    # artifacts, so retain enough headroom for a complete recovered sweep.
+    timeout-minutes: 180
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
+    env:
+      REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
     steps:
       - name: Wait for source run to finish
-        if: github.event_name != 'workflow_dispatch'
+        if: >-
+          github.event_name == 'repository_dispatch' &&
+          github.event.action == 'ingest-agentic-results'
         run: sleep 300
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -79,18 +124,28 @@ jobs:
 
       - name: Select ingest target
         env:
-          REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target || inputs.database-target || 'production' }}
           DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
           DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
+          DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+          INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
+          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL || 'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
         run: |
           case "$REQUESTED_DATABASE_TARGET" in
             production)
               database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
               cache_invalidate_url="https://inferencex.semianalysis.com/api/v1/invalidate"
+              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
               ;;
             dev)
               database_write_url="$DATABASE_WRITE_URL_DEV"
               cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              ;;
+            staging)
+              database_write_url="$DATABASE_WRITE_URL_STAGING"
+              cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
               ;;
             *)
               echo "::error::Unsupported database-target: $REQUESTED_DATABASE_TARGET"
@@ -102,11 +157,29 @@ jobs:
             echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
+          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ -z "$cache_invalidate_secret" ]; then
+            echo "::error::Cache invalidation secret is empty for target: $REQUESTED_DATABASE_TARGET"
+            exit 1
+          fi
+          if [ "$REQUESTED_DATABASE_TARGET" = "staging" ] && [ -z "$protection_bypass_secret" ]; then
+            echo "::error::Vercel protection bypass secret is empty for staging"
+            exit 1
+          fi
 
           echo "::add-mask::$database_write_url"
-          echo "DATABASE_WRITE_URL=$database_write_url" >> "$GITHUB_ENV"
-          echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET" >> "$GITHUB_ENV"
-          echo "CACHE_INVALIDATE_URL=$cache_invalidate_url" >> "$GITHUB_ENV"
+          if [ -n "$cache_invalidate_secret" ]; then
+            echo "::add-mask::$cache_invalidate_secret"
+          fi
+          if [ -n "$protection_bypass_secret" ]; then
+            echo "::add-mask::$protection_bypass_secret"
+          fi
+          {
+            echo "DATABASE_WRITE_URL=$database_write_url"
+            echo "CACHE_INVALIDATE_SECRET=$cache_invalidate_secret"
+            echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET"
+            echo "CACHE_INVALIDATE_URL=$cache_invalidate_url"
+            echo "CACHE_PROTECTION_BYPASS_SECRET=$protection_bypass_secret"
+          } >> "$GITHUB_ENV"
           echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
           echo "Cache invalidate URL: $cache_invalidate_url"
 
@@ -184,11 +257,14 @@ jobs:
         run: pnpm admin:db:verify
 
       - name: Invalidate Vercel cache
-        env:
-          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: |
-          curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
-            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET" || true
+          if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
+          else
+            curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET" || true
+          fi
 
       - name: Check for unmapped entities
         if: always()
@@ -216,7 +292,7 @@ jobs:
           fi
 
       - name: Notify Slack on unmapped entities
-        if: steps.unmapped.outputs.found == 'true'
+        if: steps.unmapped.outputs.found == 'true' && env.REQUESTED_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -227,7 +303,7 @@ jobs:
             }
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() && env.REQUESTED_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

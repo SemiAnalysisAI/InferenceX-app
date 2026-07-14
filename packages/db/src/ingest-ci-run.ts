@@ -549,20 +549,20 @@ async function main(): Promise<void> {
                     `server_csv=${formatBytes(fileSize(trace.serverMetricsCsv))}, ` +
                     `server_json=${formatBytes(fileSize(trace.serverMetricsJson))}`,
                 );
-                const profile = trace.profileJsonl ? fs.readFileSync(trace.profileJsonl) : null;
-                const metrics = trace.serverMetricsCsv
-                  ? fs.readFileSync(trace.serverMetricsCsv)
-                  : null;
-                const metricsJson = trace.serverMetricsJson
-                  ? fs.readFileSync(trace.serverMetricsJson)
-                  : null;
-                await insertTraceReplay(sql, insertedIds, profile, metrics, metricsJson, {
-                  metricsContext: {
-                    framework: toInsert[0]?.config.framework,
-                    disagg: toInsert[0]?.config.disagg,
+                await insertTraceReplay(
+                  sql,
+                  insertedIds,
+                  trace.profileJsonl,
+                  trace.serverMetricsCsv,
+                  trace.serverMetricsJson,
+                  {
+                    metricsContext: {
+                      framework: toInsert[0]?.config.framework,
+                      disagg: toInsert[0]?.config.disagg,
+                    },
+                    progressLabel: suffix,
                   },
-                  progressLabel: suffix,
-                });
+                );
                 totalTraceReplayLinked += insertedIds.length;
                 console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
               } catch (error: any) {
@@ -782,7 +782,7 @@ async function main(): Promise<void> {
   console.log('\n--- Changelog ---');
   for (const { baseRef, headRef, entries } of parsedChangelogs) {
     try {
-      const inserted = await ingestChangelogEntries(
+      const written = await ingestChangelogEntries(
         sql,
         workflowRunId,
         date,
@@ -790,12 +790,12 @@ async function main(): Promise<void> {
         headRef,
         entries,
       );
-      totalChangelogs += inserted;
+      totalChangelogs += written;
     } catch (error: any) {
       tracker.recordDbError('changelog', error);
     }
   }
-  console.log(`  Changelog: +${totalChangelogs} new`);
+  console.log(`  Changelog: ${totalChangelogs} written`);
 
   // ── Summary ───────────────────────────────────────────────────────────
 
@@ -815,7 +815,7 @@ async function main(): Promise<void> {
   );
   console.log(`  Eval results:      ${totalEvals} new`);
   console.log(`  Eval samples:      ${totalSamples} new across ${totalSampleFiles} file(s)`);
-  console.log(`  Changelog entries: ${totalChangelogs} new`);
+  console.log(`  Changelog entries: ${totalChangelogs} written`);
   console.log(`\n  DB totals:`);
   console.log(`    configs           ${configCount.n}`);
   console.log(`    benchmark_results ${resultCount.n}`);

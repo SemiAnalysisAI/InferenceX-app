@@ -25,6 +25,22 @@ export interface ChartSeries {
   hideFromHover?: boolean;
 }
 
+/**
+ * Find the largest plotted value without spreading the full dataset into a
+ * variadic call. Agentic runs can contain tens of thousands of request samples,
+ * which exceeds browser argument limits when passed to `Math.max(...values)`.
+ */
+export function maxTimeSeriesValue(
+  series: readonly ChartSeries[],
+  initialValue = Number.NEGATIVE_INFINITY,
+): number {
+  let maximum = initialValue;
+  for (const chartSeries of series) {
+    for (const point of chartSeries.data) maximum = Math.max(maximum, point.value);
+  }
+  return maximum;
+}
+
 export type RequestMetric = 'interactivity' | 'ttft' | 'e2e';
 export type RequestPercentile = 'p75' | 'p90';
 export type ThroughputSeriesKey = 'input' | 'decode';

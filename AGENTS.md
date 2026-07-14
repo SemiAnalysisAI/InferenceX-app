@@ -72,8 +72,9 @@ API routes (`packages/app/src/app/api/v1/`):
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
 - `invalidate` — invalidate API cache (admin)
+- `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query)
 
-**API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
+**API routes return raw DB data** — no presentation logic. Frontend handles all transformations. Sole exception: `tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers (spreadsheets) cannot execute the TS transforms; it serves reads only — weights/assumptions stay with the consumer.
 
 Static content routes (no DB):
 

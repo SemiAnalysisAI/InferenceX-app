@@ -54,8 +54,8 @@ export function hasEvalsOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): b
 
 /**
  * Insert changelog entries for a workflow run into the `changelog_entries` table.
- * Uses `ON CONFLICT DO NOTHING` on `(workflow_run_id, base_ref, head_ref)`, so
- * re-running the ingest for the same run is safe — existing entries are left unchanged.
+ * Uses `ON CONFLICT DO UPDATE` on `(workflow_run_id, base_ref, head_ref)`, so
+ * re-running the ingest for the same workflow replaces its previous changelog metadata.
  *
  * @param sql - Active `postgres` connection.
  * @param workflowRunId - DB id of the parent `workflow_runs` row.
@@ -63,7 +63,7 @@ export function hasEvalsOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): b
  * @param baseRef - The base git ref for this changelog (e.g. `"main"`).
  * @param headRef - The head git ref for this changelog (e.g. a branch or SHA).
  * @param entries - Parsed changelog entries to insert.
- * @returns The number of rows actually inserted (0 if all already existed).
+ * @returns The number of rows inserted or updated.
  */
 export async function ingestChangelogEntries(
   sql: Sql,
@@ -73,7 +73,7 @@ export async function ingestChangelogEntries(
   headRef: string,
   entries: ChangelogEntry[],
 ): Promise<number> {
-  let inserted = 0;
+  let written = 0;
   for (const e of entries) {
     const [row] = await sql`
       insert into changelog_entries (
@@ -82,10 +82,15 @@ export async function ingestChangelogEntries(
         ${workflowRunId}, ${date}, ${baseRef}, ${headRef},
         ${sql.array(e.configKeys)}, ${e.description}, ${e.prLink}
       )
-      on conflict (workflow_run_id, base_ref, head_ref) do nothing
+      on conflict (workflow_run_id, base_ref, head_ref)
+      do update set
+        date = excluded.date,
+        config_keys = excluded.config_keys,
+        description = excluded.description,
+        pr_link = excluded.pr_link
       returning id
     `;
-    if (row) inserted++;
+    if (row) written++;
   }
-  return inserted;
+  return written;
 }

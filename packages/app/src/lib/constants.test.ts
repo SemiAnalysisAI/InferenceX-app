@@ -196,7 +196,7 @@ describe('getHardwareConfig', () => {
 describe('getGpuSpecs', () => {
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
-    expect(specs.power).toBe(1.73);
+    expect(specs.power).toBe(1.37);
     expect(specs.costh).toBe(1.3);
     expect(specs.costn).toBe(1.69);
     expect(specs.costr).toBe(1.3);
@@ -204,12 +204,12 @@ describe('getGpuSpecs', () => {
 
   it('extracts base from compound key (e.g. h100_vllm)', () => {
     const specs = getGpuSpecs('h100_vllm');
-    expect(specs.power).toBe(1.73);
+    expect(specs.power).toBe(1.37);
   });
 
   it('extracts base from dash-separated key (e.g. h200-dynamo-trt)', () => {
     const specs = getGpuSpecs('h200-dynamo-trt');
-    expect(specs.power).toBe(1.73);
+    expect(specs.power).toBe(1.37);
     expect(specs.costh).toBe(1.41);
   });
 

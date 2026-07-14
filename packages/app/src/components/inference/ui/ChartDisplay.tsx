@@ -255,7 +255,6 @@ export default function ChartDisplay() {
     selectedXAxisMode,
     setSelectedXAxisMode,
     quickFilters,
-    resolveComparisonSelection,
   } = useInference();
 
   const {
@@ -448,12 +447,11 @@ export default function ChartDisplay() {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
       for (const point of graph.data) {
-        const key = String(point.hwKey);
         if (
           selectedPrecisions.includes(point.precision) &&
           matchesQuickFilters(point, quickFilters)
         ) {
-          eligibleKeys.add(key);
+          eligibleKeys.add(String(point.hwKey));
         }
       }
     }
@@ -463,42 +461,25 @@ export default function ChartDisplay() {
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}`;
   const [appliedOverlayRowsScopeKey, setAppliedOverlayRowsScopeKey] = useState(overlayRowsScopeKey);
-  const overlayRowsScopeChanged = appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
-  const selectedOfficialHwTypes =
-    overlayRowsScopeChanged || localOfficialOverride === null
-      ? activeHwTypes
-      : localOfficialOverride;
-  const resolvedScopedOverlayHwTypes = useMemo(() => {
-    const activeOfficialKeys = new Set(
-      [...selectedOfficialHwTypes].filter((key) => officialScope.has(key)),
-    );
-    const officialKeys = activeOfficialKeys;
+  const overlayRowsScopeChanged =
+    isUnofficialRun && appliedOverlayRowsScopeKey !== overlayRowsScopeKey;
+  const selectedOfficialHwTypes = overlayRowsScopeChanged
+    ? officialScope
+    : isUnofficialRun
+      ? (localOfficialOverride ?? activeHwTypes)
+      : activeHwTypes;
+  // Preview tables follow the same policy as ScatterGraph: preserve every
+  // active engine family instead of applying the production comparison guard.
+  const scopedActiveOverlayHwTypes = useMemo(() => {
     const activeScopedOverlayKeys = new Set(
       [...activeOverlayHwTypes].filter((key) => overlayScope.has(key)),
     );
-    const overlayKeys = overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
-    const proposed = new Set(officialKeys);
-    overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
-    const previous = new Set(activeOfficialKeys);
-    activeScopedOverlayKeys.forEach((key) => previous.add(`overlay:${key}`));
-    const resolved = resolveComparisonSelection(proposed, previous).result;
-    const overlay = new Set<string>();
-    for (const key of resolved) {
-      if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
-    }
-    return overlay;
-  }, [
-    selectedOfficialHwTypes,
-    activeOverlayHwTypes,
-    officialScope,
-    overlayScope,
-    overlayRowsScopeChanged,
-    resolveComparisonSelection,
-  ]);
+    return overlayRowsScopeChanged ? overlayScope : activeScopedOverlayKeys;
+  }, [activeOverlayHwTypes, overlayScope, overlayRowsScopeChanged]);
   useEffect(() => {
     const merged = new Set(activeOverlayHwTypes);
     overlayScope.forEach((key) => merged.delete(key));
-    resolvedScopedOverlayHwTypes.forEach((key) => merged.add(key));
+    scopedActiveOverlayHwTypes.forEach((key) => merged.add(key));
     let selectionChanged = merged.size !== activeOverlayHwTypes.size;
     if (!selectionChanged) {
       for (const key of merged) {
@@ -509,18 +490,21 @@ export default function ChartDisplay() {
       }
     }
     if (selectionChanged) setActiveOverlayHwTypes(merged);
-    if (overlayRowsScopeChanged && localOfficialOverride !== null) {
-      setLocalOfficialOverride(null);
+    // A scope change can render once before its official graphs arrive. Do not
+    // persist that transient empty set as an intentional legend selection.
+    if (overlayRowsScopeChanged && (!loading || officialScope.size > 0)) {
+      setLocalOfficialOverride(officialScope);
+      setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
     }
-    if (overlayRowsScopeChanged) setAppliedOverlayRowsScopeKey(overlayRowsScopeKey);
   }, [
     overlayRowsScopeChanged,
     overlayRowsScopeKey,
     activeOverlayHwTypes,
+    loading,
+    officialScope,
     overlayScope,
-    resolvedScopedOverlayHwTypes,
+    scopedActiveOverlayHwTypes,
     setActiveOverlayHwTypes,
-    localOfficialOverride,
     setLocalOfficialOverride,
   ]);
 
@@ -541,34 +525,17 @@ export default function ChartDisplay() {
       const activeOfficialKeys = new Set(
         [...selectedOfficialHwTypes].filter((key) => availableOfficialKeys.has(key)),
       );
-      const activeScopedOverlayKeys = new Set(
-        [...activeOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
-      );
       const officialKeys = activeOfficialKeys;
       const overlayKeys = new Set(
-        [...resolvedScopedOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
+        [...scopedActiveOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
       );
-      const proposed = new Set(officialKeys);
-      overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
-      const previous = new Set(activeOfficialKeys);
-      activeScopedOverlayKeys.forEach((key) => previous.add(`overlay:${key}`));
-      const resolved = resolveComparisonSelection(proposed, previous).result;
 
       return {
-        officialRows: eligibleOfficialRows.filter((point) => resolved.has(String(point.hwKey))),
-        overlayRows: eligibleOverlayRows.filter((point) =>
-          resolved.has(`overlay:${String(point.hwKey)}`),
-        ),
+        officialRows: eligibleOfficialRows.filter((point) => officialKeys.has(String(point.hwKey))),
+        overlayRows: eligibleOverlayRows.filter((point) => overlayKeys.has(String(point.hwKey))),
       };
     },
-    [
-      selectedPrecisions,
-      quickFilters,
-      selectedOfficialHwTypes,
-      activeOverlayHwTypes,
-      resolvedScopedOverlayHwTypes,
-      resolveComparisonSelection,
-    ],
+    [selectedPrecisions, quickFilters, selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
 
   // Resolve x-axis field per chart type for trend data

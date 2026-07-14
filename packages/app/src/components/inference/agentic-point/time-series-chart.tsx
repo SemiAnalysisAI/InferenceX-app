@@ -6,7 +6,7 @@ import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import { CHART_PAD, ChartEmpty, fmtCount, fmtSeconds } from './chart-shared';
-import { interpAt, type ChartSeries } from './time-series-math';
+import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
 
 // Historical entry point: the pure data-shaping helpers lived in this module
 // before being extracted; re-export them so both import paths stay valid.
@@ -59,9 +59,9 @@ export function TimeSeriesChart({
     const xMax = Math.max(durationS, 1);
     // Fold reference-line values into the auto max so a ceiling above the data
     // (e.g. KV-cache pool >> working set) still renders inside the plot.
-    const refMax = refLines.length > 0 ? Math.max(...refLines.map((r) => r.value)) : 0;
-    const yMax =
-      yMaxOpt ?? Math.max(1e-9, refMax, ...series.flatMap((s) => s.data.map((d) => d.value)));
+    let refMax = 0;
+    for (const refLine of refLines) refMax = Math.max(refMax, refLine.value);
+    const yMax = yMaxOpt ?? maxTimeSeriesValue(series, Math.max(1e-9, refMax));
     const xScale = (t: number) => PAD.left + (t / xMax) * innerW;
     const yScale = (v: number) => PAD.top + (1 - v / yMax) * innerH;
     return { innerW, innerH, xMax, yMax, xScale, yScale };

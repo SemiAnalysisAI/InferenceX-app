@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock next/cache before importing the module under test
 vi.mock('next/cache', () => ({
@@ -25,11 +25,21 @@ const mockUnstableCache = vi.mocked(unstable_cache);
 const mockBlobGet = vi.mocked(blobGet);
 const mockBlobSet = vi.mocked(blobSet);
 const mockBlobPurge = vi.mocked(blobPurge);
+const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env.CACHE_NAMESPACE;
   // Default: unstable_cache returns the original function as-is
   mockUnstableCache.mockImplementation((fn: (...args: any[]) => any) => fn as any);
+});
+
+afterAll(() => {
+  if (originalCacheNamespace === undefined) {
+    delete process.env.CACHE_NAMESPACE;
+  } else {
+    process.env.CACHE_NAMESPACE = originalCacheNamespace;
+  }
 });
 
 describe('cachedQuery', () => {
@@ -39,6 +49,17 @@ describe('cachedQuery', () => {
       cachedQuery(fn, 'test-key');
 
       expect(mockUnstableCache).toHaveBeenCalledWith(fn, ['test-key'], { tags: ['db'] });
+    });
+
+    it('isolates the key and tag when CACHE_NAMESPACE is set', () => {
+      process.env.CACHE_NAMESPACE = 'staging';
+      const fn = vi.fn(() => Promise.resolve('data'));
+
+      cachedQuery(fn, 'test-key');
+
+      expect(mockUnstableCache).toHaveBeenCalledWith(fn, ['staging:test-key'], {
+        tags: ['db:staging'],
+      });
     });
 
     it('calls through to the original function and returns its result', async () => {
@@ -140,6 +161,15 @@ describe('purgeAll', () => {
     const deleted = await purgeAll();
     expect(deleted).toBe(0);
   });
+
+  it('invalidates only the configured cache namespace', async () => {
+    process.env.CACHE_NAMESPACE = 'staging';
+    mockBlobPurge.mockResolvedValue(0);
+
+    await purgeAll();
+
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db:staging', { expire: 0 });
+  });
 });
 
 describe('cachedJson', () => {
@@ -151,6 +181,14 @@ describe('cachedJson', () => {
   it('sets Vercel-Cache-Tag to db', () => {
     const res = cachedJson({ ok: true });
     expect(res.headers.get('Vercel-Cache-Tag')).toBe('db');
+  });
+
+  it('sets an environment-scoped Vercel-Cache-Tag', () => {
+    process.env.CACHE_NAMESPACE = 'staging';
+
+    const res = cachedJson({ ok: true });
+
+    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db:staging');
   });
 
   it('sets Content-Type to application/json', () => {
