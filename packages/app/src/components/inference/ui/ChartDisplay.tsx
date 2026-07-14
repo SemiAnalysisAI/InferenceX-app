@@ -550,9 +550,6 @@ export default function ChartDisplay() {
       const activeOfficialKeys = new Set(
         [...selectedOfficialHwTypes].filter((key) => availableOfficialKeys.has(key)),
       );
-      const activeScopedOverlayKeys = new Set(
-        [...activeOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
-      );
       const officialKeys = activeOfficialKeys;
       const overlayKeys = new Set(
         [...resolvedScopedOverlayHwTypes].filter((key) => availableOverlayKeys.has(key)),
@@ -560,10 +557,12 @@ export default function ChartDisplay() {
       const proposed = new Set(officialKeys);
       overlayKeys.forEach((key) => proposed.add(`overlay:${key}`));
       // Same overlay-preferring sticky set as resolvedScopedOverlayHwTypes:
-      // while overlay rows are active, the run's engine family wins.
+      // while overlay rows are visible, the run's engine family wins. Built
+      // from the already-resolved overlayKeys (not the provider selection,
+      // which can lag by a render after a scope change).
       const previous = new Set<string>();
-      if (activeScopedOverlayKeys.size > 0) {
-        activeScopedOverlayKeys.forEach((key) => previous.add(`overlay:${key}`));
+      if (overlayKeys.size > 0) {
+        overlayKeys.forEach((key) => previous.add(`overlay:${key}`));
       } else {
         activeOfficialKeys.forEach((key) => previous.add(key));
       }
@@ -580,7 +579,6 @@ export default function ChartDisplay() {
       selectedPrecisions,
       quickFilters,
       selectedOfficialHwTypes,
-      activeOverlayHwTypes,
       resolvedScopedOverlayHwTypes,
       resolveComparisonSelection,
     ],
