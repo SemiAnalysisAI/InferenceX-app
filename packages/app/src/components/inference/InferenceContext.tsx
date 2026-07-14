@@ -21,6 +21,7 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import { useGlobalFilters } from '@/components/GlobalFilterContext';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import type {
   InferenceChartContextType,
   InferenceData,
@@ -45,18 +46,12 @@ import { useUrlState } from '@/hooks/useUrlState';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu, TABLEAU_10 } from '@/lib/constants';
-import {
-  getModelExclusion,
-  getSequenceExclusion,
-  MODEL_PREFIX_MAPPING,
-  sequenceKind,
-} from '@/lib/data-mappings';
+import { MODEL_PREFIX_MAPPING, sequenceKind } from '@/lib/data-mappings';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
 } from '@/components/engine-comparison-conflict-toast';
 import {
-  buildExclusion,
   effectiveLegendItems,
   exclusionResolutionFamilies,
   resolveExclusionGroups,
@@ -72,6 +67,7 @@ import {
   type XAxisMode,
 } from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
+import { comparisonExclusion as resolveComparisonExclusion } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import {
   EMPTY_QUICK_FILTERS,
@@ -137,17 +133,14 @@ export function InferenceProvider({
     availableRuns,
     workflowError,
   } = useGlobalFilters();
+  const { isUnofficialRun } = useUnofficialRun();
 
   const { getUrlParam, setUrlParam } = useUrlState();
 
-  const exclusion = useMemo(() => {
-    const modelSpecs = getModelExclusion(selectedModel);
-    const sequenceSpecs = getSequenceExclusion(effectiveSequence);
-    if (modelSpecs.length === 0 && sequenceSpecs.length === 0) return null;
-    if (modelSpecs.length === 0) return buildExclusion(sequenceSpecs);
-    if (sequenceSpecs.length === 0) return buildExclusion(modelSpecs);
-    return buildExclusion([...modelSpecs, ...sequenceSpecs]);
-  }, [selectedModel, effectiveSequence]);
+  const exclusion = useMemo(
+    () => resolveComparisonExclusion(selectedModel, effectiveSequence, isUnofficialRun),
+    [selectedModel, effectiveSequence, isUnofficialRun],
+  );
   const exclusionPolicy: ExclusionConflictPolicy =
     sequenceKind(effectiveSequence) === 'agentic' ? 'keep-sticky' : 'clear-all';
 
@@ -170,6 +163,9 @@ export function InferenceProvider({
   // --- Cross-engine comparison conflict toast state ---
   const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
   const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
+  useEffect(() => {
+    if (isUnofficialRun) setEngineConflict(null);
+  }, [isUnofficialRun]);
 
   // ── Inference-specific filter state ─────────────────────────────────────────
   // Defer URL restoration until after mount so the first client render matches SSR.
@@ -988,6 +984,9 @@ export function InferenceProvider({
   // reset commits as soon as data for the new model arrives — without this, switching models
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
+  const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
+    isUnofficialRun ? 'preview' : 'official'
+  }`;
   const lastHwResetKeyRef = useRef('');
 
   // Restore legend-active selection from URL on first availability of
@@ -1023,7 +1022,7 @@ export function InferenceProvider({
       }
     }
     setActiveHwTypes(restored);
-    lastHwResetKeyRef.current = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
+    lastHwResetKeyRef.current = hwResetKey;
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
@@ -1032,6 +1031,7 @@ export function InferenceProvider({
     selectedModel,
     effectiveSequence,
     precisionsKey,
+    hwResetKey,
     resolveHwSelection,
     setActiveHwTypes,
   ]);
@@ -1040,9 +1040,8 @@ export function InferenceProvider({
     if (pendingHwFilterRef.current) return;
     if (pendingActiveHwTypes) return;
     if (hwTypesWithData.size === 0) return;
-    const key = `${selectedModel}|${effectiveSequence}|${precisionsKey}`;
-    if (lastHwResetKeyRef.current === key) return;
-    lastHwResetKeyRef.current = key;
+    if (lastHwResetKeyRef.current === hwResetKey) return;
+    lastHwResetKeyRef.current = hwResetKey;
     const presetFilter = presetHwFilterRef.current;
     if (presetFilter) {
       const filtered = new Set(
@@ -1074,6 +1073,7 @@ export function InferenceProvider({
     selectedModel,
     effectiveSequence,
     precisionsKey,
+    hwResetKey,
     hwTypesWithData,
     exclusion,
     pendingActiveHwTypes,
@@ -1530,7 +1530,10 @@ export function InferenceProvider({
   return (
     <InferenceContext.Provider value={value}>
       {children}
-      <EngineComparisonConflictToast detail={engineConflict} onDismiss={dismissEngineConflict} />
+      <EngineComparisonConflictToast
+        detail={isUnofficialRun ? null : engineConflict}
+        onDismiss={dismissEngineConflict}
+      />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
           <DialogHeader>

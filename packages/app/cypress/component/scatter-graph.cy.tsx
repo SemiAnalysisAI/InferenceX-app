@@ -511,6 +511,79 @@ describe('ScatterGraph', () => {
       '1',
     );
   });
+
+  it('removes unofficial marks when the last preview run is dismissed', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const officialData = [8, 16, 32].map((x, index) =>
+      createMockInferenceData({
+        hwKey: 'b200_sglang',
+        x,
+        y: 320 - index * 40,
+        precision: Precision.FP4,
+      }),
+    );
+    const runUrl = 'https://github.com/x/y/actions/runs/dismissed-preview';
+    const overlayData = {
+      data: [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey: 'h100_vllm',
+          x,
+          y: 260 - index * 40,
+          precision: Precision.FP4,
+          run_url: runUrl,
+        }),
+      ),
+      hardwareConfig: hwConfig,
+      label: 'dismissed-preview',
+      runUrl,
+    };
+
+    function DismissOverlayHarness() {
+      const [showOverlay, setShowOverlay] = useState(true);
+      return (
+        <div style={{ width: 800, height: 600 }}>
+          <button data-testid="dismiss-preview" onClick={() => setShowOverlay(false)}>
+            Dismiss preview
+          </button>
+          <ScatterGraph
+            chartId="test-scatter-dismiss-preview"
+            modelLabel="DeepSeek V4 Pro"
+            data={officialData}
+            xLabel="Concurrency"
+            yLabel="Throughput / GPU (tok/s)"
+            chartDefinition={chartDefinition}
+            overlayData={showOverlay ? overlayData : undefined}
+          />
+        </div>
+      );
+    }
+
+    mountWithProviders(<DismissOverlayHarness />, {
+      inference: {
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+      },
+      unofficial: {
+        isUnofficialRun: true,
+        activeOverlayHwTypes: new Set(['h100_vllm']),
+        allOverlayHwTypes: new Set(['h100_vllm']),
+      },
+    });
+
+    cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('have.length', 3);
+    cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('exist');
+
+    cy.get('[data-testid="dismiss-preview"]').click();
+    cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('not.exist');
+    cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('not.exist');
+  });
 });
 
 describe('ChartDisplay engine comparison guard', () => {

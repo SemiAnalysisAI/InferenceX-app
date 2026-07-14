@@ -2654,6 +2654,16 @@ const ScatterGraph = React.memo(
       gradientColorByPoint,
     ]);
 
+    // D3 custom layers are keyed additions, so removing the overlay layer from
+    // the config does not delete DOM that the previous render created. Clear
+    // those marks explicitly when the last unofficial run is dismissed.
+    useLayoutEffect(() => {
+      if (overlayData) return;
+      const svg = chartRef.current?.getSvgElement?.();
+      if (!svg) return;
+      d3.select(svg).selectAll('.unofficial-overlay-pt, .overlay-roofline-path').remove();
+    }, [overlayData]);
+
     // Dismiss tooltip on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
