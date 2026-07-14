@@ -123,6 +123,82 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-points svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
+  it('keeps official-only legend toggles active after a scope change', () => {
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
+      [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey,
+          x,
+          y: 320 - hwIndex * 20 - index * 40,
+          precision: Precision.FP4,
+        }),
+      ),
+    );
+    const baseInference = createMockInferenceContext();
+
+    function OfficialScopeHarness() {
+      const [secondScope, setSecondScope] = useState(false);
+      const activeHwTypes = new Set([secondScope ? 'h100_vllm' : 'b200_sglang']);
+      const selectedModel = secondScope ? Model.DeepSeek_R1 : Model.DeepSeek_V4_Pro;
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes,
+        hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+        selectedModel,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+      };
+
+      return (
+        <InferenceContext.Provider value={inference}>
+          <button data-testid="change-official-scope" onClick={() => setSecondScope(true)}>
+            Change official scope
+          </button>
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId="test-scatter-official-scope"
+              modelLabel={selectedModel}
+              data={officialData}
+              xLabel="Concurrency"
+              yLabel="Throughput / GPU (tok/s)"
+              chartDefinition={chartDefinition}
+            />
+          </div>
+        </InferenceContext.Provider>
+      );
+    }
+
+    mountWithProviders(<OfficialScopeHarness />, { unofficial: {} });
+
+    cy.get('#test-scatter-official-scope svg .roofline-path[data-hw-key="b200_sglang"]').should(
+      'have.css',
+      'opacity',
+      '1',
+    );
+    cy.get('#test-scatter-official-scope svg .roofline-path[data-hw-key="h100_vllm"]').should(
+      'have.css',
+      'opacity',
+      '0',
+    );
+
+    cy.get('[data-testid="change-official-scope"]').click();
+    cy.get('#test-scatter-official-scope svg .roofline-path[data-hw-key="b200_sglang"]').should(
+      'have.css',
+      'opacity',
+      '0',
+    );
+    cy.get('#test-scatter-official-scope svg .roofline-path[data-hw-key="h100_vllm"]').should(
+      'have.css',
+      'opacity',
+      '1',
+    );
+  });
+
   it('renders legend with hardware items', () => {
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),

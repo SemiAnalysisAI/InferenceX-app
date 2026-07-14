@@ -417,7 +417,11 @@ const ScatterGraph = React.memo(
     }, [overlayData, selectedPrecisions, quickFilters]);
     const overlayScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(',')}`;
     const previousOverlayScopeRef = useRef(overlayScopeKey);
-    const overlayScopeChanged = previousOverlayScopeRef.current !== overlayScopeKey;
+    // Scope seeding is preview-only. Official charts have no overlay lifecycle
+    // to commit the ref below, so treating their key changes as pending would
+    // bypass subsequent activeHwTypes legend toggles indefinitely.
+    const overlayScopeChanged =
+      Boolean(overlayData) && previousOverlayScopeRef.current !== overlayScopeKey;
 
     const localOfficialOverrideIsStale = useMemo(() => {
       if (localOfficialOverride === null) return false;
