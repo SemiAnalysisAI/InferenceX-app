@@ -107,22 +107,27 @@ describe('computeTcoFeed — frontier reads', () => {
     expect(low.frontier_max_interactivity).toBe(80);
   });
 
-  it('derives interactivity from median_itl only — stored intvty values are never trusted', () => {
+  it('uses stored median_intvty (chart parity), falling back to 1/median_itl', () => {
     const rows = computeTcoFeed(
       [
-        // Bogus stored median_intvty must be ignored; itl says iv = 50.
+        // Stored intvty wins — it is what the chart plots for single_turn
+        // rows — even when 1/median_itl disagrees (here itl implies iv 40).
         makeRow({
-          metrics: { median_itl: 1 / 50, output_tput_per_gpu: 600, median_intvty: 9999 },
+          metrics: { median_intvty: 50, median_itl: 1 / 40, output_tput_per_gpu: 600 },
         }),
-        // No itl at all → row dropped even though intvty is present.
-        makeRow({ metrics: { median_intvty: 50, output_tput_per_gpu: 5000 } }),
+        // Legacy row without intvty → derived from itl (iv 20, higher tput,
+        // so it lands on the frontier as the low-iv knot).
+        makeRow({ metrics: { median_itl: 1 / 20, output_tput_per_gpu: 900 } }),
+        // Neither metric valid → row dropped.
+        makeRow({ metrics: { output_tput_per_gpu: 5000 } }),
       ],
       WORKLOAD_8K1K,
-      [50],
+      [20, 50],
     );
-    expect(rows).toHaveLength(1);
-    expect(rows[0].output_tput_per_gpu).toBe(600);
-    expect(rows[0].frontier_points).toBe(1);
+    expect(rows).toHaveLength(2);
+    expect(findRow(rows, 'gb200', '8192x1024', 50)?.output_tput_per_gpu).toBe(600);
+    expect(findRow(rows, 'gb200', '8192x1024', 20)?.output_tput_per_gpu).toBe(900);
+    expect(rows[0].frontier_points).toBe(2);
   });
 
   it('treats rows without a benchmark_type (legacy fixtures) as single_turn', () => {

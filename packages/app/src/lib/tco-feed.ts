@@ -138,14 +138,23 @@ export function computeTcoFeed(
       // match below excludes anyway).
       if ((row.benchmark_type ?? 'single_turn') !== 'single_turn') continue;
       if (row.isl !== workload.isl || row.osl !== workload.osl) continue;
-      // Interactivity is ALWAYS derived as 1/median_itl. Stored `*_intvty`
-      // values have drifted across harness versions and are never trusted —
-      // same rule as benchmark-transform.ts on the chart path.
+      // Chart parity: for single_turn rows the inference chart plots the
+      // STORED median_intvty on the x-axis (the ingest mapper's 1/itl
+      // invariant only rewrites agentic rows), so prefer the stored value
+      // and fall back to 1/median_itl only for legacy rows/fixtures that
+      // predate the intvty key.
+      const storedIv = row.metrics.median_intvty;
       const itl = row.metrics.median_itl;
+      const interactivity =
+        Number.isFinite(storedIv) && storedIv > 0
+          ? storedIv
+          : Number.isFinite(itl) && itl > 0
+            ? 1 / itl
+            : undefined;
       const otput = row.metrics.output_tput_per_gpu;
-      if (!Number.isFinite(itl) || itl <= 0) continue;
+      if (interactivity === undefined) continue;
       if (!Number.isFinite(otput) || otput <= 0) continue;
-      const point = { interactivity: 1 / itl, throughput: otput, date: row.date };
+      const point = { interactivity, throughput: otput, date: row.date };
       const bucket = byHardware.get(row.hardware);
       if (bucket) bucket.push(point);
       else byHardware.set(row.hardware, [point]);
