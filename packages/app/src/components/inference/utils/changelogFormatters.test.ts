@@ -43,6 +43,26 @@ describe('formatConfigKeys', () => {
     expect(result).toContain('TRTLLM');
     expect(result).toContain('FP4');
   });
+
+  it('uses the legend framework label for keys with trailing descriptors', () => {
+    expect(formatConfigKeys('dsv4-fp4-b200-sglang-agentic-hicache')).toBe(
+      'B200 (SGLang, Agentic, Hicache) DeepSeek-V4-Pro FP4',
+    );
+  });
+
+  it('keeps multi-token frameworks intact ahead of descriptors', () => {
+    const result = formatConfigKeys('dsv4-fp4-gb200-llmd-vllm-agentic');
+    expect(result).toContain('llm-d vLLM');
+    expect(result).toContain('Agentic');
+    expect(result).not.toContain('LLMD');
+  });
+
+  it('still renders M3 mtp as EAGLE after a descriptor split', () => {
+    const result = formatConfigKeys('minimaxm3-fp8-h100-vllm-agentic-mtp');
+    expect(result).toContain('vLLM');
+    expect(result).toContain('Agentic');
+    expect(result).toContain('EAGLE');
+  });
 });
 
 describe('configKeyMatchesHwKey', () => {
