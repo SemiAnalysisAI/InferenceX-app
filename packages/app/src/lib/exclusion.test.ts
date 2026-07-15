@@ -174,6 +174,20 @@ describe('AgentX STP engine exclusion', () => {
     expect(resolved.droppedGroups).toEqual(['sglang']);
   });
 
+  it('uses hardware STP state to choose the compatible global MTP engine', () => {
+    const proposed = new Set(['b200_vllm', 'b200_vllm_mtp', 'mi355x_sglang_mtp']);
+    const resolved = resolveExclusionGroups(
+      proposed,
+      new Set(['b200_vllm']),
+      agenticEx,
+      'keep-sticky',
+    );
+
+    expect(resolved.result).toEqual(new Set(['b200_vllm', 'b200_vllm_mtp']));
+    expect(resolved.keptGroup).toBe('vllm');
+    expect(resolved.droppedGroups).toEqual(['sglang']);
+  });
+
   it('blocks cross-engine adds across official and overlay namespaces', () => {
     const prev = new Set(['overlay:b300_sglang']);
     const all = new Set(['overlay:b300_sglang', 'b300_vllm']);
@@ -393,6 +407,18 @@ describe('effectiveLegendItems', () => {
 
     expect(effective).toEqual(new Set(['b200_sglang', 'mi355x_vllm']));
     expect(computeToggle(active, 'b200_sglang', effective)).toEqual(effective);
+  });
+
+  it('restores the remembered engine for a temporarily idle hardware scope', () => {
+    const all = new Set(['b200_sglang', 'mi355x_sglang', 'mi355x_vllm']);
+    const preferred = new Set(['b200_sglang', 'mi355x_vllm']);
+    const initialUniverse = effectiveLegendItems(all, preferred, agenticEx, preferred);
+    const solo = computeToggle(preferred, 'b200_sglang', initialUniverse);
+    const restoreUniverse = effectiveLegendItems(all, solo, agenticEx, preferred);
+
+    expect(solo).toEqual(new Set(['b200_sglang']));
+    expect(restoreUniverse).toEqual(preferred);
+    expect(computeToggle(solo, 'b200_sglang', restoreUniverse)).toEqual(preferred);
   });
 
   it('makes computeToggle solo on click in the default-deselected state', () => {

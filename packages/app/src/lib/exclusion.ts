@@ -169,8 +169,10 @@ function activeFamilyInGroup(
 
 /**
  * Pick a single comparability group to keep when `proposed` contains keys from
- * multiple groups. Sticks to a group already present in `prev`; otherwise falls
- * back to the alphabetically-first group. Drops other groups' participating keys.
+ * multiple groups. Sticks to a group already present in `prev`; for a shared
+ * scope with no direct prior key (for example the global MTP scope), also honors
+ * a prior key from the same group on an overlapping hardware scope. Otherwise
+ * falls back to the alphabetically-first group.
  *
  * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
  */
@@ -187,14 +189,34 @@ export function pickStickyGroup(
 
   for (const [scope, byGroup] of byScope) {
     if (byGroup.size <= 1) continue;
-    const prevGroups = new Set<string>();
+    const directPrevGroups = new Set<string>();
     for (const key of prev) {
       if (!ex.scopesOf(key).includes(scope)) continue;
       const group = ex.groupOf(key);
-      if (group) prevGroups.add(group);
+      if (group) directPrevGroups.add(group);
     }
     const groups = [...byGroup.keys()];
-    const winner = groups.find((group) => prevGroups.has(group)) ?? groups.toSorted()[0];
+    const correlatedPrevGroups = new Set<string>();
+    if (directPrevGroups.size === 0) {
+      for (const [group, keys] of byGroup) {
+        const relatedScopes = new Set(
+          [...keys].flatMap((key) => ex.scopesOf(key).filter((candidate) => candidate !== scope)),
+        );
+        if (
+          [...prev].some(
+            (key) =>
+              ex.groupOf(key) === group &&
+              ex.scopesOf(key).some((candidate) => relatedScopes.has(candidate)),
+          )
+        ) {
+          correlatedPrevGroups.add(group);
+        }
+      }
+    }
+    const winner =
+      groups.find((group) => directPrevGroups.has(group)) ??
+      groups.find((group) => correlatedPrevGroups.has(group)) ??
+      groups.toSorted()[0];
     winners.add(winner);
     for (const [group, keys] of byGroup) {
       if (group === winner) continue;
@@ -217,15 +239,17 @@ export function pickStickyGroup(
 
 /**
  * Compute the effective legend universe for solo/restore-all toggle semantics
- * under exclusion. Participating keys whose group is not currently active are
- * dropped, so the default-deselected state (e.g. DSv4 MTP on first load) counts
- * as "all selected" — clicking an entry then solos it instead of just removing
- * it.
+ * under exclusion. Participating keys whose group is not active or remembered
+ * for one of their scopes are dropped. Remembered groups preserve each
+ * hardware's selection while it is temporarily absent in solo mode; an idle
+ * global scope without a remembered selection remains excluded so default-
+ * deselected variants (e.g. DSv4 MTP) still count as deselected.
  */
 export function effectiveLegendItems(
   allItems: Set<string>,
   active: Set<string>,
   ex: Exclusion,
+  preferred: Set<string> = active,
 ): Set<string> {
   const activeGroupsByScope = new Map<string, Set<string>>();
   for (const key of active) {
@@ -237,15 +261,28 @@ export function effectiveLegendItems(
       else activeGroupsByScope.set(scope, new Set([group]));
     }
   }
+  const preferredGroupsByScope = new Map<string, Set<string>>();
+  for (const key of preferred) {
+    const group = ex.groupOf(key);
+    if (!group) continue;
+    for (const scope of ex.scopesOf(key)) {
+      const groups = preferredGroupsByScope.get(scope);
+      if (groups) groups.add(group);
+      else preferredGroupsByScope.set(scope, new Set([group]));
+    }
+  }
   const result = new Set<string>();
   for (const key of allItems) {
     const group = ex.groupOf(key);
     const scopes = ex.scopesOf(key);
-    const activeScopeGroups = scopes
-      .map((scope) => activeGroupsByScope.get(scope))
+    const effectiveScopeGroups = scopes
+      .map((scope) => activeGroupsByScope.get(scope) ?? preferredGroupsByScope.get(scope))
       .filter((groups): groups is Set<string> => groups !== undefined);
-    const idleGlobalScope = scopes.includes(GLOBAL_SCOPE) && !activeGroupsByScope.has(GLOBAL_SCOPE);
-    if (!group || (!idleGlobalScope && activeScopeGroups.every((groups) => groups.has(group)))) {
+    const idleGlobalScope =
+      scopes.includes(GLOBAL_SCOPE) &&
+      !activeGroupsByScope.has(GLOBAL_SCOPE) &&
+      !preferredGroupsByScope.has(GLOBAL_SCOPE);
+    if (!group || (!idleGlobalScope && effectiveScopeGroups.every((groups) => groups.has(group)))) {
       result.add(key);
     }
   }
