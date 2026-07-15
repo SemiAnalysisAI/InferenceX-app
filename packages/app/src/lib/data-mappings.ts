@@ -67,15 +67,17 @@ const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
 ];
 
 /**
- * AgentX STP exclusion: unsuffixed standard-token configs from different engine
- * families can't be active together. Fixed-sequence STP comparisons remain
- * available; this rule is attached only to the Agentic Traces sequence.
+ * AgentX STP exclusion: unsuffixed standard-token configs for the same hardware
+ * SKU can't mix engine families. Different hardware may use different engines
+ * on one graph. Fixed-sequence STP comparisons remain available; this rule is
+ * attached only to the Agentic Traces sequence.
  */
 const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
   {
     suffix: null,
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
     groupAliases: { atom: 'sglang' },
+    scope: 'hardware',
   },
 ];
 

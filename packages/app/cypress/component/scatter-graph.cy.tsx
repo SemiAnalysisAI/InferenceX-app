@@ -558,13 +558,19 @@ describe('ScatterGraph', () => {
       runUrl,
     };
     const exclusion = buildExclusion([
-      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+      {
+        suffix: null,
+        stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+        scope: 'hardware',
+      },
     ]);
     const namespacedExclusion = {
       familyOf: (key: string) =>
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopeOf: (key: string) =>
+        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
     const blockedToggle = cy.stub().as('blockedComparisonToggle').returns(null);
 
@@ -649,13 +655,19 @@ describe('ScatterGraph', () => {
       runUrl,
     };
     const exclusion = buildExclusion([
-      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+      {
+        suffix: null,
+        stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+        scope: 'hardware',
+      },
     ]);
     const namespacedExclusion = {
       familyOf: (key: string) =>
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopeOf: (key: string) =>
+        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
 
     mountWithProviders(
@@ -845,7 +857,7 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('@setLocalOfficialOverride').should('not.have.been.called');
   });
 
-  it('keeps cross-engine AgentX STP rows out of table mode', () => {
+  it('keeps same-hardware cross-engine AgentX STP rows out of table mode', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const sglangRow = createMockInferenceData({
       hwKey: 'b200_sglang',
@@ -854,13 +866,17 @@ describe('ChartDisplay engine comparison guard', () => {
       precision: Precision.FP4,
     });
     const vllmRow = createMockInferenceData({
-      hwKey: 'h100_vllm',
+      hwKey: 'b200_vllm',
       hw: 'Official vLLM',
       model: Model.DeepSeek_V4_Pro,
       precision: Precision.FP4,
     });
     const exclusion = buildExclusion([
-      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+      {
+        suffix: null,
+        stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+        scope: 'hardware',
+      },
     ]);
     const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
       resolveExclusionGroups(proposed, prev, exclusion, 'keep-sticky');
@@ -911,13 +927,19 @@ describe('ChartDisplay engine comparison guard', () => {
       run_url: runUrl,
     });
     const exclusion = buildExclusion([
-      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+      {
+        suffix: null,
+        stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+        scope: 'hardware',
+      },
     ]);
     const namespacedExclusion = {
       familyOf: (key: string) =>
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopeOf: (key: string) =>
+        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
     const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
       resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky');
@@ -1014,13 +1036,19 @@ describe('ChartDisplay engine comparison guard', () => {
   it('commits a new table overlay scope and preserves an explicit empty selection', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const exclusion = buildExclusion([
-      { suffix: null, stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'] },
+      {
+        suffix: null,
+        stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+        scope: 'hardware',
+      },
     ]);
     const namespacedExclusion = {
       familyOf: (key: string) =>
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopeOf: (key: string) =>
+        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
     const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
       resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky');

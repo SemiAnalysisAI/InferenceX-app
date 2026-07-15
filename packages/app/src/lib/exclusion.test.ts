@@ -28,6 +28,7 @@ const STP_SPEC: ExclusionSpec[] = [
     suffix: null,
     stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
     groupAliases: { atom: 'sglang' },
+    scope: 'hardware',
   },
 ];
 const agenticEx = buildExclusion([...MTP_SPEC, ...STP_SPEC]);
@@ -36,6 +37,8 @@ const namespacedAgenticEx = {
     agenticEx.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
   groupOf: (key: string) =>
     agenticEx.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+  scopeOf: (key: string) =>
+    agenticEx.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
 };
 
 describe('buildExclusion — familyOf', () => {
@@ -117,6 +120,14 @@ describe('AgentX STP engine exclusion', () => {
       kind: 'block',
       attempted: 'vllm',
       existing: 'sglang',
+    });
+  });
+
+  it('allows different engine families on different hardware SKUs', () => {
+    const prev = new Set(['b200_sglang']);
+    const all = new Set(['b200_sglang', 'mi355x_vllm']);
+    expect(resolveExclusionToggle(prev, 'mi355x_vllm', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'fallthrough',
     });
   });
 

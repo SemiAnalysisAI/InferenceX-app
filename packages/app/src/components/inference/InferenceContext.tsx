@@ -801,6 +801,8 @@ export function InferenceProvider({
               exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
             groupOf: (key: string) =>
               exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+            scopeOf: (key: string) =>
+              exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
           }
         : null,
     [exclusion],
