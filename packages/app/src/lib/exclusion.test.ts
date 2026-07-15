@@ -188,6 +188,22 @@ describe('AgentX STP engine exclusion', () => {
     expect(resolved.droppedGroups).toEqual(['sglang']);
   });
 
+  it.each([
+    ['SGLang MTP first', ['b200_sglang', 'mi355x_vllm', 'b200_sglang_mtp', 'mi355x_vllm_mtp']],
+    ['vLLM MTP first', ['b200_sglang', 'mi355x_vllm', 'mi355x_vllm_mtp', 'b200_sglang_mtp']],
+  ])('breaks multiple correlated MTP ties alphabetically with %s', (_label, keys) => {
+    const resolved = resolveExclusionGroups(
+      new Set(keys),
+      new Set(['b200_sglang', 'mi355x_vllm']),
+      agenticEx,
+      'keep-sticky',
+    );
+
+    expect(resolved.result).toEqual(new Set(['b200_sglang', 'mi355x_vllm', 'b200_sglang_mtp']));
+    expect(resolved.keptGroup).toBe('sglang');
+    expect(resolved.droppedGroups).toEqual(['vllm']);
+  });
+
   it('blocks cross-engine adds across official and overlay namespaces', () => {
     const prev = new Set(['overlay:b300_sglang']);
     const all = new Set(['overlay:b300_sglang', 'b300_vllm']);

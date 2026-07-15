@@ -214,8 +214,8 @@ export function pickStickyGroup(
       }
     }
     const winner =
-      groups.find((group) => directPrevGroups.has(group)) ??
-      groups.find((group) => correlatedPrevGroups.has(group)) ??
+      groups.filter((group) => directPrevGroups.has(group)).toSorted()[0] ??
+      groups.filter((group) => correlatedPrevGroups.has(group)).toSorted()[0] ??
       groups.toSorted()[0];
     winners.add(winner);
     for (const [group, keys] of byGroup) {
