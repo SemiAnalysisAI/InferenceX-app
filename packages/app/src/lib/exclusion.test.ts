@@ -98,6 +98,18 @@ describe('exclusionResolutionFamilies', () => {
     expect(exclusionResolutionFamilies(proposed, result, ex)).toEqual({
       kept: ['atom', 'sglang'],
       dropped: ['vllm'],
+      partial: [],
+    });
+  });
+
+  it('reports families retained only on other hardware scopes as partial', () => {
+    const proposed = new Set(['b200_vllm', 'b200_sglang', 'mi355x_sglang']);
+    const result = new Set(['b200_vllm', 'mi355x_sglang']);
+
+    expect(exclusionResolutionFamilies(proposed, result, agenticEx)).toEqual({
+      kept: ['vllm'],
+      dropped: [],
+      partial: ['sglang'],
     });
   });
 });

@@ -299,12 +299,12 @@ export function resolveExclusionGroups(
   return { ...cleared, keptGroup: null };
 }
 
-/** Literal engine families retained and removed by an exclusion resolution. */
+/** Engine families wholly retained, wholly removed, or retained only on other scopes. */
 export function exclusionResolutionFamilies(
   proposed: Iterable<string>,
   result: ReadonlySet<string>,
   ex: Exclusion,
-): { kept: string[]; dropped: string[] } {
+): { kept: string[]; dropped: string[]; partial: string[] } {
   const kept = new Set<string>();
   const dropped = new Set<string>();
   for (const key of proposed) {
@@ -312,7 +312,16 @@ export function exclusionResolutionFamilies(
     if (!family) continue;
     (result.has(key) ? kept : dropped).add(family);
   }
-  return { kept: [...kept].toSorted(), dropped: [...dropped].toSorted() };
+  const partial = new Set([...kept].filter((family) => dropped.has(family)));
+  for (const family of partial) {
+    kept.delete(family);
+    dropped.delete(family);
+  }
+  return {
+    kept: [...kept].toSorted(),
+    dropped: [...dropped].toSorted(),
+    partial: [...partial].toSorted(),
+  };
 }
 
 /**

@@ -201,11 +201,12 @@ export function InferenceProvider({
     if (!selectedGpuResolution) return;
     setSelectedGpuState(selectedGpuResolution.selection);
     setUrlParam('i_gpus', selectedGpuResolution.selection.join(','));
-    if (selectedGpuResolution.dropped.length > 0) {
+    if (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0) {
       setEngineConflict({
         kind: 'resolved',
         kept: selectedGpuResolution.kept,
         dropped: selectedGpuResolution.dropped,
+        partial: selectedGpuResolution.partial,
       });
     }
   }, [selectedGpuResolution, setUrlParam]);
