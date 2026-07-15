@@ -569,8 +569,8 @@ describe('ScatterGraph', () => {
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
-      scopeOf: (key: string) =>
-        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopesOf: (key: string) =>
+        exclusion.scopesOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
     const blockedToggle = cy.stub().as('blockedComparisonToggle').returns(null);
 
@@ -666,8 +666,8 @@ describe('ScatterGraph', () => {
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
-      scopeOf: (key: string) =>
-        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopesOf: (key: string) =>
+        exclusion.scopesOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
 
     mountWithProviders(
@@ -895,7 +895,7 @@ describe('ChartDisplay engine comparison guard', () => {
         selectedSequence: Sequence.AgenticTraces,
         selectedXAxisMode: 'interactivity',
         activeHwTypes: new Set(['b200_sglang']),
-        hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+        hwTypesWithData: new Set(['b200_sglang', 'b200_vllm']),
         resolveComparisonSelection: resolveSelection,
       },
       globalFilters: {
@@ -938,8 +938,8 @@ describe('ChartDisplay engine comparison guard', () => {
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
-      scopeOf: (key: string) =>
-        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopesOf: (key: string) =>
+        exclusion.scopesOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
     const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
       resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky');
@@ -1047,8 +1047,8 @@ describe('ChartDisplay engine comparison guard', () => {
         exclusion.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
       groupOf: (key: string) =>
         exclusion.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
-      scopeOf: (key: string) =>
-        exclusion.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+      scopesOf: (key: string) =>
+        exclusion.scopesOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
     };
     const resolveSelection = (proposed: Set<string>, prev = new Set<string>()) =>
       resolveExclusionGroups(proposed, prev, namespacedExclusion, 'keep-sticky');

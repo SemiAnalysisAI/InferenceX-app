@@ -37,8 +37,8 @@ const namespacedAgenticEx = {
     agenticEx.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
   groupOf: (key: string) =>
     agenticEx.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
-  scopeOf: (key: string) =>
-    agenticEx.scopeOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+  scopesOf: (key: string) =>
+    agenticEx.scopesOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
 };
 
 describe('buildExclusion — familyOf', () => {
@@ -136,6 +136,16 @@ describe('AgentX STP engine exclusion', () => {
     const all = new Set(['b300_vllm', 'b300_vllm_mtp']);
     expect(resolveExclusionToggle(prev, 'b300_vllm_mtp', all, agenticEx, 'keep-sticky')).toEqual({
       kind: 'fallthrough',
+    });
+  });
+
+  it('blocks cross-engine STP and MTP configs on the same hardware SKU', () => {
+    const prev = new Set(['b300_sglang']);
+    const all = new Set(['b300_sglang', 'b300_vllm_mtp']);
+    expect(resolveExclusionToggle(prev, 'b300_vllm_mtp', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'block',
+      attempted: 'vllm',
+      existing: 'sglang',
     });
   });
 

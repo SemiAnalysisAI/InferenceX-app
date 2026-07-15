@@ -52,8 +52,8 @@ export interface Exclusion {
   familyOf: (hwKey: string) => string | null;
   /** Comparability-group id of a participating key (for exclusion), else null. */
   groupOf: (hwKey: string) => string | null;
-  /** Mutual-exclusion scope of a participating key, else null. */
-  scopeOf: (hwKey: string) => string | null;
+  /** Mutual-exclusion scopes of a participating key. Empty when it does not participate. */
+  scopesOf: (hwKey: string) => readonly string[];
 }
 
 const ACTIVE_SPEC_SUFFIXES = [...SPEC_METHOD_KEYS]
@@ -110,15 +110,16 @@ export function buildExclusion(specs: readonly ExclusionSpec[]): Exclusion {
       }
       return null;
     },
-    scopeOf(hwKey: string): string | null {
+    scopesOf(hwKey: string): readonly string[] {
       for (const spec of specs) {
         const fam = familyForSpec(hwKey, spec);
         if (!fam) continue;
-        if (spec.scope !== 'hardware') return GLOBAL_SCOPE;
         const firstUnderscore = hwKey.indexOf('_');
-        return firstUnderscore === -1 ? GLOBAL_SCOPE : hwKey.slice(0, firstUnderscore);
+        const hardwareScope =
+          firstUnderscore === -1 ? GLOBAL_SCOPE : hwKey.slice(0, firstUnderscore);
+        return spec.scope === 'hardware' ? [hardwareScope] : [GLOBAL_SCOPE, hardwareScope];
       }
-      return null;
+      return [];
     },
   };
 }
@@ -130,16 +131,17 @@ function groupKeysByScope(
   const byScope = new Map<string, Map<string, string[]>>();
   for (const key of keys) {
     const group = ex.groupOf(key);
-    const scope = ex.scopeOf(key);
-    if (!group || !scope) continue;
-    let byGroup = byScope.get(scope);
-    if (!byGroup) {
-      byGroup = new Map();
-      byScope.set(scope, byGroup);
+    if (!group) continue;
+    for (const scope of ex.scopesOf(key)) {
+      let byGroup = byScope.get(scope);
+      if (!byGroup) {
+        byGroup = new Map();
+        byScope.set(scope, byGroup);
+      }
+      const existing = byGroup.get(group);
+      if (existing) existing.push(key);
+      else byGroup.set(group, [key]);
     }
-    const existing = byGroup.get(group);
-    if (existing) existing.push(key);
-    else byGroup.set(group, [key]);
   }
   return byScope;
 }
@@ -153,15 +155,14 @@ function groupKeysByScope(
  */
 function activeFamilyInGroup(
   keys: Iterable<string>,
-  group: string | null,
-  scope: string | null,
+  group: string,
+  scope: string,
   ex: Exclusion,
 ): string | null {
-  if (!group || !scope) return null;
   const families: string[] = [];
   for (const key of keys) {
     const fam = ex.familyOf(key);
-    if (fam && ex.groupOf(key) === group && ex.scopeOf(key) === scope) families.push(fam);
+    if (fam && ex.groupOf(key) === group && ex.scopesOf(key).includes(scope)) families.push(fam);
   }
   return families.length > 0 ? families.toSorted()[0] : null;
 }
@@ -188,7 +189,7 @@ export function pickStickyGroup(
     if (byGroup.size <= 1) continue;
     const prevGroups = new Set<string>();
     for (const key of prev) {
-      if (ex.scopeOf(key) !== scope) continue;
+      if (!ex.scopesOf(key).includes(scope)) continue;
       const group = ex.groupOf(key);
       if (group) prevGroups.add(group);
     }
@@ -229,17 +230,26 @@ export function effectiveLegendItems(
   const activeGroupsByScope = new Map<string, Set<string>>();
   for (const key of active) {
     const group = ex.groupOf(key);
-    const scope = ex.scopeOf(key);
-    if (!group || !scope) continue;
-    const groups = activeGroupsByScope.get(scope);
-    if (groups) groups.add(group);
-    else activeGroupsByScope.set(scope, new Set([group]));
+    if (!group) continue;
+    for (const scope of ex.scopesOf(key)) {
+      const groups = activeGroupsByScope.get(scope);
+      if (groups) groups.add(group);
+      else activeGroupsByScope.set(scope, new Set([group]));
+    }
   }
   const result = new Set<string>();
   for (const key of allItems) {
     const group = ex.groupOf(key);
-    const scope = ex.scopeOf(key);
-    if (!group || !scope || activeGroupsByScope.get(scope)?.has(group)) result.add(key);
+    const activeScopeGroups = ex
+      .scopesOf(key)
+      .map((scope) => activeGroupsByScope.get(scope))
+      .filter((groups): groups is Set<string> => groups !== undefined);
+    if (
+      !group ||
+      (activeScopeGroups.length > 0 && activeScopeGroups.every((groups) => groups.has(group)))
+    ) {
+      result.add(key);
+    }
   }
   return result;
 }
@@ -336,17 +346,18 @@ export function resolveExclusionToggle(
   const willBeActive = proposed.has(hw);
   const newFamily = ex.familyOf(hw);
   const newGroup = ex.groupOf(hw);
-  const newScope = ex.scopeOf(hw);
+  const newScopes = ex.scopesOf(hw);
 
-  // Hard-block only an explicit add that introduces a second group in the same
-  // exclusion scope. Hardware-scoped rules therefore allow different engines
-  // on different GPU SKUs while still protecting same-SKU comparisons.
-  if (!wasActive && willBeActive && newGroup && newScope) {
-    const existingGroup = [...prev]
-      .filter((key) => ex.scopeOf(key) === newScope)
-      .map((key) => ex.groupOf(key))
-      .find((group) => group !== null && group !== newGroup);
-    if (existingGroup) {
+  // Hard-block only an explicit add that introduces a second group in an
+  // overlapping exclusion scope. Global rules also participate in their
+  // hardware scope, preserving same-SKU STP/MTP conflicts.
+  if (!wasActive && willBeActive && newGroup && newScopes.length > 0) {
+    for (const newScope of newScopes) {
+      const existingGroup = [...prev]
+        .filter((key) => ex.scopesOf(key).includes(newScope))
+        .map((key) => ex.groupOf(key))
+        .find((group) => group !== null && group !== newGroup);
+      if (!existingGroup) continue;
       const existing = activeFamilyInGroup(prev, existingGroup, newScope, ex) ?? existingGroup;
       return { kind: 'block', attempted: newFamily ?? newGroup, existing };
     }
