@@ -240,14 +240,12 @@ export function effectiveLegendItems(
   const result = new Set<string>();
   for (const key of allItems) {
     const group = ex.groupOf(key);
-    const activeScopeGroups = ex
-      .scopesOf(key)
+    const scopes = ex.scopesOf(key);
+    const activeScopeGroups = scopes
       .map((scope) => activeGroupsByScope.get(scope))
       .filter((groups): groups is Set<string> => groups !== undefined);
-    if (
-      !group ||
-      (activeScopeGroups.length > 0 && activeScopeGroups.every((groups) => groups.has(group)))
-    ) {
+    const idleGlobalScope = scopes.includes(GLOBAL_SCOPE) && !activeGroupsByScope.has(GLOBAL_SCOPE);
+    if (!group || (!idleGlobalScope && activeScopeGroups.every((groups) => groups.has(group)))) {
       result.add(key);
     }
   }

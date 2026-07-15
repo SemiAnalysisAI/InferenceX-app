@@ -374,6 +374,15 @@ describe('effectiveLegendItems', () => {
     expect([...out].toSorted()).toEqual(['h100_dynamo-vllm_mtp', 'h100_vllm', 'h100_vllm_mtp']);
   });
 
+  it('keeps idle hardware scopes in the restore-all universe', () => {
+    const all = new Set(['b200_sglang', 'b200_vllm', 'mi355x_vllm']);
+    const active = new Set(['b200_sglang']);
+    const effective = effectiveLegendItems(all, active, agenticEx);
+
+    expect(effective).toEqual(new Set(['b200_sglang', 'mi355x_vllm']));
+    expect(computeToggle(active, 'b200_sglang', effective)).toEqual(effective);
+  });
+
   it('makes computeToggle solo on click in the default-deselected state', () => {
     // Default DSv4 state: all non-MTP active, MTP keys exist in data but
     // are deselected. The effective universe matches active → computeToggle
