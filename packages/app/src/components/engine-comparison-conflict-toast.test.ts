@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { describeEngineComparisonConflict } from './engine-comparison-conflict-toast';
 
 describe('describeEngineComparisonConflict', () => {
-  it('describes hardware-scoped partial removal without contradicting itself', () => {
+  it('describes partial removal without assuming hardware scope', () => {
     const message = describeEngineComparisonConflict(
       {
         kind: 'resolved',
@@ -14,8 +14,10 @@ describe('describeEngineComparisonConflict', () => {
       'en',
     );
 
-    expect(message).toContain('Disabled conflicting SGLang configs only on affected SKUs');
-    expect(message).toContain('compatible configs on other SKUs remain shown');
+    expect(message).toContain(
+      'Disabled conflicting SGLang configs while compatible SGLang configs remain shown',
+    );
+    expect(message).not.toContain('SKU');
     expect(message).not.toContain('Kept SGLang');
     expect(message).not.toContain('removed SGLang');
   });

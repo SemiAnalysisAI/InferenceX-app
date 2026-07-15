@@ -55,7 +55,7 @@ export function describeEngineComparisonConflict(
   const partial = [...detail.partial].toSorted().map(familyLabel);
   if (partial.length > 0) {
     const removed = dropped.length > 0 ? ` Removed ${joinList(dropped)} configs.` : '';
-    return `Only compatible engine families can be shown together on each hardware SKU.${removed} Disabled conflicting ${joinList(partial)} configs only on affected SKUs; compatible configs on other SKUs remain shown.`;
+    return `Only compatible engine configurations can be shown together in this view.${removed} Disabled conflicting ${joinList(partial)} configs while compatible ${joinList(partial)} configs remain shown.`;
   }
   if (kept.length > 0) {
     return `Only compatible engine families can be shown together in this view. Kept ${joinList(kept)} and removed ${joinList(dropped)} configs.`;
@@ -80,7 +80,7 @@ function describeZh(detail: EngineComparisonConflictDetail): string {
   const partial = [...detail.partial].toSorted().map(familyLabel);
   if (partial.length > 0) {
     const removed = dropped.length > 0 ? ` 已移除 ${joinListZh(dropped)} 配置。` : '';
-    return `每个硬件 SKU 只能同时显示相互兼容的引擎系列。${removed}仅在受影响的 SKU 上禁用了冲突的 ${joinListZh(partial)} 配置；其他 SKU 上的兼容配置仍会显示。`;
+    return `此视图只能同时显示相互兼容的引擎配置。${removed}已禁用冲突的 ${joinListZh(partial)} 配置，同时保留兼容的 ${joinListZh(partial)} 配置。`;
   }
   if (kept.length > 0) {
     return `此视图只能同时显示相互兼容的引擎系列。已保留 ${joinListZh(kept)}，并移除 ${joinListZh(dropped)} 配置。`;
