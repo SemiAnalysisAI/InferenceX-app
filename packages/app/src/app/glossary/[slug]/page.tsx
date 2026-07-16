@@ -163,16 +163,29 @@ export default async function GlossaryTermPage({ params }: Props) {
 
             <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_16rem]">
               <div className="px-5 py-8 md:px-10 md:py-12">
-                <section aria-labelledby="definition-heading">
+                <section
+                  aria-labelledby="plain-english-heading"
+                  className="rounded-xl border border-brand/20 bg-brand/6 p-5 md:p-6"
+                >
                   <p
-                    id="definition-heading"
+                    id="plain-english-heading"
                     className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase"
                   >
-                    Definition
+                    In plain English
                   </p>
                   <p className="mt-3 text-xl leading-relaxed font-medium text-pretty md:text-2xl">
-                    {entry.definition}
+                    {entry.plainEnglish}
                   </p>
+                </section>
+
+                <section aria-labelledby="technical-definition-heading" className="mt-8">
+                  <h2
+                    id="technical-definition-heading"
+                    className="text-xl font-semibold tracking-tight"
+                  >
+                    Technical definition
+                  </h2>
+                  <p className="mt-3 leading-7 text-muted-foreground">{entry.definition}</p>
                 </section>
 
                 {entry.measurement && (
@@ -187,9 +200,9 @@ export default async function GlossaryTermPage({ params }: Props) {
                 )}
 
                 <div className="mt-10 space-y-10 border-t border-border/50 pt-10">
-                  <section aria-labelledby="how-it-works">
-                    <h2 id="how-it-works" className="text-xl font-semibold tracking-tight">
-                      How it works
+                  <section aria-labelledby="engineering-details">
+                    <h2 id="engineering-details" className="text-xl font-semibold tracking-tight">
+                      Engineering details
                     </h2>
                     <p className="mt-3 leading-7 text-muted-foreground">{entry.explanation}</p>
                   </section>

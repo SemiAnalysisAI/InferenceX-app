@@ -29,6 +29,10 @@ describe('glossary content', () => {
       expect(GLOSSARY_CATEGORIES).toContain(entry.category);
       expect(entry.relatedTerms.length).toBeGreaterThanOrEqual(3);
       expect(entry.articleSlugs.length).toBeGreaterThanOrEqual(1);
+      const plainEnglishWords = entry.plainEnglish.split(/\s+/u);
+      expect(plainEnglishWords.length, entry.term).toBeGreaterThanOrEqual(8);
+      expect(plainEnglishWords.length, entry.term).toBeLessThanOrEqual(40);
+      expect(entry.plainEnglish).not.toBe(entry.definition);
 
       const renderedCopy = [
         entry.definition,
@@ -70,6 +74,10 @@ describe('Chinese glossary content', () => {
     expect(Object.keys(GLOSSARY_CATEGORY_LABELS_ZH)).toEqual([...GLOSSARY_CATEGORIES]);
 
     for (const entry of zhEntries) {
+      const plainLanguageCharacters = entry.plainEnglish.match(/\p{Script=Han}/gu)?.length ?? 0;
+      expect(plainLanguageCharacters, entry.slug).toBeGreaterThanOrEqual(8);
+      expect(plainLanguageCharacters, entry.slug).toBeLessThanOrEqual(60);
+      expect(entry.plainEnglish).not.toBe(entry.definition);
       const renderedCopy = [
         entry.definition,
         entry.explanation,

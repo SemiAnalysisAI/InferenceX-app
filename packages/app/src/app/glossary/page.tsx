@@ -47,12 +47,14 @@ export default function GlossaryPage() {
     ...(entry.abbreviation && { abbreviation: entry.abbreviation }),
     ...(entry.aliases && { aliases: entry.aliases }),
     category: entry.category,
+    plainEnglish: entry.plainEnglish,
     definition: entry.definition,
     searchText: [
       entry.term,
       entry.abbreviation,
       ...(entry.aliases ?? []),
       entry.category,
+      entry.plainEnglish,
       entry.definition,
     ]
       .filter(Boolean)

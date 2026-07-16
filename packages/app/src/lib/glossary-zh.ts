@@ -12,13 +12,20 @@ export const GLOSSARY_CATEGORY_LABELS_ZH: Readonly<Record<GlossaryCategory, stri
 
 type GlossaryTranslation = Pick<
   GlossaryEntry,
-  'term' | 'aliases' | 'definition' | 'explanation' | 'significance' | 'benchmarkContext'
+  | 'term'
+  | 'aliases'
+  | 'plainEnglish'
+  | 'definition'
+  | 'explanation'
+  | 'significance'
+  | 'benchmarkContext'
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'ai-inference': {
     term: 'AI 推理',
     aliases: ['AI inference', 'LLM 推理', '模型服务'],
+    plainEnglish: '把提示词、图片或音频交给已经训练好的模型，它会利用学到的知识给出答案。',
     definition:
       'AI 推理是使用已经训练好的模型处理新输入并生成输出的过程；对大语言模型而言，通常就是处理提示词并生成 token。',
     explanation:
@@ -31,6 +38,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'inference-engine': {
     term: '推理引擎',
     aliases: ['inference engine', '服务引擎', 'LLM 服务框架'],
+    plainEnglish:
+      '推理引擎就像 AI 服务背后的交通调度员：它安排请求流转，并让 GPU 在正确时间执行正确任务。',
     definition: '推理引擎是将模型权重和用户请求转化为加速器上生成结果的软件运行时。',
     explanation:
       '它负责请求调度、连续批处理、KV 缓存分配、分布式执行、内核选择与 token 采样。vLLM、SGLang 和 TensorRT-LLM 即使运行同一模型和 GPU，也会因调度器、内核与分布式策略不同而产生不同曲线。',
@@ -42,6 +51,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   throughput: {
     term: '吞吐量',
     aliases: ['throughput', 'token 吞吐量', '总吞吐量'],
+    plainEnglish: '吞吐量就是整个系统每秒一共能完成多少工作。',
     definition: '吞吐量是推理系统在所有活跃请求上生成 token 的总速率。',
     explanation:
       'InferenceX 通常使用每 GPU 每秒 token 数进行归一化，便于比较不同规模的系统。提高批大小或并发往往能摊薄权重读取和计算成本，从而提高总吞吐量，但单个用户收到 token 的速度可能下降。',
@@ -53,6 +63,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   interactivity: {
     term: '交互性',
     aliases: ['interactivity', '生成速度', '每用户 token 速率'],
+    plainEnglish: '交互性表示模型开始回答后，单个用户看到新文字出现得有多快。',
     definition: '交互性是解码阶段单个用户接收生成 token 的速率。',
     explanation:
       '在单位换算一致时，它是每输出 token 时间的倒数。50 tok/s/user 表示首个 token 之后大约每 20 毫秒输出一个新 token；它描述流式响应速度，而不是首 token 到达前的等待。',
@@ -64,6 +75,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   latency: {
     term: '延迟',
     aliases: ['latency', '响应延迟', '推理延迟'],
+    plainEnglish: '延迟就是需要等待多久；流式回答既有开始前的等待，也有后续文字之间的停顿。',
     definition:
       '延迟是请求经历的时间；在流式 LLM 服务中，应区分首 token 等待时间与后续 token 间隔。',
     explanation:
@@ -76,6 +88,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'time-to-first-token': {
     term: '首 token 时间',
     aliases: ['time to first token', '首字延迟'],
+    plainEnglish: 'TTFT 就是发送提示词后，到看到答案第一个片段前的“思考中……”时间。',
     definition: '首 token 时间（TTFT）是从提交请求到收到第一个生成 token 的时间。',
     explanation:
       'TTFT 包含排队、提示词处理，以及解码开始前的路由或 KV 缓存传输。更长提示词通常增加预填充工作，系统过载也会在模型计算不变时增加排队时间。',
@@ -87,6 +100,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'time-per-output-token': {
     term: '每输出 token 时间',
     aliases: ['time per output token', 'token 间延迟', 'ITL'],
+    plainEnglish: 'TPOT 是流式回答每个新片段之间的间隔；间隔越短，回答看起来越快越顺畅。',
     definition: '每输出 token 时间（TPOT）是首 token 到达后，相邻生成 token 之间的平均时间。',
     explanation:
       'TPOT 描述流式响应的解码节奏。在忽略单位换算时，它是每用户 token 速率的倒数；20 毫秒/token 约等于 50 tok/s/user。',
@@ -98,6 +112,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   concurrency: {
     term: '并发量',
     aliases: ['concurrency', '并发请求数'],
+    plainEnglish: '并发量就是系统同一时间正在服务多少个人或请求。',
     definition: '并发量是基准测试或部署中同时被服务的请求数量。',
     explanation:
       '提高并发能为调度器提供更多可批处理工作，通常提升加速器利用率和总吞吐量；代价是每个请求分到的计算与内存带宽减少，因此交互性往往下降。',
@@ -109,6 +124,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   batching: {
     term: '批处理',
     aliases: ['batching', '连续批处理', '动态批处理'],
+    plainEnglish:
+      '批处理就像让多名乘客坐同一辆巴士：GPU 一次处理多个请求，让每趟计算完成更多有效工作。',
     definition: '批处理将多个请求的工作组合起来，使加速器能够一起处理它们的 token。',
     explanation:
       '大型矩阵运算比大量微小运算更能发挥 GPU 效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，而不是等待固定批次全部完成。',
@@ -120,6 +137,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'pareto-frontier': {
     term: 'Pareto 前沿',
     aliases: ['Pareto frontier', '性能前沿', 'Pareto 最优曲线'],
+    plainEnglish:
+      'Pareto 前沿是一条“最佳权衡线”：线上的每个点都值得考虑，因为改善一项指标就必须牺牲另一项。',
     definition: 'Pareto 前沿由不存在另一个测量点能在两个比较维度上都更好的运行点组成。',
     explanation:
       '在吞吐量与交互性图中，如果另一个点既能处理更多总 token，又能让每个用户更快收到 token，那么原点就被支配；删除所有被支配点后得到有效边界。',
@@ -131,6 +150,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'iso-interactivity': {
     term: '等交互性',
     aliases: ['iso-interactivity', '匹配交互性', '相同 token 速率'],
+    plainEnglish: '等交互性就是让不同系统以相同速度向用户显示文字，再比较背后的硬件效率。',
     definition: '等交互性是指在相同的每用户生成速度下比较不同系统。',
     explanation:
       '不同方案的并发点很少正好落在相同 tok/s/user。等交互性比较会在各自 Pareto 前沿上对共同目标插值，再比较该点的吞吐量、成本或效率。',
@@ -142,6 +162,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'input-output-sequence-length': {
     term: '输入与输出序列长度',
     aliases: ['input/output sequence length', '提示词长度', '生成长度', '8K/1K'],
+    plainEnglish:
+      '输入长度是模型要读多少内容，输出长度是模型要写多少内容；8K/1K 表示长提示词配较短回答。',
     definition:
       '输入序列长度（ISL）是提示词 token 数，输出序列长度（OSL）是响应中生成的 token 数。',
     explanation:
@@ -154,6 +176,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'cost-per-million-tokens': {
     term: '每百万 token 成本',
     aliases: ['cost per million tokens', '$/M tokens', 'token 成本'],
+    plainEnglish: '它估算 AI 读取和生成一百万个 token 需要支付多少基础设施成本。',
     definition: '每百万 token 成本估算系统在某个实测运行点生成一百万 token 所需的基础设施成本。',
     explanation:
       'InferenceX 根据每小时总体拥有成本和实测 token 吞吐量计算该指标。它可能按总 token 报告，也可能区分输入和输出 token，因此比较前必须确认分母。',
@@ -165,6 +188,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'performance-per-dollar': {
     term: '每美元性能',
     aliases: ['performance per dollar', 'perf/$', '成本效率'],
+    plainEnglish: '每美元性能回答一个简单问题：花在运行系统上的每一美元，能换来多少有效 AI 输出？',
     definition: '每美元性能表示系统每单位建模成本能够交付多少实测推理工作。',
     explanation:
       '在固定工作负载和交互性目标下，它是每 token 成本的倒数。2 倍 perf/$ 意味着在相同基础设施支出下，可生成约两倍可比 token。',
@@ -176,6 +200,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'total-cost-of-ownership': {
     term: '总体拥有成本',
     aliases: ['total cost of ownership', '全生命周期成本'],
+    plainEnglish: 'TCO 是拥有和运行硬件的真实全口径成本，而不只是 GPU 发票上的价格。',
     definition: '总体拥有成本（TCO）是基础设施在使用寿命内采购、部署和运营的综合成本估算。',
     explanation:
       'GPU 采购价只是其中一项。TCO 模型还可包含主机、网络、供电、制冷、机房、融资、折旧、维护和预期利用率，并归一化为每 GPU 小时成本。',
@@ -187,6 +212,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'tokens-per-megawatt': {
     term: '每兆瓦 token 吞吐量',
     aliases: ['tokens per megawatt', 'tokens/MW', '功率归一化吞吐量'],
+    plainEnglish: '该指标衡量数据中心在固定电力额度下能产出多少 AI token。',
     definition: '每兆瓦 token 吞吐量衡量推理产出相对于数据中心电力预算的效率。',
     explanation:
       'InferenceX 使用全口径公用事业供电，而不只使用芯片 TDP。这个分母可包含为 IT 负载供电和制冷的开销，更适合设施级容量规划。',
@@ -198,6 +224,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   prefill: {
     term: '预填充',
     aliases: ['prefill', '提示词处理', '上下文编码'],
+    plainEnglish: '预填充就是模型先阅读并理解提示词，然后才开始写答案。',
     definition: '预填充是推理的第一阶段：模型处理输入提示词并填充 KV 缓存，然后才开始生成。',
     explanation:
       '提示词 token 可以并行处理，形成大型矩阵运算，因此通常偏计算密集。预填充成本随输入长度增长，并显著影响首 token 时间。',
@@ -209,6 +236,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   decode: {
     term: '解码',
     aliases: ['decode', '自回归生成', 'token 生成'],
+    plainEnglish: '解码就是模型读完提示词后，一个 token 接一个 token 地写出答案。',
     definition: '解码是自回归生成输出 token 的阶段，通常每个模型步为每条序列接受一个 token。',
     explanation:
       '每个新 token 都依赖此前 token，因此时间维度无法完全并行。模型会反复读取权重与该序列的 KV 缓存，使解码对内存带宽、批处理和通信尤其敏感。',
@@ -220,6 +248,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'kv-cache': {
     term: 'KV 缓存',
     aliases: ['KV cache', '键值缓存', '注意力缓存'],
+    plainEnglish: 'KV 缓存是模型对当前对话的工作记忆，让它生成新 token 时不必每次从头重读。',
     definition:
       'KV 缓存保存已经处理过的 token 的注意力 key/value 状态，避免每个解码步重新计算它们。',
     explanation:
@@ -232,6 +261,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'prefix-caching': {
     term: '前缀缓存',
     aliases: ['prefix caching', '提示词缓存', '自动前缀缓存'],
+    plainEnglish:
+      '前缀缓存会记住重复开头的处理结果，例如相同系统提示词，让模型下次可以跳过这部分工作。',
     definition: '当前多个请求以相同 token 序列开头时，前缀缓存会复用已有 KV 缓存状态。',
     explanation:
       '重复系统提示词、共享文档或共同对话前缀在缓存仍可用时无需再次预填充。命中缓存可显著减少提示词计算与首 token 时间。',
@@ -243,6 +274,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'disaggregated-inference': {
     term: '分离式推理',
     aliases: ['disaggregated inference', 'PD 分离', '分离式预填充', 'disagg'],
+    plainEnglish: '分离式推理把“读提示词”和“写答案”交给两组 GPU，让每组都能针对自己的任务优化。',
     definition: '分离式推理在不同工作池上运行预填充与解码，并在两者之间传输请求状态。',
     explanation:
       '预填充通常偏计算密集，解码则常受内存带宽和通信限制。分离后，两侧可以采用不同 GPU 数、并行度、批策略和扩缩容方式。',
@@ -254,6 +286,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'speculative-decoding': {
     term: '推测解码',
     aliases: ['speculative decoding', '草稿—验证解码'],
+    plainEnglish:
+      '推测解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，而不是逐个生成。',
     definition:
       '推测解码先以低成本提出多个未来 token，再由目标模型批量验证，从而减少昂贵的串行解码步数。',
     explanation:
@@ -266,6 +300,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'multi-token-prediction': {
     term: '多 token 预测',
     aliases: ['multi-token prediction', '多 token 预测头'],
+    plainEnglish: 'MTP 让模型一次猜测多个后续 token 并一起验证，从而减少缓慢的逐 token 步骤。',
     definition:
       '多 token 预测（MTP）使用与主模型共同训练的辅助预测头，提出多个未来 token 供推测验证。',
     explanation:
@@ -278,6 +313,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   eagle: {
     term: 'EAGLE',
     aliases: ['EAGLE 推测解码', 'EAGLE-3'],
+    plainEnglish: 'EAGLE 是一种为主模型起草多个可能后续 token 的方法，可让答案流式输出得更快。',
     definition:
       'EAGLE 是一组推测解码方法：利用与目标语言模型相关的特征预测草稿序列，再由目标模型验证。',
     explanation:
@@ -290,6 +326,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'tensor-parallelism': {
     term: '张量并行',
     aliases: ['tensor parallelism', 'TP'],
+    plainEnglish: '张量并行把一次大型计算拆给多张 GPU，让它们共同完成。',
     definition: '张量并行（TP）把单个张量运算和模型权重矩阵切分到多个加速器上。',
     explanation:
       '每一层由多个 rank 协同执行，部分结果需要通过集体通信合并，常见方式是在并行矩阵乘之后执行 all-reduce。',
@@ -301,6 +338,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'expert-parallelism': {
     term: '专家并行',
     aliases: ['expert parallelism', 'EP'],
+    plainEnglish: '专家并行把模型中的不同“专家”分配给不同 GPU，再把每个 token 送到需要的专家。',
     definition:
       '专家并行（EP）把 MoE 模型的专家分布到不同加速器，并将 token 路由到持有所选专家的 rank。',
     explanation:
@@ -313,6 +351,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'data-parallelism': {
     term: '数据并行',
     aliases: ['data parallelism', 'DP'],
+    plainEnglish: '数据并行复制多份相同模型并分摊请求，就像多开几条相同的收银通道。',
     definition:
       '数据并行（DP）在多个 rank 上运行复制的模型或层组，并把请求或 token 分配给这些副本。',
     explanation:
@@ -325,6 +364,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'wide-expert-parallelism': {
     term: '宽专家并行',
     aliases: ['wide expert parallelism', 'Wide EP'],
+    plainEnglish: '宽专家并行把模型专家铺到大量 GPU 上，让每张 GPU 需要保存和移动的专家数据更少。',
     definition: '宽专家并行使用大量加速器 rank 构成 MoE 模型的专家并行组。',
     explanation:
       '把数百个专家分散到更多 rank，可减少每张 GPU 需要存储和流式读取的专家权重；更大的同伴组也可形成更高效的专家批次，但 dispatch/combine 流量会扩展。',
@@ -336,6 +376,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'all-reduce': {
     term: 'All-reduce',
     aliases: ['全归约'],
+    plainEnglish: 'All-reduce 让每张 GPU 完成一部分计算，再合并结果并把完整答案发回所有 GPU。',
     definition:
       'All-reduce 是一种集体通信操作：合并所有参与 rank 的值，并把归约结果返回给每个 rank。',
     explanation:
@@ -348,6 +389,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'all-to-all': {
     term: 'All-to-all',
     aliases: ['全交换'],
+    plainEnglish: 'All-to-all 是一次有组织的交换：每张 GPU 都向其他每张 GPU 发送不同的数据包。',
     definition: 'All-to-all 是每个参与 rank 向所有其他 rank 发送不同数据的集体通信模式。',
     explanation:
       '专家并行 MoE 层先用 all-to-all dispatch 把 token 发往所选专家，再用 combine 把专家输出送回；流量与不均衡程度取决于 token 路由。',
@@ -359,6 +401,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'scale-up-vs-scale-out': {
     term: 'Scale-up 与 scale-out 网络',
     aliases: ['纵向扩展域', '横向扩展网络'],
+    plainEnglish: 'Scale-up 是同一套 GPU 系统内部的超高速网络，scale-out 则连接不同服务器或机架。',
     definition:
       'Scale-up 网络连接同一紧耦合系统内的加速器，scale-out 网络则把多个系统或机架连接成更大集群。',
     explanation:
@@ -371,6 +414,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'high-bandwidth-memory': {
     term: '高带宽内存',
     aliases: ['high-bandwidth memory', 'HBM'],
+    plainEnglish: 'HBM 是紧挨 GPU 的一小池超高速内存，推理时模型权重和工作数据都要放在这里。',
     definition: '高带宽内存（HBM）是靠近加速器堆叠的内存，其带宽远高于传统服务器内存。',
     explanation:
       'HBM 存储模型权重、激活、工作区与 KV 缓存。容量决定哪些模型、批大小和并行布局能放入；带宽决定内存受限内核能多快读取这些状态。',
@@ -382,6 +426,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'memory-bandwidth': {
     term: '内存带宽',
     aliases: ['memory bandwidth', 'HBM 带宽'],
+    plainEnglish: '内存带宽就像向 GPU 计算单元供给数据的管道宽度；管道越宽，计算单元越不容易空等。',
     definition: '内存带宽是数据在加速器内存与计算单元之间传输的速率。',
     explanation:
       '当移动所需字节比执行算术更耗时，内核就是内存带宽受限。LLM 解码经常处于该状态，因为每一步都要为较少的新 token 计算流式读取模型/专家权重和 KV 缓存。',
@@ -393,6 +438,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   nvlink: {
     term: 'NVLink',
     aliases: ['NVIDIA NVLink', 'GPU 高速互连'],
+    plainEnglish: 'NVLink 是 NVIDIA GPU 之间的高速公路，让多张 GPU 的协作远快于普通服务器网络。',
     definition: 'NVLink 是 NVIDIA 用于 scale-up 域内 GPU 直接数据传输的高带宽加速器互连。',
     explanation:
       'NVSwitch 系统连接多个 NVLink 端点，使集体通信可覆盖八卡服务器，或在 NVL72 产品中覆盖 72 GPU 机架级域；该带宽不同于连接独立系统的 InfiniBand/Ethernet。',
@@ -404,6 +450,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   quantization: {
     term: '量化',
     aliases: ['quantization', '低精度推理', '权重量化'],
+    plainEnglish:
+      '量化用更少 bit 保存模型数字，让模型更小、更容易搬运，通常会带来经过控制的精度损失。',
     definition: '量化使用比高精度基线更少的 bit 表示模型权重、激活或缓存值。',
     explanation:
       '更低精度减少内存占用与传输字节，并可使用更快的低精度 tensor-core 路径。完整方案必须说明量化对象、格式、缩放方式、内核支持和为稳定性保留的高精度运算。',
@@ -415,6 +463,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   fp8: {
     term: 'FP8',
     aliases: ['8 位浮点'],
+    plainEnglish: 'FP8 用紧凑的 8 位格式保存和计算模型数字，可减少内存占用并经常加快推理。',
     definition: 'FP8 是一组八位浮点格式，用于相对 FP16/BF16 降低模型存储、内存流量和计算成本。',
     explanation:
       '常见 FP8 编码在指数范围与尾数精度之间取舍。服务方案可能将 FP8 用于权重、激活、KV 缓存或部分内核，并配合缩放元数据和更高精度累加。',
@@ -426,6 +475,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   fp4: {
     term: 'FP4',
     aliases: ['4 位浮点'],
+    plainEnglish: 'FP4 只用 4 bit 表示模型数字，能让推理更小更快，但可保留的数值细节也更少。',
     definition: 'FP4 指用于超低精度模型表示与矩阵运算加速的四位浮点格式。',
     explanation:
       '四位格式相对 FP8 再把权重存储与流量减半左右，但极小数值空间需要精心选择缩放和硬件专用内核；“FP4”可能指不同具体格式，而非统一编码。',
@@ -437,6 +487,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   nvfp4: {
     term: 'NVFP4',
     aliases: ['NVIDIA FP4'],
+    plainEnglish:
+      'NVFP4 是针对 NVIDIA Blackwell 优化的 4 位模型数学格式，目标是少搬数据并利用最快的低精度硬件。',
     definition: 'NVFP4 是 NVIDIA 为 Blackwell tensor core 推理设计的块缩放四位浮点量化格式。',
     explanation:
       '权重和激活使用紧凑 FP4 值，并为小块附加缩放信息。具体检查点、缩放方案和内核路径共同决定模型质量与吞吐量。',
@@ -448,6 +500,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   mxfp4: {
     term: 'MXFP4',
     aliases: ['微缩放 FP4', 'OCP MX FP4'],
+    plainEnglish: 'MXFP4 让每小组 4 位数字拥有自己的缩放值，使极紧凑的数字仍保留足够可用范围。',
     definition: 'MXFP4 是一种微缩放四位浮点格式，由小块数值共享缩放因子。',
     explanation:
       '块级缩放让四位值在局部保有可用动态范围，同时维持紧凑存储与传输；硬件和软件必须就块布局、缩放表示与矩阵内核达成一致。',
@@ -459,6 +512,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'mixture-of-experts': {
     term: '混合专家模型',
     aliases: ['mixture of experts', 'MoE', '稀疏 MoE'],
+    plainEnglish:
+      '混合专家模型像一支大型专家团队：每个 token 只调用最合适的少数专家，而不是每次动用全员。',
     definition: '混合专家模型包含大量前馈专家网络，但每个 token 只会被路由到其中一小部分。',
     explanation:
       '路由器为每个 token 计算专家分数，top-k 路由激活所选专家及共享专家。这让模型总参数可远大于每个 token 实际使用的计算量。',
@@ -470,6 +525,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'multi-head-latent-attention': {
     term: '多头潜在注意力',
     aliases: ['multi-head latent attention', 'MLA'],
+    plainEnglish: 'MLA 会压缩模型对历史 token 的“笔记”，让长对话占用更少内存、继续生成的成本更低。',
     definition:
       '多头潜在注意力把 attention key/value 状态压缩到更低维潜在表示，以减少 KV 缓存大小与内存流量。',
     explanation:
@@ -482,6 +538,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'sparse-attention': {
     term: '稀疏注意力',
     aliases: ['sparse attention', 'DeepSeek Sparse Attention', 'DSA'],
+    plainEnglish: '稀疏注意力只回看长上下文中最有用的部分，而不是重新检查每个历史 token。',
     definition: '稀疏注意力限制每个 query 可关注的历史 token，而不是对全部上下文执行完整注意力。',
     explanation:
       '稀疏模式可选择局部、压缩、索引或学习得到的上下文子集，降低长序列计算与内存移动；模型架构与运行时必须有匹配的索引器和注意力内核。',
@@ -493,6 +550,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   cuda: {
     term: 'CUDA',
     aliases: ['NVIDIA CUDA'],
+    plainEnglish: 'CUDA 是让程序在 NVIDIA GPU 上运行的软件工具箱。',
     definition: 'CUDA 是 NVIDIA 的 GPU 计算平台、编程模型、编译工具链与软件库生态。',
     explanation:
       'LLM 引擎使用 CUDA 内核和库执行矩阵乘、注意力、集体通信、图捕获、内存管理与融合操作；容器、驱动、CUDA 和 GPU 架构版本必须兼容。',
@@ -504,6 +562,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   rocm: {
     term: 'ROCm',
     aliases: ['AMD ROCm'],
+    plainEnglish: 'ROCm 是让 AI 和高性能程序在 AMD GPU 上运行的软件工具箱。',
     definition:
       'ROCm 是 AMD 的开放 GPU 计算软件平台，包含运行时、编译器、通信库及优化数学和 AI 内核。',
     explanation:
@@ -516,6 +575,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   vllm: {
     term: 'vLLM',
     aliases: ['开源 LLM 推理引擎'],
+    plainEnglish: 'vLLM 是开源软件，通过组织请求和 GPU 内存，让语言模型高效服务大量用户。',
     definition:
       'vLLM 是开源 LLM 推理与服务引擎，重点提供高吞吐调度、高效 KV 缓存管理和广泛模型/硬件支持。',
     explanation:
@@ -528,6 +588,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   sglang: {
     term: 'SGLang',
     aliases: ['开源 LLM 服务引擎'],
+    plainEnglish:
+      'SGLang 是用于快速服务语言模型的开源软件，提供面向复杂 AI 工作负载的调度和优化功能。',
     definition: 'SGLang 是面向高性能 LLM 与多模态推理的开源服务引擎和语言模型编程系统。',
     explanation:
       '服务运行时包含连续批处理、前缀感知调度、分布式并行、推测解码，以及面向 NVIDIA/AMD GPU 的多种注意力和 MoE 内核后端。',
@@ -539,6 +601,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'tensorrt-llm': {
     term: 'TensorRT-LLM',
     aliases: ['TRT-LLM', 'TRTLLM'],
+    plainEnglish: 'TensorRT-LLM 是 NVIDIA 为自家 GPU 优化的 LLM 推理软件栈。',
     definition:
       'TensorRT-LLM 是 NVIDIA 用于在 NVIDIA GPU 上编译、优化和服务大语言模型的推理软件栈。',
     explanation:
@@ -551,6 +614,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'nvidia-dynamo': {
     term: 'NVIDIA Dynamo',
     aliases: ['Dynamo', '分布式推理框架'],
+    plainEnglish:
+      'NVIDIA Dynamo 协调大量 GPU worker，负责路由请求、移动模型记忆，并把读提示词和写答案分配给合适的资源池。',
     definition:
       'NVIDIA Dynamo 是用于编排请求路由、worker 池、KV 缓存移动和分离式服务的分布式推理框架。',
     explanation:

@@ -267,7 +267,7 @@ export function GlossaryBrowser({
                         </p>
                       </div>
                       <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
-                        {entry.definition}
+                        {entry.plainEnglish}
                       </p>
                       <span
                         aria-hidden="true"

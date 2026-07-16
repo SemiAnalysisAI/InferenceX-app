@@ -16,6 +16,7 @@ export interface GlossaryEntry {
   abbreviation?: string;
   aliases?: readonly string[];
   category: GlossaryCategory;
+  plainEnglish: string;
   definition: string;
   explanation: string;
   significance: string;
@@ -49,6 +50,8 @@ const entries = [
     term: 'AI inference',
     aliases: ['LLM inference', 'model serving'],
     category: 'Serving',
+    plainEnglish:
+      'You give a trained model something new—a prompt, image, or audio—and it uses what it learned to produce an answer.',
     definition:
       'AI inference is the process of running a trained model on new input to produce an output. For a large language model, that usually means processing a prompt and generating tokens.',
     explanation:
@@ -65,6 +68,8 @@ const entries = [
     term: 'Inference engine',
     aliases: ['serving engine', 'LLM serving framework'],
     category: 'Serving',
+    plainEnglish:
+      'The inference engine is the traffic controller behind an AI service: it keeps incoming requests moving and makes sure the GPUs do the right work at the right time.',
     definition:
       'An inference engine is the software runtime that turns model weights and incoming requests into generated outputs on accelerators.',
     explanation:
@@ -81,6 +86,8 @@ const entries = [
     term: 'Throughput',
     aliases: ['token throughput', 'aggregate throughput'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Throughput is how much total work the system gets done each second across everyone using it.',
     definition:
       'Throughput is the total rate at which an inference system produces tokens across all active requests.',
     explanation:
@@ -98,6 +105,8 @@ const entries = [
     term: 'Interactivity',
     aliases: ['generation speed', 'per-user token rate'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Interactivity is how quickly one person sees new words appear after the model starts answering.',
     definition:
       'Interactivity is the rate at which an individual user receives generated tokens during the decode phase.',
     explanation:
@@ -115,6 +124,8 @@ const entries = [
     term: 'Latency',
     aliases: ['response latency', 'inference latency'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Latency is how long you wait. For a streamed answer, that includes both the wait before it starts and the pauses between later words.',
     definition:
       'Latency is elapsed time experienced by a request. In streaming LLM serving it must be decomposed because waiting for the first token and waiting between later tokens are different behaviors.',
     explanation:
@@ -131,6 +142,8 @@ const entries = [
     term: 'Time to first token',
     abbreviation: 'TTFT',
     category: 'Benchmark metrics',
+    plainEnglish:
+      'TTFT is the “thinking…” pause between sending your prompt and seeing the first piece of the answer.',
     definition:
       'Time to first token is the delay from submitting a request until the first generated token is returned.',
     explanation:
@@ -149,6 +162,8 @@ const entries = [
     abbreviation: 'TPOT',
     aliases: ['inter-token latency', 'ITL'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'TPOT is the gap between each new piece of a streamed answer. Smaller gaps make the response feel faster and smoother.',
     definition:
       'Time per output token is the average delay between generated tokens after the first token has arrived.',
     explanation:
@@ -166,6 +181,7 @@ const entries = [
     term: 'Concurrency',
     aliases: ['concurrent requests', 'batch concurrency'],
     category: 'Benchmark metrics',
+    plainEnglish: 'Concurrency is how many people or requests the system is serving at once.',
     definition:
       'Concurrency is the number of requests being served at the same time during a benchmark or deployment.',
     explanation:
@@ -182,6 +198,8 @@ const entries = [
     term: 'Batching',
     aliases: ['continuous batching', 'dynamic batching'],
     category: 'Serving',
+    plainEnglish:
+      'Batching is like putting several passengers on one bus: the GPU handles multiple requests together so each trip does more useful work.',
     definition:
       'Batching groups work from multiple requests so an accelerator can process their tokens together.',
     explanation:
@@ -198,6 +216,8 @@ const entries = [
     term: 'Pareto frontier',
     aliases: ['performance frontier', 'Pareto-optimal curve'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'The Pareto frontier is the line of best available tradeoffs. Every point on it is worth considering because improving one thing would require giving up something else.',
     definition:
       'A Pareto frontier contains the operating points for which no other measured point is better on both compared dimensions.',
     explanation:
@@ -214,6 +234,8 @@ const entries = [
     term: 'Iso-interactivity',
     aliases: ['matched interactivity', 'equal token rate'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Iso-interactivity means comparing systems while users see words appear at the same speed—an apples-to-apples comparison of the hardware behind the experience.',
     definition: 'Iso-interactivity means comparing systems at the same per-user generation rate.',
     explanation:
       'Benchmark runs rarely land at identical tok/s/user values because each recipe has different concurrency points. An iso-interactivity comparison interpolates each Pareto frontier at a shared target and then compares throughput, cost, or efficiency there.',
@@ -230,6 +252,8 @@ const entries = [
     abbreviation: 'ISL / OSL',
     aliases: ['prompt length', 'generation length', '8K/1K'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Input length is how much the model reads; output length is how much it writes. “8K/1K” means a long prompt followed by a shorter answer.',
     definition:
       'Input sequence length is the number of prompt tokens supplied to the model; output sequence length is the number of tokens generated in response.',
     explanation:
@@ -246,6 +270,8 @@ const entries = [
     term: 'Cost per million tokens',
     aliases: ['$/M tokens', 'token cost'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'This is the estimated infrastructure bill for producing one million tokens—the chunks of text an AI model reads and writes.',
     definition:
       'Cost per million tokens estimates the infrastructure cost of producing one million tokens at a measured operating point.',
     explanation:
@@ -271,6 +297,8 @@ const entries = [
     term: 'Performance per dollar',
     aliases: ['perf/$', 'cost efficiency'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Performance per dollar asks a simple question: how much useful AI output do you get for the money spent running the system?',
     definition:
       'Performance per dollar expresses how much measured inference work a system delivers for a unit of modeled cost.',
     explanation:
@@ -292,6 +320,8 @@ const entries = [
     term: 'Total cost of ownership',
     abbreviation: 'TCO',
     category: 'Benchmark metrics',
+    plainEnglish:
+      'TCO is the real all-in cost of owning and running the hardware, not just the price on the GPU invoice.',
     definition:
       'Total cost of ownership is an all-in estimate of the cost to provision and operate computing infrastructure over its useful life.',
     explanation:
@@ -313,6 +343,8 @@ const entries = [
     term: 'Tokens per megawatt',
     aliases: ['tokens per MW', 'power-normalized throughput'],
     category: 'Benchmark metrics',
+    plainEnglish:
+      'Tokens per megawatt asks how much AI output a data center can produce from a fixed amount of available power.',
     definition:
       'Tokens per megawatt measures useful inference throughput relative to a data center power budget.',
     explanation:
@@ -335,6 +367,8 @@ const entries = [
     term: 'Prefill',
     aliases: ['prompt processing', 'context encoding'],
     category: 'Serving',
+    plainEnglish:
+      'Prefill is the model reading and understanding your prompt before it begins writing the answer.',
     definition:
       'Prefill is the first inference phase, in which the model processes the input prompt and populates the KV cache before generation begins.',
     explanation:
@@ -351,6 +385,8 @@ const entries = [
     term: 'Decode',
     aliases: ['autoregressive generation', 'token generation'],
     category: 'Serving',
+    plainEnglish:
+      'Decode is the model writing its answer one token at a time after it has read the prompt.',
     definition:
       'Decode is the inference phase that generates output tokens autoregressively, normally one accepted token per sequence per model step.',
     explanation:
@@ -367,6 +403,8 @@ const entries = [
     term: 'KV cache',
     aliases: ['key-value cache', 'attention cache'],
     category: 'Serving',
+    plainEnglish:
+      'The KV cache is the model’s working memory for the current conversation. It keeps useful notes so the model does not reread everything for every new token.',
     definition:
       'The KV cache stores attention key and value states for tokens already processed so the model does not recompute them at every decode step.',
     explanation:
@@ -389,6 +427,8 @@ const entries = [
     term: 'Prefix caching',
     aliases: ['prompt caching', 'automatic prefix caching'],
     category: 'Serving',
+    plainEnglish:
+      'Prefix caching remembers the work for a repeated beginning—such as the same system prompt—so the model can skip doing that part again.',
     definition:
       'Prefix caching reuses KV-cache state when multiple requests begin with the same token sequence.',
     explanation:
@@ -406,6 +446,8 @@ const entries = [
     abbreviation: 'PD disaggregation',
     aliases: ['disaggregated prefill', 'disagg'],
     category: 'Serving',
+    plainEnglish:
+      'Disaggregated inference gives prompt reading and answer writing to separate GPU teams, so each team can be tuned for its own job.',
     definition:
       'Disaggregated inference runs prefill and decode on separate worker pools and transfers request state between them.',
     explanation:
@@ -422,6 +464,8 @@ const entries = [
     term: 'Speculative decoding',
     aliases: ['spec decode', 'draft-and-verify decoding'],
     category: 'Serving',
+    plainEnglish:
+      'Speculative decoding lets a cheaper helper draft several tokens ahead, then asks the full model to approve them together instead of generating each one separately.',
     definition:
       'Speculative decoding proposes several future tokens cheaply and verifies them together with the target model, reducing the number of expensive serial decode steps.',
     explanation:
@@ -439,6 +483,8 @@ const entries = [
     abbreviation: 'MTP',
     aliases: ['multi-token prediction heads'],
     category: 'Serving',
+    plainEnglish:
+      'MTP lets the model guess several upcoming tokens at once and then verify them, reducing the number of slow one-token-at-a-time steps.',
     definition:
       'Multi-token prediction uses auxiliary heads trained with the model to propose multiple future tokens for speculative verification.',
     explanation:
@@ -455,6 +501,8 @@ const entries = [
     term: 'EAGLE',
     aliases: ['EAGLE speculative decoding', 'EAGLE-3'],
     category: 'Serving',
+    plainEnglish:
+      'EAGLE is a particular way to draft several likely next tokens for the main model to check, which can make answers stream faster.',
     definition:
       'EAGLE is a family of speculative-decoding methods that predicts draft continuations from features associated with the target language model and then verifies them with the target model.',
     explanation:
@@ -471,6 +519,8 @@ const entries = [
     term: 'Tensor parallelism',
     abbreviation: 'TP',
     category: 'Parallelism',
+    plainEnglish:
+      'Tensor parallelism splits one large calculation across several GPUs so they solve it together.',
     definition:
       'Tensor parallelism shards individual tensor operations and model weight matrices across multiple accelerators.',
     explanation:
@@ -487,6 +537,8 @@ const entries = [
     term: 'Expert parallelism',
     abbreviation: 'EP',
     category: 'Parallelism',
+    plainEnglish:
+      'Expert parallelism gives different GPUs different specialist parts of a model, then sends each token to the specialists it needs.',
     definition:
       'Expert parallelism distributes the experts of a mixture-of-experts model across accelerators and routes tokens to the ranks holding their selected experts.',
     explanation:
@@ -508,6 +560,8 @@ const entries = [
     term: 'Data parallelism',
     abbreviation: 'DP',
     category: 'Parallelism',
+    plainEnglish:
+      'Data parallelism makes multiple copies of the model and divides incoming work among them, like opening more identical checkout lanes.',
     definition:
       'Data parallelism runs replicated model or layer groups on multiple ranks and distributes requests or tokens among those replicas.',
     explanation:
@@ -524,6 +578,8 @@ const entries = [
     term: 'Wide expert parallelism',
     abbreviation: 'Wide EP',
     category: 'Parallelism',
+    plainEnglish:
+      'Wide expert parallelism spreads a model’s specialists across many GPUs, giving each GPU less expert data to hold and move.',
     definition:
       'Wide expert parallelism uses a large number of accelerator ranks for the expert-parallel group of a mixture-of-experts model.',
     explanation:
@@ -544,6 +600,8 @@ const entries = [
     slug: 'all-reduce',
     term: 'All-reduce',
     category: 'Parallelism',
+    plainEnglish:
+      'All-reduce lets every GPU solve one piece of a calculation, combines those pieces, and gives the combined result back to everyone.',
     definition:
       'All-reduce is a collective communication operation that combines values from every participating rank and returns the reduced result to every rank.',
     explanation:
@@ -559,6 +617,8 @@ const entries = [
     slug: 'all-to-all',
     term: 'All-to-all',
     category: 'Parallelism',
+    plainEnglish:
+      'All-to-all is a coordinated exchange where every GPU sends a different package of data to every other GPU.',
     definition:
       'All-to-all is a collective pattern in which every participating rank sends distinct data to every other rank.',
     explanation:
@@ -580,6 +640,8 @@ const entries = [
     term: 'Scale-up vs. scale-out networking',
     aliases: ['scale-up domain', 'scale-out fabric'],
     category: 'Parallelism',
+    plainEnglish:
+      'Scale-up is the ultra-fast network inside one tightly connected GPU system; scale-out is the broader network connecting separate servers or racks.',
     definition:
       'Scale-up networking connects accelerators inside one tightly coupled system, while scale-out networking connects multiple systems or racks into a larger cluster.',
     explanation:
@@ -596,6 +658,8 @@ const entries = [
     term: 'High-bandwidth memory',
     abbreviation: 'HBM',
     category: 'Hardware',
+    plainEnglish:
+      'HBM is the GPU’s small pool of extremely fast nearby memory, where model weights and working data must fit while inference runs.',
     definition:
       'High-bandwidth memory is stacked memory placed close to an accelerator to provide much higher bandwidth than conventional server memory.',
     explanation:
@@ -612,6 +676,8 @@ const entries = [
     term: 'Memory bandwidth',
     aliases: ['HBM bandwidth'],
     category: 'Hardware',
+    plainEnglish:
+      'Memory bandwidth is the width of the pipe feeding data to the GPU’s compute units. A wider pipe keeps them from sitting idle.',
     definition:
       'Memory bandwidth is the rate at which data can be transferred between accelerator memory and the compute units.',
     explanation:
@@ -628,6 +694,8 @@ const entries = [
     term: 'NVLink',
     aliases: ['NVIDIA NVLink'],
     category: 'Hardware',
+    plainEnglish:
+      'NVLink is NVIDIA’s high-speed highway between GPUs, allowing them to cooperate much faster than over ordinary server networking.',
     definition:
       'NVLink is NVIDIA’s high-bandwidth accelerator interconnect for moving data directly among GPUs within a scale-up domain.',
     explanation:
@@ -644,6 +712,8 @@ const entries = [
     term: 'Quantization',
     aliases: ['low-precision inference', 'weight quantization'],
     category: 'Numerical precision',
+    plainEnglish:
+      'Quantization stores the model’s numbers with fewer bits, making it smaller and faster to move, usually with a carefully controlled loss of precision.',
     definition:
       'Quantization represents model weights, activations, or cache values with fewer bits than a higher-precision baseline.',
     explanation:
@@ -660,6 +730,8 @@ const entries = [
     term: 'FP8',
     aliases: ['8-bit floating point'],
     category: 'Numerical precision',
+    plainEnglish:
+      'FP8 is a compact 8-bit way to store and calculate with model numbers, reducing memory use and often speeding up inference.',
     definition:
       'FP8 is a family of eight-bit floating-point formats used to reduce model storage, memory traffic, and compute cost relative to FP16 or BF16.',
     explanation:
@@ -676,6 +748,8 @@ const entries = [
     term: 'FP4',
     aliases: ['4-bit floating point'],
     category: 'Numerical precision',
+    plainEnglish:
+      'FP4 compresses model numbers into just 4 bits. That can make inference much faster and smaller, but leaves less room for numerical detail.',
     definition:
       'FP4 refers to four-bit floating-point formats used for very low-precision model representation and accelerated matrix operations.',
     explanation:
@@ -692,6 +766,8 @@ const entries = [
     term: 'NVFP4',
     aliases: ['NVIDIA FP4'],
     category: 'Numerical precision',
+    plainEnglish:
+      'NVFP4 is NVIDIA’s Blackwell-optimized version of 4-bit model math, designed to move less data and use the GPU’s fastest low-precision hardware.',
     definition:
       'NVFP4 is NVIDIA’s block-scaled four-bit floating-point quantization format for Blackwell-generation tensor-core inference.',
     explanation:
@@ -708,6 +784,8 @@ const entries = [
     term: 'MXFP4',
     aliases: ['microscaling FP4', 'OCP MX FP4'],
     category: 'Numerical precision',
+    plainEnglish:
+      'MXFP4 is a 4-bit format that gives small groups of numbers their own scale, helping very compact values keep enough useful range.',
     definition:
       'MXFP4 is a microscaling four-bit floating-point format that shares a scale across small blocks of values.',
     explanation:
@@ -725,6 +803,8 @@ const entries = [
     abbreviation: 'MoE',
     aliases: ['sparse MoE'],
     category: 'Model architecture',
+    plainEnglish:
+      'A mixture-of-experts model is like a large team of specialists: it calls only the few experts best suited to each token instead of using the whole team every time.',
     definition:
       'A mixture-of-experts model contains many feed-forward expert networks but routes each token through only a selected subset.',
     explanation:
@@ -746,6 +826,8 @@ const entries = [
     term: 'Multi-head latent attention',
     abbreviation: 'MLA',
     category: 'Model architecture',
+    plainEnglish:
+      'MLA compresses the model’s notes about earlier tokens so long conversations use less memory and are cheaper to continue.',
     definition:
       'Multi-head latent attention compresses attention key and value state into a lower-dimensional latent representation to reduce KV-cache size and memory traffic.',
     explanation:
@@ -762,6 +844,8 @@ const entries = [
     term: 'Sparse attention',
     aliases: ['DeepSeek Sparse Attention', 'DSA'],
     category: 'Model architecture',
+    plainEnglish:
+      'Sparse attention lets the model look back at only the most useful parts of a long context instead of rereading every earlier token.',
     definition:
       'Sparse attention limits which prior tokens each query attends to instead of computing attention over the entire available context.',
     explanation:
@@ -778,6 +862,7 @@ const entries = [
     term: 'CUDA',
     aliases: ['NVIDIA CUDA'],
     category: 'Software',
+    plainEnglish: 'CUDA is NVIDIA’s software toolbox for making programs run on its GPUs.',
     definition:
       'CUDA is NVIDIA’s GPU computing platform, programming model, compiler toolchain, and library ecosystem.',
     explanation:
@@ -794,6 +879,8 @@ const entries = [
     term: 'ROCm',
     aliases: ['AMD ROCm'],
     category: 'Software',
+    plainEnglish:
+      'ROCm is AMD’s software toolbox for running AI and other high-performance programs on AMD GPUs.',
     definition:
       'ROCm is AMD’s open GPU computing software platform, including runtimes, compilers, communication libraries, and optimized math and AI kernels.',
     explanation:
@@ -809,6 +896,8 @@ const entries = [
     slug: 'vllm',
     term: 'vLLM',
     category: 'Software',
+    plainEnglish:
+      'vLLM is open-source software that organizes requests and GPU memory so language models can serve many users efficiently.',
     definition:
       'vLLM is an open-source LLM inference and serving engine focused on high-throughput scheduling, memory-efficient KV-cache management, and broad model and hardware support.',
     explanation:
@@ -824,6 +913,8 @@ const entries = [
     slug: 'sglang',
     term: 'SGLang',
     category: 'Software',
+    plainEnglish:
+      'SGLang is open-source software for serving language models quickly, with scheduling and optimization features for complex AI workloads.',
     definition:
       'SGLang is an open-source serving engine and language-model programming system optimized for high-performance LLM and multimodal inference.',
     explanation:
@@ -840,6 +931,8 @@ const entries = [
     term: 'TensorRT-LLM',
     aliases: ['TRT-LLM', 'TRTLLM'],
     category: 'Software',
+    plainEnglish:
+      'TensorRT-LLM is NVIDIA’s optimized software stack for getting high inference performance from NVIDIA GPUs.',
     definition:
       'TensorRT-LLM is NVIDIA’s inference stack for compiling, optimizing, and serving large language models on NVIDIA GPUs.',
     explanation:
@@ -856,6 +949,8 @@ const entries = [
     term: 'NVIDIA Dynamo',
     aliases: ['Dynamo'],
     category: 'Software',
+    plainEnglish:
+      'NVIDIA Dynamo coordinates many GPU workers—routing requests, moving model memory, and assigning prompt reading and answer generation to the right pools.',
     definition:
       'NVIDIA Dynamo is a distributed inference framework that orchestrates request routing, worker pools, KV-cache movement, and disaggregated serving.',
     explanation:
@@ -877,7 +972,7 @@ const entries = [
 
 export type GlossaryPreview = Pick<
   GlossaryEntry,
-  'slug' | 'term' | 'abbreviation' | 'aliases' | 'category' | 'definition'
+  'slug' | 'term' | 'abbreviation' | 'aliases' | 'category' | 'plainEnglish' | 'definition'
 >;
 
 const entriesBySlug: Readonly<Record<string, GlossaryEntry>> = Object.fromEntries(
