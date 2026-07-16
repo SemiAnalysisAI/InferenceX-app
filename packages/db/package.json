@@ -12,6 +12,7 @@
     "./queries/*": "./src/queries/*.ts"
   },
   "scripts": {
+    "db:prepare:ci": "tsx src/prepare-ci-artifacts.ts",
     "db:ingest:ci": "tsx src/ingest-ci-run.ts",
     "db:ingest:run": "dotenv -e ../../.env -- tsx src/ingest-ci-run.ts --download",
     "db:ingest:gcs": "dotenv -e ../../.env -- tsx src/ingest-gcs-backup.ts",

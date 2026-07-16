@@ -8,7 +8,8 @@ name: Ingest Agentic Benchmark Results
 #     -H "Accept: application/vnd.github+v3+json" \
 #     https://api.github.com/repos/SemiAnalysisAI/InferenceX-app/dispatches \
 #     -d '{"event_type": "ingest-agentic-results",
-#          "client_payload": {"run-id": "<run_id>", "run-attempt": "<attempt>",
+#          "client_payload": {"source-run-id": "<benchmark_run_id>",
+#                             "merge-run-id": "<main_run_id>",
 #                             "database-target": "production"}}'
 #
 # The ingest script (packages/db/src/ingest-ci-run.ts) auto-detects agentic
@@ -86,7 +87,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.client_payload.run-id || inputs.run-id }}
+  group: ${{ github.workflow }}-${{ github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}
   cancel-in-progress: false
 
 jobs:
@@ -106,7 +107,11 @@ jobs:
       - name: Wait for source run to finish
         if: >-
           github.event_name == 'repository_dispatch' &&
-          github.event.action == 'ingest-agentic-results'
+          github.event.action == 'ingest-agentic-results' &&
+          (
+            github.event.client_payload.source-run-id == '' ||
+            github.event.client_payload.source-run-id == github.event.client_payload.merge-run-id
+          )
         run: sleep 300
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -183,68 +188,40 @@ jobs:
           echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
           echo "Cache invalidate URL: $cache_invalidate_url"
 
-      - name: Run migrations
-        run: pnpm admin:db:migrate --yes
-
-      - name: Download artifacts from InferenceX run
+      - name: Prepare artifacts from InferenceX
+        id: artifacts
         env:
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}
+          MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id || github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-        run: |
-          mkdir -p "$ARTIFACTS_PATH"
+          INGEST_REPO: SemiAnalysisAI/InferenceX
+        run: pnpm admin:db:prepare:ci
 
-          # Download all artifacts for the run, deduplicated by name (keep latest).
-          gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}/artifacts" --paginate \
-            | jq -r '
-                [.artifacts[]]
-                | group_by(.name) | map(sort_by(.created_at) | last)[]
-                | "\(.name)\t\(.archive_download_url)"' \
-            | while IFS=$'\t' read -r name url; do
-                echo "Downloading artifact: ${name}"
-                ok=false
-                for attempt in 1 2 3; do
-                  if gh api "${url}" > artifact.zip; then
-                    ok=true
-                    break
-                  fi
-                  echo "  Attempt ${attempt}/3 failed, retrying in ${attempt}s..."
-                  sleep "$attempt"
-                done
-                if [ "$ok" = false ]; then
-                  echo "::warning::Failed to download artifact after 3 attempts: ${name} — skipping"
-                  rm -f artifact.zip
-                  echo "$name" >> "$ARTIFACTS_PATH/.failures"
-                  continue
-                fi
-                mkdir -p "${ARTIFACTS_PATH}/${name}"
-                if ! unzip -o artifact.zip -d "${ARTIFACTS_PATH}/${name}"; then
-                  echo "::warning::Failed to extract artifact: ${name} — skipping"
-                  rm -rf "${ARTIFACTS_PATH:?}/${name}"
-                  echo "$name" >> "$ARTIFACTS_PATH/.failures"
-                fi
-                rm -f artifact.zip
-              done
+      - name: Checkout reusable-artifact validator
+        if: steps.artifacts.outputs.reused == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: SemiAnalysisAI/InferenceX
+          ref: main
+          token: ${{ secrets.INFX_MAIN_PAT }}
+          path: inferencex-validator
+          persist-credentials: false
 
-          if [ -f "$ARTIFACTS_PATH/.failures" ]; then
-            count=$(wc -l < "$ARTIFACTS_PATH/.failures")
-            rm "$ARTIFACTS_PATH/.failures"
-            echo "::warning::${count} artifact(s) failed to download; ingesting what's available"
-          fi
+      - name: Validate reusable artifacts
+        if: steps.artifacts.outputs.reused == 'true'
+        run: >-
+          python3 inferencex-validator/utils/validate_reusable_sweep_artifacts.py
+          --artifacts-dir "${{ github.workspace }}/artifacts"
 
-          echo "Downloaded artifacts:"
-          ls "$ARTIFACTS_PATH/"
-
-          if [ -z "$(ls -A "$ARTIFACTS_PATH")" ]; then
-            echo "::error::No artifacts could be downloaded from run ${RUN_ID}"
-            exit 1
-          fi
+      - name: Run migrations
+        run: pnpm admin:db:migrate --yes
 
       - name: Ingest results to DB
         env:
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          INGEST_RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
-          INGEST_RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || inputs.run-attempt }}
+          INGEST_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
+          INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
@@ -299,7 +276,7 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": ":warning: *Unrecognized entities during agentic ingest*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n```${{ steps.unmapped.outputs.summary }}```\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+              "text": ":warning: *Unrecognized entities during agentic ingest*\nRun ID: ${{ steps.artifacts.outputs.source-run-id }}\n```${{ steps.unmapped.outputs.summary }}```\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }
 
       - name: Notify Slack on failure
@@ -310,5 +287,5 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": ":rotating_light: *Agentic ingest workflow failed*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+              "text": ":rotating_light: *Agentic ingest workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }

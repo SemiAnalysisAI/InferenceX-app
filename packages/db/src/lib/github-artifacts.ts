@@ -8,19 +8,21 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { hwToGpuKey } from '../etl/normalizers.js';
+
 export interface ArtifactMeta {
+  id?: number;
   name: string;
   archive_download_url: string;
   created_at: string;
+  expired?: boolean;
 }
 
 /**
- * Strips the trailing `_<runner-pool>_<attempt-digits>` token from an
- * artifact name so retries on different runners collapse to one logical
- * artifact. Without this, two artifacts produced for the same logical
- * config (e.g. `…_h200-cw_00` and `…_h200-dgxc-slurm_1`) both land in the
- * DB and the failed one's empty metrics can overwrite the good one via
- * ON CONFLICT DO UPDATE.
+ * Matches the trailing `_<runner-pool>_<runner-index>` token in an artifact
+ * name. The logical name normalizes the runner pool to its hardware class, so
+ * retries on `h200-cw` and `h200-dgxc-slurm` collapse while genuinely distinct
+ * B200 and B300 points remain separate.
  *
  * The runner pool name itself has no underscores (`h200-cw`,
  * `h200-dgxc-slurm`, `b200-nb`), so `[a-zA-Z0-9.-]*` keeps the strip
@@ -29,6 +31,13 @@ export interface ArtifactMeta {
  * name.
  */
 export const RUNNER_SUFFIX_RE = /_[a-zA-Z][a-zA-Z0-9.-]*_\d+$/u;
+
+export function logicalArtifactName(name: string): string {
+  const match = name.match(/^(?<prefix>.*)_(?<runner>[a-zA-Z][a-zA-Z0-9.-]*)_\d+$/u);
+  if (!match?.groups) return name;
+  const hardware = hwToGpuKey(match.groups.runner) ?? match.groups.runner.toLowerCase();
+  return `${match.groups.prefix}_${hardware}`;
+}
 
 /** List a workflow run's artifacts via `gh api` (paginated). Malformed lines are skipped. */
 export function listRunArtifacts(repo: string, runId: string): ArtifactMeta[] {
@@ -57,9 +66,15 @@ export function dedupeArtifactsByLogicalName(
 ): Map<string, ArtifactMeta> {
   const byLogical = new Map<string, ArtifactMeta>();
   for (const a of artifacts) {
-    const key = a.name.replace(RUNNER_SUFFIX_RE, '');
+    const key = logicalArtifactName(a.name);
     const existing = byLogical.get(key);
-    if (!existing || a.created_at > existing.created_at) byLogical.set(key, a);
+    if (
+      !existing ||
+      a.created_at > existing.created_at ||
+      (a.created_at === existing.created_at && (a.id ?? 0) > (existing.id ?? 0))
+    ) {
+      byLogical.set(key, a);
+    }
   }
   return byLogical;
 }

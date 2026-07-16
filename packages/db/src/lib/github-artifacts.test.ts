@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { RUNNER_SUFFIX_RE, dedupeArtifactsByLogicalName } from './github-artifacts.js';
+import {
+  RUNNER_SUFFIX_RE,
+  dedupeArtifactsByLogicalName,
+  logicalArtifactName,
+} from './github-artifacts.js';
 
 const art = (name: string, created_at: string) => ({
   name,
@@ -24,6 +28,22 @@ describe('RUNNER_SUFFIX_RE', () => {
   });
 });
 
+describe('logicalArtifactName', () => {
+  it('collapses runner pools for the same hardware', () => {
+    expect(logicalArtifactName('bmk_dsr1_conc4_h200-cw_00')).toBe('bmk_dsr1_conc4_h200');
+    expect(logicalArtifactName('bmk_dsr1_conc4_h200-dgxc-slurm_1')).toBe('bmk_dsr1_conc4_h200');
+  });
+
+  it('keeps different hardware generations separate', () => {
+    expect(logicalArtifactName('bmk_agentic_dsv4_conc16_b200-dgxc_2')).toBe(
+      'bmk_agentic_dsv4_conc16_b200',
+    );
+    expect(logicalArtifactName('bmk_agentic_dsv4_conc16_b300-nv_2')).toBe(
+      'bmk_agentic_dsv4_conc16_b300',
+    );
+  });
+});
+
 describe('dedupeArtifactsByLogicalName', () => {
   it('keeps only the most recent artifact per logical name', () => {
     const deduped = dedupeArtifactsByLogicalName([
@@ -31,8 +51,8 @@ describe('dedupeArtifactsByLogicalName', () => {
       art('bmk_dsr1_conc4_h200-dgxc-slurm_1', '2026-06-02T00:00:00Z'),
       art('bmk_dsr1_conc8_h200-cw_00', '2026-06-01T00:00:00Z'),
     ]);
-    expect([...deduped.keys()].toSorted()).toEqual(['bmk_dsr1_conc4', 'bmk_dsr1_conc8']);
-    expect(deduped.get('bmk_dsr1_conc4')?.name).toBe('bmk_dsr1_conc4_h200-dgxc-slurm_1');
+    expect([...deduped.keys()].toSorted()).toEqual(['bmk_dsr1_conc4_h200', 'bmk_dsr1_conc8_h200']);
+    expect(deduped.get('bmk_dsr1_conc4_h200')?.name).toBe('bmk_dsr1_conc4_h200-dgxc-slurm_1');
   });
 
   it('passes through names without a runner suffix unchanged', () => {
