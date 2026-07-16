@@ -195,7 +195,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 {entry.measurement && (
                   <div className="mt-8 border-l-2 border-brand bg-brand/6 px-5 py-4">
                     <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                      常用单位或关系
+                      {entry.measurement.label}
                     </p>
                     <p className="mt-1 font-mono text-sm leading-relaxed text-foreground">
                       {entry.measurement.value}

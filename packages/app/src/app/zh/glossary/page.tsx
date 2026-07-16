@@ -10,7 +10,11 @@ import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { getAllPosts } from '@/lib/blog';
 import { GLOSSARY_CATEGORIES } from '@/lib/glossary';
-import { GLOSSARY_CATEGORY_LABELS_ZH, getAllZhGlossaryEntries } from '@/lib/glossary-zh';
+import {
+  GLOSSARY_CATEGORY_LABELS_ZH,
+  compareZhGlossaryEntries,
+  getAllZhGlossaryEntries,
+} from '@/lib/glossary-zh';
 import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -53,20 +57,14 @@ export const metadata: Metadata = {
 };
 
 export default function ZhGlossaryPage() {
-  const entries = getAllZhGlossaryEntries().toSorted((a, b) => {
-    const categoryOrder =
-      GLOSSARY_CATEGORIES.indexOf(a.category) - GLOSSARY_CATEGORIES.indexOf(b.category);
-    return categoryOrder || a.term.localeCompare(b.term, 'zh-CN');
-  });
+  const entries = getAllZhGlossaryEntries().toSorted(compareZhGlossaryEntries);
   const articleCount = getAllPosts('zh').length;
   const browserEntries: GlossaryBrowserEntry[] = entries.map((entry) => ({
     slug: entry.slug,
     term: entry.term,
     ...(entry.abbreviation && { abbreviation: entry.abbreviation }),
-    ...(entry.aliases && { aliases: entry.aliases }),
     category: entry.category,
     plainEnglish: entry.plainEnglish,
-    definition: entry.definition,
     searchText: [
       entry.term,
       entry.abbreviation,

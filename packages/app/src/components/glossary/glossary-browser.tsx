@@ -7,7 +7,10 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import type { GlossaryCategory, GlossaryPreview } from '@/lib/glossary';
 import { cn } from '@/lib/utils';
 
-export type GlossaryBrowserEntry = GlossaryPreview & { searchText: string };
+export type GlossaryBrowserEntry = Pick<
+  GlossaryPreview,
+  'slug' | 'term' | 'abbreviation' | 'category' | 'plainEnglish'
+> & { searchText: string };
 
 export interface GlossaryBrowserLabels {
   searchLabel: string;

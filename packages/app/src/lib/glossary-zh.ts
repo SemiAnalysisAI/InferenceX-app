@@ -1,4 +1,9 @@
-import { type GlossaryCategory, type GlossaryEntry, getAllGlossaryEntries } from './glossary';
+import {
+  GLOSSARY_CATEGORIES,
+  type GlossaryCategory,
+  type GlossaryEntry,
+  getAllGlossaryEntries,
+} from './glossary';
 
 export const GLOSSARY_CATEGORY_LABELS_ZH: Readonly<Record<GlossaryCategory, string>> = {
   'Benchmark metrics': '基准指标',
@@ -19,6 +24,7 @@ type GlossaryTranslation = Pick<
   | 'explanation'
   | 'significance'
   | 'benchmarkContext'
+  | 'measurement'
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
@@ -59,6 +65,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '最大吞吐量不是完整的性能结论。某个点即使拥有最高 tok/s，也可能因为交互性过低而不适合实时产品；有效比较应在符合业务需求的延迟或交互性目标下进行。',
     benchmarkContext:
       'InferenceX 将吞吐量与交互性放在完整并发扫描中共同展示，并用 Pareto 前沿剔除两个轴上都更差的运行点。',
+    measurement: { label: '常用单位', value: 'token/秒/GPU（tok/s/GPU）' },
   },
   interactivity: {
     term: '交互性',
@@ -71,6 +78,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '不同产品需要不同运行点。语音和交互式编程要求较高 token 速率，离线摘要则可以牺牲交互性换取更高总吞吐量；在交互性不一致时比较硬件很容易得出误导性结论。',
     benchmarkContext:
       'InferenceX 将 tok/s/user 与吞吐量或成本一起绘制，并在等交互性表格中沿各自 Pareto 前沿插值，以固定用户体验。',
+    measurement: { label: '常用单位', value: 'token/秒/用户（tok/s/user）' },
   },
   latency: {
     term: '延迟',
@@ -96,6 +104,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '用户会把 TTFT 感知为系统开始回答的速度。即使后续 token 流很快，只要排队或预填充等待过长，整体体验仍会显得迟缓。',
     benchmarkContext:
       '应将 TTFT 与输入序列长度、并发量以及是否采用预填充/解码分离一起阅读，这些因素解释了为何解码速度相近的方案仍可能有不同启动时间。',
+    measurement: { label: '常用单位', value: '毫秒或秒' },
   },
   'time-per-output-token': {
     term: '每输出 token 时间',
@@ -108,6 +117,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       'TPOT 单独刻画回答流是否顺畅。随着更多请求共享系统，TPOT 通常会变差，即便总吞吐量仍在上升。',
     benchmarkContext:
       'InferenceX 多使用其倒数 tok/s/user，便于让更高数值代表更好性能；在比较相同并发下的调度器或内核变化时，方案表也会直接列出 TPOT。',
+    measurement: { label: '换算关系', value: '交互性 ≈ 1000 / TPOT（毫秒）' },
   },
   concurrency: {
     term: '并发量',
@@ -184,11 +194,15 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '该指标把系统性能转化为服务经济性，但仍受工作负载、交互性、利用率、缓存命中和成本假设影响；离线低交互点不能直接与实时端点比较。',
     benchmarkContext:
       '成本曲线使用与吞吐曲线相同的并发扫描。在等交互性下，更低的 $/M 表示以更少建模成本提供相同流式体验。',
+    measurement: {
+      label: 'InferenceX 计算式',
+      value: '$/M = TCO（$/GPU 小时）× 1,000,000 /（3600 × tok/s/GPU）',
+    },
   },
   'performance-per-dollar': {
     term: '每美元性能',
     aliases: ['performance per dollar', 'perf/$', '成本效率'],
-    plainEnglish: '每美元性能回答一个简单问题：花在运行系统上的每一美元，能换来多少有效 AI 输出？',
+    plainEnglish: '每美元性能表示每投入一美元运行系统，能够获得多少有效 AI 输出。',
     definition: '每美元性能表示系统每单位建模成本能够交付多少实测推理工作。',
     explanation:
       '在固定工作负载和交互性目标下，它是每 token 成本的倒数。2 倍 perf/$ 意味着在相同基础设施支出下，可生成约两倍可比 token。',
@@ -220,6 +234,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '电力供应往往是新增 AI 部署的硬约束。每兆瓦生成更多 token 的系统，即使单个加速器功耗更高，也能在相同电力配额下服务更多需求。',
     benchmarkContext:
       '比较 tokens/MW 时必须匹配模型、工作负载、精度与交互性，否则高吞吐低交互点可能看似高效，却无法满足目标用户体验。',
+    measurement: { label: '常用单位', value: '每单位配置市电兆瓦的 token/秒' },
   },
   prefill: {
     term: '预填充',
@@ -651,11 +666,17 @@ export function getRelatedZhGlossaryEntries(entry: GlossaryEntry): GlossaryEntry
   });
 }
 
+export function compareZhGlossaryEntries(a: GlossaryEntry, b: GlossaryEntry): number {
+  const categoryOrder =
+    GLOSSARY_CATEGORIES.indexOf(a.category) - GLOSSARY_CATEGORIES.indexOf(b.category);
+  return categoryOrder || a.term.localeCompare(b.term, 'zh-CN');
+}
+
 export function getAdjacentZhGlossaryEntries(slug: string): {
   previous: GlossaryEntry | null;
   next: GlossaryEntry | null;
 } {
-  const sorted = entries.toSorted((a, b) => a.term.localeCompare(b.term, 'zh-CN'));
+  const sorted = entries.toSorted(compareZhGlossaryEntries);
   const index = sorted.findIndex((entry) => entry.slug === slug);
   if (index === -1) return { previous: null, next: null };
   return {

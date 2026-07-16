@@ -10,6 +10,7 @@ import {
 } from './glossary';
 import {
   GLOSSARY_CATEGORY_LABELS_ZH,
+  compareZhGlossaryEntries,
   getAdjacentZhGlossaryEntries,
   getAllZhGlossaryEntries,
   getRelatedZhGlossaryEntries,
@@ -80,6 +81,12 @@ describe('Chinese glossary content', () => {
       expect(plainLanguageCharacters, entry.slug).toBeLessThanOrEqual(60);
       expect(entry.plainEnglish).not.toBe(entry.definition);
       expect(JSON.stringify(entry), entry.term).not.toMatch(/[—–]/u);
+      const englishMeasurement = getGlossaryEntry(entry.slug)?.measurement;
+      if (englishMeasurement) {
+        expect(entry.measurement, entry.term).toBeDefined();
+        expect(entry.measurement?.label, entry.term).not.toBe(englishMeasurement.label);
+        expect(entry.measurement?.value, entry.term).not.toBe(englishMeasurement.value);
+      }
       const renderedCopy = [
         entry.definition,
         entry.explanation,
@@ -103,9 +110,7 @@ describe('Chinese glossary content', () => {
     expect(getZhGlossaryEntry('multi-token-prediction')?.term).toBe('多 token 预测');
     expect(getZhGlossaryEntry('not-a-real-term')).toBeUndefined();
 
-    const sorted = getAllZhGlossaryEntries().toSorted((a, b) =>
-      a.term.localeCompare(b.term, 'zh-CN'),
-    );
+    const sorted = getAllZhGlossaryEntries().toSorted(compareZhGlossaryEntries);
     for (const [index, entry] of sorted.entries()) {
       expect(getAdjacentZhGlossaryEntries(entry.slug)).toEqual({
         previous: sorted[index - 1] ?? null,

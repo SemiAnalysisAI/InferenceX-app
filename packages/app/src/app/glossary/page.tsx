@@ -45,10 +45,8 @@ export default function GlossaryPage() {
     slug: entry.slug,
     term: entry.term,
     ...(entry.abbreviation && { abbreviation: entry.abbreviation }),
-    ...(entry.aliases && { aliases: entry.aliases }),
     category: entry.category,
     plainEnglish: entry.plainEnglish,
-    definition: entry.definition,
     searchText: [
       entry.term,
       entry.abbreviation,
