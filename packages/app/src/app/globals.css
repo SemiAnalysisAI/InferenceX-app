@@ -43,15 +43,16 @@
 /* Pride theme for the InferenceX wordmark — celebrating July Disability Pride Month.
    Paints the brand text with the Disability Pride flag's 5 stripe colors via a
    clipped diagonal gradient (Ann Magill's 2021 revised, low-sensitivity palette):
-   red = physical, gold = neurodivergent, white = invisible/undiagnosed,
-   blue = psychiatric, green = sensory. */
+   red = physical, gold = neurodivergent, gray = invisible/undiagnosed,
+   blue = psychiatric, green = sensory. The flag's white stripe is darkened to a
+   readable slate here so the clipped wordmark stays legible on the light header. */
 .pride-wordmark {
   background-image: linear-gradient(
     135deg,
     #cf7280 0%,
-    #eede77 25%,
-    #e8e8e8 50%,
-    #7bc2e0 75%,
+    #d9ad2e 28%,
+    #8a8f99 50%,
+    #4aa6cf 72%,
     #3aa660 100%
   );
   background-clip: text;
