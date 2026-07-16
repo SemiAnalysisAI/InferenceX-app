@@ -59,9 +59,11 @@ jobs:
 
       - name: Validate reusable artifacts
         if: steps.artifacts.outputs.reused == 'true'
+        env:
+          ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
         run: >-
           python3 inferencex-validator/utils/validate_reusable_sweep_artifacts.py
-          --artifacts-dir "${{ github.workspace }}/artifacts"
+          --artifacts-dir "$ARTIFACTS_PATH"
 
       - name: Run migrations
         env:
