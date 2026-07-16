@@ -40,17 +40,19 @@
   content: none;
 }
 
-/* Pride theme for the InferenceX wordmark — celebrating June Pride Month.
-   Paints the brand text with the 6-stripe rainbow flag via a clipped gradient. */
+/* Pride theme for the InferenceX wordmark — celebrating July Disability Pride Month.
+   Paints the brand text with the Disability Pride flag's 5 stripe colors via a
+   clipped diagonal gradient (Ann Magill's 2021 revised, low-sensitivity palette):
+   red = physical, gold = neurodivergent, white = invisible/undiagnosed,
+   blue = psychiatric, green = sensory. */
 .pride-wordmark {
   background-image: linear-gradient(
-    90deg,
-    #e40303 0%,
-    #ff8c00 20%,
-    #ffed00 40%,
-    #008026 60%,
-    #004dff 80%,
-    #750787 100%
+    135deg,
+    #cf7280 0%,
+    #eede77 25%,
+    #e8e8e8 50%,
+    #7bc2e0 75%,
+    #3aa660 100%
   );
   background-clip: text;
   -webkit-background-clip: text;
