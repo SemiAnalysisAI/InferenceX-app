@@ -33,7 +33,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '推理既是模型问题，也是系统问题。用户体验取决于延迟和交互性，运营成本则取决于吞吐量、利用率、功耗与硬件成本；只优化其中一个维度，往往会牺牲另一个维度。',
     benchmarkContext:
-      'InferenceX 测试完整的推理方案，而不是只引用芯片峰值规格。每条曲线都对应明确的模型、引擎、精度、并行策略、GPU 系统、序列长度和并发扫描。',
+      'InferenceX 测试完整的推理方案，因为芯片峰值规格无法代表实际服务性能。每条曲线都对应明确的模型、引擎、精度、并行策略、GPU 系统、序列长度和并发扫描。',
   },
   'inference-engine': {
     term: '推理引擎',
@@ -66,7 +66,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: '交互性表示模型开始回答后，单个用户看到新文字出现得有多快。',
     definition: '交互性是解码阶段单个用户接收生成 token 的速率。',
     explanation:
-      '在单位换算一致时，它是每输出 token 时间的倒数。50 tok/s/user 表示首个 token 之后大约每 20 毫秒输出一个新 token；它描述流式响应速度，而不是首 token 到达前的等待。',
+      '在单位换算一致时，它是每输出 token 时间的倒数。50 tok/s/user 表示首个 token 之后大约每 20 毫秒输出一个新 token；它描述流式响应速度，不包含首 token 到达前的等待。',
     significance:
       '不同产品需要不同运行点。语音和交互式编程要求较高 token 速率，离线摘要则可以牺牲交互性换取更高总吞吐量；在交互性不一致时比较硬件很容易得出误导性结论。',
     benchmarkContext:
@@ -119,7 +119,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '单个并发值只代表一个运行点。生产流量持续变化，在低并发领先的方案，可能在大批次或通信占主导时被其他方案超越。',
     benchmarkContext:
-      'InferenceX 扫描多个并发值以构建吞吐量—交互性曲线，曲线标签会标出每个点的请求数，并显示方案何时饱和或性能坍塌。',
+      'InferenceX 扫描多个并发值以构建吞吐量与交互性曲线，曲线标签会标出每个点的请求数，并显示方案何时饱和或性能坍塌。',
   },
   batching: {
     term: '批处理',
@@ -128,7 +128,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '批处理就像让多名乘客坐同一辆巴士：GPU 一次处理多个请求，让每趟计算完成更多有效工作。',
     definition: '批处理将多个请求的工作组合起来，使加速器能够一起处理它们的 token。',
     explanation:
-      '大型矩阵运算比大量微小运算更能发挥 GPU 效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，而不是等待固定批次全部完成。',
+      '大型矩阵运算比大量微小运算更能发挥 GPU 效率。现代推理引擎采用连续批处理，请求到达和结束时动态加入或退出，无需等待固定批次全部完成。',
     significance:
       '批处理是吞吐量与延迟核心权衡的来源。更大的有效批次能摊薄权重读取和内核启动开销，但通常会增加每位用户的 token 间隔。',
     benchmarkContext:
@@ -145,7 +145,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '前沿能避免噪声点或调优较差的点扭曲比较，并展示真正的权衡。沿曲线仍不存在普适赢家，最佳点取决于用户最低交互性或最高成本目标。',
     benchmarkContext:
-      'InferenceX 连接并发与配置扫描中的 Pareto 最优点，等交互性比较也沿这些前沿插值，而不是随意选择原始点。',
+      'InferenceX 连接并发与配置扫描中的 Pareto 最优点，等交互性比较也沿这些前沿插值，避免用随意选择的原始点直接比较。',
   },
   'iso-interactivity': {
     term: '等交互性',
@@ -200,7 +200,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'total-cost-of-ownership': {
     term: '总体拥有成本',
     aliases: ['total cost of ownership', '全生命周期成本'],
-    plainEnglish: 'TCO 是拥有和运行硬件的真实全口径成本，而不只是 GPU 发票上的价格。',
+    plainEnglish: 'TCO 包含硬件采购，以及后续供电、制冷、网络和运维成本。',
     definition: '总体拥有成本（TCO）是基础设施在使用寿命内采购、部署和运营的综合成本估算。',
     explanation:
       'GPU 采购价只是其中一项。TCO 模型还可包含主机、网络、供电、制冷、机房、融资、折旧、维护和预期利用率，并归一化为每 GPU 小时成本。',
@@ -269,7 +269,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '具有重复前缀的生产工作负载可能明显快于随机 token 基准；收益取决于命中率、缓存容量、淘汰策略与请求能否路由到持有所需状态的节点。',
     benchmarkContext:
-      'InferenceX 通常在随机数据集上禁用前缀缓存，因为偶然复用会测量缓存策略而不是完整提示词处理；除非明确说明，应把结果视为无命中基线。',
+      'InferenceX 通常在随机数据集上禁用前缀缓存，避免把缓存策略混入完整提示词处理的测量。除非明确说明，应把结果视为无命中基线。',
   },
   'disaggregated-inference': {
     term: '分离式推理',
@@ -285,9 +285,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'speculative-decoding': {
     term: '推测解码',
-    aliases: ['speculative decoding', '草稿—验证解码'],
+    aliases: ['speculative decoding', '草稿与验证解码'],
     plainEnglish:
-      '推测解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，而不是逐个生成。',
+      '推测解码让一个便宜的助手先起草多个 token，再由完整模型一次性审核，省去部分逐个生成步骤。',
     definition:
       '推测解码先以低成本提出多个未来 token，再由目标模型批量验证，从而减少昂贵的串行解码步数。',
     explanation:
@@ -419,7 +419,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       'HBM 存储模型权重、激活、工作区与 KV 缓存。容量决定哪些模型、批大小和并行布局能放入；带宽决定内存受限内核能多快读取这些状态。',
     significance:
-      'LLM 解码中，每个 token 往往读取的数据远多于计算量，因此 HBM 带宽是主要性能上限；额外容量也可能在峰值算力相近时解锁更高效的方案。',
+      'LLM 解码中，每个 token 往往读取的数据远多于计算量，因此 HBM 带宽是主要性能上限；额外容量即使在峰值算力相近时也能支持更高效的方案。',
     benchmarkContext:
       'InferenceX 硬件比较会区分 HBM 容量与带宽。例如 GB300 的更大容量可容纳 GB200 无法放入的更宽预填充/解码布局。',
   },
@@ -470,7 +470,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'FP8 在新一代 NVIDIA 与 AMD 加速器上支持广泛，常作为稳定低精度基线；真实性能取决于端到端内核覆盖，回退操作会抹平理论收益。',
     benchmarkContext:
-      'InferenceX 的 FP8 标签描述完整方案，而不只是检查点文件名。引擎、注意力后端、KV 缓存格式、GPU 代际和 MTP 设置都可能改变曲线。',
+      'InferenceX 的 FP8 标签覆盖完整方案，检查点文件名只是其中一项。引擎、注意力后端、KV 缓存格式、GPU 代际和 MTP 设置都可能改变曲线。',
   },
   fp4: {
     term: 'FP4',
@@ -505,7 +505,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '块级缩放让四位值在局部保有可用动态范围，同时维持紧凑存储与传输；硬件和软件必须就块布局、缩放表示与矩阵内核达成一致。',
     significance:
-      'MXFP4 用于 AMD 及跨厂商低精度路径，实际结果取决于检查点制备与内核覆盖，而不只是标称 bit 数。',
+      'MXFP4 用于 AMD 及跨厂商低精度路径。实际结果由检查点制备与内核覆盖决定，标称 bit 数无法完整描述。',
     benchmarkContext:
       'InferenceX 把 MXFP4 记录为完整引擎和硬件方案的一部分。与 NVFP4 或 FP8 比较时，应匹配模型、序列长度、质量要求和交互性目标。',
   },
@@ -513,7 +513,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: '混合专家模型',
     aliases: ['mixture of experts', 'MoE', '稀疏 MoE'],
     plainEnglish:
-      '混合专家模型像一支大型专家团队：每个 token 只调用最合适的少数专家，而不是每次动用全员。',
+      '混合专家模型像一支大型专家团队：每个 token 只调用最合适的少数专家，无需每次动用全员。',
     definition: '混合专家模型包含大量前馈专家网络，但每个 token 只会被路由到其中一小部分。',
     explanation:
       '路由器为每个 token 计算专家分数，top-k 路由激活所选专家及共享专家。这让模型总参数可远大于每个 token 实际使用的计算量。',
@@ -538,8 +538,8 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   'sparse-attention': {
     term: '稀疏注意力',
     aliases: ['sparse attention', 'DeepSeek Sparse Attention', 'DSA'],
-    plainEnglish: '稀疏注意力只回看长上下文中最有用的部分，而不是重新检查每个历史 token。',
-    definition: '稀疏注意力限制每个 query 可关注的历史 token，而不是对全部上下文执行完整注意力。',
+    plainEnglish: '稀疏注意力只回看长上下文中最有用的部分，无需重新检查每个历史 token。',
+    definition: '稀疏注意力限制每个 query 可关注的历史 token，避免对全部上下文执行完整注意力。',
     explanation:
       '稀疏模式可选择局部、压缩、索引或学习得到的上下文子集，降低长序列计算与内存移动；模型架构与运行时必须有匹配的索引器和注意力内核。',
     significance:
@@ -596,7 +596,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'SGLang 快速迭代的版本和模型专用内核可在硬件不变时显著改变吞吐量；低并发受调度开销影响，其他区间则由注意力、MoE 与通信内核主导。',
     benchmarkContext:
-      'InferenceX 持续重跑固定版本的 SGLang 方案。跨版本曲线能显示改动落在性能曲线的哪个区间，而不是把发布简化成单一峰值数字。',
+      'InferenceX 持续重跑固定版本的 SGLang 方案。跨版本曲线会保留改动对完整性能区间的影响。',
   },
   'tensorrt-llm': {
     term: 'TensorRT-LLM',
@@ -607,7 +607,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '它提供 NVIDIA 优化内核、量化路径、分布式执行和模型专用优化；既可作为服务后端，也可通过集成让其他引擎使用其衍生内核。',
     significance:
-      '紧密硬件集成可快速解锁 Blackwell 与 NVL72 功能，但模型支持和引擎兼容仍与版本相关，因此 TensorRT-LLM 标签必须对应具体容器与方案。',
+      '紧密硬件集成可快速支持 Blackwell 与 NVL72 功能，但模型支持和引擎兼容仍与版本相关，因此 TensorRT-LLM 标签必须对应具体容器与方案。',
     benchmarkContext:
       'InferenceX 同时包含直接 TensorRT-LLM、Dynamo TensorRT-LLM，以及 SGLang/vLLM 使用 TRT-LLM 衍生内核后端的配置。',
   },
@@ -619,9 +619,9 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     definition:
       'NVIDIA Dynamo 是用于编排请求路由、worker 池、KV 缓存移动和分离式服务的分布式推理框架。',
     explanation:
-      'Dynamo 可把预填充与解码放在独立扩展的池中，并使用 vLLM 或 TensorRT-LLM 作为 worker 运行时；它管理引擎周围的数据与控制路径，而不是替代内部所有内核。',
+      'Dynamo 可把预填充与解码放在独立扩展的池中，并使用 vLLM 或 TensorRT-LLM 作为 worker 运行时。内核仍由这些引擎执行，Dynamo 负责外围数据与控制路径。',
     significance:
-      '机架级服务不仅需要快速单 GPU 运行时。路由、缓存传输、拓扑感知与池大小决定 Wide EP 和分离式推理能否提升端到端性能。',
+      '机架级性能由单 GPU 运行时、路由、缓存传输、拓扑感知与池大小共同决定。这些因素决定 Wide EP 和分离式推理能否提升端到端性能。',
     benchmarkContext:
       'Dynamo vLLM、Dynamo TRT-LLM 标签同时标识编排层与执行引擎。InferenceX 文章还会明确预填充/解码拓扑，因为两种 Dynamo 配置可能表现完全不同。',
   },

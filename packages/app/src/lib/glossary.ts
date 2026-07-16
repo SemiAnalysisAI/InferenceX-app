@@ -51,15 +51,15 @@ const entries = [
     aliases: ['LLM inference', 'model serving'],
     category: 'Serving',
     plainEnglish:
-      'You give a trained model something new—a prompt, image, or audio—and it uses what it learned to produce an answer.',
+      'You give a trained model something new, such as a prompt, image, or audio. It uses what it learned to produce an answer.',
     definition:
       'AI inference is the process of running a trained model on new input to produce an output. For a large language model, that usually means processing a prompt and generating tokens.',
     explanation:
-      'Training changes model weights; inference uses those weights. A production inference system wraps the model in a serving engine that schedules requests, manages memory, batches work, and runs kernels on one or more accelerators. The same model can have radically different inference performance depending on that software and hardware stack.',
+      'Training changes model weights; inference uses those weights. A production inference system wraps the model in a serving engine that schedules requests, manages memory, batches work, and runs kernels on one or more accelerators. Performance can vary with the surrounding software and hardware stack.',
     significance:
-      'Inference is a systems problem as much as a model problem. User experience depends on latency and interactivity, while operator economics depend on throughput, utilization, power, and hardware cost. Optimizing only one of those dimensions can make another worse.',
+      'Inference performance depends on the system around the model. User experience depends on latency and interactivity, while operator economics depend on throughput, utilization, power, and hardware cost. Optimizing one dimension can make another worse.',
     benchmarkContext:
-      'InferenceX benchmarks complete serving recipes rather than quoting only peak chip specifications. Each curve captures a model, engine, numerical precision, parallelism strategy, GPU system, sequence length, and concurrency sweep.',
+      'InferenceX benchmarks complete serving recipes because peak chip specifications alone cannot describe serving performance. Each curve captures a model, engine, numerical precision, parallelism strategy, GPU system, sequence length, and concurrency sweep.',
     relatedTerms: ['inference-engine', 'prefill', 'decode', 'throughput', 'interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
   },
@@ -93,7 +93,7 @@ const entries = [
     explanation:
       'InferenceX commonly normalizes throughput as tokens per second per GPU so systems of different sizes can be compared. Higher batching or concurrency often raises aggregate throughput because weight reads and compute are amortized across more requests, but individual users may receive tokens more slowly.',
     significance:
-      'Maximum throughput alone is not a complete performance claim. A point can lead in tokens per second while operating at interactivity too low for a real-time product. The useful comparison is throughput at a latency or interactivity target appropriate to the workload.',
+      'Maximum throughput captures only one operating point. A system can lead in tokens per second while operating at interactivity too low for a real-time product. The useful comparison is throughput at a latency or interactivity target appropriate to the workload.',
     benchmarkContext:
       'On an InferenceX chart, throughput is read together with interactivity across the full concurrency sweep. The Pareto frontier removes operating points that are worse on both axes.',
     measurement: { label: 'Typical unit', value: 'tokens/second/GPU (tok/s/GPU)' },
@@ -133,7 +133,7 @@ const entries = [
     significance:
       'Low latency can require smaller batches or more parallel resources, which may reduce hardware utilization and increase cost. Good serving design chooses a latency service level and then maximizes throughput within it.',
     benchmarkContext:
-      'InferenceX emphasizes interactivity for decode responsiveness and exposes workload shape and concurrency so readers do not mistake a high-throughput batch point for a low-latency serving point.',
+      'InferenceX exposes workload shape and concurrency alongside interactivity. This keeps a high-throughput batch point from being mistaken for a low-latency serving point.',
     relatedTerms: ['time-to-first-token', 'time-per-output-token', 'interactivity', 'concurrency'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2],
   },
@@ -189,7 +189,7 @@ const entries = [
     significance:
       'A single concurrency value reveals only one operating point. Production traffic changes over time, and a recipe that looks best at low concurrency may be overtaken when batches become large or communication begins to dominate.',
     benchmarkContext:
-      'InferenceX sweeps concurrency to build a throughput–interactivity curve. Labels on the curve identify the request count behind each point and expose where a configuration saturates or collapses.',
+      'InferenceX sweeps concurrency to build a throughput-interactivity curve. Labels on the curve identify the request count behind each point and expose where a configuration saturates or collapses.',
     relatedTerms: ['throughput', 'interactivity', 'batching', 'pareto-frontier'],
     articleSlugs: [SGLANG_056, GB200_KIMI, MI355X_QWEN],
   },
@@ -203,11 +203,11 @@ const entries = [
     definition:
       'Batching groups work from multiple requests so an accelerator can process their tokens together.',
     explanation:
-      'Large matrix operations use GPUs more efficiently than many tiny operations. Modern serving engines continuously add and remove sequences as requests arrive and finish rather than waiting for a fixed batch to complete. The resulting batch shape changes throughout prefill and decode.',
+      'Large matrix operations use GPUs more efficiently than many tiny operations. Modern serving engines continuously add and remove sequences as requests arrive and finish, without waiting for a fixed batch to complete. The resulting batch shape changes throughout prefill and decode.',
     significance:
-      'Batching is the source of the core throughput–latency tradeoff. Larger effective batches amortize weight reads and launch overhead but generally increase the time between tokens for each user.',
+      'Batching creates the core throughput-latency tradeoff. Larger effective batches amortize weight reads and launch overhead but generally increase the time between tokens for each user.',
     benchmarkContext:
-      'Concurrency is an input to batching, not a guarantee of a particular kernel batch size. Parallelism, sequence lengths, request completion, and scheduler policy all affect the effective batch observed by the GPU.',
+      'Concurrency supplies work to the batcher. Parallelism, sequence lengths, request completion, and scheduler policy determine the effective batch observed by the GPU.',
     relatedTerms: ['concurrency', 'throughput', 'decode', 'interactivity'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2, SGLANG_056],
   },
@@ -217,7 +217,7 @@ const entries = [
     aliases: ['performance frontier', 'Pareto-optimal curve'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'The Pareto frontier is the line of best available tradeoffs. Every point on it is worth considering because improving one thing would require giving up something else.',
+      'The Pareto frontier is the line of best available tradeoffs. Each point remains viable because improving one dimension would require giving up ground on another.',
     definition:
       'A Pareto frontier contains the operating points for which no other measured point is better on both compared dimensions.',
     explanation:
@@ -225,7 +225,7 @@ const entries = [
     significance:
       'The frontier prevents noisy or poorly tuned points from distorting comparisons and makes the real tradeoff visible. There is still no universal winner along the curve: the best point depends on the user’s minimum interactivity or maximum cost target.',
     benchmarkContext:
-      'InferenceX connects Pareto-optimal points from a concurrency and configuration sweep. Iso-interactivity comparisons interpolate along those frontiers rather than comparing arbitrarily selected raw points.',
+      'InferenceX connects Pareto-optimal points from a concurrency and configuration sweep. Iso-interactivity comparisons interpolate along those frontiers because direct comparisons of arbitrary raw points can mislead.',
     relatedTerms: ['throughput', 'interactivity', 'iso-interactivity', 'concurrency'],
     articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_GLM5],
   },
@@ -235,14 +235,14 @@ const entries = [
     aliases: ['matched interactivity', 'equal token rate'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'Iso-interactivity means comparing systems while users see words appear at the same speed—an apples-to-apples comparison of the hardware behind the experience.',
+      'Iso-interactivity compares systems while users see words appear at the same speed. This provides an apples-to-apples view of the hardware behind the experience.',
     definition: 'Iso-interactivity means comparing systems at the same per-user generation rate.',
     explanation:
       'Benchmark runs rarely land at identical tok/s/user values because each recipe has different concurrency points. An iso-interactivity comparison interpolates each Pareto frontier at a shared target and then compares throughput, cost, or efficiency there.',
     significance:
       'Holding user experience constant avoids a common benchmark error: declaring a high-throughput system faster when it reaches that throughput only by serving every request more slowly.',
     benchmarkContext:
-      'InferenceX articles use iso-interactivity tables for hardware, precision, and software comparisons. Values outside a measured frontier are marked unreachable rather than extrapolated beyond observed data.',
+      'InferenceX articles use iso-interactivity tables for hardware, precision, and software comparisons. Values outside a measured frontier are marked unreachable and are not extrapolated beyond observed data.',
     relatedTerms: ['interactivity', 'pareto-frontier', 'throughput', 'performance-per-dollar'],
     articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, GB300_DSV4],
   },
@@ -271,13 +271,13 @@ const entries = [
     aliases: ['$/M tokens', 'token cost'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'This is the estimated infrastructure bill for producing one million tokens—the chunks of text an AI model reads and writes.',
+      'This is the estimated infrastructure bill for producing one million tokens, the chunks of text an AI model reads and writes.',
     definition:
       'Cost per million tokens estimates the infrastructure cost of producing one million tokens at a measured operating point.',
     explanation:
       'InferenceX derives the metric from hourly total cost of ownership and measured token throughput. It may be reported for total tokens or separated into input and output tokens, so the denominator must be checked before comparing values.',
     significance:
-      'The metric converts systems performance into serving economics. It still depends on workload shape, interactivity, utilization, cache behavior, and cost assumptions; a low-throughput offline point is not directly comparable to a high-interactivity endpoint.',
+      'Workload shape, interactivity, utilization, cache behavior, and cost assumptions determine whether two values are comparable. A low-throughput offline point and a high-interactivity endpoint represent different operating regimes.',
     benchmarkContext:
       'Cost curves use the same concurrency sweep as throughput curves. At iso-interactivity, lower $/M means the system delivers the same streaming experience with less modeled infrastructure cost.',
     measurement: {
@@ -298,13 +298,13 @@ const entries = [
     aliases: ['perf/$', 'cost efficiency'],
     category: 'Benchmark metrics',
     plainEnglish:
-      'Performance per dollar asks a simple question: how much useful AI output do you get for the money spent running the system?',
+      'Performance per dollar measures how much useful AI output the system produces for each dollar spent running it.',
     definition:
       'Performance per dollar expresses how much measured inference work a system delivers for a unit of modeled cost.',
     explanation:
       'For a fixed workload and interactivity target, performance per dollar is the inverse of cost per token. A 2× perf/$ advantage means the system can produce about twice as many comparable tokens for the same infrastructure spend.',
     significance:
-      'Peak chip FLOPS do not determine serving economics by themselves. Memory, networking, software maturity, numerical precision, and achievable utilization all affect the measured output behind the ratio.',
+      'Peak chip FLOPS account for only part of serving economics. Memory, networking, software maturity, numerical precision, and achievable utilization all affect the measured output behind the ratio.',
     benchmarkContext:
       'InferenceX compares perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes.',
     relatedTerms: [
@@ -321,7 +321,7 @@ const entries = [
     abbreviation: 'TCO',
     category: 'Benchmark metrics',
     plainEnglish:
-      'TCO is the real all-in cost of owning and running the hardware, not just the price on the GPU invoice.',
+      'TCO covers the hardware purchase plus the cost of powering, cooling, networking, and operating it over time.',
     definition:
       'Total cost of ownership is an all-in estimate of the cost to provision and operate computing infrastructure over its useful life.',
     explanation:
@@ -348,7 +348,7 @@ const entries = [
     definition:
       'Tokens per megawatt measures useful inference throughput relative to a data center power budget.',
     explanation:
-      'InferenceX uses all-in provisioned utility power rather than chip thermal design power alone. That broader denominator can include the overhead required to deliver and cool the IT load, making the metric useful for capacity planning at facility scale.',
+      'InferenceX uses all-in provisioned utility power, including overhead for power delivery and cooling. Chip thermal design power covers only the accelerator, so it is less useful for facility-level capacity planning.',
     significance:
       'Power availability is often the binding constraint on new AI deployments. A system that produces more tokens per provisioned megawatt can serve more demand from the same utility allocation even if its individual accelerators draw more power.',
     benchmarkContext:
@@ -390,7 +390,7 @@ const entries = [
     definition:
       'Decode is the inference phase that generates output tokens autoregressively, normally one accepted token per sequence per model step.',
     explanation:
-      'Each new token depends on preceding tokens, so generation cannot be fully parallelized across time. The model repeatedly reads weights and the sequence’s KV cache, which makes decode especially sensitive to memory bandwidth, batching, and communication.',
+      'Each new token depends on preceding tokens, which limits parallelism across time. The model repeatedly reads weights and the sequence’s KV cache, making decode especially sensitive to memory bandwidth, batching, and communication.',
     significance:
       'Decode controls streaming interactivity and often dominates the cost of long outputs. Techniques such as speculative decoding, MTP, quantization, and wide expert parallelism aim to reduce the work or time required per accepted token.',
     benchmarkContext:
@@ -404,9 +404,9 @@ const entries = [
     aliases: ['key-value cache', 'attention cache'],
     category: 'Serving',
     plainEnglish:
-      'The KV cache is the model’s working memory for the current conversation. It keeps useful notes so the model does not reread everything for every new token.',
+      'The KV cache is the model’s working memory for the current conversation. It keeps useful notes and avoids rereading everything for every new token.',
     definition:
-      'The KV cache stores attention key and value states for tokens already processed so the model does not recompute them at every decode step.',
+      'The KV cache stores attention key and value states for tokens already processed, allowing each decode step to reuse them.',
     explanation:
       'The cache grows with sequence length, batch size, layer count, and the number and width of stored attention heads. During decode it is repeatedly read from accelerator memory, so both capacity and bandwidth matter.',
     significance:
@@ -428,15 +428,15 @@ const entries = [
     aliases: ['prompt caching', 'automatic prefix caching'],
     category: 'Serving',
     plainEnglish:
-      'Prefix caching remembers the work for a repeated beginning—such as the same system prompt—so the model can skip doing that part again.',
+      'Prefix caching remembers the work for a repeated beginning, such as the same system prompt, so the model can skip that work next time.',
     definition:
       'Prefix caching reuses KV-cache state when multiple requests begin with the same token sequence.',
     explanation:
-      'A repeated system prompt, shared document, or common conversation prefix does not need to be prefetched again if its cached states remain available. A cache hit can sharply reduce prompt computation and time to first token.',
+      'A repeated system prompt, shared document, or common conversation prefix can reuse cached states. A cache hit can reduce prompt computation and time to first token.',
     significance:
       'Production workloads with repeated prefixes may outperform synthetic random-token benchmarks. The benefit depends on hit rate, cache capacity, eviction policy, and whether requests route to workers that hold the needed state.',
     benchmarkContext:
-      'InferenceX generally disables prefix caching on random datasets because accidental reuse would measure the cache policy rather than full prompt processing. Treat benchmark cost as a no-hit baseline unless the recipe says otherwise.',
+      'InferenceX generally disables prefix caching on random datasets to isolate full prompt processing from cache policy. Treat benchmark cost as a no-hit baseline unless the recipe says otherwise.',
     relatedTerms: ['kv-cache', 'prefill', 'time-to-first-token', 'nvidia-dynamo'],
     articleSlugs: [INFERENCEX_V2, GB200_KIMI],
   },
@@ -455,7 +455,7 @@ const entries = [
     significance:
       'Disaggregation can isolate decode from prompt spikes and improve throughput or service-level predictability. It also adds routing and KV-transfer overhead, so weak networking or immature kernels can make it slower than aggregated serving.',
     benchmarkContext:
-      'An InferenceX disagg label is not a universal optimization switch. Read the prefill and decode world sizes, TP/EP layout, framework, network domain, and interactivity range where the disaggregated frontier actually leads.',
+      'A disagg label identifies the serving layout, not its performance. Judge it from the prefill and decode world sizes, TP/EP layout, framework, network domain, and the interactivity range where its frontier leads.',
     relatedTerms: ['prefill', 'decode', 'kv-cache', 'nvidia-dynamo', 'wide-expert-parallelism'],
     articleSlugs: [INFERENCEX_V2, GB200_R1, GB300_DSV4, GB200_KIMI],
   },
@@ -510,7 +510,7 @@ const entries = [
     significance:
       'EAGLE can raise accepted tokens per target-model step, but its result is workload dependent. Acceptance behavior, draft overhead, model architecture, and batch size determine whether the extra path improves end-to-end serving.',
     benchmarkContext:
-      'Some InferenceX curves label the feature MTP because the model supplies multi-token heads while the engine uses EAGLE-style speculative plumbing. Read the recipe flags and checkpoint details rather than assuming every MTP curve uses the same implementation.',
+      'Some InferenceX curves label the feature MTP because the model supplies multi-token heads while the engine uses EAGLE-style speculative plumbing. The recipe flags and checkpoint details identify the exact implementation.',
     relatedTerms: ['speculative-decoding', 'multi-token-prediction', 'decode', 'sglang'],
     articleSlugs: [B200_GLM5, DEEPSEEK_V4],
   },
@@ -569,7 +569,7 @@ const entries = [
     significance:
       'DP scales aggregate capacity cleanly when weights fit, but replication consumes memory and repeats weight reads. Load balancing and cache locality determine how evenly the replicas are used.',
     benchmarkContext:
-      'A DP count in an InferenceX recipe must be interpreted with TP and EP because modern MoE deployments combine all three dimensions rather than choosing only one.',
+      'Modern MoE deployments combine DP, TP, and EP. Read the DP count together with the other two dimensions.',
     relatedTerms: ['tensor-parallelism', 'expert-parallelism', 'batching', 'mixture-of-experts'],
     articleSlugs: [INFERENCEX_V2, MI355X_DSV4, GB200_KIMI],
   },
@@ -587,7 +587,7 @@ const entries = [
     significance:
       'Wide EP is most effective inside a high-bandwidth scale-up network. Crossing a slower scale-out fabric can turn the same all-to-all traffic into the bottleneck and erase the memory-side benefit.',
     benchmarkContext:
-      'InferenceX uses wide EP in rack-scale disaggregated recipes. Always compare the EP width, decode pool size, and fabric—not just the GPU model printed in the chart legend.',
+      'InferenceX uses wide EP in rack-scale disaggregated recipes. Compare the EP width, decode pool size, fabric, and GPU model together.',
     relatedTerms: [
       'expert-parallelism',
       'mixture-of-experts',
@@ -641,7 +641,7 @@ const entries = [
     aliases: ['scale-up domain', 'scale-out fabric'],
     category: 'Parallelism',
     plainEnglish:
-      'Scale-up is the ultra-fast network inside one tightly connected GPU system; scale-out is the broader network connecting separate servers or racks.',
+      'Scale-up is the ultra-fast network inside one tightly connected GPU system. Scale-out is the broader network connecting separate servers or racks.',
     definition:
       'Scale-up networking connects accelerators inside one tightly coupled system, while scale-out networking connects multiple systems or racks into a larger cluster.',
     explanation:
@@ -649,7 +649,7 @@ const entries = [
     significance:
       'Distributed inference crosses both domains. Frequent TP or EP collectives benefit disproportionately from staying inside scale-up, while coarser request routing and some prefill/decode transfers can tolerate scale-out.',
     benchmarkContext:
-      'The GPU name alone does not describe the communication domain. A B200 in an eight-GPU node and a GB200 NVL72 expose related silicon through radically different scale-up group sizes.',
+      'System topology determines the communication domain. A B200 in an eight-GPU node and a GB200 NVL72 expose related silicon through different scale-up group sizes.',
     relatedTerms: ['nvlink', 'wide-expert-parallelism', 'all-to-all', 'tensor-parallelism'],
     articleSlugs: [INFERENCEX_V2, GB200_R1, GB200_KIMI],
   },
@@ -665,9 +665,9 @@ const entries = [
     explanation:
       'HBM stores model weights, activations, workspace, and KV cache. Capacity determines which models, batch sizes, and parallel layouts fit; bandwidth determines how quickly memory-bound kernels can stream that state.',
     significance:
-      'LLM decode often reads far more data than it computes per token, making HBM bandwidth a primary performance limit. Extra capacity can also unlock a more efficient recipe even when nominal compute remains similar.',
+      'LLM decode often reads far more data than it computes per token, making HBM bandwidth a primary performance limit. Extra capacity can also enable a more efficient recipe even when nominal compute remains similar.',
     benchmarkContext:
-      'InferenceX hardware comparisons separate HBM capacity from bandwidth. GB300’s larger capacity, for example, can fit wider prefill/decode layouts that GB200 cannot, despite similar bandwidth per GPU.',
+      'InferenceX hardware comparisons separate HBM capacity from bandwidth. For example, GB300’s larger capacity fits wider prefill/decode layouts than GB200 despite similar bandwidth per GPU.',
     relatedTerms: ['memory-bandwidth', 'decode', 'kv-cache', 'quantization'],
     articleSlugs: [GB300_DSV4, B200_KIMI, MI355X_DSV4],
   },
@@ -683,7 +683,7 @@ const entries = [
     explanation:
       'A kernel is memory-bandwidth bound when moving its required bytes takes longer than performing its arithmetic. LLM decode frequently enters this regime because each step streams model or expert weights and KV-cache state for relatively little new-token computation.',
     significance:
-      'More tensor-core FLOPS do not speed up a kernel already waiting on memory. Quantization, batching, cache compression, and expert sharding can help by reducing bytes moved or amortizing each weight read across more tokens.',
+      'A kernel waiting on memory gains little from additional tensor-core FLOPS. Quantization, batching, cache compression, and expert sharding help by reducing bytes moved or amortizing each weight read across more tokens.',
     benchmarkContext:
       'Use the shape of the concurrency curve to infer regime changes carefully: low batches may be launch or bandwidth bound, while large batches can raise arithmetic intensity and approach compute saturation.',
     relatedTerms: ['high-bandwidth-memory', 'decode', 'quantization', 'wide-expert-parallelism'],
@@ -701,7 +701,7 @@ const entries = [
     explanation:
       'NVSwitch systems connect multiple NVLink endpoints so collectives can span an eight-GPU server or, in NVL72 products, a 72-GPU rack-scale domain. That bandwidth is distinct from the InfiniBand or Ethernet fabric connecting separate systems.',
     significance:
-      'Large TP and especially wide-EP groups exchange data at every generated token. Keeping those collectives on NVLink can make a rack-scale recipe substantially faster than a similar GPU count spread across scale-out links.',
+      'Large TP and especially wide-EP groups exchange data at every generated token. Keeping those collectives on NVLink can make a rack-scale recipe faster than a similar GPU count spread across scale-out links.',
     benchmarkContext:
       'InferenceX compares both node-level GPUs and NVL72 systems. Interpret the system topology and parallel group width before attributing the entire result to per-GPU compute.',
     relatedTerms: ['scale-up-vs-scale-out', 'all-to-all', 'all-reduce', 'wide-expert-parallelism'],
@@ -719,7 +719,7 @@ const entries = [
     explanation:
       'Lower precision reduces memory footprint and bytes transferred and can use faster low-precision tensor-core paths. A complete recipe must specify what is quantized, the format, scaling method, kernel support, and any higher-precision operations retained for stability.',
     significance:
-      'A nominal format does not guarantee a speedup or preserved quality. Conversion quality, model calibration, outliers, kernel maturity, and hardware support determine the real result.',
+      'A nominal format alone says little about speed or quality. Conversion quality, model calibration, outliers, kernel maturity, and hardware support determine the result.',
     benchmarkContext:
       'InferenceX treats precision as a first-class recipe dimension and pairs throughput measurements with accuracy checks. Compare FP8, FP4, NVFP4, MXFP4, and INT4 only when the model, workload, engine, and quality bar are compatible.',
     relatedTerms: ['fp8', 'fp4', 'nvfp4', 'mxfp4', 'high-bandwidth-memory'],
@@ -739,7 +739,7 @@ const entries = [
     significance:
       'FP8 is broadly supported on recent NVIDIA and AMD accelerators and often serves as a stable low-precision baseline. Actual performance depends on end-to-end kernel coverage; fallback operations can erase theoretical gains.',
     benchmarkContext:
-      'An InferenceX FP8 label describes a recipe, not just a checkpoint filename. Engine, attention backend, KV-cache format, GPU generation, and MTP setting can all change the curve.',
+      'An InferenceX FP8 label covers the complete recipe. The checkpoint filename, engine, attention backend, KV-cache format, GPU generation, and MTP setting can all change the curve.',
     relatedTerms: ['quantization', 'fp4', 'high-bandwidth-memory', 'rocm', 'cuda'],
     articleSlugs: [INFERENCEX_V2, MI355X_GLM5, B200_MINIMAX],
   },
@@ -753,11 +753,11 @@ const entries = [
     definition:
       'FP4 refers to four-bit floating-point formats used for very low-precision model representation and accelerated matrix operations.',
     explanation:
-      'Four-bit formats roughly halve weight storage and traffic again relative to FP8, but their tiny value space requires carefully chosen scaling and hardware-specific kernels. “FP4” may refer to different concrete formats rather than one universal encoding.',
+      'Four-bit formats roughly halve weight storage and traffic again relative to FP8, but their tiny value space requires carefully chosen scaling and hardware-specific kernels. The FP4 label covers several concrete formats.',
     significance:
       'For memory-bound LLM inference, reducing weight bytes can deliver large throughput and capacity gains. Model quality and unsupported operations must be checked because aggressive precision reduction can also introduce error or fallback overhead.',
     benchmarkContext:
-      'InferenceX identifies concrete recipe formats such as NVFP4 and MXFP4 where possible and validates representative configurations. Do not treat every line labeled FP4 as numerically or operationally identical.',
+      'InferenceX identifies concrete recipe formats such as NVFP4 and MXFP4 where possible and validates representative configurations. Each FP4 line still has its own numerical and operational behavior.',
     relatedTerms: ['quantization', 'nvfp4', 'mxfp4', 'fp8', 'memory-bandwidth'],
     articleSlugs: [INFERENCEX_V2, B200_KIMI, MI355X_DSV4, SGLANG_056],
   },
@@ -775,7 +775,7 @@ const entries = [
     significance:
       'NVFP4 can reduce weight bandwidth and activate Blackwell FP4 compute paths, which is especially valuable for large MoE decode. The gain appears only when the serving engine supports the model’s attention, routing, and expert kernels end to end.',
     benchmarkContext:
-      'InferenceX articles compare NVFP4 with FP8 or INT4 at matched interactivity. Those comparisons hold model workload and cost assumptions explicit because a precision label alone is not a fair benchmark.',
+      'InferenceX articles compare NVFP4 with FP8 or INT4 at matched interactivity. Model workload and cost assumptions stay explicit because a precision label alone cannot establish a fair benchmark.',
     relatedTerms: ['fp4', 'quantization', 'fp8', 'memory-bandwidth', 'cuda'],
     articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, SGLANG_056],
   },
@@ -791,7 +791,7 @@ const entries = [
     explanation:
       'Block-level scaling gives four-bit values a useful local dynamic range while keeping storage and movement compact. Hardware and software must agree on the block layout, scale representation, and supported matrix kernels.',
     significance:
-      'MXFP4 is used in AMD and cross-vendor low-precision inference paths. Its practical result depends on checkpoint preparation and kernel coverage rather than the nominal bit width alone.',
+      'MXFP4 is used in AMD and cross-vendor low-precision inference paths. Checkpoint preparation and kernel coverage determine the practical result; bit width alone does not capture it.',
     benchmarkContext:
       'InferenceX records MXFP4 as part of a complete engine and hardware recipe. Comparisons with NVFP4 or FP8 should use the same model, sequence length, quality requirements, and interactivity target.',
     relatedTerms: ['fp4', 'quantization', 'nvfp4', 'rocm', 'memory-bandwidth'],
@@ -851,7 +851,7 @@ const entries = [
     explanation:
       'The sparsity pattern may select local, compressed, indexed, or learned subsets of the context. This reduces work and memory movement for long sequences, but the model architecture and runtime need matching indexer and attention kernels.',
     significance:
-      'Sparse attention can make very long context practical, yet theoretical sparsity does not guarantee fast inference. Index construction, irregular access, kernel fusion, and precision support determine the realized speedup.',
+      'Sparse attention can make very long context practical, but theoretical sparsity alone says little about runtime. Index construction, irregular access, kernel fusion, and precision support determine the realized speedup.',
     benchmarkContext:
       'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly.',
     relatedTerms: ['multi-head-latent-attention', 'kv-cache', 'decode', 'inference-engine'],
@@ -903,9 +903,9 @@ const entries = [
     explanation:
       'Its runtime coordinates continuous batching, distributed workers, attention backends, quantized kernels, and OpenAI-compatible serving. Production recipes may also run vLLM workers beneath an orchestration layer such as NVIDIA Dynamo.',
     significance:
-      'vLLM release and backend changes can alter performance sharply. Model-specific MoE kernels, attention dispatch, wide-EP communication, and scheduler paths all contribute to the final curve.',
+      'vLLM releases and backend changes can alter performance across the curve. Model-specific MoE kernels, attention dispatch, wide-EP communication, and scheduler paths all contribute to the result.',
     benchmarkContext:
-      'InferenceX treats vLLM as one engine option and pins the exact image in each recipe. Compare vLLM results with the same model, precision, workload, and topology rather than treating the engine name as a fixed performance level.',
+      'InferenceX treats vLLM as one engine option and pins the exact image in each recipe. Engine name alone does not set a fixed performance level, so comparisons must match model, precision, workload, and topology.',
     relatedTerms: ['inference-engine', 'nvidia-dynamo', 'kv-cache', 'sglang', 'rocm'],
     articleSlugs: [MI355X_KIMI, GB200_KIMI, B200_MINIMAX, B200_KIMI],
   },
@@ -920,9 +920,9 @@ const entries = [
     explanation:
       'The serving runtime includes continuous batching, prefix-aware scheduling, distributed parallelism, speculative decoding, and multiple attention and MoE kernel backends across NVIDIA and AMD GPUs.',
     significance:
-      'SGLang’s fast-moving release and model-specific kernel work can change throughput substantially on the same hardware. Scheduler overhead matters at low concurrency, while attention, MoE, and communication kernels dominate other regions.',
+      'SGLang releases and model-specific kernel work can change throughput on the same hardware. Scheduler overhead matters at low concurrency, while attention, MoE, and communication kernels dominate other regions.',
     benchmarkContext:
-      'InferenceX continuously reruns pinned SGLang recipes. Version-to-version curves show where a change lands rather than reducing a release to one peak-throughput number.',
+      'InferenceX continuously reruns pinned SGLang recipes. Version-to-version curves show where a change affects performance across the operating range and reveal regressions or gains hidden by one peak point.',
     relatedTerms: ['inference-engine', 'eagle', 'vllm', 'rocm', 'cuda'],
     articleSlugs: [SGLANG_056, B200_GLM5, MI355X_DSV4, MI355X_GLM5, MI355X_QWEN],
   },
@@ -938,7 +938,7 @@ const entries = [
     explanation:
       'It provides NVIDIA-tuned kernels, quantization paths, distributed execution, and model-specific optimizations. It can run as a serving backend and its kernels can also appear inside other engines through integrations.',
     significance:
-      'Tight hardware integration can unlock Blackwell and NVL72 features quickly, but model support and engine compatibility remain version specific. A TensorRT-LLM label therefore needs a concrete container and recipe.',
+      'Tight hardware integration can expose Blackwell and NVL72 features quickly, but model support and engine compatibility remain version specific. A TensorRT-LLM label therefore needs a concrete container and recipe.',
     benchmarkContext:
       'InferenceX includes direct TensorRT-LLM and Dynamo TensorRT-LLM configurations and also tracks cases where SGLang or vLLM uses a TRT-LLM-derived kernel backend.',
     relatedTerms: ['inference-engine', 'cuda', 'nvidia-dynamo', 'nvfp4', 'sglang'],
@@ -950,13 +950,13 @@ const entries = [
     aliases: ['Dynamo'],
     category: 'Software',
     plainEnglish:
-      'NVIDIA Dynamo coordinates many GPU workers—routing requests, moving model memory, and assigning prompt reading and answer generation to the right pools.',
+      'NVIDIA Dynamo coordinates many GPU workers. It routes requests, moves model memory, and assigns prompt reading and answer generation to the right pools.',
     definition:
       'NVIDIA Dynamo is a distributed inference framework that orchestrates request routing, worker pools, KV-cache movement, and disaggregated serving.',
     explanation:
-      'Dynamo can place prefill and decode on separately scaled pools and use engines such as vLLM or TensorRT-LLM as worker runtimes. The orchestration layer handles the data and control path around those engines rather than replacing every kernel inside them.',
+      'Dynamo can place prefill and decode on separately scaled pools and use engines such as vLLM or TensorRT-LLM as worker runtimes. Kernels remain inside those engines while Dynamo handles the surrounding data and control paths.',
     significance:
-      'Rack-scale serving needs more than a fast single-GPU runtime. Routing, cache transfer, topology awareness, and pool sizing determine whether wide parallelism and disaggregation improve end-to-end performance.',
+      'Rack-scale performance depends on the single-GPU runtime plus routing, cache transfer, topology awareness, and pool sizing. Together they determine whether wide parallelism and disaggregation improve end-to-end performance.',
     benchmarkContext:
       'Labels such as Dynamo vLLM and Dynamo TRT-LLM identify both layers of the recipe. InferenceX articles specify the prefill/decode topology because two Dynamo configurations can have very different performance.',
     relatedTerms: [

@@ -33,6 +33,7 @@ describe('glossary content', () => {
       expect(plainEnglishWords.length, entry.term).toBeGreaterThanOrEqual(8);
       expect(plainEnglishWords.length, entry.term).toBeLessThanOrEqual(40);
       expect(entry.plainEnglish).not.toBe(entry.definition);
+      expect(JSON.stringify(entry), entry.term).not.toMatch(/[—–]/u);
 
       const renderedCopy = [
         entry.definition,
@@ -78,6 +79,7 @@ describe('Chinese glossary content', () => {
       expect(plainLanguageCharacters, entry.slug).toBeGreaterThanOrEqual(8);
       expect(plainLanguageCharacters, entry.slug).toBeLessThanOrEqual(60);
       expect(entry.plainEnglish).not.toBe(entry.definition);
+      expect(JSON.stringify(entry), entry.term).not.toMatch(/[—–]/u);
       const renderedCopy = [
         entry.definition,
         entry.explanation,

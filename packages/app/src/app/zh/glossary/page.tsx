@@ -167,10 +167,10 @@ export default function ZhGlossaryPage() {
             <p className="font-mono text-xs font-semibold tracking-[0.18em] text-brand uppercase">
               阅读基准曲线
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">先看权衡，而不是峰值。</h2>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight">完整曲线更能说明问题。</h2>
             <p className="mt-3 leading-7 text-muted-foreground">
-              LLM 服务需要在单用户速度与总吞吐量之间取舍。了解 InferenceX 为什么使用完整 Pareto
-              曲线和等交互性比较，而不是用单一最大吞吐点给 GPU 排名。
+              LLM 服务需要在单用户速度与总吞吐量之间取舍。InferenceX 使用完整 Pareto
+              曲线和等交互性比较，展示不同运行点上的真实权衡。单一最大吞吐点无法代表完整系统。
             </p>
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
               <Link href="/zh/glossary/interactivity" className="text-brand hover:underline">

@@ -103,8 +103,8 @@ export default function GlossaryPage() {
                 </h1>
                 <p className="mt-6 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
                   Definitions for the metrics, serving techniques, numerical formats, and
-                  distributed systems concepts used across InferenceX. Written from measured
-                  behavior—not vendor peak specifications.
+                  distributed systems concepts used across InferenceX. Based on measured behavior,
+                  not vendor peak specifications.
                 </p>
               </div>
 
@@ -142,12 +142,12 @@ export default function GlossaryPage() {
               Reading the benchmark
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-              Start with the tradeoff, not the peak.
+              The full curve tells the story.
             </h2>
             <p className="mt-3 leading-7 text-muted-foreground">
-              LLM serving balances per-user speed against aggregate throughput. Learn why InferenceX
-              uses full Pareto curves and matched-interactivity comparisons instead of ranking a GPU
-              by one maximum-throughput point.
+              LLM serving balances per-user speed against aggregate throughput. InferenceX uses full
+              Pareto curves and matched-interactivity comparisons to show that tradeoff across
+              operating points. One maximum-throughput point cannot rank the complete system.
             </p>
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
               <Link href="/glossary/interactivity" className="text-brand hover:underline">
@@ -170,9 +170,9 @@ export default function GlossaryPage() {
               Definitions connected to real recipes.
             </h2>
             <p className="mt-3 leading-7 text-muted-foreground">
-              Every term page links back to the InferenceX articles where the concept affects an
-              observed result—from MTP acceptance behavior to NVL72 wide-EP scaling and
-              software-only speedups on unchanged GPUs.
+              Every term page links to InferenceX articles where the concept changes a measured
+              result, including MTP acceptance behavior, NVL72 wide-EP scaling, and software-only
+              speedups on unchanged GPUs.
             </p>
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium">
               <Link href="/blog" className="text-brand hover:underline">
