@@ -128,7 +128,7 @@ if (isDownloadMode) {
   console.log(`\n--- Downloading artifacts to ${artifactsDir} ---`);
 
   // Retried configs produce artifacts on multiple runners — keep only the
-  // most recent per logical name (see logicalArtifactName in github-artifacts)
+  // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
   // so a failed attempt's empty metrics can't overwrite the good one via
   // ON CONFLICT DO UPDATE.
   const byLogical = dedupeArtifactsByLogicalName(listRunArtifacts(REPO, runIdStr));

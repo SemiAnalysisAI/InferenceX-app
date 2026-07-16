@@ -2,13 +2,9 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
-import {
-  buildArtifactPlan,
-  isIngestableAgenticBenchmarkData,
-} from './lib/ci-artifact-preparation.js';
+import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
@@ -55,48 +51,6 @@ function downloadWithRetries(artifact: ArtifactMeta, artifactsPath: string, atte
     execFileSync('sleep', [String(attempt)]);
     downloadWithRetries(artifact, artifactsPath, attempt + 1);
   }
-}
-
-function validAgenticBenchmarkIds(artifacts: readonly ArtifactMeta[]): Set<number> {
-  const candidates = artifacts.filter(
-    (artifact) =>
-      artifact.expired !== true &&
-      artifact.id !== undefined &&
-      artifact.name.startsWith('bmk_agentic_'),
-  );
-  const validIds = new Set<number>();
-  if (candidates.length === 0) return validIds;
-
-  const inspectionRoot = fs.mkdtempSync(
-    path.join(process.env.RUNNER_TEMP ?? os.tmpdir(), 'bmk-check-'),
-  );
-  try {
-    for (const artifact of candidates) {
-      const candidateRoot = path.join(inspectionRoot, String(artifact.id));
-      fs.mkdirSync(candidateRoot, { recursive: true });
-      downloadWithRetries(artifact, candidateRoot);
-      const artifactDir = path.join(candidateRoot, artifact.name);
-      const jsonFiles = fs
-        .readdirSync(artifactDir)
-        .filter((name) => name.endsWith('.json'))
-        .map((name) => path.join(artifactDir, name));
-      if (
-        jsonFiles.length > 0 &&
-        jsonFiles.every((file) =>
-          isIngestableAgenticBenchmarkData(JSON.parse(fs.readFileSync(file, 'utf8'))),
-        )
-      ) {
-        validIds.add(artifact.id!);
-      }
-    }
-  } finally {
-    fs.rmSync(inspectionRoot, { recursive: true, force: true });
-  }
-
-  console.log(
-    `Validated ${validIds.size} of ${candidates.length} agentic benchmark artifact upload(s)`,
-  );
-  return validIds;
 }
 
 function writeOutputs(values: Record<string, string | number | boolean>): void {
@@ -158,12 +112,9 @@ function main(): void {
   const mergeMetadata =
     mergeRunId === sourceRunId ? sourceMetadata : fetchRunMetadata(repo, mergeRunId);
   const sourceArtifacts = listRunArtifacts(repo, sourceRunId);
-  const validAgenticIds = validAgenticBenchmarkIds(sourceArtifacts);
   const mergeArtifacts =
     mergeRunId === sourceRunId ? sourceArtifacts : listRunArtifacts(repo, mergeRunId);
-  const plan = buildArtifactPlan(sourceRunId, mergeRunId, sourceArtifacts, mergeArtifacts, {
-    validAgenticBenchmarkIds: validAgenticIds,
-  });
+  const plan = buildArtifactPlan(sourceRunId, mergeRunId, sourceArtifacts, mergeArtifacts);
 
   console.log(`Source run: ${sourceRunId} (attempt ${sourceMetadata.run_attempt ?? 1})`);
   console.log(`Merge run:  ${mergeRunId} (attempt ${mergeMetadata.run_attempt ?? 1})`);
@@ -185,7 +136,7 @@ function main(): void {
   });
 
   if (dryRun) {
-    console.log('Dry run complete; only small benchmark artifacts were inspected temporarily.');
+    console.log('Dry run complete; no artifacts were downloaded.');
     return;
   }
 

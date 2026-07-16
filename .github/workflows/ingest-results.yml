@@ -47,24 +47,6 @@ jobs:
           INGEST_REPO: SemiAnalysisAI/InferenceX
         run: pnpm admin:db:prepare:ci
 
-      - name: Checkout reusable-artifact validator
-        if: steps.artifacts.outputs.reused == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          repository: SemiAnalysisAI/InferenceX
-          ref: main
-          token: ${{ secrets.INFX_MAIN_PAT }}
-          path: inferencex-validator
-          persist-credentials: false
-
-      - name: Validate reusable artifacts
-        if: steps.artifacts.outputs.reused == 'true'
-        env:
-          ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-        run: >-
-          python3 inferencex-validator/utils/validate_reusable_sweep_artifacts.py
-          --artifacts-dir "$ARTIFACTS_PATH"
-
       - name: Run migrations
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
