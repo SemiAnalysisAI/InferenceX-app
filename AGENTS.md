@@ -73,9 +73,15 @@ API routes (`packages/app/src/app/api/v1/`):
 - `reliability` — raw `ReliabilityRow[]`
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
-- `invalidate` — invalidate API cache (admin)
+- `invalidate` — invalidate API cache (admin; `?scope=collectivex` purges only that scope)
+- `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX sweep data
+  from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
+  assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
+  `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
+(Exception: the CollectiveX routes assemble raw stored documents through the shared reader in
+`packages/db/src/collectivex/` — see [docs/collectivex.md](./docs/collectivex.md) for why.)
 
 Static content routes (no DB):
 

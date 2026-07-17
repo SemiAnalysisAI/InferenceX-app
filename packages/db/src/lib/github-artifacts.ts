@@ -84,3 +84,26 @@ export function fetchRunAttempt(repo: string, runId: string): number {
   }).trim();
   return parseInt(attemptStr || '1', 10);
 }
+
+export interface RunMeta {
+  id: number;
+  name: string;
+  path: string;
+  run_attempt: number;
+  head_sha: string;
+  head_branch: string | null;
+  conclusion: string | null;
+  status: string | null;
+  updated_at?: string | null;
+  run_started_at?: string | null;
+  created_at?: string | null;
+}
+
+/** Fetch a workflow run's metadata via `gh api`. */
+export function fetchRunMeta(repo: string, runId: string): RunMeta {
+  const json = execSync(`gh api "repos/${repo}/actions/runs/${runId}"`, {
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return JSON.parse(json) as RunMeta;
+}

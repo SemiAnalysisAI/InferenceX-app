@@ -8,11 +8,11 @@
  *   pnpm admin:db:migrate
  */
 
-import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
+import { runMigrations } from './lib/migration-runner';
 
 const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
@@ -37,46 +37,7 @@ async function migrate(): Promise<void> {
     }
   }
 
-  // Create migrations tracking table if it doesn't exist
-  await sql`
-    create table if not exists schema_migrations (
-      filename   text        primary key,
-      applied_at timestamptz not null default now()
-    )
-  `;
-
-  const migrations = await sql<{ filename: string }[]>`select filename from schema_migrations`;
-  const applied = new Set(migrations.map((r) => r.filename));
-
-  const files = fs
-    .readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith('.sql'))
-    .toSorted();
-
-  let ran = 0;
-  for (const file of files) {
-    if (applied.has(file)) {
-      console.log(`  skip  ${file}`);
-      continue;
-    }
-
-    console.log(`  apply ${file} ...`);
-    const sql_text = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
-
-    await sql.begin(async (tx) => {
-      await tx.unsafe(sql_text);
-      await tx.unsafe('insert into schema_migrations (filename) values ($1)', [file]);
-    });
-
-    console.log(`  done  ${file}`);
-    ran++;
-  }
-
-  if (ran === 0) {
-    console.log('  all migrations already applied');
-  } else {
-    console.log(`\n  applied ${ran} migration(s)`);
-  }
+  await runMigrations(sql, MIGRATIONS_DIR);
 
   console.log('\n=== db:migrate complete ===');
   console.log('  Invalidate API cache: pnpm admin:cache:invalidate');

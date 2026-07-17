@@ -5,6 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./collectivex/*": "./src/collectivex/*.ts",
     "./connection": "./src/connection.ts",
     "./etl/*": "./src/etl/*.ts",
     "./json-provider": "./src/json-provider.ts",
@@ -14,10 +15,12 @@
   },
   "scripts": {
     "db:ingest:ci": "tsx src/ingest-ci-run.ts",
+    "db:ingest:collectivex": "dotenv -e ../../.env -- tsx src/ingest-collectivex.ts --download",
     "db:ingest:run": "dotenv -e ../../.env -- tsx src/ingest-ci-run.ts --download",
     "db:ingest:gcs": "dotenv -e ../../.env -- tsx src/ingest-gcs-backup.ts",
     "db:ingest:supplemental": "dotenv -e ../../.env -- tsx src/ingest-supplemental.ts",
     "db:migrate": "dotenv -e ../../.env -- tsx src/migrate.ts",
+    "db:migrate:collectivex": "dotenv -e ../../.env -- tsx src/migrate-collectivex.ts",
     "db:apply-overrides": "dotenv -e ../../.env -- tsx src/apply-overrides.ts",
     "db:backfill-aggregate-stats": "dotenv -e ../../.env -- tsx src/backfill-aggregate-stats.ts",
     "db:backfill-chart-series": "dotenv -e ../../.env -- tsx src/backfill-chart-series.ts",

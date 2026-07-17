@@ -1,12 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { fetchCollectiveX, fetchCollectiveXRun, fetchCollectiveXRunList } from '@/lib/api';
+import {
+  deleteCollectiveXRun,
+  fetchCollectiveX,
+  fetchCollectiveXRun,
+  fetchCollectiveXRunList,
+} from '@/lib/api';
 import {
   COLLECTIVEX_DEFAULT_VERSION,
   type CollectiveXVersion,
 } from '@/components/collectivex/types';
 
-/** Latest sweep run's neutral dataset — the default page view. */
+/** Latest ingested run's neutral dataset — the default page view. */
 export function useCollectiveX(version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION) {
   return useQuery({
     queryKey: ['collectivex', version],
@@ -17,9 +22,9 @@ export function useCollectiveX(version: CollectiveXVersion = COLLECTIVEX_DEFAULT
 }
 
 /**
- * Recent sweep runs for a version, backing the run picker. `enabled` gates the
+ * Ingested runs for a version, backing the run picker. `enabled` gates the
  * fetch so the list is only pulled when the user opens the picker; refetched on
- * mount so a reopened picker reflects newly finished runs without a hard reload.
+ * mount so a reopened picker reflects newly ingested runs without a hard reload.
  */
 export function useCollectiveXRuns(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
@@ -46,5 +51,24 @@ export function useCollectiveXRun(version: CollectiveXVersion, runId: string | n
     enabled: runId !== null,
     staleTime: 0,
     refetchOnMount: 'always',
+  });
+}
+
+/**
+ * Admin deletion of an ingested run. Resolves `false` on 401 (stale token —
+ * the caller clears its stored copy); on success every CollectiveX query is
+ * invalidated so the latest view and picker drop the run immediately.
+ */
+export function useDeleteCollectiveXRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, token }: { runId: string; token: string }) =>
+      deleteCollectiveXRun(runId, token),
+    onSuccess: (deleted) => {
+      if (!deleted) return;
+      for (const key of ['collectivex', 'collectivex-runs', 'collectivex-run']) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
   });
 }

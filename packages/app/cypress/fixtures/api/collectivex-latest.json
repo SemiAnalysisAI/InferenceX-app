@@ -1,0 +1,2535 @@
+{
+  "version": 1,
+  "run": {
+    "run_id": "160",
+    "run_attempt": 1,
+    "generated_at": "2026-07-08T12:20:00Z",
+    "conclusion": "success",
+    "source_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "requested_cases": 5,
+    "terminal_cases": 4,
+    "measured_cases": 3,
+    "unsupported_cases": 1,
+    "failed_cases": 0,
+    "requested_points": 50,
+    "terminal_points": 40,
+    "measured_points": 30,
+    "covered_skus": ["b200-dgxc", "b300", "h200-dgxc", "mi355x"]
+  },
+  "coverage": [
+    {
+      "case_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16",
+      "label": "h200-dgxc · deepep-v2 · decode · EP8 · bf16",
+      "disposition": "runnable",
+      "sku": "h200-dgxc",
+      "backend": "deepep-v2",
+      "phase": "decode",
+      "precision": "bf16",
+      "topology": {
+        "ep_size": 8,
+        "nodes": 1,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "nvlink",
+        "scale_out_transport": null,
+        "topology_class": "h200-nvlink-island"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 8,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 16,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 32,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 64,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 128,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 256,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 512,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 1024,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 2048,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 4096,
+          "terminal_status": "measured",
+          "reason": null
+        }
+      ],
+      "outcome": "success",
+      "reason": null,
+      "detail": null
+    },
+    {
+      "case_id": "mi355x-mori-deepseek-v3-normal-decode-ep16-uniform-bf16",
+      "label": "mi355x · mori · decode · EP16 · bf16",
+      "disposition": "runnable",
+      "sku": "mi355x",
+      "backend": "mori",
+      "phase": "decode",
+      "precision": "bf16",
+      "topology": {
+        "ep_size": 16,
+        "nodes": 2,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "xgmi",
+        "scale_out_transport": "rdma",
+        "topology_class": "mi355x-xgmi-rdma"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 16,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 32,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 64,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 128,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 256,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 512,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 1024,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 2048,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 4096,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 8192,
+          "terminal_status": "measured",
+          "reason": null
+        }
+      ],
+      "outcome": "success",
+      "reason": null,
+      "detail": null
+    },
+    {
+      "case_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-fp8",
+      "label": "h200-dgxc · deepep-v2 · decode · EP8 · fp8",
+      "disposition": "runnable",
+      "sku": "h200-dgxc",
+      "backend": "deepep-v2",
+      "phase": "decode",
+      "precision": "fp8",
+      "topology": {
+        "ep_size": 8,
+        "nodes": 1,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "nvlink",
+        "scale_out_transport": null,
+        "topology_class": "h200-nvlink-island"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 8,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 16,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 32,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 64,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 128,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 256,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 512,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 1024,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 2048,
+          "terminal_status": "measured",
+          "reason": null
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 4096,
+          "terminal_status": "measured",
+          "reason": null
+        }
+      ],
+      "outcome": "success",
+      "reason": null,
+      "detail": null
+    },
+    {
+      "case_id": "b300-deepep-v2-deepseek-v3-normal-decode-ep16-uniform-bf16",
+      "label": "b300 · deepep-v2 · decode · EP16 · bf16",
+      "disposition": "unsupported",
+      "sku": "b300",
+      "backend": "deepep-v2",
+      "phase": "decode",
+      "precision": "bf16",
+      "topology": {
+        "ep_size": 16,
+        "nodes": 2,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "nvlink",
+        "scale_out_transport": "rdma",
+        "topology_class": "b300-nvlink-rdma"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 16,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 32,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 64,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 128,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 256,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 512,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 1024,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 2048,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 4096,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 8192,
+          "terminal_status": "unsupported",
+          "reason": "backend-platform-unsupported"
+        }
+      ],
+      "outcome": "unsupported",
+      "reason": "backend-platform-unsupported",
+      "detail": "unsupported by the selected backend/platform"
+    },
+    {
+      "case_id": "b200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16",
+      "label": "b200-dgxc · deepep-v2 · decode · EP8 · bf16",
+      "disposition": "runnable",
+      "sku": "b200-dgxc",
+      "backend": "deepep-v2",
+      "phase": "decode",
+      "precision": "bf16",
+      "topology": {
+        "ep_size": 8,
+        "nodes": 1,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "nvlink",
+        "scale_out_transport": null,
+        "topology_class": "b200-nvlink-island"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 8,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 16,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 32,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 64,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 128,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 256,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 512,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 1024,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 2048,
+          "terminal_status": "pending",
+          "reason": "pending"
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 4096,
+          "terminal_status": "pending",
+          "reason": "pending"
+        }
+      ],
+      "outcome": "pending",
+      "reason": "pending",
+      "detail": null
+    }
+  ],
+  "series": [
+    {
+      "series_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16",
+      "phase": "decode",
+      "precision": "bf16",
+      "backend": "deepep-v2",
+      "system": {
+        "ep_size": 8,
+        "nodes": 1,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "nvlink",
+        "scale_out_transport": null,
+        "topology_class": "h200-nvlink-island",
+        "sku": "h200-dgxc",
+        "vendor": "nvidia"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 8,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 417,
+                "p90": 450.36,
+                "p95": 467.04,
+                "p99": 500.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 922.6952134292566,
+                "p90": 854.3474198419042,
+                "p95": 823.8350119904076,
+                "p99": 768.9126778577139
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 120,
+                "p90": 129.60000000000002,
+                "p95": 134.4,
+                "p99": 144
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1603.1829333333335,
+                "p90": 1484.4286419753084,
+                "p95": 1431.4133333333332,
+                "p99": 1335.9857777777777
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 392,
+                "p90": 423.36,
+                "p95": 439.04,
+                "p99": 470.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 981.5405714285715,
+                "p90": 908.8338624338625,
+                "p95": 876.3755102040816,
+                "p99": 817.9504761904763
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 921,
+                "p90": 994.6800000000001,
+                "p95": 1031.5200000000002,
+                "p99": 1105.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 835.5350792616721,
+                "p90": 773.6435919089556,
+                "p95": 746.0134636264928,
+                "p99": 696.27923271806
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 16,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 418,
+                "p90": 451.44000000000005,
+                "p95": 468.16,
+                "p99": 501.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 920.4878086124403,
+                "p90": 852.3035264930002,
+                "p95": 821.8641148325358,
+                "p99": 767.0731738437003
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 121,
+                "p90": 130.68,
+                "p95": 135.52,
+                "p99": 145.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1589.9334876033058,
+                "p90": 1472.1606366697276,
+                "p95": 1419.58347107438,
+                "p99": 1324.944573002755
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 393,
+                "p90": 424.44000000000005,
+                "p95": 440.16,
+                "p99": 471.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 979.0430127226464,
+                "p90": 906.5213080765243,
+                "p95": 874.1455470737912,
+                "p99": 815.869177268872
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 922,
+                "p90": 995.7600000000001,
+                "p95": 1032.64,
+                "p99": 1106.3999999999999
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 834.6288590021693,
+                "p90": 772.8044990760825,
+                "p95": 745.2043383947938,
+                "p99": 695.5240491684744
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 32,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 419,
+                "p90": 452.52000000000004,
+                "p95": 469.28000000000003,
+                "p99": 502.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 918.2909403341289,
+                "p90": 850.2693891982674,
+                "p95": 819.9026252983293,
+                "p99": 765.2424502784409
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 122,
+                "p90": 131.76000000000002,
+                "p95": 136.64000000000001,
+                "p99": 146.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1576.9012459016394,
+                "p90": 1460.0937462052214,
+                "p95": 1407.9475409836064,
+                "p99": 1314.0843715846995
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 394,
+                "p90": 425.52000000000004,
+                "p95": 441.28000000000003,
+                "p99": 472.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 976.5581319796954,
+                "p90": 904.2204925737921,
+                "p95": 871.9269035532996,
+                "p99": 813.798443316413
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 923,
+                "p90": 996.84,
+                "p95": 1033.76,
+                "p99": 1107.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 833.724602383532,
+                "p90": 771.9672244291962,
+                "p95": 744.3969664138677,
+                "p99": 694.7705019862767
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 64,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 420,
+                "p90": 453.6,
+                "p95": 470.40000000000003,
+                "p99": 504
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 916.1045333333334,
+                "p90": 848.244938271605,
+                "p95": 817.9504761904761,
+                "p99": 763.4204444444445
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 123,
+                "p90": 132.84,
+                "p95": 137.76000000000002,
+                "p99": 147.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1564.0809105691058,
+                "p90": 1448.2230653417646,
+                "p95": 1396.5008130081299,
+                "p99": 1303.400758807588
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 395,
+                "p90": 426.6,
+                "p95": 442.40000000000003,
+                "p99": 474
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 974.0858329113925,
+                "p90": 901.9313267698077,
+                "p95": 869.7194936708861,
+                "p99": 811.738194092827
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 924,
+                "p90": 997.9200000000001,
+                "p95": 1034.88,
+                "p99": 1108.8
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 832.822303030303,
+                "p90": 771.1317620650954,
+                "p95": 743.5913419913419,
+                "p99": 694.0185858585859
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 128,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 421,
+                "p90": 454.68,
+                "p95": 471.52000000000004,
+                "p99": 505.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 913.928513064133,
+                "p90": 846.230104689012,
+                "p95": 816.0076009501188,
+                "p99": 761.607094220111
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 124,
+                "p90": 133.92000000000002,
+                "p95": 138.88000000000002,
+                "p99": 148.79999999999998
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1551.4673548387095,
+                "p90": 1436.543847072879,
+                "p95": 1385.2387096774191,
+                "p99": 1292.8894623655915
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 396,
+                "p90": 427.68,
+                "p95": 443.52000000000004,
+                "p99": 475.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 971.6260202020202,
+                "p90": 899.653722409278,
+                "p95": 867.5232323232323,
+                "p99": 809.6883501683502
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 925,
+                "p90": 999.0000000000001,
+                "p95": 1036,
+                "p99": 1110
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 831.9219545945946,
+                "p90": 770.298106106106,
+                "p95": 742.7874594594595,
+                "p99": 693.2682954954955
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 256,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 422,
+                "p90": 455.76000000000005,
+                "p95": 472.64000000000004,
+                "p99": 506.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 911.7628056872038,
+                "p90": 844.2248200807443,
+                "p95": 814.0739336492891,
+                "p99": 759.8023380726698
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 125,
+                "p90": 135,
+                "p95": 140,
+                "p99": 150
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1539.0556159999999,
+                "p90": 1425.0514962962964,
+                "p95": 1374.1568,
+                "p99": 1282.5463466666668
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 397,
+                "p90": 428.76000000000005,
+                "p95": 444.64000000000004,
+                "p99": 476.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 969.1785994962216,
+                "p90": 897.387592126131,
+                "p95": 865.3380352644836,
+                "p99": 807.648832913518
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 926,
+                "p90": 1000.08,
+                "p95": 1037.1200000000001,
+                "p99": 1111.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 831.0235507559396,
+                "p90": 769.466250699944,
+                "p95": 741.9853131749459,
+                "p99": 692.5196256299496
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 512,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 423,
+                "p90": 456.84000000000003,
+                "p95": 473.76000000000005,
+                "p99": 507.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 909.6073380614658,
+                "p90": 842.2290167235793,
+                "p95": 812.1494089834514,
+                "p99": 758.0061150512215
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 126,
+                "p90": 136.08,
+                "p95": 141.12,
+                "p99": 151.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1526.840888888889,
+                "p90": 1413.741563786008,
+                "p95": 1363.2507936507936,
+                "p99": 1272.3674074074074
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 398,
+                "p90": 429.84000000000003,
+                "p95": 445.76000000000005,
+                "p99": 477.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 966.7434773869347,
+                "p90": 895.1328494323469,
+                "p95": 863.1638190954774,
+                "p99": 805.6195644891122
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 927,
+                "p90": 1001.1600000000001,
+                "p95": 1038.24,
+                "p99": 1112.3999999999999
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 830.1270852211435,
+                "p90": 768.6361900195773,
+                "p95": 741.1848975188781,
+                "p99": 691.7725710176197
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 1024,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 424,
+                "p90": 457.92,
+                "p95": 474.88000000000005,
+                "p99": 508.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 907.4620377358491,
+                "p90": 840.2426275331936,
+                "p95": 810.2339622641508,
+                "p99": 756.2183647798744
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 127,
+                "p90": 137.16,
+                "p95": 142.24,
+                "p99": 152.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1514.8185196850393,
+                "p90": 1402.6097404491106,
+                "p95": 1352.5165354330707,
+                "p99": 1262.3487664041995
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 399,
+                "p90": 430.92,
+                "p95": 446.88000000000005,
+                "p99": 478.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 964.3205614035088,
+                "p90": 892.8894087069526,
+                "p95": 861.0005012531327,
+                "p99": 803.6004678362574
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 928,
+                "p90": 1002.24,
+                "p95": 1039.3600000000001,
+                "p99": 1113.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 829.232551724138,
+                "p90": 767.8079182630906,
+                "p95": 740.3862068965517,
+                "p99": 691.0271264367817
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 2048,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 425,
+                "p90": 459.00000000000006,
+                "p95": 476.00000000000006,
+                "p99": 510
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 905.3268329411765,
+                "p90": 838.2655860566448,
+                "p95": 808.3275294117645,
+                "p99": 754.4390274509803
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 128,
+                "p90": 138.24,
+                "p95": 143.36,
+                "p99": 153.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1502.984,
+                "p90": 1391.6518518518517,
+                "p95": 1341.9499999999998,
+                "p99": 1252.4866666666667
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 400,
+                "p90": 432,
+                "p95": 448.00000000000006,
+                "p99": 480
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 961.90976,
+                "p90": 890.6571851851852,
+                "p95": 858.848,
+                "p99": 801.5914666666667
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 929,
+                "p90": 1003.32,
+                "p95": 1040.48,
+                "p99": 1114.8
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 828.3399440258343,
+                "p90": 766.9814296535502,
+                "p95": 739.5892357373519,
+                "p99": 690.2832866881952
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 4096,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 426,
+                "p90": 460.08000000000004,
+                "p95": 477.12000000000006,
+                "p99": 511.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 903.2016525821597,
+                "p90": 836.2978264649626,
+                "p95": 806.4300469483567,
+                "p99": 752.6680438184663
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 129,
+                "p90": 139.32000000000002,
+                "p95": 144.48000000000002,
+                "p99": 154.79999999999998
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1491.33296124031,
+                "p90": 1380.863853000287,
+                "p95": 1331.5472868217053,
+                "p99": 1242.7774677002585
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 401,
+                "p90": 433.08000000000004,
+                "p95": 449.12000000000006,
+                "p99": 481.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 959.5109825436409,
+                "p90": 888.4360949478155,
+                "p95": 856.706234413965,
+                "p99": 799.5924854530341
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 930,
+                "p90": 1004.4000000000001,
+                "p95": 1041.6000000000001,
+                "p99": 1116
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 827.4492559139785,
+                "p90": 766.1567184388689,
+                "p95": 738.7939784946236,
+                "p99": 689.541046594982
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        }
+      ]
+    },
+    {
+      "series_id": "mi355x-mori-deepseek-v3-normal-decode-ep16-uniform-bf16",
+      "phase": "decode",
+      "precision": "bf16",
+      "backend": "mori",
+      "system": {
+        "ep_size": 16,
+        "nodes": 2,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "xgmi",
+        "scale_out_transport": "rdma",
+        "topology_class": "mi355x-xgmi-rdma",
+        "sku": "mi355x",
+        "vendor": "amd"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 16,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 417,
+                "p90": 450.36,
+                "p95": 467.04,
+                "p99": 500.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 922.6952134292566,
+                "p90": 854.3474198419042,
+                "p95": 823.8350119904076,
+                "p99": 768.9126778577139
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 120,
+                "p90": 129.60000000000002,
+                "p95": 134.4,
+                "p99": 144
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1603.1829333333335,
+                "p90": 1484.4286419753084,
+                "p95": 1431.4133333333332,
+                "p99": 1335.9857777777777
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 392,
+                "p90": 423.36,
+                "p95": 439.04,
+                "p99": 470.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 981.5405714285715,
+                "p90": 908.8338624338625,
+                "p95": 876.3755102040816,
+                "p99": 817.9504761904763
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 921,
+                "p90": 994.6800000000001,
+                "p95": 1031.5200000000002,
+                "p99": 1105.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 835.5350792616721,
+                "p90": 773.6435919089556,
+                "p95": 746.0134636264928,
+                "p99": 696.27923271806
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 32,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 418,
+                "p90": 451.44000000000005,
+                "p95": 468.16,
+                "p99": 501.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 920.4878086124403,
+                "p90": 852.3035264930002,
+                "p95": 821.8641148325358,
+                "p99": 767.0731738437003
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 121,
+                "p90": 130.68,
+                "p95": 135.52,
+                "p99": 145.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1589.9334876033058,
+                "p90": 1472.1606366697276,
+                "p95": 1419.58347107438,
+                "p99": 1324.944573002755
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 393,
+                "p90": 424.44000000000005,
+                "p95": 440.16,
+                "p99": 471.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 979.0430127226464,
+                "p90": 906.5213080765243,
+                "p95": 874.1455470737912,
+                "p99": 815.869177268872
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 922,
+                "p90": 995.7600000000001,
+                "p95": 1032.64,
+                "p99": 1106.3999999999999
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 834.6288590021693,
+                "p90": 772.8044990760825,
+                "p95": 745.2043383947938,
+                "p99": 695.5240491684744
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 64,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 419,
+                "p90": 452.52000000000004,
+                "p95": 469.28000000000003,
+                "p99": 502.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 918.2909403341289,
+                "p90": 850.2693891982674,
+                "p95": 819.9026252983293,
+                "p99": 765.2424502784409
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 122,
+                "p90": 131.76000000000002,
+                "p95": 136.64000000000001,
+                "p99": 146.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1576.9012459016394,
+                "p90": 1460.0937462052214,
+                "p95": 1407.9475409836064,
+                "p99": 1314.0843715846995
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 394,
+                "p90": 425.52000000000004,
+                "p95": 441.28000000000003,
+                "p99": 472.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 976.5581319796954,
+                "p90": 904.2204925737921,
+                "p95": 871.9269035532996,
+                "p99": 813.798443316413
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 923,
+                "p90": 996.84,
+                "p95": 1033.76,
+                "p99": 1107.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 833.724602383532,
+                "p90": 771.9672244291962,
+                "p95": 744.3969664138677,
+                "p99": 694.7705019862767
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 128,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 420,
+                "p90": 453.6,
+                "p95": 470.40000000000003,
+                "p99": 504
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 916.1045333333334,
+                "p90": 848.244938271605,
+                "p95": 817.9504761904761,
+                "p99": 763.4204444444445
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 123,
+                "p90": 132.84,
+                "p95": 137.76000000000002,
+                "p99": 147.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1564.0809105691058,
+                "p90": 1448.2230653417646,
+                "p95": 1396.5008130081299,
+                "p99": 1303.400758807588
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 395,
+                "p90": 426.6,
+                "p95": 442.40000000000003,
+                "p99": 474
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 974.0858329113925,
+                "p90": 901.9313267698077,
+                "p95": 869.7194936708861,
+                "p99": 811.738194092827
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 924,
+                "p90": 997.9200000000001,
+                "p95": 1034.88,
+                "p99": 1108.8
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 832.822303030303,
+                "p90": 771.1317620650954,
+                "p95": 743.5913419913419,
+                "p99": 694.0185858585859
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 256,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 421,
+                "p90": 454.68,
+                "p95": 471.52000000000004,
+                "p99": 505.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 913.928513064133,
+                "p90": 846.230104689012,
+                "p95": 816.0076009501188,
+                "p99": 761.607094220111
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 124,
+                "p90": 133.92000000000002,
+                "p95": 138.88000000000002,
+                "p99": 148.79999999999998
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1551.4673548387095,
+                "p90": 1436.543847072879,
+                "p95": 1385.2387096774191,
+                "p99": 1292.8894623655915
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 396,
+                "p90": 427.68,
+                "p95": 443.52000000000004,
+                "p99": 475.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 971.6260202020202,
+                "p90": 899.653722409278,
+                "p95": 867.5232323232323,
+                "p99": 809.6883501683502
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 925,
+                "p90": 999.0000000000001,
+                "p95": 1036,
+                "p99": 1110
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 831.9219545945946,
+                "p90": 770.298106106106,
+                "p95": 742.7874594594595,
+                "p99": 693.2682954954955
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 512,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 422,
+                "p90": 455.76000000000005,
+                "p95": 472.64000000000004,
+                "p99": 506.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 911.7628056872038,
+                "p90": 844.2248200807443,
+                "p95": 814.0739336492891,
+                "p99": 759.8023380726698
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 125,
+                "p90": 135,
+                "p95": 140,
+                "p99": 150
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1539.0556159999999,
+                "p90": 1425.0514962962964,
+                "p95": 1374.1568,
+                "p99": 1282.5463466666668
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 397,
+                "p90": 428.76000000000005,
+                "p95": 444.64000000000004,
+                "p99": 476.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 969.1785994962216,
+                "p90": 897.387592126131,
+                "p95": 865.3380352644836,
+                "p99": 807.648832913518
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 926,
+                "p90": 1000.08,
+                "p95": 1037.1200000000001,
+                "p99": 1111.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 831.0235507559396,
+                "p90": 769.466250699944,
+                "p95": 741.9853131749459,
+                "p99": 692.5196256299496
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 1024,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 423,
+                "p90": 456.84000000000003,
+                "p95": 473.76000000000005,
+                "p99": 507.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 909.6073380614658,
+                "p90": 842.2290167235793,
+                "p95": 812.1494089834514,
+                "p99": 758.0061150512215
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 126,
+                "p90": 136.08,
+                "p95": 141.12,
+                "p99": 151.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1526.840888888889,
+                "p90": 1413.741563786008,
+                "p95": 1363.2507936507936,
+                "p99": 1272.3674074074074
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 398,
+                "p90": 429.84000000000003,
+                "p95": 445.76000000000005,
+                "p99": 477.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 966.7434773869347,
+                "p90": 895.1328494323469,
+                "p95": 863.1638190954774,
+                "p99": 805.6195644891122
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 927,
+                "p90": 1001.1600000000001,
+                "p95": 1038.24,
+                "p99": 1112.3999999999999
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 830.1270852211435,
+                "p90": 768.6361900195773,
+                "p95": 741.1848975188781,
+                "p99": 691.7725710176197
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 2048,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 424,
+                "p90": 457.92,
+                "p95": 474.88000000000005,
+                "p99": 508.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 907.4620377358491,
+                "p90": 840.2426275331936,
+                "p95": 810.2339622641508,
+                "p99": 756.2183647798744
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 127,
+                "p90": 137.16,
+                "p95": 142.24,
+                "p99": 152.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1514.8185196850393,
+                "p90": 1402.6097404491106,
+                "p95": 1352.5165354330707,
+                "p99": 1262.3487664041995
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 399,
+                "p90": 430.92,
+                "p95": 446.88000000000005,
+                "p99": 478.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 964.3205614035088,
+                "p90": 892.8894087069526,
+                "p95": 861.0005012531327,
+                "p99": 803.6004678362574
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 928,
+                "p90": 1002.24,
+                "p95": 1039.3600000000001,
+                "p99": 1113.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 829.232551724138,
+                "p90": 767.8079182630906,
+                "p95": 740.3862068965517,
+                "p99": 691.0271264367817
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 4096,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 425,
+                "p90": 459.00000000000006,
+                "p95": 476.00000000000006,
+                "p99": 510
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 905.3268329411765,
+                "p90": 838.2655860566448,
+                "p95": 808.3275294117645,
+                "p99": 754.4390274509803
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 128,
+                "p90": 138.24,
+                "p95": 143.36,
+                "p99": 153.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1502.984,
+                "p90": 1391.6518518518517,
+                "p95": 1341.9499999999998,
+                "p99": 1252.4866666666667
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 400,
+                "p90": 432,
+                "p95": 448.00000000000006,
+                "p99": 480
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 961.90976,
+                "p90": 890.6571851851852,
+                "p95": 858.848,
+                "p99": 801.5914666666667
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 929,
+                "p90": 1003.32,
+                "p95": 1040.48,
+                "p99": 1114.8
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 828.3399440258343,
+                "p90": 766.9814296535502,
+                "p95": 739.5892357373519,
+                "p99": 690.2832866881952
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 8192,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 426,
+                "p90": 460.08000000000004,
+                "p95": 477.12000000000006,
+                "p99": 511.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 903.2016525821597,
+                "p90": 836.2978264649626,
+                "p95": 806.4300469483567,
+                "p99": 752.6680438184663
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 129,
+                "p90": 139.32000000000002,
+                "p95": 144.48000000000002,
+                "p99": 154.79999999999998
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1491.33296124031,
+                "p90": 1380.863853000287,
+                "p95": 1331.5472868217053,
+                "p99": 1242.7774677002585
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 401,
+                "p90": 433.08000000000004,
+                "p95": 449.12000000000006,
+                "p99": 481.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 959.5109825436409,
+                "p90": 888.4360949478155,
+                "p95": 856.706234413965,
+                "p99": 799.5924854530341
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 930,
+                "p90": 1004.4000000000001,
+                "p95": 1041.6000000000001,
+                "p99": 1116
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 827.4492559139785,
+                "p90": 766.1567184388689,
+                "p95": 738.7939784946236,
+                "p99": 689.541046594982
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        }
+      ]
+    },
+    {
+      "series_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-fp8",
+      "phase": "decode",
+      "precision": "fp8",
+      "backend": "deepep-v2",
+      "system": {
+        "ep_size": 8,
+        "nodes": 1,
+        "gpus_per_node": 8,
+        "scale_up_domain": 8,
+        "scale_up_transport": "nvlink",
+        "scale_out_transport": null,
+        "topology_class": "h200-nvlink-island",
+        "sku": "h200-dgxc",
+        "vendor": "nvidia"
+      },
+      "points": [
+        {
+          "tokens_per_rank": 1,
+          "global_tokens": 8,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 417,
+                "p90": 450.36,
+                "p95": 467.04,
+                "p99": 500.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 922.6952134292566,
+                "p90": 854.3474198419042,
+                "p95": 823.8350119904076,
+                "p99": 768.9126778577139
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 120,
+                "p90": 129.60000000000002,
+                "p95": 134.4,
+                "p99": 144
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1603.1829333333335,
+                "p90": 1484.4286419753084,
+                "p95": 1431.4133333333332,
+                "p99": 1335.9857777777777
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 392,
+                "p90": 423.36,
+                "p95": 439.04,
+                "p99": 470.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 981.5405714285715,
+                "p90": 908.8338624338625,
+                "p95": 876.3755102040816,
+                "p99": 817.9504761904763
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 921,
+                "p90": 994.6800000000001,
+                "p95": 1031.5200000000002,
+                "p99": 1105.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 835.5350792616721,
+                "p90": 773.6435919089556,
+                "p95": 746.0134636264928,
+                "p99": 696.27923271806
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 2,
+          "global_tokens": 16,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 418,
+                "p90": 451.44000000000005,
+                "p95": 468.16,
+                "p99": 501.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 920.4878086124403,
+                "p90": 852.3035264930002,
+                "p95": 821.8641148325358,
+                "p99": 767.0731738437003
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 121,
+                "p90": 130.68,
+                "p95": 135.52,
+                "p99": 145.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1589.9334876033058,
+                "p90": 1472.1606366697276,
+                "p95": 1419.58347107438,
+                "p99": 1324.944573002755
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 393,
+                "p90": 424.44000000000005,
+                "p95": 440.16,
+                "p99": 471.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 979.0430127226464,
+                "p90": 906.5213080765243,
+                "p95": 874.1455470737912,
+                "p99": 815.869177268872
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 922,
+                "p90": 995.7600000000001,
+                "p95": 1032.64,
+                "p99": 1106.3999999999999
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 834.6288590021693,
+                "p90": 772.8044990760825,
+                "p95": 745.2043383947938,
+                "p99": 695.5240491684744
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 4,
+          "global_tokens": 32,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 419,
+                "p90": 452.52000000000004,
+                "p95": 469.28000000000003,
+                "p99": 502.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 918.2909403341289,
+                "p90": 850.2693891982674,
+                "p95": 819.9026252983293,
+                "p99": 765.2424502784409
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 122,
+                "p90": 131.76000000000002,
+                "p95": 136.64000000000001,
+                "p99": 146.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1576.9012459016394,
+                "p90": 1460.0937462052214,
+                "p95": 1407.9475409836064,
+                "p99": 1314.0843715846995
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 394,
+                "p90": 425.52000000000004,
+                "p95": 441.28000000000003,
+                "p99": 472.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 976.5581319796954,
+                "p90": 904.2204925737921,
+                "p95": 871.9269035532996,
+                "p99": 813.798443316413
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 923,
+                "p90": 996.84,
+                "p95": 1033.76,
+                "p99": 1107.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 833.724602383532,
+                "p90": 771.9672244291962,
+                "p95": 744.3969664138677,
+                "p99": 694.7705019862767
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 8,
+          "global_tokens": 64,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 420,
+                "p90": 453.6,
+                "p95": 470.40000000000003,
+                "p99": 504
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 916.1045333333334,
+                "p90": 848.244938271605,
+                "p95": 817.9504761904761,
+                "p99": 763.4204444444445
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 123,
+                "p90": 132.84,
+                "p95": 137.76000000000002,
+                "p99": 147.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1564.0809105691058,
+                "p90": 1448.2230653417646,
+                "p95": 1396.5008130081299,
+                "p99": 1303.400758807588
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 395,
+                "p90": 426.6,
+                "p95": 442.40000000000003,
+                "p99": 474
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 974.0858329113925,
+                "p90": 901.9313267698077,
+                "p95": 869.7194936708861,
+                "p99": 811.738194092827
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 924,
+                "p90": 997.9200000000001,
+                "p95": 1034.88,
+                "p99": 1108.8
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 832.822303030303,
+                "p90": 771.1317620650954,
+                "p95": 743.5913419913419,
+                "p99": 694.0185858585859
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 16,
+          "global_tokens": 128,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 421,
+                "p90": 454.68,
+                "p95": 471.52000000000004,
+                "p99": 505.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 913.928513064133,
+                "p90": 846.230104689012,
+                "p95": 816.0076009501188,
+                "p99": 761.607094220111
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 124,
+                "p90": 133.92000000000002,
+                "p95": 138.88000000000002,
+                "p99": 148.79999999999998
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1551.4673548387095,
+                "p90": 1436.543847072879,
+                "p95": 1385.2387096774191,
+                "p99": 1292.8894623655915
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 396,
+                "p90": 427.68,
+                "p95": 443.52000000000004,
+                "p99": 475.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 971.6260202020202,
+                "p90": 899.653722409278,
+                "p95": 867.5232323232323,
+                "p99": 809.6883501683502
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 925,
+                "p90": 999.0000000000001,
+                "p95": 1036,
+                "p99": 1110
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 831.9219545945946,
+                "p90": 770.298106106106,
+                "p95": 742.7874594594595,
+                "p99": 693.2682954954955
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 32,
+          "global_tokens": 256,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 422,
+                "p90": 455.76000000000005,
+                "p95": 472.64000000000004,
+                "p99": 506.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 911.7628056872038,
+                "p90": 844.2248200807443,
+                "p95": 814.0739336492891,
+                "p99": 759.8023380726698
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 125,
+                "p90": 135,
+                "p95": 140,
+                "p99": 150
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1539.0556159999999,
+                "p90": 1425.0514962962964,
+                "p95": 1374.1568,
+                "p99": 1282.5463466666668
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 397,
+                "p90": 428.76000000000005,
+                "p95": 444.64000000000004,
+                "p99": 476.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 969.1785994962216,
+                "p90": 897.387592126131,
+                "p95": 865.3380352644836,
+                "p99": 807.648832913518
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 926,
+                "p90": 1000.08,
+                "p95": 1037.1200000000001,
+                "p99": 1111.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 831.0235507559396,
+                "p90": 769.466250699944,
+                "p95": 741.9853131749459,
+                "p99": 692.5196256299496
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 64,
+          "global_tokens": 512,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 423,
+                "p90": 456.84000000000003,
+                "p95": 473.76000000000005,
+                "p99": 507.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 909.6073380614658,
+                "p90": 842.2290167235793,
+                "p95": 812.1494089834514,
+                "p99": 758.0061150512215
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 126,
+                "p90": 136.08,
+                "p95": 141.12,
+                "p99": 151.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1526.840888888889,
+                "p90": 1413.741563786008,
+                "p95": 1363.2507936507936,
+                "p99": 1272.3674074074074
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 398,
+                "p90": 429.84000000000003,
+                "p95": 445.76000000000005,
+                "p99": 477.59999999999997
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 966.7434773869347,
+                "p90": 895.1328494323469,
+                "p95": 863.1638190954774,
+                "p99": 805.6195644891122
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 927,
+                "p90": 1001.1600000000001,
+                "p95": 1038.24,
+                "p99": 1112.3999999999999
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 830.1270852211435,
+                "p90": 768.6361900195773,
+                "p95": 741.1848975188781,
+                "p99": 691.7725710176197
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 128,
+          "global_tokens": 1024,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 424,
+                "p90": 457.92,
+                "p95": 474.88000000000005,
+                "p99": 508.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 907.4620377358491,
+                "p90": 840.2426275331936,
+                "p95": 810.2339622641508,
+                "p99": 756.2183647798744
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 127,
+                "p90": 137.16,
+                "p95": 142.24,
+                "p99": 152.4
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1514.8185196850393,
+                "p90": 1402.6097404491106,
+                "p95": 1352.5165354330707,
+                "p99": 1262.3487664041995
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 399,
+                "p90": 430.92,
+                "p95": 446.88000000000005,
+                "p99": 478.79999999999995
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 964.3205614035088,
+                "p90": 892.8894087069526,
+                "p95": 861.0005012531327,
+                "p99": 803.6004678362574
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 928,
+                "p90": 1002.24,
+                "p95": 1039.3600000000001,
+                "p99": 1113.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 829.232551724138,
+                "p90": 767.8079182630906,
+                "p95": 740.3862068965517,
+                "p99": 691.0271264367817
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 256,
+          "global_tokens": 2048,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 425,
+                "p90": 459.00000000000006,
+                "p95": 476.00000000000006,
+                "p99": 510
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 905.3268329411765,
+                "p90": 838.2655860566448,
+                "p95": 808.3275294117645,
+                "p99": 754.4390274509803
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 128,
+                "p90": 138.24,
+                "p95": 143.36,
+                "p99": 153.6
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1502.984,
+                "p90": 1391.6518518518517,
+                "p95": 1341.9499999999998,
+                "p99": 1252.4866666666667
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 400,
+                "p90": 432,
+                "p95": 448.00000000000006,
+                "p99": 480
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 961.90976,
+                "p90": 890.6571851851852,
+                "p95": 858.848,
+                "p99": 801.5914666666667
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 929,
+                "p90": 1003.32,
+                "p95": 1040.48,
+                "p99": 1114.8
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 828.3399440258343,
+                "p90": 766.9814296535502,
+                "p95": 739.5892357373519,
+                "p99": 690.2832866881952
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        },
+        {
+          "tokens_per_rank": 512,
+          "global_tokens": 4096,
+          "components": {
+            "dispatch": {
+              "latency_us": {
+                "p50": 426,
+                "p90": 460.08000000000004,
+                "p95": 477.12000000000006,
+                "p99": 511.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 903.2016525821597,
+                "p90": 836.2978264649626,
+                "p95": 806.4300469483567,
+                "p99": 752.6680438184663
+              }
+            },
+            "stage": {
+              "latency_us": {
+                "p50": 129,
+                "p90": 139.32000000000002,
+                "p95": 144.48000000000002,
+                "p99": 154.79999999999998
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 1491.33296124031,
+                "p90": 1380.863853000287,
+                "p95": 1331.5472868217053,
+                "p99": 1242.7774677002585
+              }
+            },
+            "combine": {
+              "latency_us": {
+                "p50": 401,
+                "p90": 433.08000000000004,
+                "p95": 449.12000000000006,
+                "p99": 481.2
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 959.5109825436409,
+                "p90": 888.4360949478155,
+                "p95": 856.706234413965,
+                "p99": 799.5924854530341
+              }
+            },
+            "roundtrip": {
+              "latency_us": {
+                "p50": 930,
+                "p90": 1004.4000000000001,
+                "p95": 1041.6000000000001,
+                "p99": 1116
+              },
+              "activation_data_rate_gbps_at_latency_percentile": {
+                "p50": 827.4492559139785,
+                "p90": 766.1567184388689,
+                "p95": 738.7939784946236,
+                "p99": 689.541046594982
+              }
+            }
+          },
+          "roundtrip_token_rate_at_latency_percentile": {
+            "p50": 8338218,
+            "p90": 9005275.440000001,
+            "p95": 9338804.16,
+            "p99": 10005861.6
+          }
+        }
+      ]
+    }
+  ]
+}

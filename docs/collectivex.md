@@ -1,0 +1,67 @@
+# CollectiveX
+
+Design rationale for the CollectiveX tab's data pipeline. Unlike every other tab
+(Neon DB → ETL ingest → `/api/v1/*`), CollectiveX uses **lazy ingest-on-read**: its
+database is a durable cache of GitHub Actions, populated by the API routes themselves.
+
+## Why lazy ingest instead of the main pipeline
+
+- **Sweep artifacts expire after 14 days.** The sweep workflow
+  (`collectivex-sweep.yml` in the harness repo) uploads a matrix artifact
+  (`cxsweep-matrix-{run_id}`) and per-cell result artifacts
+  (`cxshard-{cell}-{run_id}-{attempt}`) with 14-day retention. Persisting on first
+  view makes a run outlive its artifacts once anyone has looked at it.
+- **The sweep JSON contract is expected to change.** The DB stores the RAW documents
+  verbatim; the shared reader (`packages/db/src/collectivex/reader.ts`) is the single
+  transform point and runs at API-read time, so a reader fix retroactively applies to
+  already-stored runs — no re-ingest. A contract change = reader change + a bump of the
+  numeric `version` in the harness's `experimental/CollectiveX/configs/sweep.json`.
+- **No CI plumbing.** There is no ingest workflow, no cross-repo dispatch, and no GH
+  secrets. Runs launched via `gh api` on any harness branch appear on the dashboard
+  within the CDN TTL of someone viewing the page — only the workflow identity is
+  checked, never the branch.
+
+## How it works
+
+`packages/app/src/lib/collectivex-lazy-ingest.ts` exposes three `ensure*` functions the
+routes call before reading the DB (`packages/db/src/queries/collectivex.ts`):
+
+- `ensureLatestCollectiveXRun` — walk GitHub's completed sweep runs newest-first; stop at
+  the first live requested-version run; persist it if absent.
+- `ensureCollectiveXRunsList` — backfill up to 8 recent runs so the picker lists sweeps
+  nobody has viewed yet.
+- `ensureCollectiveXRun` — fetch one run by id (only if completed — persisting an
+  in-progress run would freeze a partial snapshot).
+
+Key invariants:
+
+- **Writes are atomic and race-safe**: one CTE statement with
+  `ON CONFLICT (run_id) DO NOTHING`; concurrent first-viewers can't double-ingest or
+  expose a partial run. A GitHub re-run (newer `run_attempt`) is replaced through a
+  `FOR UPDATE`-guarded refresh statement.
+- **Deletion tombstones** (`cx_runs.deleted_at`, documents freed): discovery must never
+  resurrect a deleted run. Re-ingesting via the CLI
+  (`pnpm admin:db:ingest:collectivex <run-url-or-id>`) clears the tombstone — that CLI is
+  the operator tool for pre-warming runs before artifact expiry, backfills, and un-deletes.
+- **"Latest" orders by `run_id`** (monotonic with run creation, matching the discovery
+  walk) — not by completion time, where a long-failing older run would shadow a newer
+  successful one.
+- **GitHub being down never takes the page down**: routes serve whatever the DB holds and
+  only surface an error when there is no stored fallback.
+- **Caching**: responses carry the `collectivex` CDN tag with a 60s
+  `s-maxage` (freshness bound for lazy discovery). Run deletion and
+  `POST /api/v1/invalidate?scope=collectivex` purge only that tag; the main dashboard's
+  blob cache is untouched by CollectiveX operations.
+- **Env**: `DATABASE_COLLECTIVEX_READONLY_URL` (must be the same primary as the write URL
+  — the routes read their own writes), `DATABASE_COLLECTIVEX_WRITE_URL` (direct/unpooled;
+  also used by migrations via `pnpm admin:db:migrate:collectivex`),
+  `COLLECTIVEX_ADMIN_SECRET` (delete route Bearer token — deliberately not
+  INVALIDATE_SECRET, since it is remembered in browser localStorage), and `GITHUB_TOKEN`.
+
+## The raw-rows exception
+
+CollectiveX routes return the **assembled** dataset (reader over stored matrix + docs)
+instead of raw rows. The reader is shared between the app and the CLI through the db
+package (`@semianalysisai/inferencex-db/collectivex/*`), so ingest-time validation and
+read-time assembly can never drift; shipping raw docs to the client would only move the
+same shared transform across the wire.

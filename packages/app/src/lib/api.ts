@@ -306,42 +306,51 @@ export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
 
-/** Latest sweep run's neutral view dataset (default page view). */
+/** Latest ingested sweep run's neutral view dataset (default page view). */
 export function fetchCollectiveX(
   signal?: AbortSignal,
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
 ) {
-  return fetchCollectiveXJson<CollectiveXDataset>(`${version}/latest.json`, signal);
+  return fetchJson<CollectiveXDataset>(`/api/v1/collectivex/latest?version=${version}`, signal);
 }
 
-/** Recent sweep runs for the run picker, keyed by run_id + attempt. */
+/** Ingested sweep runs for the run picker, keyed by run_id + attempt. */
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,
 ) {
-  return fetchCollectiveXJson<{ runs: CollectiveXRunSummary[] }>(
-    `${version}/runs.json`,
+  return fetchJson<{ runs: CollectiveXRunSummary[] }>(
+    `/api/v1/collectivex/runs?version=${version}`,
     signal,
   ).then(({ runs }) => runs);
 }
 
-/** Resolve a specific sweep run's neutral view dataset by run_id. */
+/** Resolve a specific ingested sweep run's neutral view dataset by run_id. */
 export function fetchCollectiveXRun(
   version: CollectiveXVersion,
   runId: string,
   signal?: AbortSignal,
 ) {
-  return fetchCollectiveXJson<CollectiveXDataset>(`${version}/runs/${runId}.json`, signal);
+  return fetchJson<CollectiveXDataset>(
+    `/api/v1/collectivex/runs/${runId}?version=${version}`,
+    signal,
+  );
 }
 
-async function fetchCollectiveXJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`/collectivex-data/${path}`, {
-    cache: 'no-store',
-    credentials: 'same-origin',
-    signal,
+/**
+ * Admin deletion of an ingested run. Requires the dedicated CollectiveX admin
+ * Bearer secret (COLLECTIVEX_ADMIN_SECRET — deliberately not the CI-held
+ * INVALIDATE_SECRET); resolves false on 401 so callers can clear a stale
+ * stored token, throws on other failures.
+ */
+export async function deleteCollectiveXRun(runId: string, token: string): Promise<boolean> {
+  const response = await fetch(`/api/v1/collectivex/runs/${runId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error(`CollectiveX request failed (${response.status}).`);
-  return response.json();
+  if (response.status === 401) return false;
+  if (!response.ok) throw new Error(`CollectiveX delete failed (${response.status}).`);
+  return true;
 }
 
 export interface FeedbackListRow {

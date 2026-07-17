@@ -13,6 +13,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
+import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
+
 const baseUrl = (
   process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'https://inferencex.semianalysis.com'
 ).replace(/\/$/u, '');
@@ -250,6 +253,17 @@ async function main() {
       }),
     ],
     ['workflow-info', await writeFixture('workflow-info', workflowInfo)],
+    // CollectiveX fixtures are synthetic (deterministic contract builders),
+    // not captured — production may hold arbitrary sweep data while the e2e
+    // suite asserts on the builders' known shape.
+    ['collectivex-latest', await writeFixture('collectivex-latest', makeCollectiveXDataset())],
+    [
+      'collectivex-runs',
+      await writeFixture('collectivex-runs', {
+        version: 1,
+        runs: [buildRunSummary(makeCollectiveXDataset())],
+      }),
+    ],
   ];
 
   for (const [name, bytes] of sizes) {

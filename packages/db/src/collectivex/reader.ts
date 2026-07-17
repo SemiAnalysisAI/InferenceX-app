@@ -1,3 +1,15 @@
+/**
+ * CollectiveX neutral-contract reader: assembles the dashboard dataset from a
+ * sweep run's raw matrix + case-attempt docs. Shared by the ingest script
+ * (validation + summary precompute) and the app's API routes (assembly at
+ * read time), so the transform can never drift between the two.
+ *
+ * The sweep JSON contract is expected to change; when it does, update this
+ * reader (and bump the `version` tag in the harness's sweep config). Raw docs
+ * are stored untouched in the DB, so reader fixes retroactively apply to
+ * already-ingested runs.
+ */
+
 import type {
   CollectiveXComponent,
   CollectiveXCoverage,
@@ -328,4 +340,24 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
       failed: run.failed_cases,
     },
   };
+}
+
+/**
+ * Structural identity check for the matrix document (it carries no
+ * `record_type` tag): requested_cases[] + include[] arrays plus a valid
+ * numeric `version` — the content axis the frontend selects on.
+ */
+export function isMatrixDoc(doc: unknown): boolean {
+  const candidate = doc as { requested_cases?: unknown; include?: unknown } | null;
+  return (
+    Array.isArray(candidate?.requested_cases) &&
+    Array.isArray(candidate?.include) &&
+    matrixVersion(doc) !== null
+  );
+}
+
+/** Read the matrix doc's numeric version tag; null when absent or invalid. */
+export function matrixVersion(doc: unknown): number | null {
+  const value = (doc as { version?: unknown } | null)?.version;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
 }

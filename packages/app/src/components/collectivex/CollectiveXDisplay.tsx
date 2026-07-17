@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCollectiveX, useCollectiveXRun, useCollectiveXRuns } from '@/hooks/api/use-collectivex';
+import {
+  useCollectiveX,
+  useCollectiveXRun,
+  useCollectiveXRuns,
+  useDeleteCollectiveXRun,
+} from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -106,6 +111,12 @@ const STRINGS = {
     resetFilter: 'Reset filter',
     payloadNote:
       'Payload rate is derived at the selected latency percentile and is not physical link bandwidth.',
+    deleteRun: 'Delete run',
+    deleteConfirm: (id: string) =>
+      `Delete run #${id} from the dashboard database? This cannot be undone.`,
+    deleteTokenPrompt: 'Admin token required to delete runs:',
+    deleteUnauthorized: 'Invalid admin token.',
+    deleteFailed: 'Deleting the run failed. Try again.',
   },
   zh: {
     operation: {
@@ -231,6 +242,14 @@ const STRINGS = {
     attemptLabel: 'Attempt',
     matrixLabel: 'Matrix',
     sourceBundles: '源产物包',
+    // English placeholders per the repository's temporary language override
+    // (no new Chinese translations); localize when the override lifts.
+    deleteRun: 'Delete run',
+    deleteConfirm: (id: string) =>
+      `Delete run #${id} from the dashboard database? This cannot be undone.`,
+    deleteTokenPrompt: 'Admin token required to delete runs:',
+    deleteUnauthorized: 'Invalid admin token.',
+    deleteFailed: 'Deleting the run failed. Try again.',
   },
 } as const;
 const CONCLUSION_CLASSES: Record<string, string> = {
@@ -239,6 +258,9 @@ const CONCLUSION_CLASSES: Record<string, string> = {
 };
 const CONCLUSION_FALLBACK_CLASS =
   'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+// Remembered admin bearer token for run deletion; cleared on a 401 so a
+// rotated secret re-prompts instead of failing silently forever.
+const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
 
 function formatDate(value: string, locale: 'en' | 'zh'): string {
   return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
@@ -467,6 +489,32 @@ export default function CollectiveXDisplay() {
     void activeQuery.refetch();
     if (runsRequested) void runsQuery.refetch();
   }, [activeQuery, runsQuery, runsRequested]);
+  const deleteRun = useDeleteCollectiveXRun();
+  const shownRunId = dataset?.run.run_id;
+  const handleDeleteRun = useCallback(async () => {
+    if (!shownRunId) return;
+    track('collectivex_run_delete_prompted', { run: shownRunId });
+    if (!window.confirm(t.deleteConfirm(shownRunId))) return;
+    const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '';
+    const token = stored || (window.prompt(t.deleteTokenPrompt)?.trim() ?? '');
+    if (!token) return;
+    try {
+      const deleted = await deleteRun.mutateAsync({ runId: shownRunId, token });
+      if (!deleted) {
+        localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+        track('collectivex_run_delete_failed', { run: shownRunId, reason: 'unauthorized' });
+        window.alert(t.deleteUnauthorized);
+        return;
+      }
+      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+      track('collectivex_run_delete_confirmed', { run: shownRunId });
+      // The deleted run can no longer be pinned; fall back to the new latest.
+      setSelectedRunId(null);
+    } catch {
+      track('collectivex_run_delete_failed', { run: shownRunId, reason: 'error' });
+      window.alert(t.deleteFailed);
+    }
+  }, [deleteRun, shownRunId, t]);
   if (isLoading) {
     return (
       <Card data-testid="collectivex-loading" className="min-h-80 items-center justify-center">
@@ -559,6 +607,21 @@ export default function CollectiveXDisplay() {
                 <RefreshCw className="size-4" />
               )}
               {t.refresh}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="collectivex-delete-run"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => void handleDeleteRun()}
+              disabled={deleteRun.isPending}
+            >
+              {deleteRun.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              {t.deleteRun}
             </Button>
           </div>
         </div>
