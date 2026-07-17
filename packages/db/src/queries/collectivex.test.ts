@@ -120,18 +120,18 @@ describe('refreshCollectiveXRunAttempt', () => {
 });
 
 describe('deleteCollectiveXRun', () => {
-  it('tombstones the run then frees its documents', async () => {
-    const { sql, calls } = fakeSql([[{ run_id: '160' }], []]);
+  it('tombstones the run and frees its documents in one atomic statement', async () => {
+    const { sql, calls } = fakeSql([[{ runs_deleted: 1 }]]);
     await expect(deleteCollectiveXRun(sql, '160')).resolves.toBe(true);
+    expect(calls).toHaveLength(1);
     expect(calls[0].text).toContain('SET deleted_at = now()');
     expect(calls[0].text).toContain('deleted_at IS NULL');
-    expect(calls[1].text).toContain('DELETE FROM cx_run_docs');
+    expect(calls[0].text).toContain('DELETE FROM cx_run_docs');
   });
 
-  it('reports absent or already-tombstoned runs without touching documents', async () => {
-    const { sql, calls } = fakeSql([[]]);
+  it('reports absent or already-tombstoned runs as false', async () => {
+    const { sql } = fakeSql([[{ runs_deleted: 0 }]]);
     await expect(deleteCollectiveXRun(sql, '160')).resolves.toBe(false);
-    expect(calls).toHaveLength(1);
   });
 });
 

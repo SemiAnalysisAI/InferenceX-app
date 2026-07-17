@@ -224,8 +224,8 @@ async function main(): Promise<void> {
       for (let i = 0; i < docs.length; i += DOCS_INSERT_CHUNK) {
         const chunk = docs.slice(i, i + DOCS_INSERT_CHUNK).map((doc) => JSON.stringify(doc));
         await tx`
-          INSERT INTO cx_run_docs (run_id, doc)
-          SELECT ${runIdStr}, unnest(${tx.array(chunk)}::jsonb[])
+          INSERT INTO cx_run_docs (run_id, run_attempt, doc)
+          SELECT ${runIdStr}, ${run.run_attempt}, unnest(${tx.array(chunk)}::jsonb[])
         `;
       }
     });

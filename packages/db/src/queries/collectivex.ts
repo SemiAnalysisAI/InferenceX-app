@@ -44,15 +44,9 @@ export interface CollectiveXRunStateRow {
 /** Run summaries capped at this many rows — deletion keeps the list curated. */
 const MAX_LISTED_RUNS = 50;
 
-function toRunRow(row: Record<string, unknown>, docs: unknown[]): CollectiveXRunRow {
-  return { ...(row as unknown as Omit<CollectiveXRunRow, 'docs'>), docs };
-}
-
-async function docsForRun(sql: DbClient, runId: string): Promise<unknown[]> {
-  const rows = await sql`
-    SELECT doc FROM cx_run_docs WHERE run_id = ${runId} ORDER BY id
-  `;
-  return rows.map((row) => row.doc);
+function toRunRow(row: Record<string, unknown>): CollectiveXRunRow {
+  const { docs, ...rest } = row as unknown as Omit<CollectiveXRunRow, 'docs'> & { docs: unknown };
+  return { ...rest, docs: Array.isArray(docs) ? docs : [] };
 }
 
 /**
@@ -60,22 +54,31 @@ async function docsForRun(sql: DbClient, runId: string): Promise<unknown[]> {
  * increase monotonically with creation, matching lazy discovery's
  * newest-first walk (completion time would let a long-failing older run
  * shadow a newer successful one).
+ *
+ * Row and documents come back in ONE query, with docs filtered to the row's
+ * CURRENT run_attempt: a reader can never observe one attempt's metadata with
+ * another attempt's documents, even while a refresh commits concurrently.
  */
 export async function getLatestCollectiveXRun(
   sql: DbClient,
   version: number,
 ): Promise<CollectiveXRunRow | null> {
   const rows = await sql`
-    SELECT run_id::text, run_attempt, version,
-      to_char(generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
-      source_sha, source_branch, conclusion, matrix
-    FROM cx_runs
-    WHERE version = ${version} AND deleted_at IS NULL
-    ORDER BY run_id DESC
+    SELECT r.run_id::text, r.run_attempt, r.version,
+      to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
+      r.source_sha, r.source_branch, r.conclusion, r.matrix,
+      COALESCE(d.docs, '[]'::jsonb) AS docs
+    FROM cx_runs r
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(doc ORDER BY id) AS docs
+      FROM cx_run_docs
+      WHERE run_id = r.run_id AND run_attempt = r.run_attempt
+    ) d ON true
+    WHERE r.version = ${version} AND r.deleted_at IS NULL
+    ORDER BY r.run_id DESC
     LIMIT 1
   `;
-  if (rows.length === 0) return null;
-  return toRunRow(rows[0], await docsForRun(sql, rows[0].run_id as string));
+  return rows.length === 0 ? null : toRunRow(rows[0]);
 }
 
 /** One specific live run by id, or null when absent, tombstoned, or on another version. */
@@ -85,14 +88,19 @@ export async function getCollectiveXRun(
   runId: string,
 ): Promise<CollectiveXRunRow | null> {
   const rows = await sql`
-    SELECT run_id::text, run_attempt, version,
-      to_char(generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
-      source_sha, source_branch, conclusion, matrix
-    FROM cx_runs
-    WHERE version = ${version} AND run_id = ${runId} AND deleted_at IS NULL
+    SELECT r.run_id::text, r.run_attempt, r.version,
+      to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
+      r.source_sha, r.source_branch, r.conclusion, r.matrix,
+      COALESCE(d.docs, '[]'::jsonb) AS docs
+    FROM cx_runs r
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(doc ORDER BY id) AS docs
+      FROM cx_run_docs
+      WHERE run_id = r.run_id AND run_attempt = r.run_attempt
+    ) d ON true
+    WHERE r.version = ${version} AND r.run_id = ${runId} AND r.deleted_at IS NULL
   `;
-  if (rows.length === 0) return null;
-  return toRunRow(rows[0], await docsForRun(sql, rows[0].run_id as string));
+  return rows.length === 0 ? null : toRunRow(rows[0]);
 }
 
 /**
@@ -164,8 +172,8 @@ export async function insertCollectiveXRun(
       RETURNING run_id
     ),
     new_docs AS (
-      INSERT INTO cx_run_docs (run_id, doc)
-      SELECT new_run.run_id, entries.value
+      INSERT INTO cx_run_docs (run_id, run_attempt, doc)
+      SELECT new_run.run_id, ${run.run_attempt}, entries.value
       FROM new_run, jsonb_array_elements((${{ docs } as never}::jsonb)->'docs') AS entries(value)
       RETURNING id
     )
@@ -178,8 +186,11 @@ export async function insertCollectiveXRun(
  * Replace a live run's contents when GitHub reports a NEWER attempt (a re-run
  * of failed shards after the run was already ingested). Single statement with
  * `FOR UPDATE` + an attempt guard: concurrent refreshers serialize on the row
- * lock and the loser re-evaluates the guard to a no-op, so documents are never
- * doubled. Tombstoned runs are never refreshed. Returns true when replaced.
+ * lock and the loser re-evaluates the guard to a no-op. Readers filter docs
+ * by the row's current run_attempt, so any superseded docs this statement's
+ * snapshot could not see (and therefore could not DELETE) stay invisible until
+ * the next refresh garbage-collects them. Tombstoned runs are never refreshed.
+ * Returns true when replaced.
  */
 export async function refreshCollectiveXRunAttempt(
   sql: DbClient,
@@ -209,8 +220,8 @@ export async function refreshCollectiveXRunAttempt(
       RETURNING run_id
     ),
     new_docs AS (
-      INSERT INTO cx_run_docs (run_id, doc)
-      SELECT updated.run_id, entries.value
+      INSERT INTO cx_run_docs (run_id, run_attempt, doc)
+      SELECT updated.run_id, ${run.run_attempt}, entries.value
       FROM updated, jsonb_array_elements((${{ docs } as never}::jsonb)->'docs') AS entries(value)
       RETURNING id
     )
@@ -221,19 +232,25 @@ export async function refreshCollectiveXRunAttempt(
 
 /**
  * Tombstone a run: mark it deleted (so lazy discovery never re-ingests it)
- * and drop its documents to free space. Returns false when the run is absent
- * or already tombstoned. Re-ingesting via the CLI intentionally clears the
- * tombstone (operator override).
+ * and drop its documents to free space — one atomic statement, so a partial
+ * failure can never tombstone the run while leaving its documents orphaned
+ * behind an unretryable 404. Returns false when the run is absent or already
+ * tombstoned. Re-ingesting via the CLI intentionally clears the tombstone
+ * (operator override; its hard DELETE also cascades any leftover docs).
  */
 export async function deleteCollectiveXRun(sql: DbClient, runId: string): Promise<boolean> {
   const rows = await sql`
-    UPDATE cx_runs SET deleted_at = now()
-    WHERE run_id = ${runId} AND deleted_at IS NULL
-    RETURNING run_id::text
+    WITH tombstoned AS (
+      UPDATE cx_runs SET deleted_at = now()
+      WHERE run_id = ${runId} AND deleted_at IS NULL
+      RETURNING run_id
+    ),
+    removed AS (
+      DELETE FROM cx_run_docs WHERE run_id IN (SELECT run_id FROM tombstoned)
+    )
+    SELECT (SELECT count(*)::int FROM tombstoned) AS runs_deleted
   `;
-  if (rows.length === 0) return false;
-  await sql`DELETE FROM cx_run_docs WHERE run_id = ${runId}`;
-  return true;
+  return (rows[0]?.runs_deleted as number) > 0;
 }
 
 /** Assemble a stored run's raw documents into the dashboard dataset. */
