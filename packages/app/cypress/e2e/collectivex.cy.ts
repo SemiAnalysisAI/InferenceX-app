@@ -90,6 +90,23 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
+  it('exposes the kernel-mode toggle when a run measured both modes and pins the LL series', () => {
+    const withLowLatency = buildDataset({
+      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],
+    });
+    installLatest(withLowLatency);
+    cy.reload();
+    cy.wait('@latest');
+
+    cy.get('[data-testid="collectivex-mode-toggle"]').should('be.visible');
+    cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'deepep-v2');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+
+    cy.get('[data-testid="collectivex-mode-toggle"]').contains('Low-latency').click();
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'low-latency');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+  });
+
   it('selects the available phase when a partial run only measured prefill', () => {
     const prefill = buildDataset({ shards: [makeRawShard({ phase: 'prefill' })] });
     installLatest(prefill);

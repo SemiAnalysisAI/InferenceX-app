@@ -213,6 +213,11 @@ export function CollectiveXCoverageTable({ coverage }: { coverage: CollectiveXCo
         sortValue: (row) => t.phase[row.phase],
       },
       {
+        header: t.modeHeader,
+        cell: (row) => row.mode,
+        sortValue: (row) => row.mode,
+      },
+      {
         header: t.precisionHeader,
         cell: (row) => row.precision,
         sortValue: (row) => row.precision,

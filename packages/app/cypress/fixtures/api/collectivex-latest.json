@@ -19,11 +19,12 @@
   "coverage": [
     {
       "case_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16",
-      "label": "h200-dgxc · deepep-v2 · decode · EP8 · bf16",
+      "label": "h200-dgxc · deepep-v2 · normal · decode · EP8 · bf16",
       "disposition": "runnable",
       "sku": "h200-dgxc",
       "backend": "deepep-v2",
       "phase": "decode",
+      "mode": "normal",
       "precision": "bf16",
       "topology": {
         "ep_size": 8,
@@ -102,11 +103,12 @@
     },
     {
       "case_id": "mi355x-mori-deepseek-v3-normal-decode-ep16-uniform-bf16",
-      "label": "mi355x · mori · decode · EP16 · bf16",
+      "label": "mi355x · mori · normal · decode · EP16 · bf16",
       "disposition": "runnable",
       "sku": "mi355x",
       "backend": "mori",
       "phase": "decode",
+      "mode": "normal",
       "precision": "bf16",
       "topology": {
         "ep_size": 16,
@@ -185,11 +187,12 @@
     },
     {
       "case_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-fp8",
-      "label": "h200-dgxc · deepep-v2 · decode · EP8 · fp8",
+      "label": "h200-dgxc · deepep-v2 · normal · decode · EP8 · fp8",
       "disposition": "runnable",
       "sku": "h200-dgxc",
       "backend": "deepep-v2",
       "phase": "decode",
+      "mode": "normal",
       "precision": "fp8",
       "topology": {
         "ep_size": 8,
@@ -268,11 +271,12 @@
     },
     {
       "case_id": "b300-deepep-v2-deepseek-v3-normal-decode-ep16-uniform-bf16",
-      "label": "b300 · deepep-v2 · decode · EP16 · bf16",
+      "label": "b300 · deepep-v2 · normal · decode · EP16 · bf16",
       "disposition": "unsupported",
       "sku": "b300",
       "backend": "deepep-v2",
       "phase": "decode",
+      "mode": "normal",
       "precision": "bf16",
       "topology": {
         "ep_size": 16,
@@ -351,11 +355,12 @@
     },
     {
       "case_id": "b200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16",
-      "label": "b200-dgxc · deepep-v2 · decode · EP8 · bf16",
+      "label": "b200-dgxc · deepep-v2 · normal · decode · EP8 · bf16",
       "disposition": "runnable",
       "sku": "b200-dgxc",
       "backend": "deepep-v2",
       "phase": "decode",
+      "mode": "normal",
       "precision": "bf16",
       "topology": {
         "ep_size": 8,
@@ -437,6 +442,7 @@
     {
       "series_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16",
       "phase": "decode",
+      "mode": "normal",
       "precision": "bf16",
       "backend": "deepep-v2",
       "system": {
@@ -1136,6 +1142,7 @@
     {
       "series_id": "mi355x-mori-deepseek-v3-normal-decode-ep16-uniform-bf16",
       "phase": "decode",
+      "mode": "normal",
       "precision": "bf16",
       "backend": "mori",
       "system": {
@@ -1835,6 +1842,7 @@
     {
       "series_id": "h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-fp8",
       "phase": "decode",
+      "mode": "normal",
       "precision": "fp8",
       "backend": "deepep-v2",
       "system": {

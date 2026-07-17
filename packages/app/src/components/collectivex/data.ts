@@ -1,6 +1,7 @@
 import type {
   CollectiveXChartPoint,
   CollectiveXComponent,
+  CollectiveXMode,
   CollectiveXOperation,
   CollectiveXPercentile,
   CollectiveXPhase,
@@ -13,6 +14,7 @@ import type {
 export interface CollectiveXSeriesSelection {
   epSize: number;
   phase: CollectiveXPhase;
+  mode: CollectiveXMode;
   precision: CollectiveXPrecision;
 }
 
@@ -34,11 +36,11 @@ export function collectiveXTopologyLabel(
 }
 
 export function collectiveXSeriesLabel(series: CollectiveXSeries): string {
-  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.phase} · ${series.precision}`;
+  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.mode} · ${series.phase} · ${series.precision}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries): string {
-  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.phase}_${series.precision}`;
+  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
 export function seriesMatchesSelection(
@@ -48,6 +50,7 @@ export function seriesMatchesSelection(
   return (
     series.system.ep_size === selection.epSize &&
     series.phase === selection.phase &&
+    series.mode === selection.mode &&
     series.precision === selection.precision
   );
 }

@@ -38,6 +38,7 @@ import {
   COLLECTIVEX_VERSIONS,
   COLLECTIVEX_DEFAULT_VERSION,
   collectiveXVersionLabel,
+  type CollectiveXMode,
   type CollectiveXOperation,
   type CollectiveXPercentile,
   type CollectiveXPhase,
@@ -71,6 +72,7 @@ const STRINGS = {
     },
     phase: { decode: 'Decode', prefill: 'Prefill' },
     phaseValue: { decode: 'decode', prefill: 'prefill' },
+    mode: { normal: 'Normal', 'low-latency': 'Low-latency' },
     precision: { bf16: 'BF16', fp8: 'FP8' },
     yAxis: {
       latency: 'Latency',
@@ -99,6 +101,8 @@ const STRINGS = {
     operationControl: 'Operation',
     phaseControl: 'Phase',
     phaseAria: 'CollectiveX phase',
+    modeControl: 'Kernel mode',
+    modeAria: 'CollectiveX kernel mode',
     precisionControl: 'Precision',
     precisionAria: 'CollectiveX precision',
     latencyPercentile: 'Latency percentile',
@@ -308,6 +312,9 @@ export default function CollectiveXDisplay() {
   const [epSize, setEpSize] = useState(8);
   const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
+  // Normal (throughput) kernels are the baseline; the availability effect
+  // below falls back when a slice only measured low-latency kernels.
+  const [mode, setMode] = useState<CollectiveXMode>('normal');
   // Prefer FP8 when the run measured it; the availability effect below falls
   // back to bf16 for runs (or EP/phase slices) without FP8 series.
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
@@ -378,16 +385,36 @@ export default function CollectiveXDisplay() {
     value,
     label: t.phase[value],
   }));
-  const availablePrecisions = useMemo(
+  const availableModes = useMemo(
     () =>
       [
         ...new Set(
           dataset?.series
             .filter((item) => item.system.ep_size === epSize && item.phase === phase)
+            .map((item) => item.mode),
+        ),
+      ].toSorted((left, right) =>
+        left === right ? 0 : left === 'normal' ? -1 : right === 'normal' ? 1 : 0,
+      ),
+    [dataset?.series, epSize, phase],
+  );
+  const modeOptions: SegmentedToggleOption<CollectiveXMode>[] = availableModes.map((value) => ({
+    value,
+    label: t.mode[value],
+  }));
+  const availablePrecisions = useMemo(
+    () =>
+      [
+        ...new Set(
+          dataset?.series
+            .filter(
+              (item) =>
+                item.system.ep_size === epSize && item.phase === phase && item.mode === mode,
+            )
             .map((item) => item.precision),
         ),
       ].toSorted(),
-    [dataset?.series, epSize, phase],
+    [dataset?.series, epSize, mode, phase],
   );
   const precisionOptions: SegmentedToggleOption<CollectiveXPrecision>[] = availablePrecisions.map(
     (value) => ({ value, label: t.precision[value] }),
@@ -399,15 +426,27 @@ export default function CollectiveXDisplay() {
     if (availablePhases.length > 0 && !availablePhases.includes(phase)) {
       setPhase(availablePhases[0]);
     }
+    if (availableModes.length > 0 && !availableModes.includes(mode)) {
+      setMode(availableModes[0]);
+    }
     if (availablePrecisions.length > 0 && !availablePrecisions.includes(precision)) {
       setPrecision(availablePrecisions[0]);
     }
-  }, [availableEpSizes, availablePhases, availablePrecisions, epSize, phase, precision]);
+  }, [
+    availableEpSizes,
+    availableModes,
+    availablePhases,
+    availablePrecisions,
+    epSize,
+    mode,
+    phase,
+    precision,
+  ]);
   const seriesSelection = useMemo<CollectiveXSeriesSelection>(
-    () => ({ epSize, phase, precision }),
-    [epSize, phase, precision],
+    () => ({ epSize, phase, mode, precision }),
+    [epSize, mode, phase, precision],
   );
-  // SKU and EP determine topology; V1 fixes mode and routing. Only EP, phase,
+  // SKU and EP determine topology; V1 fixes routing. EP, phase, kernel mode,
   // and precision are needed before the library/SKU comparison filters.
   const matchedSeries = useMemo(
     () => (dataset?.series ?? []).filter((item) => seriesMatchesSelection(item, seriesSelection)),
@@ -796,6 +835,20 @@ export default function CollectiveXDisplay() {
               testId="collectivex-phase-toggle"
             />
           </ControlGroup>
+          {availableModes.length > 1 && (
+            <ControlGroup label={t.modeControl}>
+              <SegmentedToggle
+                value={mode}
+                options={modeOptions}
+                onValueChange={(next) => {
+                  setMode(next);
+                  track('collectivex_mode_changed', { mode: next });
+                }}
+                ariaLabel={t.modeAria}
+                testId="collectivex-mode-toggle"
+              />
+            </ControlGroup>
+          )}
           <ControlGroup label={t.precisionControl}>
             <SegmentedToggle
               value={precision}

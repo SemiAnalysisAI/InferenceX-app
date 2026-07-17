@@ -86,6 +86,11 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
         sortValue: (row) => row.phase,
       },
       {
+        header: 'Mode',
+        cell: (row) => row.mode,
+        sortValue: (row) => row.mode,
+      },
+      {
         header: 'Precision',
         cell: (row) => row.precision,
         sortValue: (row) => row.precision,

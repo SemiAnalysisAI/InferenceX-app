@@ -24,6 +24,8 @@ export interface ShardOverrides {
   implName?: string;
   ep?: number;
   phase?: string;
+  /** null models a pre-LL artifact: no mode field (the case_id keeps `normal`). */
+  mode?: string | null;
   /** null models a pre-FP8 artifact: no precision field and no case_id suffix. */
   precision?: string | null;
   scaleUpTransport?: string;
@@ -88,6 +90,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
     gpus_per_node: options.gpusPerNode ?? 8,
     ladder: options.ladder ?? TOKEN_LADDERS[phase],
     nodes: options.nodes ?? 1,
+    ...(options.mode === null ? {} : { mode: options.mode ?? 'normal' }),
     phase,
     ...(options.precision === null ? {} : { precision: options.precision ?? 'bf16' }),
     topology_class: options.topologyClass ?? 'h200-nvlink-island',
@@ -100,8 +103,10 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
 export function caseIdOf(options: ShardOverrides = {}): string {
   if (options.caseId) return options.caseId;
   const tail = options.variant ? `-${options.variant}` : '';
+  // Pre-LL artifacts (mode: null) still carried `normal` in their case_ids.
+  const mode = options.mode === null ? 'normal' : (options.mode ?? 'normal');
   const precision = options.precision === null ? '' : `-${options.precision ?? 'bf16'}`;
-  return `${options.sku ?? 'h200-dgxc'}-${options.backend ?? 'deepep-v2'}-${options.workload ?? 'deepseek-v3'}-normal-${options.phase ?? 'decode'}-ep${options.ep ?? 8}-uniform${precision}${tail}`;
+  return `${options.sku ?? 'h200-dgxc'}-${options.backend ?? 'deepep-v2'}-${options.workload ?? 'deepseek-v3'}-${mode}-${options.phase ?? 'decode'}-ep${options.ep ?? 8}-uniform${precision}${tail}`;
 }
 
 export function makeRawShard(options: ShardOverrides = {}): Json {

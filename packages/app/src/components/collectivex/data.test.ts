@@ -32,17 +32,19 @@ describe('collectiveXTopologyLabel', () => {
 
 describe('collectiveXSeriesLabel', () => {
   it('renders the varying identity axes of a series', () => {
-    expect(collectiveXSeriesLabel(scaleUp)).toBe('H200-DGXC · deepep-v2 · EP8 · decode · bf16');
+    expect(collectiveXSeriesLabel(scaleUp)).toBe(
+      'H200-DGXC · deepep-v2 · EP8 · normal · decode · bf16',
+    );
   });
 
   it('distinguishes the dispatch precision', () => {
     expect(collectiveXSeriesLabel(makeCollectiveXSeries({ precision: 'fp8' }))).toBe(
-      'H200-DGXC · deepep-v2 · EP8 · decode · fp8',
+      'H200-DGXC · deepep-v2 · EP8 · normal · decode · fp8',
     );
   });
 
-  it('shows the selected EP degree and phase', () => {
-    expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16 · decode');
+  it('shows the selected EP degree, mode, and phase', () => {
+    expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16 · normal · decode');
   });
 });
 
@@ -66,6 +68,12 @@ describe('collectiveXColorKey', () => {
     expect(collectiveXColorKey(bf16)).not.toBe(collectiveXColorKey(fp8));
   });
 
+  it('assigns distinct keys to normal and low-latency series of one configuration', () => {
+    const normal = makeCollectiveXSeries();
+    const lowLatency = makeCollectiveXSeries({ mode: 'low-latency' });
+    expect(collectiveXColorKey(normal)).not.toBe(collectiveXColorKey(lowLatency));
+  });
+
   it('leads with the system vendor so getVendor places series in vendor hue zones', () => {
     // The chart color system reads the first "_"-separated token to classify the
     // vendor (NVIDIA greens, AMD reds), matching the InferenceX charts.
@@ -79,16 +87,18 @@ describe('seriesMatchesSelection', () => {
   const base: CollectiveXSeriesSelection = {
     epSize: 8,
     phase: 'decode',
+    mode: 'normal',
     precision: 'bf16',
   };
 
-  it('matches on EP size, phase, and precision', () => {
+  it('matches on EP size, phase, mode, and precision', () => {
     expect(seriesMatchesSelection(scaleUp, base)).toBe(true);
   });
 
-  it('rejects a series whose EP, phase, or precision differs from the selection', () => {
+  it('rejects a series whose EP, phase, mode, or precision differs from the selection', () => {
     expect(seriesMatchesSelection(scaleUp, { ...base, epSize: 16 })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, phase: 'prefill' })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, mode: 'low-latency' })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, precision: 'fp8' })).toBe(false);
   });
 });

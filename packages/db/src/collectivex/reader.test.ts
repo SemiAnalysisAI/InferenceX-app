@@ -56,7 +56,7 @@ describe('CollectiveX artifact assembly', () => {
     expect(new Set(h200.map((series) => series.series_id)).size).toBe(2);
     expect(dataset.coverage.find((row) => row.precision === 'fp8')).toMatchObject({
       case_id: 'h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-fp8',
-      label: 'h200-dgxc · deepep-v2 · decode · EP8 · fp8',
+      label: 'h200-dgxc · deepep-v2 · normal · decode · EP8 · fp8',
     });
     expect(
       dataset.coverage.find(
@@ -64,7 +64,7 @@ describe('CollectiveX artifact assembly', () => {
       ),
     ).toMatchObject({
       precision: 'bf16',
-      label: 'h200-dgxc · deepep-v2 · decode · EP8 · bf16',
+      label: 'h200-dgxc · deepep-v2 · normal · decode · EP8 · bf16',
     });
   });
 
@@ -76,8 +76,29 @@ describe('CollectiveX artifact assembly', () => {
     expect(dataset.series[0].precision).toBe('bf16');
     expect(dataset.coverage[0]).toMatchObject({
       precision: 'bf16',
-      label: 'h200-dgxc · deepep-v2 · decode · EP8 · bf16',
+      label: 'h200-dgxc · deepep-v2 · normal · decode · EP8 · bf16',
     });
+  });
+
+  it('keeps normal and low-latency measurements of one cell as distinct labeled cases', () => {
+    const dataset = buildDataset({
+      shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],
+    });
+    expect(new Set(dataset.series.map((series) => series.series_id)).size).toBe(2);
+    expect(dataset.series.map((series) => series.mode).toSorted()).toEqual([
+      'low-latency',
+      'normal',
+    ]);
+    expect(dataset.coverage.find((row) => row.mode === 'low-latency')).toMatchObject({
+      case_id: 'h200-dgxc-deepep-v2-deepseek-v3-low-latency-decode-ep8-uniform-bf16',
+      label: 'h200-dgxc · deepep-v2 · low-latency · decode · EP8 · bf16',
+    });
+  });
+
+  it('defaults pre-LL artifacts without a mode field to normal kernels', () => {
+    const dataset = buildDataset({ shards: [makeRawShard({ mode: null })] });
+    expect(dataset.series[0].mode).toBe('normal');
+    expect(dataset.coverage[0].mode).toBe('normal');
   });
 
   it('ignores non-result documents', () => {

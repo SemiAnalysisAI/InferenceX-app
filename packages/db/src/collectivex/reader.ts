@@ -15,6 +15,7 @@ import type {
   CollectiveXCoverage,
   CollectiveXCoveragePoint,
   CollectiveXDataset,
+  CollectiveXMode,
   CollectiveXOutcome,
   CollectiveXPercentiles,
   CollectiveXPoint,
@@ -31,6 +32,7 @@ interface RawCase {
   gpus_per_node: number;
   ladder: string;
   nodes: number;
+  mode?: string;
   phase: string;
   precision?: string;
   topology_class: string;
@@ -117,6 +119,12 @@ function toPrecision(raw: string | undefined): CollectiveXPrecision {
   return raw === 'fp8' ? 'fp8' : 'bf16';
 }
 
+// Artifacts predating the low-latency kernel dimension carry no mode field
+// and were all measured with the normal (throughput) kernels.
+function toMode(raw: string | undefined): CollectiveXMode {
+  return raw === 'low-latency' ? 'low-latency' : 'normal';
+}
+
 function ratesFrom(bytes: number, latency: CollectiveXPercentiles): CollectiveXPercentiles {
   const rate = (us: number) => (bytes / us) * 1e-3;
   return {
@@ -172,6 +180,7 @@ function buildSeries(shard: RawShard): CollectiveXSeries {
   return {
     series_id: shard.identity.case_id,
     phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
+    mode: toMode(kase.mode),
     precision: toPrecision(kase.precision),
     backend: shard.implementation.name,
     system: {
@@ -280,15 +289,17 @@ export function buildDatasetFromNeutral(
       reason = 'pending';
       points = terminalPoints(kase, 'pending', reason);
     }
+    const mode = toMode(kase.mode);
     const precision = toPrecision(kase.precision);
     return [
       {
         case_id: caseId,
-        label: `${requested.sku} · ${kase.backend} · ${kase.phase} · EP${kase.ep} · ${precision}`,
+        label: `${requested.sku} · ${kase.backend} · ${mode} · ${kase.phase} · EP${kase.ep} · ${precision}`,
         disposition: requested.disposition,
         sku: requested.sku,
         backend: kase.backend,
         phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
+        mode,
         precision,
         topology: topologyOf(kase),
         points,
