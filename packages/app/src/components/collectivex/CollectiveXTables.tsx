@@ -38,6 +38,7 @@ const STRINGS = {
     sku: 'SKU',
     backend: 'Backend',
     phaseHeader: 'Phase',
+    precisionHeader: 'Precision',
     modeHeader: 'Mode',
     epHeader: 'EP',
     scopeHeader: 'Fabric scope',
@@ -78,6 +79,7 @@ const STRINGS = {
     sku: 'SKU',
     backend: '后端',
     phaseHeader: '阶段',
+    precisionHeader: '精度',
     modeHeader: '模式',
     epHeader: 'EP',
     scopeHeader: '互联范围',
@@ -209,6 +211,11 @@ export function CollectiveXCoverageTable({ coverage }: { coverage: CollectiveXCo
         header: t.phaseHeader,
         cell: (row) => t.phase[row.phase],
         sortValue: (row) => t.phase[row.phase],
+      },
+      {
+        header: t.precisionHeader,
+        cell: (row) => row.precision,
+        sortValue: (row) => row.precision,
       },
       {
         header: t.epHeader,

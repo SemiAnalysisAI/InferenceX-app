@@ -6,6 +6,7 @@ import type {
   CollectiveXOutcome,
   CollectiveXPercentiles,
   CollectiveXPoint,
+  CollectiveXPrecision,
   CollectiveXRunSummary,
   CollectiveXSeries,
   CollectiveXTerminalStatus,
@@ -19,6 +20,7 @@ interface RawCase {
   ladder: string;
   nodes: number;
   phase: string;
+  precision?: string;
   topology_class: string;
   scale_up_domain: number;
   scale_up_transport: string;
@@ -97,6 +99,12 @@ function toTerminalStatus(outcome: CollectiveXOutcome): CollectiveXTerminalStatu
   return outcome === 'success' ? 'measured' : outcome;
 }
 
+// Artifacts predating the FP8 dispatch dimension carry no precision field and
+// were all measured in bf16.
+function toPrecision(raw: string | undefined): CollectiveXPrecision {
+  return raw === 'fp8' ? 'fp8' : 'bf16';
+}
+
 function ratesFrom(bytes: number, latency: CollectiveXPercentiles): CollectiveXPercentiles {
   const rate = (us: number) => (bytes / us) * 1e-3;
   return {
@@ -152,6 +160,7 @@ function buildSeries(shard: RawShard): CollectiveXSeries {
   return {
     series_id: shard.identity.case_id,
     phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
+    precision: toPrecision(kase.precision),
     backend: shard.implementation.name,
     system: {
       ...topologyOf(kase),
@@ -259,14 +268,16 @@ export function buildDatasetFromNeutral(
       reason = 'pending';
       points = terminalPoints(kase, 'pending', reason);
     }
+    const precision = toPrecision(kase.precision);
     return [
       {
         case_id: caseId,
-        label: `${requested.sku} · ${kase.backend} · ${kase.phase} · EP${kase.ep}`,
+        label: `${requested.sku} · ${kase.backend} · ${kase.phase} · EP${kase.ep} · ${precision}`,
         disposition: requested.disposition,
         sku: requested.sku,
         backend: kase.backend,
         phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
+        precision,
         topology: topologyOf(kase),
         points,
         outcome,

@@ -86,6 +86,11 @@ export function CollectiveXInventory({ dataset }: { dataset: CollectiveXDataset 
         sortValue: (row) => row.phase,
       },
       {
+        header: 'Precision',
+        cell: (row) => row.precision,
+        sortValue: (row) => row.precision,
+      },
+      {
         header: 'Topology',
         cell: (row) => collectiveXTopologyLabel(row.topology),
         sortValue: (row) => collectiveXTopologyLabel(row.topology),

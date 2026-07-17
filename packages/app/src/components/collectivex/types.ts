@@ -1,4 +1,5 @@
 export type CollectiveXPhase = 'decode' | 'prefill';
+export type CollectiveXPrecision = 'bf16' | 'fp8';
 export const COLLECTIVEX_VERSIONS = [1] as const;
 export type CollectiveXVersion = (typeof COLLECTIVEX_VERSIONS)[number];
 export const COLLECTIVEX_DEFAULT_VERSION: CollectiveXVersion = COLLECTIVEX_VERSIONS.at(-1)!;
@@ -51,6 +52,7 @@ export interface CollectiveXTopology {
 export interface CollectiveXSeries {
   series_id: string;
   phase: CollectiveXPhase;
+  precision: CollectiveXPrecision;
   backend: string;
   system: CollectiveXTopology & {
     sku: string;
@@ -73,6 +75,7 @@ export interface CollectiveXCoverage {
   sku: string;
   backend: string;
   phase: CollectiveXPhase;
+  precision: CollectiveXPrecision;
   topology: CollectiveXTopology;
   points: CollectiveXCoveragePoint[];
   outcome: CollectiveXOutcome;

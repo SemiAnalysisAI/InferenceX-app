@@ -28,24 +28,56 @@ describe('CollectiveX artifact assembly', () => {
   it('builds the current view from matrix cases and result shards', () => {
     const dataset = makeCollectiveXDataset();
     expect(dataset.version).toBe(1);
-    expect(dataset.series).toHaveLength(2);
-    expect(dataset.coverage).toHaveLength(4);
+    expect(dataset.series).toHaveLength(3);
+    expect(dataset.coverage).toHaveLength(5);
     expect(dataset.run).toMatchObject({
-      requested_cases: 4,
-      measured_cases: 2,
+      requested_cases: 5,
+      measured_cases: 3,
       unsupported_cases: 1,
-      terminal_cases: 3,
-      measured_points: 20,
-      terminal_points: 30,
-      requested_points: 40,
+      terminal_cases: 4,
+      measured_points: 30,
+      terminal_points: 40,
+      requested_points: 50,
     });
   });
 
   it('maps series identity and points', () => {
     const series = makeCollectiveXSeries();
-    expect(series.series_id).toBe('h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform');
+    expect(series.series_id).toBe('h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16');
     expect(series.backend).toBe('deepep-v2');
+    expect(series.precision).toBe('bf16');
     expect(series.points).toHaveLength(10);
+  });
+
+  it('keeps bf16 and fp8 measurements of one cell as distinct labeled cases', () => {
+    const dataset = makeCollectiveXDataset();
+    const h200 = dataset.series.filter((series) => series.system.sku === 'h200-dgxc');
+    expect(h200.map((series) => series.precision).toSorted()).toEqual(['bf16', 'fp8']);
+    expect(new Set(h200.map((series) => series.series_id)).size).toBe(2);
+    expect(dataset.coverage.find((row) => row.precision === 'fp8')).toMatchObject({
+      case_id: 'h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-fp8',
+      label: 'h200-dgxc · deepep-v2 · decode · EP8 · fp8',
+    });
+    expect(
+      dataset.coverage.find(
+        (row) => row.case_id === 'h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16',
+      ),
+    ).toMatchObject({
+      precision: 'bf16',
+      label: 'h200-dgxc · deepep-v2 · decode · EP8 · bf16',
+    });
+  });
+
+  it('defaults pre-FP8 artifacts without a precision field to bf16', () => {
+    const dataset = buildDataset({ shards: [makeRawShard({ precision: null })] });
+    expect(dataset.series[0].series_id).toBe(
+      'h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform',
+    );
+    expect(dataset.series[0].precision).toBe('bf16');
+    expect(dataset.coverage[0]).toMatchObject({
+      precision: 'bf16',
+      label: 'h200-dgxc · deepep-v2 · decode · EP8 · bf16',
+    });
   });
 
   it('ignores non-result documents', () => {

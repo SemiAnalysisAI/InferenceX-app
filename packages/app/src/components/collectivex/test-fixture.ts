@@ -24,6 +24,8 @@ export interface ShardOverrides {
   implName?: string;
   ep?: number;
   phase?: string;
+  /** null models a pre-FP8 artifact: no precision field and no case_id suffix. */
+  precision?: string | null;
   scaleUpTransport?: string;
   scaleOutTransport?: string | null;
   topologyClass?: string;
@@ -87,6 +89,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
     ladder: options.ladder ?? TOKEN_LADDERS[phase],
     nodes: options.nodes ?? 1,
     phase,
+    ...(options.precision === null ? {} : { precision: options.precision ?? 'bf16' }),
     topology_class: options.topologyClass ?? 'h200-nvlink-island',
     scale_up_domain: options.scaleUpDomain ?? 8,
     scale_up_transport: options.scaleUpTransport ?? 'nvlink',
@@ -97,7 +100,8 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
 export function caseIdOf(options: ShardOverrides = {}): string {
   if (options.caseId) return options.caseId;
   const tail = options.variant ? `-${options.variant}` : '';
-  return `${options.sku ?? 'h200-dgxc'}-${options.backend ?? 'deepep-v2'}-${options.workload ?? 'deepseek-v3'}-normal-${options.phase ?? 'decode'}-ep${options.ep ?? 8}-uniform${tail}`;
+  const precision = options.precision === null ? '' : `-${options.precision ?? 'bf16'}`;
+  return `${options.sku ?? 'h200-dgxc'}-${options.backend ?? 'deepep-v2'}-${options.workload ?? 'deepseek-v3'}-normal-${options.phase ?? 'decode'}-ep${options.ep ?? 8}-uniform${precision}${tail}`;
 }
 
 export function makeRawShard(options: ShardOverrides = {}): Json {
@@ -204,10 +208,13 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
     topologyClass: 'mi355x-xgmi-rdma',
     nodes: 2,
   });
-  const unsupportedId = 'b300-deepep-v2-deepseek-v3-normal-decode-ep16-uniform';
-  const pendingId = 'b200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform';
+  // The same cell as shardA measured with FP8 dispatch, so consumers exercise
+  // the bf16/fp8 split of an otherwise identical configuration.
+  const shardC = makeRawShard({ precision: 'fp8' });
+  const unsupportedId = 'b300-deepep-v2-deepseek-v3-normal-decode-ep16-uniform-bf16';
+  const pendingId = 'b200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16';
   return buildDataset({
-    shards: [shardA, shardB],
+    shards: [shardA, shardB, shardC],
     requestedCases: [
       {
         caseId: unsupportedId,

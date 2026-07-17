@@ -5,6 +5,7 @@ import type {
   CollectiveXPercentile,
   CollectiveXPhase,
   CollectiveXPoint,
+  CollectiveXPrecision,
   CollectiveXSeries,
   CollectiveXYAxis,
 } from './types';
@@ -12,6 +13,7 @@ import type {
 export interface CollectiveXSeriesSelection {
   epSize: number;
   phase: CollectiveXPhase;
+  precision: CollectiveXPrecision;
 }
 
 export function collectiveXTopologyLabel(
@@ -32,18 +34,22 @@ export function collectiveXTopologyLabel(
 }
 
 export function collectiveXSeriesLabel(series: CollectiveXSeries): string {
-  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.phase}`;
+  return `${series.system.sku.toUpperCase()} · ${series.backend} · EP${series.system.ep_size} · ${series.phase} · ${series.precision}`;
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries): string {
-  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.phase}`;
+  return `${series.system.vendor}_${series.system.sku}_${series.backend}_ep${series.system.ep_size}_${series.phase}_${series.precision}`;
 }
 
 export function seriesMatchesSelection(
   series: CollectiveXSeries,
   selection: CollectiveXSeriesSelection,
 ): boolean {
-  return series.system.ep_size === selection.epSize && series.phase === selection.phase;
+  return (
+    series.system.ep_size === selection.epSize &&
+    series.phase === selection.phase &&
+    series.precision === selection.precision
+  );
 }
 
 export function metricValue(

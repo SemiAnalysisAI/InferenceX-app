@@ -71,6 +71,7 @@ describe('CollectiveX neutral run view', () => {
   it('only exposes dimensions that vary in the current matrix', () => {
     cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-phase-toggle"]').should('be.visible');
+    cy.get('[data-testid="collectivex-precision-toggle"]').should('be.visible');
     cy.get('[data-testid="collectivex-sku-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-backend-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-mode-toggle"]').should('not.exist');

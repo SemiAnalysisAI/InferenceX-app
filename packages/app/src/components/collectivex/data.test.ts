@@ -32,7 +32,13 @@ describe('collectiveXTopologyLabel', () => {
 
 describe('collectiveXSeriesLabel', () => {
   it('renders the varying identity axes of a series', () => {
-    expect(collectiveXSeriesLabel(scaleUp)).toBe('H200-DGXC · deepep-v2 · EP8 · decode');
+    expect(collectiveXSeriesLabel(scaleUp)).toBe('H200-DGXC · deepep-v2 · EP8 · decode · bf16');
+  });
+
+  it('distinguishes the dispatch precision', () => {
+    expect(collectiveXSeriesLabel(makeCollectiveXSeries({ precision: 'fp8' }))).toBe(
+      'H200-DGXC · deepep-v2 · EP8 · decode · fp8',
+    );
   });
 
   it('shows the selected EP degree and phase', () => {
@@ -54,6 +60,12 @@ describe('collectiveXColorKey', () => {
     expect(collectiveXColorKey(a)).not.toBe(collectiveXColorKey(b));
   });
 
+  it('assigns distinct keys to bf16 and fp8 series of one configuration', () => {
+    const bf16 = makeCollectiveXSeries();
+    const fp8 = makeCollectiveXSeries({ precision: 'fp8' });
+    expect(collectiveXColorKey(bf16)).not.toBe(collectiveXColorKey(fp8));
+  });
+
   it('leads with the system vendor so getVendor places series in vendor hue zones', () => {
     // The chart color system reads the first "_"-separated token to classify the
     // vendor (NVIDIA greens, AMD reds), matching the InferenceX charts.
@@ -67,15 +79,17 @@ describe('seriesMatchesSelection', () => {
   const base: CollectiveXSeriesSelection = {
     epSize: 8,
     phase: 'decode',
+    precision: 'bf16',
   };
 
-  it('matches on EP size and phase', () => {
+  it('matches on EP size, phase, and precision', () => {
     expect(seriesMatchesSelection(scaleUp, base)).toBe(true);
   });
 
-  it('rejects a series whose EP or phase differs from the selection', () => {
+  it('rejects a series whose EP, phase, or precision differs from the selection', () => {
     expect(seriesMatchesSelection(scaleUp, { ...base, epSize: 16 })).toBe(false);
     expect(seriesMatchesSelection(scaleUp, { ...base, phase: 'prefill' })).toBe(false);
+    expect(seriesMatchesSelection(scaleUp, { ...base, precision: 'fp8' })).toBe(false);
   });
 });
 

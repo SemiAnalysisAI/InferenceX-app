@@ -36,6 +36,7 @@ import {
   type CollectiveXOperation,
   type CollectiveXPercentile,
   type CollectiveXPhase,
+  type CollectiveXPrecision,
   type CollectiveXVersion,
   type CollectiveXYAxis,
 } from './types';
@@ -65,6 +66,7 @@ const STRINGS = {
     },
     phase: { decode: 'Decode', prefill: 'Prefill' },
     phaseValue: { decode: 'decode', prefill: 'prefill' },
+    precision: { bf16: 'BF16', fp8: 'FP8' },
     yAxis: {
       latency: 'Latency',
       'tokens-per-second': 'Token rate at selected latency percentile',
@@ -92,6 +94,8 @@ const STRINGS = {
     operationControl: 'Operation',
     phaseControl: 'Phase',
     phaseAria: 'CollectiveX phase',
+    precisionControl: 'Precision',
+    precisionAria: 'CollectiveX precision',
     latencyPercentile: 'Latency percentile',
     percentileAria: 'CollectiveX percentile',
     sku: 'SKU',
@@ -118,6 +122,7 @@ const STRINGS = {
     },
     phase: { decode: '解码', prefill: '预填充' },
     phaseValue: { decode: '解码', prefill: '预填充' },
+    precision: { bf16: 'BF16', fp8: 'FP8' },
     scale: { log: '对数', linear: '线性' },
     xAxis: {
       'tokens-per-rank': '每 rank 源 token 数',
@@ -172,6 +177,8 @@ const STRINGS = {
     operationControl: '操作',
     phaseControl: '阶段',
     phaseAria: 'CollectiveX 阶段',
+    precisionControl: '精度',
+    precisionAria: 'CollectiveX 精度',
     latencyPercentile: '延迟分位点',
     percentileAria: 'CollectiveX 延迟分位点',
     sku: 'SKU',
@@ -279,6 +286,9 @@ export default function CollectiveXDisplay() {
   const [epSize, setEpSize] = useState(8);
   const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
+  // Prefer FP8 when the run measured it; the availability effect below falls
+  // back to bf16 for runs (or EP/phase slices) without FP8 series.
+  const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
   const [percentile, setPercentile] = useState<CollectiveXPercentile>('p99');
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
@@ -346,6 +356,20 @@ export default function CollectiveXDisplay() {
     value,
     label: t.phase[value],
   }));
+  const availablePrecisions = useMemo(
+    () =>
+      [
+        ...new Set(
+          dataset?.series
+            .filter((item) => item.system.ep_size === epSize && item.phase === phase)
+            .map((item) => item.precision),
+        ),
+      ].toSorted(),
+    [dataset?.series, epSize, phase],
+  );
+  const precisionOptions: SegmentedToggleOption<CollectiveXPrecision>[] = availablePrecisions.map(
+    (value) => ({ value, label: t.precision[value] }),
+  );
   useEffect(() => {
     if (availableEpSizes.length > 0 && !availableEpSizes.includes(epSize)) {
       setEpSize(availableEpSizes[0]);
@@ -353,13 +377,16 @@ export default function CollectiveXDisplay() {
     if (availablePhases.length > 0 && !availablePhases.includes(phase)) {
       setPhase(availablePhases[0]);
     }
-  }, [availableEpSizes, availablePhases, epSize, phase]);
+    if (availablePrecisions.length > 0 && !availablePrecisions.includes(precision)) {
+      setPrecision(availablePrecisions[0]);
+    }
+  }, [availableEpSizes, availablePhases, availablePrecisions, epSize, phase, precision]);
   const seriesSelection = useMemo<CollectiveXSeriesSelection>(
-    () => ({ epSize, phase }),
-    [epSize, phase],
+    () => ({ epSize, phase, precision }),
+    [epSize, phase, precision],
   );
-  // SKU and EP determine topology; V1 fixes mode and routing. Only EP and phase
-  // are needed before the library/SKU comparison filters.
+  // SKU and EP determine topology; V1 fixes mode and routing. Only EP, phase,
+  // and precision are needed before the library/SKU comparison filters.
   const matchedSeries = useMemo(
     () => (dataset?.series ?? []).filter((item) => seriesMatchesSelection(item, seriesSelection)),
     [dataset?.series, seriesSelection],
@@ -704,6 +731,18 @@ export default function CollectiveXDisplay() {
               onValueChange={setPhase}
               ariaLabel={t.phaseAria}
               testId="collectivex-phase-toggle"
+            />
+          </ControlGroup>
+          <ControlGroup label={t.precisionControl}>
+            <SegmentedToggle
+              value={precision}
+              options={precisionOptions}
+              onValueChange={(next) => {
+                setPrecision(next);
+                track('collectivex_precision_changed', { precision: next });
+              }}
+              ariaLabel={t.precisionAria}
+              testId="collectivex-precision-toggle"
             />
           </ControlGroup>
           <ControlGroup label={t.latencyPercentile}>
