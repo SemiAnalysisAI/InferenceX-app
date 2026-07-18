@@ -232,7 +232,7 @@ const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
   [Sequence.OneK_OneK]: {
     label: '1K / 1K',
     compact: '1k1k',
-    category: 'default',
+    category: 'deprecated',
     kind: 'fixed-seq',
   },
   [Sequence.OneK_EightK]: {

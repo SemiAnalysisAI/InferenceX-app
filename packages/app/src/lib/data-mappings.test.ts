@@ -203,8 +203,8 @@ describe('isSequenceDeprecated', () => {
     expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
   });
 
-  it('returns false for non-deprecated sequence OneK_OneK', () => {
-    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(false);
+  it('returns true for deprecated sequence OneK_OneK', () => {
+    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(true);
   });
 
   it('returns false for non-deprecated sequence EightK_OneK', () => {
