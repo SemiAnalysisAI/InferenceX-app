@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 
-import { computeCompareImageRows } from './compare-ssr';
+import { computeCompareImageRows, KNOWN_MODELS } from './compare-ssr';
 
 // BenchmarkRow.id is required (stable per-point id from benchmark_results);
 // hand out a fresh one per stub so id-keyed logic can't collide across rows.
 let nextStubId = 1;
+
+describe('compare URL validators', () => {
+  it('accepts GLM-5.2 as a model override', () => {
+    expect(KNOWN_MODELS.has('GLM-5.2')).toBe(true);
+  });
+});
 
 function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {

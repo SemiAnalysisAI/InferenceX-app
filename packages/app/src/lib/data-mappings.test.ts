@@ -57,6 +57,11 @@ describe('getModelAndSequence', () => {
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
   });
 
+  it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
+    const result = getModelAndSequence('results_glm5.2_1k1k');
+    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+  });
+
   it('returns undefined for unrecognized model prefix', () => {
     expect(getModelAndSequence('results_unknown_1k1k')).toBeUndefined();
   });

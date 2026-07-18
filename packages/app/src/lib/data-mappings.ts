@@ -193,6 +193,12 @@ export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
     .map(([m, c]) => [c.prefix, m]),
 );
 
+// Specific point-release prefixes must win over family prefixes such as
+// `glm5`; precompute once rather than sorting for every artifact.
+const MODEL_PREFIXES_LONGEST_FIRST = Object.keys(MODEL_PREFIX_MAPPING).toSorted(
+  (a, b) => b.length - a.length,
+);
+
 // ---------------------------------------------------------------------------
 // Sequences
 // ---------------------------------------------------------------------------
@@ -358,7 +364,7 @@ export function getModelAndSequence(
   let model: Model | undefined;
   let sequence: Sequence | undefined;
 
-  for (const key in MODEL_PREFIX_MAPPING) {
+  for (const key of MODEL_PREFIXES_LONGEST_FIRST) {
     if (artifactName.includes(key)) {
       model = MODEL_PREFIX_MAPPING[key];
       break;
