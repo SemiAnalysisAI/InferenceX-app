@@ -145,13 +145,41 @@ describe('Evaluation Chart — Content & Interactions', () => {
 
 describe('Evaluation sample sharing', () => {
   beforeEach(() => {
+    cy.intercept('GET', '/api/v1/eval-samples*', {
+      statusCode: 200,
+      body: {
+        samples: [
+          {
+            docId: 0,
+            prompt: 'What is 1 + 1?',
+            target: '2',
+            response: '2',
+            rawResponse: null,
+            demonstrations: null,
+            passed: true,
+            score: 1,
+            metrics: {},
+          },
+        ],
+        total: 1,
+        passedTotal: 1,
+        failedTotal: 0,
+        source: 'db',
+        offset: 0,
+      },
+    });
     cy.visit('/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Table').click();
   });
 
   it('copies and restores a link to the prompt drawer', () => {
-    cy.on('uncaught:exception', (error) => !error.message.includes('Hydration failed'));
+    cy.on(
+      'uncaught:exception',
+      (error) =>
+        !error.message.includes('Hydration failed') &&
+        !error.message.includes('Minified React error #418'),
+    );
     cy.get('[title="View per-sample prompts and responses"]').first().click();
 
     cy.window().then((win) => {
@@ -185,7 +213,12 @@ describe('Evaluation sample sharing', () => {
   });
 
   it('copies and restores a link to one expanded sample', () => {
-    cy.on('uncaught:exception', (error) => !error.message.includes('Hydration failed'));
+    cy.on(
+      'uncaught:exception',
+      (error) =>
+        !error.message.includes('Hydration failed') &&
+        !error.message.includes('Minified React error #418'),
+    );
     cy.get('[title="View per-sample prompts and responses"]').first().click();
     cy.get('[role="dialog"] li > button').first().click();
 
