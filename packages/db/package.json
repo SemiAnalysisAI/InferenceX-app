@@ -41,7 +41,7 @@
     "@types/node": "^26.1.1",
     "@types/stream-json": "^1.7.8",
     "@vitest/coverage-v8": "^4.1.10",
-    "adm-zip": "^0.5.18",
+    "adm-zip": "^0.6.0",
     "dotenv-cli": "^11.0.0",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
