@@ -35,8 +35,9 @@ export interface CompareModelSlug {
 // gpt-oss → Llama 70B. Per product spec — flagship Chinese-developed models
 // first, smaller open US-developed models at the bottom. Qwen sits between
 // MiniMax and gpt-oss to keep the Chinese-lab cluster contiguous before the
-// US transition. The two MiniMax entries stay adjacent with the newer M3
-// flagship leading the older M2 series.
+// US transition. The two GLM entries and the two MiniMax entries each stay
+// adjacent with the newer flagship (GLM 5.2, MiniMax M3) leading the older
+// series.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'deepseek-v4',
@@ -64,12 +65,21 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     label: 'Kimi K2.5/K2.6/K2.7-Code 1T',
   },
   {
+    slug: 'glm-5-2',
+    displayName: 'GLM-5.2',
+    // GLM-5.2 is a new 743B architecture (IndexShare sparse attention), not a
+    // point release of the GLM-5/5.1 family, so it gets its own slug and dbKey
+    // rather than joining the glm-5-1 group.
+    dbKeys: ['glm5.2'],
+    label: 'GLM 5.2 743B',
+  },
+  {
     slug: 'glm-5-1',
     displayName: 'GLM-5',
-    // GLM-5 point releases share the same base architecture. Keep the existing
-    // canonical slug for URL stability while querying every DB bucket.
-    dbKeys: ['glm5.2', 'glm5.1', 'glm5'],
-    label: 'GLM 5/5.1/5.2',
+    // GLM-5.0 and GLM-5.1 share an architecture per the model card; the slug
+    // uses the newer version name but the data pull covers both DB buckets.
+    dbKeys: ['glm5.1', 'glm5'],
+    label: 'GLM 5/5.1',
   },
   {
     slug: 'minimax-m3',

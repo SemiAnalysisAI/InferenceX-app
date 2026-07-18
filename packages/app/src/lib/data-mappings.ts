@@ -10,6 +10,7 @@ export enum Model {
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
   GLM_5 = 'GLM-5',
+  GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
 
@@ -111,8 +112,25 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'dsr1',
     category: 'maintenance',
   },
-  [Model.GLM_5]: { label: 'GLM5/5.1/5.2 744B', prefix: 'glm5', category: 'default' },
+  [Model.GLM_5_2]: {
+    // GLM-5.2 is a new architecture bucket (743B core MoE / 39B active with
+    // IndexShare DSA; HF metadata shows 753B because of the bundled MTP head),
+    // NOT a point release of GLM-5/5.1 — so it gets its own entry instead of
+    // joining the GLM_5 grouping. Keep this entry above GLM_5:
+    // MODEL_PREFIX_MAPPING matches artifact names by substring in insertion
+    // order, and 'glm5.2' artifact names also contain 'glm5'.
+    label: 'GLM5.2 743B',
+    prefix: 'glm5.2',
+    category: 'default',
+  },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
+  [Model.GLM_5]: {
+    // Superseded by GLM-5.2 (a different architecture bucket, split into its
+    // own entry above), so it's deprecated (no longer actively benchmarked).
+    label: 'GLM5/5.1 744B',
+    prefix: 'glm5',
+    category: 'deprecated',
+  },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.

@@ -57,6 +57,16 @@ describe('getModelAndSequence', () => {
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
   });
 
+  it('parses glm5.2 artifact names as GLM_5_2, not GLM_5 (substring collision)', () => {
+    const result = getModelAndSequence('results_glm5.2_1k1k');
+    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+  });
+
+  it('still parses plain glm5 artifact names as GLM_5', () => {
+    const result = getModelAndSequence('results_glm5_8k1k');
+    expect(result).toEqual({ model: Model.GLM_5, sequence: Sequence.EightK_OneK });
+  });
+
   it('returns undefined for unrecognized model prefix', () => {
     expect(getModelAndSequence('results_unknown_1k1k')).toBeUndefined();
   });
@@ -127,6 +137,15 @@ describe('getModelAndSequenceFromArtifact', () => {
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.EightK_OneK });
   });
 
+  it('parses structured artifact with glm5.2 prefix as GLM_5_2', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'glm5.2',
+      isl: 1024,
+      osl: 1024,
+    });
+    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+  });
+
   it('returns undefined for unknown model prefix', () => {
     const result = getModelAndSequenceFromArtifact({
       infmax_model_prefix: 'unknown',
@@ -162,8 +181,16 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.GptOss)).toBe(true);
   });
 
+  it('returns true for deprecated model GLM_5 (superseded by GLM-5.2)', () => {
+    expect(isModelDeprecated(Model.GLM_5)).toBe(true);
+  });
+
   it('returns false for non-deprecated model DeepSeek_R1', () => {
     expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
+  });
+
+  it('returns false for non-deprecated model GLM_5_2', () => {
+    expect(isModelDeprecated(Model.GLM_5_2)).toBe(false);
   });
 });
 
@@ -224,7 +251,8 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.GptOss)).toBe('gpt-oss 120B');
     expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B');
     expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6/2.7-Code 1T');
-    expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1/5.2 744B');
+    expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1 744B');
+    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2 743B');
     expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5/2.7 230B');
   });
 

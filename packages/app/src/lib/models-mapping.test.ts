@@ -31,9 +31,12 @@ describe('DISPLAY_MODEL_TO_DB', () => {
   });
 
   it('groups point-release DB keys under one display', () => {
-    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(
-      expect.arrayContaining(['glm5', 'glm5.1', 'glm5.2']),
-    );
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(expect.arrayContaining(['glm5', 'glm5.1']));
+  });
+
+  it('keeps glm5.2 in its own GLM-5.2 display bucket (new architecture)', () => {
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.2']).toEqual(['glm5.2']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).not.toContain('glm5.2');
   });
 });
 

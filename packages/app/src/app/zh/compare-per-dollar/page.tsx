@@ -18,7 +18,7 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `哪款 GPU 每美元推理性能最高？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型基于云服务商 TCO 归一化的每百万 token 成本。`;
+const DESCRIPTION = `哪款 GPU 每美元推理性能最高？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}横向对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5.2、Qwen 3.5 等模型基于云服务商 TCO 归一化的每百万 token 成本。`;
 
 export const metadata: Metadata = {
   title: 'GPU 每美元性能',

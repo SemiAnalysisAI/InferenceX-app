@@ -19,7 +19,7 @@ import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `Which GPU delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION = `Which GPU delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5.2, Qwen 3.5 & more.`;
 
 export const metadata: Metadata = {
   title: 'GPU Performance per Dollar',

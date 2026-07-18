@@ -176,6 +176,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 | Qwen3.5-397B-A17B      | 397B  | 17B         | `Qwen/Qwen3.5-397B-A17B`            | HF model card                      |
 | GLM-5                  | 744B  | 40B         | `zai-org/GLM-5`                     | HF model card                      |
 | GLM-5.1                | 744B  | 40B         | `zai-org/GLM-5.1-FP8`               | HF model card (same base as GLM-5) |
+| GLM-5.2                | 743B  | 39B         | `zai-org/GLM-5.2`                   | HF config.json (see trap below)    |
 | MiniMax-M2.5           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.5`            | HF model card                      |
 | MiniMax-M2.7           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.7`            | NVIDIA M2.7 blog                   |
 | gpt-oss-120b           | 120B  | 5.1B        | `openai/gpt-oss-120b`               | HF model card                      |
@@ -184,6 +185,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 **Common mislabel traps** (have all bitten this repo at least once — do not repeat):
 
 - **GLM-5 ≠ 355B.** 355B is GLM-4.5. GLM-5 jumped to 744B / 40B active (256-expert MoE with DSA).
+- **GLM-5.2 is NOT a GLM-5 point release, and ≠ 753B.** Unlike 5.0 → 5.1, GLM-5.2 is a new architecture bucket (`glm_moe_dsa` with IndexShare sparse attention, 78 layers) — it maps to its own `GLM-5.2` display model; never group `glm5.2` with `glm5`/`glm5.1`. Its HF metadata shows 753B because the bundled MTP head (`num_nextn_predict_layers: 1`) adds ~10B; the core MoE is 743B / 39B active.
 - **MiniMax-M2.5/M2.7 ≠ 456B.** 456B is the older MiniMax-Text-01 / M1 (32 large experts). The M2 series is a different architecture: 230B / 10B active, 256 small experts.
 - **DeepSeek-R1 is 671B, not 685B.** HF metadata shows 685B because the bundled MTP head adds ~14B; the core MoE is 671B / 37B active.
 - **Kimi K2.5, K2.6, and K2.7-Code are post-training refinements**, not new pre-trained sizes. Same 1T / 32B / 384-expert backbone as the original K2. K2.7-Code is a coding-focused refinement of the same backbone.

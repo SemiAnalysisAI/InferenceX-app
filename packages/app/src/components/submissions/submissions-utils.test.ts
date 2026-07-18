@@ -300,6 +300,7 @@ describe('buildInferenceCompareUrl', () => {
     const cases: [string, string][] = [
       ['gptoss120b', 'gpt-oss-120b'],
       ['glm5.1', 'GLM-5'],
+      ['glm5.2', 'GLM-5.2'],
       ['llama70b', 'Llama-3.3-70B-Instruct-FP8'],
       ['kimik2.6', 'Kimi-K2.5'],
       ['kimik2.7-code', 'Kimi-K2.5'],
