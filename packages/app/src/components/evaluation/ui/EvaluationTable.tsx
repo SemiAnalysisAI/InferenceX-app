@@ -1,6 +1,7 @@
 'use client';
 
 import { MessageSquareText } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
@@ -53,11 +54,20 @@ interface EvaluationTableProps {
 
 export default function EvaluationTable({ data }: EvaluationTableProps) {
   const { runIndexByUrl } = useUnofficialRun();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const t = STRINGS[locale];
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
+  const sharedEvalResultId = Number(searchParams.get('eval'));
+  const sharedDocId = Number(searchParams.get('sample'));
+  const hasSharedEval =
+    searchParams.has('eval') && Number.isInteger(sharedEvalResultId) && sharedEvalResultId > 0;
+  const hasSharedSample =
+    searchParams.has('sample') && Number.isInteger(sharedDocId) && sharedDocId >= 0;
 
   const openDrawer = (row: EvaluationChartData) => {
     setDrawerRow(row);
@@ -72,6 +82,19 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       hw_key: row.hwKey,
     });
   };
+
+  const closeDrawer = () => {
+    setDrawerRow(null);
+    const params = new URLSearchParams(searchParams);
+    params.delete('eval');
+    params.delete('sample');
+    router.replace(params.size > 0 ? `${pathname}?${params}` : pathname, { scroll: false });
+  };
+
+  const sharedRow = hasSharedEval
+    ? (data.find((row) => Number(row.evalResultId) === sharedEvalResultId) ?? null)
+    : null;
+  const activeDrawerRow = drawerRow ?? sharedRow;
 
   const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(
     () => [
@@ -206,7 +229,11 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         testId="evaluation-results-table"
         analyticsPrefix="evaluation_table"
       />
-      <EvalSamplesDrawer row={drawerRow} onClose={() => setDrawerRow(null)} />
+      <EvalSamplesDrawer
+        row={activeDrawerRow}
+        initialDocId={hasSharedSample ? sharedDocId : null}
+        onClose={closeDrawer}
+      />
     </>
   );
 }

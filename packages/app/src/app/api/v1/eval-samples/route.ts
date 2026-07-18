@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { getDb } from '@semianalysisai/inferencex-db/connection';
-import { getEvalSamples } from '@semianalysisai/inferencex-db/queries/eval-samples';
+import {
+  getEvalSampleOffset,
+  getEvalSamples,
+} from '@semianalysisai/inferencex-db/queries/eval-samples';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { extractDemonstrations } from '@/lib/eval-sample-utils';
@@ -17,9 +20,13 @@ const getCachedEvalSamples = cachedQuery(
     getEvalSamples(getDb(), evalResultId, filter, offset, limit),
   'eval-samples',
 );
+const getCachedEvalSampleOffset = cachedQuery(
+  (evalResultId: number, docId: number) => getEvalSampleOffset(getDb(), evalResultId, docId),
+  'eval-sample-offset',
+);
 
 /**
- * GET /api/v1/eval-samples?eval_result_id=N&filter=all|passed|failed&offset=0&limit=200
+ * GET /api/v1/eval-samples?eval_result_id=N&filter=all|passed|failed&offset=0&limit=200&doc_id=N
  *
  * Returns a paginated slice of per-prompt samples for one `eval_results` row,
  * plus passed/failed totals for the filter-chip badges. Drawer use only —
@@ -33,6 +40,8 @@ export async function GET(request: NextRequest) {
   const evalResultId = Number(params.get('eval_result_id'));
   const filterParam = params.get('filter') ?? 'all';
   const offset = Math.max(0, Math.trunc(Number(params.get('offset') ?? '0')));
+  const docIdParam = params.get('doc_id');
+  const docId = docIdParam === null ? null : Math.trunc(Number(docIdParam));
   const requestedLimit = Math.trunc(Number(params.get('limit') ?? String(DEFAULT_LIMIT)));
   const limit = Math.min(MAX_LIMIT, Math.max(1, requestedLimit || DEFAULT_LIMIT));
 
@@ -41,6 +50,9 @@ export async function GET(request: NextRequest) {
       { error: 'eval_result_id is required and must be a positive integer' },
       { status: 400 },
     );
+  }
+  if (docId !== null && (!Number.isFinite(docId) || docId < 0)) {
+    return NextResponse.json({ error: 'doc_id must be a non-negative integer' }, { status: 400 });
   }
   if (!ALLOWED_FILTERS.has(filterParam)) {
     return NextResponse.json(
@@ -51,8 +63,15 @@ export async function GET(request: NextRequest) {
   const filter = filterParam as 'all' | 'passed' | 'failed';
 
   try {
-    const result = await getCachedEvalSamples(evalResultId, filter, offset, limit);
-
+    const sampleOffset =
+      docId === null ? null : await getCachedEvalSampleOffset(evalResultId, docId);
+    if (docId !== null && sampleOffset === null) {
+      return NextResponse.json({ error: 'Sample not found' }, { status: 404 });
+    }
+    const resolvedOffset =
+      sampleOffset === null ? offset : Math.floor(sampleOffset / limit) * limit;
+    const resolvedFilter = docId === null ? filter : 'all';
+    const result = await getCachedEvalSamples(evalResultId, resolvedFilter, resolvedOffset, limit);
     return cachedJson({
       samples: result.samples.map((s) => ({
         docId: s.doc_id,
@@ -69,6 +88,7 @@ export async function GET(request: NextRequest) {
       passedTotal: result.passedTotal,
       failedTotal: result.failedTotal,
       source: 'db' as const,
+      offset: resolvedOffset,
     });
   } catch (error) {
     console.error('Error fetching eval samples:', error);

@@ -235,6 +235,8 @@ export interface EvalSamplesResponse {
   passedTotal: number;
   failedTotal: number;
   source: 'db' | 'github_artifact';
+  /** Actual page offset; present when the server resolves a shared doc id. */
+  offset?: number;
 }
 
 export type EvalSamplesFilter = 'all' | 'passed' | 'failed';
@@ -244,6 +246,7 @@ export function fetchEvalSamples(
   filter: EvalSamplesFilter,
   offset: number,
   limit: number,
+  docId?: number | null,
   signal?: AbortSignal,
 ) {
   const params = new URLSearchParams({
@@ -252,6 +255,7 @@ export function fetchEvalSamples(
     offset: String(offset),
     limit: String(limit),
   });
+  if (docId !== null && docId !== undefined) params.set('doc_id', String(docId));
   return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples?${params}`, signal);
 }
 
