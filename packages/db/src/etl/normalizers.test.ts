@@ -175,9 +175,11 @@ describe('resolveModelKey', () => {
 
   it('resolves point-release variants to their own DB key (faithful to submitted data)', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'glm5.1' })).toBe('glm5.1');
+    expect(resolveModelKey({ infmax_model_prefix: 'glm5.2' })).toBe('glm5.2');
     expect(resolveModelKey({ infmax_model_prefix: 'kimik2.6' })).toBe('kimik2.6');
     expect(resolveModelKey({ infmax_model_prefix: 'minimaxm2.7' })).toBe('minimaxm2.7');
     expect(resolveModelKey({ model: 'amd/GLM-5.1-MXFP4' })).toBe('glm5.1');
+    expect(resolveModelKey({ model: 'zai-org/GLM-5.2-FP8' })).toBe('glm5.2');
   });
 });
 

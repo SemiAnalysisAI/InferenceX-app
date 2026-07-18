@@ -51,7 +51,7 @@ export interface BenchmarkRow {
 /**
  * Fetch the latest benchmark results for one or more model DB keys across ALL sequences,
  * up to a given date. Multiple keys support point-release grouping — e.g. passing
- * `['glm5', 'glm5.1']` unions both buckets under the one display.
+ * `['glm5', 'glm5.1', 'glm5.2']` unions all point-release buckets under one display.
  *
  * Selection unit is the LINE, not the point: for each line
  * `(config_id, benchmark_type, isl, osl, offload_mode)` we pick the single newest workflow run that

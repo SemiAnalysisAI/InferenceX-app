@@ -40,6 +40,7 @@ const modelNames = Object.values({
   'kimik2.7-code': 'Kimi-K2.7-Code',
   'minimaxm2.7': 'MiniMax-M2.7',
   'glm5.1': 'GLM-5.1',
+  'glm5.2': 'GLM-5.2',
 });
 
 const frameworkNames = [...new Set(Object.values(FRAMEWORK_LABELS))].map((n) =>

@@ -33,6 +33,7 @@ const MODEL_LABELS: Record<string, string> = {
   dsv4: 'DeepSeek V4 Pro',
   glm5: 'GLM-5',
   'glm5.1': 'GLM-5.1',
+  'glm5.2': 'GLM-5.2',
   gptoss120b: 'gpt-oss 120B',
   kimik2: 'Kimi K2',
   'kimik2.5': 'Kimi K2.5',

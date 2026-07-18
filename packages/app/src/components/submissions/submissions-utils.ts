@@ -80,7 +80,7 @@ export function buildInferenceCompareUrl(
   previousRow: SubmissionSummaryRow,
 ): string | null {
   // DB_MODEL_TO_DISPLAY covers every DB prefix incl. point-release aliases
-  // (gptoss120b, glm5.1, kimik2.6, kimik2.7-code, minimaxm2.7, llama70b).
+  // (gptoss120b, glm5.1, glm5.2, kimik2.6, kimik2.7-code, minimaxm2.7, llama70b).
   // MODEL_PREFIX_MAPPING only has the single canonical prefix per Model enum
   // and misses those rows.
   const displayModel = DB_MODEL_TO_DISPLAY[currentRow.model];

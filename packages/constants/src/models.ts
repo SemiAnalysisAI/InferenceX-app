@@ -2,8 +2,8 @@
  * DB model key → frontend display name (Model enum value).
  *
  * Multiple DB keys may map to the same display name. This is how point releases
- * are grouped for display: the DB stores `glm5` and `glm5.1` as distinct buckets
- * (faithful to the submitted data), but both render under the single "GLM-5"
+ * are grouped for display: the DB stores `glm5`, `glm5.1`, and `glm5.2` as distinct buckets
+ * (faithful to the submitted data), but all render under the single "GLM-5"
  * display option in the UI. See `DISPLAY_MODEL_TO_DB` for the inverse mapping.
  */
 export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
@@ -19,6 +19,7 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   minimaxm3: 'MiniMax-M3',
   glm5: 'GLM-5',
   'glm5.1': 'GLM-5',
+  'glm5.2': 'GLM-5',
   dsv4: 'DeepSeek-V4-Pro',
 };
 

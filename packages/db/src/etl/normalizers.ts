@@ -98,9 +98,10 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   // MiniMax-M3 (428B, distinct architecture from the M2 series)
   'MiniMaxAI/MiniMax-M3': 'minimaxm3',
-  // GLM-5
+  // GLM-5 / 5.1 / 5.2 (same architecture, distinct DB buckets)
   'zai-org/GLM-5-FP8': 'glm5',
   'amd/GLM-5.1-MXFP4': 'glm5.1',
+  'zai-org/GLM-5.2-FP8': 'glm5.2',
   // DeepSeek-V4-Pro
   'deepseek-ai/DeepSeek-V4-Pro': 'dsv4',
 };

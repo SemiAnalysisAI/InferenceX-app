@@ -176,6 +176,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 | Qwen3.5-397B-A17B      | 397B  | 17B         | `Qwen/Qwen3.5-397B-A17B`            | HF model card                      |
 | GLM-5                  | 744B  | 40B         | `zai-org/GLM-5`                     | HF model card                      |
 | GLM-5.1                | 744B  | 40B         | `zai-org/GLM-5.1-FP8`               | HF model card (same base as GLM-5) |
+| GLM-5.2                | 744B  | 40B         | `zai-org/GLM-5.2-FP8`               | HF model card (same base as GLM-5) |
 | MiniMax-M2.5           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.5`            | HF model card                      |
 | MiniMax-M2.7           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.7`            | NVIDIA M2.7 blog                   |
 | gpt-oss-120b           | 120B  | 5.1B        | `openai/gpt-oss-120b`               | HF model card                      |

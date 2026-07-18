@@ -128,6 +128,39 @@ describe('normalizeArtifactRows', () => {
     expect(rows[0].model).toBe('gptoss120b');
   });
 
+  it('normalizes the GLM-5.2 H200 AgentX HiCache overlay path', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawAgenticRow({
+          infmax_model_prefix: 'glm5.2',
+          model: 'zai-org/GLM-5.2-FP8',
+          hw: 'cluster:h200-dgxc',
+          framework: 'sglang',
+          precision: 'fp8',
+          users: 32,
+          kv_offloading: 'dram',
+          kv_offload_backend: 'hicache',
+        }),
+      ],
+      '2026-07-18',
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      model: 'glm5.2',
+      hardware: 'h200',
+      framework: 'sglang',
+      precision: 'fp8',
+      benchmark_type: 'agentic_traces',
+      offload_mode: 'on',
+      conc: 32,
+    });
+    expect(rows[0].metrics).toMatchObject({
+      kv_offloading: 'dram',
+      kv_offload_backend: 'hicache',
+    });
+  });
+
   it('falls back to model path when prefix is absent', () => {
     const rows = normalizeArtifactRows(
       [rawRow({ infmax_model_prefix: undefined, model: 'deepseek-ai/DeepSeek-R1-0528' })],
