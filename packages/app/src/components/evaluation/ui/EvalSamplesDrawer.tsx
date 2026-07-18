@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, ChevronLeft, ChevronRight, Search, Share2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -112,6 +112,7 @@ export default function EvalSamplesDrawer({
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [requestedDocId, setRequestedDocId] = useState<number | null>(initialDocId);
   const [copiedTarget, setCopiedTarget] = useState<number | 'drawer' | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   // Reset transient state whenever a new row is opened.
   useEffect(() => {
@@ -177,6 +178,11 @@ export default function EvalSamplesDrawer({
     if (!data.samples.some((sample) => sample.docId === requestedDocId)) return;
     setPage(Math.floor(data.offset / PAGE_SIZE));
     setExpanded(new Set([requestedDocId]));
+    requestAnimationFrame(() => {
+      bodyRef.current
+        ?.querySelector<HTMLElement>(`[data-eval-sample-id="${requestedDocId}"]`)
+        ?.scrollIntoView({ block: 'center' });
+    });
     setRequestedDocId(null);
   }, [data, requestedDocId]);
 
@@ -335,7 +341,7 @@ export default function EvalSamplesDrawer({
         </div>
 
         {/* Body */}
-        <div className="overflow-auto px-4 py-3">
+        <div ref={bodyRef} className="overflow-auto px-4 py-3">
           {liveUnavailable && (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               {t.liveUnavailable}
@@ -368,6 +374,7 @@ export default function EvalSamplesDrawer({
             {filteredSamples.map((s) => (
               <li
                 key={s.docId}
+                data-eval-sample-id={s.docId}
                 className="rounded-md border border-border/70 bg-card/30 transition-colors hover:bg-card/50"
               >
                 <button

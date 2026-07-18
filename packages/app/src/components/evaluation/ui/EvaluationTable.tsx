@@ -1,7 +1,7 @@
 'use client';
 
 import { MessageSquareText } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
@@ -62,6 +62,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     evalResultId: number;
     docId?: number;
   } | null>(null);
+  const trackedSharedEvalId = useRef<number | null>(null);
 
   const openDrawer = (row: EvaluationChartData) => {
     setSharedTarget(null);
@@ -107,6 +108,18 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     ? (data.find((row) => Number(row.evalResultId) === sharedTarget.evalResultId) ?? null)
     : null;
   const activeDrawerRow = drawerRow ?? sharedRow;
+
+  useEffect(() => {
+    if (!sharedRow || trackedSharedEvalId.current === sharedTarget?.evalResultId) return;
+    trackedSharedEvalId.current = sharedTarget?.evalResultId ?? null;
+    window.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
+    track('evaluation_samples_open', {
+      eval_result_id: sharedRow.evalResultId,
+      task: sharedRow.benchmark,
+      hw_key: sharedRow.hwKey,
+      source: 'shared_link',
+    });
+  }, [sharedRow, sharedTarget?.evalResultId]);
 
   const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(
     () => [
