@@ -31,7 +31,9 @@ describe('DISPLAY_MODEL_TO_DB', () => {
   });
 
   it('groups point-release DB keys under one display', () => {
-    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(expect.arrayContaining(['glm5', 'glm5.1']));
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(
+      expect.arrayContaining(['glm5', 'glm5.1', 'glm5.2']),
+    );
   });
 });
 

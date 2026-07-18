@@ -252,6 +252,7 @@ describe('compareModelDisplayLabel', () => {
     expect(compareModelDisplayLabel(KIMI_K26, 'gb200', 'mi355x')).toBe(
       'Kimi K2.5/K2.6/K2.7-Code 1T — GB200 NVL72 vs MI355X',
     );
+    expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM 5/5.1/5.2 — H100 vs H200');
   });
 });
 

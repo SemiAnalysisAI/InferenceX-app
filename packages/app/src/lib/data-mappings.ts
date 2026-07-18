@@ -111,7 +111,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'dsr1',
     category: 'maintenance',
   },
-  [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
+  [Model.GLM_5]: { label: 'GLM5/5.1/5.2 744B', prefix: 'glm5', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {
