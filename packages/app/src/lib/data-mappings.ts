@@ -10,6 +10,7 @@ export enum Model {
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
   GLM_5 = 'GLM-5',
+  GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
 
@@ -111,7 +112,8 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'dsr1',
     category: 'maintenance',
   },
-  [Model.GLM_5]: { label: 'GLM5/5.1/5.2 744B', prefix: 'glm5', category: 'default' },
+  [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
+  [Model.GLM_5_2]: { label: 'GLM5.2', prefix: 'glm5.2', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
   [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {

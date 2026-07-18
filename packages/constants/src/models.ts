@@ -19,7 +19,7 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   minimaxm3: 'MiniMax-M3',
   glm5: 'GLM-5',
   'glm5.1': 'GLM-5',
-  'glm5.2': 'GLM-5',
+  'glm5.2': 'GLM-5.2',
   dsv4: 'DeepSeek-V4-Pro',
 };
 

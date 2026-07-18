@@ -16,6 +16,7 @@ import {
 const DEEPSEEK_R1 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'deepseek-r1')!;
 const KIMI_K26 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'kimi-k26')!;
 const GLM_51 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-1')!;
+const GLM_52 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-2')!;
 
 describe('parseCompareSlug — new model-prefixed form', () => {
   it('parses a canonical model-prefixed slug', () => {
@@ -252,7 +253,8 @@ describe('compareModelDisplayLabel', () => {
     expect(compareModelDisplayLabel(KIMI_K26, 'gb200', 'mi355x')).toBe(
       'Kimi K2.5/K2.6/K2.7-Code 1T — GB200 NVL72 vs MI355X',
     );
-    expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM 5/5.1/5.2 — H100 vs H200');
+    expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM 5/5.1 — H100 vs H200');
+    expect(compareModelDisplayLabel(GLM_52, 'h100', 'h200')).toBe('GLM 5.2 — H100 vs H200');
   });
 });
 
@@ -260,6 +262,8 @@ describe('getCompareModelBySlug', () => {
   it('returns canonical models for canonical slugs', () => {
     expect(getCompareModelBySlug('deepseek-r1')).toBe(DEEPSEEK_R1);
     expect(getCompareModelBySlug('kimi-k26')).toBe(KIMI_K26);
+    expect(getCompareModelBySlug('glm-5-2')).toBe(GLM_52);
+    expect(GLM_52.dbKeys).toEqual(['glm5.2']);
   });
 
   it('resolves alias slugs to their canonical model', () => {

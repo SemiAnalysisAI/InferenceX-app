@@ -30,10 +30,9 @@ describe('DISPLAY_MODEL_TO_DB', () => {
     expect(DISPLAY_MODEL_TO_DB['gpt-oss-120b']).toEqual(['gptoss120b']);
   });
 
-  it('groups point-release DB keys under one display', () => {
-    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(
-      expect.arrayContaining(['glm5', 'glm5.1', 'glm5.2']),
-    );
+  it('keeps GLM-5.2 separate from the GLM-5/5.1 display bucket', () => {
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(['glm5', 'glm5.1']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.2']).toEqual(['glm5.2']);
   });
 });
 
