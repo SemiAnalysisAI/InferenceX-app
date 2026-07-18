@@ -175,6 +175,15 @@ describe('Evaluation sample sharing', () => {
     cy.get('[role="dialog"] li > button[aria-expanded="true"]').should('not.exist');
   });
 
+  it('does not apply a stale sample id to a manually opened drawer', () => {
+    cy.visit('/evaluation?sample=0');
+    cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
+    cy.get('[title="View per-sample prompts and responses"]').first().click();
+
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"] li > button[aria-expanded="true"]').should('not.exist');
+  });
+
   it('copies and restores a link to one expanded sample', () => {
     cy.on('uncaught:exception', (error) => !error.message.includes('Hydration failed'));
     cy.get('[title="View per-sample prompts and responses"]').first().click();

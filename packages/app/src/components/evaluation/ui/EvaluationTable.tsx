@@ -1,8 +1,7 @@
 'use client';
 
 import { MessageSquareText } from 'lucide-react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
@@ -54,22 +53,18 @@ interface EvaluationTableProps {
 
 export default function EvaluationTable({ data }: EvaluationTableProps) {
   const { runIndexByUrl } = useUnofficialRun();
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const locale = useLocale();
   const t = STRINGS[locale];
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
-  const sharedEvalResultId = Number(searchParams.get('eval'));
-  const sharedDocId = Number(searchParams.get('sample'));
-  const hasSharedEval =
-    searchParams.has('eval') && Number.isInteger(sharedEvalResultId) && sharedEvalResultId > 0;
-  const hasSharedSample =
-    searchParams.has('sample') && Number.isInteger(sharedDocId) && sharedDocId >= 0;
+  const [sharedTarget, setSharedTarget] = useState<{
+    evalResultId: number;
+    docId?: number;
+  } | null>(null);
 
   const openDrawer = (row: EvaluationChartData) => {
+    setSharedTarget(null);
     setDrawerRow(row);
     // Notify the first-visit nudge to dismiss itself once the user has
     // discovered the affordance on their own.
@@ -83,16 +78,33 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     });
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const evalParam = params.get('eval');
+    if (evalParam === null) return;
+
+    const evalResultId = Number(evalParam);
+    if (!Number.isInteger(evalResultId) || evalResultId <= 0) return;
+
+    const sampleParam = params.get('sample');
+    const docId = sampleParam === null ? undefined : Number(sampleParam);
+    setSharedTarget({
+      evalResultId,
+      ...(docId !== undefined && Number.isInteger(docId) && docId >= 0 ? { docId } : {}),
+    });
+  }, []);
+
   const closeDrawer = () => {
     setDrawerRow(null);
-    const params = new URLSearchParams(searchParams);
-    params.delete('eval');
-    params.delete('sample');
-    router.replace(params.size > 0 ? `${pathname}?${params}` : pathname, { scroll: false });
+    setSharedTarget(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('eval');
+    url.searchParams.delete('sample');
+    window.history.replaceState(window.history.state, '', url);
   };
 
-  const sharedRow = hasSharedEval
-    ? (data.find((row) => Number(row.evalResultId) === sharedEvalResultId) ?? null)
+  const sharedRow = sharedTarget
+    ? (data.find((row) => Number(row.evalResultId) === sharedTarget.evalResultId) ?? null)
     : null;
   const activeDrawerRow = drawerRow ?? sharedRow;
 
@@ -231,7 +243,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       />
       <EvalSamplesDrawer
         row={activeDrawerRow}
-        initialDocId={hasSharedSample ? sharedDocId : null}
+        initialDocId={drawerRow === null ? (sharedTarget?.docId ?? null) : null}
         onClose={closeDrawer}
       />
     </>
