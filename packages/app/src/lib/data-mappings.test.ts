@@ -167,6 +167,14 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.GptOss)).toBe(true);
   });
 
+  it('returns true for deprecated GLM-5/5.1', () => {
+    expect(isModelDeprecated(Model.GLM_5)).toBe(true);
+  });
+
+  it('keeps GLM-5.2 active', () => {
+    expect(isModelDeprecated(Model.GLM_5_2)).toBe(false);
+  });
+
   it('returns false for non-deprecated model DeepSeek_R1', () => {
     expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
   });
