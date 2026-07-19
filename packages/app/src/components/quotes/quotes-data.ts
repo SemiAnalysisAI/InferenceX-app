@@ -41,6 +41,16 @@ export const QUOTES: Quote[] = [
     link: 'https://qwen.ai',
   },
   {
+    text: 'GLM was built for agentic coding and long-horizon autonomous execution, the kind of workloads where real inference performance is everything. Developers are running GLM-5.2 inside coding agents and multi-step tool-calling pipelines every day, so transparent data on how it actually performs across accelerators matters enormously. InferenceX™ gives the community exactly that: open, reproducible, vendor-neutral benchmarks on real hardware. We’re proud to see rigorous measurement helping developers deploy open models with confidence.',
+    textZh:
+      'GLM 为智能体编程和长程自主执行而生——在这类工作负载中，真实推理性能就是一切。开发者每天都在编程智能体和多步工具调用流水线中运行 GLM-5.2，因此关于它在各类加速器上实际表现的透明数据至关重要。InferenceX™ 为社区提供的正是这些：基于真实硬件的开放、可复现、厂商中立的基准测试。看到严谨的测量帮助开发者自信地部署开源模型，我们深感自豪。',
+    name: 'Zhipu GLM',
+    title: '',
+    org: 'Zhipu GLM',
+    logo: 'zhipu.webp',
+    link: 'https://z.ai/',
+  },
+  {
     text: "As we build systems at unprecedented scale, it's critical for the ML community to have open, transparent benchmarks that reflect how inference really performs across hardware and software. InferenceMAX™'s head-to-head benchmarks cut through the noise and provide a living picture of token throughput, performance per dollar, and tokens per Megawatt. This kind of open source effort strengthens the entire ecosystem and helps everyone, from researchers to operators of frontier datacenters, make smarter decisions.",
     textZh:
       '在我们以前所未有的规模构建系统之际，机器学习社区拥有开放、透明的基准测试至关重要——它们真实反映了推理在不同硬件和软件上的表现。InferenceMAX™ 的对比基准测试穿透噪音，提供了关于 token 吞吐量、每美元性能和每兆瓦 token 数的动态全景。这种开源努力增强了整个生态，帮助从研究者到前沿数据中心运营者的每一个人做出更明智的决策。',
@@ -483,6 +493,7 @@ export const CAROUSEL_ORGS = [
   'MiniMax',
   'Moonshot AI',
   'Alibaba Qwen',
+  'Zhipu GLM',
   'OpenAI',
   'Microsoft',
   'Meta Superintelligence Labs',
