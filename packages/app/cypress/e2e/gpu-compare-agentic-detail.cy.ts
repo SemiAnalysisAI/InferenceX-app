@@ -108,10 +108,16 @@ const agenticBenchmarks = AGENTIC_HARDWARE.flatMap((g) =>
     isl: null,
     osl: null,
     conc,
-    offload_mode: 'off',
+    offload_mode: 'on',
     benchmark_type: 'agentic_traces',
     image: 'vllm/vllm-openai:v0.9.0',
-    metrics: agenticMetrics(conc),
+    metrics: {
+      ...agenticMetrics(conc),
+      kv_offloading: 'dram',
+      kv_offload_backend: 'mooncake',
+      kv_offload_backend_version: '0.3.11.post1',
+      server_gpu_cache_hit_rate: 0.875,
+    },
     workers: null,
     date: AGENTIC_DATE,
     run_url: null,
@@ -177,6 +183,11 @@ describe('GPU comparison agentic point detail', () => {
       });
 
     cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain', 'Offload Type: DRAM')
+      .and('contain', 'Offload Backend: Mooncake 0.3.11.post1')
+      .and('contain', 'GPU Cache Hit Rate: 87.5%')
+      .and('not.contain', 'Offload Mode');
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')
       .then(($link) => {

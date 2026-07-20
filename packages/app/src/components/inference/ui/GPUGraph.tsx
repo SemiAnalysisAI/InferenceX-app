@@ -853,6 +853,7 @@ const GPUGraph = React.memo(
               hardwareConfig,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
               hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+              locale,
             }),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),

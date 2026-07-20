@@ -1,5 +1,6 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import type { Locale } from '@/lib/i18n';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
@@ -29,6 +30,8 @@ export interface TooltipConfig {
    * call so we don't ship megabytes of profile JSONL just for this check).
    */
   hasTrace?: boolean;
+  /** Page locale for tooltip metadata labels. Defaults to English. */
+  locale?: Locale;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
@@ -90,24 +93,84 @@ export const fmt = (v: number): string => {
   return String(rounded);
 };
 
+const CACHE_STRINGS = {
+  en: {
+    offloadType: 'Offload Type',
+    offloadBackend: 'Offload Backend',
+    transferEngine: 'KV Cache Transfer Engine',
+    gpuHitRate: 'GPU Cache Hit Rate',
+    cpuHitRate: 'CPU Cache Hit Rate',
+    theoreticalHitRate: 'Theoretical Cache Hit Rate',
+    none: 'None',
+  },
+  zh: {
+    offloadType: '卸载类型',
+    offloadBackend: '卸载后端',
+    transferEngine: 'KV Cache 传输引擎',
+    gpuHitRate: 'GPU Cache 命中率',
+    cpuHitRate: 'CPU Cache 命中率',
+    theoreticalHitRate: '理论 Cache 命中率',
+    none: '无',
+  },
+} as const;
+
+const CACHE_IMPLEMENTATION_LABELS: Record<string, string> = {
+  hicache: 'HiCache',
+  lmcache: 'LMCache',
+  mooncake: 'Mooncake',
+  mori: 'MoRI',
+  moriio: 'MoRI-IO',
+  'mori-io': 'MoRI-IO',
+  nixl: 'NIXL',
+  'vllm-native': 'vLLM Native',
+  'vllm-simple': 'vLLM Simple',
+};
+
+const cacheImplementationLabel = (value: string): string =>
+  CACHE_IMPLEMENTATION_LABELS[value.toLowerCase()] ?? value;
+
+const offloadTypeLabel = (value: string, locale: Locale): string => {
+  if (value.toLowerCase() === 'dram') return 'DRAM';
+  if (value.toLowerCase() === 'none') return CACHE_STRINGS[locale].none;
+  return value.toUpperCase();
+};
+
 /**
- * Agentic-only tooltip rows: offload mode, KV cache hit rates, request
- * success, token totals. Returns an empty string for non-agentic rows.
+ * Cache configuration and hit-rate rows shared by fixed-sequence, agentic,
+ * official, comparison, and unofficial-run tooltips.
+ */
+const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => {
+  const t = CACHE_STRINGS[locale];
+  const parts: string[] = [];
+  if (d.kv_offloading) {
+    parts.push(tooltipLine(t.offloadType, offloadTypeLabel(d.kv_offloading, locale)));
+  }
+  if (d.kv_offload_backend) {
+    const backend = cacheImplementationLabel(d.kv_offload_backend);
+    const version = d.kv_offload_backend_version ? ` ${d.kv_offload_backend_version}` : '';
+    parts.push(tooltipLine(t.offloadBackend, `${backend}${version}`));
+  }
+  if (d.is_multinode && d.kv_p2p_transfer) {
+    parts.push(tooltipLine(t.transferEngine, cacheImplementationLabel(d.kv_p2p_transfer)));
+  }
+
+  const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
+  const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
+  const theoreticalHit = formatPct(d.theoretical_cache_hit_rate);
+  if (gpuHit) parts.push(tooltipLine(t.gpuHitRate, gpuHit));
+  if (cpuHit) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
+  if (theoreticalHit) parts.push(tooltipLine(t.theoreticalHitRate, theoreticalHit));
+  return parts.join('');
+};
+
+/**
+ * Agentic-only request success and token totals. Cache metadata is rendered
+ * separately because fixed-sequence rows can carry it too.
  */
 const generateAgenticHTML = (d: InferenceData): string => {
   if (d.benchmark_type !== 'agentic_traces') return '';
 
   const parts: string[] = [];
-  if (d.offload_mode) {
-    parts.push(tooltipLine('Offload Mode', d.offload_mode.toUpperCase()));
-  }
-
-  const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
-  const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
-  const theoHit = formatPct(d.theoretical_cache_hit_rate);
-  if (gpuHit) parts.push(tooltipLine('GPU Cache Hit Rate', gpuHit));
-  if (cpuHit) parts.push(tooltipLine('CPU Cache Hit Rate', cpuHit));
-  if (theoHit) parts.push(tooltipLine('Theoretical Cache Hit Rate', theoHit));
 
   if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
     const successPct =
@@ -212,6 +275,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
     runUrl,
     hasTrace,
   } = config;
+  const locale = config.locale ?? 'en';
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -258,6 +322,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d)}
       ${runLinkHTML(runUrl)}
       ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}
@@ -283,6 +348,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
  */
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
   const { data: d, isPinned, xLabel, yLabel, overlayData } = config;
+  const locale = config.locale ?? 'en';
   const hwConfig = overlayData.hardwareConfig[d.hwKey];
   const perRow = overlayData.getRunForRow?.(d);
   const branch = perRow?.branch ?? overlayData.label;
@@ -316,6 +382,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d)}
     </div>
   `;
@@ -339,6 +406,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
     runUrl,
     hasTrace,
   } = config;
+  const locale = config.locale ?? 'en';
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
@@ -385,6 +453,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Precision:</strong> ${d.precision.toUpperCase()}
       </div>
+      ${generateCacheMetadataHTML(d, locale)}
       ${generateAgenticHTML(d)}
       ${runLinkHTML(runUrl)}
       ${viewChartsButtonHTML(isPinned, Boolean(hasTrace), d.id)}

@@ -1204,6 +1204,7 @@ const ScatterGraph = React.memo(
             isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+            locale,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
@@ -1270,6 +1271,7 @@ const ScatterGraph = React.memo(
         // tooltip content closure (the "View charts" button), so rebuild the
         // config when the presence fetch resolves.
         traceAvailability,
+        locale,
       ],
     );
 
@@ -2222,6 +2224,7 @@ const ScatterGraph = React.memo(
                 selectedYAxisMetric,
                 hardwareConfig: overlayData.hardwareConfig,
                 overlayData,
+                locale,
               });
 
               overlayPoints
