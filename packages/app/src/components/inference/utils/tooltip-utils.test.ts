@@ -264,17 +264,42 @@ describe('generateTooltipContent', () => {
 
   it('keeps a clearly marked binary fallback for legacy agentic rows', () => {
     const enabled = generateTooltipContent(
-      tooltipConfig({ data: pt({ offload_mode: 'on', kv_offloading: undefined }) }),
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          offload_mode: 'on',
+          kv_offloading: undefined,
+        }),
+      }),
     );
     const disabledZh = generateTooltipContent(
       tooltipConfig({
         locale: 'zh',
-        data: pt({ offload_mode: 'off', kv_offloading: undefined }),
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          offload_mode: 'off',
+          kv_offloading: undefined,
+        }),
       }),
     );
 
     expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
     expect(disabledZh).toContain('<strong>卸载类型:</strong> 已禁用（旧版数据）');
+  });
+
+  it('does not treat the fixed-sequence offload default as legacy metadata', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'single_turn',
+          offload_mode: 'off',
+          kv_offloading: undefined,
+        }),
+      }),
+    );
+
+    expect(html).not.toContain('Offload Type');
+    expect(html).not.toContain('legacy data');
   });
 
   it('shows multinode KV transfer and cache-hit metadata for fixed-sequence points', () => {

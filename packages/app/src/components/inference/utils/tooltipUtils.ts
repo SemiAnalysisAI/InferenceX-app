@@ -153,7 +153,7 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   const parts: string[] = [];
   if (d.kv_offloading) {
     parts.push(tooltipLine(t.offloadType, offloadTypeLabel(d.kv_offloading, locale)));
-  } else if (d.offload_mode) {
+  } else if (d.benchmark_type === 'agentic_traces' && d.offload_mode) {
     const enabled = d.offload_mode.toLowerCase() === 'on';
     parts.push(tooltipLine(t.offloadType, enabled ? t.legacyEnabled : t.legacyDisabled));
   }
