@@ -90,11 +90,13 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
         <table
           data-testid="compare-pair-matrix"
           aria-label={t.matrixAria(modelLabel)}
-          className="border-separate border-spacing-[3px]"
+          className="w-full min-w-[600px] table-fixed border-separate border-spacing-[3px]"
         >
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-background p-0" aria-hidden="true" />
+              {/* Fixed-layout table: this corner cell sets the row-header
+                  column width; the 9 GPU columns share the remaining space. */}
+              <th className="sticky left-0 z-10 w-36 bg-background p-0" aria-hidden="true" />
               {colGroups.map((group) => (
                 <th key={group.vendor} colSpan={group.count} scope="colgroup" className="p-0 px-1">
                   <div
@@ -111,18 +113,16 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
             <tr>
               <th className="sticky left-0 z-10 bg-background p-0" aria-hidden="true" />
               {cols.map((gpu) => (
-                <th key={gpu.key} scope="col" className="p-0 align-bottom">
-                  <div className="flex h-14 items-end justify-center pb-1.5">
-                    <span
-                      title={`${gpu.label} (${gpu.arch})`}
-                      className={cn(
-                        'rotate-180 text-[10px] font-medium tracking-wide whitespace-nowrap transition-colors [writing-mode:vertical-rl]',
-                        active?.col === gpu.key ? 'text-foreground' : 'text-muted-foreground',
-                      )}
-                    >
-                      {gpu.shortLabel}
-                    </span>
-                  </div>
+                <th key={gpu.key} scope="col" className="p-0 pb-1 align-bottom">
+                  <span
+                    title={`${gpu.label} (${gpu.arch})`}
+                    className={cn(
+                      'block text-center text-[10px] font-medium tracking-wide whitespace-nowrap transition-colors',
+                      active?.col === gpu.key ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {gpu.shortLabel}
+                  </span>
                 </th>
               ))}
             </tr>
@@ -165,7 +165,7 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                           data-testid="compare-matrix-empty-cell"
                           title={t.emptyTitle(cell.label)}
                           aria-hidden="true"
-                          className="size-8 rounded-md border border-dashed border-border/50 lg:size-9"
+                          className="h-8 w-full rounded-md border border-dashed border-border/50 lg:h-9"
                         />
                       </td>
                     );
@@ -198,8 +198,8 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                         }
                         onBlur={() => setFocusedCell(null)}
                         className={cn(
-                          'block size-8 rounded-md transition-all duration-150 lg:size-9',
-                          'hover:scale-110 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none',
+                          'block h-8 w-full rounded-md transition-all duration-150 lg:h-9',
+                          'hover:scale-105 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none',
                           cell.cross
                             ? 'bg-brand/20 ring-1 ring-brand/40 ring-inset hover:bg-brand/45'
                             : 'bg-foreground/15 hover:bg-foreground/30',
