@@ -871,6 +871,7 @@ export default function ChartDisplay() {
                               data={[...officialRows, ...overlayRows]}
                               chartDefinition={graph.chartDefinition}
                               selectedYAxisMetric={selectedYAxisMetric}
+                              percentile={isAgenticSequence ? selectedPercentile : 'median'}
                             />
                           </>
                         );

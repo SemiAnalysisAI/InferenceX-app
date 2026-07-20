@@ -917,6 +917,8 @@ describe('ChartDisplay engine comparison guard', () => {
       hw: 'Official SGLang',
       model: Model.DeepSeek_V4_Pro,
       precision: Precision.FP4,
+      p75_ttft: 0.75,
+      p75_intvty: 75,
     });
     const runUrl = 'https://github.com/x/y/actions/runs/456';
     const overlayRow = createMockInferenceData({
@@ -924,6 +926,8 @@ describe('ChartDisplay engine comparison guard', () => {
       hw: 'Unofficial vLLM',
       model: Model.DeepSeek_V4_Pro,
       precision: Precision.FP4,
+      p75_ttft: 0.85,
+      p75_intvty: 65,
       run_url: runUrl,
     });
     const exclusion = buildExclusion([
@@ -968,6 +972,7 @@ describe('ChartDisplay engine comparison guard', () => {
         selectedModel: Model.DeepSeek_V4_Pro,
         selectedSequence: Sequence.AgenticTraces,
         selectedXAxisMode: 'interactivity',
+        selectedPercentile: 'p75',
         activeHwTypes: new Set(['b200_sglang']),
         hwTypesWithData: new Set(['b200_sglang']),
         resolveComparisonSelection: resolveSelection,
@@ -992,6 +997,15 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="inference-results-table"] tbody').contains('vLLM').should('exist');
     cy.get('[data-testid="inference-results-table"] tbody').contains('SGLang').should('exist');
+    cy.get('[data-testid="inference-results-table"] thead')
+      .should('contain.text', 'P75 TTFT (ms)')
+      .and('contain.text', 'P75 Interactivity (tok/s)')
+      .and('not.contain.text', 'Median TTFT');
+    cy.get('[data-testid="inference-results-table"] tbody')
+      .should('contain.text', '750')
+      .and('contain.text', '850')
+      .and('contain.text', '75.0')
+      .and('contain.text', '65.0');
     // The reconciliation effect must not strip the run's hw types from the provider.
     cy.get('@setActiveOverlayHwTypes').should('not.have.been.called');
   });

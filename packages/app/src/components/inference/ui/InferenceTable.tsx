@@ -13,6 +13,7 @@ interface InferenceTableProps {
   data: InferenceData[];
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
+  percentile?: string;
 }
 
 /** Format a number for table display — picks sensible precision based on magnitude. */
@@ -28,10 +29,14 @@ export default function InferenceTable({
   data,
   chartDefinition,
   selectedYAxisMetric,
+  percentile = 'median',
 }: InferenceTableProps) {
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const yLabel = chartDefinition[`${selectedYAxisMetric}_label` as keyof ChartDefinition] as string;
   const xLabel = chartDefinition.x_label;
+  const percentileLabel = percentile === 'median' ? 'Median' : percentile.toUpperCase();
+  const ttftKey = `${percentile}_ttft` as keyof InferenceData;
+  const interactivityKey = `${percentile}_intvty` as keyof InferenceData;
 
   const rooflineDir = chartDefinition[
     `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
@@ -97,21 +102,21 @@ export default function InferenceTable({
         className: 'tabular-nums',
       },
       {
-        header: 'Median TTFT (ms)',
+        header: `${percentileLabel} TTFT (ms)`,
         align: 'right',
-        cell: (row) => fmt((row.median_ttft ?? 0) * 1000, 0),
-        sortValue: (row) => row.median_ttft ?? 0,
+        cell: (row) => fmt(((row[ttftKey] as number | undefined) ?? 0) * 1000, 0),
+        sortValue: (row) => (row[ttftKey] as number | undefined) ?? 0,
         className: 'tabular-nums',
       },
       {
-        header: 'Median Interactivity (tok/s)',
+        header: `${percentileLabel} Interactivity (tok/s)`,
         align: 'right',
-        cell: (row) => fmt(row.median_intvty ?? 0, 1),
-        sortValue: (row) => row.median_intvty ?? 0,
+        cell: (row) => fmt((row[interactivityKey] as number | undefined) ?? 0, 1),
+        sortValue: (row) => (row[interactivityKey] as number | undefined) ?? 0,
         className: 'tabular-nums',
       },
     ],
-    [yPath, yLabel, xLabel],
+    [yPath, yLabel, xLabel, percentileLabel, ttftKey, interactivityKey],
   );
 
   return (
