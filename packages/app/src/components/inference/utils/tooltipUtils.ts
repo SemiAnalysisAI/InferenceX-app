@@ -96,8 +96,9 @@ export const fmt = (v: number): string => {
 const CACHE_STRINGS = {
   en: {
     offloadType: 'Offload Type',
-    offloadBackend: 'Offload Backend',
-    transferEngine: 'KV Cache Transfer Engine',
+    offloadBackend: 'KV Offload Engine',
+    transferEngine: 'KV Transfer Engine',
+    router: 'Router',
     gpuHitRate: 'GPU Cache Hit Rate',
     cpuHitRate: 'CPU Cache Hit Rate',
     theoreticalHitRate: 'Theoretical Cache Hit Rate',
@@ -105,8 +106,9 @@ const CACHE_STRINGS = {
   },
   zh: {
     offloadType: '卸载类型',
-    offloadBackend: '卸载后端',
-    transferEngine: 'KV Cache 传输引擎',
+    offloadBackend: 'KV 卸载引擎',
+    transferEngine: 'KV 传输引擎',
+    router: '路由器',
     gpuHitRate: 'GPU Cache 命中率',
     cpuHitRate: 'CPU Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
@@ -122,8 +124,11 @@ const CACHE_IMPLEMENTATION_LABELS: Record<string, string> = {
   moriio: 'MoRI-IO',
   'mori-io': 'MoRI-IO',
   nixl: 'NIXL',
+  atomesh: 'AtoMesh',
   'vllm-native': 'vLLM Native',
+  'vllm-router': 'vLLM Router',
   'vllm-simple': 'vLLM Simple',
+  'sglang-router': 'SGLang Router',
 };
 
 const cacheImplementationLabel = (value: string): string =>
@@ -150,8 +155,13 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
     const version = d.kv_offload_backend_version ? ` ${d.kv_offload_backend_version}` : '';
     parts.push(tooltipLine(t.offloadBackend, `${backend}${version}`));
   }
-  if (d.is_multinode && d.kv_p2p_transfer) {
+  if (d.kv_p2p_transfer) {
     parts.push(tooltipLine(t.transferEngine, cacheImplementationLabel(d.kv_p2p_transfer)));
+  }
+  if (d.router_name) {
+    const router = cacheImplementationLabel(d.router_name);
+    const version = d.router_version ? ` ${d.router_version}` : '';
+    parts.push(tooltipLine(t.router, `${router}${version}`));
   }
 
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);

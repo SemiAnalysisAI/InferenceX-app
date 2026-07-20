@@ -201,6 +201,10 @@ export interface AggDataEntry {
   kv_offload_backend_version?: string;
   /** P2P engine used to move KV state between workers on multinode runs. */
   kv_p2p_transfer?: string;
+  /** Request router implementation, for example `vllm-router` or `sglang-router`. */
+  router_name?: string;
+  /** Version independently declared for the request router. */
+  router_version?: string;
   /** Actual server-observed GPU prefix-cache hit rate (0..1). */
   server_gpu_cache_hit_rate?: number;
   /** Actual server-observed CPU prefix-cache hit rate (0..1). */

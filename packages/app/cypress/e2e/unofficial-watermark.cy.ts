@@ -25,6 +25,8 @@ describe('Unofficial-run watermark', () => {
               kv_offloading: 'dram',
               kv_offload_backend: 'hicache',
               kv_p2p_transfer: 'nixl',
+              router_name: 'sglang-router',
+              router_version: '0.3.2',
               server_gpu_cache_hit_rate: 0.875,
             },
             run_url: runUrl,
@@ -74,8 +76,9 @@ describe('Unofficial-run watermark', () => {
         expect(tooltip).not.to.equal(null);
         expect(tooltip!.style.display).to.equal('block');
         expect(tooltip).to.contain.text('Offload Type: DRAM');
-        expect(tooltip).to.contain.text('Offload Backend: HiCache');
-        expect(tooltip).to.contain.text('KV Cache Transfer Engine: NIXL');
+        expect(tooltip).to.contain.text('KV Offload Engine: HiCache');
+        expect(tooltip).to.contain.text('KV Transfer Engine: NIXL');
+        expect(tooltip).to.contain.text('Router: SGLang Router 0.3.2');
         expect(tooltip).to.contain.text('GPU Cache Hit Rate: 87.5%');
       });
 

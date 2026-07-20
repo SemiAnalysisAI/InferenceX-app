@@ -258,7 +258,7 @@ describe('generateTooltipContent', () => {
       }),
     );
     expect(html).toContain('<strong>Offload Type:</strong> DRAM');
-    expect(html).toContain('<strong>Offload Backend:</strong> Mooncake 0.3.11.post1');
+    expect(html).toContain('<strong>KV Offload Engine:</strong> Mooncake 0.3.11.post1');
     expect(html).not.toContain('Offload Mode');
   });
 
@@ -273,7 +273,7 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>KV Cache Transfer Engine:</strong> NIXL');
+    expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
     expect(html).toContain('<strong>GPU Cache Hit Rate:</strong> 87.5%');
   });
 
@@ -281,11 +281,17 @@ describe('generateTooltipContent', () => {
     const html = generateTooltipContent(
       tooltipConfig({
         locale: 'zh',
-        data: pt({ kv_offloading: 'dram', kv_offload_backend: 'lmcache' }),
+        data: pt({
+          kv_offloading: 'dram',
+          kv_offload_backend: 'lmcache',
+          router_name: 'vllm-router',
+          router_version: '0.1.14',
+        }),
       }),
     );
     expect(html).toContain('<strong>卸载类型:</strong> DRAM');
-    expect(html).toContain('<strong>卸载后端:</strong> LMCache');
+    expect(html).toContain('<strong>KV 卸载引擎:</strong> LMCache');
+    expect(html).toContain('<strong>路由器:</strong> vLLM Router 0.1.14');
   });
 
   it('localizes an empty offload tier on /zh surfaces', () => {
@@ -386,12 +392,17 @@ describe('generateOverlayTooltipContent', () => {
           benchmark_type: 'agentic_traces',
           kv_offloading: 'dram',
           kv_offload_backend: 'hicache',
+          kv_p2p_transfer: 'nixl',
+          router_name: 'sglang-router',
+          router_version: '0.3.2',
           server_cpu_cache_hit_rate: 0.42,
         }),
       }),
     );
     expect(html).toContain('<strong>Offload Type:</strong> DRAM');
-    expect(html).toContain('<strong>Offload Backend:</strong> HiCache');
+    expect(html).toContain('<strong>KV Offload Engine:</strong> HiCache');
+    expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
+    expect(html).toContain('<strong>Router:</strong> SGLang Router 0.3.2');
     expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
   });
 });

@@ -131,6 +131,8 @@ describe('rowToAggDataEntry', () => {
           kv_offload_backend: 'mooncake',
           kv_offload_backend_version: '0.3.11.post1',
           kv_p2p_transfer: 'nixl',
+          router_name: 'vllm-router',
+          router_version: '0.1.14',
         } as unknown as BenchmarkRow['metrics'],
       }),
     );
@@ -139,6 +141,8 @@ describe('rowToAggDataEntry', () => {
     expect(entry.kv_offload_backend).toBe('mooncake');
     expect(entry.kv_offload_backend_version).toBe('0.3.11.post1');
     expect(entry.kv_p2p_transfer).toBe('nixl');
+    expect(entry.router_name).toBe('vllm-router');
+    expect(entry.router_version).toBe('0.1.14');
   });
 
   it('passes through measured power telemetry fields when present', () => {
