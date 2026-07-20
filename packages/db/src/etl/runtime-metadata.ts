@@ -30,15 +30,19 @@ export function extractRuntimeMetadata(row: Record<string, unknown>): RuntimeMet
   if (kvOffloading) metadata.kv_offloading = kvOffloading;
 
   const backend = componentMetadata(row.kv_offload_backend);
-  if (backend.name) metadata.kv_offload_backend = backend.name;
-  if (backend.version) metadata.kv_offload_backend_version = backend.version;
+  if (backend.name) {
+    metadata.kv_offload_backend = backend.name;
+    if (backend.version) metadata.kv_offload_backend_version = backend.version;
+  }
 
   const transfer = nonEmptyString(row.kv_p2p_transfer);
   if (transfer) metadata.kv_p2p_transfer = transfer;
 
   const router = componentMetadata(row.router);
-  if (router.name) metadata.router_name = router.name;
-  if (router.version) metadata.router_version = router.version;
+  if (router.name) {
+    metadata.router_name = router.name;
+    if (router.version) metadata.router_version = router.version;
+  }
 
   return metadata;
 }

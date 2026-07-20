@@ -28,7 +28,7 @@ import {
 } from './lib/runtime-metadata-artifacts.js';
 
 const REPO = 'SemiAnalysisAI/InferenceX';
-const FIRST_METADATA_DATE = '2026-07-14';
+const FIRST_METADATA_DATE = '2026-07-13';
 const RUNTIME_KEYS = [
   'kv_offloading',
   'kv_offload_backend',
