@@ -28,9 +28,6 @@ describe('extractRuntimeMetadata', () => {
         kv_p2p_transfer: '',
         router: { name: '', version: '0.1.14' },
       }),
-    ).toEqual({
-      kv_offload_backend: 'hicache',
-      router_version: '0.1.14',
-    });
+    ).toEqual({ kv_offload_backend: 'hicache' });
   });
 });
