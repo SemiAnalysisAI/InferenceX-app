@@ -1999,8 +1999,7 @@ const ScatterGraph = React.memo(
               // Overlay tooltip handlers
               const svgNode = ctx.layout.svg.node()!;
               const container = svgNode.parentElement as HTMLDivElement;
-              const tooltipDiv = svgNode.nextElementSibling as HTMLDivElement;
-              const tooltip = d3.select(tooltipDiv);
+              const tooltip = d3.select(ctx.tooltipElement);
 
               const createOverlayConfig = (d: InferenceData, pinned: boolean) => ({
                 data: d,
