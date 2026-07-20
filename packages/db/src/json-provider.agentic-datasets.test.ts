@@ -18,10 +18,9 @@ import type * as JsonProvider from './json-provider.js';
  * directory, point DUMP_DIR at it, and dynamically import the module once.
  *
  * Coverage per mirror:
- *  - fast path: precomputed JSONB (aggregate_stats / chart_series /
- *    request_timeline) at the CURRENT version is served verbatim.
- *  - blob fallback: a STALE version forces a re-derive from the (dumped) blob
- *    using the same pure helper the SQL path uses.
+ *  - fast path: precomputed JSONB is served directly when canonical/current.
+ *  - blob fallback: missing chart_series or stale aggregate/timeline payloads
+ *    force a re-derive using the same helper as the SQL path.
  *  - bytea round-trip: blobs are stored as {type:'Buffer',data:[…]} (what
  *    dump-db emits) and must gunzip cleanly.
  */
@@ -131,12 +130,11 @@ const CURRENT_TIMELINE = {
   ],
 };
 
-const PREVIOUS_CHART_SERIES: ChartSeries = {
-  version: 12,
+const STORED_CHART_SERIES: ChartSeries = {
   startNs: 0,
   endNs: 11e9,
   durationS: 11,
-  timeslicesCount: 1,
+  timeslicesCount: 2,
   kvCacheUsage: [
     { t: 0, value: 0.1 },
     { t: 10, value: 0.2 },
@@ -149,8 +147,13 @@ const PREVIOUS_CHART_SERIES: ChartSeries = {
   prefixCacheHitsTps: [],
   hostKvCacheUsage: [],
   kvCacheUsageByEngine: [
-    { engineLabel: '0', points: [{ t: 10, value: 0.2 }] },
-    { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
+    {
+      engineLabel: '0',
+      points: [
+        { t: 0, value: 0.1 },
+        { t: 10, value: 0.2 },
+      ],
+    },
   ],
   metricSources: [],
 };
@@ -285,8 +288,8 @@ beforeAll(async () => {
     ]),
   );
 
-  // agentic_trace_replay: 100 = current stats/timeline, 200 = stale stats/timeline
-  // plus directly-upgradable chart series.
+  // agentic_trace_replay: 100 = current stats/timeline, 200 = stale
+  // stats/timeline plus canonical chart series.
   writeFileSync(
     join(dir, 'agentic_trace_replay.json'),
     JSON.stringify([
@@ -312,7 +315,7 @@ beforeAll(async () => {
         server_metrics_json_gz: byteaJson(SERVER_GZ),
         server_metrics_json_uncompressed_size: SERVER_JSON.length,
         aggregate_stats: { version: 1 }, // stale → force profile-blob fallback
-        chart_series: PREVIOUS_CHART_SERIES,
+        chart_series: STORED_CHART_SERIES,
         request_timeline: { version: 1 }, // stale → force profile-blob fallback
         created_at: '2026-06-14T04:00:00Z',
       },
@@ -496,7 +499,7 @@ describe('trace server metrics mirror', () => {
     expect(m?.kvCacheUsage.length).toBeGreaterThan(0);
   });
 
-  it('upgrades the previous chart series without recomputing the server blob', async () => {
+  it('serves canonical stored chart series without recomputing the server blob', async () => {
     const m = await jp.getTraceServerMetrics(2);
 
     expect(m?.kvCacheUsageByEngine).toEqual([

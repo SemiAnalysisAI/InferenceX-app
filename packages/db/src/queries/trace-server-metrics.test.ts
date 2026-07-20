@@ -2,18 +2,13 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  CHART_SERIES_VERSION,
-  upgradeStoredChartSeries,
-  type ChartSeries,
-} from '../etl/compute-chart-series';
+import type { ChartSeries } from '../etl/compute-chart-series';
 import type { DbClient } from '../connection.js';
 
 import { getTraceServerMetrics } from './trace-server-metrics';
 
 function currentSeries(): ChartSeries {
   return {
-    version: CHART_SERIES_VERSION,
     startNs: 0,
     endNs: 1e9,
     durationS: 1,
@@ -28,18 +23,6 @@ function currentSeries(): ChartSeries {
     hostKvCacheUsage: [],
     kvCacheUsageByEngine: [],
     metricSources: [],
-  };
-}
-
-function previousSeries(version = 13): ChartSeries {
-  return {
-    ...currentSeries(),
-    version,
-    timeslicesCount: 1,
-    kvCacheUsageByEngine: [
-      { engineLabel: '0', points: [{ t: 10, value: 0.2 }] },
-      { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
-    ],
   };
 }
 
@@ -90,40 +73,7 @@ describe('getTraceServerMetrics', () => {
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 
-  it.each([12, 13])(
-    'upgrades an unambiguous v%s chart series without selecting the raw blob',
-    async (version) => {
-      const { sql, calls } = mockSql([[metaRow({ chart_series: previousSeries(version) })], []]);
-
-      const result = await getTraceServerMetrics(sql, 42);
-
-      expect(result?.kvCacheUsageByEngine).toEqual([
-        {
-          engineLabel: '0',
-          points: [
-            { t: 0, value: 0.1 },
-            { t: 10, value: 0.2 },
-          ],
-        },
-      ]);
-      expect(result?.timeslicesCount).toBe(2);
-      expect(calls).toHaveLength(2);
-      expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
-      expect(calls[1]).toContain('update agentic_trace_replay set chart_series');
-    },
-  );
-
-  it('rejects v12 labels whose time ranges overlap', () => {
-    const ambiguous = previousSeries(12);
-    ambiguous.kvCacheUsageByEngine = [
-      { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
-      { engineLabel: '0', points: [{ t: 0, value: 0.2 }] },
-    ];
-
-    expect(upgradeStoredChartSeries(ambiguous)).toBeNull();
-  });
-
-  it('fetches and computes the raw blob only when chart_series is stale', async () => {
+  it('fetches and computes the raw blob only when chart_series is missing', async () => {
     const raw = gzipSync(
       Buffer.from(
         JSON.stringify({
@@ -135,14 +85,13 @@ describe('getTraceServerMetrics', () => {
         }),
       ),
     );
-    const stale = { ...currentSeries(), version: 11 };
-    const { sql, calls } = mockSql([[metaRow({ chart_series: stale })], [{ blob: raw }]]);
+    const { sql, calls } = mockSql([[metaRow({ chart_series: null })], [{ blob: raw }]]);
 
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
     // 3 calls: meta read, blob read, then the fire-and-forget chart_series
-    // write-back that self-heals the stale precomputed series.
+    // write-back that self-heals the missing precomputed series.
     expect(calls).toHaveLength(3);
     expect(calls[1]).toContain('server_metrics_json_gz as blob');
     expect(calls[2]).toContain('update agentic_trace_replay set chart_series');

@@ -2,7 +2,7 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, computeChartSeries } from './compute-chart-series.js';
+import { computeChartSeries } from './compute-chart-series.js';
 
 /**
  * Build a minimal server_metrics_json blob covering the metrics the chart
@@ -137,9 +137,9 @@ describe('computeChartSeries', () => {
     expect(await computeChartSeries(null)).toBeNull();
   });
 
-  it('returns the current CHART_SERIES_VERSION in the bundle', async () => {
+  it('returns a canonical bundle without embedded version metadata', async () => {
     const series = await computeChartSeries(makeBlob());
-    expect(series?.version).toBe(CHART_SERIES_VERSION);
+    expect(series).not.toHaveProperty('version');
   });
 
   it('extracts kvCacheUsage points with t=seconds-from-start', async () => {

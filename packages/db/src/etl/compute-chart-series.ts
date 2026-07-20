@@ -4,8 +4,9 @@
  * request. The output lands in `agentic_trace_replay.chart_series` and is
  * read directly by `getTraceServerMetrics`.
  *
- * Versioned so the backfill script knows which rows are stale — bump
- * `CHART_SERIES_VERSION` whenever the extraction algorithm changes.
+ * The stored JSONB is the canonical representation. Extraction changes must
+ * be followed by an explicit DB backfill and API-cache invalidation rather
+ * than accumulating request-time payload-version branches.
  */
 
 import { gunzipSync } from 'node:zlib';
@@ -16,69 +17,6 @@ import {
   type MetricSource,
   type ServerMetricsContext,
 } from './server-metrics-adapters';
-
-/**
- * Bump when the extraction algorithm changes — backfill recomputes anything
- * older.
- *
- * v2: aggregate vllm gauges/counters across all engine series (was reading
- * only series[0], which under-counted by Nx on multi-engine DP/PP
- * deployments — most visible as a request-queue-depth chart that maxed out
- * at ~3 when the timeline clearly showed 20+ in-flight).
- *
- * v3: extract `prefixCacheHitsTps` so the detail page can derive cumulative
- * unique input tokens as cumsum(prefillTps - prefixCacheHitsTps).
- *
- * v4: extract sglang:* metrics too (fallback chain in each picker), so
- * SGLang runs populate the chart_series the same way vllm runs do.
- *
- * v5: map sglang:realtime_tokens (mode={prefill_cache,prefill_compute,decode})
- * into promptTokensBySource so the cumulative prompt-token-source-breakdown
- * chart shows useful splits for SGLang runs (filtered to prefill_* modes).
- *
- * v6: for SGLang, swap the coarse "prefill_cache" bucket for per-cache_source
- * breakdown from sglang:cached_tokens — current runs always have one
- * cache_source ("device" / HBM) but hicache (CPU offload) runs would
- * split into "device" + "host" automatically once ingested.
- *
- * v7: extract sglang:hicache_host_{used,total}_tokens into a new
- * hostKvCacheUsage series so the KV cache utilization chart can plot
- * the CPU offload pool's usage alongside the on-GPU HBM line.
- *
- * v8: keep the per-engine dimension on kv_cache_usage_perc as
- * `kvCacheUsageByEngine` (one entry per DP rank). The cluster-average
- * line hides load skew on DEP configs; the detail page overlays the
- * per-rank lines so a hot rank is visible at a glance.
- *
- * v9: retain orchestrator-normalized per-source series. Dynamo labels are
- * mapped to canonical router/prefill/decode roles, allowing the frontend to
- * inspect individual workers without interpreting Dynamo-native labels.
- *
- * v10: only emit per-source series for disaggregated configs with a recognized
- * orchestrator adapter. Non-disaggregated and unsupported configs retain the
- * existing aggregate-only behavior.
- *
- * v12: also consume the `warmup_metrics` block from the server-metrics blob and
- * merge its scrapes into the same series as the profiling `metrics` block.
- * Warmup and profiling timeslices carry their own absolute `start_ns` and never
- * overlap in time, so the merged series is continuous (warmup at lower t,
- * profiling after). This lets the agentic detail page slice `chart_series` into
- * warmup vs profiling at the request-derived boundary; older blobs without a
- * warmup block are unaffected. (v11 was a short-lived, since-reverted attempt to
- * carry kvCachePoolTokens in chart_series; that value now lives in
- * benchmark_results.metrics, derived from the server log — unrelated to this.)
- *
- * v13: prefer `dp_rank` over the per-rank-local `engine` label when naming
- * KV-cache series. Some DEP exports report engine=0 for every rank, which
- * made every legend entry read "DP 0" despite distinct dp_rank labels.
- *
- * v14: coalesce warmup and profiling metric series by source identity before
- * concatenating their timeslices. Concatenating the phase-level arrays emitted
- * every DP rank twice, leaving one empty duplicate in each phase-filtered view.
- */
-export const CHART_SERIES_VERSION = 14;
-const ENGINE_FIRST_CHART_SERIES_VERSION = 12;
-const PHASE_DUPLICATED_CHART_SERIES_VERSION = 13;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -94,7 +32,6 @@ export interface QueueDepthPoint {
 }
 
 export interface ChartSeries {
-  version: number;
   /** ns wall-clock of the first window's start; for debugging only. */
   startNs: number;
   /** ns wall-clock of the last window's end. */
@@ -151,108 +88,6 @@ export interface MetricSourceSeries {
   prefixCacheHitsTps: TimeSeriesPoint[];
   hostKvCacheUsage: TimeSeriesPoint[];
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
-}
-
-/**
- * Coalesce warmup/profile duplicates using the rank label retained in stored
- * chart series. v12 labels are only safe when equal-label entries occupy
- * non-overlapping time ranges; overlap means multiple ranks shared a local
- * engine label and their DP identities cannot be recovered without raw data.
- */
-function coalesceStoredKvSeries(
-  series: { engineLabel: string; points: TimeSeriesPoint[] }[],
-  rejectOverlappingLabels: boolean,
-): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
-  const entriesByLabel = new Map<string, TimeSeriesPoint[][]>();
-  for (const entry of series) {
-    const entries = entriesByLabel.get(entry.engineLabel) ?? [];
-    entries.push(entry.points);
-    entriesByLabel.set(entry.engineLabel, entries);
-  }
-
-  const result: { engineLabel: string; points: TimeSeriesPoint[] }[] = [];
-  for (const [engineLabel, entries] of entriesByLabel) {
-    if (rejectOverlappingLabels && entries.length > 1) {
-      const ranges = entries
-        .filter((points) => points.length > 0)
-        .map((points) => {
-          let min = Number.POSITIVE_INFINITY;
-          let max = Number.NEGATIVE_INFINITY;
-          for (const point of points) {
-            min = Math.min(min, point.t);
-            max = Math.max(max, point.t);
-          }
-          return { min, max };
-        })
-        .toSorted((a, b) => a.min - b.min);
-      for (let i = 1; i < ranges.length; i += 1) {
-        if (ranges[i]!.min <= ranges[i - 1]!.max) return null;
-      }
-    }
-    result.push({
-      engineLabel,
-      points: entries.flat().toSorted((a, b) => a.t - b.t),
-    });
-  }
-  return result;
-}
-
-/**
- * Upgrade the immediately previous chart-series representation without
- * reopening the potentially multi-hundred-MB raw server-metrics blob.
- * Returns null for older versions whose missing transformations cannot be
- * reconstructed from stored chart data alone.
- */
-export function upgradeStoredChartSeries(series: ChartSeries): ChartSeries | null {
-  const storedVersion = Number(series.version);
-  if (storedVersion === CHART_SERIES_VERSION) return series;
-  if (
-    storedVersion !== ENGINE_FIRST_CHART_SERIES_VERSION &&
-    storedVersion !== PHASE_DUPLICATED_CHART_SERIES_VERSION
-  ) {
-    return null;
-  }
-  const rejectOverlappingLabels = storedVersion === ENGINE_FIRST_CHART_SERIES_VERSION;
-
-  const kvCacheUsageByEngine = coalesceStoredKvSeries(
-    series.kvCacheUsageByEngine ?? [],
-    rejectOverlappingLabels,
-  );
-  if (!kvCacheUsageByEngine) return null;
-  const metricSources: MetricSourceSeries[] = [];
-  for (const metricSource of series.metricSources ?? []) {
-    const sourceKvCacheUsageByEngine = coalesceStoredKvSeries(
-      metricSource.kvCacheUsageByEngine ?? [],
-      rejectOverlappingLabels,
-    );
-    if (!sourceKvCacheUsageByEngine) return null;
-    metricSources.push({
-      ...metricSource,
-      kvCacheUsageByEngine: sourceKvCacheUsageByEngine,
-    });
-  }
-  const timeslicesCount = Math.max(
-    series.timeslicesCount,
-    series.kvCacheUsage.length,
-    series.prefixCacheHitRate.length,
-    series.queueDepth.length,
-    series.prefillTps.length,
-    series.decodeTps.length,
-    series.prefixCacheHitsTps?.length ?? 0,
-    series.hostKvCacheUsage?.length ?? 0,
-    ...kvCacheUsageByEngine.map(({ points }) => points.length),
-    ...metricSources.flatMap((source) =>
-      source.kvCacheUsageByEngine.map(({ points }) => points.length),
-    ),
-  );
-
-  return {
-    ...series,
-    version: CHART_SERIES_VERSION,
-    timeslicesCount,
-    kvCacheUsageByEngine,
-    metricSources,
-  };
 }
 
 // ── Raw blob shapes (subset we read) ────────────────────────────────────
@@ -699,7 +534,6 @@ function buildSeriesFromMetrics(
     );
   }
   return {
-    version: CHART_SERIES_VERSION,
     startNs,
     endNs,
     durationS: endNs > startNs ? (endNs - startNs) / 1e9 : 0,

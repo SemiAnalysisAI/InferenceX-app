@@ -68,6 +68,12 @@ AIPerf defines the `server_metrics_export.json` envelope, but labels such as wor
 
 Adapters are selected from the benchmark's canonical framework, and per-worker series are only emitted for disaggregated configs with a recognized adapter. Unknown orchestrators and non-disaggregated configs retain their aggregate-only series; roles are never guessed from ports or metric names. The frontend only consumes the canonical source identity and never interprets orchestrator-native labels.
 
+### Canonical Agentic Chart Series
+
+`agentic_trace_replay.chart_series` is canonical materialized DB data, not a chain of application-versioned cache formats. The ingest path writes the current representation, API readers trust any non-null stored value, and the raw compressed server-metrics blob is only opened when the materialized column is missing.
+
+When extraction behavior changes, use an explicit expand/migrate/contract rollout: deploy a reader compatible with the canonical shape, backfill every maintained Neon branch, purge the API/Blob cache through `/api/v1/invalidate`, and then remove temporary migration compatibility. The `--force` option on `db:backfill-chart-series` deliberately recomputes all rows when needed. Keeping migration state in the operational workflow instead of every JSONB payload prevents historical version branches from accumulating on the request path.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.
