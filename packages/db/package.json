@@ -23,6 +23,7 @@
     "db:backfill-chart-series": "dotenv -e ../../.env -- tsx src/backfill-chart-series.ts",
     "db:backfill-dataset-stats": "dotenv -e ../../.env -- tsx src/backfill-dataset-stats.ts",
     "db:backfill-request-timeline": "dotenv -e ../../.env -- tsx src/backfill-request-timeline.ts",
+    "db:backfill-runtime-metadata": "dotenv -e ../../.env -- tsx src/backfill-runtime-metadata.ts",
     "db:reset": "dotenv -e ../../.env -- tsx src/reset-db.ts",
     "db:verify": "dotenv -e ../../.env -- tsx src/verify-db.ts",
     "test:unit": "vitest run",

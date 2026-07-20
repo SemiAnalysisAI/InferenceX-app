@@ -18,6 +18,7 @@ import {
   parseNum,
   parseInt2,
 } from './normalizers';
+import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
 
@@ -66,6 +67,7 @@ const NON_METRIC_KEYS = new Set([
   'kv_offloading',
   'kv_offload_backend',
   'kv_p2p_transfer',
+  'router',
   // v3 agentic nested containers — flattened by flattenAgenticAggRow before
   // the auto-capture loop runs; the raw objects themselves are not metrics.
   'request_metrics',
@@ -89,22 +91,6 @@ export type BenchmarkType = 'single_turn' | 'agentic_traces';
 /** Reduce an offload descriptor ('none'|'dram'|…) to the binary on/off. */
 function descriptorToOnOff(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? (v === 'none' ? 'off' : 'on') : null;
-}
-
-function nonEmptyString(v: unknown): string | undefined {
-  return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
-}
-
-/** Normalize legacy string and current `{ name, version? }` backend metadata. */
-function kvOffloadBackendMetadata(raw: unknown): { name?: string; version?: string } {
-  const legacyName = nonEmptyString(raw);
-  if (legacyName) return { name: legacyName };
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const metadata = raw as Record<string, unknown>;
-  return {
-    name: nonEmptyString(metadata.name),
-    version: nonEmptyString(metadata.version),
-  };
 }
 
 /**
@@ -256,17 +242,7 @@ export function mapBenchmarkRow(
   if (isAgentic) {
     (metrics as Record<string, unknown>).offload_mode = offloadModeRaw;
   }
-  const kvOffloading = nonEmptyString(row.kv_offloading);
-  if (kvOffloading) (metrics as Record<string, unknown>).kv_offloading = kvOffloading;
-  const backend = kvOffloadBackendMetadata(row.kv_offload_backend);
-  if (backend.name) (metrics as Record<string, unknown>).kv_offload_backend = backend.name;
-  if (backend.version) {
-    (metrics as Record<string, unknown>).kv_offload_backend_version = backend.version;
-  }
-  const kvP2pTransfer = nonEmptyString(row.kv_p2p_transfer);
-  if (kvP2pTransfer) {
-    (metrics as Record<string, unknown>).kv_p2p_transfer = kvP2pTransfer;
-  }
+  Object.assign(metrics, extractRuntimeMetadata(row));
 
   // Slow-tail interactivity invariant. Agentic artifacts ship `*_intvty`, but the
   // definition has drifted across harness versions: some emit `1/p(ITL)`
