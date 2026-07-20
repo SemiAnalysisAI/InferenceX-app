@@ -222,7 +222,9 @@ const pointMeta = {
   date: '2026-06-23',
   run_url: null,
   server_gpu_cache_hit_rate: 0.5,
-  server_cpu_cache_hit_rate: null,
+  // Reproduces historical rows that retained a CPU hit metric after offload
+  // was disabled. The agentic point summary must suppress this stale value.
+  server_cpu_cache_hit_rate: 0.42,
 };
 
 const sourceSeries = (source: Record<string, unknown>, prompt: number, generation: number) => ({
@@ -297,6 +299,9 @@ describe('Agentic point orchestrator metric sources', () => {
   });
 
   it('switches every server chart to an orchestrator-normalized worker', () => {
+    cy.contains('GPU cache hit').should('be.visible');
+    cy.contains('CPU cache hit').should('not.exist');
+
     cy.get('[data-testid="metric-source-toolbar"]')
       .should('have.css', 'position', 'sticky')
       .and('have.css', 'top', '64px');

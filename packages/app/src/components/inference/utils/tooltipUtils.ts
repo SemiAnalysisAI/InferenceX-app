@@ -1,6 +1,7 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import type { Locale } from '@/lib/i18n';
+import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
@@ -175,7 +176,7 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
   const theoreticalHit = formatPct(d.theoretical_cache_hit_rate);
   if (gpuHit) parts.push(tooltipLine(t.gpuHitRate, gpuHit));
-  if (cpuHit) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
+  if (cpuHit && isKvOffloadEnabled(d)) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
   if (theoreticalHit) parts.push(tooltipLine(t.theoreticalHitRate, theoreticalHit));
   return parts.join('');
 };
