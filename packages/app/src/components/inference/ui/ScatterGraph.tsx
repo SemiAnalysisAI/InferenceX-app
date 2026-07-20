@@ -587,6 +587,26 @@ const ScatterGraph = React.memo(
       [overlayData, unifiedToggle, toggleHwType],
     );
 
+    // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
+    // overlay loaded the chart reads localOfficialOverride, which the context's
+    // removeHwType (activeHwTypes) never touches, so routing the X through it
+    // left the official series visibly un-removed. Commit the removal through
+    // the unified selection instead; context state stays untouched so
+    // dismissing the overlay restores the pre-overlay official selection, same
+    // as the toggle path.
+    const handleRemoveHwType = useCallback(
+      (key: string) => {
+        if (!overlayData) {
+          removeHwType(key);
+          return;
+        }
+        const next = new Set(resolvedUnifiedSelection);
+        next.delete(key);
+        commitUnifiedSelection(next);
+      },
+      [overlayData, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
+    );
+
     // --- Theme ---
     const hardwareConfig = hardwareConfigOverride || contextHardwareConfig;
     const activeHwKeys = useMemo(() => {
@@ -2820,7 +2840,7 @@ const ScatterGraph = React.memo(
               variant="sidebar"
               onItemHover={handleLegendHover}
               onItemHoverEnd={handleLegendHoverEnd}
-              onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
+              onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
               legendItems={[
                 // Overlay legend: one entry per loaded unofficial run that actually
                 // contributes points to this chart. Colored from the shared palette
