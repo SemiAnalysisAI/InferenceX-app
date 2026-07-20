@@ -15,6 +15,8 @@ describe('compareMatrixGpuOrder', () => {
     const vendors = compareMatrixGpuOrder().map((g) => g.vendor);
     // Once the vendor changes, the earlier vendor must never reappear —
     // contiguous blocks are what make the cross-vendor region a rectangle.
+    // NVIDIA-first is pinned by VENDOR_BLOCK_ORDER, not derived from registry
+    // sort, so a future low-sort AMD flagship can't silently flip the axis.
     const blocks = vendors.filter((v, i) => i === 0 || v !== vendors[i - 1]);
     expect(blocks).toEqual(['NVIDIA', 'AMD']);
   });

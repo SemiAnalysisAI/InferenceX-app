@@ -13,8 +13,11 @@
  *   - Vendors form contiguous blocks (NVIDIA, then AMD) so the three vendor
  *     regions of the old index — NVIDIA×NVIDIA, cross-vendor, AMD×AMD — appear
  *     as contiguous areas of the triangle instead of separate card groups.
- *     Vendor blocks are ordered by each vendor's best (lowest) registry sort
- *     value, which matches the NVIDIA-first ordering used across the site.
+ *     Block order is pinned by VENDOR_BLOCK_ORDER (NVIDIA first, the site-wide
+ *     convention) rather than derived from registry sort: a future AMD flagship
+ *     with a lower sort than GB300 would otherwise silently flip the whole axis
+ *     to AMD-first. Any unlisted vendor sorts after the pinned blocks, ordered
+ *     by its best (lowest) registry sort value.
  *   - Within a vendor, GPUs sort by registry `sort` DESCENDING. The registry
  *     sorts newest-first for chart legends, so descending here reads
  *     oldest→newest along the axis (H100 → H200 → B200 → B300 → GB200 → GB300),
@@ -57,6 +60,12 @@ export interface CompareMatrix {
   availableCount: number;
 }
 
+/** Pinned vendor block order for the matrix axes — NVIDIA first per the
+ *  site-wide convention. Vendors not listed here (a future third vendor)
+ *  sort after the pinned blocks, ordered by their best registry sort, so
+ *  new registry entries can never silently reorder the existing axes. */
+const VENDOR_BLOCK_ORDER = ['NVIDIA', 'AMD'];
+
 /** Shared axis order for every model's matrix. See module docblock. */
 export function compareMatrixGpuOrder(): CompareMatrixGpu[] {
   const entries = Object.entries(HW_REGISTRY).map(([key, meta]) => ({
@@ -76,6 +85,16 @@ export function compareMatrixGpuOrder(): CompareMatrixGpu[] {
 
   entries.sort((x, y) => {
     if (x.vendor !== y.vendor) {
+      const ix = VENDOR_BLOCK_ORDER.indexOf(x.vendor);
+      const iy = VENDOR_BLOCK_ORDER.indexOf(y.vendor);
+      // Both pinned → pinned order. One pinned → it sorts first. Neither pinned
+      // → best registry sort, so a future third vendor still orders
+      // deterministically without disturbing the pinned NVIDIA→AMD blocks.
+      if (ix !== -1 || iy !== -1) {
+        if (ix === -1) return 1;
+        if (iy === -1) return -1;
+        return ix - iy;
+      }
       return (vendorRank.get(x.vendor) ?? 0) - (vendorRank.get(y.vendor) ?? 0);
     }
     return y.sort - x.sort;
