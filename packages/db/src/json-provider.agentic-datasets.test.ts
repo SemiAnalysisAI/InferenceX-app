@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, type ChartSeries } from './etl/compute-chart-series.js';
+import type { ChartSeries } from './etl/compute-chart-series.js';
 import { REQUEST_TIMELINE_VERSION } from './etl/compute-request-timeline.js';
 import { STATS_VERSION } from './queries/agentic-shared.js';
 import type * as JsonProvider from './json-provider.js';
@@ -132,7 +132,7 @@ const CURRENT_TIMELINE = {
 };
 
 const PREVIOUS_CHART_SERIES: ChartSeries = {
-  version: CHART_SERIES_VERSION - 1,
+  version: 12,
   startNs: 0,
   endNs: 11e9,
   durationS: 11,

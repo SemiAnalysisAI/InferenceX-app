@@ -77,6 +77,7 @@ import {
  * every DP rank twice, leaving one empty duplicate in each phase-filtered view.
  */
 export const CHART_SERIES_VERSION = 14;
+const ENGINE_FIRST_CHART_SERIES_VERSION = 12;
 const PHASE_DUPLICATED_CHART_SERIES_VERSION = 13;
 
 export interface TimeSeriesPoint {
@@ -153,24 +154,47 @@ export interface MetricSourceSeries {
 }
 
 /**
- * Coalesce the v13 warmup/profile duplicates using the DP label retained in
- * the stored chart series. The raw source identity is no longer available at
- * this layer, but v13 guarantees DP-rank-first labels, so equal labels are the
- * same rank split across the two non-overlapping phase windows.
+ * Coalesce warmup/profile duplicates using the rank label retained in stored
+ * chart series. v12 labels are only safe when equal-label entries occupy
+ * non-overlapping time ranges; overlap means multiple ranks shared a local
+ * engine label and their DP identities cannot be recovered without raw data.
  */
 function coalesceStoredKvSeries(
   series: { engineLabel: string; points: TimeSeriesPoint[] }[],
-): { engineLabel: string; points: TimeSeriesPoint[] }[] {
-  const pointsByLabel = new Map<string, TimeSeriesPoint[]>();
+  rejectOverlappingLabels: boolean,
+): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
+  const entriesByLabel = new Map<string, TimeSeriesPoint[][]>();
   for (const entry of series) {
-    const points = pointsByLabel.get(entry.engineLabel) ?? [];
-    points.push(...entry.points);
-    pointsByLabel.set(entry.engineLabel, points);
+    const entries = entriesByLabel.get(entry.engineLabel) ?? [];
+    entries.push(entry.points);
+    entriesByLabel.set(entry.engineLabel, entries);
   }
-  return [...pointsByLabel].map(([engineLabel, points]) => ({
-    engineLabel,
-    points: points.toSorted((a, b) => a.t - b.t),
-  }));
+
+  const result: { engineLabel: string; points: TimeSeriesPoint[] }[] = [];
+  for (const [engineLabel, entries] of entriesByLabel) {
+    if (rejectOverlappingLabels && entries.length > 1) {
+      const ranges = entries
+        .filter((points) => points.length > 0)
+        .map((points) => {
+          let min = Number.POSITIVE_INFINITY;
+          let max = Number.NEGATIVE_INFINITY;
+          for (const point of points) {
+            min = Math.min(min, point.t);
+            max = Math.max(max, point.t);
+          }
+          return { min, max };
+        })
+        .toSorted((a, b) => a.min - b.min);
+      for (let i = 1; i < ranges.length; i += 1) {
+        if (ranges[i]!.min <= ranges[i - 1]!.max) return null;
+      }
+    }
+    result.push({
+      engineLabel,
+      points: entries.flat().toSorted((a, b) => a.t - b.t),
+    });
+  }
+  return result;
 }
 
 /**
@@ -180,14 +204,33 @@ function coalesceStoredKvSeries(
  * reconstructed from stored chart data alone.
  */
 export function upgradeStoredChartSeries(series: ChartSeries): ChartSeries | null {
-  if (Number(series.version) === CHART_SERIES_VERSION) return series;
-  if (Number(series.version) !== PHASE_DUPLICATED_CHART_SERIES_VERSION) return null;
+  const storedVersion = Number(series.version);
+  if (storedVersion === CHART_SERIES_VERSION) return series;
+  if (
+    storedVersion !== ENGINE_FIRST_CHART_SERIES_VERSION &&
+    storedVersion !== PHASE_DUPLICATED_CHART_SERIES_VERSION
+  ) {
+    return null;
+  }
+  const rejectOverlappingLabels = storedVersion === ENGINE_FIRST_CHART_SERIES_VERSION;
 
-  const kvCacheUsageByEngine = coalesceStoredKvSeries(series.kvCacheUsageByEngine ?? []);
-  const metricSources = (series.metricSources ?? []).map((metricSource) => ({
-    ...metricSource,
-    kvCacheUsageByEngine: coalesceStoredKvSeries(metricSource.kvCacheUsageByEngine ?? []),
-  }));
+  const kvCacheUsageByEngine = coalesceStoredKvSeries(
+    series.kvCacheUsageByEngine ?? [],
+    rejectOverlappingLabels,
+  );
+  if (!kvCacheUsageByEngine) return null;
+  const metricSources: MetricSourceSeries[] = [];
+  for (const metricSource of series.metricSources ?? []) {
+    const sourceKvCacheUsageByEngine = coalesceStoredKvSeries(
+      metricSource.kvCacheUsageByEngine ?? [],
+      rejectOverlappingLabels,
+    );
+    if (!sourceKvCacheUsageByEngine) return null;
+    metricSources.push({
+      ...metricSource,
+      kvCacheUsageByEngine: sourceKvCacheUsageByEngine,
+    });
+  }
   const timeslicesCount = Math.max(
     series.timeslicesCount,
     series.kvCacheUsage.length,
