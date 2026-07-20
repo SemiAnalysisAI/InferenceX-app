@@ -3,6 +3,9 @@ import path from 'node:path';
 
 import matter from 'gray-matter';
 
+import { AUTHOR_NAME, OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { ZH_LANG_TAG } from '@/lib/i18n';
+
 export interface BlogFrontmatter {
   title: string;
   date: string;
@@ -159,4 +162,95 @@ export function getPostBySlug(
 /** Whether a Simplified Chinese translation exists for a post (any visibility). */
 export function hasZhTranslation(slug: string): boolean {
   return fs.existsSync(path.join(contentDir('zh'), `${slugify(slug)}.mdx`));
+}
+
+// ---------------------------------------------------------------------------
+// Structured data (JSON-LD)
+//
+// Pure builders shared by the English (`/blog/[slug]`) and Chinese
+// (`/zh/blog/[slug]`) post pages. Kept here — not inline in the page — so the
+// recommended schema.org fields are unit-testable and the two language pages
+// can't drift on the shape.
+// ---------------------------------------------------------------------------
+
+/** Locale-aware route prefix for a post's canonical URL. */
+function blogPathPrefix(locale: BlogLocale): string {
+  return locale === 'zh' ? '/zh/blog' : '/blog';
+}
+
+/**
+ * Absolute URL of a post's Open Graph image. Next.js serves the
+ * file-convention image at `<postUrl>/opengraph-image`; the `/zh` route has its
+ * own segment that reuses the English card art (its Satori font has no CJK
+ * glyphs), so each locale points at its own route.
+ */
+export function blogOgImageUrl(slug: string, locale: BlogLocale = 'en'): string {
+  return `${SITE_URL}${blogPathPrefix(locale)}/${slug}/opengraph-image`;
+}
+
+/**
+ * schema.org `BlogPosting` for a post page. Includes the recommended Article
+ * fields — `image`, `inLanguage`, `mainEntityOfPage`, and `publisher.logo` —
+ * on top of the required headline/author/dates so posts qualify for Google's
+ * Article rich results.
+ */
+export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: BlogLocale = 'en') {
+  const url = `${SITE_URL}${blogPathPrefix(locale)}/${meta.slug}`;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: meta.title,
+    image: blogOgImageUrl(meta.slug, locale),
+    author: { '@type': 'Person', name: AUTHOR_NAME },
+    publisher: {
+      '@type': 'Organization',
+      name: AUTHOR_NAME,
+      logo: {
+        '@type': 'ImageObject',
+        url: OG_IMAGE,
+        width: 1200,
+        height: 675,
+      },
+    },
+    datePublished: `${meta.date}T00:00:00Z`,
+    ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
+    description: meta.subtitle,
+    url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    inLanguage: locale === 'zh' ? ZH_LANG_TAG : 'en-US',
+    wordCount: raw.trim().split(/\s+/u).length,
+    timeRequired: `PT${meta.readingTime}M`,
+  };
+}
+
+/**
+ * schema.org `BreadcrumbList` for a post: Home → Blog → post title. Emitted as
+ * a separate JSON-LD block alongside the BlogPosting so Google can render the
+ * trail in search results (mirrors the compare pages' breadcrumb). Matches the
+ * shape of `buildBreadcrumbJsonLd` in `compare-ssr.ts`.
+ */
+export function buildBlogBreadcrumbJsonLd(slug: string, title: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
+      { '@type': 'ListItem', position: 3, name: title, item: `${SITE_URL}/blog/${slug}` },
+    ],
+  };
+}
+
+/** Simplified Chinese port of `buildBlogBreadcrumbJsonLd` — 1:1 structural
+ *  mirror with translated labels and `/zh` URLs. */
+export function buildBlogBreadcrumbJsonLdZh(slug: string, title: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: '首页', item: `${SITE_URL}/zh` },
+      { '@type': 'ListItem', position: 2, name: '博客', item: `${SITE_URL}/zh/blog` },
+      { '@type': 'ListItem', position: 3, name: title, item: `${SITE_URL}/zh/blog/${slug}` },
+    ],
+  };
 }

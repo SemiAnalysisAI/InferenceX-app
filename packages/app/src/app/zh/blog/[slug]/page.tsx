@@ -16,8 +16,15 @@ import { ReadingProgressBar } from '@/components/blog/reading-progress-bar';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
-import { getAllPosts, getAdjacentPosts, extractHeadings, getPostBySlug } from '@/lib/blog';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import {
+  getAllPosts,
+  getAdjacentPosts,
+  buildBlogBreadcrumbJsonLdZh,
+  buildBlogPostingJsonLd,
+  extractHeadings,
+  getPostBySlug,
+} from '@/lib/blog';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,
@@ -123,32 +130,21 @@ export default async function ZhBlogPostPage({ params }: Props) {
     },
   });
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: meta.title,
-    author: { '@type': 'Person', name: AUTHOR_NAME },
-    publisher: { '@type': 'Organization', name: AUTHOR_NAME },
-    datePublished: `${meta.date}T00:00:00Z`,
-    ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
-    description: meta.subtitle,
-    url: `${SITE_URL}/zh/blog/${slug}`,
-    inLanguage: ZH_LANG_TAG,
-    wordCount: raw.trim().split(/\s+/u).length,
-    timeRequired: `PT${meta.readingTime}M`,
-  };
+  const jsonLd = buildBlogPostingJsonLd(meta, raw, 'zh');
+  const breadcrumbJsonLd = buildBlogBreadcrumbJsonLdZh(slug, meta.title);
 
   return (
     <main className="relative">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
       <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <section data-blog-section="true" className="flex flex-col gap-4">
           <Card>
             <BlogBackLink href="/zh/blog" label="返回文章列表" />
             <header>
-              <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h2>
+              <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
               <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
                 <span>{AUTHOR_NAME}</span>

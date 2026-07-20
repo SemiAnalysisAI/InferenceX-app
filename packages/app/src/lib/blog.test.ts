@@ -1,7 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 
+import { OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
+
 import {
+  type BlogPostMeta,
+  blogOgImageUrl,
+  buildBlogBreadcrumbJsonLd,
+  buildBlogBreadcrumbJsonLdZh,
+  buildBlogPostingJsonLd,
   extractHeadings,
   getAdjacentPosts,
   getAllPosts,
@@ -534,5 +541,167 @@ describe('extractHeadings', () => {
     const headings = extractHeadings(mdx);
     expect(headings[0].id).toBe('intro');
     expect(headings[1].id).toBe('intro-2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Structured data (JSON-LD) builders — pure, no fs access.
+// ---------------------------------------------------------------------------
+
+const SAMPLE_META: BlogPostMeta = {
+  title: 'GB200 vs MI355X Inference Benchmark',
+  subtitle: 'Head-to-head throughput and latency.',
+  date: '2026-03-01',
+  slug: 'gb200-vs-mi355x',
+  readingTime: 7,
+  tags: ['gpu', 'benchmark'],
+};
+
+const SAMPLE_META_MODIFIED: BlogPostMeta = {
+  ...SAMPLE_META,
+  modifiedDate: '2026-04-10',
+};
+
+describe('blogOgImageUrl', () => {
+  it('builds an absolute URL to the English post opengraph-image route', () => {
+    expect(blogOgImageUrl('gb200-vs-mi355x')).toBe(
+      `${SITE_URL}/blog/gb200-vs-mi355x/opengraph-image`,
+    );
+  });
+
+  it('builds an absolute URL to the /zh post opengraph-image route', () => {
+    expect(blogOgImageUrl('gb200-vs-mi355x', 'zh')).toBe(
+      `${SITE_URL}/zh/blog/gb200-vs-mi355x/opengraph-image`,
+    );
+  });
+});
+
+describe('buildBlogPostingJsonLd', () => {
+  it('emits a BlogPosting with the recommended Article fields (en)', () => {
+    const jsonLd = buildBlogPostingJsonLd(SAMPLE_META, 'one two three four five', 'en') as Record<
+      string,
+      any
+    >;
+
+    expect(jsonLd['@context']).toBe('https://schema.org');
+    expect(jsonLd['@type']).toBe('BlogPosting');
+    expect(jsonLd.headline).toBe(SAMPLE_META.title);
+
+    // image — absolute OG image URL for the post.
+    expect(jsonLd.image).toBe(`${SITE_URL}/blog/gb200-vs-mi355x/opengraph-image`);
+
+    // inLanguage — English tag on the English page.
+    expect(jsonLd.inLanguage).toBe('en-US');
+
+    // mainEntityOfPage — WebPage pointing at the canonical post URL.
+    expect(jsonLd.mainEntityOfPage).toEqual({
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/blog/gb200-vs-mi355x`,
+    });
+
+    // publisher.logo — ImageObject with an absolute URL.
+    expect(jsonLd.publisher['@type']).toBe('Organization');
+    expect(jsonLd.publisher.logo).toEqual({
+      '@type': 'ImageObject',
+      url: OG_IMAGE,
+      width: 1200,
+      height: 675,
+    });
+    expect(String(jsonLd.publisher.logo.url)).toMatch(/^https:\/\//u);
+
+    // Existing required fields are preserved.
+    expect(jsonLd.author).toEqual({ '@type': 'Person', name: 'SemiAnalysis' });
+    expect(jsonLd.datePublished).toBe('2026-03-01T00:00:00Z');
+    expect(jsonLd.description).toBe(SAMPLE_META.subtitle);
+    expect(jsonLd.url).toBe(`${SITE_URL}/blog/gb200-vs-mi355x`);
+    expect(jsonLd.wordCount).toBe(5);
+    expect(jsonLd.timeRequired).toBe('PT7M');
+  });
+
+  it('omits dateModified when no modifiedDate, includes it when present', () => {
+    const withoutMod = buildBlogPostingJsonLd(SAMPLE_META, 'a b c') as Record<string, any>;
+    expect(withoutMod.dateModified).toBeUndefined();
+
+    const withMod = buildBlogPostingJsonLd(SAMPLE_META_MODIFIED, 'a b c') as Record<string, any>;
+    expect(withMod.dateModified).toBe('2026-04-10T00:00:00Z');
+  });
+
+  it('uses the zh language tag and /zh canonical URL for the Chinese page', () => {
+    const jsonLd = buildBlogPostingJsonLd(SAMPLE_META, 'a b c', 'zh') as Record<string, any>;
+    expect(jsonLd.inLanguage).toBe('zh-CN');
+    expect(jsonLd.url).toBe(`${SITE_URL}/zh/blog/gb200-vs-mi355x`);
+    expect(jsonLd.mainEntityOfPage['@id']).toBe(`${SITE_URL}/zh/blog/gb200-vs-mi355x`);
+    expect(jsonLd.image).toBe(`${SITE_URL}/zh/blog/gb200-vs-mi355x/opengraph-image`);
+  });
+});
+
+describe('buildBlogBreadcrumbJsonLd', () => {
+  it('builds a 3-item BreadcrumbList with correct positions and absolute URLs (en)', () => {
+    const crumb = buildBlogBreadcrumbJsonLd('gb200-vs-mi355x', SAMPLE_META.title) as Record<
+      string,
+      any
+    >;
+
+    expect(crumb['@context']).toBe('https://schema.org');
+    expect(crumb['@type']).toBe('BreadcrumbList');
+    expect(crumb.itemListElement).toHaveLength(3);
+
+    const [home, blog, post] = crumb.itemListElement;
+    expect(home).toEqual({ '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL });
+    expect(blog).toEqual({
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Blog',
+      item: `${SITE_URL}/blog`,
+    });
+    expect(post).toEqual({
+      '@type': 'ListItem',
+      position: 3,
+      name: SAMPLE_META.title,
+      item: `${SITE_URL}/blog/gb200-vs-mi355x`,
+    });
+
+    for (const el of crumb.itemListElement) {
+      expect(el['@type']).toBe('ListItem');
+      expect(String(el.item)).toMatch(/^https:\/\//u);
+    }
+    expect(crumb.itemListElement.map((el: any) => el.position)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('buildBlogBreadcrumbJsonLdZh', () => {
+  it('mirrors the English breadcrumb with translated labels and /zh URLs', () => {
+    const crumb = buildBlogBreadcrumbJsonLdZh('gb200-vs-mi355x', SAMPLE_META.title) as Record<
+      string,
+      any
+    >;
+
+    expect(crumb['@type']).toBe('BreadcrumbList');
+    expect(crumb.itemListElement).toHaveLength(3);
+
+    const [home, blog, post] = crumb.itemListElement;
+    expect(home).toEqual({
+      '@type': 'ListItem',
+      position: 1,
+      name: '首页',
+      item: `${SITE_URL}/zh`,
+    });
+    expect(blog).toEqual({
+      '@type': 'ListItem',
+      position: 2,
+      name: '博客',
+      item: `${SITE_URL}/zh/blog`,
+    });
+    expect(post).toEqual({
+      '@type': 'ListItem',
+      position: 3,
+      name: SAMPLE_META.title,
+      item: `${SITE_URL}/zh/blog/gb200-vs-mi355x`,
+    });
+
+    for (const el of crumb.itemListElement) {
+      expect(String(el.item)).toMatch(/^https:\/\/[^/]+\/zh/u);
+    }
+    expect(crumb.itemListElement.map((el: any) => el.position)).toEqual([1, 2, 3]);
   });
 });
