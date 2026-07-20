@@ -376,6 +376,36 @@ describe('processOverlayChartData', () => {
     expect(result[0].isOnE2eFrontier).toBeUndefined();
   });
 
+  it('stamps isOnE2eFrontier on the e2e chart when x is overridden to TTFT (ttft mode)', () => {
+    // The 'ttft' x-axis mode renders the e2e chartType with a *_ttft override.
+    // Official stamps the e2e-frontier flag for every non-e2e x-mode, so the
+    // overlay must too — otherwise the TTFT overlay roofline draws a fresh
+    // TTFT-plane frontier instead of the e2e-restricted one.
+    const A = pt({
+      tpPerGpu: { y: 100, roof: false },
+      p90_e2el: 1,
+      p90_ttft: 0.2,
+    } as any);
+    const B = pt({
+      tpPerGpu: { y: 150, roof: false },
+      p90_e2el: 3, // dominated on e2e? No — higher tput at higher e2el stays on upper_right
+      p90_ttft: 0.4,
+    } as any);
+    const C = pt({
+      tpPerGpu: { y: 90, roof: false },
+      p90_e2el: 5, // dominated: lower tput than B at higher e2el
+      p90_ttft: 0.1,
+    } as any);
+    const result = processOverlayChartData([A, B, C], 'e2e', 'y_tpPerGpu', 'p90_ttft', {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+    });
+    const byY = Object.fromEntries(result.map((p) => [p.y, p.isOnE2eFrontier]));
+    expect(byY[100]).toBe(true); // A
+    expect(byY[150]).toBe(true); // B
+    expect(byY[90]).toBe(false); // C — TTFT-optimal but not e2e-optimal
+  });
+
   it('seeds the agentic e2e frontier per unofficial run (runs do not cross-dominate)', () => {
     // Merged across runs, run-2's point (higher e2el, lower tput) would be
     // dominated by run-1's and dropped. Per run, each is on its own frontier.

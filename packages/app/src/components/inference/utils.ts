@@ -164,17 +164,20 @@ export function processOverlayChartData(
 
   const costFiltered = filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
 
-  // Anti-benchmark-hacking parity: on the agentic interactivity chart the
-  // official roofline is restricted to configs that ALSO win on end-to-end
-  // latency (useChartData stamps `isOnE2eFrontier`, ScatterGraph's roofline
-  // honors it). Stamp the same flag on overlay points so overlayRooflines can
-  // apply the identical restriction — otherwise the overlay draws a fresh
-  // interactivity-plane frontier that rides above the official e2e-restricted
-  // line. Seed per run (matching overlayRooflines' per-run grouping) so points
-  // from one unofficial run can't dominate another's. The e2e chart itself
-  // needs no restriction (it IS the e2e frontier), and fixed-seq has no
-  // separate session-time notion, so both leave the flag unset.
-  if (isAgentic && chartType === 'interactivity') {
+  // Anti-benchmark-hacking parity: on agentic charts whose x-axis is NOT the
+  // natural e2e latency, the official roofline is restricted to configs that
+  // ALSO win on end-to-end latency (useChartData stamps `isOnE2eFrontier` for
+  // every non-e2e x-mode, ScatterGraph's roofline honors it). Stamp the same
+  // flag on overlay points so overlayRooflines can apply the identical
+  // restriction — otherwise the overlay draws a fresh frontier on the swapped
+  // axis that rides above the official e2e-restricted line. This covers the
+  // interactivity chartType (only displayed in non-e2e modes) AND the e2e
+  // chartType when its x is overridden to TTFT (the 'ttft' mode). Seed per run
+  // (matching overlayRooflines' per-run grouping) so points from one unofficial
+  // run can't dominate another's. The e2e chart on its natural axis needs no
+  // restriction (it IS the e2e frontier), and fixed-seq has no separate
+  // session-time notion, so both leave the flag unset.
+  if (isAgentic && (chartType === 'interactivity' || isTtftX)) {
     const byRun = new Map<string, InferenceData[]>();
     for (const p of costFiltered) {
       const runKey = p.run_url ?? '';
