@@ -55,12 +55,13 @@ interface ComparePairMatrixProps {
 }
 
 /**
- * Upper-triangle GPU×GPU selection matrix for the compare index pages. Each
+ * Lower-triangle GPU×GPU selection matrix for the compare index pages. Each
  * available pair is a real server-rendered `<a>` (SEO: all pair links stay in
- * the HTML with the pair name as sr-only anchor text); pairs without benchmark
- * data render as ghost cells so coverage gaps are visible at a glance. The
- * vendor blocks make the cross-vendor region a contiguous rectangle, which
- * gets the brand tint — same-vendor triangles stay neutral.
+ * the HTML with the pair name as sr-only anchor text) carrying a visible ↗
+ * glyph so linked cells read as clickable next to the empty ghosts; pairs
+ * without benchmark data render as ghost cells so coverage gaps are visible
+ * at a glance. The vendor blocks make the cross-vendor region a contiguous
+ * rectangle, which gets the brand tint — same-vendor triangles stay neutral.
  */
 export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePairMatrixProps) {
   const locale = useLocale();
@@ -73,8 +74,10 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
   const active = hoveredCell ?? focusedCell;
 
   const { gpus, cells } = matrix;
-  const rows = gpus.slice(0, -1);
-  const cols = gpus.slice(1);
+  // Lower triangle: the first GPU never appears as a row (nothing precedes
+  // it), the last never as a column (nothing follows it).
+  const rows = gpus.slice(1);
+  const cols = gpus.slice(0, -1);
 
   // Consecutive same-vendor column runs → the colSpan group bars on top.
   const colGroups: { vendor: string; count: number }[] = [];
@@ -153,8 +156,10 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                   </div>
                 </th>
                 {cols.map((colGpu, jIdx) => {
-                  // cols is gpus[1..]; display index of this column is jIdx+1.
-                  if (jIdx + 1 <= i) {
+                  // rows is gpus[1..], so this row's display index is i+1;
+                  // cols is gpus[0..n-2], so the column's display index is
+                  // jIdx. Cells exist below the diagonal (col before row).
+                  if (jIdx > i) {
                     return <td key={colGpu.key} className="p-0" aria-hidden="true" />;
                   }
                   const cell = cells[rowGpu.key][colGpu.key];
@@ -198,13 +203,24 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                         }
                         onBlur={() => setFocusedCell(null)}
                         className={cn(
-                          'block h-8 w-full rounded-md transition-all duration-150 lg:h-9',
+                          'group flex h-8 w-full items-center justify-center rounded-md transition-all duration-150 lg:h-9',
                           'hover:scale-105 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none',
                           cell.cross
                             ? 'bg-brand/20 ring-1 ring-brand/40 ring-inset hover:bg-brand/45'
                             : 'bg-foreground/15 hover:bg-foreground/30',
                         )}
                       >
+                        {/* Visible link affordance — ghost cells stay empty,
+                            so the glyph doubles as the clickable/not marker. */}
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            'text-xs transition-opacity group-hover:opacity-100',
+                            cell.cross ? 'text-brand opacity-70' : 'text-foreground opacity-40',
+                          )}
+                        >
+                          ↗
+                        </span>
                         <span className="sr-only">{cell.label}</span>
                       </a>
                     </td>

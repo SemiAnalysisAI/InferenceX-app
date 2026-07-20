@@ -4,7 +4,7 @@
  *
  * The index used to render one card per comparable pair — ~36 cards per model
  * across 9+ model sections stopped scaling as a navigation surface. The matrix
- * replaces the card walls with one upper-triangle GPU×GPU grid per model:
+ * replaces the card walls with one lower-triangle GPU×GPU grid per model:
  * every possible pair is a cell, cells with benchmark data on both sides are
  * links, cells without data render as ghosts so coverage gaps are visible.
  *
@@ -54,8 +54,8 @@ export interface CompareMatrix {
   /** Full GPU axis in display order — identical for every model so the nine
    *  matrices line up and coverage is comparable across sections. */
   gpus: CompareMatrixGpu[];
-  /** cells[rowKey][colKey], defined only for column display-index > row
-   *  display-index (upper triangle). */
+  /** cells[rowKey][colKey], defined only for column display-index < row
+   *  display-index (lower triangle). */
   cells: Record<string, Record<string, CompareMatrixCell>>;
   availableCount: number;
 }
@@ -123,22 +123,22 @@ export function buildCompareMatrix(
   const cells: Record<string, Record<string, CompareMatrixCell>> = {};
   let availableCount = 0;
 
-  for (let i = 0; i < gpus.length; i++) {
+  for (let j = 1; j < gpus.length; j++) {
     const row: Record<string, CompareMatrixCell> = {};
-    for (let j = i + 1; j < gpus.length; j++) {
-      const a = gpus[i];
-      const b = gpus[j];
-      const [first, second] = [a.key, b.key].toSorted();
+    for (let i = 0; i < j; i++) {
+      const col = gpus[i];
+      const rowGpu = gpus[j];
+      const [first, second] = [col.key, rowGpu.key].toSorted();
       const available = availableKeys.has(`${first}__${second}`);
       if (available) availableCount++;
-      row[b.key] = {
-        slug: canonicalCompareSlug(modelSlug, a.key, b.key),
+      row[col.key] = {
+        slug: canonicalCompareSlug(modelSlug, col.key, rowGpu.key),
         label: compareDisplayLabel(first, second),
         available,
-        cross: a.vendor !== b.vendor,
+        cross: col.vendor !== rowGpu.vendor,
       };
     }
-    cells[gpus[i].key] = row;
+    cells[gpus[j].key] = row;
   }
 
   return { gpus, cells, availableCount };

@@ -45,15 +45,15 @@ describe('buildCompareMatrix', () => {
     { a: 'mi300x', b: 'mi325x' },
   ];
 
-  it('defines cells only for the upper triangle of the display order', () => {
+  it('defines cells only for the lower triangle of the display order', () => {
     const { gpus, cells } = buildCompareMatrix('deepseek-r1', PAIRS);
     const index = new Map(gpus.map((g, i) => [g.key, i]));
     for (const [rowKey, row] of Object.entries(cells)) {
       for (const colKey of Object.keys(row)) {
-        expect(index.get(colKey)!).toBeGreaterThan(index.get(rowKey)!);
+        expect(index.get(colKey)!).toBeLessThan(index.get(rowKey)!);
       }
     }
-    // Every above-diagonal position is present, even when unavailable.
+    // Every below-diagonal position is present, even when unavailable.
     const cellCount = Object.values(cells).reduce((s, r) => s + Object.keys(r).length, 0);
     expect(cellCount).toBe((gpus.length * (gpus.length - 1)) / 2);
   });
@@ -61,27 +61,27 @@ describe('buildCompareMatrix', () => {
   it('marks exactly the provided pairs as available', () => {
     const { cells, availableCount } = buildCompareMatrix('deepseek-r1', PAIRS);
     expect(availableCount).toBe(PAIRS.length);
-    expect(cells['h100']['h200'].available).toBe(true);
-    expect(cells['h100']['mi300x'].available).toBe(true);
-    expect(cells['mi300x']['mi325x'].available).toBe(true);
-    expect(cells['h100']['b200'].available).toBe(false);
+    expect(cells['h200']['h100'].available).toBe(true);
+    expect(cells['mi300x']['h100'].available).toBe(true);
+    expect(cells['mi325x']['mi300x'].available).toBe(true);
+    expect(cells['b200']['h100'].available).toBe(false);
   });
 
   it('builds canonical alphabetical slugs regardless of display order', () => {
     const { cells } = buildCompareMatrix('deepseek-r1', PAIRS);
     // Display order puts h100 before b200, but the slug sorts alphabetically.
-    expect(cells['h100']['b200'].slug).toBe(canonicalCompareSlug('deepseek-r1', 'b200', 'h100'));
-    expect(cells['h100']['b200'].slug).toBe('deepseek-r1-b200-vs-h100');
+    expect(cells['b200']['h100'].slug).toBe(canonicalCompareSlug('deepseek-r1', 'b200', 'h100'));
+    expect(cells['b200']['h100'].slug).toBe('deepseek-r1-b200-vs-h100');
   });
 
   it('labels cells in canonical alphabetical order to match the destination page', () => {
     const { cells } = buildCompareMatrix('deepseek-r1', PAIRS);
-    // Display order puts h100 (row) before b200 (col), but the label sorts
+    // Display puts h100 (col) before b200 (row), and the label also sorts
     // alphabetically so it matches the destination page title and the
     // analytics payload ("deepseek-r1-b200-vs-h100" → "B200 vs H100").
-    expect(cells['h100']['b200'].label).toBe('B200 vs H100');
+    expect(cells['b200']['h100'].label).toBe('B200 vs H100');
     // Display and alphabetical order coincide here, so the label is unchanged.
-    expect(cells['gb200']['mi355x'].label).toBe('GB200 NVL72 vs MI355X');
+    expect(cells['mi355x']['gb200'].label).toBe('GB200 NVL72 vs MI355X');
   });
 
   it('flags cross-vendor cells and only those', () => {
