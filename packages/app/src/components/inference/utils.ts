@@ -6,6 +6,7 @@
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { withPercentile } from '@/lib/benchmark-transform';
+import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
@@ -161,5 +162,34 @@ export function processOverlayChartData(
       (d) => !isTtftX || isAgentic || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,
     );
 
-  return filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
+  const costFiltered = filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
+
+  // Anti-benchmark-hacking parity: on the agentic interactivity chart the
+  // official roofline is restricted to configs that ALSO win on end-to-end
+  // latency (useChartData stamps `isOnE2eFrontier`, ScatterGraph's roofline
+  // honors it). Stamp the same flag on overlay points so overlayRooflines can
+  // apply the identical restriction — otherwise the overlay draws a fresh
+  // interactivity-plane frontier that rides above the official e2e-restricted
+  // line. Seed per run (matching overlayRooflines' per-run grouping) so points
+  // from one unofficial run can't dominate another's. The e2e chart itself
+  // needs no restriction (it IS the e2e frontier), and fixed-seq has no
+  // separate session-time notion, so both leave the flag unset.
+  if (isAgentic && chartType === 'interactivity') {
+    const byRun = new Map<string, InferenceData[]>();
+    for (const p of costFiltered) {
+      const runKey = p.run_url ?? '';
+      let bucket = byRun.get(runKey);
+      if (!bucket) {
+        bucket = [];
+        byRun.set(runKey, bucket);
+      }
+      bucket.push(p);
+    }
+    for (const runPoints of byRun.values()) {
+      const winners = e2eFrontierWinners(runPoints, selectedYAxisMetric, selectedPercentile);
+      for (const p of runPoints) p.isOnE2eFrontier = winners.has(p);
+    }
+  }
+
+  return costFiltered;
 }

@@ -791,7 +791,17 @@ const ScatterGraph = React.memo(
       const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        const front = frontierFn(group.points.filter(isFrontierEligible));
+        // Mirror the official `rooflines` path: when overlay points carry an
+        // `isOnE2eFrontier` flag (agentic interactivity, stamped in
+        // processOverlayChartData), restrict the frontier to the e2e-Pareto
+        // winners before paretoing on the interactivity axis — otherwise we'd
+        // recompute a fresh frontier on the swapped x and reintroduce the
+        // benchmark hack the official line guards against.
+        const flagged = group.points.some((p) => p.isOnE2eFrontier !== undefined);
+        const seedPoints = (
+          flagged ? group.points.filter((p) => p.isOnE2eFrontier === true) : group.points
+        ).filter(isFrontierEligible);
+        const front = frontierFn(seedPoints);
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }

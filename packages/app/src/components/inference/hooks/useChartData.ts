@@ -31,7 +31,8 @@ import {
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
-import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
+import type { ParetoDirection } from '@/lib/chart-utils';
+import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import {
   applyQuickFilters,
   computeAvailableQuickFilters,
@@ -86,39 +87,21 @@ function e2eParetoIds(
   selectedYAxisMetric: string,
   percentile: string,
 ): Set<number> | null {
+  // Bail (→ caller skips filtering) when the y-metric has no e2e roofline
+  // direction, matching the pre-refactor contract. e2eFrontierWinners returns
+  // an empty set in that case, so distinguish it here up front.
   const e2eChartDef = (chartDefinitions as ChartDefinition[]).find((c) => c.chartType === 'e2e');
   if (!e2eChartDef) return null;
   const dir = e2eChartDef[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition] as
     | ParetoDirection
     | undefined;
   if (!dir) return null;
-  const frontierFn = paretoFrontForDirection(dir);
-  // Percentile-prefixed e2e-latency field name (e.g. 'p90_e2el').
-  const e2elField = withPercentile('median_e2el', percentile);
-  const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
-  // Re-frame each candidate point in (e2el, y) space, then compute the
-  // pareto per (hwKey, precision, date) bucket — frontiers don't span dates
-  // (a May 17 point can't dominate a May 15 plot).
-  const byGroup = new Map<string, InferenceData[]>();
-  for (const p of points) {
-    const yValue = (p[metricKey] as { y?: number } | undefined)?.y;
-    const xValue = (p as unknown as Record<string, unknown>)[e2elField];
-    if (typeof xValue !== 'number' || !Number.isFinite(xValue)) continue;
-    if (typeof yValue !== 'number' || !Number.isFinite(yValue)) continue;
-    const key = `${p.hwKey}|${p.precision}|${p.date}`;
-    let bucket = byGroup.get(key);
-    if (!bucket) {
-      bucket = [];
-      byGroup.set(key, bucket);
-    }
-    bucket.push({ ...p, x: xValue, y: yValue });
-  }
+  // Shared seed with the overlay path (processOverlayChartData) so both draw the
+  // SAME e2e-restricted frontier. Only persisted DB rows carry ids to pin.
   const ids = new Set<number>();
-  for (const bucket of byGroup.values()) {
-    for (const f of frontierFn(bucket)) {
-      if (isPersistedBenchmarkId(f.id)) ids.add(f.id);
-    }
+  for (const winner of e2eFrontierWinners(points, selectedYAxisMetric, percentile)) {
+    if (isPersistedBenchmarkId(winner.id)) ids.add(winner.id);
   }
   return ids;
 }
