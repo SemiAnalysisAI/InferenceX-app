@@ -136,10 +136,12 @@ export function sliceServerSeriesByPhase<S extends ServerSeriesLike>(
     decodeTps: sliceTs(series.decodeTps),
     prefixCacheHitsTps: sliceTs(series.prefixCacheHitsTps),
     hostKvCacheUsage: sliceTs(series.hostKvCacheUsage),
-    kvCacheUsageByEngine: series.kvCacheUsageByEngine.map((e) => ({
-      engineLabel: e.engineLabel,
-      points: sliceTs(e.points),
-    })),
+    kvCacheUsageByEngine: series.kvCacheUsageByEngine
+      .map((e) => ({
+        engineLabel: e.engineLabel,
+        points: sliceTs(e.points),
+      }))
+      .filter(({ points }) => points.length > 0),
   };
 
   const durationS = phase === 'warmup' ? b : Math.max(1, fullDurationS - b);

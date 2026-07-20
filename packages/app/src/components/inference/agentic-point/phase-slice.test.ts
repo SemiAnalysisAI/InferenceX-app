@@ -151,6 +151,26 @@ describe('sliceServerSeriesByPhase', () => {
     expect(out.series.kvCacheUsageByEngine[0]!.engineLabel).toBe('e0');
   });
 
+  it('drops per-engine series with no points in the selected phase', () => {
+    const s = makeSeries([0, 1, 2, 3]);
+    s.kvCacheUsageByEngine = [
+      { engineLabel: 'warmup-only', points: s.kvCacheUsage.filter((p) => p.t < 2) },
+      { engineLabel: 'profiling-only', points: s.kvCacheUsage.filter((p) => p.t >= 2) },
+    ];
+
+    const out = sliceServerSeriesByPhase(s, 'profiling', 2, 4);
+
+    expect(out.series.kvCacheUsageByEngine).toEqual([
+      {
+        engineLabel: 'profiling-only',
+        points: [
+          { t: 0, value: 20 },
+          { t: 1, value: 30 },
+        ],
+      },
+    ]);
+  });
+
   it('does not mutate the input series', () => {
     const s = makeSeries([0, 1, 2]);
     const before = s.kvCacheUsage.map((p) => p.t);

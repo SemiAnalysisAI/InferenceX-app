@@ -71,8 +71,12 @@ import {
  * v13: prefer `dp_rank` over the per-rank-local `engine` label when naming
  * KV-cache series. Some DEP exports report engine=0 for every rank, which
  * made every legend entry read "DP 0" despite distinct dp_rank labels.
+ *
+ * v14: coalesce warmup and profiling metric series by source identity before
+ * concatenating their timeslices. Concatenating the phase-level arrays emitted
+ * every DP rank twice, leaving one empty duplicate in each phase-filtered view.
  */
-export const CHART_SERIES_VERSION = 13;
+export const CHART_SERIES_VERSION = 14;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -197,19 +201,49 @@ const CHART_METRIC_KEYS = new Set([
 ]);
 
 /**
- * Merge a warmup phase metric map into the profiling one by concatenating each
- * metric's `series`. The two phases' timeslices carry their own absolute
- * `start_ns` and never overlap in time, so `buildSeriesFromMetrics` (which keys
- * by `start_ns`) yields one continuous series — warmup scrapes at lower t,
- * profiling after. No-ops when either side is empty (older blobs have no warmup).
+ * Stable identity for pairing the same exported series across phases.
+ */
+function phaseSeriesBaseIdentity(series: RawSeries): string {
+  const labels = Object.entries(series.labels ?? {}).toSorted(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify([series.endpoint_url ?? null, labels]);
+}
+
+/**
+ * Merge warmup and profiling metric maps into continuous source series. Each
+ * source keeps one entry whose timeslices span both phases, so phase slicing in
+ * the frontend cannot leave duplicate, empty DP-rank legend entries behind.
  */
 function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMap {
   if (Object.keys(warmup).length === 0) return profiling;
   if (Object.keys(profiling).length === 0) return warmup;
   const out: MetricsMap = {};
   for (const name of new Set([...Object.keys(profiling), ...Object.keys(warmup)])) {
+    const merged = new Map<string, RawSeries>();
+    for (const phaseSeries of [warmup[name]?.series ?? [], profiling[name]?.series ?? []]) {
+      const occurrences = new Map<string, number>();
+      for (const series of phaseSeries) {
+        const baseIdentity = phaseSeriesBaseIdentity(series);
+        const occurrence = occurrences.get(baseIdentity) ?? 0;
+        occurrences.set(baseIdentity, occurrence + 1);
+        // The occurrence suffix preserves distinct series when an exporter
+        // omits labels or repeats a label set; phase-local order pairs them.
+        const identity = JSON.stringify([baseIdentity, occurrence]);
+        const existing = merged.get(identity);
+        if (existing) {
+          existing.timeslices = [...(existing.timeslices ?? []), ...(series.timeslices ?? [])];
+        } else {
+          merged.set(identity, { ...series, timeslices: [...(series.timeslices ?? [])] });
+        }
+      }
+    }
     out[name] = {
-      series: [...(profiling[name]?.series ?? []), ...(warmup[name]?.series ?? [])],
+      series: [...merged.values()].map((series) => ({
+        ...series,
+        timeslices: (series.timeslices ?? []).toSorted(
+          (a, b) =>
+            (a.start_ns ?? Number.POSITIVE_INFINITY) - (b.start_ns ?? Number.POSITIVE_INFINITY),
+        ),
+      })),
     };
   }
   return out;
