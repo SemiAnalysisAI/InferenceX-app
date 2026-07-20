@@ -37,7 +37,9 @@ export interface CompareMatrixGpu {
 export interface CompareMatrixCell {
   /** Canonical compare slug (alphabetical GPU order), e.g. "deepseek-r1-b200-vs-h100". */
   slug: string;
-  /** Display-ordered pair label matching the cell position, e.g. "H100 vs B200". */
+  /** Canonical alphabetical pair label — matches the destination page title
+   *  and the pre-matrix `compare_index_pair_clicked` analytics payload, e.g.
+   *  "B200 vs H100" (not the display row-vs-column order). */
   label: string;
   /** True when both GPUs have benchmark data for the model — cell is a link. */
   available: boolean;
@@ -112,7 +114,7 @@ export function buildCompareMatrix(
       if (available) availableCount++;
       row[b.key] = {
         slug: canonicalCompareSlug(modelSlug, a.key, b.key),
-        label: compareDisplayLabel(a.key, b.key),
+        label: compareDisplayLabel(first, second),
         available,
         cross: a.vendor !== b.vendor,
       };

@@ -72,9 +72,13 @@ describe('buildCompareMatrix', () => {
     expect(cells['h100']['b200'].slug).toBe('deepseek-r1-b200-vs-h100');
   });
 
-  it('labels cells in display (row vs column) order', () => {
+  it('labels cells in canonical alphabetical order to match the destination page', () => {
     const { cells } = buildCompareMatrix('deepseek-r1', PAIRS);
-    expect(cells['h100']['b200'].label).toBe('H100 vs B200');
+    // Display order puts h100 (row) before b200 (col), but the label sorts
+    // alphabetically so it matches the destination page title and the
+    // analytics payload ("deepseek-r1-b200-vs-h100" → "B200 vs H100").
+    expect(cells['h100']['b200'].label).toBe('B200 vs H100');
+    // Display and alphabetical order coincide here, so the label is unchanged.
     expect(cells['gb200']['mi355x'].label).toBe('GB200 NVL72 vs MI355X');
   });
 
