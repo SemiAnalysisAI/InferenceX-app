@@ -140,7 +140,10 @@ export default async function ZhBlogPostPage({ params }: Props) {
     publisher: { '@type': 'Organization', name: AUTHOR_NAME },
     datePublished: `${meta.date}T00:00:00Z`,
     ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
-    description: meta.subtitle,
+    // Keep structured-data description in sync with the SERP/OG/Twitter meta
+    // (both go through blogDescription) so they never diverge for posts with a
+    // seoDescription or a long subtitle.
+    description: blogDescription(meta),
     url: `${SITE_URL}/zh/blog/${slug}`,
     inLanguage: ZH_LANG_TAG,
     wordCount: raw.trim().split(/\s+/u).length,
