@@ -5,6 +5,7 @@ import { gzipSync } from 'node:zlib';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { CHART_SERIES_VERSION, type ChartSeries } from './etl/compute-chart-series.js';
 import { REQUEST_TIMELINE_VERSION } from './etl/compute-request-timeline.js';
 import { STATS_VERSION } from './queries/agentic-shared.js';
 import type * as JsonProvider from './json-provider.js';
@@ -128,6 +129,30 @@ const CURRENT_TIMELINE = {
       cancelled: false,
     },
   ],
+};
+
+const PREVIOUS_CHART_SERIES: ChartSeries = {
+  version: CHART_SERIES_VERSION - 1,
+  startNs: 0,
+  endNs: 11e9,
+  durationS: 11,
+  timeslicesCount: 1,
+  kvCacheUsage: [
+    { t: 0, value: 0.1 },
+    { t: 10, value: 0.2 },
+  ],
+  prefixCacheHitRate: [],
+  queueDepth: [],
+  promptTokensBySource: {},
+  prefillTps: [],
+  decodeTps: [],
+  prefixCacheHitsTps: [],
+  hostKvCacheUsage: [],
+  kvCacheUsageByEngine: [
+    { engineLabel: '0', points: [{ t: 10, value: 0.2 }] },
+    { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
+  ],
+  metricSources: [],
 };
 
 let jp: typeof JsonProvider;
@@ -260,7 +285,8 @@ beforeAll(async () => {
     ]),
   );
 
-  // agentic_trace_replay: 100 = current JSONB, 200 = stale JSONB (force blob).
+  // agentic_trace_replay: 100 = current stats/timeline, 200 = stale stats/timeline
+  // plus directly-upgradable chart series.
   writeFileSync(
     join(dir, 'agentic_trace_replay.json'),
     JSON.stringify([
@@ -286,7 +312,7 @@ beforeAll(async () => {
         server_metrics_json_gz: byteaJson(SERVER_GZ),
         server_metrics_json_uncompressed_size: SERVER_JSON.length,
         aggregate_stats: { version: 1 }, // stale → force profile-blob fallback
-        chart_series: { version: 1 }, // stale → force server-blob fallback
+        chart_series: PREVIOUS_CHART_SERIES,
         request_timeline: { version: 1 }, // stale → force profile-blob fallback
         created_at: '2026-06-14T04:00:00Z',
       },
@@ -468,6 +494,21 @@ describe('trace server metrics mirror', () => {
     expect(m?.meta.hardware).toBe('h100');
     expect(m?.meta.run_url).toBe('https://github.com/x/runs/555/attempts/1');
     expect(m?.kvCacheUsage.length).toBeGreaterThan(0);
+  });
+
+  it('upgrades the previous chart series without recomputing the server blob', async () => {
+    const m = await jp.getTraceServerMetrics(2);
+
+    expect(m?.kvCacheUsageByEngine).toEqual([
+      {
+        engineLabel: '0',
+        points: [
+          { t: 0, value: 0.1 },
+          { t: 10, value: 0.2 },
+        ],
+      },
+    ]);
+    expect(m?.timeslicesCount).toBe(2);
   });
 
   it('returns null for an id without a trace_replay blob', async () => {

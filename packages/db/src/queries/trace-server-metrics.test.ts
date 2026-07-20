@@ -27,6 +27,18 @@ function currentSeries(): ChartSeries {
   };
 }
 
+function previousSeries(): ChartSeries {
+  return {
+    ...currentSeries(),
+    version: CHART_SERIES_VERSION - 1,
+    timeslicesCount: 1,
+    kvCacheUsageByEngine: [
+      { engineLabel: '0', points: [{ t: 10, value: 0.2 }] },
+      { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
+    ],
+  };
+}
+
 function metaRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 42,
@@ -74,6 +86,26 @@ describe('getTraceServerMetrics', () => {
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 
+  it('upgrades the previous chart series without selecting the raw blob', async () => {
+    const { sql, calls } = mockSql([[metaRow({ chart_series: previousSeries() })], []]);
+
+    const result = await getTraceServerMetrics(sql, 42);
+
+    expect(result?.kvCacheUsageByEngine).toEqual([
+      {
+        engineLabel: '0',
+        points: [
+          { t: 0, value: 0.1 },
+          { t: 10, value: 0.2 },
+        ],
+      },
+    ]);
+    expect(result?.timeslicesCount).toBe(2);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
+    expect(calls[1]).toContain('update agentic_trace_replay set chart_series');
+  });
+
   it('fetches and computes the raw blob only when chart_series is stale', async () => {
     const raw = gzipSync(
       Buffer.from(
@@ -86,7 +118,7 @@ describe('getTraceServerMetrics', () => {
         }),
       ),
     );
-    const stale = { ...currentSeries(), version: CHART_SERIES_VERSION - 1 };
+    const stale = { ...currentSeries(), version: CHART_SERIES_VERSION - 2 };
     const { sql, calls } = mockSql([[metaRow({ chart_series: stale })], [{ blob: raw }]]);
 
     const result = await getTraceServerMetrics(sql, 42);

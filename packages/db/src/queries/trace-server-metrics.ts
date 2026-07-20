@@ -6,13 +6,13 @@
  * Backed by `agentic_trace_replay.chart_series` (pre-computed at ingest
  * time, see `etl/compute-chart-series.ts`). The fast path is a single SQL
  * row read; the slow path re-computes from `server_metrics_json_gz` and is
- * only taken when the column is missing or the stored
- * `CHART_SERIES_VERSION` is stale (the backfill script should drain that).
+ * only taken when the column is missing or too old for an in-memory upgrade
+ * (the backfill script should drain that).
  */
 
 import {
-  CHART_SERIES_VERSION,
   computeChartSeries,
+  upgradeStoredChartSeries,
   type ChartSeries,
   type MetricSourceSeries,
   type QueueDepthPoint,
@@ -183,9 +183,15 @@ export async function getTraceServerMetrics(
   const kvCachePoolTokens =
     row.kv_cache_pool_tokens === null ? null : Number(row.kv_cache_pool_tokens);
 
-  // Fast path: pre-computed chart_series at the current version.
-  if (row.chart_series && Number(row.chart_series.version) === CHART_SERIES_VERSION) {
-    return merge(meta, row.chart_series, kvCachePoolTokens);
+  // Fast path: serve current chart_series directly, or upgrade v13 → v14 from
+  // the stored points. Reopening some raw blobs exceeds Vercel function memory,
+  // while this representation already contains everything v14 needs.
+  const storedSeries = row.chart_series ? upgradeStoredChartSeries(row.chart_series) : null;
+  if (storedSeries) {
+    if (storedSeries !== row.chart_series) {
+      writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, storedSeries);
+    }
+    return merge(meta, storedSeries, kvCachePoolTokens);
   }
 
   // Slow path only: fetch the large raw blob after establishing that the

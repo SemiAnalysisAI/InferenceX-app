@@ -16,8 +16,8 @@ import { fileURLToPath } from 'node:url';
 // convention in etl/queries here), NOT the `.js` type-only style below — the
 // app bundler (Turbopack) resolves the former but not a `.js` on a value import.
 import {
-  CHART_SERIES_VERSION,
   computeChartSeries,
+  upgradeStoredChartSeries,
   type ChartSeries,
 } from './etl/compute-chart-series';
 import {
@@ -1112,9 +1112,10 @@ export function getRequestTimeline(benchmarkResultId: number): RequestTimeline |
 
 /**
  * Mirror of {@link import('./queries/trace-server-metrics.js').getTraceServerMetrics}.
- * Fast path: chart_series at CHART_SERIES_VERSION. Fallback: computeChartSeries
- * over the server blob (same helper as the SQL path). Returns null when the point
- * has no server_metrics blob, matching the SQL `has_blob` gate.
+ * Fast path: current or directly-upgradable chart_series. Fallback:
+ * computeChartSeries over the server blob (same helpers as the SQL path).
+ * Returns null when the point has no server_metrics blob, matching the SQL
+ * `has_blob` gate.
  */
 export async function getTraceServerMetrics(
   benchmarkResultId: number,
@@ -1174,7 +1175,8 @@ export async function getTraceServerMetrics(
   });
 
   const stored = tr.chart_series as (ChartSeries & { version?: number }) | null;
-  if (stored && Number(stored.version) === CHART_SERIES_VERSION) return merge(stored);
+  const storedSeries = stored ? upgradeStoredChartSeries(stored) : null;
+  if (storedSeries) return merge(storedSeries);
 
   const series = await computeChartSeries(bufferFromJson(tr.server_metrics_json_gz), {
     framework: c.framework,

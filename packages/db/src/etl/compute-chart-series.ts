@@ -77,6 +77,7 @@ import {
  * every DP rank twice, leaving one empty duplicate in each phase-filtered view.
  */
 export const CHART_SERIES_VERSION = 14;
+const PHASE_DUPLICATED_CHART_SERIES_VERSION = 13;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -149,6 +150,66 @@ export interface MetricSourceSeries {
   prefixCacheHitsTps: TimeSeriesPoint[];
   hostKvCacheUsage: TimeSeriesPoint[];
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
+}
+
+/**
+ * Coalesce the v13 warmup/profile duplicates using the DP label retained in
+ * the stored chart series. The raw source identity is no longer available at
+ * this layer, but v13 guarantees DP-rank-first labels, so equal labels are the
+ * same rank split across the two non-overlapping phase windows.
+ */
+function coalesceStoredKvSeries(
+  series: { engineLabel: string; points: TimeSeriesPoint[] }[],
+): { engineLabel: string; points: TimeSeriesPoint[] }[] {
+  const pointsByLabel = new Map<string, TimeSeriesPoint[]>();
+  for (const entry of series) {
+    const points = pointsByLabel.get(entry.engineLabel) ?? [];
+    points.push(...entry.points);
+    pointsByLabel.set(entry.engineLabel, points);
+  }
+  return [...pointsByLabel].map(([engineLabel, points]) => ({
+    engineLabel,
+    points: points.toSorted((a, b) => a.t - b.t),
+  }));
+}
+
+/**
+ * Upgrade the immediately previous chart-series representation without
+ * reopening the potentially multi-hundred-MB raw server-metrics blob.
+ * Returns null for older versions whose missing transformations cannot be
+ * reconstructed from stored chart data alone.
+ */
+export function upgradeStoredChartSeries(series: ChartSeries): ChartSeries | null {
+  if (Number(series.version) === CHART_SERIES_VERSION) return series;
+  if (Number(series.version) !== PHASE_DUPLICATED_CHART_SERIES_VERSION) return null;
+
+  const kvCacheUsageByEngine = coalesceStoredKvSeries(series.kvCacheUsageByEngine ?? []);
+  const metricSources = (series.metricSources ?? []).map((metricSource) => ({
+    ...metricSource,
+    kvCacheUsageByEngine: coalesceStoredKvSeries(metricSource.kvCacheUsageByEngine ?? []),
+  }));
+  const timeslicesCount = Math.max(
+    series.timeslicesCount,
+    series.kvCacheUsage.length,
+    series.prefixCacheHitRate.length,
+    series.queueDepth.length,
+    series.prefillTps.length,
+    series.decodeTps.length,
+    series.prefixCacheHitsTps?.length ?? 0,
+    series.hostKvCacheUsage?.length ?? 0,
+    ...kvCacheUsageByEngine.map(({ points }) => points.length),
+    ...metricSources.flatMap((source) =>
+      source.kvCacheUsageByEngine.map(({ points }) => points.length),
+    ),
+  );
+
+  return {
+    ...series,
+    version: CHART_SERIES_VERSION,
+    timeslicesCount,
+    kvCacheUsageByEngine,
+    metricSources,
+  };
 }
 
 // ── Raw blob shapes (subset we read) ────────────────────────────────────
