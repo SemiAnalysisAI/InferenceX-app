@@ -205,11 +205,14 @@ export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: 
     publisher: {
       '@type': 'Organization',
       name: AUTHOR_NAME,
+      // Dimensions are intentionally omitted: the OG_IMAGE asset's real size
+      // (1200×675) disagrees with the root layout's OG declaration (1200×630),
+      // so rather than assert a conflicting number we follow the existing
+      // Organization-logo precedent in layout.tsx and leave width/height off
+      // (both are optional in schema.org's ImageObject).
       logo: {
         '@type': 'ImageObject',
         url: OG_IMAGE,
-        width: 1200,
-        height: 675,
       },
     },
     datePublished: `${meta.date}T00:00:00Z`,

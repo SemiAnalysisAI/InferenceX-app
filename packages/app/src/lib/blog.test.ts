@@ -599,14 +599,15 @@ describe('buildBlogPostingJsonLd', () => {
       '@id': `${SITE_URL}/blog/gb200-vs-mi355x`,
     });
 
-    // publisher.logo — ImageObject with an absolute URL.
+    // publisher.logo — ImageObject with an absolute URL. Dimensions are
+    // intentionally omitted (optional in schema.org) because the asset's real
+    // size conflicts with the root layout's OG declaration; see blog.ts.
     expect(jsonLd.publisher['@type']).toBe('Organization');
     expect(jsonLd.publisher.logo).toEqual({
       '@type': 'ImageObject',
       url: OG_IMAGE,
-      width: 1200,
-      height: 675,
     });
+    expect(jsonLd.publisher.logo.width).toBeUndefined();
     expect(String(jsonLd.publisher.logo.url)).toMatch(/^https:\/\//u);
 
     // Existing required fields are preserved.
