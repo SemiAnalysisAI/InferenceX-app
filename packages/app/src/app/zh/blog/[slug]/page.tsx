@@ -17,6 +17,7 @@ import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-butt
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
 import {
+  blogDescription,
   getAllPosts,
   getAdjacentPosts,
   buildBlogBreadcrumbJsonLdZh,
@@ -45,16 +46,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const result = getPostBySlug(slug, 'zh');
   if (!result) return {};
   const { meta } = result;
+  const description = blogDescription(meta);
 
   return {
-    title: meta.title,
-    description: meta.subtitle,
+    // Short " | InferenceX" suffix via `absolute` (mirrors the English page)
+    // so the headline keeps more of the SERP title before truncation.
+    title: { absolute: `${meta.title} | ${SITE_NAME}` },
+    description,
     keywords: meta.tags,
     authors: [{ name: AUTHOR_NAME }],
     alternates: zhAlternates(`/blog/${slug}`),
     openGraph: {
       title: `${meta.title} | ${SITE_NAME}`,
-      description: meta.subtitle,
+      description,
       url: `${SITE_URL}/zh/blog/${slug}`,
       type: 'article',
       locale: ZH_OG_LOCALE,
@@ -66,7 +70,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: 'summary_large_image',
       title: meta.title,
-      description: meta.subtitle,
+      description,
       site: AUTHOR_HANDLE,
       creator: AUTHOR_HANDLE,
     },

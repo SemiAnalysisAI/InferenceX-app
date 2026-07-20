@@ -159,6 +159,7 @@ const MODEL_SLUG = {
   displayName: 'DeepSeek-R1-0528',
   dbKeys: ['dsr1'],
   label: 'DeepSeek R1',
+  seoName: 'DeepSeek R1',
 };
 
 // ---------------------------------------------------------------------------

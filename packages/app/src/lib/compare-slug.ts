@@ -28,6 +28,13 @@ export interface CompareModelSlug {
   dbKeys: string[];
   /** Human label for OG image, metadata, and page header. */
   label: string;
+  /** Single, natural, current-version model name for SEO `<title>` tags and
+   *  meta descriptions — e.g. `GLM-5` (not the version-grouped `GLM 5/5.1`)
+   *  or `Kimi K2.6` (the primary version the slug represents). Kept short so
+   *  the GPU-pair-led title survives Google's ~60-char SERP truncation, and
+   *  written the way people actually search rather than the fully-qualified
+   *  HF checkpoint id. See `compareModelSeoName`. */
+  seoName: string;
 }
 
 // Order matches the master /compare and /compare-per-dollar index display:
@@ -43,12 +50,14 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     displayName: 'DeepSeek-V4-Pro',
     dbKeys: ['dsv4'],
     label: 'DeepSeek V4 Pro 1.6T',
+    seoName: 'DeepSeek V4 Pro',
   },
   {
     slug: 'deepseek-r1',
     displayName: 'DeepSeek-R1-0528',
     dbKeys: ['dsr1'],
     label: 'DeepSeek R1',
+    seoName: 'DeepSeek R1',
   },
   {
     slug: 'kimi-k26',
@@ -62,6 +71,8 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // surfaces every version so the URL doesn't read as "only K2.6". Param
     // count appended so the label conveys model scale alongside the version.
     label: 'Kimi K2.5/K2.6/K2.7-Code 1T',
+    // SEO name uses the primary version the slug canonicalizes to (K2.6).
+    seoName: 'Kimi K2.6',
   },
   {
     slug: 'glm-5-1',
@@ -69,12 +80,14 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // GLM-5 and GLM-5.1 remain grouped under the stable canonical slug.
     dbKeys: ['glm5.1', 'glm5'],
     label: 'GLM 5/5.1',
+    seoName: 'GLM-5',
   },
   {
     slug: 'glm-5-2',
     displayName: 'GLM-5.2',
     dbKeys: ['glm5.2'],
     label: 'GLM 5.2',
+    seoName: 'GLM-5.2',
   },
   {
     slug: 'minimax-m3',
@@ -84,6 +97,7 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // joining the minimax-m27 group.
     dbKeys: ['minimaxm3'],
     label: 'MiniMax M3 428B',
+    seoName: 'MiniMax M3',
   },
   {
     slug: 'minimax-m27',
@@ -91,6 +105,8 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     // Same point-release grouping pattern as Kimi and GLM.
     dbKeys: ['minimaxm2.7', 'minimaxm2.5'],
     label: 'MiniMax M2.5/M2.7',
+    // Primary version the slug canonicalizes to (M2.7).
+    seoName: 'MiniMax M2.7',
   },
   {
     slug: 'qwen-3-5',
@@ -98,18 +114,21 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     dbKeys: ['qwen3.5'],
     // 397B total parameters, 17B active per forward pass (MoE).
     label: 'Qwen 3.5 397B-A17B',
+    seoName: 'Qwen3.5',
   },
   {
     slug: 'gptoss-120b',
     displayName: 'gpt-oss-120b',
     dbKeys: ['gptoss120b'],
     label: 'gpt-oss 120B',
+    seoName: 'gpt-oss-120b',
   },
   {
     slug: 'llama-3-3-70b',
     displayName: 'Llama-3.3-70B-Instruct-FP8',
     dbKeys: ['llama70b'],
     label: 'Llama 3.3 70B',
+    seoName: 'Llama 3.3 70B',
   },
 ];
 
@@ -271,4 +290,26 @@ export function compareDisplayLabel(a: string, b: string): string {
  *  metadata titles, and OG image text. */
 export function compareModelDisplayLabel(model: CompareModelSlug, a: string, b: string): string {
   return `${model.label} — ${compareDisplayLabel(a, b)}`;
+}
+
+/** Single natural, current-version model name for SEO titles / descriptions —
+ *  e.g. `GLM-5`, `Kimi K2.6`, `DeepSeek R1`. Unlike `label`, it never contains
+ *  version-group slashes ("GLM 5/5.1"), param-count suffixes ("1.6T"), or the
+ *  fully-qualified checkpoint id — it reads the way people search. */
+export function compareModelSeoName(model: CompareModelSlug): string {
+  return model.seoName;
+}
+
+/** Pre-pipe portion of the SEO `<title>`, GPU-pair first so the actual search
+ *  query ("B200 vs B300") survives Google's ~60-char truncation. Falls back
+ *  from "Inference Benchmark" to "Benchmark" when the longer suffix would push
+ *  the pair-led phrase past ~60 chars for a long GPU pair / model name.
+ *
+ *  Returns the text before the " | InferenceX" site-name suffix; callers add
+ *  the suffix via `title: { absolute: ... }` so the long root template
+ *  ("%s | InferenceX by SemiAnalysis") does not apply and truncate the query. */
+export function compareSeoTitle(gpuLabel: string, modelSeoName: string): string {
+  const full = `${gpuLabel}: ${modelSeoName} Inference Benchmark`;
+  if (full.length <= 60) return full;
+  return `${gpuLabel}: ${modelSeoName} Benchmark`;
 }

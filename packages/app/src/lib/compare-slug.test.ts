@@ -6,6 +6,8 @@ import {
   canonicalCompareSlug,
   compareDisplayLabel,
   compareModelDisplayLabel,
+  compareModelSeoName,
+  compareSeoTitle,
   COMPARE_MODEL_ALIASES,
   COMPARE_MODEL_SLUGS,
   getCompareModelBySlug,
@@ -255,6 +257,69 @@ describe('compareModelDisplayLabel', () => {
     );
     expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM 5/5.1 — H100 vs H200');
     expect(compareModelDisplayLabel(GLM_52, 'h100', 'h200')).toBe('GLM 5.2 — H100 vs H200');
+  });
+});
+
+describe('compareModelSeoName', () => {
+  // Single, natural, current-version search name per model — no version-group
+  // slashes, no param-count suffix, no fully-qualified checkpoint id.
+  const EXPECTED: Record<string, string> = {
+    'deepseek-v4': 'DeepSeek V4 Pro',
+    'deepseek-r1': 'DeepSeek R1',
+    'kimi-k26': 'Kimi K2.6',
+    'glm-5-1': 'GLM-5',
+    'glm-5-2': 'GLM-5.2',
+    'minimax-m3': 'MiniMax M3',
+    'minimax-m27': 'MiniMax M2.7',
+    'qwen-3-5': 'Qwen3.5',
+    'gptoss-120b': 'gpt-oss-120b',
+    'llama-3-3-70b': 'Llama 3.3 70B',
+  };
+
+  it('returns the expected single-version name for every model', () => {
+    for (const model of COMPARE_MODEL_SLUGS) {
+      expect(compareModelSeoName(model), `seoName for ${model.slug}`).toBe(EXPECTED[model.slug]);
+    }
+  });
+
+  it('covers every model in the registry (no missing entries)', () => {
+    expect(Object.keys(EXPECTED).toSorted()).toEqual(
+      COMPARE_MODEL_SLUGS.map((m) => m.slug).toSorted(),
+    );
+  });
+
+  it('never returns a version-grouped label (no slashes) and is non-empty', () => {
+    for (const model of COMPARE_MODEL_SLUGS) {
+      const name = compareModelSeoName(model);
+      expect(name.length, `non-empty for ${model.slug}`).toBeGreaterThan(0);
+      expect(name.includes('/'), `no slash in ${model.slug}`).toBe(false);
+    }
+  });
+});
+
+describe('compareSeoTitle', () => {
+  it('leads with the GPU pair and keeps "Inference Benchmark" when it fits', () => {
+    const title = compareSeoTitle('B200 vs B300', 'GLM-5');
+    expect(title).toBe('B200 vs B300: GLM-5 Inference Benchmark');
+    expect(title.startsWith('B200 vs B300:')).toBe(true);
+    expect(title.length).toBeLessThanOrEqual(60);
+  });
+
+  it('drops "Inference" → "Benchmark" for a long GPU pair + model name', () => {
+    const title = compareSeoTitle('GB200 NVL72 vs GB300 NVL72', 'DeepSeek V4 Pro');
+    // "…Inference Benchmark" would exceed ~60 chars, so it shortens.
+    expect(title).toBe('GB200 NVL72 vs GB300 NVL72: DeepSeek V4 Pro Benchmark');
+    expect(title.includes('Inference Benchmark')).toBe(false);
+    expect(title.startsWith('GB200 NVL72 vs GB300 NVL72:')).toBe(true);
+  });
+
+  it('always starts with the GPU pair for every real (model × pair)', () => {
+    for (const model of COMPARE_MODEL_SLUGS) {
+      const gpuLabel = compareDisplayLabel('gb200', 'gb300');
+      const title = compareSeoTitle(gpuLabel, compareModelSeoName(model));
+      expect(title.startsWith(`${gpuLabel}:`), `pair-led for ${model.slug}`).toBe(true);
+      expect(/(?<suffix>Inference Benchmark|Benchmark)$/u.test(title)).toBe(true);
+    }
   });
 });
 
