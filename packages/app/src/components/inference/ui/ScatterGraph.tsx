@@ -81,6 +81,7 @@ import {
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -634,16 +635,17 @@ const ScatterGraph = React.memo(
 
     // --- Changelog ---
     const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
-    const highlightConfigSuffixes = useMemo(() => {
+    const highlightedHwKeys = useMemo(() => {
       if (availableRuns) {
         const cl = availableRuns[selectedRunId]?.changelog;
         if (cl) {
-          const suffixes = cl.entries.flatMap((entry: any) =>
+          const hwKeys = cl.entries.flatMap((entry: any) =>
             (entry.config_keys ?? entry['config-keys'] ?? [])
               .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map((key: string) => key.split('-').slice(2).join('-')),
+              .map(changelogConfigToHwKey)
+              .filter((key: string | null): key is string => key !== null),
           );
-          return new Set(suffixes);
+          return new Set(hwKeys);
         }
       }
       return new Set<string>();
@@ -2913,7 +2915,7 @@ const ScatterGraph = React.memo(
                     label: getDisplayLabel(hwConfig),
                     color: resolveColor(key),
                     title: hwConfig.gpu,
-                    isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
+                    isHighlighted: highlightedHwKeys.has(key),
                     hw: key,
                     isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
                     onClick: showAllHardwareTypes
