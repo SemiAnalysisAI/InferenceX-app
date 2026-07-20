@@ -262,6 +262,21 @@ describe('generateTooltipContent', () => {
     expect(html).not.toContain('Offload Mode');
   });
 
+  it('keeps a clearly marked binary fallback for legacy agentic rows', () => {
+    const enabled = generateTooltipContent(
+      tooltipConfig({ data: pt({ offload_mode: 'on', kv_offloading: undefined }) }),
+    );
+    const disabledZh = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({ offload_mode: 'off', kv_offloading: undefined }),
+      }),
+    );
+
+    expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
+    expect(disabledZh).toContain('<strong>卸载类型:</strong> 已禁用（旧版数据）');
+  });
+
   it('shows multinode KV transfer and cache-hit metadata for fixed-sequence points', () => {
     const html = generateTooltipContent(
       tooltipConfig({
