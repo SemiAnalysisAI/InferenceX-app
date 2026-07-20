@@ -64,4 +64,23 @@ describe('Compare index matrix', () => {
       .should('have.attr', 'href')
       .and('match', /^\/compare-per-dollar\//u);
   });
+
+  it('renders the zh matrices with /zh hrefs and Chinese legend strings', () => {
+    cy.visit('/zh/compare');
+    cy.get('[data-testid="compare-pair-matrix"]').should('have.length.greaterThan', 0);
+    cy.get('a[data-testid="compare-matrix-cell"]')
+      .first()
+      .should('have.attr', 'href')
+      .and('match', /^\/zh\/compare\//u);
+    cy.contains('暂无基准测试数据').should('exist');
+    cy.contains('点击单元格查看对比').should('exist');
+  });
+
+  it('renders the zh per-dollar matrices with /zh/compare-per-dollar hrefs', () => {
+    cy.visit('/zh/compare-per-dollar');
+    cy.get('a[data-testid="compare-matrix-cell"]')
+      .first()
+      .should('have.attr', 'href')
+      .and('match', /^\/zh\/compare-per-dollar\//u);
+  });
 });

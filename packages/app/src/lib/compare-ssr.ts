@@ -31,9 +31,7 @@ import { cachedQuery } from '@/lib/api-cache';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { getHardwareKey } from '@/lib/chart-utils';
 import {
-  canonicalCompareSlug,
   compareDisplayLabel,
-  type ComparePair,
   type CompareModelSlug,
   compareModelDisplayLabel,
   compareModelSeoName,
@@ -885,48 +883,6 @@ export function formatModelList(models: CompareModelSlug[]): string {
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
-}
-
-export interface VendorBucketEntry {
-  a: string;
-  b: string;
-  slug: string;
-  label: string;
-}
-
-export interface VendorBuckets {
-  /** Cross-vendor pairs (NVIDIA × AMD). */
-  cross: VendorBucketEntry[];
-  /** Both sides NVIDIA. */
-  nvidia: VendorBucketEntry[];
-  /** Both sides AMD. */
-  amd: VendorBucketEntry[];
-}
-
-/** Split (a, b) GPU pairs into vendor buckets for the index grid. The caller
- *  wraps these entries with its own group headings / descriptions / route
- *  prefix — keeps the sorting + bucketing + slug-building in one place so the
- *  two index pages can't drift on those mechanics. */
-export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair[]): VendorBuckets {
-  const nvidia: VendorBucketEntry[] = [];
-  const amd: VendorBucketEntry[] = [];
-  const cross: VendorBucketEntry[] = [];
-
-  for (const { a, b } of pairs) {
-    const entry: VendorBucketEntry = {
-      a,
-      b,
-      slug: canonicalCompareSlug(modelSlug, a, b),
-      label: compareDisplayLabel(a, b),
-    };
-    const vA = HW_REGISTRY[a]?.vendor;
-    const vB = HW_REGISTRY[b]?.vendor;
-    if (vA === 'NVIDIA' && vB === 'NVIDIA') nvidia.push(entry);
-    else if (vA === 'AMD' && vB === 'AMD') amd.push(entry);
-    else cross.push(entry);
-  }
-
-  return { cross, nvidia, amd };
 }
 
 /** Breadcrumb trail for a compare slug page. Emitted alongside the main

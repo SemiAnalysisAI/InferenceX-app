@@ -1,19 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
-import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
+import { ComparePairMatrix } from '@/components/compare/compare-pair-matrix';
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { buildCompareMatrix } from '@/lib/compare-matrix';
+import { COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
+import { formatModelList } from '@/lib/compare-ssr';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -37,42 +33,6 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
   },
 };
-
-interface VendorGroup {
-  heading: string;
-  description: string;
-  pairs: { a: string; b: string; slug: string; label: string }[];
-}
-
-function groupPairsByVendorForModel(
-  model: CompareModelSlug,
-  comparablePairs: ComparePair[],
-): VendorGroup[] {
-  const { cross, nvidia, amd } = bucketComparePairsByVendor(model.slug, comparablePairs);
-  const groups: VendorGroup[] = [];
-  if (cross.length > 0) {
-    groups.push({
-      heading: 'NVIDIA vs AMD',
-      description: '跨厂商的不同架构代际每 token 成本对比。',
-      pairs: cross,
-    });
-  }
-  if (nvidia.length > 0) {
-    groups.push({
-      heading: 'NVIDIA vs NVIDIA',
-      description: 'Hopper 与 Blackwell 代际每 token 成本对比。',
-      pairs: nvidia,
-    });
-  }
-  if (amd.length > 0) {
-    groups.push({
-      heading: 'AMD vs AMD',
-      description: 'CDNA 3 与 CDNA 4 代际每 token 成本对比。',
-      pairs: amd,
-    });
-  }
-  return groups;
-}
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -139,7 +99,6 @@ export default async function ComparePerDollarIndexPageZh() {
 
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
-        const groups = groupPairsByVendorForModel(model, pairs);
         return (
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
@@ -149,30 +108,11 @@ export default async function ComparePerDollarIndexPageZh() {
                   {pairs.length} 组 GPU 对比具有 {model.label} 的每 token 成本基准测试数据。
                 </p>
               </div>
-              {groups.map((group) => (
-                <div key={`${model.slug}__${group.heading}`} className="flex flex-col gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold">{group.heading}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">{group.description}</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {group.pairs.map(({ slug, label, a, b }) => {
-                      const aMeta = HW_REGISTRY[a];
-                      const bMeta = HW_REGISTRY[b];
-                      const archLine = `${aMeta?.arch ?? '—'} · ${bMeta?.arch ?? '—'}`;
-                      return (
-                        <ComparePairCardLink
-                          key={slug}
-                          href={`/zh/compare-per-dollar/${slug}`}
-                          slug={slug}
-                          label={label}
-                          archLine={archLine}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+              <ComparePairMatrix
+                matrix={buildCompareMatrix(model.slug, pairs)}
+                hrefPrefix="/zh/compare-per-dollar"
+                modelLabel={model.label}
+              />
             </Card>
           </section>
         );

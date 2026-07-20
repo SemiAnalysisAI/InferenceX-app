@@ -1,6 +1,6 @@
 /**
  * Pure helpers for the GPU-pair selection matrices on the `/compare` and
- * `/compare-per-dollar` index pages.
+ * `/compare-per-dollar` index pages (and their /zh siblings).
  *
  * The index used to render one card per comparable pair — ~36 cards per model
  * across 9+ model sections stopped scaling as a navigation surface. The matrix

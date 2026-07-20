@@ -4,17 +4,37 @@ import { useState } from 'react';
 
 import { track } from '@/lib/analytics';
 import type { CompareMatrix } from '@/lib/compare-matrix';
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
 
 const STRINGS = {
-  hint: 'Click a cell to open the comparison.',
-  crossLegend: 'NVIDIA vs AMD',
-  sameLegend: 'Same vendor',
-  emptyLegend: 'No benchmark data yet',
-  matrixAria: (model: string) => `${model} GPU comparison matrix`,
-  cellAria: (model: string, pair: string) => `${model}: ${pair} benchmark comparison`,
-  emptyTitle: (pair: string) => `${pair} — no benchmark data yet`,
+  en: {
+    hint: 'Click a cell to open the comparison.',
+    crossLegend: 'NVIDIA vs AMD',
+    sameLegend: 'Same vendor',
+    emptyLegend: 'No benchmark data yet',
+    matrixAria: (model: string) => `${model} GPU comparison matrix`,
+    cellAria: (model: string, pair: string) => `${model}: ${pair} benchmark comparison`,
+    emptyTitle: (pair: string) => `${pair} — no benchmark data yet`,
+  },
+  zh: {
+    hint: '点击单元格查看对比。',
+    crossLegend: 'NVIDIA vs AMD',
+    sameLegend: '同厂商',
+    emptyLegend: '暂无基准测试数据',
+    matrixAria: (model: string) => `${model} GPU 对比矩阵`,
+    cellAria: (model: string, pair: string) => `${model}：${pair} 基准测试对比`,
+    emptyTitle: (pair: string) => `${pair} — 暂无基准测试数据`,
+  },
 } as const;
+
+/** A row/column cell coordinate plus its display label, tracked for the
+ *  hover/focus highlight and readout. */
+interface ActiveCell {
+  row: string;
+  col: string;
+  label: string;
+}
 
 const VENDOR_HEADER_CLASS: Record<string, string> = {
   NVIDIA: 'border-emerald-500/60 text-emerald-700 dark:text-emerald-400',
@@ -43,8 +63,14 @@ interface ComparePairMatrixProps {
  * gets the brand tint — same-vendor triangles stay neutral.
  */
 export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePairMatrixProps) {
-  const t = STRINGS;
-  const [hovered, setHovered] = useState<{ row: string; col: string; label: string } | null>(null);
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  // Hover and keyboard focus are tracked separately so a pointer entering and
+  // leaving a still-focused cell doesn't wipe the focus highlight. Hover takes
+  // precedence while present; when the pointer leaves, a focused cell persists.
+  const [hoveredCell, setHoveredCell] = useState<ActiveCell | null>(null);
+  const [focusedCell, setFocusedCell] = useState<ActiveCell | null>(null);
+  const active = hoveredCell ?? focusedCell;
 
   const { gpus, cells } = matrix;
   const rows = gpus.slice(0, -1);
@@ -91,7 +117,7 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                       title={`${gpu.label} (${gpu.arch})`}
                       className={cn(
                         'rotate-180 text-[10px] font-medium tracking-wide whitespace-nowrap transition-colors [writing-mode:vertical-rl]',
-                        hovered?.col === gpu.key ? 'text-foreground' : 'text-muted-foreground',
+                        active?.col === gpu.key ? 'text-foreground' : 'text-muted-foreground',
                       )}
                     >
                       {gpu.shortLabel}
@@ -108,7 +134,7 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                   <div
                     className={cn(
                       'flex h-8 flex-col justify-center rounded-md py-0.5 pr-3 pl-1 transition-colors lg:h-9',
-                      hovered?.row === rowGpu.key && 'bg-foreground/5',
+                      active?.row === rowGpu.key && 'bg-foreground/5',
                     )}
                   >
                     <span className="flex items-center gap-1.5 text-xs leading-tight font-medium whitespace-nowrap">
@@ -164,13 +190,13 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
                           window.location.href = href;
                         }}
                         onMouseEnter={() =>
-                          setHovered({ row: rowGpu.key, col: colGpu.key, label: cell.label })
+                          setHoveredCell({ row: rowGpu.key, col: colGpu.key, label: cell.label })
                         }
-                        onMouseLeave={() => setHovered(null)}
+                        onMouseLeave={() => setHoveredCell(null)}
                         onFocus={() =>
-                          setHovered({ row: rowGpu.key, col: colGpu.key, label: cell.label })
+                          setFocusedCell({ row: rowGpu.key, col: colGpu.key, label: cell.label })
                         }
-                        onBlur={() => setHovered(null)}
+                        onBlur={() => setFocusedCell(null)}
                         className={cn(
                           'block size-8 rounded-md transition-all duration-150 lg:size-9',
                           'hover:scale-110 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none',
@@ -192,7 +218,7 @@ export function ComparePairMatrix({ matrix, hrefPrefix, modelLabel }: ComparePai
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
         <span data-testid="compare-matrix-readout" className="min-w-40 font-medium">
-          {hovered ? <span className="text-foreground">{hovered.label} →</span> : t.hint}
+          {active ? <span className="text-foreground">{active.label} →</span> : t.hint}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span
