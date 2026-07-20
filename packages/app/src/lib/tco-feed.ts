@@ -87,8 +87,9 @@ const MAX_WORKLOADS = 8;
 const MAX_ALPHA = 10;
 
 /**
- * Parse `tiers=30,50,75,100`. Absent/blank → defaults; any invalid entry →
- * null (caller responds 400).
+ * Parse `tiers=30,50,75,100`. Absent/blank → defaults; any invalid or
+ * duplicate entry → null (caller responds 400 — duplicates would
+ * double-count in the scores view).
  */
 export function parseTiers(raw: string | null): number[] | null {
   if (raw === null || raw.trim() === '') return [...DEFAULT_TIERS];
@@ -100,6 +101,7 @@ export function parseTiers(raw: string | null): number[] | null {
     if (part === '' || !Number.isFinite(value) || value <= 0 || value > MAX_TIER_VALUE) {
       return null;
     }
+    if (tiers.includes(value)) return null;
     tiers.push(value);
   }
   return tiers;

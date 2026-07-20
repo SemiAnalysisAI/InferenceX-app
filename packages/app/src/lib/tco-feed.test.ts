@@ -226,6 +226,11 @@ describe('parseTiers', () => {
     expect(parseTiers('10001')).toBeNull();
     expect(parseTiers(Array.from({ length: 21 }, (_, i) => String(i + 1)).join(','))).toBeNull();
   });
+
+  it('rejects duplicate tiers (would double-count in the scores view)', () => {
+    expect(parseTiers('50,50')).toBeNull();
+    expect(parseTiers('50,50.0')).toBeNull(); // same numeric value
+  });
 });
 
 describe('parseWorkloads', () => {
