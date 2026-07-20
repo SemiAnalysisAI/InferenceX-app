@@ -103,7 +103,6 @@ const CACHE_STRINGS = {
     gpuHitRate: 'GPU Cache Hit Rate',
     cpuHitRate: 'CPU Cache Hit Rate',
     theoreticalHitRate: 'Theoretical Cache Hit Rate',
-    none: 'None',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
   },
@@ -115,7 +114,6 @@ const CACHE_STRINGS = {
     gpuHitRate: 'GPU Cache 命中率',
     cpuHitRate: 'CPU Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
-    none: '无',
     legacyEnabled: '已启用（旧版数据）',
     legacyDisabled: '已禁用（旧版数据）',
   },
@@ -139,9 +137,8 @@ const CACHE_IMPLEMENTATION_LABELS: Record<string, string> = {
 const cacheImplementationLabel = (value: string): string =>
   CACHE_IMPLEMENTATION_LABELS[value.toLowerCase()] ?? value;
 
-const offloadTypeLabel = (value: string, locale: Locale): string => {
+const offloadTypeLabel = (value: string): string => {
   if (value.toLowerCase() === 'dram') return 'DRAM';
-  if (value.toLowerCase() === 'none') return CACHE_STRINGS[locale].none;
   return value.toUpperCase();
 };
 
@@ -152,9 +149,10 @@ const offloadTypeLabel = (value: string, locale: Locale): string => {
 const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => {
   const t = CACHE_STRINGS[locale];
   const parts: string[] = [];
-  if (d.kv_offloading) {
-    parts.push(tooltipLine(t.offloadType, offloadTypeLabel(d.kv_offloading, locale)));
-  } else if (d.benchmark_type === 'agentic_traces' && d.offload_mode) {
+  const offloadType = d.kv_offloading?.trim();
+  if (offloadType && offloadType.toLowerCase() !== 'none') {
+    parts.push(tooltipLine(t.offloadType, offloadTypeLabel(offloadType)));
+  } else if (!offloadType && d.benchmark_type === 'agentic_traces' && d.offload_mode) {
     const enabled = d.offload_mode.toLowerCase() === 'on';
     parts.push(tooltipLine(t.offloadType, enabled ? t.legacyEnabled : t.legacyDisabled));
   }

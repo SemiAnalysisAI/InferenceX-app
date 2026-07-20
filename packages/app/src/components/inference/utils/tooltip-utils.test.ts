@@ -376,11 +376,14 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('<strong>路由器:</strong> vLLM Router 0.1.14');
   });
 
-  it('localizes an empty offload tier on /zh surfaces', () => {
-    const html = generateTooltipContent(
+  it('omits the offload type row when the canonical tier is none', () => {
+    const en = generateTooltipContent(tooltipConfig({ data: pt({ kv_offloading: 'none' }) }));
+    const zh = generateTooltipContent(
       tooltipConfig({ locale: 'zh', data: pt({ kv_offloading: 'none' }) }),
     );
-    expect(html).toContain('<strong>卸载类型:</strong> 无');
+
+    expect(en).not.toContain('Offload Type');
+    expect(zh).not.toContain('卸载类型');
   });
 
   it('falls back to hwKey when hardware config entry is missing', () => {
@@ -500,7 +503,7 @@ describe('generateOverlayTooltipContent', () => {
       }),
     );
 
-    expect(html).toContain('<strong>Offload Type:</strong> None');
+    expect(html).not.toContain('Offload Type');
     expect(html).not.toContain('CPU Cache Hit Rate');
   });
 });
