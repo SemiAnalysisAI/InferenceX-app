@@ -1,7 +1,9 @@
 /**
  * TCO feed — per-hardware Pareto-frontier throughput reads at fixed
  * interactivity tiers, consumed by external spreadsheet TCO models
- * (Excel / Power Query) via /api/v1/tco-feed.
+ * (Excel / Power Query) via /api/v1/tco-feed. The scores view
+ * (computeTcoScores) folds those per-tier reads into a single tier-weighted,
+ * workload-blended, output-equivalent number per chip.
  *
  * Reuses the calculator's frontier + monotone-spline code (interpolation.ts)
  * so every number matches what the dashboard chart renders at the same
@@ -66,10 +68,23 @@ export const DEFAULT_WORKLOADS: readonly TcoFeedWorkload[] = [
   { isl: 1024, osl: 1024 },
   { isl: 8192, osl: 1024 },
 ];
+/**
+ * Traffic-mix weights for DEFAULT_TIERS: most tokens are served in the
+ * 30–75 tok/s/user band; 100+ is a premium sliver. Only used when the
+ * request keeps the default tiers — custom tiers default to equal weights.
+ */
+export const DEFAULT_TIER_WEIGHTS: readonly number[] = [0.35, 0.4, 0.2, 0.05];
+/**
+ * Default input-token value ratio for the output-equivalent conversion
+ * `out × (1 + α × ISL/OSL)` — prefill work is worth ~25% of decode work
+ * per token, consistent with prevailing API input:output pricing.
+ */
+export const DEFAULT_ALPHA = 0.25;
 
 const MAX_TIERS = 20;
 const MAX_TIER_VALUE = 10_000;
 const MAX_WORKLOADS = 8;
+const MAX_ALPHA = 10;
 
 /**
  * Parse `tiers=30,50,75,100`. Absent/blank → defaults; any invalid entry →
@@ -92,22 +107,84 @@ export function parseTiers(raw: string | null): number[] | null {
 
 /**
  * Parse `workloads=1024x1024,8192x1024` (lowercase `x` separator).
- * Absent/blank → defaults; any invalid entry → null (caller responds 400).
+ * Absent/blank → defaults; any invalid or duplicate entry → null (caller
+ * responds 400 — duplicates would double-count in the scores view).
  */
 export function parseWorkloads(raw: string | null): TcoFeedWorkload[] | null {
   if (raw === null || raw.trim() === '') return [...DEFAULT_WORKLOADS];
   const parts = raw.split(',').map((s) => s.trim());
   if (parts.length > MAX_WORKLOADS) return null;
   const workloads: TcoFeedWorkload[] = [];
+  const seen = new Set<string>();
   for (const part of parts) {
     const match = /^(?<isl>\d{1,7})x(?<osl>\d{1,7})$/u.exec(part);
     if (!match?.groups) return null;
     const isl = Number(match.groups.isl);
     const osl = Number(match.groups.osl);
     if (isl <= 0 || osl <= 0) return null;
+    const key = `${isl}x${osl}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
     workloads.push({ isl, osl });
   }
   return workloads;
+}
+
+/**
+ * Parse a comma-separated non-negative weight list of exactly `expected`
+ * entries, normalized to sum to 1. Any invalid entry or a zero sum → null.
+ */
+function parseWeightList(raw: string, expected: number): number[] | null {
+  const parts = raw.split(',').map((s) => s.trim());
+  if (parts.length !== expected) return null;
+  const weights: number[] = [];
+  for (const part of parts) {
+    const value = Number(part);
+    if (part === '' || !Number.isFinite(value) || value < 0) return null;
+    weights.push(value);
+  }
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (sum <= 0) return null;
+  return weights.map((w) => w / sum);
+}
+
+/**
+ * Parse `weights=0.35,0.4,0.2,0.05` (one per tier, normalized to sum 1).
+ * Absent/blank → DEFAULT_TIER_WEIGHTS when the tiers are exactly
+ * DEFAULT_TIERS, equal weights otherwise; invalid → null (caller 400s).
+ */
+export function parseTierWeights(raw: string | null, tiers: readonly number[]): number[] | null {
+  if (raw === null || raw.trim() === '') {
+    const isDefaultTiers =
+      tiers.length === DEFAULT_TIERS.length && tiers.every((t, i) => t === DEFAULT_TIERS[i]);
+    if (isDefaultTiers) return [...DEFAULT_TIER_WEIGHTS];
+    return tiers.map(() => 1 / tiers.length);
+  }
+  return parseWeightList(raw, tiers.length);
+}
+
+/**
+ * Parse `workload_weights=0.5,0.5` (one per workload, normalized to sum 1).
+ * Absent/blank → equal split; invalid → null (caller 400s).
+ */
+export function parseWorkloadWeights(
+  raw: string | null,
+  workloads: readonly TcoFeedWorkload[],
+): number[] | null {
+  if (raw === null || raw.trim() === '') return workloads.map(() => 1 / workloads.length);
+  return parseWeightList(raw, workloads.length);
+}
+
+/**
+ * Parse `alpha=0.25` — the input-token value ratio in the score view's
+ * output-equivalent conversion. Absent/blank → DEFAULT_ALPHA; invalid
+ * (non-finite, negative, > 10) → null (caller 400s).
+ */
+export function parseAlpha(raw: string | null): number | null {
+  if (raw === null || raw.trim() === '') return DEFAULT_ALPHA;
+  const value = Number(raw.trim());
+  if (!Number.isFinite(value) || value < 0 || value > MAX_ALPHA) return null;
+  return value;
 }
 
 interface FrontierPoint {
@@ -241,4 +318,144 @@ const CSV_COLUMNS = [
 export function tcoFeedToCsv(rows: readonly TcoFeedRow[]): string {
   const lines = rows.map((row) => CSV_COLUMNS.map((col) => String(row[col])).join(','));
   return `${[CSV_COLUMNS.join(','), ...lines].join('\n')}\n`;
+}
+
+export interface TcoScoreRow {
+  hardware: string;
+  /**
+   * Tier-weighted, workload-blended, output-equivalent throughput
+   * (tok/s/GPU) — the single per-chip number a TCO sheet consumes.
+   */
+  score: number;
+  /**
+   * Tier-weighted output tok/s/GPU per requested workload key, BEFORE the
+   * output-equivalent factor and workload blend; null = no benchmark data
+   * for that workload (as opposed to 0 = every tier unreachable).
+   */
+  workload_scores: Record<string, number | null>;
+  workloads_covered: number;
+  /** Tier reads (across covered workloads) above the capability ceiling. */
+  unreachable_tiers: number;
+  /** Tier reads (across covered workloads) below the sweep floor. */
+  clamped_tiers: number;
+  /** Newest frontier-knot date across covered workloads. */
+  latest_date: string;
+  /** Oldest frontier-knot date across covered workloads. */
+  oldest_frontier_date: string;
+}
+
+/**
+ * Aggregate per-tier feed rows into one score per hardware:
+ *
+ *   score = Σ_covered workloads [ wWeight × (Σ_tiers tierWeight × tput) × (1 + α × ISL/OSL) ]
+ *
+ * - Unreachable tiers contribute 0 at full weight — the chip genuinely
+ *   cannot serve that traffic segment (matches the feed's boundary docs).
+ * - Workloads with no data are EXCLUDED and the workload weights are
+ *   renormalized over covered ones — absence of a sweep is a coverage gap,
+ *   not a capability limit; `workloads_covered` flags the reduced basis.
+ * - Aggregates from the already-rounded feed values, so a consumer can
+ *   reproduce `score` exactly by SUMPRODUCT over the `points` view.
+ */
+export function computeTcoScores(
+  feedRows: readonly TcoFeedRow[],
+  workloads: readonly TcoFeedWorkload[],
+  tiers: readonly number[],
+  tierWeights: readonly number[],
+  workloadWeights: readonly number[],
+  alpha: number,
+): TcoScoreRow[] {
+  const byHardware = new Map<string, TcoFeedRow[]>();
+  for (const row of feedRows) {
+    const bucket = byHardware.get(row.hardware);
+    if (bucket) bucket.push(row);
+    else byHardware.set(row.hardware, [row]);
+  }
+
+  const out: TcoScoreRow[] = [];
+  for (const hardware of [...byHardware.keys()].toSorted((a, b) => a.localeCompare(b))) {
+    const hwRows = byHardware.get(hardware)!;
+    const workloadScores: Record<string, number | null> = {};
+    let unreachable = 0;
+    let clamped = 0;
+    let latest = '';
+    let oldest = '';
+    let coveredWeight = 0;
+    let blended = 0;
+
+    for (const [w, workload] of workloads.entries()) {
+      const key = `${workload.isl}x${workload.osl}`;
+      // computeTcoFeed emits per-workload rows in `tiers` order.
+      const tierRows = hwRows.filter((r) => r.workload === key);
+      if (tierRows.length !== tiers.length) {
+        workloadScores[key] = null;
+        continue;
+      }
+      let weighted = 0;
+      for (const [i, row] of tierRows.entries()) {
+        weighted += tierWeights[i] * row.output_tput_per_gpu;
+        if (row.boundary === 'unreachable') unreachable += 1;
+        if (row.boundary === 'clamped_low') clamped += 1;
+      }
+      workloadScores[key] = round3(weighted);
+      coveredWeight += workloadWeights[w];
+      blended += workloadWeights[w] * weighted * (1 + (alpha * workload.isl) / workload.osl);
+      // 'YYYY-MM-DD' compares chronologically as a string.
+      if (latest === '' || tierRows[0].latest_date > latest) latest = tierRows[0].latest_date;
+      if (oldest === '' || tierRows[0].oldest_frontier_date < oldest) {
+        oldest = tierRows[0].oldest_frontier_date;
+      }
+    }
+
+    // Every hardware in feedRows covers ≥1 workload, so coveredWeight can
+    // only be 0 when the caller zero-weighted all its covered workloads.
+    const covered = Object.values(workloadScores).filter((v) => v !== null).length;
+    out.push({
+      hardware,
+      score: coveredWeight > 0 ? round3(blended / coveredWeight) : 0,
+      workload_scores: workloadScores,
+      workloads_covered: covered,
+      unreachable_tiers: unreachable,
+      clamped_tiers: clamped,
+      latest_date: latest,
+      oldest_frontier_date: oldest,
+    });
+  }
+  return out;
+}
+
+/**
+ * Serialize score rows as CSV. One `score_<isl>x<osl>` column per requested
+ * workload, in request order; an uncovered workload is an empty field.
+ * Same no-quoting invariant as tcoFeedToCsv — every value is a number, ISO
+ * date, hardware key, or `<digits>x<digits>` workload key.
+ */
+export function tcoScoresToCsv(
+  rows: readonly TcoScoreRow[],
+  workloads: readonly TcoFeedWorkload[],
+): string {
+  const workloadKeys = workloads.map((w) => `${w.isl}x${w.osl}`);
+  const header = [
+    'hardware',
+    'score',
+    ...workloadKeys.map((k) => `score_${k}`),
+    'workloads_covered',
+    'unreachable_tiers',
+    'clamped_tiers',
+    'latest_date',
+    'oldest_frontier_date',
+  ];
+  const lines = rows.map((row) =>
+    [
+      row.hardware,
+      row.score,
+      ...workloadKeys.map((k) => row.workload_scores[k] ?? ''),
+      row.workloads_covered,
+      row.unreachable_tiers,
+      row.clamped_tiers,
+      row.latest_date,
+      row.oldest_frontier_date,
+    ].join(','),
+  );
+  return `${[header.join(','), ...lines].join('\n')}\n`;
 }

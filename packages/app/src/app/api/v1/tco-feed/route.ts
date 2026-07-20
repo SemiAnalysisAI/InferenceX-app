@@ -10,9 +10,14 @@ import { loadFixture } from '@/lib/test-fixtures';
 
 import {
   computeTcoFeed,
+  computeTcoScores,
+  parseAlpha,
   parseTiers,
+  parseTierWeights,
   parseWorkloads,
+  parseWorkloadWeights,
   tcoFeedToCsv,
+  tcoScoresToCsv,
   type TcoFeedRow,
   type TcoFeedSourceRow,
   type TcoFeedWorkload,
@@ -31,9 +36,11 @@ export const dynamic = 'force-dynamic';
  * data" convention: it applies the dashboard's frontier interpolation
  * (calculator/interpolation.ts) server-side so external consumers get
  * numbers identical to what the chart renders, without reimplementing —
- * and inevitably drifting from — the spline. Keep all *assumptions*
- * (tier weights, workload mix, token-value ratios) out of this route;
- * it serves reads, consumers apply weights.
+ * and inevitably drifting from — the spline. Assumptions (tier weights,
+ * workload mix, the α token-value ratio) enter ONLY as query params on the
+ * `scores` view, never as hidden constants beyond the documented defaults —
+ * a published sheet's URL fully records its methodology, and `view=scores`
+ * is exactly SUMPRODUCT over the `points` view, reproducible by hand.
  *
  * Query params (all optional):
  * - model     — DB key (`dsv4`) or display name (`DeepSeek-V4-Pro`).
@@ -45,6 +52,21 @@ export const dynamic = 'force-dynamic';
  * - date      — `YYYY-MM-DD`; reads use data as of this date
  *               (reproducibility of published sheets). Default: latest.
  * - format    — `json` (default) or `csv` (one-line Power Query import).
+ * - view      — `points` (default): one row per hardware × workload × tier.
+ *               `scores`: one row per hardware — tier-weighted, workload-
+ *               blended, output-equivalent tok/s/GPU (the single number a
+ *               TCO sheet consumes per chip).
+ *
+ * `scores`-only params (400 with `view=points`):
+ * - weights          — per-tier traffic-mix weights, comma-separated,
+ *                      normalized to sum 1. Default `0.35,0.4,0.2,0.05`
+ *                      for the default tiers, equal weights otherwise.
+ * - workload_weights — per-workload blend weights, normalized to sum 1.
+ *                      Default: equal split. Renormalized over covered
+ *                      workloads when a chip lacks data for one.
+ * - alpha            — input-token value ratio in the output-equivalent
+ *                      conversion `out × (1 + α × ISL/OSL)`. Default 0.25;
+ *                      `alpha=0` scores plain output throughput.
  */
 
 const getCachedTcoFeed = cachedQuery(
@@ -104,10 +126,74 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid format — expected json or csv' }, { status: 400 });
   }
 
+  const view = params.get('view') ?? 'points';
+  if (view !== 'points' && view !== 'scores') {
+    return NextResponse.json(
+      { error: 'Invalid view — expected points or scores' },
+      { status: 400 },
+    );
+  }
+
+  const rawWeights = params.get('weights');
+  const rawWorkloadWeights = params.get('workload_weights');
+  const rawAlpha = params.get('alpha');
+  if (view === 'points' && (rawWeights ?? rawWorkloadWeights ?? rawAlpha) !== null) {
+    // Reject rather than ignore — a consumer passing weights to the points
+    // view would silently get unweighted numbers.
+    return NextResponse.json(
+      { error: 'weights, workload_weights, and alpha require view=scores' },
+      { status: 400 },
+    );
+  }
+
+  const tierWeights = parseTierWeights(rawWeights, tiers);
+  if (!tierWeights) {
+    return NextResponse.json(
+      { error: 'Invalid weights — expected one non-negative number per tier, sum > 0' },
+      { status: 400 },
+    );
+  }
+
+  const workloadWeights = parseWorkloadWeights(rawWorkloadWeights, workloads);
+  if (!workloadWeights) {
+    return NextResponse.json(
+      {
+        error: 'Invalid workload_weights — expected one non-negative number per workload, sum > 0',
+      },
+      { status: 400 },
+    );
+  }
+
+  const alpha = parseAlpha(rawAlpha);
+  if (alpha === null) {
+    return NextResponse.json(
+      { error: 'Invalid alpha — expected a number in [0, 10]' },
+      { status: 400 },
+    );
+  }
+
   try {
     const rows = FIXTURES_MODE
       ? computeTcoFeed(loadFixture<TcoFeedSourceRow[]>('benchmarks'), workloads, tiers)
       : await getCachedTcoFeed(dbModelKeys, date, workloads, tiers);
+
+    if (view === 'scores') {
+      const scores = computeTcoScores(rows, workloads, tiers, tierWeights, workloadWeights, alpha);
+      if (format === 'csv') {
+        return cachedText(tcoScoresToCsv(scores, workloads), 'text/csv; charset=utf-8');
+      }
+      return cachedJson({
+        model,
+        db_model_keys: dbModelKeys,
+        date: date ?? null,
+        workloads: workloads.map((w) => `${w.isl}x${w.osl}`),
+        tiers,
+        weights: tierWeights,
+        workload_weights: workloadWeights,
+        alpha,
+        rows: scores,
+      });
+    }
 
     if (format === 'csv') {
       return cachedText(tcoFeedToCsv(rows), 'text/csv; charset=utf-8');
