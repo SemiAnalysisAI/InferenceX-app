@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { configKeyMatchesHwKey, formatConfigKeys } from './changelogFormatters';
+import {
+  changelogConfigToHwKey,
+  configKeyMatchesHwKey,
+  formatConfigKeys,
+} from './changelogFormatters';
 
 describe('formatConfigKeys', () => {
   it('formats a standard config key', () => {
@@ -43,6 +47,26 @@ describe('formatConfigKeys', () => {
     expect(result).toContain('TRTLLM');
     expect(result).toContain('FP4');
   });
+
+  it('uses the legend framework label for an agentic HiCache config', () => {
+    expect(formatConfigKeys('dsv4-fp4-mi355x-mori-sglang-agentic-hicache')).toBe(
+      'MI355X (MoRI SGLang) DeepSeek-V4-Pro FP4',
+    );
+  });
+});
+
+describe('changelogConfigToHwKey', () => {
+  it('strips agentic scenario and cache-backend suffixes from the legend identity', () => {
+    expect(changelogConfigToHwKey('dsv4-fp4-mi355x-mori-sglang-agentic-hicache')).toBe(
+      'mi355x_mori-sglang',
+    );
+  });
+
+  it('keeps a trailing MTP spec method while dropping agentic metadata', () => {
+    expect(changelogConfigToHwKey('dsv4-fp4-mi355x-sglang-agentic-hicache-mtp')).toBe(
+      'mi355x_sglang_mtp',
+    );
+  });
 });
 
 describe('configKeyMatchesHwKey', () => {
@@ -66,6 +90,12 @@ describe('configKeyMatchesHwKey', () => {
 
   it('matches old sglang-disagg keys to mori-sglang hwKey', () => {
     expect(configKeyMatchesHwKey('dsr1-fp8-mi355x-sglang-disagg', 'mi355x_mori-sglang')).toBe(true);
+  });
+
+  it('matches an agentic HiCache changelog key to the framework-only legend key', () => {
+    expect(
+      configKeyMatchesHwKey('dsv4-fp4-mi355x-mori-sglang-agentic-hicache', 'mi355x_mori-sglang'),
+    ).toBe(true);
   });
 
   it('matches sglang framework', () => {
