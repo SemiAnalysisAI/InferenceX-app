@@ -126,6 +126,16 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('tp');
       expect(result!.metrics).not.toHaveProperty('ep');
     });
+
+    it('preserves the KV transfer engine for fixed-sequence multinode rows', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV1Row({ is_multinode: true, kv_p2p_transfer: 'nixl' }),
+        tracker,
+      );
+
+      expect((result!.metrics as Record<string, unknown>).kv_p2p_transfer).toBe('nixl');
+    });
   });
 
   describe('v2 schema', () => {
@@ -856,6 +866,20 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(result!.offloadMode).toBe('on');
     expect((result!.metrics as Record<string, unknown>).kv_offloading).toBe('dram');
     expect((result!.metrics as Record<string, unknown>).kv_offload_backend).toBe('mooncake');
+  });
+
+  it('flattens current backend metadata and preserves its independent version', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({
+        kv_offloading: 'dram',
+        kv_offload_backend: { name: 'lmcache', version: '0.5.1' },
+      }),
+      tracker,
+    );
+    const metrics = result!.metrics as Record<string, unknown>;
+    expect(metrics.kv_offload_backend).toBe('lmcache');
+    expect(metrics.kv_offload_backend_version).toBe('0.5.1');
   });
 
   it('still applies the failed-run guard to v3 rows', () => {

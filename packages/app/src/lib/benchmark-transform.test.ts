@@ -123,6 +123,24 @@ describe('rowToAggDataEntry', () => {
     expect(entryNull.image).toBeUndefined();
   });
 
+  it('passes runtime cache metadata through to chart points', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          kv_offloading: 'dram',
+          kv_offload_backend: 'mooncake',
+          kv_offload_backend_version: '0.3.11.post1',
+          kv_p2p_transfer: 'nixl',
+        } as unknown as BenchmarkRow['metrics'],
+      }),
+    );
+
+    expect(entry.kv_offloading).toBe('dram');
+    expect(entry.kv_offload_backend).toBe('mooncake');
+    expect(entry.kv_offload_backend_version).toBe('0.3.11.post1');
+    expect(entry.kv_p2p_transfer).toBe('nixl');
+  });
+
   it('passes through measured power telemetry fields when present', () => {
     const entry = rowToAggDataEntry(
       makeRow({

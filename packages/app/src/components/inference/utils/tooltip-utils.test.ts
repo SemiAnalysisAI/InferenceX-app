@@ -245,6 +245,56 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('FP8');
   });
 
+  it('shows offload type, backend, and version instead of the binary offload mode', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          offload_mode: 'on',
+          kv_offloading: 'dram',
+          kv_offload_backend: 'mooncake',
+          kv_offload_backend_version: '0.3.11.post1',
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>Offload Type:</strong> DRAM');
+    expect(html).toContain('<strong>Offload Backend:</strong> Mooncake 0.3.11.post1');
+    expect(html).not.toContain('Offload Mode');
+  });
+
+  it('shows multinode KV transfer and cache-hit metadata for fixed-sequence points', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'single_turn',
+          is_multinode: true,
+          kv_p2p_transfer: 'nixl',
+          server_gpu_cache_hit_rate: 0.875,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>KV Cache Transfer Engine:</strong> NIXL');
+    expect(html).toContain('<strong>GPU Cache Hit Rate:</strong> 87.5%');
+  });
+
+  it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({ kv_offloading: 'dram', kv_offload_backend: 'lmcache' }),
+      }),
+    );
+    expect(html).toContain('<strong>卸载类型:</strong> DRAM');
+    expect(html).toContain('<strong>卸载后端:</strong> LMCache');
+  });
+
+  it('localizes an empty offload tier on /zh surfaces', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ locale: 'zh', data: pt({ kv_offloading: 'none' }) }),
+    );
+    expect(html).toContain('<strong>卸载类型:</strong> 无');
+  });
+
   it('falls back to hwKey when hardware config entry is missing', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ hwKey: 'unknown_gpu' }) }));
     expect(html).toContain('unknown_gpu');
@@ -327,6 +377,22 @@ describe('generateOverlayTooltipContent', () => {
     const html = generateOverlayTooltipContent(overlayConfig());
     expect(html).toContain('Concurrency');
     expect(html).toContain('64');
+  });
+
+  it('shows cache metadata for unofficial agentic overlays', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          kv_offloading: 'dram',
+          kv_offload_backend: 'hicache',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>Offload Type:</strong> DRAM');
+    expect(html).toContain('<strong>Offload Backend:</strong> HiCache');
+    expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
   });
 });
 

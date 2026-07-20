@@ -65,6 +65,7 @@ const NON_METRIC_KEYS = new Set([
   // to offloadMode / stringified metrics explicitly in mapBenchmarkRow.
   'kv_offloading',
   'kv_offload_backend',
+  'kv_p2p_transfer',
   // v3 agentic nested containers — flattened by flattenAgenticAggRow before
   // the auto-capture loop runs; the raw objects themselves are not metrics.
   'request_metrics',
@@ -88,6 +89,22 @@ export type BenchmarkType = 'single_turn' | 'agentic_traces';
 /** Reduce an offload descriptor ('none'|'dram'|…) to the binary on/off. */
 function descriptorToOnOff(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? (v === 'none' ? 'off' : 'on') : null;
+}
+
+function nonEmptyString(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
+}
+
+/** Normalize legacy string and current `{ name, version? }` backend metadata. */
+function kvOffloadBackendMetadata(raw: unknown): { name?: string; version?: string } {
+  const legacyName = nonEmptyString(raw);
+  if (legacyName) return { name: legacyName };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const metadata = raw as Record<string, unknown>;
+  return {
+    name: nonEmptyString(metadata.name),
+    version: nonEmptyString(metadata.version),
+  };
 }
 
 /**
@@ -233,17 +250,22 @@ export function mapBenchmarkRow(
   const metrics = captureNumericMetrics(row);
 
   // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
-  // — preserve as a stringified metric so the frontend can expose it in tooltips.
-  // v3 rows additionally carry the offload tier + backend ('dram'/'mooncake');
-  // keep them so the UI can say *what kind* of offload, not just on/off.
+  // — preserve as a stringified metric for legacy readers. Runtime cache
+  // descriptors are kept for every benchmark type so fixed-sequence multinode
+  // rows can expose their P2P transfer engine alongside agentic offload details.
   if (isAgentic) {
     (metrics as Record<string, unknown>).offload_mode = offloadModeRaw;
-    if (typeof row.kv_offloading === 'string' && row.kv_offloading.length > 0) {
-      (metrics as Record<string, unknown>).kv_offloading = row.kv_offloading;
-    }
-    if (typeof row.kv_offload_backend === 'string' && row.kv_offload_backend.length > 0) {
-      (metrics as Record<string, unknown>).kv_offload_backend = row.kv_offload_backend;
-    }
+  }
+  const kvOffloading = nonEmptyString(row.kv_offloading);
+  if (kvOffloading) (metrics as Record<string, unknown>).kv_offloading = kvOffloading;
+  const backend = kvOffloadBackendMetadata(row.kv_offload_backend);
+  if (backend.name) (metrics as Record<string, unknown>).kv_offload_backend = backend.name;
+  if (backend.version) {
+    (metrics as Record<string, unknown>).kv_offload_backend_version = backend.version;
+  }
+  const kvP2pTransfer = nonEmptyString(row.kv_p2p_transfer);
+  if (kvP2pTransfer) {
+    (metrics as Record<string, unknown>).kv_p2p_transfer = kvP2pTransfer;
   }
 
   // Slow-tail interactivity invariant. Agentic artifacts ship `*_intvty`, but the
