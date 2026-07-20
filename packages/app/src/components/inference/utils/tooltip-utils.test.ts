@@ -317,6 +317,48 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('<strong>GPU Cache Hit Rate:</strong> 87.5%');
   });
 
+  it('hides stale CPU cache hits when offload is disabled', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          kv_offloading: 'none',
+          offload_mode: 'on',
+          server_gpu_cache_hit_rate: 0.8,
+          server_cpu_cache_hit_rate: 0.42,
+          theoretical_cache_hit_rate: 0.9,
+        }),
+      }),
+    );
+
+    expect(html).not.toContain('CPU Cache Hit Rate');
+    expect(html).toContain('<strong>GPU Cache Hit Rate:</strong> 80.0%');
+    expect(html).toContain('<strong>Theoretical Cache Hit Rate:</strong> 90.0%');
+  });
+
+  it('uses legacy offload mode to gate CPU cache hits when no descriptor exists', () => {
+    const disabled = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          kv_offloading: undefined,
+          offload_mode: 'off',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+    const enabled = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          kv_offloading: undefined,
+          offload_mode: 'on',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+
+    expect(disabled).not.toContain('CPU Cache Hit Rate');
+    expect(enabled).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+  });
+
   it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -444,6 +486,22 @@ describe('generateOverlayTooltipContent', () => {
     expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
     expect(html).toContain('<strong>Router:</strong> SGLang Router 0.3.2');
     expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+  });
+
+  it('hides stale CPU cache hits for unofficial overlays without offload', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          kv_offloading: 'none',
+          offload_mode: 'off',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+
+    expect(html).toContain('<strong>Offload Type:</strong> None');
+    expect(html).not.toContain('CPU Cache Hit Rate');
   });
 });
 
