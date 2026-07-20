@@ -2283,6 +2283,7 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       chartDefinition,
+      locale,
     ]);
 
     // Layers handle for the decoration effect — lets it re-run individual

@@ -103,6 +103,8 @@ const CACHE_STRINGS = {
     cpuHitRate: 'CPU Cache Hit Rate',
     theoreticalHitRate: 'Theoretical Cache Hit Rate',
     none: 'None',
+    legacyEnabled: 'Enabled (legacy data)',
+    legacyDisabled: 'Disabled (legacy data)',
   },
   zh: {
     offloadType: '卸载类型',
@@ -113,6 +115,8 @@ const CACHE_STRINGS = {
     cpuHitRate: 'CPU Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
     none: '无',
+    legacyEnabled: '已启用（旧版数据）',
+    legacyDisabled: '已禁用（旧版数据）',
   },
 } as const;
 
@@ -149,6 +153,9 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   const parts: string[] = [];
   if (d.kv_offloading) {
     parts.push(tooltipLine(t.offloadType, offloadTypeLabel(d.kv_offloading, locale)));
+  } else if (d.offload_mode) {
+    const enabled = d.offload_mode.toLowerCase() === 'on';
+    parts.push(tooltipLine(t.offloadType, enabled ? t.legacyEnabled : t.legacyDisabled));
   }
   if (d.kv_offload_backend) {
     const backend = cacheImplementationLabel(d.kv_offload_backend);
