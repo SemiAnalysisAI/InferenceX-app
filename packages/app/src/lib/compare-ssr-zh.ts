@@ -9,17 +9,25 @@ import {
   AUTHOR_NAME,
   AUTHOR_URL,
   HW_REGISTRY,
+  SITE_NAME,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
 
-import { type CompareModelSlug, compareModelDisplayLabel } from '@/lib/compare-slug';
+import {
+  type CompareModelSlug,
+  compareDisplayLabel,
+  compareModelDisplayLabel,
+  compareModelSeoName,
+} from '@/lib/compare-slug';
 import {
   bandFor,
   type CompareJsonLdVariant,
+  computeCompareStat,
   fmtCost,
   fmtPctDelta,
   type FullBoth,
   jsonLdEntryFor,
+  META_DESCRIPTION_MAX,
   type PairSummary,
   type PerDollarBoth,
   pickRotated,
@@ -272,6 +280,67 @@ export function compareTableNarrativeZh(
   }
 
   return paragraphs;
+}
+
+// ---------------------------------------------------------------------------
+// SEO meta description — Chinese port of compareMetaDescription
+// ---------------------------------------------------------------------------
+
+/** First candidate ≤ max, or undefined. Local mirror of the private helper in
+ *  compare-ssr.ts so the ladder logic stays identical between the two files. */
+function firstUnderZh(candidates: string[], max: number): string | undefined {
+  return candidates.find((c) => c.length <= max);
+}
+
+/** Simplified Chinese, stat-led, ≤155-char meta description for a
+ *  `/zh/compare/<slug>` page. 1:1 port of `compareMetaDescription`: same
+ *  representative-row stat (`computeCompareStat`), same fallback-to-boilerplate
+ *  and brand-clause-drop ladders. Model name, GPU SKUs and units stay English
+ *  per the translation rules; the connective prose is Chinese. */
+export function compareMetaDescriptionZh(
+  model: CompareModelSlug,
+  a: string,
+  b: string,
+  ssrRows: SsrInterpolatedRow[],
+): string {
+  const modelName = compareModelSeoName(model);
+  const gpuLabel = compareDisplayLabel(a, b);
+
+  const fallback =
+    firstUnderZh(
+      [
+        `${gpuLabel} 在 ${modelName} 上的推理基准测试：来自 ${SITE_NAME}（${AUTHOR_NAME} 出品）的经验证、可复现开源结果。对比延迟、吞吐量与成本。`,
+        `${gpuLabel} 在 ${modelName} 上的推理基准测试：来自 ${SITE_NAME}（${AUTHOR_NAME} 出品）的开源结果。`,
+        `${gpuLabel} 在 ${modelName} 上的推理基准测试，来自 ${SITE_NAME}。`,
+        `${gpuLabel} 在 ${modelName} 上的推理基准测试。`,
+      ],
+      META_DESCRIPTION_MAX,
+    ) ?? `${gpuLabel} 推理基准测试`.slice(0, META_DESCRIPTION_MAX);
+
+  const stat = computeCompareStat(a, b, ssrRows);
+  if (!stat) return fallback;
+
+  const tputClause =
+    stat.tputPct > 0 ? `${stat.faster} 每 GPU 吞吐量比 ${stat.slower} 高 ${stat.tputPct}%` : null;
+  const costClause = stat.costPct > 0 ? `${stat.cheaper} 每 token 成本低 ${stat.costPct}%` : null;
+
+  let core: string;
+  if (tputClause && costClause) core = `在 ${modelName} 上，${tputClause}；${costClause}。`;
+  else if (tputClause) core = `在 ${modelName} 上，${tputClause}。`;
+  else if (costClause)
+    core = `在 ${modelName} 上，${stat.cheaper} 每 token 成本比 ${stat.pricier} 低 ${stat.costPct}%。`;
+  else return fallback;
+
+  return (
+    firstUnderZh(
+      [
+        `${core}来自 ${SITE_NAME}（${AUTHOR_NAME} 出品）的可验证开源基准测试。`,
+        `${core}来自 ${SITE_NAME} 的开源基准测试。`,
+        core,
+      ],
+      META_DESCRIPTION_MAX,
+    ) ?? fallback
+  );
 }
 
 // ---------------------------------------------------------------------------

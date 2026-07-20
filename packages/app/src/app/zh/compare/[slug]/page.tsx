@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { pickPairDefaults } from '@/lib/compare-pair-defaults';
@@ -14,6 +9,7 @@ import {
   canonicalCompareSlug,
   compareDisplayLabel,
   compareModelDisplayLabel,
+  compareModelSeoName,
   parseCompareSlug,
 } from '@/lib/compare-slug';
 import {
@@ -29,6 +25,7 @@ import {
 import {
   buildBreadcrumbJsonLdZh,
   buildJsonLdZh,
+  compareMetaDescriptionZh,
   compareTableNarrativeZh,
 } from '@/lib/compare-ssr-zh';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
@@ -48,11 +45,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!parsed) return {};
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
+  const modelSeoName = compareModelSeoName(parsed.model);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   const url = `${SITE_URL}/zh/compare/${canonical}`;
-  const description = `${gpuLabel} 在 ${parsed.model.label} 上的推理基准测试：来自 InferenceX（SemiAnalysis 推出的独立开源 GPU 基准测试平台）的经验证、可复现的正面对比结果。${SUPPORTERS_LINE_ZH}对比延迟、吞吐量与成本。`;
+
+  // GPU-pair-first title (mirrors the English page) via `absolute` so the long
+  // root template doesn't bury the search phrase. Model name / SKUs stay English.
+  const title = `${gpuLabel}：${modelSeoName} 推理基准测试 | ${SITE_NAME}`;
+
+  // Stat-led Chinese meta description from the interpolated head-to-head numbers
+  // at the slug's default operating point (falls back to boilerplate when thin).
+  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
+  const { sequence, precision } = pickPairDefaults(rows, parsed.a, parsed.b);
+  const { ssrRows } = computeCompareTableData(rows, parsed.a, parsed.b, sequence, precision);
+  const description = compareMetaDescriptionZh(parsed.model, parsed.a, parsed.b, ssrRows);
+
   return {
-    title: `${fullLabel} 推理基准测试`,
+    title: { absolute: title },
     description,
     alternates: zhAlternates(`/compare/${canonical}`),
     openGraph: {

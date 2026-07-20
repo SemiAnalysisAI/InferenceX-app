@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 
 import {
+  blogDescription,
   extractHeadings,
   getAdjacentPosts,
   getAllPosts,
@@ -9,6 +10,7 @@ import {
   getReadingTime,
   hasZhTranslation,
   slugify,
+  smartTruncate,
 } from './blog';
 
 const FAKE_MDX = `---
@@ -176,6 +178,60 @@ describe('getReadingTime', () => {
     // 400 Han chars (1 min at 400 cpm) + 265 Latin words (1 min at 265 wpm)
     const mixed = `${'理'.repeat(400)} ${Array.from({ length: 265 }, () => 'word').join(' ')}`;
     expect(getReadingTime(mixed)).toBe(2);
+  });
+});
+
+describe('smartTruncate', () => {
+  it('returns the text unchanged (no ellipsis) when at or under the limit', () => {
+    expect(smartTruncate('Short and sweet.', 155)).toBe('Short and sweet.');
+    const exact = 'x'.repeat(20);
+    expect(smartTruncate(exact, 20)).toBe(exact);
+    expect(smartTruncate('  trimmed  ', 155)).toBe('trimmed');
+  });
+
+  it('cuts at a word boundary (never mid-word) and appends an ellipsis', () => {
+    const text = Array.from({ length: 60 }, () => 'word').join(' '); // 60×"word " → 299 chars
+    const out = smartTruncate(text, 155);
+    expect(out.length).toBeLessThanOrEqual(155);
+    expect(out.endsWith('…')).toBe(true);
+    const body = out.slice(0, -1);
+    // Every retained token is a complete "word" — no "wor"/"rd" fragments.
+    expect(body.split(' ').every((t) => t === 'word')).toBe(true);
+  });
+
+  it('strips trailing punctuation before the ellipsis', () => {
+    const text = `${'alpha, '.repeat(40)}beta`; // lands the cut right after a comma
+    const out = smartTruncate(text, 50);
+    const body = out.slice(0, -1);
+    expect(out.endsWith('…')).toBe(true);
+    expect(/[\s,]$/u.test(body)).toBe(false);
+    expect(out.length).toBeLessThanOrEqual(50);
+  });
+
+  it('hard-cuts CJK prose (no spaces) and stays within the limit', () => {
+    const cjk = '推'.repeat(200);
+    const out = smartTruncate(cjk, 155);
+    expect(out.length).toBeLessThanOrEqual(155);
+    expect(out.endsWith('…')).toBe(true);
+  });
+});
+
+describe('blogDescription', () => {
+  it('returns the explicit seoDescription verbatim when present', () => {
+    const meta = { seoDescription: 'Hand-written, punchy, ≤155 chars.', subtitle: 'x'.repeat(300) };
+    expect(blogDescription(meta)).toBe('Hand-written, punchy, ≤155 chars.');
+  });
+
+  it('smart-truncates the subtitle to ≤155 chars when no seoDescription is set', () => {
+    const subtitle = Array.from({ length: 60 }, () => 'word').join(' ');
+    const out = blogDescription({ subtitle });
+    expect(out).toBe(smartTruncate(subtitle, 155));
+    expect(out.length).toBeLessThanOrEqual(155);
+    expect(out.endsWith('…')).toBe(true);
+  });
+
+  it('passes a short subtitle through without an ellipsis', () => {
+    expect(blogDescription({ subtitle: 'A concise subtitle.' })).toBe('A concise subtitle.');
   });
 });
 

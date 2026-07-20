@@ -14,6 +14,7 @@ import {
   AUTHOR_NAME,
   AUTHOR_URL,
   HW_REGISTRY,
+  SITE_NAME,
   SITE_URL,
   sequenceToIslOsl,
 } from '@semianalysisai/inferencex-constants';
@@ -35,6 +36,7 @@ import {
   type ComparePair,
   type CompareModelSlug,
   compareModelDisplayLabel,
+  compareModelSeoName,
 } from '@/lib/compare-slug';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/constants';
 import { loadFixture } from '@/lib/test-fixtures';
@@ -724,6 +726,150 @@ export function compareTableNarrative(
   }
 
   return paragraphs;
+}
+
+// ---------------------------------------------------------------------------
+// SEO meta description — stat-led, ≤155 chars, per (model, GPU pair)
+// ---------------------------------------------------------------------------
+
+/** The single interpolated head-to-head stat surfaced in the meta description.
+ *  `tputPct` / `costPct` are 0 when that dimension is within ~1% (a tie). */
+export interface CompareStat {
+  aLabel: string;
+  bLabel: string;
+  gpuLabel: string;
+  faster: string;
+  slower: string;
+  /** Throughput-per-GPU advantage of `faster` over `slower`, as a whole
+   *  percent (0 when the two are within 1%). */
+  tputPct: number;
+  cheaper: string;
+  pricier: string;
+  /** Cost-per-token advantage of `cheaper` over `pricier`, as a whole percent
+   *  (0 when the two are within 1%). */
+  costPct: number;
+}
+
+/** Does a row carry a real, comparable data point for both GPUs? */
+function statRowUsable(row: SsrInterpolatedRow): boolean {
+  return Boolean(
+    row.a && row.b && row.a.value > 0 && row.b.value > 0 && row.a.cost > 0 && row.b.cost > 0,
+  );
+}
+
+/** Pick the representative interpolated row for the meta description — the
+ *  default (middle) interactivity target if it has data for both GPUs, else
+ *  the first target that does. Returns null when no target has a comparable
+ *  pair (sparse-data pairs fall back to boilerplate). */
+function pickCompareStatRow(rows: SsrInterpolatedRow[]): SsrInterpolatedRow | null {
+  const mid = rows[Math.floor(rows.length / 2)];
+  if (mid && statRowUsable(mid)) return mid;
+  return rows.find(statRowUsable) ?? null;
+}
+
+/** Language-agnostic head-to-head stat for the meta description, computed at
+ *  the default interactivity target. Shared by the English `compareMetaDescription`
+ *  and its Chinese port so both surface the same numbers. Returns null when the
+ *  pair has no comparable interpolated data. */
+export function computeCompareStat(
+  a: string,
+  b: string,
+  ssrRows: SsrInterpolatedRow[],
+): CompareStat | null {
+  const row = pickCompareStatRow(ssrRows);
+  if (!row || !row.a || !row.b) return null;
+
+  const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
+  const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
+  const rA = row.a;
+  const rB = row.b;
+
+  const aFaster = rA.value > rB.value;
+  const tputRatio = aFaster ? rA.value / rB.value : rB.value / rA.value;
+  const tputPct = Math.round((tputRatio - 1) * 100);
+
+  const aCheaper = rA.cost < rB.cost;
+  const costRatio = aCheaper ? rB.cost / rA.cost : rA.cost / rB.cost;
+  const costPct = Math.round((costRatio - 1) * 100);
+
+  return {
+    aLabel,
+    bLabel,
+    gpuLabel: compareDisplayLabel(a, b),
+    faster: aFaster ? aLabel : bLabel,
+    slower: aFaster ? bLabel : aLabel,
+    tputPct: tputPct >= 1 ? tputPct : 0,
+    cheaper: aCheaper ? aLabel : bLabel,
+    pricier: aCheaper ? bLabel : aLabel,
+    costPct: costPct >= 1 ? costPct : 0,
+  };
+}
+
+/** Length cap for meta descriptions — Google truncates SERP snippets past
+ *  ~155–160 chars, so every branch below must stay at or under this. */
+export const META_DESCRIPTION_MAX = 155;
+
+/** First candidate that fits within `max`, or undefined if none do. */
+function firstUnder(candidates: string[], max: number): string | undefined {
+  return candidates.find((c) => c.length <= max);
+}
+
+/** Stat-led, ≤155-char meta description for a `/compare/<slug>` page. Leads
+ *  with the differentiating throughput / cost delta at the default interactivity
+ *  target (the actual reason a searcher clicks) instead of the boilerplate that
+ *  was identical across ~360 pages. Falls back to a compact, still-≤155-char
+ *  boilerplate sentence when the pair has thin / degenerate data.
+ *
+ *  A trailing brand clause is dropped down a ladder (full → short → none) so a
+ *  long GPU-pair / model name never pushes the description over the cap. */
+export function compareMetaDescription(
+  model: CompareModelSlug,
+  a: string,
+  b: string,
+  ssrRows: SsrInterpolatedRow[],
+): string {
+  const modelName = compareModelSeoName(model);
+  const gpuLabel = compareDisplayLabel(a, b);
+
+  // Boilerplate fallback ladder — progressively shorter so one always fits.
+  const fallback =
+    firstUnder(
+      [
+        `${gpuLabel} inference benchmark on ${modelName}: verified, reproducible open-source results from ${SITE_NAME} by ${AUTHOR_NAME}. Latency, throughput & cost.`,
+        `${gpuLabel} inference benchmark on ${modelName}: verified open-source results from ${SITE_NAME} by ${AUTHOR_NAME}.`,
+        `${gpuLabel} inference benchmark on ${modelName} from ${SITE_NAME} by ${AUTHOR_NAME}.`,
+        `${gpuLabel} inference benchmark on ${modelName}.`,
+      ],
+      META_DESCRIPTION_MAX,
+    ) ?? `${gpuLabel} inference benchmark`.slice(0, META_DESCRIPTION_MAX);
+
+  const stat = computeCompareStat(a, b, ssrRows);
+  if (!stat) return fallback;
+
+  const tputClause =
+    stat.tputPct > 0
+      ? `${stat.faster} delivers ${stat.tputPct}% more tok/s/GPU than ${stat.slower} on ${modelName}`
+      : null;
+  const costClause =
+    stat.costPct > 0 ? `${stat.cheaper} is ${stat.costPct}% cheaper per token` : null;
+
+  let core: string;
+  if (tputClause && costClause) core = `${tputClause}; ${costClause}.`;
+  else if (tputClause) core = `${tputClause}.`;
+  else if (costClause)
+    core = `${stat.cheaper} is ${stat.costPct}% cheaper per token than ${stat.pricier} on ${modelName}.`;
+  else return fallback; // both dimensions within 1% — nothing differentiating to lead with
+
+  return (
+    firstUnder(
+      [
+        `${core} Verified open-source benchmarks from ${SITE_NAME} by ${AUTHOR_NAME}.`,
+        `${core} Verified open-source ${SITE_NAME} benchmarks.`,
+        core,
+      ],
+      META_DESCRIPTION_MAX,
+    ) ?? fallback
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,11 @@ export interface BlogFrontmatter {
   subtitle: string;
   modifiedDate?: string;
   publishDate?: string;
+  /** Optional hand-written SEO/social meta description. When set it overrides
+   *  the auto-truncated `subtitle` for the SERP snippet — use it on posts whose
+   *  `subtitle` runs past ~155 chars and would otherwise truncate mid-sentence.
+   *  Keep it ≤155 chars (English) / ≤~78 CJK chars and compelling. */
+  seoDescription?: string;
   tags?: string[];
 }
 
@@ -47,6 +52,37 @@ export function getReadingTime(content: string): number {
   const cjkChars = content.match(CJK_CHAR_REGEX)?.length ?? 0;
   const words = content.replaceAll(CJK_CHAR_REGEX, ' ').trim().split(/\s+/u).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE + cjkChars / CJK_CHARS_PER_MINUTE));
+}
+
+/** Trailing whitespace + punctuation (any script), so a truncated snippet
+ *  doesn't end in a dangling comma / dash / open bracket before the ellipsis. */
+const TRAILING_PUNCT_REGEX = /[\s\p{P}]+$/u;
+
+/**
+ * Truncate to at most `max` characters (ellipsis included) without cutting a
+ * word in half. Cuts at the last space that fits, strips trailing punctuation,
+ * and appends "…" only when the text was actually shortened. CJK prose has no
+ * spaces, so it falls back to a hard character cut (which is correct — there
+ * are no word boundaries to preserve).
+ */
+export function smartTruncate(text: string, max: number): string {
+  const clean = text.trim();
+  if (clean.length <= max) return clean;
+  // Reserve one char for the ellipsis so the result is guaranteed ≤ max.
+  const slice = clean.slice(0, max - 1);
+  const lastSpace = slice.lastIndexOf(' ');
+  const boundary = lastSpace > 0 ? slice.slice(0, lastSpace) : slice;
+  return `${boundary.replace(TRAILING_PUNCT_REGEX, '')}…`;
+}
+
+/**
+ * SERP / social meta description for a post: the explicit `seoDescription`
+ * frontmatter when present, otherwise the `subtitle` smart-truncated to a
+ * SERP-safe length. Used for the `<meta name="description">`, OpenGraph, and
+ * Twitter descriptions.
+ */
+export function blogDescription(meta: Pick<BlogPostMeta, 'seoDescription' | 'subtitle'>): string {
+  return meta.seoDescription ?? smartTruncate(meta.subtitle, 155);
 }
 
 export function getAllPosts(locale: BlogLocale = 'en'): BlogPostMeta[] {

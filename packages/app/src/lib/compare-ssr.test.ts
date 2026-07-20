@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
+import type { InterpolatedResult } from '@/components/calculator/types';
 
-import { computeCompareImageRows, KNOWN_MODELS } from './compare-ssr';
+import { COMPARE_MODEL_SLUGS } from './compare-slug';
+import {
+  compareMetaDescription,
+  computeCompareImageRows,
+  KNOWN_MODELS,
+  META_DESCRIPTION_MAX,
+  type SsrInterpolatedRow,
+} from './compare-ssr';
+import { compareMetaDescriptionZh } from './compare-ssr-zh';
 
 // BenchmarkRow.id is required (stable per-point id from benchmark_results);
 // hand out a fresh one per stub so id-keyed logic can't collide across rows.
@@ -139,5 +148,164 @@ describe('computeCompareImageRows', () => {
         [20],
       ),
     ).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// compareMetaDescription (+ zh port)
+// ---------------------------------------------------------------------------
+
+const GLM = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-1')!; // seoName 'GLM-5'
+const DSV4 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'deepseek-v4')!; // long seoName
+
+/** Minimal InterpolatedResult stub — compareMetaDescription only reads
+ *  `value` (tok/s/GPU) and `cost` ($/M tok); the rest are inert zeros. */
+function ir(value: number, cost: number): InterpolatedResult {
+  return {
+    hwKey: 'x',
+    resultKey: 'x',
+    value,
+    outputTputValue: value,
+    inputTputValue: 0,
+    cost,
+    costInput: 0,
+    costOutput: cost,
+    tpPerMw: 0,
+    inputTpPerMw: 0,
+    outputTpPerMw: 0,
+    concurrency: 0,
+    nearestPoints: [],
+  };
+}
+
+function makeSsrRows(
+  triples: [number, InterpolatedResult | null, InterpolatedResult | null][],
+): SsrInterpolatedRow[] {
+  return triples.map(([target, a, b]) => ({ target, a, b }));
+}
+
+describe('compareMetaDescription', () => {
+  it('leads with the throughput + cost stat when both dimensions differ', () => {
+    // a=B200 34% faster, b=B300 12% cheaper, at the middle (default) target.
+    const ssr = makeSsrRows([
+      [20, ir(60, 2), ir(50, 1.7)],
+      [40, ir(134, 1.12), ir(100, 1)], // 134/100 = +34%, 1.12/1.0 = +12%
+      [60, ir(200, 0.9), ir(160, 0.85)],
+    ]);
+    const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    expect(desc).toBe(
+      'B200 delivers 34% more tok/s/GPU than B300 on GLM-5; B300 is 12% cheaper per token. Verified open-source benchmarks from InferenceX by SemiAnalysis.',
+    );
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(desc.startsWith('B200 delivers 34% more tok/s/GPU than B300 on GLM-5')).toBe(true);
+  });
+
+  it('emits only the throughput clause when cost is within 1% (tied)', () => {
+    const ssr = makeSsrRows([[40, ir(134, 1), ir(100, 1)]]);
+    const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    expect(desc.includes('34% more tok/s/GPU')).toBe(true);
+    expect(desc.includes('cheaper per token')).toBe(false);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+  });
+
+  it('emits only the cost clause (with "than") when throughput is tied', () => {
+    const ssr = makeSsrRows([[40, ir(100, 1.5), ir(100, 1)]]);
+    const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    expect(desc).toContain('B300 is 50% cheaper per token than B200 on GLM-5');
+    expect(desc.includes('more tok/s/GPU')).toBe(false);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+  });
+
+  it('falls back to boilerplate when there is no comparable data', () => {
+    const empty = compareMetaDescription(GLM, 'b200', 'b300', []);
+    expect(empty.startsWith('B200 vs B300 inference benchmark on GLM-5')).toBe(true);
+    expect(empty.includes('tok/s/GPU')).toBe(false);
+    expect(empty.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+
+    // One side missing at every target → still boilerplate.
+    const oneSided = compareMetaDescription(
+      GLM,
+      'b200',
+      'b300',
+      makeSsrRows([[40, ir(100, 1), null]]),
+    );
+    expect(oneSided.startsWith('B200 vs B300 inference benchmark on GLM-5')).toBe(true);
+  });
+
+  it('falls back when both dimensions are within 1%', () => {
+    const ssr = makeSsrRows([[40, ir(100, 1), ir(100, 1)]]);
+    const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    expect(desc.startsWith('B200 vs B300 inference benchmark on GLM-5')).toBe(true);
+  });
+
+  it('prefers the middle (default) target row', () => {
+    // Middle row has the data; outer rows are degenerate.
+    const ssr = makeSsrRows([
+      [20, null, null],
+      [40, ir(134, 1.12), ir(100, 1)],
+      [60, null, null],
+    ]);
+    const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    expect(desc.includes('34% more tok/s/GPU')).toBe(true);
+  });
+
+  it('falls back to an outer usable row when the middle target is degenerate', () => {
+    const ssr = makeSsrRows([
+      [20, ir(134, 1.12), ir(100, 1)],
+      [40, null, null],
+      [60, null, null],
+    ]);
+    const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    expect(desc.includes('34% more tok/s/GPU')).toBe(true);
+  });
+
+  it('stays ≤155 chars even with long GPU labels, model name, and huge ratios', () => {
+    const ssr = makeSsrRows([[40, ir(9999, 99.9), ir(10, 0.5)]]);
+    const desc = compareMetaDescription(DSV4, 'gb200', 'gb300', ssr);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    // A differentiating stat is still present (not the boilerplate).
+    expect(desc.includes('tok/s/GPU') || desc.includes('cheaper per token')).toBe(true);
+  });
+});
+
+describe('compareMetaDescriptionZh — structural 1:1 port', () => {
+  const ssr = makeSsrRows([
+    [20, ir(60, 2), ir(50, 1.7)],
+    [40, ir(134, 1.12), ir(100, 1)],
+    [60, ir(200, 0.9), ir(160, 0.85)],
+  ]);
+
+  it('surfaces the same numbers, model name, and GPU labels as the English version', () => {
+    const zh = compareMetaDescriptionZh(GLM, 'b200', 'b300', ssr);
+    expect(zh).toContain('GLM-5');
+    expect(zh).toContain('B200');
+    expect(zh).toContain('B300');
+    expect(zh).toContain('34%');
+    expect(zh).toContain('12%');
+    expect(zh).toContain('每 GPU 吞吐量');
+    expect(zh).toContain('每 token 成本');
+    expect(zh.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+  });
+
+  it('is stat-led exactly when the English version is (and boilerplate otherwise)', () => {
+    // With data: both stat-led.
+    const en = compareMetaDescription(GLM, 'b200', 'b300', ssr);
+    const zh = compareMetaDescriptionZh(GLM, 'b200', 'b300', ssr);
+    expect(en.includes('34%')).toBe(true);
+    expect(zh.includes('34%')).toBe(true);
+
+    // Without data: both boilerplate.
+    const enFb = compareMetaDescription(GLM, 'b200', 'b300', []);
+    const zhFb = compareMetaDescriptionZh(GLM, 'b200', 'b300', []);
+    expect(enFb.includes('inference benchmark')).toBe(true);
+    expect(zhFb.includes('推理基准测试')).toBe(true);
+    expect(zhFb.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+  });
+
+  it('stays ≤155 chars with long labels + huge ratios', () => {
+    const big = makeSsrRows([[40, ir(9999, 99.9), ir(10, 0.5)]]);
+    expect(compareMetaDescriptionZh(DSV4, 'gb200', 'gb300', big).length).toBeLessThanOrEqual(
+      META_DESCRIPTION_MAX,
+    );
   });
 });
