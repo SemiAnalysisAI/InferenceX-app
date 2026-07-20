@@ -351,6 +351,7 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartData([A, B, C], 'interactivity', 'y_tpPerGpu', null, {
       isAgentic: true,
       selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
     });
     const frontierByY = Object.fromEntries(result.map((p) => [p.y, p.isOnE2eFrontier]));
     expect(frontierByY[100]).toBe(true); // A
@@ -359,19 +360,23 @@ describe('processOverlayChartData', () => {
   });
 
   it('does not stamp isOnE2eFrontier for non-agentic overlays', () => {
+    // ChartDisplay computes restrictToE2eFrontier = isAgentic && mode !== 'e2e',
+    // so fixed-seq always passes false.
     const data = [pt({ tpPerGpu: { y: 100, roof: false }, median_intvty: 50, p90_e2el: 1 } as any)];
     const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null, {
       isAgentic: false,
       selectedPercentile: 'median',
+      restrictToE2eFrontier: false,
     });
     expect(result[0].isOnE2eFrontier).toBeUndefined();
   });
 
-  it('does not stamp isOnE2eFrontier on the e2e chart (it already IS the e2e frontier)', () => {
+  it('does not stamp isOnE2eFrontier in the e2e x-mode (it already IS the e2e frontier)', () => {
     const data = [pt({ tpPerGpu: { y: 100, roof: false }, median_e2el: 1, p90_e2el: 1 } as any)];
     const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', null, {
       isAgentic: true,
       selectedPercentile: 'p90',
+      restrictToE2eFrontier: false,
     });
     expect(result[0].isOnE2eFrontier).toBeUndefined();
   });
@@ -399,6 +404,7 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartData([A, B, C], 'e2e', 'y_tpPerGpu', 'p90_ttft', {
       isAgentic: true,
       selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
     });
     const byY = Object.fromEntries(result.map((p) => [p.y, p.isOnE2eFrontier]));
     expect(byY[100]).toBe(true); // A
@@ -424,10 +430,33 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartData([r1, r2], 'interactivity', 'y_tpPerGpu', null, {
       isAgentic: true,
       selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
     });
     const byUrl = Object.fromEntries(result.map((p) => [p.run_url, p.isOnE2eFrontier]));
     expect(byUrl['https://gh/runs/1']).toBe(true);
     expect(byUrl['https://gh/runs/2']).toBe(true); // false if runs were merged
+  });
+
+  it('leaves isOnE2eFrontier unset for metrics with no e2e roofline direction', () => {
+    // y_measuredAvgPower has no `_roofline` on the e2e chart def, so no e2e
+    // restriction applies. The official path leaves the flag undefined and
+    // draws the roofline unrestricted; the overlay must do the same — an
+    // all-false stamping here would seed an EMPTY overlay frontier and (with
+    // Optimal Only on) hide every overlay point.
+    const data = [
+      pt({
+        measuredAvgPower: { y: 700, roof: false },
+        p90_intvty: 100,
+        p90_e2el: 10,
+      } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_measuredAvgPower', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].isOnE2eFrontier).toBeUndefined();
   });
 
   it('applies the selected percentile to an agentic input-metric x override', () => {
