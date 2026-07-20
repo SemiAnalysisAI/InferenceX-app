@@ -197,6 +197,8 @@ export interface TooltipConfig<T = any> {
 
 export interface RenderContext {
   layout: ChartLayout;
+  /** Portaled tooltip node owned by the chart wrapper. */
+  tooltipElement: HTMLDivElement;
   xScale: AnyScale | d3.ScaleTime<number, number>;
   yScale: AnyScale | d3.ScaleTime<number, number>;
   width: number;
