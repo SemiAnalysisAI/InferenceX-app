@@ -1,7 +1,21 @@
-import { Table2, X } from 'lucide-react';
+import { Plus, Table2, X } from 'lucide-react';
 import React from 'react';
 
+import { useLocale } from '@/lib/use-locale';
 import { cn } from '@/lib/utils';
+
+const STRINGS = {
+  en: {
+    hide: (label: string) => `Hide ${label}`,
+    show: (label: string) => `Show ${label}`,
+    showAllPoints: (label: string) => `Show all ${label} data points`,
+  },
+  zh: {
+    hide: (label: string) => `隐藏 ${label}`,
+    show: (label: string) => `显示 ${label}`,
+    showAllPoints: (label: string) => `显示 ${label} 的全部数据点`,
+  },
+} as const;
 
 export interface CommonLegendItemProps {
   name: string;
@@ -44,9 +58,16 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   onRemove,
   onShowPoints,
 }) => {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const id = `checkbox-${hw || name}`; // Unique ID for accessibility
   const isLongText = (label ?? '').length > 8;
   const canRemove = isActive && Boolean(onRemove);
+  // Inactive rows get the mirror affordance: hovering swaps the dimmed dot for
+  // a "+", making it explicit that clicking the row brings the series back
+  // (the X on active rows hides it). Clicking anywhere on the row — including
+  // the icon — toggles via the label/checkbox, so the "+" is decorative.
+  const canRestore = !isActive;
 
   const content = (
     <>
@@ -71,7 +92,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
           <span
             className={cn(
               'size-3 rounded-full transition-opacity',
-              canRemove && 'group-hover/item:opacity-0!',
+              (canRemove || canRestore) && 'group-hover/item:opacity-0!',
             )}
             style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
           />
@@ -84,9 +105,19 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
                 onRemove!(hw || name);
               }}
               className="absolute inset-0 inline-flex items-center justify-center opacity-0 group-hover/item:opacity-100"
-              aria-label={`Hide ${label}`}
+              aria-label={t.hide(label)}
+              title={t.hide(label)}
             >
               <X size={14} strokeWidth={4} className="text-foreground" />
+            </span>
+          )}
+          {canRestore && (
+            <span
+              className="absolute inset-0 inline-flex items-center justify-center opacity-0 group-hover/item:opacity-100"
+              title={t.show(label)}
+              aria-hidden="true"
+            >
+              <Plus size={14} strokeWidth={4} className="text-foreground" />
             </span>
           )}
         </span>
@@ -108,7 +139,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         <button
           type="button"
           data-testid={`legend-points-${hw || name}`}
-          aria-label={`Show all ${label} data points`}
+          aria-label={t.showAllPoints(label)}
           onClick={() => onShowPoints(hw || name)}
           // Reduced opacity at rest (still visible/tappable on touch), full on
           // row hover or keyboard focus. ml-auto pins the icon to the row's
