@@ -2,7 +2,7 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, computeChartSeries } from './compute-chart-series.js';
+import { computeChartSeries } from './compute-chart-series.js';
 
 /**
  * Build a minimal server_metrics_json blob covering the metrics the chart
@@ -119,14 +119,27 @@ function buildDynamoSeries(
   };
 }
 
+function buildPhaseKvSeries(startNs: number, baseValue: number) {
+  return Array.from({ length: 8 }, (_, dpRank) => ({
+    labels: { engine: '0', dp_rank: String(dpRank) },
+    timeslices: [
+      {
+        start_ns: startNs,
+        end_ns: startNs + 1e9,
+        avg: baseValue + dpRank / 100,
+      },
+    ],
+  }));
+}
+
 describe('computeChartSeries', () => {
   it('returns null when the blob is null', async () => {
     expect(await computeChartSeries(null)).toBeNull();
   });
 
-  it('returns the current CHART_SERIES_VERSION in the bundle', async () => {
+  it('returns a canonical bundle without embedded version metadata', async () => {
     const series = await computeChartSeries(makeBlob());
-    expect(series?.version).toBe(CHART_SERIES_VERSION);
+    expect(series).not.toHaveProperty('version');
   });
 
   it('extracts kvCacheUsage points with t=seconds-from-start', async () => {
@@ -179,6 +192,43 @@ describe('computeChartSeries', () => {
       { t: 10, value: 0.8 },
       { t: 11, value: 0.9 },
     ]);
+  });
+
+  it('coalesces each DP rank across warmup and profiling instead of duplicating it', async () => {
+    const blob = gzipSync(
+      Buffer.from(
+        JSON.stringify({
+          warmup_metrics: {
+            'vllm:kv_cache_usage_perc': { series: buildPhaseKvSeries(0, 0.1) },
+          },
+          metrics: {
+            'vllm:kv_cache_usage_perc': { series: buildPhaseKvSeries(10e9, 0.2) },
+          },
+        }),
+      ),
+    );
+
+    const series = await computeChartSeries(blob);
+
+    expect(series?.kvCacheUsageByEngine).toHaveLength(8);
+    expect(series?.kvCacheUsageByEngine.map(({ engineLabel }) => engineLabel)).toEqual([
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+    ]);
+    expect(series?.kvCacheUsageByEngine.every(({ points }) => points.length === 2)).toBe(true);
+    expect(series?.kvCacheUsageByEngine[0]).toEqual({
+      engineLabel: '0',
+      points: [
+        { t: 0, value: 0.1 },
+        { t: 10, value: 0.2 },
+      ],
+    });
   });
 
   it('computes prefixCacheHitRate as hits.rate / queries.rate', async () => {

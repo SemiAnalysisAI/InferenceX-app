@@ -29,7 +29,7 @@ afterEach(() => {
 describe('writeBackTraceReplayJsonb', () => {
   it('issues a fixed-column UPDATE binding the payload as ::jsonb + the id', () => {
     const { sql, calls } = mockSql();
-    writeBackTraceReplayJsonb(sql, 'chart_series', 870, { version: 12, foo: 'bar' });
+    writeBackTraceReplayJsonb(sql, 'chart_series', 870, { foo: 'bar' });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.text).toContain('update agentic_trace_replay set chart_series');
@@ -37,7 +37,7 @@ describe('writeBackTraceReplayJsonb', () => {
     // The payload OBJECT is bound directly (not JSON.stringify'd — that would
     // double-encode into a JSONB string), followed by the id. Only the value +
     // id are interpolated; the column name is fully static in the SQL text.
-    expect(calls[0]!.values).toEqual([{ version: 12, foo: 'bar' }, 870]);
+    expect(calls[0]!.values).toEqual([{ foo: 'bar' }, 870]);
   });
 
   it('targets the requested column verbatim (no cross-talk between columns)', () => {

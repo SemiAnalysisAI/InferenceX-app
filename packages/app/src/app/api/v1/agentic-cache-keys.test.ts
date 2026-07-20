@@ -1,11 +1,7 @@
 /**
- * Guards that every agentic blob-cache key is DERIVED from the version constant
- * that governs its payload — not a hand-written string. `blobSet` is write-once
- * and nothing purges the blob cache after a backfill, so an unversioned (or
- * hand-bumped) key would serve stale data forever after a payload-version bump.
- * Deriving the key from the constant means a future bump rolls the cache
- * namespace automatically; these tests fail loudly if a route drifts back to a
- * literal string.
+ * Versioned derived payloads roll their cache namespace with their format.
+ * chart_series is instead canonical DB data under a stable key; ingest and
+ * backfill operations explicitly purge Blob storage through the invalidate API.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -26,7 +22,6 @@ vi.mock('@/lib/api-cache', () => ({
 }));
 
 import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';
-import { CHART_SERIES_VERSION } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
 
 import { CACHE_KEY_PREFIX as derivedAgenticMetricsKey } from './derived-agentic-metrics/route';
@@ -35,7 +30,7 @@ import { CACHE_KEY_PREFIX as requestTimelineKey } from './request-timeline/route
 import { CACHE_KEY_PREFIX as traceServerMetricsKey } from './trace-server-metrics/route';
 import { CACHE_KEY_PREFIX as traceHistogramsKey } from './trace-histograms/route';
 
-describe('agentic blob-cache keys are version-derived', () => {
+describe('agentic blob-cache keys match their storage contracts', () => {
   it('derived-agentic-metrics key embeds STATS_VERSION', () => {
     expect(derivedAgenticMetricsKey).toBe(`derived-agentic-metrics-v${STATS_VERSION}`);
   });
@@ -48,20 +43,19 @@ describe('agentic blob-cache keys are version-derived', () => {
     expect(requestTimelineKey).toBe(`request-timeline-v${REQUEST_TIMELINE_VERSION}`);
   });
 
-  it('trace-server-metrics key embeds CHART_SERIES_VERSION', () => {
-    expect(traceServerMetricsKey).toBe(`trace-server-metrics-v${CHART_SERIES_VERSION}`);
+  it('trace-server-metrics uses the canonical chart-series namespace', () => {
+    expect(traceServerMetricsKey).toBe('trace-server-metrics');
   });
 
   it('trace-histograms key embeds REQUEST_TIMELINE_VERSION (its payload is read from request_timeline)', () => {
     expect(traceHistogramsKey).toBe(`trace-histograms-v${REQUEST_TIMELINE_VERSION}`);
   });
 
-  it('every key actually contains a version segment (no unversioned literals)', () => {
+  it('keeps versioned namespaces for the remaining versioned derived payloads', () => {
     for (const key of [
       derivedAgenticMetricsKey,
       agenticAggregatesKey,
       requestTimelineKey,
-      traceServerMetricsKey,
       traceHistogramsKey,
     ]) {
       expect(key).toMatch(/-v\d+$/u);

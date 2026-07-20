@@ -15,11 +15,7 @@ import { fileURLToPath } from 'node:url';
 // Runtime-value cross-module imports use extensionless relative paths (the
 // convention in etl/queries here), NOT the `.js` type-only style below — the
 // app bundler (Turbopack) resolves the former but not a `.js` on a value import.
-import {
-  CHART_SERIES_VERSION,
-  computeChartSeries,
-  type ChartSeries,
-} from './etl/compute-chart-series';
+import { computeChartSeries, type ChartSeries } from './etl/compute-chart-series';
 import {
   REQUEST_TIMELINE_VERSION,
   computeRequestTimeline,
@@ -955,15 +951,13 @@ export function getServerLog(benchmarkResultId: number): string | null {
 // Agentic per-point mirrors (blob-backed; lazy trace_replay)
 //
 // Parity strategy: the SQL fast path reads the precomputed JSONB column
-// (aggregate_stats / chart_series / request_timeline) when its inner `version`
-// matches the current constant, else it re-derives from the gzipped blob using
+// (aggregate_stats / request_timeline) when its inner `version` matches the
+// current constant; chart_series is canonical DB data and is served whenever
+// present. Missing derived data is re-derived from the gzipped blob using
 // a shared pure helper (computeChartSeries / computeRequestTimeline /
 // extract*+percentilesOf / computeDerivedFromBlob). These mirrors take the
-// same two branches so dump mode yields the same payloads: serve the stored
-// JSONB at the current version, otherwise gunzip the dumped blob and reuse the
-// identical helper (the blobs ARE in the dump). Only if a stale/missing JSONB
-// row also has no usable blob do we fall through to null — exactly as the SQL
-// path does. No version-gated payload is ever served blindly.
+// same branches so dump mode yields the same payloads. Only if missing JSONB
+// also has no usable blob do we fall through to null, matching the SQL path.
 // ---------------------------------------------------------------------------
 
 function blankAggregate(id: number): AgenticAggregate {
@@ -1112,9 +1106,10 @@ export function getRequestTimeline(benchmarkResultId: number): RequestTimeline |
 
 /**
  * Mirror of {@link import('./queries/trace-server-metrics.js').getTraceServerMetrics}.
- * Fast path: chart_series at CHART_SERIES_VERSION. Fallback: computeChartSeries
- * over the server blob (same helper as the SQL path). Returns null when the point
- * has no server_metrics blob, matching the SQL `has_blob` gate.
+ * Fast path: canonical stored chart_series. Fallback: computeChartSeries over
+ * the server blob (same helper as the SQL path).
+ * Returns null when the point has no server_metrics blob, matching the SQL
+ * `has_blob` gate.
  */
 export async function getTraceServerMetrics(
   benchmarkResultId: number,
@@ -1173,8 +1168,8 @@ export async function getTraceServerMetrics(
     metricSources: series.metricSources ?? [],
   });
 
-  const stored = tr.chart_series as (ChartSeries & { version?: number }) | null;
-  if (stored && Number(stored.version) === CHART_SERIES_VERSION) return merge(stored);
+  const stored = tr.chart_series as ChartSeries | null;
+  if (stored) return merge(stored);
 
   const series = await computeChartSeries(bufferFromJson(tr.server_metrics_json_gz), {
     framework: c.framework,

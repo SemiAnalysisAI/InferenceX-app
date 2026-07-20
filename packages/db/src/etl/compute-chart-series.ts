@@ -4,8 +4,9 @@
  * request. The output lands in `agentic_trace_replay.chart_series` and is
  * read directly by `getTraceServerMetrics`.
  *
- * Versioned so the backfill script knows which rows are stale — bump
- * `CHART_SERIES_VERSION` whenever the extraction algorithm changes.
+ * The stored JSONB is the canonical representation. Extraction changes must
+ * be followed by an explicit DB backfill and API-cache invalidation rather
+ * than accumulating request-time payload-version branches.
  */
 
 import { gunzipSync } from 'node:zlib';
@@ -16,63 +17,6 @@ import {
   type MetricSource,
   type ServerMetricsContext,
 } from './server-metrics-adapters';
-
-/**
- * Bump when the extraction algorithm changes — backfill recomputes anything
- * older.
- *
- * v2: aggregate vllm gauges/counters across all engine series (was reading
- * only series[0], which under-counted by Nx on multi-engine DP/PP
- * deployments — most visible as a request-queue-depth chart that maxed out
- * at ~3 when the timeline clearly showed 20+ in-flight).
- *
- * v3: extract `prefixCacheHitsTps` so the detail page can derive cumulative
- * unique input tokens as cumsum(prefillTps - prefixCacheHitsTps).
- *
- * v4: extract sglang:* metrics too (fallback chain in each picker), so
- * SGLang runs populate the chart_series the same way vllm runs do.
- *
- * v5: map sglang:realtime_tokens (mode={prefill_cache,prefill_compute,decode})
- * into promptTokensBySource so the cumulative prompt-token-source-breakdown
- * chart shows useful splits for SGLang runs (filtered to prefill_* modes).
- *
- * v6: for SGLang, swap the coarse "prefill_cache" bucket for per-cache_source
- * breakdown from sglang:cached_tokens — current runs always have one
- * cache_source ("device" / HBM) but hicache (CPU offload) runs would
- * split into "device" + "host" automatically once ingested.
- *
- * v7: extract sglang:hicache_host_{used,total}_tokens into a new
- * hostKvCacheUsage series so the KV cache utilization chart can plot
- * the CPU offload pool's usage alongside the on-GPU HBM line.
- *
- * v8: keep the per-engine dimension on kv_cache_usage_perc as
- * `kvCacheUsageByEngine` (one entry per DP rank). The cluster-average
- * line hides load skew on DEP configs; the detail page overlays the
- * per-rank lines so a hot rank is visible at a glance.
- *
- * v9: retain orchestrator-normalized per-source series. Dynamo labels are
- * mapped to canonical router/prefill/decode roles, allowing the frontend to
- * inspect individual workers without interpreting Dynamo-native labels.
- *
- * v10: only emit per-source series for disaggregated configs with a recognized
- * orchestrator adapter. Non-disaggregated and unsupported configs retain the
- * existing aggregate-only behavior.
- *
- * v12: also consume the `warmup_metrics` block from the server-metrics blob and
- * merge its scrapes into the same series as the profiling `metrics` block.
- * Warmup and profiling timeslices carry their own absolute `start_ns` and never
- * overlap in time, so the merged series is continuous (warmup at lower t,
- * profiling after). This lets the agentic detail page slice `chart_series` into
- * warmup vs profiling at the request-derived boundary; older blobs without a
- * warmup block are unaffected. (v11 was a short-lived, since-reverted attempt to
- * carry kvCachePoolTokens in chart_series; that value now lives in
- * benchmark_results.metrics, derived from the server log — unrelated to this.)
- *
- * v13: prefer `dp_rank` over the per-rank-local `engine` label when naming
- * KV-cache series. Some DEP exports report engine=0 for every rank, which
- * made every legend entry read "DP 0" despite distinct dp_rank labels.
- */
-export const CHART_SERIES_VERSION = 13;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -88,7 +32,6 @@ export interface QueueDepthPoint {
 }
 
 export interface ChartSeries {
-  version: number;
   /** ns wall-clock of the first window's start; for debugging only. */
   startNs: number;
   /** ns wall-clock of the last window's end. */
@@ -197,19 +140,49 @@ const CHART_METRIC_KEYS = new Set([
 ]);
 
 /**
- * Merge a warmup phase metric map into the profiling one by concatenating each
- * metric's `series`. The two phases' timeslices carry their own absolute
- * `start_ns` and never overlap in time, so `buildSeriesFromMetrics` (which keys
- * by `start_ns`) yields one continuous series — warmup scrapes at lower t,
- * profiling after. No-ops when either side is empty (older blobs have no warmup).
+ * Stable identity for pairing the same exported series across phases.
+ */
+function phaseSeriesBaseIdentity(series: RawSeries): string {
+  const labels = Object.entries(series.labels ?? {}).toSorted(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify([series.endpoint_url ?? null, labels]);
+}
+
+/**
+ * Merge warmup and profiling metric maps into continuous source series. Each
+ * source keeps one entry whose timeslices span both phases, so phase slicing in
+ * the frontend cannot leave duplicate, empty DP-rank legend entries behind.
  */
 function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMap {
   if (Object.keys(warmup).length === 0) return profiling;
   if (Object.keys(profiling).length === 0) return warmup;
   const out: MetricsMap = {};
   for (const name of new Set([...Object.keys(profiling), ...Object.keys(warmup)])) {
+    const merged = new Map<string, RawSeries>();
+    for (const phaseSeries of [warmup[name]?.series ?? [], profiling[name]?.series ?? []]) {
+      const occurrences = new Map<string, number>();
+      for (const series of phaseSeries) {
+        const baseIdentity = phaseSeriesBaseIdentity(series);
+        const occurrence = occurrences.get(baseIdentity) ?? 0;
+        occurrences.set(baseIdentity, occurrence + 1);
+        // The occurrence suffix preserves distinct series when an exporter
+        // omits labels or repeats a label set; phase-local order pairs them.
+        const identity = JSON.stringify([baseIdentity, occurrence]);
+        const existing = merged.get(identity);
+        if (existing) {
+          existing.timeslices = [...(existing.timeslices ?? []), ...(series.timeslices ?? [])];
+        } else {
+          merged.set(identity, { ...series, timeslices: [...(series.timeslices ?? [])] });
+        }
+      }
+    }
     out[name] = {
-      series: [...(profiling[name]?.series ?? []), ...(warmup[name]?.series ?? [])],
+      series: [...merged.values()].map((series) => ({
+        ...series,
+        timeslices: (series.timeslices ?? []).toSorted(
+          (a, b) =>
+            (a.start_ns ?? Number.POSITIVE_INFINITY) - (b.start_ns ?? Number.POSITIVE_INFINITY),
+        ),
+      })),
     };
   }
   return out;
@@ -561,7 +534,6 @@ function buildSeriesFromMetrics(
     );
   }
   return {
-    version: CHART_SERIES_VERSION,
     startNs,
     endNs,
     durationS: endNs > startNs ? (endNs - startNs) / 1e9 : 0,

@@ -2,14 +2,13 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
+import type { ChartSeries } from '../etl/compute-chart-series';
 import type { DbClient } from '../connection.js';
 
 import { getTraceServerMetrics } from './trace-server-metrics';
 
 function currentSeries(): ChartSeries {
   return {
-    version: CHART_SERIES_VERSION,
     startNs: 0,
     endNs: 1e9,
     durationS: 1,
@@ -74,7 +73,7 @@ describe('getTraceServerMetrics', () => {
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 
-  it('fetches and computes the raw blob only when chart_series is stale', async () => {
+  it('fetches and computes the raw blob only when chart_series is missing', async () => {
     const raw = gzipSync(
       Buffer.from(
         JSON.stringify({
@@ -86,14 +85,13 @@ describe('getTraceServerMetrics', () => {
         }),
       ),
     );
-    const stale = { ...currentSeries(), version: CHART_SERIES_VERSION - 1 };
-    const { sql, calls } = mockSql([[metaRow({ chart_series: stale })], [{ blob: raw }]]);
+    const { sql, calls } = mockSql([[metaRow({ chart_series: null })], [{ blob: raw }]]);
 
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
     // 3 calls: meta read, blob read, then the fire-and-forget chart_series
-    // write-back that self-heals the stale precomputed series.
+    // write-back that self-heals the missing precomputed series.
     expect(calls).toHaveLength(3);
     expect(calls[1]).toContain('server_metrics_json_gz as blob');
     expect(calls[2]).toContain('update agentic_trace_replay set chart_series');

@@ -5,6 +5,7 @@ import { gzipSync } from 'node:zlib';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import type { ChartSeries } from './etl/compute-chart-series.js';
 import { REQUEST_TIMELINE_VERSION } from './etl/compute-request-timeline.js';
 import { STATS_VERSION } from './queries/agentic-shared.js';
 import type * as JsonProvider from './json-provider.js';
@@ -17,10 +18,9 @@ import type * as JsonProvider from './json-provider.js';
  * directory, point DUMP_DIR at it, and dynamically import the module once.
  *
  * Coverage per mirror:
- *  - fast path: precomputed JSONB (aggregate_stats / chart_series /
- *    request_timeline) at the CURRENT version is served verbatim.
- *  - blob fallback: a STALE version forces a re-derive from the (dumped) blob
- *    using the same pure helper the SQL path uses.
+ *  - fast path: precomputed JSONB is served directly when canonical/current.
+ *  - blob fallback: missing chart_series or stale aggregate/timeline payloads
+ *    force a re-derive using the same helper as the SQL path.
  *  - bytea round-trip: blobs are stored as {type:'Buffer',data:[…]} (what
  *    dump-db emits) and must gunzip cleanly.
  */
@@ -128,6 +128,34 @@ const CURRENT_TIMELINE = {
       cancelled: false,
     },
   ],
+};
+
+const STORED_CHART_SERIES: ChartSeries = {
+  startNs: 0,
+  endNs: 11e9,
+  durationS: 11,
+  timeslicesCount: 2,
+  kvCacheUsage: [
+    { t: 0, value: 0.1 },
+    { t: 10, value: 0.2 },
+  ],
+  prefixCacheHitRate: [],
+  queueDepth: [],
+  promptTokensBySource: {},
+  prefillTps: [],
+  decodeTps: [],
+  prefixCacheHitsTps: [],
+  hostKvCacheUsage: [],
+  kvCacheUsageByEngine: [
+    {
+      engineLabel: '0',
+      points: [
+        { t: 0, value: 0.1 },
+        { t: 10, value: 0.2 },
+      ],
+    },
+  ],
+  metricSources: [],
 };
 
 let jp: typeof JsonProvider;
@@ -260,7 +288,8 @@ beforeAll(async () => {
     ]),
   );
 
-  // agentic_trace_replay: 100 = current JSONB, 200 = stale JSONB (force blob).
+  // agentic_trace_replay: 100 = current stats/timeline, 200 = stale
+  // stats/timeline plus canonical chart series.
   writeFileSync(
     join(dir, 'agentic_trace_replay.json'),
     JSON.stringify([
@@ -286,7 +315,7 @@ beforeAll(async () => {
         server_metrics_json_gz: byteaJson(SERVER_GZ),
         server_metrics_json_uncompressed_size: SERVER_JSON.length,
         aggregate_stats: { version: 1 }, // stale → force profile-blob fallback
-        chart_series: { version: 1 }, // stale → force server-blob fallback
+        chart_series: STORED_CHART_SERIES,
         request_timeline: { version: 1 }, // stale → force profile-blob fallback
         created_at: '2026-06-14T04:00:00Z',
       },
@@ -468,6 +497,21 @@ describe('trace server metrics mirror', () => {
     expect(m?.meta.hardware).toBe('h100');
     expect(m?.meta.run_url).toBe('https://github.com/x/runs/555/attempts/1');
     expect(m?.kvCacheUsage.length).toBeGreaterThan(0);
+  });
+
+  it('serves canonical stored chart series without recomputing the server blob', async () => {
+    const m = await jp.getTraceServerMetrics(2);
+
+    expect(m?.kvCacheUsageByEngine).toEqual([
+      {
+        engineLabel: '0',
+        points: [
+          { t: 0, value: 0.1 },
+          { t: 10, value: 0.2 },
+        ],
+      },
+    ]);
+    expect(m?.timeslicesCount).toBe(2);
   });
 
   it('returns null for an id without a trace_replay blob', async () => {

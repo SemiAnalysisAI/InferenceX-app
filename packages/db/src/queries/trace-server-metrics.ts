@@ -6,12 +6,10 @@
  * Backed by `agentic_trace_replay.chart_series` (pre-computed at ingest
  * time, see `etl/compute-chart-series.ts`). The fast path is a single SQL
  * row read; the slow path re-computes from `server_metrics_json_gz` and is
- * only taken when the column is missing or the stored
- * `CHART_SERIES_VERSION` is stale (the backfill script should drain that).
+ * only taken when the canonical DB column is missing.
  */
 
 import {
-  CHART_SERIES_VERSION,
   computeChartSeries,
   type ChartSeries,
   type MetricSourceSeries,
@@ -183,8 +181,9 @@ export async function getTraceServerMetrics(
   const kvCachePoolTokens =
     row.kv_cache_pool_tokens === null ? null : Number(row.kv_cache_pool_tokens);
 
-  // Fast path: pre-computed chart_series at the current version.
-  if (row.chart_series && Number(row.chart_series.version) === CHART_SERIES_VERSION) {
+  // chart_series is canonicalized during ingest/backfill. The request path
+  // deliberately has no format-version or migration logic.
+  if (row.chart_series) {
     return merge(meta, row.chart_series, kvCachePoolTokens);
   }
 
@@ -210,9 +209,8 @@ export async function getTraceServerMetrics(
   if (!series) return null;
 
   // Self-heal the stored chart_series so the next request takes the fast path
-  // instead of re-decompressing this (tens-of-MB) blob. `series` is complete
-  // and stamped at CHART_SERIES_VERSION here; fire-and-forget and best-effort
-  // (no-ops on a read-only replica). trace_replay_id is non-null on this path.
+  // instead of re-decompressing this (tens-of-MB) blob. Fire-and-forget and
+  // best-effort (no-ops on a read-only replica). trace_replay_id is non-null.
   writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
 
   return merge(meta, series, kvCachePoolTokens);

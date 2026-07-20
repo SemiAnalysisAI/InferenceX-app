@@ -1,11 +1,9 @@
 /**
- * Backfill `agentic_trace_replay.chart_series` for rows that are missing it
- * or were computed by an older `CHART_SERIES_VERSION`.
+ * Backfill `agentic_trace_replay.chart_series` for rows that are missing it.
  *
  * The ingest path now computes the time-series inline, but existing rows
- * (and rows whose computation logic has since changed) still need this
- * pass. Run after the agentic schema migration and any time `CHART_SERIES_VERSION`
- * bumps.
+ * Existing rows whose extraction logic has changed can be deliberately
+ * recomputed with `--force`; chart_series itself carries no format version.
  *
  * Strategy:
  *   - Stream rows one at a time (server_metrics_json_gz can decompress
@@ -23,7 +21,7 @@
  */
 
 import { hasNoSslFlag } from './cli-utils.js';
-import { CHART_SERIES_VERSION, computeChartSeries } from './etl/compute-chart-series.js';
+import { computeChartSeries } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
 import {
   confirmProceed,
@@ -43,7 +41,6 @@ const sql = createAdminSql({
 
 async function main(): Promise<void> {
   console.log('=== backfill-chart-series ===');
-  console.log(`  CHART_SERIES_VERSION = ${CHART_SERIES_VERSION}`);
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
 
@@ -64,10 +61,7 @@ async function main(): Promise<void> {
         select id
         from agentic_trace_replay
         where server_metrics_json_gz is not null
-          and (
-            chart_series is null
-            or coalesce((chart_series->>'version')::int, -1) <> ${CHART_SERIES_VERSION}
-          )
+          and chart_series is null
         order by id
         ${flags.limit ? sql`limit ${flags.limit}` : sql``}
       `;
