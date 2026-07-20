@@ -279,4 +279,65 @@ describe('processOverlayChartData', () => {
     expect(result).toHaveLength(1);
     expect(result[0].y).toBe(0.5);
   });
+
+  // Regression: overlay points must sit on the SAME x column as the official run.
+  // useChartData plots agentic interactivity at withPercentile('median_intvty',
+  // selectedPercentile) (e.g. p90_intvty). The overlay previously ignored the
+  // percentile and used the raw median_intvty, so an `?unofficialrun=` overlay of
+  // the very same run rendered to the right of its own official points on the
+  // "P90 Interactivity" chart. See InferenceX_GLM.png misalignment report.
+  it('applies the selected percentile to the natural interactivity x-axis for agentic overlays', () => {
+    const data = [
+      pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200, p90_intvty: 130 } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+    });
+    expect(result).toHaveLength(1);
+    // Must land on p90_intvty (130), NOT the raw median_intvty (200).
+    expect(result[0].x).toBe(130);
+  });
+
+  it('applies the selected percentile to the natural e2e x-axis for agentic overlays', () => {
+    const data = [pt({ tpPerGpu: { y: 42, roof: false }, median_e2el: 2.5, p99_e2el: 9 } as any)];
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p99',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(9);
+  });
+
+  it('keeps the natural median x-axis for non-agentic overlays regardless of percentile', () => {
+    // Fixed-seq rows have no p90_/p99_ columns; the percentile selector is hidden
+    // and forced to median. A stale 'p90' must NOT be applied to fixed-seq overlays.
+    const data = [
+      pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200, p90_intvty: 130 } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: false,
+      selectedPercentile: 'p90',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(200);
+  });
+
+  it('applies the selected percentile to an agentic input-metric x override', () => {
+    // Input metrics on the interactivity chart override x to *_ttft; agentic must
+    // carry the chosen percentile onto that override (p90_ttft) too.
+    const data = [
+      pt({
+        inputTputPerGpu: { y: 5, roof: false },
+        median_ttft: 0.1,
+        p90_ttft: 0.4,
+      } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_inputTputPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(0.4);
+  });
 });

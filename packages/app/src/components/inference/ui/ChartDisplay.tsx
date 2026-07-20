@@ -385,7 +385,10 @@ export default function ChartDisplay() {
         chartType,
         selectedYAxisMetric,
         effectiveXMetric,
-        { isAgentic: sequenceKind(selectedSequence) === 'agentic' },
+        {
+          isAgentic: sequenceKind(selectedSequence) === 'agentic',
+          selectedPercentile,
+        },
       );
 
       let overlayPoints = processed;
@@ -425,6 +428,7 @@ export default function ChartDisplay() {
     selectedYAxisMetric,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
+    selectedPercentile,
     compareGpuPair,
   ]);
 

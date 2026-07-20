@@ -5,6 +5,7 @@
  */
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import { withPercentile } from '@/lib/benchmark-transform';
 
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
@@ -82,26 +83,40 @@ export const filterDataByCostLimit = (
  * Process overlay (unofficial run) data to match the same pipeline as official data.
  *
  * Applies: metric field filtering, x/y remapping (including x-axis overrides for
- * input metrics on the interactivity chart), and cost limit filtering.
+ * input metrics on the interactivity chart, and percentile selection for agentic
+ * runs), and cost limit filtering.
+ *
+ * The percentile handling MUST mirror `useChartData`'s `stableChartDefinitions`
+ * exactly. Both the official run and its `?unofficialrun=` overlay draw from the
+ * same transform, so the overlay of a run must land on the identical x column as
+ * that run's official points. Agentic charts plot the natural latency metric at
+ * the user-selected percentile (e.g. `median_intvty` → `p90_intvty`); skipping
+ * that here plotted overlays against `median_intvty` while the official points sat
+ * on `p90_intvty`, shifting an overlay of the *same* run to the right on the "P90
+ * Interactivity" chart. Fixed-seq rows carry no p90_/p99_ columns, so non-agentic
+ * is forced to `median` (the percentile selector is hidden for them).
  */
 export function processOverlayChartData(
   data: InferenceData[],
   chartType: 'e2e' | 'interactivity',
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
-  options?: { isAgentic?: boolean },
+  options?: { isAgentic?: boolean; selectedPercentile?: string },
 ): InferenceData[] {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
   if (!chartDef) return [];
 
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isAgentic = options?.isAgentic === true;
+  const selectedPercentile = options?.selectedPercentile ?? 'median';
 
-  // Resolve x-axis field (must match useChartData logic)
+  // Resolve x-axis field (must match useChartData logic). Default = the chart's
+  // natural latency metric, percentile-adjusted for agentic (median forced for
+  // fixed-seq, whose p90_/p99_ columns don't exist).
   const metricTitle =
     (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
   const isInputMetric = metricTitle.toLowerCase().includes('input');
-  let xAxisField: string = chartDef.x;
+  let xAxisField: string = withPercentile(chartDef.x, isAgentic ? selectedPercentile : 'median');
   // selectedXAxisMetric is already the effective metric for this chart type
   // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric).
   // Match any *_ttft metric — the x-axis-mode picker can now select any
@@ -109,7 +124,12 @@ export function processOverlayChartData(
   const isTtftOverride =
     typeof selectedXAxisMetric === 'string' && selectedXAxisMetric.endsWith('_ttft');
 
-  if (selectedXAxisMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
+  if (
+    selectedXAxisMetric &&
+    chartDef.chartType === 'interactivity' &&
+    isInputMetric &&
+    !isAgentic
+  ) {
     xAxisField = selectedXAxisMetric;
   } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
     const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
@@ -117,6 +137,18 @@ export function processOverlayChartData(
   } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
     xAxisField = selectedXAxisMetric!;
   }
+
+  // Agentic: rewrite the resolved x metric to the chosen percentile (mirrors the
+  // final agentic block in useChartData). Idempotent for overrides that already
+  // carry the percentile (e.g. p90_ttft), and applies it to the config-default
+  // input override (median_ttft → p90_ttft) and the natural intvty/e2el field.
+  if (isAgentic) {
+    xAxisField = withPercentile(xAxisField, selectedPercentile);
+  }
+
+  // The latency limit targets overload outliers on the TTFT axis only; skip it
+  // for the natural axis and for agentic (long TTFTs are normal there).
+  const isTtftX = xAxisField.endsWith('_ttft');
 
   const processedData = data
     .filter((d) => metricKey in d)
@@ -126,13 +158,7 @@ export function processOverlayChartData(
       return { ...d, x: xValue, y: yValue };
     })
     .filter(
-      (d) =>
-        // Skip the latency limit for the natural x-axis or for agentic
-        // (long TTFTs are normal there, not overload outliers).
-        xAxisField === chartDef.x ||
-        isAgentic ||
-        !chartDef.y_latency_limit ||
-        d.x <= chartDef.y_latency_limit,
+      (d) => !isTtftX || isAgentic || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,
     );
 
   return filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
