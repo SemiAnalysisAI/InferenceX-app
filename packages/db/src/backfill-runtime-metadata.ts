@@ -117,6 +117,7 @@ async function main(): Promise<void> {
   let missing = 0;
   let empty = 0;
   let unmapped = 0;
+  // oxlint-disable-next-line no-unreachable-loop -- runs are intentionally processed sequentially
   for (const [index, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
     const repository = repositoryFromRunUrl(run.html_url) ?? REPO;

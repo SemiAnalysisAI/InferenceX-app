@@ -25,8 +25,8 @@ vi.mock('@/lib/api-cache', () => ({
 }));
 
 import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';
-import { CHART_SERIES_VERSION } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
+import { TRACE_SERVER_METRICS_VERSION } from '@semianalysisai/inferencex-db/queries/trace-server-metrics';
 
 import { CACHE_KEY_PREFIX as derivedAgenticMetricsKey } from './derived-agentic-metrics/route';
 import { CACHE_KEY_PREFIX as agenticAggregatesKey } from './agentic-aggregates/route';
@@ -47,8 +47,8 @@ describe('agentic blob-cache keys are version-derived', () => {
     expect(requestTimelineKey).toBe(`request-timeline-v${REQUEST_TIMELINE_VERSION}`);
   });
 
-  it('trace-server-metrics key embeds CHART_SERIES_VERSION', () => {
-    expect(traceServerMetricsKey).toBe(`trace-server-metrics-v${CHART_SERIES_VERSION}`);
+  it('trace-server-metrics key embeds its composite response version', () => {
+    expect(traceServerMetricsKey).toBe(`trace-server-metrics-v${TRACE_SERVER_METRICS_VERSION}`);
   });
 
   it('trace-histograms key embeds REQUEST_TIMELINE_VERSION (its payload is read from request_timeline)', () => {

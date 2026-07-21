@@ -5,6 +5,11 @@ import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
+import {
+  cacheImplementationLabel,
+  offloadTypeLabel,
+  versionedComponentLabel,
+} from '@/components/inference/utils/runtime-metadata-labels';
 
 export interface TooltipConfig {
   /** The data point to display */
@@ -119,29 +124,6 @@ const CACHE_STRINGS = {
   },
 } as const;
 
-const CACHE_IMPLEMENTATION_LABELS: Record<string, string> = {
-  hicache: 'HiCache',
-  lmcache: 'LMCache',
-  mooncake: 'Mooncake',
-  mori: 'MoRI',
-  moriio: 'MoRI-IO',
-  'mori-io': 'MoRI-IO',
-  nixl: 'NIXL',
-  atomesh: 'AtoMesh',
-  'vllm-native': 'vLLM Native',
-  'vllm-router': 'vLLM Router',
-  'vllm-simple': 'vLLM Simple',
-  'sglang-router': 'SGLang Router',
-};
-
-const cacheImplementationLabel = (value: string): string =>
-  CACHE_IMPLEMENTATION_LABELS[value.toLowerCase()] ?? value;
-
-const offloadTypeLabel = (value: string): string => {
-  if (value.toLowerCase() === 'dram') return 'DRAM';
-  return value.toUpperCase();
-};
-
 /**
  * Cache configuration and hit-rate rows shared by fixed-sequence, agentic,
  * official, comparison, and unofficial-run tooltips.
@@ -157,17 +139,18 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
     parts.push(tooltipLine(t.offloadType, enabled ? t.legacyEnabled : t.legacyDisabled));
   }
   if (d.kv_offload_backend) {
-    const backend = cacheImplementationLabel(d.kv_offload_backend);
-    const version = d.kv_offload_backend_version ? ` ${d.kv_offload_backend_version}` : '';
-    parts.push(tooltipLine(t.offloadBackend, `${backend}${version}`));
+    parts.push(
+      tooltipLine(
+        t.offloadBackend,
+        versionedComponentLabel(d.kv_offload_backend, d.kv_offload_backend_version)!,
+      ),
+    );
   }
   if (d.kv_p2p_transfer) {
     parts.push(tooltipLine(t.transferEngine, cacheImplementationLabel(d.kv_p2p_transfer)));
   }
   if (d.router_name) {
-    const router = cacheImplementationLabel(d.router_name);
-    const version = d.router_version ? ` ${d.router_version}` : '';
-    parts.push(tooltipLine(t.router, `${router}${version}`));
+    parts.push(tooltipLine(t.router, versionedComponentLabel(d.router_name, d.router_version)!));
   }
 
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);

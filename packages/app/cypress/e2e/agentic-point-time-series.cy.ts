@@ -215,15 +215,19 @@ const pointMeta = {
   spec_method: 'none',
   disagg: true,
   conc: 128,
-  offload_mode: 'off',
+  offload_mode: 'on',
+  kv_offloading: 'dram',
+  kv_offload_backend: 'lmcache',
+  kv_offload_backend_version: '0.5.1',
+  kv_p2p_transfer: 'mooncake',
+  router_name: 'vllm-router',
+  router_version: '0.1.14',
   isl: null,
   osl: null,
   benchmark_type: 'agentic_traces',
   date: '2026-06-23',
   run_url: null,
   server_gpu_cache_hit_rate: 0.5,
-  // Reproduces historical rows that retained a CPU hit metric after offload
-  // was disabled. The agentic point summary must suppress this stale value.
   server_cpu_cache_hit_rate: 0.42,
 };
 
@@ -299,8 +303,17 @@ describe('Agentic point orchestrator metric sources', () => {
   });
 
   it('switches every server chart to an orchestrator-normalized worker', () => {
-    cy.contains('GPU cache hit').should('be.visible');
-    cy.contains('CPU cache hit').should('not.exist');
+    cy.get('[data-testid="point-summary"]')
+      .should('contain.text', 'Offload Type')
+      .and('contain.text', 'DRAM')
+      .and('contain.text', 'KV Offload Engine')
+      .and('contain.text', 'LMCache 0.5.1')
+      .and('contain.text', 'KV Transfer Engine')
+      .and('contain.text', 'Mooncake')
+      .and('contain.text', 'Router')
+      .and('contain.text', 'vLLM Router 0.1.14')
+      .and('contain.text', 'GPU cache hit')
+      .and('contain.text', 'CPU cache hit');
 
     cy.get('[data-testid="metric-source-toolbar"]')
       .should('have.css', 'position', 'sticky')
