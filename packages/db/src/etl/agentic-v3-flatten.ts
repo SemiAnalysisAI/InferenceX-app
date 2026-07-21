@@ -63,6 +63,21 @@ const V3_SCALAR_PATHS: [string[], string][] = [
   [['server_metrics', 'tokens', 'prompt_total'], 'total_prompt_tokens'],
   [['server_metrics', 'tokens', 'generation_total'], 'total_generation_tokens'],
   [['server_metrics', 'tokens', 'requests_completed'], 'total_requests_completed'],
+  // One-run AgentX coverage and non-overlapping-window diagnostics. These
+  // describe the realized hour; they are not confidence intervals.
+  [['request_metrics', 'stability', 'window_seconds'], 'observed_window_seconds'],
+  [['request_metrics', 'stability', 'expected_window_count'], 'observed_window_expected_count'],
+  [['request_metrics', 'stability', 'observed_window_count'], 'observed_window_count'],
+  [['request_metrics', 'stability', 'min_window_requests'], 'observed_window_min_requests'],
+  [['request_metrics', 'stability', 'root_trajectory_count'], 'root_trajectory_count'],
+  [
+    ['request_metrics', 'stability', 'root_trajectory_kish_effective_count'],
+    'root_trajectory_kish_effective_count',
+  ],
+  [
+    ['request_metrics', 'stability', 'root_trajectory_largest_share'],
+    'root_trajectory_largest_share',
+  ],
   // Deliberately NOT mapped (yet): cache.overall/prefix_cache_hits/queries,
   // kv_cache.cpu_*, tokens.prompt_by_source, sources[] — new v3 detail we don't
   // consume anywhere; add here + METRIC_KEYS when a view needs them.
@@ -125,6 +140,26 @@ export function flattenAgenticAggRow(row: Record<string, any>): Record<string, a
   for (const [path, key] of V3_SCALAR_PATHS) {
     const n = parseNum(atPath(row, path));
     if (n !== undefined) flat[key] = n;
+  }
+
+  for (const metric of ['ttft', 'e2el', 'intvty']) {
+    for (const percentile of ['p75', 'p90']) {
+      for (const bound of ['min', 'max']) {
+        const value = parseNum(
+          atPath(row, [
+            'request_metrics',
+            'stability',
+            'observed_ranges',
+            metric,
+            percentile,
+            bound,
+          ]),
+        );
+        if (value !== undefined) {
+          flat[`observed_window_${percentile}_${metric}_${bound}`] = value;
+        }
+      }
+    }
   }
 
   return { ...row, ...flat };

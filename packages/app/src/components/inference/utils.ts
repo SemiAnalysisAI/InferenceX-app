@@ -7,6 +7,7 @@
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
 import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { withObservedWindowRange } from '@/components/inference/utils/observed-window-range';
 
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
@@ -127,7 +128,7 @@ export function processOverlayChartData(
     .map((d: InferenceData) => {
       const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
       const xValue = (d as any)[xAxisField] ?? d.x;
-      return { ...d, x: xValue, y: yValue };
+      return withObservedWindowRange({ ...d, x: xValue, y: yValue }, xAxisField);
     })
     .filter(
       (d) => !isTtftX || isAgentic || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,

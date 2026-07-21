@@ -233,6 +233,24 @@ describe('processOverlayChartData', () => {
     expect(result[0].x).toBe(0.12);
   });
 
+  it('stamps the observed bounds matching the overlay x-axis metric', () => {
+    const data = [
+      pt({
+        tpPerGpu: { y: 42, roof: false },
+        p90_ttft: 2,
+        observed_window_count: 6,
+        observed_window_p90_ttft_min: 1.4,
+        observed_window_p90_ttft_max: 4.1,
+        observed_window_p75_e2el_min: 40,
+        observed_window_p75_e2el_max: 80,
+      } as any),
+    ];
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p90_ttft');
+
+    expect(result[0].observedXMin).toBe(1.4);
+    expect(result[0].observedXMax).toBe(4.1);
+  });
+
   it('filters e2e TTFT outliers exceeding y_latency_limit', () => {
     const data = [
       pt({ tpPerGpu: { y: 10, roof: false }, p90_ttft: 0.5, median_e2el: 1 } as any),

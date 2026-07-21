@@ -145,4 +145,26 @@ export const METRIC_KEYS = new Set([
   'peak_temp_c',
   'avg_util_pct',
   'avg_mem_used_mb',
+  // AgentX realized-workload coverage and non-overlapping time-window ranges.
+  // Bounds describe one observed run and must never be labeled as confidence
+  // intervals or rerun-prediction intervals.
+  'observed_window_seconds',
+  'observed_window_expected_count',
+  'observed_window_count',
+  'observed_window_min_requests',
+  'root_trajectory_count',
+  'root_trajectory_kish_effective_count',
+  'root_trajectory_largest_share',
+  'observed_window_p75_ttft_min',
+  'observed_window_p75_ttft_max',
+  'observed_window_p90_ttft_min',
+  'observed_window_p90_ttft_max',
+  'observed_window_p75_e2el_min',
+  'observed_window_p75_e2el_max',
+  'observed_window_p90_e2el_min',
+  'observed_window_p90_e2el_max',
+  'observed_window_p75_intvty_min',
+  'observed_window_p75_intvty_max',
+  'observed_window_p90_intvty_min',
+  'observed_window_p90_intvty_max',
 ]);

@@ -732,6 +732,10 @@ describe('ScatterGraph', () => {
           y: 260 - index * 40,
           precision: Precision.FP4,
           run_url: runUrl,
+          observedXMin: x * 0.75,
+          observedXMax: x * 1.25,
+          observed_window_seconds: 600,
+          observed_window_count: 6,
         }),
       ),
       hardwareConfig: hwConfig,
@@ -777,10 +781,16 @@ describe('ScatterGraph', () => {
 
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('have.length', 3);
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('exist');
+    cy.get(
+      '#test-scatter-dismiss-preview svg .observed-window-range[data-source="overlay"]',
+    ).should('exist');
 
     cy.get('[data-testid="dismiss-preview"]').click();
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('not.exist');
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('not.exist');
+    cy.get(
+      '#test-scatter-dismiss-preview svg .observed-window-range[data-source="overlay"]',
+    ).should('not.exist');
   });
 });
 

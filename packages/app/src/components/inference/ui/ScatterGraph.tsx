@@ -261,6 +261,46 @@ interface ScaleConfigValue {
   nice: boolean;
   _isLog?: boolean;
 }
+
+interface ObservedRangeMark {
+  key: string;
+  point: InferenceData & { observedXMin: number; observedXMax: number };
+  hw: string;
+  precision: string;
+  source: 'official' | 'overlay';
+  color: string;
+  visible: boolean;
+  runIndex?: number;
+}
+
+const hasObservedWindowRange = (
+  point: InferenceData,
+): point is InferenceData & { observedXMin: number; observedXMax: number } =>
+  (point.observed_window_count ?? 0) >= 2 &&
+  typeof point.observedXMin === 'number' &&
+  Number.isFinite(point.observedXMin) &&
+  point.observedXMin > 0 &&
+  typeof point.observedXMax === 'number' &&
+  Number.isFinite(point.observedXMax) &&
+  point.observedXMax > point.observedXMin;
+
+const observedRangeLegendLabel = (
+  locale: 'en' | 'zh',
+  windowSeconds: number | undefined,
+): string => {
+  if (!windowSeconds) {
+    return locale === 'zh'
+      ? '观测时间窗口范围——并非置信区间'
+      : 'Observed window range — not a confidence interval';
+  }
+  const minutes = windowSeconds / 60;
+  if (locale === 'zh') {
+    const duration = Number.isInteger(minutes) ? `${minutes} 分钟` : `${windowSeconds} 秒`;
+    return `${duration}观测范围——并非置信区间`;
+  }
+  const duration = Number.isInteger(minutes) ? `${minutes}-minute` : `${windowSeconds}-second`;
+  return `Observed ${duration} range — not a confidence interval`;
+};
 const isSameScaleConfig = (a: ScaleConfigValue, b: ScaleConfigValue): boolean =>
   a.type === b.type &&
   a.nice === b.nice &&
@@ -935,6 +975,51 @@ const ScatterGraph = React.memo(
       [allPointLabelsByKey],
     );
 
+    // Window ranges are a descriptive annotation on the Pareto frontier, not
+    // additional observations and not an alternate frontier. Keeping this
+    // list sourced from `rooflines` / `overlayRooflines` guarantees a
+    // dominated scatter point can never stretch the axis merely because it
+    // carries diagnostics.
+    const visibleFrontierPoints = useMemo(() => {
+      const points: InferenceData[] = [];
+      for (const [key, front] of Object.entries(rooflines)) {
+        const hw = key.split('_').slice(0, -1).join('_');
+        const precision = key.split('_').pop()!;
+        if (effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(precision)) {
+          points.push(...front);
+        }
+      }
+      for (const group of Object.values(overlayRooflines)) {
+        if (activeOverlayHwTypes.has(group.hwKey)) points.push(...group.points);
+      }
+      return points;
+    }, [
+      rooflines,
+      overlayRooflines,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      activeOverlayHwTypes,
+    ]);
+
+    const observedRangePoints = useMemo(
+      () => visibleFrontierPoints.filter(hasObservedWindowRange),
+      [visibleFrontierPoints],
+    );
+
+    // A mixed-duration comparison gets a generic key rather than claiming one
+    // window width applies to every point. Current AgentX artifacts use 600s.
+    const observedRangeWindowSeconds = useMemo(() => {
+      const durations = new Set(
+        observedRangePoints
+          .map((point) => point.observed_window_seconds)
+          .filter(
+            (seconds): seconds is number =>
+              typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0,
+          ),
+      );
+      return durations.size === 1 ? [...durations][0] : undefined;
+    }, [observedRangePoints]);
+
     // Ref for trackedConfigIds (needs to be current at event time inside D3 handlers)
     const trackedConfigIdsRef = useRef(trackedConfigIds);
     trackedConfigIdsRef.current = trackedConfigIds;
@@ -966,7 +1051,10 @@ const ScatterGraph = React.memo(
       const ext =
         xExtentOverride ??
         (visiblePoints.length > 0
-          ? (d3.extent(visiblePoints, (d) => d.x) as [number, number])
+          ? (d3.extent([
+              ...visiblePoints.map((point) => point.x),
+              ...observedRangePoints.flatMap((point) => [point.observedXMin, point.observedXMax]),
+            ]) as [number, number])
           : ([0, 100] as [number, number]));
 
       let useLog = false;
@@ -986,7 +1074,15 @@ const ScatterGraph = React.memo(
         nice: niceAxes,
         _isLog: useLog,
       };
-    }, [visiblePoints, isInputTputMetric, xLabel, scaleType, niceAxes, xExtentOverride]);
+    }, [
+      visiblePoints,
+      observedRangePoints,
+      isInputTputMetric,
+      xLabel,
+      scaleType,
+      niceAxes,
+      xExtentOverride,
+    ]);
     const xScaleConfig = useStableValue(xScaleConfigRaw, isSameScaleConfig);
 
     const yScaleConfigRaw = useMemo(() => {
@@ -1059,6 +1155,20 @@ const ScatterGraph = React.memo(
       [effectiveActiveHwTypes, selectedPrecisions],
     );
 
+    const observedRangeOpacity = useCallback(
+      (el: SVGGElement): number => {
+        const hw = el.dataset.hwKey;
+        const precision = el.dataset.precision;
+        if (!hw || !precision) return 0;
+        const active =
+          el.dataset.source === 'overlay'
+            ? activeOverlayHwTypes.has(hw)
+            : effectiveActiveHwTypes.has(hw);
+        return active && selectedPrecisions.includes(precision) ? 0.42 : 0;
+      },
+      [activeOverlayHwTypes, effectiveActiveHwTypes, selectedPrecisions],
+    );
+
     // --- Interaction state ref ---
     // Latest visibility predicates, color resolvers, and active sets — read by
     // long-lived D3 closures (layer renders, zoom handlers, hover handlers).
@@ -1116,12 +1226,19 @@ const ScatterGraph = React.memo(
           return this.dataset.hwKey === hwKey ? null : '0.15';
         });
         root
+          .selectAll<SVGGElement, unknown>('.observed-window-range[data-source="official"]')
+          .style('opacity', function () {
+            const base = observedRangeOpacity(this);
+            if (base === 0) return 0;
+            return this.dataset.hwKey === hwKey ? base : 0.06;
+          });
+        root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
           .style('opacity', function () {
             return labelOpacityForHover((this as SVGGElement).dataset, hwKey);
           });
       },
-      [isPointVisible, isRooflineVisible],
+      [isPointVisible, isRooflineVisible, observedRangeOpacity],
     );
 
     const handleLegendHoverEnd = useCallback(() => {
@@ -1134,6 +1251,9 @@ const ScatterGraph = React.memo(
       root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
         return isRooflineVisible(this) ? 1 : 0;
       });
+      root.selectAll<SVGGElement, unknown>('.observed-window-range').style('opacity', function () {
+        return observedRangeOpacity(this);
+      });
       root
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
         .style('opacity', function () {
@@ -1143,7 +1263,13 @@ const ScatterGraph = React.memo(
             selectedPrecisions,
           );
         });
-    }, [isPointVisible, isRooflineVisible, effectiveActiveHwTypes, selectedPrecisions]);
+    }, [
+      isPointVisible,
+      isRooflineVisible,
+      observedRangeOpacity,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+    ]);
 
     // --- Zoom config ---
     const eventPrefix = chartDefinition.chartType === 'e2e' ? 'latency' : 'interactivity';
@@ -1402,6 +1528,105 @@ const ScatterGraph = React.memo(
             .attr('d', (d) => lineGen(d.points))
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
+
+          // Thin, capped horizontal whiskers summarize the range observed
+          // across non-overlapping windows in this one run. They deliberately
+          // live in the roofline layer (behind points), carry no pointer
+          // events, and are never used to compute the Pareto frontier.
+          const observedRangeMarks: ObservedRangeMark[] = [];
+          for (const [key, front] of Object.entries(rooflines)) {
+            const hw = key.split('_').slice(0, -1).join('_');
+            const precision = key.split('_').pop()!;
+            const visible =
+              ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+            front.forEach((point, index) => {
+              if (!hasObservedWindowRange(point)) return;
+              observedRangeMarks.push({
+                key: `official-${key}-${point.date}-${point.id ?? 'na'}-${point.conc}-${point.x}-${point.y}-${index}`,
+                point,
+                hw,
+                precision,
+                source: 'official',
+                color: ir.getCssColor(ir.resolveColor(hw)),
+                visible,
+              });
+            });
+          }
+          if (overlayData) {
+            for (const [key, group] of Object.entries(overlayRooflines)) {
+              if (!overlayData.hardwareConfig[group.hwKey]) continue;
+              group.points.forEach((point, index) => {
+                if (!hasObservedWindowRange(point)) return;
+                observedRangeMarks.push({
+                  key: `overlay-${key}-${point.date}-${point.id ?? 'na'}-${point.conc}-${point.x}-${point.y}-${index}`,
+                  point,
+                  hw: group.hwKey,
+                  precision: point.precision,
+                  source: 'overlay',
+                  color: overlayRunColor(group.runIndex),
+                  visible:
+                    ir.activeOverlayHwTypes.has(group.hwKey) &&
+                    ir.selectedPrecisions.includes(point.precision),
+                  runIndex: group.runIndex,
+                });
+              });
+            }
+          }
+
+          const observedRanges = rooflinesLayer
+            .selectAll<SVGGElement, ObservedRangeMark>('.observed-window-range')
+            .data(observedRangeMarks, (mark) => mark.key)
+            .join(
+              (enter) => {
+                const group = enter.append('g').attr('class', 'observed-window-range');
+                group.append('line').attr('class', 'observed-window-range-stem');
+                group.append('line').attr('class', 'observed-window-range-cap-min');
+                group.append('line').attr('class', 'observed-window-range-cap-max');
+                return group;
+              },
+              (update) => update,
+              (exit) => exit.remove(),
+            )
+            .attr('data-testid', 'observed-window-range')
+            .attr('data-source', (mark) => mark.source)
+            .attr('data-hw-key', (mark) => mark.hw)
+            .attr('data-precision', (mark) => mark.precision)
+            .attr('data-run-index', (mark) => mark.runIndex ?? null)
+            .attr('aria-hidden', 'true')
+            .attr('fill', 'none')
+            .attr('stroke', (mark) => mark.color)
+            .attr('stroke-width', 1)
+            .attr('stroke-linecap', 'round')
+            .style('pointer-events', 'none')
+            .style('transition', 'opacity 150ms ease')
+            .style('opacity', (mark) => (mark.visible ? 0.42 : 0));
+
+          observedRanges.selectAll('line').attr('vector-effect', 'non-scaling-stroke');
+          observedRanges.each(function (mark) {
+            const group = d3.select(this);
+            const minX = xScale(mark.point.observedXMin);
+            const maxX = xScale(mark.point.observedXMax);
+            const y = yScale(mark.point.y);
+            group
+              .select('.observed-window-range-stem')
+              .attr('x1', minX)
+              .attr('x2', maxX)
+              .attr('y1', y)
+              .attr('y2', y);
+            group
+              .select('.observed-window-range-cap-min')
+              .attr('x1', minX)
+              .attr('x2', minX)
+              .attr('y1', y - 3.5)
+              .attr('y2', y + 3.5);
+            group
+              .select('.observed-window-range-cap-max')
+              .attr('x1', maxX)
+              .attr('x2', maxX)
+              .attr('y1', y - 3.5)
+              .attr('y2', y + 3.5);
+          });
+          observedRanges.lower();
 
           // Parallelism labels
           interface LabelSeg {
@@ -1853,6 +2078,35 @@ const ScatterGraph = React.memo(
               if (!sel.empty()) sel.attr('d', lineGen(datePoints) as string);
             }
           });
+
+          // Keep observed-window whiskers anchored to the full-run point while
+          // zooming. End caps stay a fixed seven CSS pixels tall.
+          zoomGroup
+            .selectAll<SVGGElement, ObservedRangeMark>('.observed-window-range')
+            .each(function (mark) {
+              const group = d3.select(this);
+              const minX = newXScale(mark.point.observedXMin);
+              const maxX = newXScale(mark.point.observedXMax);
+              const y = newYScale(mark.point.y);
+              group
+                .select('.observed-window-range-stem')
+                .attr('x1', minX)
+                .attr('x2', maxX)
+                .attr('y1', y)
+                .attr('y2', y);
+              group
+                .select('.observed-window-range-cap-min')
+                .attr('x1', minX)
+                .attr('x2', minX)
+                .attr('y1', y - 3.5)
+                .attr('y2', y + 3.5);
+              group
+                .select('.observed-window-range-cap-max')
+                .attr('x1', maxX)
+                .attr('x2', maxX)
+                .attr('y1', y - 3.5)
+                .attr('y2', y + 3.5);
+            });
 
           // Update gradient coordinates
           if (showGradientLabels) {
@@ -2683,6 +2937,16 @@ const ScatterGraph = React.memo(
         }
       });
 
+      // Observed-window ranges follow the same visibility/recolor path as
+      // their frontier series without touching their zoomed geometry.
+      zoomGroup.selectAll<SVGGElement, unknown>('.observed-window-range').each(function () {
+        const el = d3.select(this);
+        el.style('opacity', observedRangeOpacity(this));
+        if (this.dataset.source === 'official' && this.dataset.hwKey) {
+          el.attr('stroke', ir.getCssColor(ir.resolveColor(this.dataset.hwKey)));
+        }
+      });
+
       // Parallelism / line labels: visibility via data attributes (mirrors
       // handleLegendHoverEnd). Placement-level updates happen below.
       zoomGroup
@@ -2740,6 +3004,7 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       gradientColorByPoint,
+      observedRangeOpacity,
     ]);
 
     // D3 custom layers are keyed additions, so removing the overlay layer from
@@ -2749,7 +3014,11 @@ const ScatterGraph = React.memo(
       if (overlayData) return;
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
-      d3.select(svg).selectAll('.unofficial-overlay-pt, .overlay-roofline-path').remove();
+      d3.select(svg)
+        .selectAll(
+          '.unofficial-overlay-pt, .overlay-roofline-path, .observed-window-range[data-source="overlay"]',
+        )
+        .remove();
     }, [overlayData]);
 
     // Dismiss tooltip on filter changes
@@ -2937,6 +3206,32 @@ const ScatterGraph = React.memo(
                   })),
               ]}
               disableActiveSort={false}
+              keyIndicators={
+                observedRangePoints.length > 0 ? (
+                  <div
+                    data-testid="observed-window-range-key"
+                    className="mt-2 flex items-start gap-2 px-1 text-[10px] leading-tight text-muted-foreground"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      width="22"
+                      height="10"
+                      viewBox="0 0 22 10"
+                      className="mt-px shrink-0"
+                    >
+                      <path
+                        d="M2 5H20M2 2V8M20 2V8"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        strokeLinecap="round"
+                        opacity="0.55"
+                      />
+                    </svg>
+                    <span>{observedRangeLegendLabel(locale, observedRangeWindowSeconds)}</span>
+                  </div>
+                ) : undefined
+              }
               isLegendExpanded={isLegendExpanded}
               onExpandedChange={(expanded) => {
                 setIsLegendExpanded(expanded);

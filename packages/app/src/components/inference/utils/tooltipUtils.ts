@@ -99,6 +99,106 @@ export const fmt = (v: number): string => {
   return String(rounded);
 };
 
+const OBSERVED_RANGE_STRINGS = {
+  en: {
+    genericTitle: 'Observed window range',
+    title: (duration: string) => `Observed ${duration} range`,
+    completeWindows: (count: number) =>
+      `${count} non-overlapping windows; not a confidence interval or rerun prediction.`,
+    partialWindows: (count: number, expected: number) =>
+      `${count} of ${expected} non-overlapping windows contained successful requests; not a confidence interval or rerun prediction.`,
+    rootTrajectories: 'Root trajectories',
+    kishCoverage: 'Kish-effective root coverage',
+    kishExplanation: 'coverage diversity, not a statistical effective sample size',
+    smallestWindow: 'Smallest window',
+    successfulRequests: 'successful requests',
+  },
+  zh: {
+    genericTitle: '观测时间窗口范围',
+    title: (duration: string) => `${duration}观测范围`,
+    completeWindows: (count: number) =>
+      `基于 ${count} 个互不重叠的时间窗口；并非置信区间，也不预测复跑结果。`,
+    partialWindows: (count: number, expected: number) =>
+      `${expected} 个互不重叠的时间窗口中有 ${count} 个包含成功请求；并非置信区间，也不预测复跑结果。`,
+    rootTrajectories: '根轨迹数',
+    kishCoverage: 'Kish 有效根轨迹覆盖数',
+    kishExplanation: '仅表示覆盖多样性，并非统计有效样本量',
+    smallestWindow: '最小时间窗口',
+    successfulRequests: '个成功请求',
+  },
+} as const;
+
+const observedWindowDuration = (seconds: number | undefined, locale: Locale): string | null => {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return null;
+  const minutes = seconds / 60;
+  if (locale === 'zh') {
+    return Number.isInteger(minutes) ? `${minutes} 分钟` : `${seconds} 秒`;
+  }
+  return Number.isInteger(minutes) ? `${minutes}-minute` : `${seconds}-second`;
+};
+
+/**
+ * One-run descriptive diagnostics for the x metric. This intentionally says
+ * what the range is not: the windows are dependent slices of one run, so the
+ * min/max cannot support confidence-interval or rerun-prediction language.
+ */
+const generateObservedWindowRangeHTML = (d: InferenceData, locale: Locale): string => {
+  const min = d.observedXMin;
+  const max = d.observedXMax;
+  const count = d.observed_window_count ?? 0;
+  if (
+    count < 2 ||
+    typeof min !== 'number' ||
+    !Number.isFinite(min) ||
+    min <= 0 ||
+    typeof max !== 'number' ||
+    !Number.isFinite(max) ||
+    max <= min
+  ) {
+    return '';
+  }
+
+  const t = OBSERVED_RANGE_STRINGS[locale];
+  const duration = observedWindowDuration(d.observed_window_seconds, locale);
+  const title = duration ? t.title(duration) : t.genericTitle;
+  const expected = d.observed_window_expected_count;
+  const windowNote =
+    typeof expected === 'number' && expected > count
+      ? t.partialWindows(count, expected)
+      : t.completeWindows(count);
+
+  const coverageRows: string[] = [];
+  if (typeof d.root_trajectory_count === 'number') {
+    coverageRows.push(tooltipLine(t.rootTrajectories, d.root_trajectory_count));
+  }
+  if (typeof d.root_trajectory_kish_effective_count === 'number') {
+    coverageRows.push(
+      tooltipLine(
+        t.kishCoverage,
+        `${fmt(d.root_trajectory_kish_effective_count)} <span style="font-size: 10px; opacity: 0.8;">(${t.kishExplanation})</span>`,
+      ),
+    );
+  }
+  if (typeof d.observed_window_min_requests === 'number') {
+    const value =
+      locale === 'zh'
+        ? `${d.observed_window_min_requests}${t.successfulRequests}`
+        : `${d.observed_window_min_requests} ${t.successfulRequests}`;
+    coverageRows.push(tooltipLine(t.smallestWindow, value));
+  }
+
+  return `
+    <div data-testid="observed-window-range-tooltip" style="border-top: 1px solid var(--border); margin-top: 7px; padding-top: 7px; margin-bottom: 5px;">
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 3px;">
+        <strong>${title}:</strong> ${fmt(min)}–${fmt(max)}
+      </div>
+      <div style="color: var(--muted-foreground); font-size: 10px; line-height: 1.35; margin-bottom: 5px; max-width: 280px;">
+        ${windowNote}
+      </div>
+      ${coverageRows.join('')}
+    </div>`;
+};
+
 const CACHE_STRINGS = {
   en: {
     offloadType: 'Offload Type',
@@ -313,6 +413,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           </div>`
           : ''
       }
+      ${generateObservedWindowRangeHTML(d, locale)}
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
@@ -373,6 +474,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
+      ${generateObservedWindowRangeHTML(d, locale)}
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
@@ -444,6 +546,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           </div>`
           : ''
       }
+      ${generateObservedWindowRangeHTML(d, locale)}
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">

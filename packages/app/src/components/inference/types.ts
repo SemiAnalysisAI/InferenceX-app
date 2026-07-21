@@ -219,6 +219,32 @@ export interface AggDataEntry {
   total_prompt_tokens?: number;
   /** Total generated (output) tokens. */
   total_generation_tokens?: number;
+  /** Width of each non-overlapping descriptive window, in seconds. */
+  observed_window_seconds?: number;
+  /** Configured number of complete windows in the measurement duration. */
+  observed_window_expected_count?: number;
+  /** Number of those windows containing at least one successful request. */
+  observed_window_count?: number;
+  /** Smallest successful-request count among observed windows. */
+  observed_window_min_requests?: number;
+  /** Distinct root source trajectories represented by all requests. */
+  root_trajectory_count?: number;
+  /** Kish diversity count from root-trajectory request shares (not a statistical ESS). */
+  root_trajectory_kish_effective_count?: number;
+  /** Fraction of requests belonging to the most represented root trajectory. */
+  root_trajectory_largest_share?: number;
+  observed_window_p75_ttft_min?: number;
+  observed_window_p75_ttft_max?: number;
+  observed_window_p90_ttft_min?: number;
+  observed_window_p90_ttft_max?: number;
+  observed_window_p75_e2el_min?: number;
+  observed_window_p75_e2el_max?: number;
+  observed_window_p90_e2el_min?: number;
+  observed_window_p90_e2el_max?: number;
+  observed_window_p75_intvty_min?: number;
+  observed_window_p75_intvty_max?: number;
+  observed_window_p90_intvty_min?: number;
+  observed_window_p90_intvty_max?: number;
 }
 
 /**
@@ -243,7 +269,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // Chart-specific derived fields
   x: number;
   y: number;
+  /** Roofline membership for the currently selected, flattened y metric. */
+  roof?: boolean;
   hidden?: boolean;
+  /** Descriptive non-overlapping-window bounds for the currently resolved x field. */
+  observedXMin?: number;
+  observedXMax?: number;
   /**
    * Whether this point sits on the (e2e_latency, y-metric) Pareto frontier.
    * Set by useChartData when `selectedXAxisMode !== 'e2e'`. The TTFT /

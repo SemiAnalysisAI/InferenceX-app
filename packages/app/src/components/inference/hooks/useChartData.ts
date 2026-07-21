@@ -29,6 +29,7 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { withObservedWindowRange } from '@/components/inference/utils/observed-window-range';
 import {
   applyQuickFilters,
   computeAvailableQuickFilters,
@@ -137,6 +138,32 @@ const FLIP_MAP: Record<RooflineDirection, RooflineDirection> = {
 /** Flip roofline direction when the x-axis is swapped. */
 export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection {
   return FLIP_MAP[dir];
+}
+
+/**
+ * Remap a transformed benchmark point onto the currently selected chart axes.
+ * Keep the selected y-metric's roofline marker on the flattened point: chart
+ * consumers read this marker after the metric object has been reduced to `y`.
+ */
+export function remapChartPoint(
+  point: InferenceData,
+  metricKey: YAxisMetricKey,
+  xAxisField: keyof AggDataEntry,
+  isOnE2eFrontier?: boolean,
+): InferenceData {
+  const metric = point[metricKey] as { y: number; roof: boolean } | undefined;
+  const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
+
+  return withObservedWindowRange(
+    {
+      ...point,
+      x: typeof xCandidate === 'number' ? xCandidate : point.x,
+      y: metric?.y ?? point.y,
+      roof: metric?.roof ?? false,
+      isOnE2eFrontier,
+    },
+    String(xAxisField),
+  );
 }
 
 /** The dedup key fields a chart series is identified by. */
@@ -526,25 +553,11 @@ export function useChartData(
           ? filteredData
               .filter((d) => metricKey in d)
               .map((d: InferenceData) => {
-                const yValue = (d[metricKey] as { y: number })?.y ?? d.y;
-                const roof = (d[metricKey] as { roof: boolean })?.roof ?? false;
-                // xAxisField is `keyof AggDataEntry`; InferenceData embeds those
-                // fields via `Partial<Omit<AggDataEntry, ...>>`, so a typed
-                // accessor catches a future field rename (silent fallthrough to
-                // d.x would otherwise mask the regression).
-                const xCandidate = (d as Partial<AggDataEntry>)[xAxisField];
-                const xValue = typeof xCandidate === 'number' ? xCandidate : d.x;
                 const isOnE2eFrontier =
                   e2eParetoSet === null
                     ? undefined
                     : isPersistedBenchmarkId(d.id) && e2eParetoSet.has(d.id);
-                return {
-                  ...d,
-                  x: xValue,
-                  y: yValue,
-                  roof,
-                  isOnE2eFrontier,
-                };
+                return remapChartPoint(d, metricKey, xAxisField, isOnE2eFrontier);
               })
               // When TTFT is on the x-axis, apply the latency limit to filter
               // overload outliers (fixed-seq conc=2048 rows with TTFT > 60s that

@@ -71,6 +71,21 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   };
 }
 
+function observedRangePoint(overrides: Partial<InferenceData> = {}): InferenceData {
+  return pt({
+    benchmark_type: 'agentic_traces',
+    observedXMin: 1.416,
+    observedXMax: 4.114,
+    observed_window_seconds: 600,
+    observed_window_expected_count: 6,
+    observed_window_count: 6,
+    observed_window_min_requests: 21,
+    root_trajectory_count: 3,
+    root_trajectory_kish_effective_count: 1.69,
+    ...overrides,
+  });
+}
+
 // ===========================================================================
 // getPointLabel
 // ===========================================================================
@@ -425,6 +440,39 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('Track Over Time');
     expect(html).not.toContain('Untrack Over Time');
   });
+
+  it('labels the observed window range as descriptive, not inferential', () => {
+    const html = generateTooltipContent(tooltipConfig({ data: observedRangePoint() }));
+
+    expect(html).toContain('<strong>Observed 10-minute range:</strong> 1.416–4.114');
+    expect(html).toContain(
+      '6 non-overlapping windows; not a confidence interval or rerun prediction.',
+    );
+    expect(html).toContain('<strong>Root trajectories:</strong> 3');
+    expect(html).toContain('<strong>Kish-effective root coverage:</strong> 1.69');
+    expect(html).toContain('not a statistical effective sample size');
+    expect(html).toContain('<strong>Smallest window:</strong> 21 successful requests');
+  });
+
+  it('renders natural Chinese observed-range caveats', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ locale: 'zh', data: observedRangePoint() }),
+    );
+
+    expect(html).toContain('<strong>10 分钟观测范围:</strong> 1.416–4.114');
+    expect(html).toContain('基于 6 个互不重叠的时间窗口；并非置信区间，也不预测复跑结果。');
+    expect(html).toContain('<strong>根轨迹数:</strong> 3');
+    expect(html).toContain('<strong>Kish 有效根轨迹覆盖数:</strong> 1.69');
+    expect(html).toContain('并非统计有效样本量');
+    expect(html).toContain('<strong>最小时间窗口:</strong> 21个成功请求');
+  });
+
+  it('omits an observed range when fewer than two windows are available', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: observedRangePoint({ observed_window_count: 1 }) }),
+    );
+    expect(html).not.toContain('observed-window-range-tooltip');
+  });
 });
 
 // ===========================================================================
@@ -505,6 +553,14 @@ describe('generateOverlayTooltipContent', () => {
 
     expect(html).not.toContain('Offload Type');
     expect(html).not.toContain('CPU Cache Hit Rate');
+  });
+
+  it('shows the same observed-range caveat for unofficial overlays', () => {
+    const html = generateOverlayTooltipContent(overlayConfig({ data: observedRangePoint() }));
+
+    expect(html).toContain('<strong>Observed 10-minute range:</strong> 1.416–4.114');
+    expect(html).toContain('not a confidence interval or rerun prediction');
+    expect(html).toContain('Kish-effective root coverage');
   });
 });
 

@@ -772,6 +772,29 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
         },
       },
       cache: { theoretical_cache_hit_rate: 0.97509 },
+      stability: {
+        window_seconds: 600,
+        expected_window_count: 6,
+        observed_window_count: 6,
+        min_window_requests: 190,
+        root_trajectory_count: 25,
+        root_trajectory_kish_effective_count: 14.767,
+        root_trajectory_largest_share: 0.159,
+        observed_ranges: {
+          ttft: {
+            p75: { min: 0.941, max: 1.758 },
+            p90: { min: 1.416, max: 4.114 },
+          },
+          e2el: {
+            p75: { min: 42.1, max: 79.2 },
+            p90: { min: 57.456, max: 110.924 },
+          },
+          intvty: {
+            p75: { min: 24.5, max: 31.2 },
+            p90: { min: 22.621, max: 30.653 },
+          },
+        },
+      },
     },
     server_metrics: {
       present: true,
@@ -841,6 +864,16 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m.total_prompt_tokens).toBe(261750519);
     expect(m.total_generation_tokens).toBe(1422696);
     expect(m.total_requests_completed).toBe(1648);
+    // realized coverage + non-overlapping-window diagnostics
+    expect(m.observed_window_seconds).toBe(600);
+    expect(m.observed_window_count).toBe(6);
+    expect(m.observed_window_min_requests).toBe(190);
+    expect(m.root_trajectory_count).toBe(25);
+    expect(m.root_trajectory_kish_effective_count).toBeCloseTo(14.767, 3);
+    expect(m.observed_window_p90_ttft_min).toBeCloseTo(1.416, 3);
+    expect(m.observed_window_p90_ttft_max).toBeCloseTo(4.114, 3);
+    expect(m.observed_window_p75_e2el_max).toBeCloseTo(79.2, 3);
+    expect(m.observed_window_p90_intvty_min).toBeCloseTo(22.621, 3);
     // nested containers must not leak into metrics
     expect(m).not.toHaveProperty('request_metrics');
     expect(m).not.toHaveProperty('server_metrics');
