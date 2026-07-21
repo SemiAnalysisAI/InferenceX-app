@@ -794,6 +794,38 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
             p90: { min: 22.621, max: 30.653 },
           },
         },
+        convergence: {
+          checkpoint_seconds: 300,
+          tolerance_ratio: 0.05,
+          min_confirmation_seconds: 1200,
+          horizon_seconds: 3600,
+          metrics: {
+            ttft: {
+              p75: {
+                time_seconds: 900,
+                requests: 300,
+                min: 1.21,
+                max: 1.27,
+                max_relative_deviation: 0.031,
+              },
+              p90: null,
+            },
+            e2el: {
+              p75: null,
+              p90: null,
+            },
+            intvty: {
+              p75: null,
+              p90: {
+                time_seconds: 1200,
+                requests: 407,
+                min: 43.36036,
+                max: 46.97824,
+                max_relative_deviation: 0.04385,
+              },
+            },
+          },
+        },
       },
     },
     server_metrics: {
@@ -874,6 +906,21 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m.observed_window_p90_ttft_max).toBeCloseTo(4.114, 3);
     expect(m.observed_window_p75_e2el_max).toBeCloseTo(79.2, 3);
     expect(m.observed_window_p90_intvty_min).toBeCloseTo(22.621, 3);
+    // retrospective cumulative-prefix convergence
+    expect(m.convergence_checkpoint_seconds).toBe(300);
+    expect(m.convergence_tolerance_ratio).toBe(0.05);
+    expect(m.convergence_min_confirmation_seconds).toBe(1200);
+    expect(m.convergence_horizon_seconds).toBe(3600);
+    expect(m.convergence_p75_ttft_time_seconds).toBe(900);
+    expect(m.convergence_p75_ttft_requests).toBe(300);
+    expect(m.convergence_p75_ttft_min).toBeCloseTo(1.21, 5);
+    expect(m.convergence_p75_ttft_max_relative_deviation).toBeCloseTo(0.031, 5);
+    expect(m.convergence_p90_intvty_time_seconds).toBe(1200);
+    expect(m.convergence_p90_intvty_requests).toBe(407);
+    expect(m.convergence_p90_intvty_min).toBeCloseTo(43.36036, 5);
+    expect(m.convergence_p90_intvty_max).toBeCloseTo(46.97824, 5);
+    expect(m.convergence_p90_intvty_max_relative_deviation).toBeCloseTo(0.04385, 5);
+    expect(m).not.toHaveProperty('convergence_p90_ttft_time_seconds');
     // nested containers must not leak into metrics
     expect(m).not.toHaveProperty('request_metrics');
     expect(m).not.toHaveProperty('server_metrics');

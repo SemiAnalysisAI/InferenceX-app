@@ -245,6 +245,44 @@ export interface AggDataEntry {
   observed_window_p75_intvty_max?: number;
   observed_window_p90_intvty_min?: number;
   observed_window_p90_intvty_max?: number;
+  /** Width of each cumulative convergence checkpoint, in seconds. */
+  convergence_checkpoint_seconds?: number;
+  /** Symmetric multiplicative tolerance around the final cumulative estimate. */
+  convergence_tolerance_ratio?: number;
+  /** Required duration after stabilization, in seconds. */
+  convergence_min_confirmation_seconds?: number;
+  /** Last complete cumulative checkpoint included in the diagnostic. */
+  convergence_horizon_seconds?: number;
+  convergence_p75_ttft_time_seconds?: number;
+  convergence_p75_ttft_requests?: number;
+  convergence_p75_ttft_min?: number;
+  convergence_p75_ttft_max?: number;
+  convergence_p75_ttft_max_relative_deviation?: number;
+  convergence_p90_ttft_time_seconds?: number;
+  convergence_p90_ttft_requests?: number;
+  convergence_p90_ttft_min?: number;
+  convergence_p90_ttft_max?: number;
+  convergence_p90_ttft_max_relative_deviation?: number;
+  convergence_p75_e2el_time_seconds?: number;
+  convergence_p75_e2el_requests?: number;
+  convergence_p75_e2el_min?: number;
+  convergence_p75_e2el_max?: number;
+  convergence_p75_e2el_max_relative_deviation?: number;
+  convergence_p90_e2el_time_seconds?: number;
+  convergence_p90_e2el_requests?: number;
+  convergence_p90_e2el_min?: number;
+  convergence_p90_e2el_max?: number;
+  convergence_p90_e2el_max_relative_deviation?: number;
+  convergence_p75_intvty_time_seconds?: number;
+  convergence_p75_intvty_requests?: number;
+  convergence_p75_intvty_min?: number;
+  convergence_p75_intvty_max?: number;
+  convergence_p75_intvty_max_relative_deviation?: number;
+  convergence_p90_intvty_time_seconds?: number;
+  convergence_p90_intvty_requests?: number;
+  convergence_p90_intvty_min?: number;
+  convergence_p90_intvty_max?: number;
+  convergence_p90_intvty_max_relative_deviation?: number;
 }
 
 /**
@@ -272,9 +310,14 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   /** Roofline membership for the currently selected, flattened y metric. */
   roof?: boolean;
   hidden?: boolean;
-  /** Descriptive non-overlapping-window bounds for the currently resolved x field. */
-  observedXMin?: number;
-  observedXMax?: number;
+  /** Retrospective post-stabilization bounds for the currently resolved x field. */
+  convergenceXMin?: number;
+  convergenceXMax?: number;
+  convergenceTimeSeconds?: number;
+  convergenceRequests?: number;
+  convergenceMaxRelativeDeviation?: number;
+  /** True when convergence was evaluated for the current x field. */
+  convergenceEvaluated?: boolean;
   /**
    * Whether this point sits on the (e2e_latency, y-metric) Pareto frontier.
    * Set by useChartData when `selectedXAxisMode !== 'e2e'`. The TTFT /

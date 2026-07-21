@@ -732,10 +732,12 @@ describe('ScatterGraph', () => {
           y: 260 - index * 40,
           precision: Precision.FP4,
           run_url: runUrl,
-          observedXMin: x * 0.75,
-          observedXMax: x * 1.25,
-          observed_window_seconds: 600,
-          observed_window_count: 6,
+          convergenceXMin: x * 0.96,
+          convergenceXMax: x * 1.04,
+          convergenceTimeSeconds: 1200,
+          convergenceRequests: 407,
+          convergenceMaxRelativeDeviation: 0.04,
+          convergence_tolerance_ratio: 0.05,
         }),
       ),
       hardwareConfig: hwConfig,
@@ -781,16 +783,16 @@ describe('ScatterGraph', () => {
 
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('have.length', 3);
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('exist');
-    cy.get(
-      '#test-scatter-dismiss-preview svg .observed-window-range[data-source="overlay"]',
-    ).should('exist');
+    cy.get('#test-scatter-dismiss-preview svg .convergence-range[data-source="overlay"]').should(
+      'exist',
+    );
 
     cy.get('[data-testid="dismiss-preview"]').click();
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('not.exist');
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('not.exist');
-    cy.get(
-      '#test-scatter-dismiss-preview svg .observed-window-range[data-source="overlay"]',
-    ).should('not.exist');
+    cy.get('#test-scatter-dismiss-preview svg .convergence-range[data-source="overlay"]').should(
+      'not.exist',
+    );
   });
 });
 

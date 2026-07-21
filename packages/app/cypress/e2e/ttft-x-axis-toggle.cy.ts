@@ -41,7 +41,7 @@ const percentileLadder = (prefix: string, base: number): Record<string, number> 
   [`std_${prefix}`]: base * 0.3,
 });
 
-const agenticMetrics = (conc: number): Record<string, number> => {
+const agenticMetrics = (conc: number, stabilized = true): Record<string, number> => {
   const scale = conc / 16;
   const itl = 0.011 * scale;
   const p75Ttft = 0.4 * scale * 1.2;
@@ -83,6 +83,44 @@ const agenticMetrics = (conc: number): Record<string, number> => {
     observed_window_p75_intvty_max: p75Interactivity * 1.28,
     observed_window_p90_intvty_min: p90Interactivity * 0.68,
     observed_window_p90_intvty_max: p90Interactivity * 1.32,
+    convergence_checkpoint_seconds: 300,
+    convergence_tolerance_ratio: 0.05,
+    convergence_min_confirmation_seconds: 1200,
+    convergence_horizon_seconds: 3600,
+    ...(stabilized
+      ? {
+          convergence_p75_ttft_time_seconds: 900,
+          convergence_p75_ttft_requests: Math.round(conc * 25),
+          convergence_p75_ttft_min: p75Ttft * 0.97,
+          convergence_p75_ttft_max: p75Ttft * 1.03,
+          convergence_p75_ttft_max_relative_deviation: 0.03,
+          convergence_p90_ttft_time_seconds: 1200,
+          convergence_p90_ttft_requests: Math.round(conc * 25.4),
+          convergence_p90_ttft_min: p90Ttft * 0.96,
+          convergence_p90_ttft_max: p90Ttft * 1.04,
+          convergence_p90_ttft_max_relative_deviation: 0.04,
+          convergence_p75_e2el_time_seconds: 900,
+          convergence_p75_e2el_requests: Math.round(conc * 25),
+          convergence_p75_e2el_min: p75E2e * 0.97,
+          convergence_p75_e2el_max: p75E2e * 1.03,
+          convergence_p75_e2el_max_relative_deviation: 0.03,
+          convergence_p90_e2el_time_seconds: 1200,
+          convergence_p90_e2el_requests: Math.round(conc * 25.4),
+          convergence_p90_e2el_min: p90E2e * 0.96,
+          convergence_p90_e2el_max: p90E2e * 1.04,
+          convergence_p90_e2el_max_relative_deviation: 0.04,
+          convergence_p75_intvty_time_seconds: 900,
+          convergence_p75_intvty_requests: Math.round(conc * 25),
+          convergence_p75_intvty_min: p75Interactivity * 0.97,
+          convergence_p75_intvty_max: p75Interactivity * 1.03,
+          convergence_p75_intvty_max_relative_deviation: 0.03,
+          convergence_p90_intvty_time_seconds: 1200,
+          convergence_p90_intvty_requests: Math.round(conc * 25.4),
+          convergence_p90_intvty_min: p90Interactivity * 0.96,
+          convergence_p90_intvty_max: p90Interactivity * 1.04,
+          convergence_p90_intvty_max_relative_deviation: 0.04,
+        }
+      : {}),
   };
 };
 
@@ -141,7 +179,7 @@ const agenticBenchmarks = agenticGpus.flatMap((g) =>
     offload_mode: 'off',
     benchmark_type: 'agentic_traces',
     image: 'vllm/vllm-openai:v0.9.0',
-    metrics: agenticMetrics(conc),
+    metrics: agenticMetrics(conc, !(g.hardware === 'b200' && conc === 16)),
     workers: null,
     date: AGENTIC_DATE,
     run_url: null,
@@ -225,26 +263,60 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  it('renders observed-window ranges with an explicit non-inferential caveat', () => {
+  it('renders post-stabilization spans with an explicit non-inferential caveat', () => {
     cy.get(
-      '[data-testid="inference-chart-display"] [data-testid="observed-window-range"][data-source="official"]',
+      '[data-testid="inference-chart-display"] [data-testid="convergence-range"][data-source="official"]',
     ).should('have.length.greaterThan', 0);
-    cy.get('[data-testid="observed-window-range-key"]')
-      .should('contain.text', 'Observed 10-minute range')
+    cy.get('[data-testid="convergence-range-key"]')
+      .should('contain.text', 'Cumulative span after ±5% stabilization')
+      .and('contain.text', 'retrospective')
       .and('contain.text', 'not a confidence interval');
 
-    cy.get('[data-testid="scatter-graph"] svg .dot-group .visible-shape')
-      .first()
-      .click({ force: true });
+    cy.get('[data-testid="scatter-graph"] svg .dot-group').then(($dots) => {
+      const stabilizedDot = [...$dots].find(
+        (dot) =>
+          (dot as unknown as SVGGElement & { __data__: { id?: number } }).__data__.id === 900001,
+      );
+      expect(stabilizedDot, 'stabilized fixture point').not.to.equal(undefined);
+      cy.wrap(stabilizedDot).find('.visible-shape').click({ force: true });
+    });
     cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', 'Observed 10-minute range')
+      .should('contain.text', 'Stabilized by 20 minutes at ±5%')
+      .and('contain.text', 'Post-stabilization span')
+      .and('contain.text', 'Maximum later deviation')
+      .and('contain.text', 'Retrospective within-run diagnostic')
       .and('contain.text', 'not a confidence interval or rerun prediction')
       .and('contain.text', 'Kish-effective root coverage');
   });
 
-  it('keeps observed-window ranges anchored through chart zoom', () => {
+  it('renders no whisker when the cumulative estimate did not stabilize', () => {
     cy.get(
-      '[data-testid="inference-chart-display"] [data-testid="observed-window-range"][data-source="official"] .observed-window-range-stem',
+      '[data-testid="inference-chart-display"] [data-testid="convergence-range"][data-source="official"]',
+    ).then(($ranges) => {
+      const hasUnstablePoint = [...$ranges].some(
+        (range) =>
+          (range as unknown as SVGGElement & { __data__: { point: { id?: number } } }).__data__
+            .point.id === 900000,
+      );
+      expect(hasUnstablePoint).to.equal(false);
+    });
+
+    cy.get('[data-testid="scatter-graph"] svg .dot-group').then(($dots) => {
+      const unstableDot = [...$dots].find(
+        (dot) =>
+          (dot as unknown as SVGGElement & { __data__: { id?: number } }).__data__.id === 900000,
+      );
+      expect(unstableDot, 'non-stabilized fixture point').not.to.equal(undefined);
+      cy.wrap(unstableDot).find('.visible-shape').click({ force: true });
+    });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', 'Not stabilized within the 60-minute run at ±5%')
+      .and('not.contain.text', 'Post-stabilization span');
+  });
+
+  it('keeps convergence ranges anchored through chart zoom', () => {
+    cy.get(
+      '[data-testid="inference-chart-display"] [data-testid="convergence-range"][data-source="official"] .convergence-range-stem',
     )
       .first()
       .then(($stem) => {
@@ -456,7 +528,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       expect(total).to.be.greaterThan(0);
     });
     cy.get(
-      '[data-testid="inference-chart-display"] [data-testid="observed-window-range"][data-source="overlay"]',
+      '[data-testid="inference-chart-display"] [data-testid="convergence-range"][data-source="overlay"]',
     )
       .should('have.length.greaterThan', 0)
       .and('have.attr', 'data-run-index', '0');

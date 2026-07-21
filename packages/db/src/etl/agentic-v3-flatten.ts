@@ -78,6 +78,22 @@ const V3_SCALAR_PATHS: [string[], string][] = [
     ['request_metrics', 'stability', 'root_trajectory_largest_share'],
     'root_trajectory_largest_share',
   ],
+  [
+    ['request_metrics', 'stability', 'convergence', 'checkpoint_seconds'],
+    'convergence_checkpoint_seconds',
+  ],
+  [
+    ['request_metrics', 'stability', 'convergence', 'tolerance_ratio'],
+    'convergence_tolerance_ratio',
+  ],
+  [
+    ['request_metrics', 'stability', 'convergence', 'min_confirmation_seconds'],
+    'convergence_min_confirmation_seconds',
+  ],
+  [
+    ['request_metrics', 'stability', 'convergence', 'horizon_seconds'],
+    'convergence_horizon_seconds',
+  ],
   // Deliberately NOT mapped (yet): cache.overall/prefix_cache_hits/queries,
   // kv_cache.cpu_*, tokens.prompt_by_source, sources[] — new v3 detail we don't
   // consume anywhere; add here + METRIC_KEYS when a view needs them.
@@ -157,6 +173,27 @@ export function flattenAgenticAggRow(row: Record<string, any>): Record<string, a
         );
         if (value !== undefined) {
           flat[`observed_window_${percentile}_${metric}_${bound}`] = value;
+        }
+      }
+    }
+  }
+
+  for (const metric of ['ttft', 'e2el', 'intvty']) {
+    for (const percentile of ['p75', 'p90']) {
+      for (const field of ['time_seconds', 'requests', 'min', 'max', 'max_relative_deviation']) {
+        const value = parseNum(
+          atPath(row, [
+            'request_metrics',
+            'stability',
+            'convergence',
+            'metrics',
+            metric,
+            percentile,
+            field,
+          ]),
+        );
+        if (value !== undefined) {
+          flat[`convergence_${percentile}_${metric}_${field}`] = value;
         }
       }
     }

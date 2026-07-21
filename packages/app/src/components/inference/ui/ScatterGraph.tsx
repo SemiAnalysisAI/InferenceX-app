@@ -262,9 +262,9 @@ interface ScaleConfigValue {
   _isLog?: boolean;
 }
 
-interface ObservedRangeMark {
+interface ConvergenceRangeMark {
   key: string;
-  point: InferenceData & { observedXMin: number; observedXMax: number };
+  point: InferenceData & { convergenceXMin: number; convergenceXMax: number };
   hw: string;
   precision: string;
   source: 'official' | 'overlay';
@@ -273,33 +273,28 @@ interface ObservedRangeMark {
   runIndex?: number;
 }
 
-const hasObservedWindowRange = (
+const hasConvergenceRange = (
   point: InferenceData,
-): point is InferenceData & { observedXMin: number; observedXMax: number } =>
-  (point.observed_window_count ?? 0) >= 2 &&
-  typeof point.observedXMin === 'number' &&
-  Number.isFinite(point.observedXMin) &&
-  point.observedXMin > 0 &&
-  typeof point.observedXMax === 'number' &&
-  Number.isFinite(point.observedXMax) &&
-  point.observedXMax > point.observedXMin;
+): point is InferenceData & { convergenceXMin: number; convergenceXMax: number } =>
+  typeof point.convergenceTimeSeconds === 'number' &&
+  Number.isFinite(point.convergenceTimeSeconds) &&
+  point.convergenceTimeSeconds > 0 &&
+  typeof point.convergenceXMin === 'number' &&
+  Number.isFinite(point.convergenceXMin) &&
+  point.convergenceXMin > 0 &&
+  typeof point.convergenceXMax === 'number' &&
+  Number.isFinite(point.convergenceXMax) &&
+  point.convergenceXMax > point.convergenceXMin;
 
-const observedRangeLegendLabel = (
+const convergenceRangeLegendLabel = (
   locale: 'en' | 'zh',
-  windowSeconds: number | undefined,
+  toleranceRatio: number | undefined,
 ): string => {
-  if (!windowSeconds) {
-    return locale === 'zh'
-      ? '观测时间窗口范围——并非置信区间'
-      : 'Observed window range — not a confidence interval';
-  }
-  const minutes = windowSeconds / 60;
-  if (locale === 'zh') {
-    const duration = Number.isInteger(minutes) ? `${minutes} 分钟` : `${windowSeconds} 秒`;
-    return `${duration}观测范围——并非置信区间`;
-  }
-  const duration = Number.isInteger(minutes) ? `${minutes}-minute` : `${windowSeconds}-second`;
-  return `Observed ${duration} range — not a confidence interval`;
+  const tolerance =
+    typeof toleranceRatio === 'number' ? `±${Number((toleranceRatio * 100).toFixed(2))}%` : '';
+  return locale === 'zh'
+    ? `累计指标在${tolerance ? ` ${tolerance} ` : ''}内稳定后的范围——回溯性诊断，并非置信区间`
+    : `Cumulative span after ${tolerance ? `${tolerance} ` : ''}stabilization — retrospective, not a confidence interval`;
 };
 const isSameScaleConfig = (a: ScaleConfigValue, b: ScaleConfigValue): boolean =>
   a.type === b.type &&
@@ -1001,24 +996,21 @@ const ScatterGraph = React.memo(
       activeOverlayHwTypes,
     ]);
 
-    const observedRangePoints = useMemo(
-      () => visibleFrontierPoints.filter(hasObservedWindowRange),
+    const convergenceRangePoints = useMemo(
+      () => visibleFrontierPoints.filter(hasConvergenceRange),
       [visibleFrontierPoints],
     );
 
-    // A mixed-duration comparison gets a generic key rather than claiming one
-    // window width applies to every point. Current AgentX artifacts use 600s.
-    const observedRangeWindowSeconds = useMemo(() => {
-      const durations = new Set(
-        observedRangePoints
-          .map((point) => point.observed_window_seconds)
-          .filter(
-            (seconds): seconds is number =>
-              typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0,
-          ),
+    // A mixed-policy comparison gets a generic key rather than claiming one
+    // tolerance applies to every point.
+    const convergenceToleranceRatio = useMemo(() => {
+      const tolerances = new Set(
+        convergenceRangePoints
+          .map((point) => point.convergence_tolerance_ratio)
+          .filter((ratio): ratio is number => typeof ratio === 'number' && Number.isFinite(ratio)),
       );
-      return durations.size === 1 ? [...durations][0] : undefined;
-    }, [observedRangePoints]);
+      return tolerances.size === 1 ? [...tolerances][0] : undefined;
+    }, [convergenceRangePoints]);
 
     // Ref for trackedConfigIds (needs to be current at event time inside D3 handlers)
     const trackedConfigIdsRef = useRef(trackedConfigIds);
@@ -1053,7 +1045,10 @@ const ScatterGraph = React.memo(
         (visiblePoints.length > 0
           ? (d3.extent([
               ...visiblePoints.map((point) => point.x),
-              ...observedRangePoints.flatMap((point) => [point.observedXMin, point.observedXMax]),
+              ...convergenceRangePoints.flatMap((point) => [
+                point.convergenceXMin,
+                point.convergenceXMax,
+              ]),
             ]) as [number, number])
           : ([0, 100] as [number, number]));
 
@@ -1076,7 +1071,7 @@ const ScatterGraph = React.memo(
       };
     }, [
       visiblePoints,
-      observedRangePoints,
+      convergenceRangePoints,
       isInputTputMetric,
       xLabel,
       scaleType,
@@ -1155,7 +1150,7 @@ const ScatterGraph = React.memo(
       [effectiveActiveHwTypes, selectedPrecisions],
     );
 
-    const observedRangeOpacity = useCallback(
+    const convergenceRangeOpacity = useCallback(
       (el: SVGGElement): number => {
         const hw = el.dataset.hwKey;
         const precision = el.dataset.precision;
@@ -1226,9 +1221,9 @@ const ScatterGraph = React.memo(
           return this.dataset.hwKey === hwKey ? null : '0.15';
         });
         root
-          .selectAll<SVGGElement, unknown>('.observed-window-range[data-source="official"]')
+          .selectAll<SVGGElement, unknown>('.convergence-range[data-source="official"]')
           .style('opacity', function () {
-            const base = observedRangeOpacity(this);
+            const base = convergenceRangeOpacity(this);
             if (base === 0) return 0;
             return this.dataset.hwKey === hwKey ? base : 0.06;
           });
@@ -1238,7 +1233,7 @@ const ScatterGraph = React.memo(
             return labelOpacityForHover((this as SVGGElement).dataset, hwKey);
           });
       },
-      [isPointVisible, isRooflineVisible, observedRangeOpacity],
+      [isPointVisible, isRooflineVisible, convergenceRangeOpacity],
     );
 
     const handleLegendHoverEnd = useCallback(() => {
@@ -1251,8 +1246,8 @@ const ScatterGraph = React.memo(
       root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
         return isRooflineVisible(this) ? 1 : 0;
       });
-      root.selectAll<SVGGElement, unknown>('.observed-window-range').style('opacity', function () {
-        return observedRangeOpacity(this);
+      root.selectAll<SVGGElement, unknown>('.convergence-range').style('opacity', function () {
+        return convergenceRangeOpacity(this);
       });
       root
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
@@ -1266,7 +1261,7 @@ const ScatterGraph = React.memo(
     }, [
       isPointVisible,
       isRooflineVisible,
-      observedRangeOpacity,
+      convergenceRangeOpacity,
       effectiveActiveHwTypes,
       selectedPrecisions,
     ]);
@@ -1529,19 +1524,19 @@ const ScatterGraph = React.memo(
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
 
-          // Thin, capped horizontal whiskers summarize the range observed
-          // across non-overlapping windows in this one run. They deliberately
-          // live in the roofline layer (behind points), carry no pointer
-          // events, and are never used to compute the Pareto frontier.
-          const observedRangeMarks: ObservedRangeMark[] = [];
+          // Thin, capped horizontal whiskers summarize cumulative estimates
+          // after retrospective stabilization. They deliberately live in the
+          // roofline layer (behind points), carry no pointer events, and are
+          // never used to compute the Pareto frontier.
+          const convergenceRangeMarks: ConvergenceRangeMark[] = [];
           for (const [key, front] of Object.entries(rooflines)) {
             const hw = key.split('_').slice(0, -1).join('_');
             const precision = key.split('_').pop()!;
             const visible =
               ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
             front.forEach((point, index) => {
-              if (!hasObservedWindowRange(point)) return;
-              observedRangeMarks.push({
+              if (!hasConvergenceRange(point)) return;
+              convergenceRangeMarks.push({
                 key: `official-${key}-${point.date}-${point.id ?? 'na'}-${point.conc}-${point.x}-${point.y}-${index}`,
                 point,
                 hw,
@@ -1556,8 +1551,8 @@ const ScatterGraph = React.memo(
             for (const [key, group] of Object.entries(overlayRooflines)) {
               if (!overlayData.hardwareConfig[group.hwKey]) continue;
               group.points.forEach((point, index) => {
-                if (!hasObservedWindowRange(point)) return;
-                observedRangeMarks.push({
+                if (!hasConvergenceRange(point)) return;
+                convergenceRangeMarks.push({
                   key: `overlay-${key}-${point.date}-${point.id ?? 'na'}-${point.conc}-${point.x}-${point.y}-${index}`,
                   point,
                   hw: group.hwKey,
@@ -1573,21 +1568,21 @@ const ScatterGraph = React.memo(
             }
           }
 
-          const observedRanges = rooflinesLayer
-            .selectAll<SVGGElement, ObservedRangeMark>('.observed-window-range')
-            .data(observedRangeMarks, (mark) => mark.key)
+          const convergenceRanges = rooflinesLayer
+            .selectAll<SVGGElement, ConvergenceRangeMark>('.convergence-range')
+            .data(convergenceRangeMarks, (mark) => mark.key)
             .join(
               (enter) => {
-                const group = enter.append('g').attr('class', 'observed-window-range');
-                group.append('line').attr('class', 'observed-window-range-stem');
-                group.append('line').attr('class', 'observed-window-range-cap-min');
-                group.append('line').attr('class', 'observed-window-range-cap-max');
+                const group = enter.append('g').attr('class', 'convergence-range');
+                group.append('line').attr('class', 'convergence-range-stem');
+                group.append('line').attr('class', 'convergence-range-cap-min');
+                group.append('line').attr('class', 'convergence-range-cap-max');
                 return group;
               },
               (update) => update,
               (exit) => exit.remove(),
             )
-            .attr('data-testid', 'observed-window-range')
+            .attr('data-testid', 'convergence-range')
             .attr('data-source', (mark) => mark.source)
             .attr('data-hw-key', (mark) => mark.hw)
             .attr('data-precision', (mark) => mark.precision)
@@ -1601,32 +1596,32 @@ const ScatterGraph = React.memo(
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (mark) => (mark.visible ? 0.42 : 0));
 
-          observedRanges.selectAll('line').attr('vector-effect', 'non-scaling-stroke');
-          observedRanges.each(function (mark) {
+          convergenceRanges.selectAll('line').attr('vector-effect', 'non-scaling-stroke');
+          convergenceRanges.each(function (mark) {
             const group = d3.select(this);
-            const minX = xScale(mark.point.observedXMin);
-            const maxX = xScale(mark.point.observedXMax);
+            const minX = xScale(mark.point.convergenceXMin);
+            const maxX = xScale(mark.point.convergenceXMax);
             const y = yScale(mark.point.y);
             group
-              .select('.observed-window-range-stem')
+              .select('.convergence-range-stem')
               .attr('x1', minX)
               .attr('x2', maxX)
               .attr('y1', y)
               .attr('y2', y);
             group
-              .select('.observed-window-range-cap-min')
+              .select('.convergence-range-cap-min')
               .attr('x1', minX)
               .attr('x2', minX)
               .attr('y1', y - 3.5)
               .attr('y2', y + 3.5);
             group
-              .select('.observed-window-range-cap-max')
+              .select('.convergence-range-cap-max')
               .attr('x1', maxX)
               .attr('x2', maxX)
               .attr('y1', y - 3.5)
               .attr('y2', y + 3.5);
           });
-          observedRanges.lower();
+          convergenceRanges.lower();
 
           // Parallelism labels
           interface LabelSeg {
@@ -2079,29 +2074,29 @@ const ScatterGraph = React.memo(
             }
           });
 
-          // Keep observed-window whiskers anchored to the full-run point while
+          // Keep convergence whiskers anchored to the full-run point while
           // zooming. End caps stay a fixed seven CSS pixels tall.
           zoomGroup
-            .selectAll<SVGGElement, ObservedRangeMark>('.observed-window-range')
+            .selectAll<SVGGElement, ConvergenceRangeMark>('.convergence-range')
             .each(function (mark) {
               const group = d3.select(this);
-              const minX = newXScale(mark.point.observedXMin);
-              const maxX = newXScale(mark.point.observedXMax);
+              const minX = newXScale(mark.point.convergenceXMin);
+              const maxX = newXScale(mark.point.convergenceXMax);
               const y = newYScale(mark.point.y);
               group
-                .select('.observed-window-range-stem')
+                .select('.convergence-range-stem')
                 .attr('x1', minX)
                 .attr('x2', maxX)
                 .attr('y1', y)
                 .attr('y2', y);
               group
-                .select('.observed-window-range-cap-min')
+                .select('.convergence-range-cap-min')
                 .attr('x1', minX)
                 .attr('x2', minX)
                 .attr('y1', y - 3.5)
                 .attr('y2', y + 3.5);
               group
-                .select('.observed-window-range-cap-max')
+                .select('.convergence-range-cap-max')
                 .attr('x1', maxX)
                 .attr('x2', maxX)
                 .attr('y1', y - 3.5)
@@ -2937,11 +2932,11 @@ const ScatterGraph = React.memo(
         }
       });
 
-      // Observed-window ranges follow the same visibility/recolor path as
+      // Convergence ranges follow the same visibility/recolor path as
       // their frontier series without touching their zoomed geometry.
-      zoomGroup.selectAll<SVGGElement, unknown>('.observed-window-range').each(function () {
+      zoomGroup.selectAll<SVGGElement, unknown>('.convergence-range').each(function () {
         const el = d3.select(this);
-        el.style('opacity', observedRangeOpacity(this));
+        el.style('opacity', convergenceRangeOpacity(this));
         if (this.dataset.source === 'official' && this.dataset.hwKey) {
           el.attr('stroke', ir.getCssColor(ir.resolveColor(this.dataset.hwKey)));
         }
@@ -3004,7 +2999,7 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       gradientColorByPoint,
-      observedRangeOpacity,
+      convergenceRangeOpacity,
     ]);
 
     // D3 custom layers are keyed additions, so removing the overlay layer from
@@ -3016,7 +3011,7 @@ const ScatterGraph = React.memo(
       if (!svg) return;
       d3.select(svg)
         .selectAll(
-          '.unofficial-overlay-pt, .overlay-roofline-path, .observed-window-range[data-source="overlay"]',
+          '.unofficial-overlay-pt, .overlay-roofline-path, .convergence-range[data-source="overlay"]',
         )
         .remove();
     }, [overlayData]);
@@ -3207,9 +3202,9 @@ const ScatterGraph = React.memo(
               ]}
               disableActiveSort={false}
               keyIndicators={
-                observedRangePoints.length > 0 ? (
+                convergenceRangePoints.length > 0 ? (
                   <div
-                    data-testid="observed-window-range-key"
+                    data-testid="convergence-range-key"
                     className="mt-2 flex items-start gap-2 px-1 text-[10px] leading-tight text-muted-foreground"
                   >
                     <svg
@@ -3228,7 +3223,7 @@ const ScatterGraph = React.memo(
                         opacity="0.55"
                       />
                     </svg>
-                    <span>{observedRangeLegendLabel(locale, observedRangeWindowSeconds)}</span>
+                    <span>{convergenceRangeLegendLabel(locale, convergenceToleranceRatio)}</span>
                   </div>
                 ) : undefined
               }

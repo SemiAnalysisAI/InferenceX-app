@@ -71,15 +71,19 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   };
 }
 
-function observedRangePoint(overrides: Partial<InferenceData> = {}): InferenceData {
+function convergencePoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return pt({
     benchmark_type: 'agentic_traces',
-    observedXMin: 1.416,
-    observedXMax: 4.114,
-    observed_window_seconds: 600,
-    observed_window_expected_count: 6,
-    observed_window_count: 6,
-    observed_window_min_requests: 21,
+    convergenceEvaluated: true,
+    convergenceXMin: 43.36036,
+    convergenceXMax: 46.97824,
+    convergenceTimeSeconds: 1200,
+    convergenceRequests: 407,
+    convergenceMaxRelativeDeviation: 0.04385,
+    convergence_checkpoint_seconds: 300,
+    convergence_tolerance_ratio: 0.05,
+    convergence_min_confirmation_seconds: 1200,
+    convergence_horizon_seconds: 3600,
     root_trajectory_count: 3,
     root_trajectory_kish_effective_count: 1.69,
     ...overrides,
@@ -441,37 +445,58 @@ describe('generateTooltipContent', () => {
     expect(html).not.toContain('Untrack Over Time');
   });
 
-  it('labels the observed window range as descriptive, not inferential', () => {
-    const html = generateTooltipContent(tooltipConfig({ data: observedRangePoint() }));
+  it('explains cumulative stabilization without making inferential claims', () => {
+    const html = generateTooltipContent(tooltipConfig({ data: convergencePoint() }));
 
-    expect(html).toContain('<strong>Observed 10-minute range:</strong> 1.416–4.114');
     expect(html).toContain(
-      '6 non-overlapping windows; not a confidence interval or rerun prediction.',
+      '<strong>Cumulative convergence:</strong> Stabilized by 20 minutes at ±5%',
     );
+    expect(html).toContain('<strong>Post-stabilization span:</strong> 43.36–46.978');
+    expect(html).toContain('<strong>Requests at stabilization:</strong> 407');
+    expect(html).toContain('<strong>Maximum later deviation:</strong> 4.38%');
+    expect(html).toContain('5-minute cumulative checkpoints');
+    expect(html).toContain('at least 20 minutes of later confirmation');
+    expect(html).toContain('not a confidence interval or rerun prediction');
     expect(html).toContain('<strong>Root trajectories:</strong> 3');
     expect(html).toContain('<strong>Kish-effective root coverage:</strong> 1.69');
     expect(html).toContain('not a statistical effective sample size');
-    expect(html).toContain('<strong>Smallest window:</strong> 21 successful requests');
   });
 
-  it('renders natural Chinese observed-range caveats', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({ locale: 'zh', data: observedRangePoint() }),
-    );
+  it('renders natural Chinese convergence language', () => {
+    const html = generateTooltipContent(tooltipConfig({ locale: 'zh', data: convergencePoint() }));
 
-    expect(html).toContain('<strong>10 分钟观测范围:</strong> 1.416–4.114');
-    expect(html).toContain('基于 6 个互不重叠的时间窗口；并非置信区间，也不预测复跑结果。');
+    expect(html).toContain('<strong>累计收敛:</strong> 在 20 分钟时已稳定至 ±5% 范围内');
+    expect(html).toContain('<strong>稳定后的累计范围:</strong> 43.36–46.978');
+    expect(html).toContain('<strong>达到稳定时的请求数:</strong> 407');
+    expect(html).toContain('<strong>后续最大偏差:</strong> 4.38%');
+    expect(html).toContain('回溯性单次运行诊断');
+    expect(html).toContain('并非置信区间，也不预测复跑结果');
     expect(html).toContain('<strong>根轨迹数:</strong> 3');
     expect(html).toContain('<strong>Kish 有效根轨迹覆盖数:</strong> 1.69');
     expect(html).toContain('并非统计有效样本量');
-    expect(html).toContain('<strong>最小时间窗口:</strong> 21个成功请求');
   });
 
-  it('omits an observed range when fewer than two windows are available', () => {
+  it('marks an evaluated metric that never stabilized and shows no span', () => {
     const html = generateTooltipContent(
-      tooltipConfig({ data: observedRangePoint({ observed_window_count: 1 }) }),
+      tooltipConfig({
+        data: convergencePoint({
+          convergenceTimeSeconds: undefined,
+          convergenceXMin: undefined,
+          convergenceXMax: undefined,
+          convergenceRequests: undefined,
+          convergenceMaxRelativeDeviation: undefined,
+        }),
+      }),
     );
-    expect(html).not.toContain('observed-window-range-tooltip');
+    expect(html).toContain('Not stabilized within the 60-minute run at ±5%');
+    expect(html).not.toContain('Post-stabilization span');
+  });
+
+  it('omits convergence copy when the selected metric was not evaluated', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: convergencePoint({ convergenceEvaluated: false }) }),
+    );
+    expect(html).not.toContain('convergence-diagnostic-tooltip');
   });
 });
 
@@ -555,10 +580,11 @@ describe('generateOverlayTooltipContent', () => {
     expect(html).not.toContain('CPU Cache Hit Rate');
   });
 
-  it('shows the same observed-range caveat for unofficial overlays', () => {
-    const html = generateOverlayTooltipContent(overlayConfig({ data: observedRangePoint() }));
+  it('shows the same convergence caveat for unofficial overlays', () => {
+    const html = generateOverlayTooltipContent(overlayConfig({ data: convergencePoint() }));
 
-    expect(html).toContain('<strong>Observed 10-minute range:</strong> 1.416–4.114');
+    expect(html).toContain('Stabilized by 20 minutes at ±5%');
+    expect(html).toContain('Post-stabilization span');
     expect(html).toContain('not a confidence interval or rerun prediction');
     expect(html).toContain('Kish-effective root coverage');
   });

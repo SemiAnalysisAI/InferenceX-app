@@ -29,7 +29,7 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
-import { withObservedWindowRange } from '@/components/inference/utils/observed-window-range';
+import { withConvergenceRange } from '@/components/inference/utils/convergence-range';
 import {
   applyQuickFilters,
   computeAvailableQuickFilters,
@@ -154,7 +154,7 @@ export function remapChartPoint(
   const metric = point[metricKey] as { y: number; roof: boolean } | undefined;
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
 
-  return withObservedWindowRange(
+  return withConvergenceRange(
     {
       ...point,
       x: typeof xCandidate === 'number' ? xCandidate : point.x,

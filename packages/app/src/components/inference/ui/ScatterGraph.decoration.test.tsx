@@ -55,7 +55,7 @@ class MockResizeObserver {
 const point = (hwKey: string, precision: string, x: number, y: number, tp: number): InferenceData =>
   ({ hwKey, precision, x, y, tp, conc: 16, framework: 'vllm' }) as unknown as InferenceData;
 
-const rangedPoint = (
+const convergedPoint = (
   hwKey: string,
   x: number,
   y: number,
@@ -63,10 +63,12 @@ const rangedPoint = (
   max: number,
 ): InferenceData => ({
   ...point(hwKey, 'fp8', x, y, 8),
-  observedXMin: min,
-  observedXMax: max,
-  observed_window_seconds: 600,
-  observed_window_count: 6,
+  convergenceXMin: min,
+  convergenceXMax: max,
+  convergenceTimeSeconds: 1200,
+  convergenceRequests: 407,
+  convergenceMaxRelativeDeviation: 0.04,
+  convergence_tolerance_ratio: 0.05,
 });
 
 // h100 owns both axis extremes so hiding b200 / showing fp4 keeps the niced
@@ -235,12 +237,12 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
-  it('renders observed ranges only for Pareto-front points and fits their x extent', () => {
+  it('renders convergence ranges only for Pareto-front points and fits their x extent', () => {
     const data = [
-      rangedPoint('h100', 1, 50, 0.5, 1.8),
-      rangedPoint('h100', 2, 100, 1.2, 8),
+      convergedPoint('h100', 1, 50, 0.5, 1.8),
+      convergedPoint('h100', 2, 100, 1.2, 8),
       // Below the running upper-right envelope, so it must not get a whisker.
-      rangedPoint('h100', 1.5, 40, 0.8, 6),
+      convergedPoint('h100', 1.5, 40, 0.8, 6),
     ];
     const { container, unmount } = mountChart({
       data,
@@ -251,7 +253,7 @@ describe('ScatterGraph toggle decoration', () => {
     });
 
     const ranges = [
-      ...container.querySelectorAll<SVGGElement>('.observed-window-range[data-source="official"]'),
+      ...container.querySelectorAll<SVGGElement>('.convergence-range[data-source="official"]'),
     ];
     expect(ranges).toHaveLength(2);
     expect(ranges.every((range) => range.style.pointerEvents === 'none')).toBe(true);
@@ -266,7 +268,7 @@ describe('ScatterGraph toggle decoration', () => {
       (range) =>
         (range as SVGGElement & { __data__: { point: InferenceData } }).__data__.point.x === 2,
     )!;
-    const stem = wideRange.querySelector<SVGLineElement>('.observed-window-range-stem')!;
+    const stem = wideRange.querySelector<SVGLineElement>('.convergence-range-stem')!;
     const pointDot = dotGroups(container).find(
       (dot) => (dot as SVGGElement & { __data__: InferenceData }).__data__.x === 2,
     )!;
@@ -274,9 +276,22 @@ describe('ScatterGraph toggle decoration', () => {
       pointDot.getAttribute('transform')?.match(/translate\((?<x>[^,]+)/u)?.groups?.x,
     );
     expect(Number(stem.getAttribute('x2'))).toBeGreaterThan(pointX);
-    // The observed max participates in the domain, so its cap remains inside
+    // The convergence max participates in the domain, so its cap remains inside
     // the 800px chart rather than being clipped at the right edge.
     expect(Number(stem.getAttribute('x2'))).toBeLessThan(800);
+    unmount();
+  });
+
+  it('renders no whisker for a point that was evaluated but did not stabilize', () => {
+    const unstable = {
+      ...point('h100', 'fp8', 2, 100, 8),
+      convergenceEvaluated: true,
+      convergence_tolerance_ratio: 0.05,
+      convergence_horizon_seconds: 3600,
+    };
+    const { container, unmount } = mountChart({ data: [unstable] });
+
+    expect(container.querySelectorAll('.convergence-range')).toHaveLength(0);
     unmount();
   });
 
@@ -442,10 +457,10 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
-  it('renders and removes overlay observed ranges through the overlay path', () => {
+  it('renders and removes overlay convergence ranges through the overlay path', () => {
     const overlayPoints = [
-      rangedPoint('h100', 30, 250, 20, 36),
-      rangedPoint('h100', 35, 300, 28, 48),
+      convergedPoint('h100', 30, 250, 20, 36),
+      convergedPoint('h100', 35, 300, 28, 48),
     ].map((p) => ({
       ...p,
       run_url: 'https://github.com/o/r/actions/runs/123',
@@ -473,15 +488,13 @@ describe('ScatterGraph toggle decoration', () => {
     });
 
     const ranges = [
-      ...container.querySelectorAll<SVGGElement>('.observed-window-range[data-source="overlay"]'),
+      ...container.querySelectorAll<SVGGElement>('.convergence-range[data-source="overlay"]'),
     ];
     expect(ranges).toHaveLength(2);
     expect(ranges.every((range) => range.getAttribute('stroke') === overlayRunColor(0))).toBe(true);
 
     updateProps({ overlayData: undefined });
-    expect(
-      container.querySelectorAll('.observed-window-range[data-source="overlay"]'),
-    ).toHaveLength(0);
+    expect(container.querySelectorAll('.convergence-range[data-source="overlay"]')).toHaveLength(0);
     unmount();
   });
 
