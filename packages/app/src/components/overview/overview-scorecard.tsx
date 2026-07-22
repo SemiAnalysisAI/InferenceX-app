@@ -65,7 +65,7 @@ export const OVERVIEW_STRINGS = {
       `Open filtered dashboard: ${model} · ${config}`,
     evidenceHighAria: (model: string, config: string) =>
       `Open filtered dashboard @${OVERVIEW_HIGH_TIER} tok/s/user leader: ${model} · ${config}`,
-    notRankedLine: (entries: string) => `Not ranked: ${entries}`,
+    infinityLegend: '∞ = no comparable result',
     notRankedReasons: {
       standard_decode_only: 'standard decode only',
       int4_bf16_only: 'INT4/BF16 only',
@@ -125,7 +125,7 @@ export const OVERVIEW_STRINGS = {
       `打开筛选后的仪表板：${model} · ${config}`,
     evidenceHighAria: (model: string, config: string) =>
       `打开筛选后的仪表板 @${OVERVIEW_HIGH_TIER} tok/s/user：${model} · ${config}`,
-    notRankedLine: (entries: string) => `未参与排名：${entries}`,
+    infinityLegend: '∞ = 无可比结果',
     notRankedReasons: {
       standard_decode_only: '仅标准解码',
       int4_bf16_only: '仅 INT4/BF16',
@@ -551,12 +551,27 @@ function NotRankedLine({
   // coverage 'measured' list — is not repeated here; dedup against the secondary's
   // measured labels so each hardware surfaces in exactly one place.
   const secondaryMeasured = new Set(model.secondary?.measuredHardware);
-  const entries = model.notRanked
-    .filter((entry) => !secondaryMeasured.has(entry.hardwareLabel))
-    .map((entry) => `${entry.hardwareLabel} — ${notRankedReason(entry, strings)}`)
-    .join(' · ');
-  if (entries === '') return null;
-  return <p className="text-xs text-muted-foreground">{strings.notRankedLine(entries)}</p>;
+  const entries = model.notRanked.filter((entry) => !secondaryMeasured.has(entry.hardwareLabel));
+  if (entries.length === 0) return null;
+  // ∞ marks missing/unavailable only — it never enters ranking or gap math, so it
+  // must never render with a percent. The reason rides in title/aria; the page
+  // footer carries the legend.
+  return (
+    <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+      {entries.map((entry) => {
+        const reason = notRankedReason(entry, strings);
+        return (
+          <span
+            key={entry.hardware}
+            title={reason}
+            aria-label={`${entry.hardwareLabel}: ${reason}`}
+          >
+            {entry.hardwareLabel} <span aria-hidden="true">∞</span>
+          </span>
+        );
+      })}
+    </p>
+  );
 }
 
 /** The full per-model hierarchy, identical on both surfaces. */
@@ -729,6 +744,7 @@ export function OverviewMethodology({ strings }: { strings: OverviewStrings }) {
   return (
     <div className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6">
       <p>{strings.methodologyNote}</p>
+      <p>{strings.infinityLegend}</p>
       <p>{strings.cohortNote}</p>
       <p>{strings.interpolationNote}</p>
     </div>

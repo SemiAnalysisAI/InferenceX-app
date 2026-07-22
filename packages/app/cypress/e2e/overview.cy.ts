@@ -89,11 +89,12 @@ describe('Overview page', () => {
       cy.contains('Jul 18').should('exist');
       cy.contains('381').should('exist');
       cy.contains('Only exact result').should('exist');
-      // Every remaining hardware carries one reason, both clamp directions included.
-      cy.contains('cannot reach @50').should('exist');
-      cy.contains('no exact @50 result').should('exist');
-      cy.contains('no 8K/1K data').should('exist');
-      cy.contains('standard decode only').should('exist');
+      // Every remaining hardware carries an ∞ chip whose title/aria holds the
+      // reason, both clamp directions included; ∞ never renders with a percent.
+      cy.get('[title="cannot reach @50"]').should('exist').and('contain', '∞');
+      cy.get('[title="no exact @50 result"]').should('exist').and('contain', '∞');
+      cy.get('[title="no 8K/1K data"]').should('exist').and('contain', '∞');
+      cy.get('[title="standard decode only"]').should('exist').and('contain', '∞');
       // Each ranked value links into its own pre-filtered dashboard view.
       cy.get('a[href*="i_gpus="]')
         .first()
@@ -102,6 +103,11 @@ describe('Overview page', () => {
         .and('include', 'i_gpus=b300_sglang_mtp')
         .and('include', 'i_spec=mtp');
     });
+    // The legend lives once in the page footnotes; ∞ never renders as a percent.
+    cy.contains('∞ = no comparable result').should('exist');
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /∞\s*%/);
   });
 
   it('opens a ranked secondary only when the other precision adds comparable hardware', () => {
