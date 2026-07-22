@@ -77,7 +77,7 @@ function CategorySectionTitle({ label, reason }: { label: string; reason: string
             data-testid={`selector-category-${label.toLowerCase().replaceAll(' ', '-')}-info`}
           />
         </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10}>
+        <TooltipContent side="top" collisionPadding={10} className="z-[130]">
           <span>{reason}</span>
         </TooltipContent>
       </TooltipRoot>
