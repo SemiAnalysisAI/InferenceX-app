@@ -274,10 +274,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // Roofline metric fields
   tpPerGpu: { y: number; roof: boolean };
   outputTputPerGpu?: { y: number; roof: boolean };
+  outputTputPerTotalGpu?: { y: number; roof: boolean };
   inputTputPerGpu?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
+  outputTputPerTotalMw?: { y: number; roof: boolean };
   costh: { y: number; roof: boolean };
   costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
@@ -312,10 +314,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
 export type YAxisMetricKey =
   | 'tpPerGpu'
   | 'outputTputPerGpu'
+  | 'outputTputPerTotalGpu'
   | 'inputTputPerGpu'
   | 'tpPerMw'
   | 'inputTputPerMw'
   | 'outputTputPerMw'
+  | 'outputTputPerTotalMw'
   | 'costh'
   | 'costn'
   | 'costr'
@@ -366,6 +370,10 @@ export interface ChartDefinition {
   y_outputTputPerGpu_label?: string;
   y_outputTputPerGpu_title?: string;
   y_outputTputPerGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTputPerTotalGpu?: string;
+  y_outputTputPerTotalGpu_label?: string;
+  y_outputTputPerTotalGpu_title?: string;
+  y_outputTputPerTotalGpu_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_inputTputPerGpu?: string;
   y_inputTputPerGpu_label?: string;
   y_inputTputPerGpu_title?: string;
@@ -385,6 +393,10 @@ export interface ChartDefinition {
   y_outputTputPerMw_label?: string;
   y_outputTputPerMw_title?: string;
   y_outputTputPerMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
+  y_outputTputPerTotalMw?: string;
+  y_outputTputPerTotalMw_label?: string;
+  y_outputTputPerTotalMw_title?: string;
+  y_outputTputPerTotalMw_roofline?: 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
   y_costh?: string;
   y_costh_label?: string;
   y_costh_title?: string;

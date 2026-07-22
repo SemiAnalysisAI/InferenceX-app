@@ -175,6 +175,31 @@ describe('processOverlayChartData', () => {
     expect(result[0].y).toBe(5);
   });
 
+  it('remaps y to outputTputPerTotalGpu for unofficial-run overlay points', () => {
+    // Overlay points flow through the same transform pipeline, so the total-GPU
+    // metrics must resolve for ?unofficialrun= overlays like any other metric.
+    const data = [pt({ outputTputPerTotalGpu: { y: 300, roof: false }, median_intvty: 10 } as any)];
+    const result = processOverlayChartData(data, 'interactivity', 'y_outputTputPerTotalGpu', null);
+    expect(result).toHaveLength(1);
+    expect(result[0].y).toBe(300);
+  });
+
+  it('remaps y to outputTputPerTotalMw and drops overlay points missing it', () => {
+    const withMetric = pt({
+      outputTputPerTotalMw: { y: 425, roof: false },
+      median_intvty: 10,
+    } as any);
+    const withoutMetric = pt({ median_intvty: 10 } as any);
+    const result = processOverlayChartData(
+      [withMetric, withoutMetric],
+      'interactivity',
+      'y_outputTputPerTotalMw',
+      null,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].y).toBe(425);
+  });
+
   it('remaps x to config override for input metrics on interactivity chart', () => {
     // inputTputPerGpu has x override to p90_ttft on interactivity chart
     const data = [

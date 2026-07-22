@@ -104,4 +104,41 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).toContain('calculate Joules per decode GPU or per prefill GPU');
     expect(getVisibleCaveatText()).toContain('direct Joules per token comparison');
   });
+
+  it('shows power source badges without the per-pool disagg caveat for y_outputTputPerTotalMw', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_outputTputPerTotalMw" />);
+
+    // Power badges apply — the metric divides by the spec-sheet all-in power…
+    expect(getVisibleText()).toContain('All in Power/GPU:');
+    expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
+    // …but the per-decode/prefill-pool caveat does NOT: this metric already
+    // normalizes over the total GPU count.
+    expect(getVisibleCaveatText()).not.toContain(
+      'calculate power per decode GPU or per prefill GPU',
+    );
+    expect(getVisibleCaveatText()).toContain(
+      'normalizes output throughput over the total GPU count',
+    );
+  });
+
+  it('shows the total-GPU normalization note for y_outputTputPerTotalGpu only', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_outputTputPerTotalGpu" />);
+
+    expect(getVisibleCaveatText()).toContain(
+      'normalizes output throughput over the total GPU count',
+    );
+    // The per-decode-GPU caveat belongs to y_outputTputPerGpu, not this metric
+    expect(getVisibleCaveatText()).not.toContain(
+      'calculate output throughput per decode GPU or per prefill GPU',
+    );
+
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_outputTputPerGpu" />);
+
+    expect(getVisibleCaveatText()).toContain(
+      'calculate output throughput per decode GPU or per prefill GPU',
+    );
+    expect(getVisibleCaveatText()).not.toContain(
+      'normalizes output throughput over the total GPU count',
+    );
+  });
 });

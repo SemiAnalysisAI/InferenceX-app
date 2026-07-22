@@ -167,6 +167,8 @@ function fullPt(
     inputTputY?: number;
     inputTputPerMwY?: number;
     outputTputPerMwY?: number;
+    outputTputPerTotalGpuY?: number;
+    outputTputPerTotalMwY?: number;
   },
 ): InferenceData {
   return {
@@ -209,6 +211,12 @@ function fullPt(
     ...(vals.outputTputPerMwY === undefined
       ? {}
       : { outputTputPerMw: { y: vals.outputTputPerMwY, roof: false } }),
+    ...(vals.outputTputPerTotalGpuY === undefined
+      ? {}
+      : { outputTputPerTotalGpu: { y: vals.outputTputPerTotalGpuY, roof: false } }),
+    ...(vals.outputTputPerTotalMwY === undefined
+      ? {}
+      : { outputTputPerTotalMw: { y: vals.outputTputPerTotalMwY, roof: false } }),
   } as InferenceData;
 }
 
@@ -1064,6 +1072,45 @@ describe('createChartDataPoint', () => {
     expect(point.outputTputPerGpu).toBeUndefined();
   });
 
+  it('sets outputTputPerTotalGpu equal to outputTputPerGpu for non-disagg entries', () => {
+    const e = entry({ disagg: false, output_tput_per_gpu: 800 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.outputTputPerTotalGpu).toEqual({ y: 800, roof: false });
+  });
+
+  it('normalizes outputTputPerTotalGpu over prefill+decode GPUs for disagg entries', () => {
+    const e = entry({
+      disagg: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 2,
+      output_tput_per_gpu: 900,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // (900 tok/s/decode-gpu * 2 decode GPUs) / (4 + 2 total GPUs)
+    expect(point.outputTputPerTotalGpu).toEqual({ y: 300, roof: false });
+  });
+
+  it('omits total-GPU output metrics when output_tput_per_gpu is 0', () => {
+    const e = entry({ output_tput_per_gpu: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.outputTputPerTotalGpu).toBeUndefined();
+    expect(point.outputTputPerTotalMw).toBeUndefined();
+  });
+
+  it('computes outputTputPerTotalMw from total-GPU output throughput and hardware power', () => {
+    const e = entry({
+      disagg: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 2,
+      output_tput_per_gpu: 900,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // outputTputPerTotalGpu = 300, then (300 * 1000) / 700 (mocked power)
+    expect(point.outputTputPerTotalMw).toBeDefined();
+    expect(point.outputTputPerTotalMw!.y).toBeCloseTo((300 * 1000) / 700, 5);
+    expect(point.outputTputPerTotalMw!.roof).toBe(false);
+  });
+
   it('sets inputTputPerGpu when input_tput_per_gpu > 0', () => {
     const e = entry({ input_tput_per_gpu: 300 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
@@ -1733,6 +1780,61 @@ describe('markRooflinePoints energy and output fields', () => {
     expect(m1.outputTputPerGpu!.roof).toBe(true);
     expect(m2.outputTputPerGpu!.roof).toBe(true);
     expect(m3.outputTputPerGpu!.roof).toBe(false);
+  });
+
+  it('marks outputTputPerTotalGpu.roof for points on the total-GPU output throughput roofline', () => {
+    const chartDef = {
+      chartType: 'e2e',
+      heading: 'Test',
+      x: 'median_e2el',
+      x_label: 'E2E Latency',
+      y: 'tput_per_gpu',
+      y_outputTputPerTotalGpu: 'outputTputPerTotalGpu.y',
+      y_outputTputPerTotalGpu_roofline: 'upper_right',
+    } as any;
+
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, outputTputPerTotalGpuY: 200 });
+    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, outputTputPerTotalGpuY: 500 });
+    const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, outputTputPerTotalGpuY: 350 });
+
+    const groupedData = { h100: [p1, p2, p3] };
+    const rooflines = computeAllRooflines(groupedData, chartDef);
+    const marked = markRooflinePoints(groupedData, rooflines, chartDef);
+
+    // upper_right: p1(1,200) and p2(2,500) on front; p3(3,350) < 500 so not on front
+    const m1 = marked.find((p) => p.x === 1)!;
+    const m2 = marked.find((p) => p.x === 2)!;
+    const m3 = marked.find((p) => p.x === 3)!;
+    expect(m1.outputTputPerTotalGpu!.roof).toBe(true);
+    expect(m2.outputTputPerTotalGpu!.roof).toBe(true);
+    expect(m3.outputTputPerTotalGpu!.roof).toBe(false);
+  });
+
+  it('marks outputTputPerTotalMw.roof for points on the total-GPU per-MW roofline', () => {
+    const chartDef = {
+      chartType: 'e2e',
+      heading: 'Test',
+      x: 'median_e2el',
+      x_label: 'E2E Latency',
+      y: 'tput_per_gpu',
+      y_outputTputPerTotalMw: 'outputTputPerTotalMw.y',
+      y_outputTputPerTotalMw_roofline: 'upper_right',
+    } as any;
+
+    const p1 = fullPt(1, 'h100', { tpPerGpuY: 50, outputTputPerTotalMwY: 100 });
+    const p2 = fullPt(2, 'h100', { tpPerGpuY: 80, outputTputPerTotalMwY: 400 });
+    const p3 = fullPt(3, 'h100', { tpPerGpuY: 60, outputTputPerTotalMwY: 250 });
+
+    const groupedData = { h100: [p1, p2, p3] };
+    const rooflines = computeAllRooflines(groupedData, chartDef);
+    const marked = markRooflinePoints(groupedData, rooflines, chartDef);
+
+    const m1 = marked.find((p) => p.x === 1)!;
+    const m2 = marked.find((p) => p.x === 2)!;
+    const m3 = marked.find((p) => p.x === 3)!;
+    expect(m1.outputTputPerTotalMw!.roof).toBe(true);
+    expect(m2.outputTputPerTotalMw!.roof).toBe(true);
+    expect(m3.outputTputPerTotalMw!.roof).toBe(false);
   });
 
   it('marks inputTputPerGpu.roof for points on the input throughput roofline', () => {

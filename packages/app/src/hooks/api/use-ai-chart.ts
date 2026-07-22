@@ -244,8 +244,10 @@ function buildReliabilityBarData(
 const METRIC_LABELS: Record<string, string> = {
   y_tpPerGpu: 'Throughput/GPU',
   y_outputTputPerGpu: 'Output Tput/GPU',
+  y_outputTputPerTotalGpu: 'Output Tput/Total GPUs',
   y_inputTputPerGpu: 'Input Tput/GPU',
   y_tpPerMw: 'Tput/MW',
+  y_outputTputPerTotalMw: 'Output Tput/MW (Total GPUs)',
   y_costh: 'Cost (Hyper)',
   y_costn: 'Cost (Neo)',
   y_costr: 'Cost (Rental)',
