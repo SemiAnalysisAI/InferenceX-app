@@ -58,6 +58,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...localizedPair('/', { lastModified: now, changeFrequency: 'daily', priority: 1 }),
+    ...localizedPair('/overview', {
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    }),
     ...TABS.flatMap((tab) =>
       localizedPair(`/${tab}`, {
         lastModified: now,

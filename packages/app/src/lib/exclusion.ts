@@ -1,6 +1,6 @@
 import { SPEC_METHOD_KEYS } from '@semianalysisai/inferencex-constants';
 
-import { computeToggle } from '@/hooks/useTogglableSet';
+import { computeToggle } from '@/lib/toggle-set';
 
 /**
  * Data-driven config exclusion.

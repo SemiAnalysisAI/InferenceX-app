@@ -61,6 +61,14 @@ export interface TcoFeedRow {
   latest_date: string;
   /** Oldest benchmark date among the frontier knots (staleness flag). */
   oldest_frontier_date: string;
+  /**
+   * Run dates of the frontier knot(s) actually backing THIS tier read: the
+   * bracketing pair when interpolated, the single min-interactivity knot when
+   * clamped_low, null when unreachable. Unlike latest/oldest_frontier_date
+   * (whole-frontier freshness), it never blends knots outside the tier, so a
+   * downstream result can carry its own evidence date. Ordered ascending.
+   */
+  evidence_date: { from: string; to: string } | null;
 }
 
 export const DEFAULT_TIERS: readonly number[] = [30, 50, 75, 100];
@@ -197,6 +205,27 @@ interface FrontierPoint {
 
 const round3 = (v: number): number => Math.round(v * 1000) / 1000;
 
+/** Two knots' dates as an ascending {from,to} evidence range. */
+function evidenceRange(a: FrontierPoint, b: FrontierPoint): { from: string; to: string } {
+  return a.date <= b.date ? { from: a.date, to: b.date } : { from: b.date, to: a.date };
+}
+
+/**
+ * The frontier knots backing an interpolated read at `tier`: the bracketing
+ * pair xs[lo] ≤ tier ≤ xs[lo+1], collapsing to a single knot when `tier` lands
+ * on an endpoint. `frontier` is sorted ascending by interactivity.
+ */
+function bracketKnots(frontier: FrontierPoint[], tier: number): [FrontierPoint, FrontierPoint] {
+  const last = frontier.length - 1;
+  if (tier <= frontier[0].interactivity) return [frontier[0], frontier[0]];
+  if (tier >= frontier[last].interactivity) return [frontier[last], frontier[last]];
+  let lo = 0;
+  for (let i = 0; i < last; i++) {
+    if (frontier[i].interactivity <= tier) lo = i;
+  }
+  return [frontier[lo], frontier[lo + 1]];
+}
+
 /**
  * Compute the feed: for each (workload, hardware), build the
  * (interactivity, output tok/s/GPU) Pareto frontier across every config —
@@ -268,16 +297,22 @@ export function computeTcoFeed(
       for (const tier of tiers) {
         let value: number;
         let boundary: TcoTierBoundary;
+        let evidenceDate: { from: string; to: string } | null;
         if (tier > maxIv) {
           value = 0;
           boundary = 'unreachable';
+          evidenceDate = null;
         } else if (tier < minIv) {
           value = ys[0];
           boundary = 'clamped_low';
+          // The clamped read is the min-interactivity knot's throughput.
+          evidenceDate = evidenceRange(frontier[0], frontier[0]);
         } else {
           const raw = hermiteInterpolate(xs, ys, slopes, tier);
           value = Math.max(yLo, Math.min(yHi, raw));
           boundary = 'interpolated';
+          const [lo, hi] = bracketKnots(frontier, tier);
+          evidenceDate = evidenceRange(lo, hi);
         }
         out.push({
           hardware,
@@ -290,6 +325,7 @@ export function computeTcoFeed(
           frontier_max_interactivity: round3(maxIv),
           latest_date: latest,
           oldest_frontier_date: oldest,
+          evidence_date: evidenceDate,
         });
       }
     }

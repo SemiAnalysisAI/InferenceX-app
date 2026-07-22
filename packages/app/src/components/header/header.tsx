@@ -83,7 +83,7 @@ function LanguageToggle({ pathname }: { pathname: string }) {
       href={target}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
-      className="px-2 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+      className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
       onClick={() => track('header_language_toggled', { to: isZh ? 'en' : 'zh' })}
     >
       {isZh ? 'EN' : '中文'}
@@ -145,7 +145,11 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-6">
           {/* Brand */}
-          <Link href={isZh ? '/zh' : '/'} className="flex items-center gap-2 shrink-0">
+          <Link
+            href={isZh ? '/zh' : '/'}
+            data-testid="header-brand"
+            className="flex items-center min-h-11 gap-2 shrink-0"
+          >
             <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
@@ -184,9 +188,18 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-2">
-            <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
+            <span className="hidden sm:flex">
+              <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
+            </span>
             <LanguageToggle pathname={pathname} />
-            <MinecraftToggles />
+            {/* Minecraft-only audio toggles ride alongside GitHub stars below the
+                same `sm` cutoff: in minecraft mode the pixel font widens the bar,
+                and these two extra buttons are what push a 320px header past its
+                bounds. Below `sm` they move into the mobile menu instead (see the
+                MinecraftToggles instance in the hamburger dropdown below). */}
+            <span className="hidden items-center gap-2 sm:flex">
+              <MinecraftToggles />
+            </span>
             <ModeToggle />
 
             {/* Mobile hamburger */}
@@ -195,7 +208,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 type="button"
                 data-testid="mobile-menu-toggle"
                 onClick={toggleMenu}
-                className="flex items-center justify-center size-9 rounded-md transition-colors hover:bg-muted cursor-pointer"
+                className="flex items-center justify-center size-11 rounded-md transition-colors hover:bg-muted cursor-pointer"
                 aria-expanded={mobileMenuOpen}
                 aria-label="Navigation menu"
               >
@@ -224,7 +237,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       key={href}
                       href={displayHref}
                       className={cn(
-                        'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
                         isActive(pathname, href)
                           ? 'text-brand bg-brand/10'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -237,6 +250,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       {label}
                     </Link>
                   ))}
+                  <span className="flex items-center gap-2 px-3 sm:hidden">
+                    <MinecraftToggles />
+                  </span>
                 </div>
               )}
             </div>

@@ -1,0 +1,3 @@
+# Deliberately compact test fixture (one benchmark row per line, <=60 lines);
+# oxfmt/prettier would pretty-print it to ~530 lines. See overview-data.test.ts drift guard.
+packages/app/cypress/fixtures/api/overview-rows.json
