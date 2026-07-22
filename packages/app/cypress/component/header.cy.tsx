@@ -72,10 +72,16 @@ describe('Header', () => {
 
   it('shows mobile hamburger menu on small viewports', () => {
     cy.viewport(375, 812);
-    cy.get('[data-testid="mobile-menu-toggle"]').should('be.visible');
-    cy.get('[data-testid="mobile-menu-toggle"]').click();
-    cy.contains('Dashboard').should('be.visible');
-    cy.contains('Comparisons').should('be.visible');
-    cy.contains('Supporters').should('be.visible');
+    cy.get('[data-testid="nav-link-dashboard"]').should('not.be.visible');
+    cy.get('[data-testid="mobile-menu-toggle"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-expanded', 'false')
+      .click()
+      .should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="mobile-menu"]').within(() => {
+      cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
+      cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
+      cy.contains('a', 'Supporters').should('be.visible').and('have.attr', 'href', '/quotes');
+    });
   });
 });

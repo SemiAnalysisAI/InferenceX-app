@@ -215,7 +215,10 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 </svg>
               </button>
               {mobileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40">
+                <div
+                  data-testid="mobile-menu"
+                  className="absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
+                >
                   {navLinks.map(({ href, displayHref, label, event }) => (
                     <Link
                       key={href}
