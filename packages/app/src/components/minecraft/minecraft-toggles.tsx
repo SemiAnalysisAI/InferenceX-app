@@ -6,7 +6,7 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 const toggleClasses = cn(
-  'inline-flex items-center justify-center rounded-md p-2',
+  'inline-flex items-center justify-center rounded-md size-11',
   'text-muted-foreground hover:text-foreground hover:bg-accent',
   'transition-colors duration-200',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

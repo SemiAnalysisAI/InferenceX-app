@@ -1,7 +1,5 @@
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
-import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
-
 import type { BenchmarkRow } from './api';
 import { buildAvailabilityHwKey } from './chart-utils';
 import { getHardwareConfig, getModelSortIndex } from './constants';
@@ -47,7 +45,6 @@ export interface OverviewConfigResult {
   key: string;
   dbModel: string;
   hardware: string;
-  hardwareLabel: string;
   hwKey: string;
   framework: string;
   frameworkLabel: string;
@@ -55,19 +52,9 @@ export interface OverviewConfigResult {
   specLabel: string;
   disagg: boolean;
   precision: string;
-  offloadMode: string;
-  isMultinode: boolean;
-  numPrefillGpu: number;
-  numDecodeGpu: number;
-  /** Physical GPUs backing this config: one shared pool when aggregated, prefill
-   * plus decode when disaggregated. */
-  totalGpu: number;
-  parallelism: string;
-  image: string | null;
   sourceRunUrls: string[];
   tierValues: OverviewTierValue[];
   latestDate: string;
-  oldestFrontierDate: string;
 }
 
 /** One hardware's frontier read at a single tier, with its backing config. */
@@ -467,7 +454,6 @@ function buildConfigResult(
 
   const first = rows[0];
   const { hardware, framework, spec_method: specMethod, disagg } = first;
-  const latestRow = rows.reduce((a, b) => (b.date > a.date ? b : a));
   const sourceRunUrls = [
     ...new Set(rows.flatMap((row) => (row.run_url === null ? [] : [row.run_url]))),
   ].toSorted();
@@ -475,7 +461,6 @@ function buildConfigResult(
     key,
     dbModel: first.model,
     hardware,
-    hardwareLabel: getHardwareConfig(hardware, model).label,
     hwKey: buildAvailabilityHwKey(hardware, framework, specMethod, disagg),
     framework,
     frameworkLabel: resolveFrameworkPartLabel(model, framework),
@@ -483,27 +468,6 @@ function buildConfigResult(
     specLabel: resolveFrameworkPartLabel(model, specMethod),
     disagg,
     precision,
-    offloadMode: first.offload_mode ?? 'off',
-    isMultinode: first.is_multinode,
-    numPrefillGpu: first.num_prefill_gpu,
-    numDecodeGpu: first.num_decode_gpu,
-    totalGpu: disagg ? first.num_prefill_gpu + first.num_decode_gpu : first.num_decode_gpu,
-    parallelism: parallelismLabel({
-      tp: first.decode_tp,
-      ep: first.decode_ep,
-      dpAttention: first.decode_dp_attention,
-      disagg: first.disagg,
-      isMultinode: first.is_multinode,
-      prefillTp: first.prefill_tp,
-      prefillEp: first.prefill_ep,
-      prefillDpAttention: first.prefill_dp_attention,
-      prefillNumWorkers: first.prefill_num_workers,
-      decodeTp: first.decode_tp,
-      decodeEp: first.decode_ep,
-      decodeDpAttention: first.decode_dp_attention,
-      decodeNumWorkers: first.decode_num_workers,
-    }),
-    image: latestRow.image,
     sourceRunUrls,
     tierValues: feed.map((row) => {
       const value =
@@ -518,7 +482,6 @@ function buildConfigResult(
       };
     }),
     latestDate: feed[0].latest_date,
-    oldestFrontierDate: feed[0].oldest_frontier_date,
   };
 }
 
