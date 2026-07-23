@@ -52,6 +52,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   29427827757, // 2026-07-15 | Reason: sweep-reuse recovery of the run above (PR #2158) — reverted for the same reason
   29654139122, // 2026-07-18 | Reason: accidental ingest while testing
   29660737166, // 2026-07-18 | Reason: accidental ingest while testing
+  29912027293, // 2026-07-22 | Reason: accidental ingest while testing
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
