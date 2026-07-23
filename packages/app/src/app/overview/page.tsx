@@ -4,12 +4,13 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { OverviewPageContent } from '@/components/overview/overview-page';
 import { enAlternates } from '@/lib/i18n';
+import { resolveOverviewTier } from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
 
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Comparable validated AI inference serving results for every active model and platform at a fixed single-turn 8K input / 1K output workload, ranked at 50 tok/s/user.';
+  'Every active model across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload — each platform’s best validated speculative-decode serving result at 50 tok/s/user, with same-precision deltas against B200.';
 
 export const metadata: Metadata = {
   title: 'AI Inference Overview',
@@ -28,8 +29,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function OverviewPage() {
-  const data = await getOverviewPageData();
+interface Props {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function OverviewPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const data = await getOverviewPageData(resolveOverviewTier(sp.tier));
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8 pb-8">

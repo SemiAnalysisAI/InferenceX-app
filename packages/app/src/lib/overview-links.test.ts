@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Model, Precision } from './data-mappings';
 import type { OverviewConfigResult, OverviewModelSummary } from './overview-data';
-import { buildOverviewDashboardHref } from './overview-links';
+import { buildOverviewDashboardHref, detailHref } from './overview-links';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26714221123';
 
@@ -43,13 +43,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
   return {
     model: Model.Qwen3_5,
     modelLabel: 'Qwen 3.5',
-    selectedPrecision: Precision.FP4,
-    hardwareStatuses: [],
-    comparisonGroups: [],
-    secondary: null,
-    notRanked: [],
-    latestWorkloadDate: null,
-    emptyReason: null,
+    headlinePairs: [],
     ...overrides,
   };
 }
@@ -95,6 +89,14 @@ describe('buildOverviewDashboardHref', () => {
     );
     expect(buildOverviewDashboardHref('en', summary(), config({ specMethod: 'mtp' }))).toContain(
       'i_spec=mtp',
+    );
+  });
+});
+
+describe('detailHref', () => {
+  it('keeps the model drilldown precision-neutral because headline pairs may differ', () => {
+    expect(detailHref('en', summary())).toBe(
+      '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_optimal=1',
     );
   });
 });

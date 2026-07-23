@@ -3,15 +3,11 @@ import { describe, expect, it } from 'vitest';
 import overviewRowsFixture from '../../cypress/fixtures/api/overview-rows.json';
 
 import type { BenchmarkRow } from './api';
-import { getHardwareConfig } from './constants';
 import { DEFAULT_MODELS, Model, Precision } from './data-mappings';
-import { overviewConfigIdentityKey } from './overview-config-identity';
 import {
   assembleOverviewPageData,
-  buildOverviewHardwareOrder,
   buildOverviewModelSummary,
-  overviewPrimaryValue,
-  selectOverviewPrecision,
+  resolveOverviewTier,
   type OverviewModelSummary,
 } from './overview-data';
 
@@ -78,388 +74,72 @@ function frontierAt(
   );
 }
 
-/** One config's frontier at explicit [interactivity, throughput, date] knots. */
-function datedFrontier(
-  knots: [number, number, string][],
-  overrides: Partial<BenchmarkRow> = {},
-): BenchmarkRow[] {
-  return knots.map(([intvty, tput, date], index) =>
-    row({
-      conc: index + 1,
-      metrics: { median_intvty: intvty, output_tput_per_gpu: tput },
-      date,
-      ...overrides,
-    }),
-  );
+function headlinePairOf(summary: OverviewModelSummary, id: string) {
+  return summary.headlinePairs.find((pair) => pair.id === id);
 }
 
-function statusOf(summary: OverviewModelSummary, hardware: string) {
-  return summary.hardwareStatuses.find((status) => status.hardware === hardware);
-}
-
-/**
- * Leader of the model's first comparable cohort. Leadership only ever exists
- * inside a cohort, so every ranking assertion reads it from there — there is no
- * model-global winner to compare across engine families or deployment modes.
- */
-function primaryLeaderOf(summary: OverviewModelSummary) {
-  return summary.comparisonGroups[0]?.primaryRanking.leader ?? null;
-}
-
-describe('selectOverviewPrecision', () => {
-  it('returns null without any FP4/FP8 rows', () => {
-    expect(selectOverviewPrecision(Model.Qwen3_5, [row({ precision: Precision.BF16 })])).toBeNull();
-    expect(selectOverviewPrecision(Model.Qwen3_5, [row({ precision: Precision.INT4 })])).toBeNull();
-  });
-
-  it('ignores standard-decode rows when counting exact-@50 coverage', () => {
-    // FP8 has the most curves but every one is standard decode; FP4's single
-    // speculative curve is the only exact-@50 coverage, so it wins outnumbered.
-    const rows = [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], {
-        hardware: 'gb200',
-        precision: Precision.FP8,
-        spec_method: 'none',
-      }),
-      ...frontier([1000, 800, 600, 400], {
-        hardware: 'gb300',
-        precision: Precision.FP8,
-        spec_method: 'none',
-      }),
-    ];
-
-    expect(selectOverviewPrecision(Model.Qwen3_5, rows)).toBe(Precision.FP4);
-  });
-});
-
-describe('buildOverviewModelSummary', () => {
-  it('keeps Kimi point releases as separate exact results, never one blended frontier', () => {
-    // kimik2.5 and kimik2.7-code both map to Model.Kimi_K2_5. Otherwise
-    // identical (same hardware/date/config), a model-blind key would merge them
-    // into one frontier — kimik2.5's 100 tok/s/user point would make the winner
-    // reachable there. Exact identity keeps kimik2.7-code's frontier pure.
-    const summary = buildOverviewModelSummary(Model.Kimi_K2_5, [
-      row({
-        model: 'kimik2.7-code',
-        conc: 1,
-        metrics: { median_intvty: 30, output_tput_per_gpu: 1200 },
-      }),
-      row({
-        model: 'kimik2.7-code',
-        conc: 2,
-        metrics: { median_intvty: 50, output_tput_per_gpu: 1000 },
-      }),
-      row({
-        model: 'kimik2.7-code',
-        conc: 3,
-        metrics: { median_intvty: 75, output_tput_per_gpu: 800 },
-      }),
-      row({ model: 'kimik2.5', conc: 4, metrics: { median_intvty: 50, output_tput_per_gpu: 400 } }),
-      row({
-        model: 'kimik2.5',
-        conc: 5,
-        metrics: { median_intvty: 100, output_tput_per_gpu: 700 },
-      }),
-    ]);
-
-    const leader = primaryLeaderOf(summary);
-
-    expect(leader?.dbModel).toBe('kimik2.7-code');
-    expect(overviewPrimaryValue(leader!)).toBe(1000);
-    expect(leader?.tierValues.find(({ tier }) => tier === 100)).toEqual({
-      tier: 100,
-      value: null,
-      boundary: 'unreachable',
-      evidenceDate: null,
-    });
-  });
-
-  it('splits cohorts by db model so point releases never rank against each other', () => {
-    // Same hardware, engine group and deployment mode; only the db model
-    // differs, so the two point releases must land in separate cohorts.
-    const summary = buildOverviewModelSummary(Model.Kimi_K2_5, [
-      ...frontier([1200, 1000, 800, 600], { model: 'kimik2.5' }),
-      ...frontier([1100, 900, 700, 500], { model: 'kimik2.7-code' }),
-    ]);
-
-    expect(summary.comparisonGroups.map((group) => group.dbModel).toSorted()).toEqual([
-      'kimik2.5',
-      'kimik2.7-code',
-    ]);
-  });
-
-  it('never compares incompatible DeepSeek MTP engine families', () => {
-    const summary = buildOverviewModelSummary(Model.DeepSeek_V4_Pro, [
-      ...frontier([1200, 1000, 800, 600], { framework: 'dynamo-trt' }),
-      ...frontier([1100, 900, 700, 500], { framework: 'mori-sglang' }),
-    ]);
-
-    expect(summary.comparisonGroups.map(({ engineGroup }) => engineGroup).toSorted()).toEqual([
-      'sglang',
-      'trt',
-    ]);
-    expect(summary.comparisonGroups.every((group) => group.primaryRanking.runnerUp === null)).toBe(
-      true,
-    );
-  });
-
-  it('keeps aggregate and disaggregate denominators in separate cohorts', () => {
+describe('overview headline pairs', () => {
+  it('keeps each side on its own best precision and withholds the delta on a mismatch', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { disagg: false }),
-      ...frontier([1800, 1500, 1200, 900], {
-        hardware: 'gb200',
-        disagg: true,
-        is_multinode: true,
-      }),
-    ]);
-    expect(summary.comparisonGroups.map(({ deploymentMode }) => deploymentMode).toSorted()).toEqual(
-      ['aggregated', 'disaggregated'],
-    );
-  });
-
-  it('counts aggregated GPUs as one pool and disaggregated as prefill + decode', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { num_prefill_gpu: 4, num_decode_gpu: 4 }),
-      ...frontier([1800, 1500, 1200, 900], {
-        hardware: 'gb200',
-        disagg: true,
-        is_multinode: true,
-        num_prefill_gpu: 16,
-        num_decode_gpu: 16,
-      }),
-    ]);
-    const leaderFor = (mode: string) =>
-      summary.comparisonGroups.find((group) => group.deploymentMode === mode)?.primaryRanking
-        .leader;
-
-    expect(leaderFor('aggregated')?.totalGpu).toBe(4);
-    expect(leaderFor('disaggregated')?.totalGpu).toBe(32);
-  });
-
-  it('ranks 50 and 100 independently across hardware with a real gap', () => {
-    // b200 leads 50 (1000 vs 800) but bottoms out at 100 (300), where gb200's
-    // shallower curve (400) takes over — two exact reads, so the gap is real.
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 300], { hardware: 'b200' }),
-      ...frontier([1100, 800, 600, 400], { hardware: 'gb200' }),
-    ]);
-    const [group] = summary.comparisonGroups;
-    const expectedHighConfigKey = overviewConfigIdentityKey(row({ hardware: 'gb200' }));
-
-    expect(group.primaryRanking.state).toBe('comparable');
-    expect(group.primaryRanking.leader?.hardware).toBe('b200');
-    expect(group.primaryRanking.runnerUp?.hardware).toBe('gb200');
-    expect(group.primaryRanking.gapPercent).toBeCloseTo((1000 / 800 - 1) * 100);
-    expect(group.highRanking.leader?.key).toBe(expectedHighConfigKey);
-    expect(group.highRanking.leader?.hardware).toBe('gb200');
-    expect(group.highLeaderTransition).toBe('changed_hardware');
-  });
-
-  it('picks the best per-hardware config independently at each tier', () => {
-    // On b200, sglang wins 50 (1000 > 700) while dynamo-trt wins 100 (400 > 200).
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 200], { framework: 'sglang' }),
-      ...frontier([1100, 700, 500, 400], { framework: 'dynamo-trt' }),
-    ]);
-    const [group] = summary.comparisonGroups;
-
-    expect(group.primaryRanking.leader).toMatchObject({ hardware: 'b200', framework: 'sglang' });
-    expect(group.highRanking.leader).toMatchObject({ hardware: 'b200', framework: 'dynamo-trt' });
-    expect(group.highLeaderTransition).toBe('same_hardware');
-  });
-
-  it('reports no_primary_baseline when 50 has no exact read but 100 does', () => {
-    // Frontier floor at 60 tok/s/user: tier 50 is clamped_low (no exact read),
-    // so the primary tier has no leader, while tier 100 sits inside [60, 110]
-    // and interpolates — a high leader with no primary baseline to compare to.
-    // FP4 rows so this insufficient-coverage precision is the primary (0-0 exact
-    // tie → FP4); the transition mechanics under test are precision-agnostic.
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontierAt(
-        [
-          [60, 900],
-          [75, 800],
-          [90, 700],
-          [110, 600],
-        ],
-        { precision: Precision.FP4 },
-      ),
-    ]);
-    const [group] = summary.comparisonGroups;
-
-    expect(group.primaryRanking.state).toBe('insufficient_coverage');
-    expect(group.highLeaderTransition).toBe('no_primary_baseline');
-  });
-
-  it('never lets clamped or unreachable reads lead or form a gap at a tier', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      // Frontier floor at 60 tok/s/user → 50 read is clamped_low.
-      ...frontierAt(
-        [
-          [60, 900],
-          [70, 800],
-          [80, 700],
-          [90, 600],
-        ],
-        { hardware: 'b300', precision: Precision.FP4 },
-      ),
-      // Frontier ceiling at 35 tok/s/user → 50 read is unreachable.
-      ...frontierAt(
-        [
-          [20, 500],
-          [25, 450],
-          [30, 400],
-          [35, 350],
-        ],
-        { hardware: 'b200', precision: Precision.FP4 },
-      ),
-    ]);
-    const [group] = summary.comparisonGroups;
-
-    expect(group.primaryRanking.state).toBe('insufficient_coverage');
-    expect(group.primaryRanking.gapPercent).toBeNull();
-    expect(group.primaryRanking.leader).toBeNull();
-    expect(group.hardwareStatuses.find((s) => s.hardware === 'b300')?.primary.boundary).toBe(
-      'clamped_low',
-    );
-  });
-
-  it('lets a lower exact read outrank a higher clamped one', () => {
-    // b300's clamped 900 is its frontier floor, not a 50 tok/s/user result, so
-    // gb200's real 500 leads and no gap is claimed against unmeasured coverage.
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontierAt(
-        [
-          [60, 900],
-          [70, 800],
-          [80, 700],
-          [90, 600],
-        ],
-        { hardware: 'b300' },
-      ),
-      ...frontier([700, 500, 400, 300], { hardware: 'gb200' }),
-    ]);
-    const [group] = summary.comparisonGroups;
-
-    expect(group.primaryRanking.leader?.hardware).toBe('gb200');
-    expect(group.primaryRanking.state).toBe('single_measured');
-    expect(group.primaryRanking.gapPercent).toBeNull();
-    expect(group.hardwareStatuses.find((s) => s.hardware === 'b300')?.primary).toMatchObject({
-      value: 900,
-      boundary: 'clamped_low',
-    });
-  });
-
-  it('dates a model by its newest workload row, and null when it has none', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { date: '2026-07-01' }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'gb200', date: '2026-07-15' }),
-    ]);
-
-    expect(summary.latestWorkloadDate).toBe('2026-07-15');
-    expect(buildOverviewModelSummary(Model.Qwen3_5, []).latestWorkloadDate).toBeNull();
-  });
-});
-
-describe('overview precision selection and secondary', () => {
-  it('makes the wider exact-@50 coverage the primary precision', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'gb200', precision: Precision.FP8 }),
-      ...frontier([1000, 800, 600, 400], { hardware: 'gb300', precision: Precision.FP8 }),
-    ]);
-
-    expect(summary.selectedPrecision).toBe(Precision.FP8);
-  });
-
-  it('breaks an exact-@50 coverage tie toward FP4', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'gb200', precision: Precision.FP8 }),
-    ]);
-
-    expect(summary.selectedPrecision).toBe(Precision.FP4);
-  });
-
-  it('ranks each precision within itself, never across FP4 and FP8', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b300', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'b200', precision: Precision.FP4 }),
-      ...frontier([1000, 800, 600, 400], { hardware: 'gb200', precision: Precision.FP8 }),
-    ]);
-
-    // The FP4 cohort ranks only its own two hardware; the FP8 platform is the
-    // secondary precision, never a cross-precision delta in the primary cohort.
-    expect(summary.comparisonGroups[0].hardwareStatuses.map((s) => s.hardware).toSorted()).toEqual([
-      'b200',
-      'b300',
-    ]);
-    expect(summary.secondary?.precision).toBe(Precision.FP8);
-  });
-
-  it('keeps FP8 visible as secondary coverage when FP4 is primary', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b300', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'b200', precision: Precision.FP4 }),
-      ...frontier([1000, 800, 600, 400], { hardware: 'h200', precision: Precision.FP8 }),
-    ]);
-
-    expect(summary.selectedPrecision).toBe(Precision.FP4);
-    expect(summary.secondary?.state).toBe('coverage');
-    expect(summary.secondary?.measuredHardware).toContain(getHardwareConfig('h200').label);
-  });
-
-  it('opens secondary rows only when FP8 ranks a pair on hardware FP4 lacks', () => {
-    const ranked = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b300', precision: Precision.FP4 }),
-      ...frontier([1150, 950, 750, 550], { hardware: 'b200', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'gb300', precision: Precision.FP4 }),
-      ...frontier([1000, 800, 600, 400], { hardware: 'gb200', precision: Precision.FP8 }),
-      ...frontier([980, 780, 580, 380], { hardware: 'mi355x', precision: Precision.FP8 }),
-    ]);
-    // FP4 leads on three hardware; FP8 ranks a comparable pair on two it lacks.
-    expect(ranked.selectedPrecision).toBe(Precision.FP4);
-    expect(ranked.secondary?.state).toBe('ranked');
-
-    const covered = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'gb200', precision: Precision.FP4 }),
-      ...frontier([1150, 950, 750, 550], { hardware: 'mi355x', precision: Precision.FP4 }),
-      ...frontier([900, 850, 650, 450], { hardware: 'gb200', precision: Precision.FP8 }),
-      ...frontier([880, 820, 620, 420], { hardware: 'mi355x', precision: Precision.FP8 }),
-    ]);
-    // Same FP8 pair, but both hardware already rank in FP4 → no new coverage.
-    expect(covered.secondary?.state).toBe('coverage');
-  });
-});
-
-describe('overview not-ranked reasons', () => {
-  it('accounts for every page hardware with an exact value or one reason', () => {
-    const model = [
-      ...frontier([1200, 1000, 800, 600], { hardware: 'b300', precision: Precision.FP4 }),
-      ...frontier([1100, 900, 700, 500], { hardware: 'b200', precision: Precision.FP4 }),
-      // gb200 measured at the primary precision, but standard decode only.
-      ...frontier([1000, 800, 600, 400], {
-        hardware: 'gb200',
+      ...frontier([1200, 1000, 800, 600], {
+        hardware: 'mi355x',
         precision: Precision.FP4,
-        spec_method: 'none',
       }),
-    ];
-    // mi355x reaches the page order only because another model measured it.
-    const other = frontier([900, 800, 700, 600], { hardware: 'mi355x', precision: Precision.FP4 });
-    const order = buildOverviewHardwareOrder([...model, ...other]);
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, model, order);
-
-    // b300/b200 rank (exact @50) and are absent; gb200 and mi355x each get one.
-    expect(summary.notRanked.map((entry) => [entry.hardware, entry.reason])).toEqual([
-      ['gb200', 'standard_decode_only'],
-      ['mi355x', 'no_8k1k_data'],
+      ...frontier([1100, 900, 700, 500], {
+        hardware: 'mi355x',
+        precision: Precision.FP8,
+      }),
+      ...frontier([1000, 800, 600, 400], {
+        hardware: 'b200',
+        precision: Precision.FP8,
+      }),
     ]);
+
+    const pair = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(pair?.candidate.read.value).toBe(1000);
+    expect(pair?.candidate.precision).toBe(Precision.FP4);
+    expect(pair?.baseline.read.value).toBe(800);
+    expect(pair?.baseline.precision).toBe(Precision.FP8);
+    expect(pair?.precision).toBeNull();
+    expect(pair?.directDeltaPercent).toBeNull();
+    expect(pair?.deltaUnavailableReason).toBe('precision_mismatch');
+    expect(pair?.highLeaderTransition).toBeNull();
   });
 
-  it('separates a frontier that tops out below 50 from a missing @50 read', () => {
+  it('breaks equal exact-read coverage toward FP4', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      // b200 frontier ceiling at 45 tok/s/user → @50 unreachable.
+      ...frontier([1200, 1000, 800, 600], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+      }),
+      ...frontier([1100, 900, 700, 500], {
+        hardware: 'b200',
+        precision: Precision.FP4,
+      }),
+      ...frontier([1000, 800, 600, 400], {
+        hardware: 'mi355x',
+        precision: Precision.FP8,
+      }),
+      ...frontier([900, 700, 500, 300], {
+        hardware: 'b200',
+        precision: Precision.FP8,
+      }),
+    ]);
+
+    expect(headlinePairOf(summary, 'mi355x-vs-b200')?.precision).toBe(Precision.FP4);
+  });
+
+  it('keeps an FP4 bucket and member boundaries when neither side has an exact read', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontierAt(
+        [
+          [60, 900],
+          [70, 800],
+          [80, 700],
+          [90, 600],
+        ],
+        { hardware: 'mi355x', precision: Precision.FP4 },
+      ),
       ...frontierAt(
         [
           [20, 500],
@@ -469,197 +149,299 @@ describe('overview not-ranked reasons', () => {
         ],
         { hardware: 'b200', precision: Precision.FP4 },
       ),
-      // b300 frontier floor at 60 tok/s/user → @50 clamped_low, not unreachable.
+    ]);
+
+    const pair = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(pair?.precision).toBeNull();
+    expect(pair?.candidate.precision).toBe(Precision.FP4);
+    expect(pair?.candidate.dbModel).toBe('qwen3.5');
+    expect(pair?.baseline.precision).toBe(Precision.FP4);
+    expect(pair?.candidate.read).toMatchObject({
+      value: null,
+      boundary: 'clamped_low',
+      config: { hardware: 'mi355x' },
+    });
+    expect(pair?.baseline.read).toMatchObject({
+      value: null,
+      boundary: 'unreachable',
+      config: { hardware: 'b200' },
+    });
+    expect(pair?.candidate.missingReason).toBe('no_exact_at_tier');
+    expect(pair?.baseline.missingReason).toBe('cannot_reach_at_tier');
+  });
+
+  it('keeps an exact side and marks an unreachable side missing without a delta', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([1200, 1000, 800, 600], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+      }),
       ...frontierAt(
         [
-          [60, 900],
-          [70, 800],
-          [80, 700],
-          [90, 600],
-        ],
-        { hardware: 'b300', precision: Precision.FP4 },
-      ),
-    ]);
-    const reasonOf = (hardware: string) =>
-      summary.notRanked.find((entry) => entry.hardware === hardware)?.reason;
-
-    expect(reasonOf('b200')).toBe('cannot_reach_at50');
-    expect(reasonOf('b300')).toBe('no_exact_at50');
-  });
-});
-
-describe('overview result-level evidence dates', () => {
-  it('dates each read from its own config frontier, never a sibling', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...datedFrontier(
-        [
-          [40, 1100, '2026-07-10'],
-          [60, 900, '2026-07-10'],
-        ],
-        { hardware: 'b300', precision: Precision.FP4 },
-      ),
-      ...datedFrontier(
-        [
-          [40, 900, '2026-07-16'],
-          [60, 700, '2026-07-16'],
+          [20, 500],
+          [30, 450],
+          [40, 400],
+          [45, 350],
         ],
         { hardware: 'b200', precision: Precision.FP4 },
       ),
     ]);
 
-    expect(statusOf(summary, 'b300')?.primary.evidenceDate).toEqual({
-      from: '2026-07-10',
-      to: '2026-07-10',
-    });
-    expect(statusOf(summary, 'b200')?.primary.evidenceDate).toEqual({
-      from: '2026-07-16',
-      to: '2026-07-16',
-    });
+    const pair = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(pair?.candidate.read).toMatchObject({ value: 1000, boundary: 'interpolated' });
+    expect(pair?.baseline.read).toMatchObject({ value: null, boundary: 'unreachable' });
+    expect(pair?.baseline.missingReason).toBe('cannot_reach_at_tier');
+    expect(pair?.directDeltaPercent).toBeNull();
   });
 
-  it('collapses a same-day bracket and spans a cross-day one', () => {
+  it('selects member precisions independently and shares a pair precision only when they match', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...datedFrontier(
-        [
-          [40, 1100, '2026-07-10'],
-          [60, 900, '2026-07-10'],
-        ],
-        { hardware: 'b300', precision: Precision.FP4 },
-      ),
-      ...datedFrontier(
-        [
-          [40, 900, '2026-06-24'],
-          [60, 700, '2026-07-04'],
-        ],
-        { hardware: 'b200', precision: Precision.FP4 },
-      ),
+      ...frontier([1200, 1000, 800, 600], {
+        hardware: 'mi355x',
+        precision: Precision.FP8,
+      }),
+      ...frontier([1100, 900, 700, 500], {
+        hardware: 'b200',
+        precision: Precision.FP8,
+      }),
+      ...frontier([1300, 1100, 900, 700], {
+        hardware: 'gb300',
+        precision: Precision.FP4,
+      }),
+      ...frontier([1000, 800, 600, 400], {
+        hardware: 'b200',
+        precision: Precision.FP4,
+      }),
     ]);
 
-    expect(statusOf(summary, 'b300')?.primary.evidenceDate).toEqual({
-      from: '2026-07-10',
-      to: '2026-07-10',
-    });
-    expect(statusOf(summary, 'b200')?.primary.evidenceDate).toEqual({
-      from: '2026-06-24',
-      to: '2026-07-04',
-    });
+    const matched = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(matched?.precision).toBe(Precision.FP8);
+    expect(matched?.directDeltaPercent).not.toBeNull();
+
+    const mismatched = headlinePairOf(summary, 'gb300-vs-b200');
+    expect(mismatched?.candidate.precision).toBe(Precision.FP4);
+    expect(mismatched?.baseline.precision).toBe(Precision.FP8);
+    expect(mismatched?.precision).toBeNull();
+    expect(mismatched?.deltaUnavailableReason).toBe('precision_mismatch');
   });
 
-  it('ignores a hidden slower config even when it is newer', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...datedFrontier(
-        [
-          [40, 1100, '2026-07-10'],
-          [60, 900, '2026-07-10'],
-        ],
-        { hardware: 'b300', precision: Precision.FP4, framework: 'sglang' },
-      ),
-      // Slower same-hardware config, newer runs — never backs the visible read.
-      ...datedFrontier(
-        [
-          [40, 700, '2026-07-20'],
-          [60, 500, '2026-07-20'],
-        ],
-        { hardware: 'b300', precision: Precision.FP4, framework: 'dynamo-trt' },
-      ),
-    ]);
-
-    expect(statusOf(summary, 'b300')?.primary.evidenceDate).toEqual({
-      from: '2026-07-10',
-      to: '2026-07-10',
-    });
-  });
-
-  it('dates @50 and @100 from their own bracketing knots', () => {
-    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
-      ...datedFrontier(
-        [
-          [40, 1200, '2026-07-01'],
-          [60, 1000, '2026-07-01'],
-          [90, 700, '2026-07-15'],
-          [110, 500, '2026-07-15'],
-        ],
-        { hardware: 'b300', precision: Precision.FP4 },
-      ),
-    ]);
-    const status = statusOf(summary, 'b300');
-
-    expect(status?.primary.evidenceDate).toEqual({ from: '2026-07-01', to: '2026-07-01' });
-    expect(status?.high.evidenceDate).toEqual({ from: '2026-07-15', to: '2026-07-15' });
-  });
-});
-
-describe('overview hardware coverage', () => {
-  it('holds hardware order fixed against input order and performance changes', () => {
-    const expected = ['gb300', 'gb200', 'b300', 'b200', 'mi355x'];
-    const build = (throughputs: number[], hardware: string[]) => {
-      const rows = hardware.flatMap((hw, index) =>
-        frontier(
-          [
-            throughputs[index] + 200,
-            throughputs[index],
-            throughputs[index] - 200,
-            throughputs[index] - 400,
-          ],
-          { hardware: hw },
-        ),
-      );
-      return buildOverviewModelSummary(Model.Qwen3_5, rows, buildOverviewHardwareOrder(rows));
-    };
-
-    // Same throughputs, hardware fed in the opposite order: the fastest platform
-    // swaps from mi355x to gb300 while the display order must not move.
-    const mi355xLeads = build([600, 700, 800, 900, 1000], expected);
-    const gb300Leads = build([600, 700, 800, 900, 1000], [...expected].toReversed());
-
-    expect(mi355xLeads.hardwareStatuses.map(({ hardware }) => hardware)).toEqual(expected);
-    expect(gb300Leads.hardwareStatuses.map(({ hardware }) => hardware)).toEqual(expected);
-    expect(primaryLeaderOf(mi355xLeads)).toMatchObject({ hardware: 'mi355x' });
-    expect(primaryLeaderOf(gb300Leads)).toMatchObject({ hardware: 'gb300' });
-    expect(gb300Leads.comparisonGroups[0].hardwareStatuses.map(({ hardware }) => hardware)).toEqual(
-      expected,
-    );
-  });
-
-  it('separates unsupported-precision coverage from hardware this model never ran', () => {
-    // Kimi shape: FP4 standard decode on B200, INT4 only on H200. H200 and
-    // MI355X reach the page order only because another model measured them.
-    const kimi = [
+  it('shows each release’s own read but never deltas across releases', () => {
+    const summary = buildOverviewModelSummary(Model.Kimi_K2_5, [
       ...frontier([1200, 1000, 800, 600], {
         model: 'kimik2.5',
         hardware: 'b200',
         precision: Precision.FP4,
-        spec_method: 'none',
+        date: '2026-07-10',
       }),
-      ...frontier([900, 800, 700, 600], {
-        model: 'kimik2.5',
-        hardware: 'h200',
-        precision: Precision.INT4,
-        spec_method: 'none',
+      ...frontier([1100, 900, 700, 500], {
+        model: 'kimik2.7-code',
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+        date: '2026-07-20',
       }),
-    ];
-    const otherModel = [
-      ...frontier([900, 800, 700, 600], { hardware: 'mi355x', precision: Precision.FP4 }),
-      ...frontier([700, 600, 500, 400], { hardware: 'h200', precision: Precision.FP8 }),
-    ];
-    const order = buildOverviewHardwareOrder([...kimi, ...otherModel]);
-    const summary = buildOverviewModelSummary(Model.Kimi_K2_5, kimi, order);
-
-    expect(order.map(({ hardware }) => hardware)).toEqual(['b200', 'mi355x', 'h200']);
-    expect(summary.hardwareStatuses.map(({ hardware }) => hardware)).toEqual([
-      'b200',
-      'mi355x',
-      'h200',
     ]);
-    expect(statusOf(summary, 'b200')?.coverage.kind).toBe('standard_only');
-    expect(statusOf(summary, 'h200')?.coverage).toMatchObject({
-      kind: 'unsupported_precision_only',
-      availablePrecisions: [Precision.INT4],
-    });
-    expect(statusOf(summary, 'mi355x')?.coverage).toMatchObject({
-      kind: 'no_workload_data',
-      availablePrecisions: [],
-    });
+
+    const pair = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(pair?.candidate.read.config?.dbModel).toBe('kimik2.7-code');
+    expect(pair?.baseline.read.config?.dbModel).toBe('kimik2.5');
+    expect(pair?.dbModel).toBeNull();
+    expect(pair?.directDeltaPercent).toBeNull();
+    expect(pair?.deltaUnavailableReason).toBe('version_mismatch');
+    expect(pair?.highLeaderTransition).toBeNull();
+  });
+
+  it('computes signed candidate-relative-to-B200 deltas', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([1000, 800, 600, 400], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+      }),
+      ...frontier([1200, 1000, 800, 600], {
+        hardware: 'b200',
+        precision: Precision.FP4,
+      }),
+      ...frontier([1400, 1200, 1000, 800], {
+        hardware: 'gb300',
+        precision: Precision.FP4,
+      }),
+    ]);
+
+    expect(headlinePairOf(summary, 'mi355x-vs-b200')?.directDeltaPercent).toBeCloseTo(-20);
+    expect(headlinePairOf(summary, 'gb300-vs-b200')?.directDeltaPercent).toBeCloseTo(20);
+  });
+
+  it('reports a hardware leader flip at @100 using independently best configs', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([1400, 1200, 800, 400], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+        framework: 'sglang',
+      }),
+      ...frontier([1000, 700, 650, 600], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+        framework: 'dynamo-trt',
+      }),
+      ...frontier([1200, 1000, 800, 650], {
+        hardware: 'b200',
+        precision: Precision.FP4,
+      }),
+    ]);
+
+    const pair = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(pair?.candidate.read.config?.framework).toBe('sglang');
+    expect(pair?.candidate.highRead.config?.framework).toBe('dynamo-trt');
+    expect(pair?.highLeaderTransition).toBe('changed_hardware');
+  });
+
+  it('distinguishes standard-decode-only and unsupported-precision coverage per member', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),
+      row({ hardware: 'mi355x', precision: Precision.FP8, spec_method: 'none' }),
+      row({ hardware: 'b300', precision: Precision.INT4 }),
+    ]);
+
+    expect(headlinePairOf(summary, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
+      'standard_decode_only',
+    );
+    expect(headlinePairOf(summary, 'b300-vs-b200')?.candidate.missingReason).toBe('int4_bf16_only');
+  });
+
+  it('always returns all four fixed pairs for an empty model', () => {
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, []);
+
+    expect(summary.headlinePairs.map(({ id }) => id)).toEqual([
+      'mi355x-vs-b200',
+      'b300-vs-b200',
+      'gb200-vs-b200',
+      'gb300-vs-b200',
+    ]);
+    expect(summary.headlinePairs.every(({ precision }) => precision === null)).toBe(true);
+    expect(
+      summary.headlinePairs.every(
+        ({ candidate, baseline }) =>
+          candidate.missingReason === 'no_8k1k_data' && baseline.missingReason === 'no_8k1k_data',
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('tier-parameterized overview', () => {
+  it('resolves the tier query value and falls back to 50', () => {
+    expect(resolveOverviewTier('100')).toBe(100);
+    expect(resolveOverviewTier(['75', '30'])).toBe(75);
+    expect(resolveOverviewTier('40')).toBe(50);
+    expect(resolveOverviewTier('')).toBe(50);
+    expect(resolveOverviewTier(undefined)).toBe(50);
+  });
+
+  it('stamps the displayed tier on the page and defaults to 50, down to empty models', () => {
+    expect(assembleOverviewPageData({}).tier).toBe(50);
+    const page = assembleOverviewPageData({}, 75);
+    expect(page.tier).toBe(75);
+    expect(page.models[0]?.headlinePairs[0]?.candidate.read.tier).toBe(75);
+  });
+
+  it('reads every pair member and its delta at the requested tier', () => {
+    const page = assembleOverviewPageData(
+      {
+        [Model.Qwen3_5]: [
+          ...frontier([1000, 800, 600, 400], { hardware: 'mi355x', precision: Precision.FP4 }),
+          ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),
+        ],
+      },
+      100,
+    );
+
+    const pair = headlinePairOf(
+      page.models.find((m) => m.model === Model.Qwen3_5)!,
+      'mi355x-vs-b200',
+    );
+    expect(pair?.candidate.read).toMatchObject({ tier: 100, value: 400 });
+    expect(pair?.baseline.read).toMatchObject({ tier: 100, value: 600 });
+    expect(pair?.directDeltaPercent).toBeCloseTo((400 / 600 - 1) * 100);
+  });
+
+  it('turns an unreachable @50 side into an exact read on the 30 view', () => {
+    const rows = [
+      ...frontier([1200, 1000, 800, 600], { hardware: 'mi355x', precision: Precision.FP4 }),
+      ...frontierAt(
+        [
+          [20, 500],
+          [30, 450],
+          [40, 400],
+          [45, 350],
+        ],
+        { hardware: 'b200', precision: Precision.FP4 },
+      ),
+    ];
+
+    const at50 = headlinePairOf(
+      assembleOverviewPageData({ [Model.Qwen3_5]: rows }).models.find(
+        (m) => m.model === Model.Qwen3_5,
+      )!,
+      'mi355x-vs-b200',
+    );
+    expect(at50?.baseline.missingReason).toBe('cannot_reach_at_tier');
+
+    const at30 = headlinePairOf(
+      assembleOverviewPageData({ [Model.Qwen3_5]: rows }, 30).models.find(
+        (m) => m.model === Model.Qwen3_5,
+      )!,
+      'mi355x-vs-b200',
+    );
+    expect(at30?.baseline.read).toMatchObject({ tier: 30, value: 450 });
+    expect(at30?.baseline.missingReason).toBeNull();
+    expect(at30?.directDeltaPercent).toBeCloseTo((1200 / 450 - 1) * 100);
+  });
+
+  it('re-selects each platform’s best bucket at the displayed tier', () => {
+    // FP4 wins @50 (1000 > 900) but tops out low; FP8 wins @100 (700 > 400).
+    const page = (tier?: 30 | 50 | 75 | 100) =>
+      assembleOverviewPageData(
+        {
+          [Model.Qwen3_5]: [
+            ...frontier([1200, 1000, 800, 400], { hardware: 'mi355x', precision: Precision.FP4 }),
+            ...frontier([1100, 900, 850, 700], { hardware: 'mi355x', precision: Precision.FP8 }),
+            ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP8 }),
+          ],
+        },
+        tier,
+      ).models.find((m) => m.model === Model.Qwen3_5)!;
+
+    const at50 = headlinePairOf(page(), 'mi355x-vs-b200');
+    expect(at50?.candidate.precision).toBe(Precision.FP4);
+    expect(at50?.deltaUnavailableReason).toBe('precision_mismatch');
+
+    const at100 = headlinePairOf(page(100), 'mi355x-vs-b200');
+    expect(at100?.candidate.precision).toBe(Precision.FP8);
+    expect(at100?.candidate.read.value).toBe(700);
+    expect(at100?.directDeltaPercent).toBeCloseTo((700 / 600 - 1) * 100);
+  });
+
+  it('never reports a leader transition on the 100 view', () => {
+    const rows = [
+      ...frontier([1400, 1200, 800, 400], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+        framework: 'sglang',
+      }),
+      ...frontier([1000, 700, 650, 600], {
+        hardware: 'mi355x',
+        precision: Precision.FP4,
+        framework: 'dynamo-trt',
+      }),
+      ...frontier([1200, 1000, 800, 650], { hardware: 'b200', precision: Precision.FP4 }),
+    ];
+
+    const summaryAt = (tier?: 30 | 50 | 75 | 100) =>
+      assembleOverviewPageData({ [Model.Qwen3_5]: rows }, tier).models.find(
+        (m) => m.model === Model.Qwen3_5,
+      )!;
+    expect(headlinePairOf(summaryAt(), 'mi355x-vs-b200')?.highLeaderTransition).toBe(
+      'changed_hardware',
+    );
+    expect(headlinePairOf(summaryAt(100), 'mi355x-vs-b200')?.highLeaderTransition).toBeNull();
   });
 });
 
@@ -667,74 +449,67 @@ describe('overview hardware coverage', () => {
 // changes, the hand-built rows in overview-rows.json must be regenerated, and
 // this fails loudly instead of the e2e stranding empty data. Every expectation
 // is derived by running this same assembler over the fixture — never eyeballed —
-// so it locks the exact 8.7 states overview.cy.ts renders against.
+// so it locks the exact matrix cell states overview.cy.ts renders against.
 describe('assembleOverviewPageData over the overview-rows fixture', () => {
-  it('serves every 8.7 precision, coverage and evidence-date state through the real builder', () => {
+  it('serves every matrix cell state through the real builder', () => {
     const page = assembleOverviewPageData(
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
     );
 
     expect(page.models).toHaveLength(DEFAULT_MODELS.size);
     expect(page.datasetThroughDate).toBe('2026-07-18');
-    expect(page.hardwareOrder.map((entry) => entry.hardware)).toEqual([
-      'gb300',
-      'gb200',
-      'b300',
-      'b200',
-      'mi355x',
-      'h200',
-      'mi325x',
-      'h100',
-    ]);
+    expect(page.tier).toBe(50);
 
-    // DeepSeek: FP4 primary ranks B300 over B200; FP8 stays visible as one
-    // coverage line (single measured hardware, not a second table); every other
-    // page hardware carries exactly one not-ranked reason, including BOTH clamp
-    // directions; and the leader's @50 read spans two calendar days — the only
-    // cross-day evidence range in the fixture, so the e2e can exercise the range
-    // label the current live dataset never produces.
-    const deepseek = page.models.find((m) => m.model === Model.DeepSeek_V4_Pro);
-    expect(deepseek?.selectedPrecision).toBe(Precision.FP4);
-    const dsCohort = deepseek?.comparisonGroups[0];
-    expect(dsCohort?.primaryRanking.state).toBe('comparable');
-    expect(dsCohort?.primaryRanking.leader?.hardware).toBe('b300');
-    expect(dsCohort?.highRanking.leader?.hardware).toBe('b200');
+    // DeepSeek: FP4 exacts on B200/B300 carry the only same-precision delta with
+    // a cross-day evidence range; GB200's own best is FP8, so its value shows
+    // but the delta is withheld; MI355X and GB300 miss in opposite clamp
+    // directions.
+    const deepseek = page.models.find((m) => m.model === Model.DeepSeek_V4_Pro)!;
+    const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
+    expect(dsB300.precision).toBe(Precision.FP4);
+    expect(dsB300.baseline.read.value).toBeCloseTo(900.219);
+    expect(dsB300.candidate.read.value).toBeCloseTo(1121.875);
+    expect(dsB300.candidate.read.evidenceDate).toEqual({ from: '2026-06-24', to: '2026-07-04' });
+    expect(dsB300.directDeltaPercent).toBeCloseTo(24.62, 1);
+    const dsGb200 = headlinePairOf(deepseek, 'gb200-vs-b200')!;
+    expect(dsGb200.candidate.precision).toBe(Precision.FP8);
+    expect(dsGb200.candidate.read.value).toBe(600);
+    expect(dsGb200.deltaUnavailableReason).toBe('precision_mismatch');
+    expect(headlinePairOf(deepseek, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
+      'no_exact_at_tier',
+    );
+    expect(headlinePairOf(deepseek, 'gb300-vs-b200')?.candidate.missingReason).toBe(
+      'cannot_reach_at_tier',
+    );
+
+    // MiniMax: only GB300 has workload rows, so its value stands alone — a
+    // missing baseline never yields a delta OR a mismatch note.
+    const minimax = page.models.find((m) => m.model === Model.MiniMax_M3)!;
+    const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
+    expect(mmGb300.baseline.missingReason).toBe('no_8k1k_data');
+    expect(mmGb300.candidate.read.value).toBe(700);
+    expect(mmGb300.directDeltaPercent).toBeNull();
+    expect(mmGb300.deltaUnavailableReason).toBeNull();
+
+    // Qwen: FP8 exacts on both sides yield the −16% delta and a leader flip at
+    // 100, while B300's FP4 best withholds its delta against the FP8 baseline.
+    const qwen = page.models.find((m) => m.model === Model.Qwen3_5)!;
+    const qwenMi = headlinePairOf(qwen, 'mi355x-vs-b200')!;
+    expect(qwenMi.precision).toBe(Precision.FP8);
+    expect(qwenMi.directDeltaPercent).toBeCloseTo(-15.56, 1);
+    expect(qwenMi.highLeaderTransition).toBe('changed_hardware');
+    const qwenB300 = headlinePairOf(qwen, 'b300-vs-b200')!;
+    expect(qwenB300.candidate.precision).toBe(Precision.FP4);
+    expect(qwenB300.candidate.read.value).toBeCloseTo(1150.625);
+    expect(qwenB300.deltaUnavailableReason).toBe('precision_mismatch');
+
+    // Kimi: no workload rows at all → every member of every pair says so.
+    const kimi = page.models.find((m) => m.model === Model.Kimi_K2_5)!;
     expect(
-      dsCohort?.hardwareStatuses.find((s) => s.hardware === 'b300')?.primary.evidenceDate,
-    ).toEqual({ from: '2026-06-24', to: '2026-07-04' });
-    expect(deepseek?.secondary?.state).toBe('coverage');
-    expect(deepseek?.secondary?.precision).toBe(Precision.FP8);
-    expect(deepseek?.secondary?.measuredHardware).toEqual(['GB200 NVL72']);
-    expect(
-      Object.fromEntries(
-        (deepseek?.notRanked ?? []).map((entry) => [entry.hardware, entry.reason]),
+      kimi.headlinePairs.every(
+        ({ candidate, baseline }) =>
+          candidate.missingReason === 'no_8k1k_data' && baseline.missingReason === 'no_8k1k_data',
       ),
-    ).toMatchObject({
-      gb300: 'cannot_reach_at50',
-      mi355x: 'no_exact_at50',
-      h100: 'standard_decode_only',
-      gb200: 'other_precision_only',
-      h200: 'no_8k1k_data',
-    });
-
-    // MiniMax: the wider exact-@50 FP8 coverage flips the primary precision to
-    // FP8 (the coverage rule), dropping FP4 to a single-hardware coverage line.
-    const minimax = page.models.find((m) => m.model === Model.MiniMax_M3);
-    expect(minimax?.selectedPrecision).toBe(Precision.FP8);
-    expect(minimax?.comparisonGroups[0]?.primaryRanking.leader?.hardware).toBe('h200');
-    expect(minimax?.secondary?.state).toBe('coverage');
-    expect(minimax?.secondary?.precision).toBe(Precision.FP4);
-    expect(minimax?.secondary?.measuredHardware).toEqual(['H200']);
-
-    // Qwen: FP4 primary, and FP8 secondary earns a FULL ranked block — it ranks a
-    // comparable pair AND adds MI355X, hardware FP4 has no exact @50 read for.
-    const qwen = page.models.find((m) => m.model === Model.Qwen3_5);
-    expect(qwen?.selectedPrecision).toBe(Precision.FP4);
-    expect(qwen?.secondary?.state).toBe('ranked');
-    expect(qwen?.secondary?.precision).toBe(Precision.FP8);
-    const qwenSecondaryCohort = qwen?.secondary?.comparisonGroups[0];
-    expect(qwenSecondaryCohort?.primaryRanking.state).toBe('comparable');
-    expect(qwenSecondaryCohort?.primaryRanking.leader?.hardware).toBe('b200');
-    expect(qwen?.secondary?.measuredHardware).toEqual(['B200', 'MI355X']);
+    ).toBe(true);
   });
 });

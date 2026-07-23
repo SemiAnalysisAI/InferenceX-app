@@ -221,6 +221,7 @@ function bracketKnots(frontier: FrontierPoint[], tier: number): [FrontierPoint, 
   if (tier >= frontier[last].interactivity) return [frontier[last], frontier[last]];
   let lo = 0;
   for (let i = 0; i < last; i++) {
+    if (frontier[i].interactivity === tier) return [frontier[i], frontier[i]];
     if (frontier[i].interactivity <= tier) lo = i;
   }
   return [frontier[lo], frontier[lo + 1]];

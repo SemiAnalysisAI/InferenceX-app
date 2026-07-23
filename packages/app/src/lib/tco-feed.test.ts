@@ -180,6 +180,34 @@ describe('computeTcoFeed — frontier reads', () => {
     expect(rows[0].oldest_frontier_date).toBe('2026-04-25');
   });
 
+  it("uses only an exact interior frontier knot's date as evidence", () => {
+    const rows = computeTcoFeed(
+      [
+        makeRow({ itl: 1 / 20, otput: 1000, date: '2026-04-25' }),
+        makeRow({ itl: 1 / 50, otput: 400, date: '2026-05-20' }),
+        makeRow({ itl: 1 / 100, otput: 100, date: '2026-07-12' }),
+      ],
+      WORKLOAD_8K1K,
+      [50],
+    );
+
+    expect(rows[0].evidence_date).toEqual({ from: '2026-05-20', to: '2026-05-20' });
+  });
+
+  it('uses both bracketing frontier-knot dates as evidence between knots', () => {
+    const rows = computeTcoFeed(
+      [
+        makeRow({ itl: 1 / 20, otput: 1000, date: '2026-04-25' }),
+        makeRow({ itl: 1 / 50, otput: 400, date: '2026-05-20' }),
+        makeRow({ itl: 1 / 100, otput: 100, date: '2026-07-12' }),
+      ],
+      WORKLOAD_8K1K,
+      [75],
+    );
+
+    expect(rows[0].evidence_date).toEqual({ from: '2026-05-20', to: '2026-07-12' });
+  });
+
   it('groups by workload and hardware, sorted by hardware key', () => {
     const rows = computeTcoFeed(
       [

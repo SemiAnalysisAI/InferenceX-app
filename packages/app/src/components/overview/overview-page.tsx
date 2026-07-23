@@ -5,6 +5,7 @@ import {
   DesktopOverviewMatrix,
   MobileOverviewList,
   OverviewMethodology,
+  OverviewTierSwitcher,
   overviewFormatters,
   OVERVIEW_STRINGS,
   type OverviewLocale,
@@ -31,11 +32,12 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
           {strings.purpose}
         </p>
         <p className="mt-1.5 max-w-4xl text-xs leading-snug text-muted-foreground sm:text-sm">
-          {strings.scope}
+          {strings.scope(data.tier)}
         </p>
         {snapshot === null ? null : (
           <p className="mt-1 text-xs text-muted-foreground/80 tabular-nums">{snapshot}</p>
         )}
+        <OverviewTierSwitcher tier={data.tier} locale={locale} strings={strings} />
       </header>
 
       {/* Official-only summary; uploaded runs remain in the linked dashboard. */}

@@ -6,7 +6,12 @@
  */
 
 import { runIdFromRunUrl } from './known-issues';
-import type { OverviewConfigResult, OverviewModelSummary } from './overview-data';
+import {
+  OVERVIEW_PRIMARY_TIER,
+  type OverviewConfigResult,
+  type OverviewModelSummary,
+  type OverviewTier,
+} from './overview-data';
 import type { UrlStateParams } from './url-state';
 
 /** The single-turn 8K-in/1K-out workload every overview link filters to. */
@@ -75,15 +80,24 @@ export function buildOverviewDashboardHref(
 }
 
 /**
- * Model-level dashboard view: the workload and precision this page ranked, with
- * no configuration pinned. Cohort-level evidence links narrow it further.
+ * Model-level dashboard view: precision-neutral, because the two headline pairs
+ * may select different precisions. Result-level evidence links narrow further.
  */
 export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): string {
   const query = new URLSearchParams({
     g_model: model.model,
     i_seq: OVERVIEW_WORKLOAD_SEQ,
-    ...(model.selectedPrecision ? { i_prec: model.selectedPrecision } : {}),
     i_optimal: '1',
   });
   return `${inferenceRoute(locale)}?${query}`;
+}
+
+/**
+ * The overview itself at another service point. The default tier keeps the bare
+ * canonical URL; other tiers ride a plain `?tier=` query the server re-renders
+ * from, so any view is a copyable link.
+ */
+export function overviewTierHref(locale: 'en' | 'zh', tier: OverviewTier): string {
+  const base = locale === 'zh' ? '/zh/overview' : '/overview';
+  return tier === OVERVIEW_PRIMARY_TIER ? base : `${base}?tier=${tier}`;
 }

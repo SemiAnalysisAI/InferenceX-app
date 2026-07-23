@@ -1,11 +1,3 @@
-// Focused smoke coverage for /overview. In fixtures mode the page is served by
-// the synthetic cypress/fixtures/api/overview-rows.json through the real data
-// builder, so every expected value below was derived by running the assembler
-// over that fixture (the drift guard in overview-data.test.ts locks the same
-// values) — never eyeballed. The fixture exercises every 8.7 state: coverage-driven
-// primary precision, ranked vs coverage secondary, all not-ranked reasons, and —
-// uniquely — a cross-day evidence range the live dataset does not produce.
-
 const MODEL_LABELS = [
   'DeepSeek V4 Pro 1.6T',
   'Kimi K2.5/2.6/2.7-Code 1T',
@@ -14,20 +6,22 @@ const MODEL_LABELS = [
   'Qwen3.5 397B',
 ];
 
-/** The page must never scroll sideways: the whole comparison has to fit. */
+const PLATFORM_HEADERS = [
+  'Model',
+  'B200',
+  'MI355X',
+  'B300',
+  'GB200 NVL72',
+  'GB300 NVL72',
+  'Details',
+];
+
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
     expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
   });
 }
 
-/**
- * A narrow document is not enough: a table parked in an `overflow-x` region
- * keeps the document narrow while still scrolling sideways, so nothing inside
- * the surface may be wider than its own box either. `sr-only` clips (1px) and
- * non-replaced inline boxes are exempt — CSSOM reports a spurious `scrollWidth`
- * for inline boxes in Firefox, and `overflow` cannot apply to them anyway.
- */
 function expectNoHorizontalScroller(testId: string) {
   cy.get(`[data-testid="${testId}"]`).then(([surface]) => {
     const scrollers = [surface, ...surface.querySelectorAll('*')]
@@ -46,112 +40,275 @@ function desktopModel(model: string) {
   return cy.get(`[data-testid="overview-desktop-model"][data-model="${model}"]`);
 }
 
+function mobileModel(model: string) {
+  return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]`);
+}
+
+function pair(pairId: string) {
+  return cy.get(`[data-testid="overview-pair"][data-pair="${pairId}"]`);
+}
+
 describe('Overview page', () => {
-  it('summarizes every active model without interactive widgets', () => {
-    cy.viewport(1280, 800);
+  it('renders the full platform matrix for every active model', () => {
+    cy.viewport(1280, 900);
     cy.visit('/overview');
 
     cy.contains('h1', 'AI Inference Overview').should('exist');
-    cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
-    cy.get('[data-testid="overview-desktop-matrix"] h2').should('have.length', MODEL_LABELS.length);
+    cy.contains(
+      'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
+    ).should('exist');
+    cy.contains('Best validated stack per platform').should('exist');
+    cy.contains('Database snapshot through Jul 18').should('exist');
+    cy.get('[data-testid="overview-desktop-matrix"]')
+      .should('be.visible')
+      .within(() => {
+        cy.get('thead th').then(($headers) => {
+          expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
+            PLATFORM_HEADERS,
+          );
+        });
+        cy.get('[data-testid="overview-desktop-model"]').should('have.length', MODEL_LABELS.length);
+        cy.get('[data-testid="overview-baseline"]').should('have.length', MODEL_LABELS.length);
+        cy.get('[data-testid="overview-pair"]').should('have.length', MODEL_LABELS.length * 4);
+        cy.get('details, summary, button').should('not.exist');
+        cy.contains(/PRIMARY|Ranked results/).should('not.exist');
+      });
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    // Database-wide freshness line + the methodology footnote's once-per-page note.
-    cy.contains('Database snapshot through Jul 18').should('exist');
-    cy.contains(
-      'The default precision maximizes comparable hardware coverage. Not ranked does not mean slower.',
-    ).should('exist');
-    // A one-glance summary, not an interactive widget.
-    cy.get('[data-testid="overview-desktop-matrix"]').within(() => {
-      cy.get('details, summary, button').should('not.exist');
+  });
+
+  it('shows per-cell best reads with precision badges, dates, links, and matched deltas', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+      cy.get('[data-testid="overview-baseline"][data-hardware="b200"]')
+        .should('contain.text', '900')
+        .and('contain.text', 'FP8');
+      pair('mi355x-vs-b200').within(() => {
+        cy.contains('SGLang · FP8').should('exist');
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]')
+          .should('contain.text', '760')
+          .find('a')
+          .should('have.attr', 'title', 'MI355X · SGLang · FP8 · MTP');
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"] a')
+          .should('have.attr', 'href')
+          .and('include', 'g_model=Qwen-3.5-397B-A17B')
+          .and('include', 'i_prec=fp8')
+          .and('include', 'i_gpus=mi355x_sglang_mtp');
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').should(
+          'have.text',
+          'Jul 18',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '−16% vs B200');
+        cy.contains('At 100, MI355X leads').should('exist');
+      });
+    });
+
+    desktopModel('DeepSeek-V4-Pro').within(() => {
+      cy.get('[data-testid="overview-baseline"][data-hardware="b200"]')
+        .should('contain.text', '900')
+        .and('contain.text', 'FP4');
+      pair('b300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
+          'contain.text',
+          '1,122',
+        );
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="b300"]').should(
+          'have.text',
+          'Jun 24–Jul 4',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '+25% vs B200');
+      });
     });
   });
 
-  it('ranks the primary precision, dates each read, and accounts for every hardware', () => {
-    cy.viewport(1280, 800);
+  it('never mixes precisions or releases in a delta and says so instead', () => {
+    cy.viewport(1280, 900);
     cy.visit('/overview');
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      // Primary precision, its leader, and the runner-up's own signed delta (ASCII minus).
-      cy.contains('FP4 · PRIMARY @50').should('exist');
-      cy.contains('B300').should('exist');
-      cy.contains('1,122').should('exist');
-      cy.contains('Leader').should('exist');
-      cy.contains('-20%').should('exist');
-      // FP8 measured one platform → one compact coverage line, not a second table.
-      cy.contains('FP8 coverage: GB200 NVL72 measured; insufficient comparable results.').should(
-        'exist',
-      );
-      // Leader @50 is bracketed by two run days (en-dash range); same-day reads and
-      // the @100 read (its own leader) collapse to a single date.
-      cy.contains('Jun 24–Jul 4').should('exist');
-      cy.contains('Jul 18').should('exist');
-      cy.contains('381').should('exist');
-      cy.contains('Only exact result').should('exist');
-      // Every remaining hardware carries an ∞ chip whose title/aria holds the
-      // reason, both clamp directions included; ∞ never renders with a percent.
-      cy.get('[title="cannot reach @50"]').should('exist').and('contain', '∞');
-      cy.get('[title="no exact @50 result"]').should('exist').and('contain', '∞');
-      cy.get('[title="no 8K/1K data"]').should('exist').and('contain', '∞');
-      cy.get('[title="standard decode only"]').should('exist').and('contain', '∞');
-      // Each ranked value links into its own pre-filtered dashboard view.
-      cy.get('a[href*="i_gpus="]')
-        .first()
-        .should('have.attr', 'href')
-        .and('include', 'g_model=DeepSeek-V4-Pro')
-        .and('include', 'i_gpus=b300_sglang_mtp')
-        .and('include', 'i_spec=mtp');
+      pair('gb200-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="gb200"]')
+          .should('contain.text', '600')
+          .parents('[data-testid="overview-pair"]')
+          .should('contain.text', 'FP8');
+        cy.get('[data-testid="overview-pair-mismatch"]').should(
+          'have.text',
+          'FP8 vs FP4 · no comparable delta',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
+      });
     });
-    // The legend lives once in the page footnotes; ∞ never renders as a percent.
+
+    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+      pair('b300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
+          'contain.text',
+          '1,151',
+        );
+        cy.get('[data-testid="overview-pair-mismatch"]').should(
+          'have.text',
+          'FP4 vs FP8 · no comparable delta',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
+      });
+    });
+  });
+
+  it('distinguishes candidate, baseline, and whole-row missing results without a percent', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    desktopModel('DeepSeek-V4-Pro').within(() => {
+      pair('mi355x-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
+          .should('contain.text', '∞')
+          .and('have.attr', 'title', 'no exact @50 result');
+      });
+      pair('gb300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
+          .should('contain.text', '∞')
+          .and('have.attr', 'title', 'cannot reach @50');
+      });
+    });
+
+    desktopModel('MiniMax-M3').within(() => {
+      cy.get('[data-testid="overview-baseline"] [data-testid="overview-pair-missing"]')
+        .should('contain.text', '∞')
+        .and('have.attr', 'title', 'no 8K/1K data');
+      pair('gb300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]').should(
+          'contain.text',
+          '700',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
+        cy.get('[data-testid="overview-pair-mismatch"]').should('not.exist');
+      });
+    });
+
+    desktopModel('Kimi-K2.5').within(() => {
+      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-pair-value"]').should('not.exist');
+    });
     cy.contains('∞ = no comparable result').should('exist');
     cy.get('body')
       .invoke('text')
       .should('not.match', /∞\s*%/);
   });
 
-  it('opens a ranked secondary only when the other precision adds comparable hardware', () => {
-    cy.viewport(1280, 800);
+  it('re-renders the whole matrix at the service level the URL names, via plain links', () => {
+    cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    // Qwen: FP8 ranks a comparable pair AND adds MI355X, so it renders subordinate rows.
+    cy.get('[data-testid="overview-tier-switcher"]').within(() => {
+      cy.get('[aria-current="page"]').should('have.text', '50');
+      cy.get('a').should('have.length', 3);
+      cy.contains('a', '30').should('have.attr', 'href', '/overview?tier=30');
+      cy.contains('a', '100').should('have.attr', 'href', '/overview?tier=100').click();
+    });
+
+    cy.location('search').should('eq', '?tier=100');
+    cy.contains('Output tok/s/GPU @100 tok/s/user').should('exist');
+    cy.get('[data-testid="overview-tier-switcher"]').within(() => {
+      cy.get('[aria-current="page"]').should('have.text', '100');
+      cy.contains('a', '50').should('have.attr', 'href', '/overview');
+    });
+
     desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      cy.contains('FP4 · PRIMARY @50').should('exist');
-      cy.contains('FP8 @50').should('exist');
-      cy.contains('MI355X').should('exist');
-      cy.contains('760').should('exist');
-      cy.contains('-16%').should('exist');
+      cy.get('[data-testid="overview-baseline"][data-hardware="b200"]')
+        .should('contain.text', '432')
+        .and('contain.text', 'FP8');
+      pair('mi355x-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
+          'contain.text',
+          '635',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '+47% vs B200');
+        cy.contains('At 100, MI355X leads').should('not.exist');
+      });
+      pair('b300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
+          .should('contain.text', '∞')
+          .and('have.attr', 'title', 'cannot reach @100');
+      });
     });
-    // MiniMax: wider exact-@50 FP8 coverage flips the primary precision to FP8;
-    // FP4 falls back to a single-hardware coverage line.
-    desktopModel('MiniMax-M3').within(() => {
-      cy.contains('FP8 · PRIMARY @50').should('exist');
-      cy.contains('FP4 coverage: H200 measured; insufficient comparable results.').should('exist');
+
+    cy.visit('/overview?tier=30');
+    desktopModel('DeepSeek-V4-Pro').within(() => {
+      pair('b300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
+          'contain.text',
+          '1,300',
+        );
+        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
+      });
+      cy.get('[data-testid="overview-baseline"] [data-testid="overview-pair-missing"]')
+        .should('contain.text', '∞')
+        .and('have.attr', 'title', 'no exact @30 result');
     });
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /∞\s*%/);
   });
 
-  it('stacks on a 390px phone with no sideways scroll', () => {
-    cy.viewport(390, 844);
-    cy.visit('/overview');
+  it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
+    for (const width of [390, 320]) {
+      cy.viewport(width, 844);
+      cy.visit('/overview');
 
-    cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
-    cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
-    cy.get('[data-testid="overview-mobile-list"]').within(() => {
-      cy.get('details, summary, button').should('not.exist');
-    });
-    expectNoHorizontalOverflow();
-    expectNoHorizontalScroller('overview-mobile-list');
+      cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
+      cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
+      cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
+      mobileModel('Qwen-3.5-397B-A17B').within(() => {
+        cy.get('[data-testid="overview-pair"]').should('have.length', 4);
+        pair('mi355x-vs-b200').within(() => {
+          cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
+            'contain.text',
+            '760',
+          );
+          cy.get('[data-testid="overview-pair-delta"]').should('have.text', '−16% vs B200');
+        });
+      });
+      expectNoHorizontalOverflow();
+      expectNoHorizontalScroller('overview-mobile-list');
+    }
   });
 
-  it('renders the Chinese sibling with the same hierarchy and the per-GPU unit', () => {
-    cy.viewport(1280, 800);
+  it('renders the Chinese sibling with equivalent matrix copy and semantics', () => {
+    cy.viewport(1280, 900);
     cy.visit('/zh/overview');
 
     cy.contains('h1', 'AI 推理总览').should('exist');
-    cy.contains('输出 tok/s/GPU').should('exist');
-    desktopModel('DeepSeek-V4-Pro').within(() => {
-      cy.contains('FP4 · 主排名 @50').should('exist');
+    cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
+      'exist',
+    );
+    cy.contains('各平台最佳验证配置').should('exist');
+    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+      pair('mi355x-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '相对 B200 −16%');
+        cy.contains('100 档由 MI355X 领先').should('exist');
+      });
+      pair('b300-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-mismatch"]').should(
+          'have.text',
+          'FP4 与 FP8 · 无可比差值',
+        );
+      });
     });
-    cy.contains('默认精度优先覆盖更多可比较硬件。未参与排名不代表性能更低。').should('exist');
+    cy.contains('∞ = 无可比结果').should('exist');
+
+    cy.visit('/zh/overview?tier=100');
+    cy.contains('每 GPU 输出 tok/s @100 tok/s/用户').should('exist');
+    desktopModel('Qwen-3.5-397B-A17B').within(() => {
+      pair('mi355x-vs-b200').within(() => {
+        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '相对 B200 +47%');
+        cy.contains('100 档由 MI355X 领先').should('not.exist');
+      });
+    });
+    cy.get('[data-testid="overview-tier-switcher"]').within(() => {
+      cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
+    });
   });
 });
