@@ -17,6 +17,9 @@ const baseTemplate = {
   precision: 'fp8',
   tp: 8,
   conc: 64,
+  // Deliberately NOT one of the timeline dates: templates carry each config's
+  // first-observation date, which buildFrameData must override per frame.
+  date: '2025-08-15',
 } as unknown as InferenceData;
 
 function makeTimeline(): ReplayTimeline {
@@ -38,7 +41,7 @@ function makeTimeline(): ReplayTimeline {
         configId: 'b',
         hwKey: 'h100',
         precision: 'fp8',
-        template: { ...baseTemplate, hwKey: 'h100' } as InferenceData,
+        template: { ...baseTemplate, hwKey: 'h100', date: '2025-08-20' } as InferenceData,
         // Stays invisible across the first two steps so a true "omits invisible
         // configs" assertion is meaningful — `interpolateAtStep` pops a config
         // in for the *whole* invisible→visible segment, so we need both
@@ -241,6 +244,22 @@ describe('buildFrameData', () => {
       expect(d.tp).toBe(8);
       expect(d.conc).toBe(64);
     }
+  });
+
+  // Regression: ScatterGraph scopes Pareto frontiers and line paths per
+  // point.date, so a frame mixing template (first-observation) dates renders
+  // one hardware series as several same-colored lines with duplicate labels.
+  it('stamps every point with the playhead date, not the template first-observation date', () => {
+    const t = makeTimeline();
+    const atStart = buildFrameData(t, 0);
+    expect(atStart.length).toBeGreaterThan(0);
+    for (const d of atStart) expect(d.date).toBe('2025-09-01');
+
+    const atEnd = buildFrameData(t, 1);
+    // Both configs are visible at the last step and carry distinct template
+    // dates — the frame must still present a single uniform date.
+    expect(atEnd).toHaveLength(2);
+    for (const d of atEnd) expect(d.date).toBe('2025-09-03');
   });
 
   it('returns empty when the timeline has zero configs', () => {
