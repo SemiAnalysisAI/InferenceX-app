@@ -75,7 +75,13 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 /** EN ↔ 中文 switcher; maps the current page to its sibling in the other language. */
-function LanguageToggle({ pathname }: { pathname: string }) {
+function LanguageToggle({
+  pathname,
+  router,
+}: {
+  pathname: string;
+  router: ReturnType<typeof useRouter>;
+}) {
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
   return (
@@ -84,7 +90,11 @@ function LanguageToggle({ pathname }: { pathname: string }) {
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-      onClick={() => track('header_language_toggled', { to: isZh ? 'en' : 'zh' })}
+      onClick={(event) => {
+        track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
+        // The sibling keeps shareable query state (e.g. the overview's ?tier=).
+        navigateInApp(event, router, target + window.location.search);
+      }}
     >
       {isZh ? 'EN' : '中文'}
     </Link>
@@ -191,7 +201,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>
-            <LanguageToggle pathname={pathname} />
+            <LanguageToggle pathname={pathname} router={router} />
             {/* Minecraft-only audio toggles ride alongside GitHub stars below the
                 same `sm` cutoff: in minecraft mode the pixel font widens the bar,
                 and these two extra buttons are what push a 320px header past its
