@@ -135,6 +135,21 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'dsv4pro-fp8' })).toBe('dsv4');
   });
 
+  it('resolves AMD Kimi-K2.7-Code identifiers to the canonical kimik2.7-code key', () => {
+    // AMD AgentX sweeps emit the bare prefix `kimik2.7` (no `-code`) and the
+    // MXFP4 model path `amd/Kimi-K2.7-Code-MXFP4`; both must fold into the
+    // canonical `kimik2.7-code` DB bucket. Regression for GitHub Actions run
+    // 29975243963, whose overlay rendered nothing because every row was skipped
+    // as an unmapped model.
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7-fp4' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ model_prefix: 'kimik2.7' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ model: 'amd/Kimi-K2.7-Code-MXFP4' })).toBe('kimik2.7-code');
+    // Canonical identifiers still resolve to the same bucket.
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7-code' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ model: 'moonshotai/Kimi-K2.7-Code' })).toBe('kimik2.7-code');
+  });
+
   it('falls back to MODEL_TO_KEY when prefix not present', () => {
     expect(resolveModelKey({ model: 'deepseek-ai/DeepSeek-R1' })).toBe('dsr1');
     expect(resolveModelKey({ model: 'nvidia/Llama-3.3-70B-Instruct-FP8' })).toBe('llama70b');

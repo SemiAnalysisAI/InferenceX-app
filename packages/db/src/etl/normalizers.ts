@@ -45,6 +45,10 @@ const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/iu;
 const PREFIX_ALIASES: Record<string, string> = {
   gptoss: 'gptoss120b',
   dsv4pro: 'dsv4',
+  // AMD AgentX sweeps emit the bare prefix `kimik2.7` instead of the canonical
+  // `kimik2.7-code` DB key; alias it so those rows resolve (and precision-suffixed
+  // forms like `kimik2.7-fp4` fold in via PRECISION_SUFFIX stripping too).
+  'kimik2.7': 'kimik2.7-code',
 };
 
 function resolvePrefixToKey(prefix: string): string | null {
@@ -94,6 +98,7 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'moonshotai/Kimi-K2.5': 'kimik2.5',
   'moonshotai/Kimi-K2.6': 'kimik2.6',
   'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
+  'amd/Kimi-K2.7-Code-MXFP4': 'kimik2.7-code',
   // MiniMax-M2.5
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   // MiniMax-M3 (428B, distinct architecture from the M2 series)
