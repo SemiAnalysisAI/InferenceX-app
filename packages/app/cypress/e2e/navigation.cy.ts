@@ -10,6 +10,9 @@ describe('Chart Section Tabs — E2E', () => {
   });
 
   it('updates the URL path when switching tabs', () => {
+    cy.get('[data-testid="tab-trigger-overview"]').click();
+    cy.url().should('include', '/overview');
+
     cy.get('[data-testid="tab-trigger-evaluation"]').click();
     cy.url().should('include', '/evaluation');
 

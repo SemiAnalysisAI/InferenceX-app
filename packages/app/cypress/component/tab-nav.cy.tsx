@@ -48,6 +48,7 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
 
   it('renders bare hrefs when the URL has no unofficialrun param', () => {
     mountTabNav({});
+    cy.get('[data-testid="tab-trigger-overview"]').should('have.attr', 'href', '/overview');
     cy.get('[data-testid="tab-trigger-evaluation"]').should('have.attr', 'href', '/evaluation');
     cy.get('[data-testid="tab-trigger-historical"]').should('have.attr', 'href', '/historical');
     cy.get('[data-testid="tab-trigger-calculator"]').should('have.attr', 'href', '/calculator');
@@ -55,6 +56,11 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
 
   it('appends unofficialruns to every tab href when the URL has the param', () => {
     mountTabNav({ search: '?unofficialruns=12345' });
+    cy.get('[data-testid="tab-trigger-overview"]').should(
+      'have.attr',
+      'href',
+      '/overview?unofficialruns=12345',
+    );
     cy.get('[data-testid="tab-trigger-evaluation"]').should(
       'have.attr',
       'href',

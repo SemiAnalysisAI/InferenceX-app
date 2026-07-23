@@ -3,28 +3,29 @@ import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { OverviewPageContent } from '@/components/overview/overview-page';
-import { enAlternates } from '@/lib/i18n';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import { resolveOverviewTier } from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
 
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Every active model across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload — each platform’s best validated speculative-decode serving result at 50 tok/s/user, with same-precision deltas against B200.';
+  '在固定单轮 8K 输入 / 1K 输出负载下，总览各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现；每格为该平台最佳验证推测解码结果（50 tok/s/user 档位），相对 B200 的差值仅在同精度结果之间计算。';
 
 export const metadata: Metadata = {
-  title: 'AI Inference Overview',
+  title: 'AI 推理总览',
   description: DESCRIPTION,
-  alternates: enAlternates('/overview'),
+  alternates: zhAlternates('/overview'),
   openGraph: {
-    title: `AI Inference Overview | ${SITE_NAME}`,
+    title: `AI 推理总览 | ${SITE_NAME}`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/overview`,
+    url: `${SITE_URL}/zh/overview`,
     type: 'website',
+    locale: ZH_OG_LOCALE,
   },
   twitter: {
     card: 'summary_large_image',
-    title: `AI Inference Overview | ${SITE_NAME}`,
+    title: `AI 推理总览 | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };
@@ -33,14 +34,8 @@ interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function OverviewPage({ searchParams }: Props) {
+export default async function ZhOverviewPage({ searchParams }: Props) {
   const sp = await searchParams;
   const data = await getOverviewPageData(resolveOverviewTier(sp.tier));
-  return (
-    <main className="relative">
-      <div className="container mx-auto px-4 lg:px-8 pb-8">
-        <OverviewPageContent data={data} locale="en" />
-      </div>
-    </main>
-  );
+  return <OverviewPageContent data={data} locale="zh" />;
 }

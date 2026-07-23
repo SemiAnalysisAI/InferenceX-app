@@ -53,6 +53,12 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
+    cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
+    cy.get('[data-testid="tab-trigger-overview"]')
+      .should('have.attr', 'href', '/overview')
+      .and('have.class', 'border-secondary');
+    cy.get('[data-testid="nav-link-dashboard"]').should('have.class', 'text-brand');
+
     cy.contains('h1', 'AI Inference Overview').should('exist');
     cy.contains(
       'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
@@ -265,6 +271,7 @@ describe('Overview page', () => {
       cy.viewport(width, 844);
       cy.visit('/overview');
 
+      cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
       cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
@@ -287,6 +294,9 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/zh/overview');
 
+    cy.get('[data-testid="tab-trigger-overview"]')
+      .should('have.attr', 'href', '/zh/overview')
+      .and('contain.text', '总览');
     cy.contains('h1', 'AI 推理总览').should('exist');
     cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
       'exist',

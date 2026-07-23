@@ -17,6 +17,7 @@ import { GitHubStars } from './GithubStars';
 
 /** Dashboard tab paths that should highlight the "Dashboard" nav link. */
 const DASHBOARD_TABS = [
+  '/overview',
   '/inference',
   '/evaluation',
   '/historical',
