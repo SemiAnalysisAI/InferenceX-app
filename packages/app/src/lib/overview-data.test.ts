@@ -294,6 +294,43 @@ describe('overview headline pairs', () => {
     expect(pair?.highLeaderTransition).toBe('changed_hardware');
   });
 
+  it('claims cannot-reach only when every speculative bucket is unreachable', () => {
+    const unreachable: [number, number][] = [
+      [20, 500],
+      [30, 450],
+      [40, 400],
+      [45, 350],
+    ];
+    const underSwept: [number, number][] = [
+      [60, 900],
+      [70, 800],
+      [80, 700],
+      [90, 600],
+    ];
+    const baseline = frontier([1200, 1000, 800, 600], {
+      hardware: 'b200',
+      precision: Precision.FP4,
+    });
+
+    const mixed = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...baseline,
+      ...frontierAt(unreachable, { hardware: 'mi355x', precision: Precision.FP4 }),
+      ...frontierAt(underSwept, { hardware: 'mi355x', precision: Precision.FP8 }),
+    ]);
+    expect(headlinePairOf(mixed, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
+      'no_exact_at_tier',
+    );
+
+    const allUnreachable = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...baseline,
+      ...frontierAt(unreachable, { hardware: 'mi355x', precision: Precision.FP4 }),
+      ...frontierAt(unreachable, { hardware: 'mi355x', precision: Precision.FP8 }),
+    ]);
+    expect(headlinePairOf(allUnreachable, 'mi355x-vs-b200')?.candidate.missingReason).toBe(
+      'cannot_reach_at_tier',
+    );
+  });
+
   it('distinguishes standard-decode-only and unsupported-precision coverage per member', () => {
     const summary = buildOverviewModelSummary(Model.Qwen3_5, [
       ...frontier([1200, 1000, 800, 600], { hardware: 'b200', precision: Precision.FP4 }),

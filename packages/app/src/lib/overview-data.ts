@@ -318,6 +318,7 @@ function missingReasonForHeadlineMember(
   workloadRows: readonly BenchmarkRow[],
   hardware: string,
   read: OverviewTierRead,
+  bucketReads: readonly OverviewTierRead[],
 ): OverviewMissingReason | null {
   if (isExactTierRead(read)) return null;
   const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
@@ -325,7 +326,12 @@ function missingReasonForHeadlineMember(
   const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
   if (supportedRows.length === 0) return 'int4_bf16_only';
   if (!supportedRows.some((row) => row.spec_method !== 'none')) return 'standard_decode_only';
-  return read.boundary === 'unreachable' ? 'cannot_reach_at_tier' : 'no_exact_at_tier';
+  // `cannot reach` is a claim about the whole platform, so it holds only when
+  // EVERY qualified speculative stack tops out below the tier — one merely
+  // under-swept stack downgrades the gap to a missing exact read.
+  return bucketReads.length > 0 && bucketReads.every((r) => r.boundary === 'unreachable')
+    ? 'cannot_reach_at_tier'
+    : 'no_exact_at_tier';
 }
 
 function headlineLeaderTransition(
@@ -365,20 +371,23 @@ function buildHeadlinePairs(
   // lexical dbModel. One bucket per member keeps point releases from blending
   // within a read.
   const buildMember = (memberHardware: string): OverviewHeadlinePairMember => {
-    const best = buildHeadlinePairBuckets(configsByPrecision, new Set([memberHardware]), tier)
-      .map((memberBucket) => ({
-        bucket: memberBucket,
-        read: nonComparableAsMissing(memberBucket.tierReads.get(memberHardware), tier),
-      }))
-      .toSorted(
-        (a, b) =>
-          Number(isExactTierRead(b.read)) - Number(isExactTierRead(a.read)) ||
-          (b.read.value ?? -1) - (a.read.value ?? -1) ||
-          OVERVIEW_PRECISIONS.indexOf(a.bucket.precision) -
-            OVERVIEW_PRECISIONS.indexOf(b.bucket.precision) ||
-          b.bucket.newestEvidence.localeCompare(a.bucket.newestEvidence) ||
-          a.bucket.dbModel.localeCompare(b.bucket.dbModel),
-      )[0];
+    const candidates = buildHeadlinePairBuckets(
+      configsByPrecision,
+      new Set([memberHardware]),
+      tier,
+    ).map((memberBucket) => ({
+      bucket: memberBucket,
+      read: nonComparableAsMissing(memberBucket.tierReads.get(memberHardware), tier),
+    }));
+    const best = candidates.toSorted(
+      (a, b) =>
+        Number(isExactTierRead(b.read)) - Number(isExactTierRead(a.read)) ||
+        (b.read.value ?? -1) - (a.read.value ?? -1) ||
+        OVERVIEW_PRECISIONS.indexOf(a.bucket.precision) -
+          OVERVIEW_PRECISIONS.indexOf(b.bucket.precision) ||
+        b.bucket.newestEvidence.localeCompare(a.bucket.newestEvidence) ||
+        a.bucket.dbModel.localeCompare(b.bucket.dbModel),
+    )[0];
     const primary = best?.read ?? nullTierRead(tier);
     const high = nonComparableAsMissing(
       best === undefined
@@ -393,7 +402,12 @@ function buildHeadlinePairs(
       dbModel: best?.bucket.dbModel ?? null,
       read: primary,
       highRead: high,
-      missingReason: missingReasonForHeadlineMember(workloadRows, memberHardware, primary),
+      missingReason: missingReasonForHeadlineMember(
+        workloadRows,
+        memberHardware,
+        primary,
+        candidates.map(({ read }) => read),
+      ),
     };
   };
 
