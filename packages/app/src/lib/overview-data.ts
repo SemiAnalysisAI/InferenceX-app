@@ -272,7 +272,6 @@ interface OverviewHeadlinePairBucket {
   dbModel: string;
   configs: OverviewConfigResult[];
   tierReads: Map<string, ConfigTierRead>;
-  exactCount: number;
   newestEvidence: string;
 }
 
@@ -299,7 +298,6 @@ function buildHeadlinePairBuckets(
         dbModel,
         configs,
         tierReads,
-        exactCount: exactReads.length,
         newestEvidence: exactReads.reduce(
           (latest, read) =>
             read.evidenceDate !== null && read.evidenceDate.to > latest
