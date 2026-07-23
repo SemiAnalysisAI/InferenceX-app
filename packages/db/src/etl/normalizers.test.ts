@@ -82,6 +82,11 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('gb300-cw')).toBe('gb300');
   });
 
+  it('strips -lat suffix for RTX PRO 6000 (latency-optimized PCIe SKU)', () => {
+    expect(hwToGpuKey('rtx6000pro-lat')).toBe('rtx6000pro');
+    expect(hwToGpuKey('rtx6000pro')).toBe('rtx6000pro');
+  });
+
   it('strips runner index suffix before other suffixes', () => {
     expect(hwToGpuKey('mi355x-amd_0')).toBe('mi355x');
     expect(hwToGpuKey('mi355x-amd_2')).toBe('mi355x');
