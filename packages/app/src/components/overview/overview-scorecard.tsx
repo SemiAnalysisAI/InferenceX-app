@@ -121,13 +121,12 @@ export function overviewFormatters(locale: OverviewLocale): Formatters {
 /**
  * A result's evidence dates, localized: a single day (`Jul 6` / `7月6日`) when
  * both backing frontier points share a date, else an en-dash range
- * (`Jun 24–Jul 4`). Null when the value has no backing date.
+ * (`Jun 24–Jul 4`). The caller renders nothing when there is no backing date.
  */
 function formatEvidenceDate(
   formatters: Formatters,
-  evidenceDate: { from: string; to: string } | null,
-): string | null {
-  if (evidenceDate === null) return null;
+  evidenceDate: { from: string; to: string },
+): string {
   const from = formatters.shortDate(evidenceDate.from);
   return evidenceDate.from === evidenceDate.to
     ? from
