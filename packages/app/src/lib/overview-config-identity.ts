@@ -1,14 +1,8 @@
 import type { BenchmarkRow } from './api';
 
-/**
- * Exact per-deployment identity for the overview grouping. Every dimension that
- * makes a serving configuration a distinct deployable topology is part of the
- * key — model, hardware, framework, precision, spec method, disagg, multinode,
- * per-role parallelism and worker counts, GPU counts, and offload mode. Rows
- * that differ only in concurrency, date, image, or run URL share one identity.
- *
- * Serialized as a JSON tuple so no field delimiter can collide with a value.
- */
+/** Every dimension that makes a distinct deployable topology; rows differing
+ *  only in concurrency, date, image, or run URL share one identity. A JSON
+ *  tuple so no delimiter can collide with a value. */
 export function overviewConfigIdentityKey(row: BenchmarkRow): string {
   return JSON.stringify([
     row.model,

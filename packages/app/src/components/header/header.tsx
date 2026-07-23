@@ -203,11 +203,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>
             <LanguageToggle pathname={pathname} router={router} />
-            {/* Minecraft-only audio toggles ride alongside GitHub stars below the
-                same `sm` cutoff: in minecraft mode the pixel font widens the bar,
-                and these two extra buttons are what push a 320px header past its
-                bounds. Below `sm` they move into the mobile menu instead (see the
-                MinecraftToggles instance in the hamburger dropdown below). */}
+            {/* Below `sm` these move into the mobile menu — they are what push
+                a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">
               <MinecraftToggles />
             </span>

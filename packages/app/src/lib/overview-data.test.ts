@@ -482,11 +482,8 @@ describe('tier-parameterized overview', () => {
   });
 });
 
-// Drift guard for the synthetic overview e2e fixture: if the assembler contract
-// changes, the hand-built rows in overview-rows.json must be regenerated, and
-// this fails loudly instead of the e2e stranding empty data. Every expectation
-// is derived by running this same assembler over the fixture — never eyeballed —
-// so it locks the exact matrix cell states overview.cy.ts renders against.
+// Drift guard: runs the real assembler over the e2e fixture; expectations are
+// engine-derived, never eyeballed. Contract drift fails here, not in overview.cy.ts.
 describe('assembleOverviewPageData over the overview-rows fixture', () => {
   it('serves every matrix cell state through the real builder', () => {
     const page = assembleOverviewPageData(
@@ -497,10 +494,8 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(page.datasetThroughDate).toBe('2026-07-18');
     expect(page.tier).toBe(50);
 
-    // DeepSeek: FP4 exacts on B200/B300 carry the only same-precision delta with
-    // a cross-day evidence range; GB200's own best is FP8, so its value shows
-    // but the delta is withheld; MI355X and GB300 miss in opposite clamp
-    // directions.
+    // DeepSeek: FP4 delta + cross-day range; GB200's FP8 best withholds its
+    // delta; MI355X and GB300 miss in opposite clamp directions.
     const deepseek = page.models.find((m) => m.model === Model.DeepSeek_V4_Pro)!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
     expect(dsB300.precision).toBe(Precision.FP4);
@@ -519,8 +514,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       'cannot_reach_at_tier',
     );
 
-    // MiniMax: only GB300 has workload rows, so its value stands alone — a
-    // missing baseline never yields a delta OR a mismatch note.
+    // MiniMax: a missing baseline yields neither delta nor mismatch note.
     const minimax = page.models.find((m) => m.model === Model.MiniMax_M3)!;
     const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
     expect(mmGb300.baseline.missingReason).toBe('no_8k1k_data');
@@ -528,8 +522,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(mmGb300.directDeltaPercent).toBeNull();
     expect(mmGb300.deltaUnavailableReason).toBeNull();
 
-    // Qwen: FP8 exacts on both sides yield the −16% delta and a leader flip at
-    // 100, while B300's FP4 best withholds its delta against the FP8 baseline.
+    // Qwen: FP8 delta −16% + leader flip at 100; B300's FP4 best withholds its delta.
     const qwen = page.models.find((m) => m.model === Model.Qwen3_5)!;
     const qwenMi = headlinePairOf(qwen, 'mi355x-vs-b200')!;
     expect(qwenMi.precision).toBe(Precision.FP8);

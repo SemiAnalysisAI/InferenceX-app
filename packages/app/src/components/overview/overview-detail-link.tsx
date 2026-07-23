@@ -6,12 +6,9 @@ import type { ReactNode } from 'react';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
-/**
- * Model-level dashboard link. A plain anchor, not a `<Link>`: the dashboard
- * reads its filters from a snapshot `url-state.ts` takes at module evaluation,
- * so a client-side navigation would land on an unfiltered dashboard while the
- * label promises the model's own view.
- */
+/** A plain anchor, not `<Link>`: the dashboard reads filters from a snapshot
+ *  `url-state.ts` takes at module evaluation, so client-side navigation would
+ *  land unfiltered. */
 export function OverviewDetailLink({
   href,
   model,

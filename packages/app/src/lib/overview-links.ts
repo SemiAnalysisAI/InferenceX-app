@@ -1,10 +1,3 @@
-/**
- * @file overview-links.ts
- * @description Evidence links for the overview scorecard: a pre-filtered
- * /inference view and the CI run a configuration came from. Pure and
- * React-free so the server-rendered overview page can build them.
- */
-
 import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_PRIMARY_TIER,

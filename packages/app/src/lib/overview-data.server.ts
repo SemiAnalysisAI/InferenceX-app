@@ -15,9 +15,8 @@ import { loadFixture } from '@/lib/test-fixtures';
 export async function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
 ): Promise<OverviewPageData> {
-  // E2E fixtures mode serves a small synthetic rows-by-display-model fixture
-  // through the same assembler the live path uses, so a contract drift breaks
-  // the fixture tests instead of silently stranding the page's data.
+  // Synthetic rows go through the same assembler as the live path, so a
+  // contract drift breaks the fixture tests instead of stranding the page.
   if (FIXTURES_MODE) {
     return assembleOverviewPageData(
       loadFixture<Record<string, BenchmarkRow[]>>('overview-rows'),
@@ -25,8 +24,6 @@ export async function getOverviewPageData(
     );
   }
 
-  // Fetch rows per db model, concatenated per display model (one display model
-  // can span several db buckets), then hand the same shape to the assembler.
   const entries = await Promise.all(
     [...DEFAULT_MODELS].map(async (model) => {
       const keys = DISPLAY_MODEL_TO_DB[model] ?? [];

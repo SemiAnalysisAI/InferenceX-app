@@ -10,12 +10,9 @@ import { computeTcoFeed, type TcoTierBoundary } from './tco-feed';
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
 export const OVERVIEW_TIERS = [30, 50, 75, 100] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
-/** Default service point; ?tier= re-renders the matrix at any OVERVIEW_TIERS value. */
 export const OVERVIEW_PRIMARY_TIER = 50;
-/** High-interactivity capability read; also drives the high-tier leader transition. */
 export const OVERVIEW_HIGH_TIER = 100;
 
-/** The `?tier=` query value as a displayable tier; anything else falls back to 50. */
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
   const candidate = Number(Array.isArray(raw) ? raw[0] : raw);
   return OVERVIEW_TIERS.find((tier) => tier === candidate) ?? OVERVIEW_PRIMARY_TIER;
@@ -25,22 +22,13 @@ export interface OverviewTierValue {
   tier: number;
   value: number | null;
   boundary: TcoTierBoundary;
-  /**
-   * Run dates of the frontier point(s) backing this value — the two bracketing
-   * points when interpolated (from = earlier, to = later; equal on the same
-   * day), the single point twice when clamped, null when `value` is null. Comes
-   * only from this config's own frontier at this tier, never a sibling or cohort.
-   */
+  /** Bracketing frontier points when interpolated, the single point twice when
+   *  clamped; always from this config's own frontier, never a sibling's. */
   evidenceDate: { from: string; to: string } | null;
 }
 
-/**
- * One real deployable serving configuration, identified by its exact
- * deployment topology (model × hardware × framework × precision × spec_method ×
- * disagg × multinode × per-role parallelism × GPU counts × offload). Tier
- * values come from this configuration's own Pareto frontier only — never
- * blended across configurations.
- */
+/** One deployable serving configuration (exact topology identity); tier values
+ *  come from its own Pareto frontier only, never blended across configs. */
 export interface OverviewConfigResult {
   key: string;
   dbModel: string;
@@ -57,28 +45,17 @@ export interface OverviewConfigResult {
   latestDate: string;
 }
 
-/** One hardware's frontier read at a single tier, with its backing config. */
 export interface OverviewTierRead {
   tier: number;
   value: number | null;
   boundary: TcoTierBoundary | null;
-  /** Copied from the backing config's tier value; null when there is no read. */
   evidenceDate: { from: string; to: string } | null;
   config: OverviewConfigResult | null;
 }
 
-/**
- * Why a pair member shows `∞` instead of a value, from most to least
- * fundamental gap:
- *
- *  - `no_8k1k_data` — no 8K/1K single-turn row for this hardware at all;
- *  - `int4_bf16_only` — measured only outside FP4/FP8;
- *  - `standard_decode_only` — FP4/FP8 measured, but standard decode only;
- *  - `cannot_reach_at_tier` — speculative frontier tops out below the
- *    displayed tier;
- *  - `no_exact_at_tier` — no exact read at the displayed tier for any other
- *    reason (an under-swept frontier that starts above the tier).
- */
+/** Why a member shows `∞`. The subtle pair: `cannot_reach_at_tier` = every
+ *  speculative stack tops out below the tier; `no_exact_at_tier` = merely
+ *  under-swept. */
 export type OverviewMissingReason =
   | 'standard_decode_only'
   | 'int4_bf16_only'
@@ -98,18 +75,10 @@ export type OverviewHeadlinePairId = (typeof OVERVIEW_HEADLINE_PAIR_DEFINITIONS)
 export interface OverviewHeadlinePairMember {
   hardware: string;
   hardwareLabel: string;
-  /**
-   * The precision of this platform's own best qualified speculative read at
-   * the displayed tier, selected independently per platform (exact first, then
-   * value, tie → FP4). Null when the platform has no FP4/FP8 speculative
-   * bucket at all.
-   */
   precision: string | null;
-  /** The dbModel (point release) backing this platform's selected read. */
   dbModel: string | null;
-  /** Exact read when available; non-exact reads retain their boundary but never a numeric value. */
   read: OverviewTierRead;
-  /** Best @100 read from this platform's own selected dbModel and precision. */
+  /** @100 read from the same selected bucket as `read`. */
   highRead: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
 }
@@ -117,19 +86,13 @@ export interface OverviewHeadlinePairMember {
 export interface OverviewHeadlinePairComparison {
   id: OverviewHeadlinePairId;
   label: string;
-  /** The precision shared by both displayed reads when the delta is comparable; null otherwise. */
   precision: string | null;
-  /** The dbModel shared by both displayed reads when the delta is comparable; null otherwise. */
   dbModel: string | null;
   candidate: OverviewHeadlinePairMember;
   baseline: OverviewHeadlinePairMember;
-  /**
-   * Candidate relative to B200. Non-null only when both displayed-tier reads
-   * are exact, share one precision AND one dbModel, and B200 > 0 — a delta
-   * never mixes FP4 with FP8 or two point releases.
-   */
+  /** Non-null only for exact reads sharing precision AND dbModel — never FP4
+   *  vs FP8 or cross-release. */
   directDeltaPercent: number | null;
-  /** Why two displayed exact reads still carry no delta; null when a delta exists or a side is missing. */
   deltaUnavailableReason: 'precision_mismatch' | 'version_mismatch' | null;
   highLeaderTransition: 'same_hardware' | 'changed_hardware' | null;
 }
@@ -137,21 +100,18 @@ export interface OverviewHeadlinePairComparison {
 export interface OverviewModelSummary {
   model: Model;
   modelLabel: string;
-  /** Fixed candidate-vs-B200 serving-stack comparisons, one per matrix column. */
   headlinePairs: OverviewHeadlinePairComparison[];
 }
 
 export interface OverviewPageData {
   models: OverviewModelSummary[];
   datasetThroughDate: string | null;
-  /** The service point every headline pair was read at. */
   tier: OverviewTier;
 }
 
-/** Precisions the overview may rank, in preference order. */
+/** In preference order — FP4 wins ties. */
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
 
-/** Rows measuring the fixed overview workload, before any other filter. */
 function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
   return rows.filter(
     (row) =>
@@ -161,11 +121,8 @@ function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
   );
 }
 
-/**
- * Newest raw workload row across the page. Deliberately not derived from the
- * retained winners: a precision or engine the page never ranks still dates the
- * dataset it was measured in.
- */
+/** Deliberately from raw rows, not retained winners: an unranked precision or
+ *  engine still dates the dataset it was measured in. */
 export function overviewDatasetThroughDate(rows: readonly BenchmarkRow[]): string | null {
   return overviewWorkloadRows(rows).reduce<string | null>(
     (latest, row) => (latest === null || row.date > latest ? row.date : latest),
@@ -173,11 +130,7 @@ export function overviewDatasetThroughDate(rows: readonly BenchmarkRow[]): strin
   );
 }
 
-/**
- * Speculative configs for one precision, grouped by exact deployment identity.
- * Standard-decode rows never enter the pool, so a precision is ranked on its
- * speculative frontier alone.
- */
+/** Speculative-only configs for one precision, grouped by exact deployment identity. */
 function buildPrecisionConfigs(
   model: Model,
   workloadRows: readonly BenchmarkRow[],
@@ -211,16 +164,12 @@ function readConfigAtTier(config: OverviewConfigResult, tier: number): OverviewT
   };
 }
 
-/** A tier read known to be backed by a configuration. */
 interface ConfigTierRead extends OverviewTierRead {
   config: OverviewConfigResult;
 }
 
-/**
- * A tier read counts only when it lands inside the configuration's own measured
- * frontier. A clamped or unreachable read is a coverage gap, so it can never
- * lead a tier or anchor a percentage gap.
- */
+/** In-range reads only: a clamped/unreachable read is a coverage gap and never
+ *  leads a tier or anchors a delta. */
 const isExactTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
   read.value !== null && read.boundary === 'interpolated';
 
@@ -232,11 +181,8 @@ function compareTierReads(a: ConfigTierRead, b: ConfigTierRead): number {
   );
 }
 
-/**
- * One read per hardware at `tier`: its best exact in-range read, or — only when
- * the hardware has no exact read at all — its best out-of-range read, kept so
- * the hardware still surfaces as a coverage gap rather than disappearing.
- */
+/** Best exact read per hardware; a hardware with no exact read keeps its best
+ *  out-of-range read so it surfaces as a gap instead of disappearing. */
 function readsByHardwareAtTier(
   configs: readonly OverviewConfigResult[],
   tier: number,
@@ -360,16 +306,14 @@ function buildHeadlinePairs(
   workloadRows: readonly BenchmarkRow[],
   tier: OverviewTier,
 ): OverviewHeadlinePairComparison[] {
-  // FP4 and FP8 configs are built independently and never blend within a read.
   const configsByPrecision = new Map(
     OVERVIEW_PRECISIONS.map(
       (precision) => [precision, buildPrecisionConfigs(model, workloadRows, precision)] as const,
     ),
   );
-  // Each platform selects its own best qualified bucket (dbModel × precision):
-  // exact at the displayed tier first, then value, tie → FP4, newest evidence,
-  // lexical dbModel. One bucket per member keeps point releases from blending
-  // within a read.
+  // Per-platform best bucket (dbModel × precision): exact first, then value,
+  // tie → FP4, newest evidence, lexical dbModel — one bucket per member so
+  // point releases never blend within a read.
   const buildMember = (memberHardware: string): OverviewHeadlinePairMember => {
     const candidates = buildHeadlinePairBuckets(
       configsByPrecision,
@@ -440,8 +384,6 @@ function buildHeadlinePairs(
             : 'version_mismatch'
           : 'precision_mismatch'
         : null,
-      // On the 100 view the displayed reads ARE the high reads, so a
-      // transition line would restate the cell values.
       highLeaderTransition:
         comparable && tier !== OVERVIEW_HIGH_TIER
           ? headlineLeaderTransition(
@@ -509,13 +451,8 @@ export function buildOverviewModelSummary(
   };
 }
 
-/**
- * Assemble the whole page from rows already grouped by DISPLAY model. Iterating
- * DEFAULT_MODELS fixes the output order and renders every active model — a model
- * with no rows still gets its four pairs, every member carrying a missing
- * reason. The live server path and the e2e fixture path feed this same
- * function; only the row source differs.
- */
+/** DEFAULT_MODELS fixes the row order; a rowless model still renders four
+ *  pairs with missing reasons. Live and fixture paths both feed this. */
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,

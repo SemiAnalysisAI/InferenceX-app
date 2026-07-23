@@ -1,20 +1,3 @@
-/**
- * @file overview-scorecard.tsx
- * @description The comparison surface itself: a portfolio matrix of every
- * active model (rows) across today's key serving platforms (columns — B200 as
- * the reference, then MI355X, B300, GB200 NVL72, GB300 NVL72). The desktop
- * table at `xl` and the mobile cards below `xl` render every cell through the
- * SAME `BaselineCell`/`CandidateCell` components, so the two surfaces cannot
- * drift semantically.
- *
- * Each cell shows that platform's own best validated speculative read at the
- * displayed tier (50 tok/s/user by default; `?tier=` picks another) with its
- * precision badge, evidence date and filtered-dashboard link. The signed
- * delta against B200 appears only when both displayed reads share a precision
- * and a release — mismatches say so instead of comparing FP4 with FP8. A side
- * with no exact read shows `∞` with its reason, never a number or percent.
- */
-
 import {
   OVERVIEW_HIGH_TIER,
   OVERVIEW_TIERS,
@@ -118,11 +101,6 @@ export function overviewFormatters(locale: OverviewLocale): Formatters {
   };
 }
 
-/**
- * A result's evidence dates, localized: a single day (`Jul 6` / `7月6日`) when
- * both backing frontier points share a date, else an en-dash range
- * (`Jun 24–Jul 4`). The caller renders nothing when there is no backing date.
- */
 function formatEvidenceDate(
   formatters: Formatters,
   evidenceDate: { from: string; to: string },
@@ -133,24 +111,18 @@ function formatEvidenceDate(
     : `${from}–${formatters.shortDate(evidenceDate.to)}`;
 }
 
-/** The reason copy for a missing side, keyed to the displayed tier. */
 function missingReasonCopy(member: OverviewHeadlinePairMember, strings: OverviewStrings): string {
   const reason = member.missingReason;
   return reason === null ? '' : strings.missingReasons(member.read.tier)[reason];
 }
 
-/** `candidate/B200 − 1` as a rounded percent with a U+2212 or `+` sign. */
 function signedPercent(formatters: Formatters, percent: number): string {
   const rounded = Math.round(percent);
   const sign = rounded < 0 ? '−' : '+';
   return `${sign}${formatters.number.format(Math.abs(rounded))}%`;
 }
 
-/**
- * The @100 line, rendered only when the @100 leader is a different hardware
- * than the displayed tier's leader — the leader being the side with the
- * greater exact @100 read. Null on the 100 view itself (data layer).
- */
+/** Rendered only when the @100 leader flips; the data layer nulls it on the 100 view. */
 function highLeadLine(
   pair: OverviewHeadlinePairComparison,
   strings: OverviewStrings,
@@ -167,7 +139,6 @@ function highLeadLine(
 const PAIR_VALUE_LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
-/** A side with no exact read at the displayed tier: `∞` plus its reason, no link/date/percent. */
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
     <span
@@ -182,11 +153,6 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
   );
 }
 
-/**
- * One platform's read: its exact displayed-tier value linked to the platform's
- * own filtered dashboard, with a precision badge and the evidence date — or
- * `∞` with the reason it has no exact read.
- */
 function CellValue({
   locale,
   model,
@@ -204,8 +170,7 @@ function CellValue({
   if (member.missingReason !== null || value === null) {
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
-  // The full deployment stack behind this read; the framework and precision
-  // stay visible, the spec method rides the link title and aria only.
+  // Framework and precision stay visible; the spec method rides the title/aria only.
   const stack =
     config === null
       ? null
@@ -250,7 +215,6 @@ function CellValue({
   );
 }
 
-/** The B200 reference cell: the read alone, no delta against itself. */
 function BaselineCell(props: {
   locale: OverviewLocale;
   model: OverviewModelSummary;
@@ -265,11 +229,6 @@ function BaselineCell(props: {
   );
 }
 
-/**
- * One candidate platform's cell: its own read, then the same-precision delta
- * against B200, a mismatch note when both sides exist but cannot compare, and
- * the @100 leader line only when the leader flips.
- */
 function CandidateCell({
   locale,
   model,
@@ -316,7 +275,6 @@ function CandidateCell({
   );
 }
 
-/** The model's display name, shared by both surfaces. */
 function ModelName({ model }: { model: OverviewModelSummary }) {
   return <h2 className="text-sm font-semibold leading-snug">{model.modelLabel}</h2>;
 }
@@ -328,7 +286,6 @@ interface SurfaceProps {
   strings: OverviewStrings;
 }
 
-/** Model column, the B200 reference, one column per candidate platform, details. */
 export function DesktopOverviewMatrix({ models, locale, formatters, strings }: SurfaceProps) {
   const headlinePairs = models[0]?.headlinePairs ?? [];
   const baselineHeader = headlinePairs[0]?.baseline.hardwareLabel ?? null;
@@ -417,7 +374,6 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
   );
 }
 
-/** Below `xl`: the same cells stacked as one card per model, always fully visible. */
 export function MobileOverviewList({ models, locale, formatters, strings }: SurfaceProps) {
   return (
     <ul data-testid="overview-mobile-list" className="divide-y divide-border/50 xl:hidden">
@@ -474,11 +430,8 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
   );
 }
 
-/**
- * The service-level selector: one plain link per tier, so every view is a
- * server-rendered, copyable URL — no client state. The displayed tier is
- * inert text marked `aria-current`, never a self-link.
- */
+/** Plain links so every view is a copyable server-rendered URL; the displayed
+ *  tier is inert `aria-current` text, never a self-link. */
 export function OverviewTierSwitcher({
   tier,
   locale,

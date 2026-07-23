@@ -5,10 +5,8 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 
-// Component specs mount outside the Next app shell, so the global stylesheet is
-// never injected. The layout assertions below need real Tailwind output, and
-// next-style-loader inserts before this anchor node, so both must exist before
-// the stylesheet module evaluates.
+// Mounted outside the Next app shell; next-style-loader inserts the global
+// stylesheet before this anchor, so it must exist before the import below.
 const cssAnchor = document.createElement('noscript');
 cssAnchor.id = '__next_css__DO_NOT_USE__';
 document.head.append(cssAnchor);
