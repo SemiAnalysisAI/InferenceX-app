@@ -85,15 +85,23 @@ function LanguageToggle({
 }) {
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
+  // The href carries the query too, so modified clicks and copied links keep
+  // shareable state (e.g. the overview's ?tier=) — same sync as TabNav's.
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const sync = () => setSearch(window.location.search);
+    sync();
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, [pathname]);
   return (
     <Link
-      href={target}
+      href={target + search}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className="inline-flex items-center min-h-11 px-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
       onClick={(event) => {
         track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
-        // The sibling keeps shareable query state (e.g. the overview's ?tier=).
         navigateInApp(event, router, target + window.location.search);
       }}
     >

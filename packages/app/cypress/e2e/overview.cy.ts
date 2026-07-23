@@ -260,7 +260,9 @@ describe('Overview page', () => {
 
     cy.visit('/overview?tier=100');
     cy.contains('Output tok/s/GPU @100 tok/s/user').should('exist');
-    cy.get('[data-testid="language-toggle"]').click();
+    cy.get('[data-testid="language-toggle"]')
+      .should('have.attr', 'href', '/zh/overview?tier=100')
+      .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
     cy.contains('每 GPU 输出 tok/s @100 tok/s/用户').should('exist');
