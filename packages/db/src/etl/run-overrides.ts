@@ -50,8 +50,10 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   29089300938, // 2026-07-10 | Reason: reverting due to rule to disallow any patching
   29425167775, // 2026-07-15 | Reason: reverting per rule that recipes PRs must merge before the InferenceX PR; also used the wrong draft model
   29427827757, // 2026-07-15 | Reason: sweep-reuse recovery of the run above (PR #2158) — reverted for the same reason
+  29651998085, // 2026-07-18 | Reason: accidental ingest while testing (e2e Test dsv4-fp4-mi355x-sglang-agentic-mtp, branch amd/agentx_dsv4_sgl_mtp_0717)
   29654139122, // 2026-07-18 | Reason: accidental ingest while testing
   29660737166, // 2026-07-18 | Reason: accidental ingest while testing
+  29819261957, // 2026-07-21 | Reason: accidental ingest while testing (e2e Test dsv4-fp4-mi355x-sglang-disagg-agentic-hicache, branch amd/agentx-v1.0-th-hicon)
   29912027293, // 2026-07-22 | Reason: accidental ingest while testing
 ]);
 
