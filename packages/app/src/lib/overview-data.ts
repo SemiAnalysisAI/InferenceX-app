@@ -78,7 +78,7 @@ export interface OverviewHeadlinePairMember {
   precision: string | null;
   dbModel: string | null;
   read: OverviewTierRead;
-  /** @100 read from the same selected bucket as `read`. */
+  /** The 100 view's own re-selected read, so the leader line can never disagree with ?tier=100. */
   highRead: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
 }
@@ -286,11 +286,17 @@ function headlineLeaderTransition(
   candidateHigh: OverviewTierRead,
   baselineHigh: OverviewTierRead,
 ): OverviewHeadlinePairComparison['highLeaderTransition'] {
+  // A cross-precision or cross-release @100 pair carries no leader claim,
+  // mirroring the delta rule.
   if (
     !isExactTierRead(candidatePrimary) ||
     !isExactTierRead(baselinePrimary) ||
     !isExactTierRead(candidateHigh) ||
     !isExactTierRead(baselineHigh) ||
+    candidateHigh.config === null ||
+    baselineHigh.config === null ||
+    candidateHigh.config.precision !== baselineHigh.config.precision ||
+    candidateHigh.config.dbModel !== baselineHigh.config.dbModel ||
     candidatePrimary.value === baselinePrimary.value ||
     candidateHigh.value === baselineHigh.value
   ) {
@@ -314,14 +320,14 @@ function buildHeadlinePairs(
   // Per-platform best bucket (dbModel × precision): exact first, then value,
   // tie → FP4, newest evidence, lexical dbModel — one bucket per member so
   // point releases never blend within a read.
-  const buildMember = (memberHardware: string): OverviewHeadlinePairMember => {
+  const selectRead = (memberHardware: string, atTier: OverviewTier) => {
     const candidates = buildHeadlinePairBuckets(
       configsByPrecision,
       new Set([memberHardware]),
-      tier,
+      atTier,
     ).map((memberBucket) => ({
       bucket: memberBucket,
-      read: nonComparableAsMissing(memberBucket.tierReads.get(memberHardware), tier),
+      read: nonComparableAsMissing(memberBucket.tierReads.get(memberHardware), atTier),
     }));
     const best = candidates.toSorted(
       (a, b) =>
@@ -332,25 +338,29 @@ function buildHeadlinePairs(
         b.bucket.newestEvidence.localeCompare(a.bucket.newestEvidence) ||
         a.bucket.dbModel.localeCompare(b.bucket.dbModel),
     )[0];
-    const primary = best?.read ?? nullTierRead(tier);
-    const high = nonComparableAsMissing(
-      best === undefined
-        ? undefined
-        : readsByHardwareAtTier(best.bucket.configs, OVERVIEW_HIGH_TIER).get(memberHardware),
-      OVERVIEW_HIGH_TIER,
-    );
+    return {
+      reads: candidates.map(({ read }) => read),
+      bucket: best?.bucket ?? null,
+      read: best?.read ?? nullTierRead(atTier),
+    };
+  };
+
+  const buildMember = (memberHardware: string): OverviewHeadlinePairMember => {
+    const primary = selectRead(memberHardware, tier);
+    const high =
+      tier === OVERVIEW_HIGH_TIER ? primary : selectRead(memberHardware, OVERVIEW_HIGH_TIER);
     return {
       hardware: memberHardware,
       hardwareLabel: getHardwareConfig(memberHardware, model).label,
-      precision: best?.bucket.precision ?? null,
-      dbModel: best?.bucket.dbModel ?? null,
-      read: primary,
-      highRead: high,
+      precision: primary.bucket?.precision ?? null,
+      dbModel: primary.bucket?.dbModel ?? null,
+      read: primary.read,
+      highRead: high.read,
       missingReason: missingReasonForHeadlineMember(
         workloadRows,
         memberHardware,
-        primary,
-        candidates.map(({ read }) => read),
+        primary.read,
+        primary.reads,
       ),
     };
   };

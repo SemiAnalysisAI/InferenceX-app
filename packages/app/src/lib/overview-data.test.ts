@@ -294,6 +294,21 @@ describe('overview headline pairs', () => {
     expect(pair?.highLeaderTransition).toBe('changed_hardware');
   });
 
+  it('suppresses the leader line when another precision wins the 100 view', () => {
+    // Both sides are FP8-comparable @50, but the candidate's FP4 stack wins
+    // @100 — the 100 view re-selects FP4 vs FP8 and refuses to compare.
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, [
+      ...frontier([1100, 900, 700, 500], { hardware: 'mi355x', precision: Precision.FP8 }),
+      ...frontier([1000, 800, 750, 700], { hardware: 'mi355x', precision: Precision.FP4 }),
+      ...frontier([1050, 850, 720, 600], { hardware: 'b200', precision: Precision.FP8 }),
+    ]);
+
+    const pair = headlinePairOf(summary, 'mi355x-vs-b200');
+    expect(pair?.directDeltaPercent).toBeCloseTo((900 / 850 - 1) * 100);
+    expect(pair?.candidate.highRead.config?.precision).toBe(Precision.FP4);
+    expect(pair?.highLeaderTransition).toBeNull();
+  });
+
   it('claims cannot-reach only when every speculative bucket is unreachable', () => {
     const unreachable: [number, number][] = [
       [20, 500],
