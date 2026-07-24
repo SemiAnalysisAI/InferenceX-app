@@ -51,7 +51,7 @@ interface RawRow {
   global_tokens: number;
   token_rate_at_latency_percentile: CollectiveXPercentiles;
   components: Record<string, RawComponent | null>;
-  byte_provenance: Record<string, { activation_data_bytes: number }>;
+  byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
 }
 
 interface RawShard {
@@ -125,8 +125,14 @@ function toMode(raw: string | undefined): CollectiveXMode {
   return raw === 'low-latency' ? 'low-latency' : 'normal';
 }
 
-function ratesFrom(bytes: number, latency: CollectiveXPercentiles): CollectiveXPercentiles {
-  const rate = (us: number) => (bytes / us) * 1e-3;
+// GB/s = bytes / (latency_us * 1e-6) / 1e9 = (bytes / latency_us) * 1e-3. `divisor`
+// splits an aggregate world byte count into a per-GPU figure (divisor = ep_size).
+function ratesFrom(
+  bytes: number,
+  latency: CollectiveXPercentiles,
+  divisor = 1,
+): CollectiveXPercentiles {
+  const rate = (us: number) => (bytes / divisor / us) * 1e-3;
   return {
     p50: rate(latency.p50),
     p90: rate(latency.p90),
@@ -137,19 +143,29 @@ function ratesFrom(bytes: number, latency: CollectiveXPercentiles): CollectiveXP
 
 function mapComponent(
   raw: RawComponent | null | undefined,
-  bytes?: { activation_data_bytes: number },
+  bytes: { activation_data_bytes: number; total_logical_bytes?: number } | undefined,
+  ep: number,
 ): CollectiveXComponent | null {
   if (!raw?.percentiles_us || raw.availability === 'unavailable') return null;
+  // Byte counts are aggregate across the EP world (routed_copies = fanout.sum()).
+  // Activation rate stays aggregate (unchanged); payload rate is per-GPU over the
+  // full logical payload, falling back to activation bytes for pre-provenance
+  // artifacts that carry no total_logical_bytes.
+  const payloadBytes = bytes ? (bytes.total_logical_bytes ?? bytes.activation_data_bytes) : null;
   return {
     latency_us: raw.percentiles_us,
     activation_data_rate_gbps_at_latency_percentile: bytes
       ? ratesFrom(bytes.activation_data_bytes, raw.percentiles_us)
       : null,
+    payload_data_rate_gbps_at_latency_percentile:
+      payloadBytes === null ? null : ratesFrom(payloadBytes, raw.percentiles_us, Math.max(1, ep)),
+    payload_bytes: payloadBytes,
   };
 }
 
-function mapPoint(row: RawRow): CollectiveXPoint {
-  const component = (name: string) => mapComponent(row.components[name], row.byte_provenance[name]);
+function mapPoint(row: RawRow, ep: number): CollectiveXPoint {
+  const component = (name: string) =>
+    mapComponent(row.components[name], row.byte_provenance[name], ep);
   return {
     tokens_per_rank: row.tokens_per_rank,
     global_tokens: row.global_tokens,
@@ -188,7 +204,7 @@ function buildSeries(shard: RawShard): CollectiveXSeries {
       sku: shard.identity.case_factors.sku,
       vendor: shard.runtime.vendor === 'amd' ? 'amd' : 'nvidia',
     },
-    points: shard.measurement.rows.map(mapPoint),
+    points: shard.measurement.rows.map((row) => mapPoint(row, kase.ep)),
   };
 }
 

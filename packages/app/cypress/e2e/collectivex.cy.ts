@@ -90,6 +90,24 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
+  it('renders an nccl-ep backend series end to end', () => {
+    const ncclEp = buildDataset({
+      shards: [makeRawShard({ backend: 'nccl-ep', implName: 'nccl-ep' })],
+    });
+    installLatest(ncclEp);
+    cy.reload();
+    cy.wait('@latest');
+    cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'nccl-ep');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+  });
+
+  it('switches the y-axis to per-GPU payload bandwidth', () => {
+    cy.get('[data-testid="collectivex-y-axis-select"]').click();
+    cy.contains('[role="option"]', 'Payload bandwidth').click();
+    cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'Payload bandwidth');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+  });
+
   it('exposes the kernel-mode toggle when a run measured both modes and pins the LL series', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' })],

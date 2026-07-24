@@ -38,6 +38,21 @@ export type CollectiveXPercentiles = Record<CollectiveXPercentile, number>;
 export interface CollectiveXComponent {
   latency_us: CollectiveXPercentiles;
   activation_data_rate_gbps_at_latency_percentile: CollectiveXPercentiles | null;
+  /**
+   * Per-GPU bandwidth over the FULL logical payload (activation bytes plus any
+   * FP8 scale bytes), i.e. `total_logical_bytes / ep_size / latency`. Distinct
+   * from `activation_data_rate_gbps_at_latency_percentile`, which is aggregate
+   * and excludes scale bytes. Null when the component carries no byte
+   * provenance (e.g. an unavailable component).
+   */
+  payload_data_rate_gbps_at_latency_percentile: CollectiveXPercentiles | null;
+  /**
+   * Aggregate total logical payload bytes for this component at this point
+   * (the numerator behind `payload_data_rate_*`). Carried raw so a consumer can
+   * fit latency vs bytes across the ladder (bandwidth-vs-overhead decomposition)
+   * without reconstructing bytes from a rate. Null when no byte provenance.
+   */
+  payload_bytes: number | null;
 }
 
 export interface CollectiveXPoint {

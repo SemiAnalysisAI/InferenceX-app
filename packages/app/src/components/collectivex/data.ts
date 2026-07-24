@@ -69,7 +69,71 @@ export function metricValue(
       ? point.roundtrip_token_rate_at_latency_percentile[percentile]
       : null;
   }
+  if (yAxis === 'payload-rate') {
+    return component.payload_data_rate_gbps_at_latency_percentile?.[percentile] ?? null;
+  }
   return component.activation_data_rate_gbps_at_latency_percentile?.[percentile] ?? null;
+}
+
+export interface CollectiveXFit {
+  /** Fixed per-call overhead (µs): the launch/sync/rendezvous floor. */
+  alphaUs: number;
+  /** Per-GPU bandwidth term (GB/s): the slope of latency vs bytes. */
+  betaGbps: number;
+  /** Points that entered the fit. */
+  pointCount: number;
+}
+
+/** Ordinary least squares; returns [intercept, slope]. */
+function ols(xs: number[], ys: number[]): [number, number] {
+  const n = xs.length;
+  const meanX = xs.reduce((a, b) => a + b, 0) / n;
+  const meanY = ys.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (xs[i] - meanX) ** 2;
+    sxy += (xs[i] - meanX) * (ys[i] - meanY);
+  }
+  const slope = sxy / sxx;
+  return [meanY - slope * meanX, slope];
+}
+
+/**
+ * Separate the bandwidth term (β) from the fixed overhead (α) for one operation
+ * across a series' token ladder: latency(bytes) ≈ α + bytes/β. Regresses the
+ * per-point latency against the per-GPU payload bytes (raw `payload_bytes` ÷
+ * ep_size), so β lands in the same per-GPU GB/s units as the payload-rate axis
+ * and α is the fixed overhead in µs. p50 by default (p99 carries tail noise).
+ * Mirrors experimental/CollectiveX/bandwidth.py. Returns null when fewer than
+ * three points, a degenerate (near-zero-variance) byte axis — e.g. a constant
+ * payload across the ladder — or a non-positive slope leaves no bandwidth term.
+ */
+export function fitAlphaBeta(
+  series: CollectiveXSeries,
+  operation: CollectiveXOperation,
+  percentile: CollectiveXPercentile = 'p50',
+): CollectiveXFit | null {
+  const ep = Math.max(1, series.system.ep_size);
+  const bytesPerGpu: number[] = [];
+  const latencies: number[] = [];
+  for (const point of series.points) {
+    const component = point.components[operation];
+    if (component === null || component.payload_bytes === null) continue;
+    const latency = component.latency_us[percentile];
+    if (latency <= 0) continue;
+    bytesPerGpu.push(component.payload_bytes / ep);
+    latencies.push(latency);
+  }
+  if (bytesPerGpu.length < 3) return null;
+  // Reject a near-constant byte axis (constant payload across the ladder): a
+  // relative spread this small carries no real slope, only numeric noise.
+  const min = Math.min(...bytesPerGpu);
+  const max = Math.max(...bytesPerGpu);
+  if (max - min <= 1e-9 * max) return null;
+  const [alphaUs, slopeUsPerByte] = ols(bytesPerGpu, latencies);
+  if (slopeUsPerByte <= 0) return null;
+  return { alphaUs, betaGbps: 1e-3 / slopeUsPerByte, pointCount: bytesPerGpu.length };
 }
 
 export function chartPoints(

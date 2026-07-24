@@ -158,6 +158,28 @@ describe('CollectiveX artifact assembly', () => {
     });
   });
 
+  it('maps an nccl-ep backend series (the 4th pluggable backend)', () => {
+    const series = makeCollectiveXSeries({ backend: 'nccl-ep', implName: 'nccl-ep' });
+    expect(series.backend).toBe('nccl-ep');
+    expect(series.series_id).toContain('nccl-ep');
+    expect(series.points).toHaveLength(10);
+  });
+
+  it('derives a per-GPU payload bandwidth from total_logical_bytes', () => {
+    const dispatch = makeCollectiveXSeries().points[0].components.dispatch;
+    // total_logical_bytes (400000000) / ep (8) / p50 latency (417 µs) → GB/s.
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
+      (400000000 / 8 / 417) * 1e-3,
+      3,
+    );
+    // Distinct from the aggregate activation rate (activation bytes, no ep split):
+    // the payload rate reads total_logical_bytes and divides by the EP world size.
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).not.toBeCloseTo(
+      dispatch?.activation_data_rate_gbps_at_latency_percentile?.p50 ?? 0,
+      1,
+    );
+  });
+
   it('does not invent rates for zero-byte or unavailable components', () => {
     const zeroStage = makeCollectiveXSeries({ rows: [{ stageZeroBytes: true }] }).points[0]
       .components.stage;

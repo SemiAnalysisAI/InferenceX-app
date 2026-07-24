@@ -14,7 +14,7 @@ export * from '@semianalysisai/inferencex-db/collectivex/types';
 
 export const collectiveXVersionLabel = (version: CollectiveXVersion): string => `V${version}`;
 
-export type CollectiveXYAxis = 'latency' | 'tokens-per-second' | 'activation-rate';
+export type CollectiveXYAxis = 'latency' | 'tokens-per-second' | 'activation-rate' | 'payload-rate';
 
 export interface CollectiveXChartPoint {
   seriesId: string;

@@ -77,6 +77,7 @@ const STRINGS = {
     yAxis: {
       latency: 'Latency',
       'tokens-per-second': 'Token rate at selected latency percentile',
+      'payload-rate': 'Payload bandwidth at selected latency percentile (per GPU)',
     },
     all: 'All',
     loading: 'Resolving CollectiveX run...',
@@ -115,6 +116,8 @@ const STRINGS = {
     resetFilter: 'Reset filter',
     payloadNote:
       'Payload rate is derived at the selected latency percentile and is not physical link bandwidth.',
+    payloadBandwidthNote:
+      'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per GPU — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-GPU bandwidth term, α = fixed overhead).',
     deleteRun: 'Delete run',
     deleteConfirm: (id: string) =>
       `Delete run #${id} from the dashboard database? This cannot be undone.`,
@@ -146,6 +149,7 @@ const STRINGS = {
     yAxis: {
       latency: '延迟',
       'tokens-per-second': '所选延迟分位点的 token 速率',
+      'payload-rate': '所选延迟分位点的载荷带宽（每 GPU）',
     },
     mode: { normal: '常规', 'low-latency': '低延迟' },
     fabricScope: { all: '全部', 'scale-up': '域内', 'scale-out': '跨域' },
@@ -241,6 +245,8 @@ const STRINGS = {
     missingComponents: '不可用的测量分项保持为空，并从图表中省略。',
     isolatedNote: '分项之和为派生值，不用于计算吞吐量。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
+    payloadBandwidthNote:
+      '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每 GPU），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 为延迟对字节在整个梯度上的最小二乘拟合（β = 每 GPU 带宽项，α = 固定开销）。',
     provenance: '发布数据溯源',
     runLabel: 'Run',
     attemptLabel: 'Attempt',
@@ -734,6 +740,9 @@ export default function CollectiveXDisplay() {
         {yAxis === 'activation-rate' && (
           <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
         )}
+        {yAxis === 'payload-rate' && (
+          <p className="mt-2 text-xs text-muted-foreground">{t.payloadBandwidthNote}</p>
+        )}
       </Card>
       <Card className="py-4 md:py-5">
         <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
@@ -902,6 +911,10 @@ export default function CollectiveXDisplay() {
               {
                 value: 'activation-rate',
                 label: 'Activation-data rate at latency percentile',
+              },
+              {
+                value: 'payload-rate',
+                label: t.yAxis['payload-rate'],
               },
             ]}
           />

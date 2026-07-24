@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 
-import { chartPoints, collectiveXColorKey } from './data';
+import { chartPoints, collectiveXColorKey, fitAlphaBeta } from './data';
 import type {
   CollectiveXChartPoint,
   CollectiveXOperation,
@@ -37,6 +37,7 @@ const Y_AXIS_LABELS: Record<CollectiveXYAxis, string> = {
   latency: 'Latency (µs)',
   'tokens-per-second': 'Token rate at selected latency percentile (tokens/s)',
   'activation-rate': 'Activation-data rate at selected latency percentile (GB/s)',
+  'payload-rate': 'Payload bandwidth at selected latency percentile (GB/s, per GPU)',
 };
 
 function paddedDomain(values: number[]): [number, number] {
@@ -97,6 +98,13 @@ export function CollectiveXChart({
     [series, operation, percentile, yAxis],
   );
   const seriesById = useMemo(() => new Map(series.map((item) => [item.series_id, item])), [series]);
+  // Per-series α/β fit for the current operation (p50). β is the per-GPU
+  // bandwidth term, α the fixed overhead; surfaced in the tooltip. Null when a
+  // series has too few points / a degenerate byte axis to fit.
+  const fitsBySeries = useMemo(
+    () => new Map(series.map((item) => [item.series_id, fitAlphaBeta(item, operation)])),
+    [series, operation],
+  );
   const lines = useMemo(() => {
     const result: Record<string, { x: number; y: number }[]> = {};
     for (const point of points) {
@@ -194,6 +202,10 @@ export function CollectiveXChart({
           const color = colors[point.colorKey] ?? '#888';
           const measurement = point.point;
           const measuredRoundtrip = measurement.components.roundtrip;
+          const fit = fitsBySeries.get(point.seriesId);
+          const fitLine = fit
+            ? `<div class="mt-1 text-muted-foreground">Fit β=${fit.betaGbps.toFixed(fit.betaGbps >= 100 ? 0 : 1)} GB/s · α=${fit.alphaUs.toFixed(1)} µs (p50, per GPU)</div>`
+            : '';
           return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
             ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
@@ -204,6 +216,7 @@ export function CollectiveXChart({
             <div class="text-muted-foreground">Stage: ${formatPercentiles(measurement.components.stage)}</div>
             <div class="text-muted-foreground">Combine: ${formatPercentiles(measurement.components.combine)}</div>
             <div class="text-muted-foreground">Round trip: ${formatPercentiles(measuredRoundtrip)}${measuredRoundtrip ? ' (measured)' : ''}</div>
+            ${fitLine}
           </div>`;
         },
         getRulerX: (point, scale) =>

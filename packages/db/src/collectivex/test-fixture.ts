@@ -50,8 +50,12 @@ function component(base: number): Json {
   return { availability: 'measured', percentiles_us: percentiles(base) };
 }
 
-function bytes(activation: number): Json {
-  return { activation_data_bytes: activation };
+// `total` defaults to the activation count (the bf16 case, where there are no
+// scale bytes). Dispatch under FP8 carries extra scale bytes, so its total
+// exceeds activation — the fixture models that so tests can prove the payload
+// rate reads total_logical_bytes rather than activation_data_bytes.
+function bytes(activation: number, total: number = activation): Json {
+  return { activation_data_bytes: activation, total_logical_bytes: total };
 }
 
 function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
@@ -64,10 +68,12 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
       ? { availability: 'unavailable', percentiles_us: null }
       : component(120 + index),
   };
+  // Dispatch total exceeds activation (models FP8 scale bytes); combine is
+  // always bf16 (total == activation); roundtrip total is their sum.
   const byteProvenance: Json = {
-    dispatch: bytes(384763904),
+    dispatch: bytes(384763904, 400000000),
     combine: bytes(384763904),
-    roundtrip: bytes(769527808),
+    roundtrip: bytes(769527808, 784763904),
   };
   if (!row.stageUnavailable) {
     byteProvenance.stage = bytes(row.stageZeroBytes ? 0 : 192381952);
