@@ -56,6 +56,9 @@ export const dynamic = 'force-dynamic';
  *               `scores`: one row per hardware — tier-weighted, workload-
  *               blended, output-equivalent tok/s/GPU (the single number a
  *               TCO sheet consumes per chip).
+ *               JSON point rows include `is_interpolated` to distinguish
+ *               estimates between frontier knots from observed in-range
+ *               knots. The CSV column contract remains unchanged.
  *
  * `scores`-only params (400 with `view=points`):
  * - weights          — per-tier traffic-mix weights, comma-separated,
@@ -79,7 +82,7 @@ const getCachedTcoFeed = cachedQuery(
     const rows = await getLatestBenchmarks(getDb(), dbModelKeys, date);
     return computeTcoFeed(rows, workloads, tiers);
   },
-  'tco-feed',
+  'tco-feed-v2',
 );
 
 /** Resolve a `model` param that may be a DB key or a display name. */

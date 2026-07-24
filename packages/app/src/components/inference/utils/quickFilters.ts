@@ -7,6 +7,7 @@ import type {
   QuickFilters,
   SpecMode,
 } from '@/components/inference/types';
+import { frameworkFamily } from '@/lib/framework-family';
 
 export type { AvailableQuickFilters, DisaggMode, QuickFilters, SpecMode };
 
@@ -45,21 +46,6 @@ export const FRAMEWORK_FAMILIES = [
 ] as const;
 
 const FRAMEWORK_FAMILY_ORDER = FRAMEWORK_FAMILIES.map((f) => f.key);
-
-/**
- * Map a raw framework string (e.g. `dynamo-trt`, `mori-sglang`, `mooncake-atom`)
- * to its engine family, or undefined when it matches no known family.
- */
-export function frameworkFamily(framework: string | undefined): string | undefined {
-  if (!framework) return undefined;
-  const f = framework.toLowerCase();
-  // The family substrings are mutually exclusive, so order is irrelevant.
-  if (f.includes('vllm')) return 'vllm';
-  if (f.includes('sglang')) return 'sglang';
-  if (f.includes('trt')) return 'trt';
-  if (f.includes('atom')) return 'atom';
-  return undefined;
-}
 
 /**
  * Compute, in a single pass, which quick-filter values actually have data in a

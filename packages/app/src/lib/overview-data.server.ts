@@ -7,6 +7,7 @@ import { DEFAULT_MODELS } from '@/lib/data-mappings';
 import {
   assembleOverviewPageData,
   OVERVIEW_PRIMARY_TIER,
+  type OverviewEngineScope,
   type OverviewPageData,
   type OverviewTier,
 } from '@/lib/overview-data';
@@ -14,6 +15,7 @@ import { loadFixture } from '@/lib/test-fixtures';
 
 export async function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'all',
 ): Promise<OverviewPageData> {
   // Synthetic rows go through the same assembler as the live path, so a
   // contract drift breaks the fixture tests instead of stranding the page.
@@ -21,6 +23,7 @@ export async function getOverviewPageData(
     return assembleOverviewPageData(
       loadFixture<Record<string, BenchmarkRow[]>>('overview-rows'),
       tier,
+      engineScope,
     );
   }
 
@@ -32,5 +35,5 @@ export async function getOverviewPageData(
     }),
   );
 
-  return assembleOverviewPageData(Object.fromEntries(entries), tier);
+  return assembleOverviewPageData(Object.fromEntries(entries), tier, engineScope);
 }

@@ -6,15 +6,7 @@ const MODEL_LABELS = [
   'Qwen3.5 397B',
 ];
 
-const PLATFORM_HEADERS = [
-  'Model',
-  'B200',
-  'MI355X',
-  'B300',
-  'GB200 NVL72',
-  'GB300 NVL72',
-  'Details',
-];
+const PLATFORM_HEADERS = ['Model', 'B200', 'MI355X', 'B300', 'GB200', 'GB300', 'Details'];
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -44,11 +36,126 @@ function mobileModel(model: string) {
   return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]`);
 }
 
-function pair(pairId: string) {
-  return cy.get(`[data-testid="overview-pair"][data-pair="${pairId}"]`);
+function platform(hardware: string) {
+  return cy.get(`[data-testid="overview-platform"][data-hardware="${hardware}"]`);
+}
+
+function textRect(element: Element) {
+  const view = element.ownerDocument.defaultView;
+  if (view === null) throw new Error('Element has no window');
+  const walker = element.ownerDocument.createTreeWalker(element, view.NodeFilter.SHOW_TEXT);
+  const text = walker.nextNode();
+  if (text === null) throw new Error('Element has no text node');
+  const range = element.ownerDocument.createRange();
+  range.selectNodeContents(text);
+  return range.getBoundingClientRect();
 }
 
 describe('Overview page', () => {
+  it('switches engine scope with canonical links while preserving tier and locale', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .should('have.attr', 'aria-label', 'Engine scope')
+      .within(() => {
+        cy.get('[data-overview-engine-scope="all"]')
+          .should('have.attr', 'aria-current', 'true')
+          .and('match', 'span')
+          .and('have.text', 'All Platforms')
+          .and('not.have.attr', 'href');
+        cy.get('[data-overview-engine-scope="community"]')
+          .should('have.attr', 'href', '/overview?engine=community')
+          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)');
+      });
+
+    desktopModel('GLM-5.2')
+      .find('[data-testid="overview-model-coverage-note"]')
+      .should('have.text', 'No GLM‑5.2 single-turn 8K/1K benchmark yet');
+    cy.get(
+      '[data-testid="overview-engine-scope-switcher"] [data-overview-engine-scope="community"]',
+    ).click();
+    cy.location('search').should('eq', '?engine=community');
+    desktopModel('GLM-5.2')
+      .find(
+        '[data-testid="overview-platform"][data-hardware="b300"] [data-testid="overview-pair-missing"]',
+      )
+      .should('contain.text', '∞');
+    cy.get('[data-testid="overview-tier-switcher"]')
+      .contains('a', '100')
+      .should('have.attr', 'href', '/overview?tier=100&engine=community')
+      .click();
+    cy.location('search').should('eq', '?tier=100&engine=community');
+
+    cy.get('[data-testid="overview-engine-scope-switcher"]')
+      .find('[data-overview-engine-scope="all"]')
+      .should('have.attr', 'href', '/overview?tier=100');
+    cy.get('[data-testid="language-toggle"]')
+      .should('have.attr', 'href', '/zh/overview?tier=100&engine=community')
+      .click();
+    cy.location('pathname').should('eq', '/zh/overview');
+    cy.location('search').should('eq', '?tier=100&engine=community');
+    cy.get('[data-testid="overview-engine-scope-switcher"]').within(() => {
+      cy.get('[data-overview-engine-scope="community"]')
+        .should('have.attr', 'aria-current', 'true')
+        .and('match', 'span')
+        .and('have.text', '开源社区引擎（vLLM/SGLang）')
+        .and('not.have.attr', 'href');
+      cy.get('[data-overview-engine-scope="all"]').should('have.text', '所有平台');
+    });
+  });
+
+  it('shows standard-decode and FP8 labels without inline comparison deltas', () => {
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
+
+    desktopModel('Kimi-K2.5').within(() => {
+      platform('b200')
+        .should('contain.text', '800')
+        .and('contain.text', 'SGLang · FP4 · Standard decode');
+      platform('mi355x').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]')
+          .should('have.text', '1,000')
+          .and('not.contain.text', '≈')
+          .and('not.have.attr', 'title');
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"] a').should('not.exist');
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]')
+          .find('a')
+          .should('have.attr', 'href')
+          .and('include', 'i_spec=stp')
+          .and('include', 'i_metric=y_outputTputPerGpu');
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]')
+          .find('a')
+          .should('have.attr', 'aria-label')
+          .and('include', 'Open raw source dashboard');
+        cy.contains('SGLang · FP4 · Standard decode').should('exist');
+      });
+      platform('b300').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
+          'contain.text',
+          '900',
+        );
+        cy.contains('SGLang · FP8 · Standard decode').should('exist');
+      });
+      cy.get('a[title*="NONE"], a[aria-label*="NONE"]').should('not.exist');
+    });
+
+    desktopModel('DeepSeek-V4-Pro').within(() => {
+      platform('gb300').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]')
+          .should('have.attr', 'title', 'Estimated from validated benchmark runs.')
+          .and('not.have.attr', 'aria-label');
+        cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]')
+          .find('.sr-only')
+          .should('have.text', 'Approximately 922. Estimated from validated benchmark runs.');
+        cy.get(
+          '[data-testid="overview-pair-value"][data-hardware="gb300"] [data-testid="overview-estimate-visible"]',
+        ).should('have.text', '≈922');
+        cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
+      });
+    });
+  });
+
   it('renders the full platform matrix for every active model', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -63,7 +170,26 @@ describe('Overview page', () => {
     cy.contains(
       'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     ).should('exist');
-    cy.contains('Best validated stack per platform').should('exist');
+    cy.contains(
+      'Prioritizes speculative decode and FP4; otherwise uses the best available platform envelope',
+    ).should('exist');
+    cy.contains(
+      "Best observed platform serving envelopes for every active model across today's key platforms",
+    ).should('exist');
+    cy.contains('Output tok/s per deployed GPU @50 tok/s/user').should('exist');
+    cy.contains(
+      'Disaggregated results include both prefill and decode GPUs in the denominator.',
+    ).should('exist');
+    cy.contains(
+      'Tier values use the best observed platform serving envelope; ≈ marks estimates between validated runs. No extrapolation.',
+    ).should('exist');
+    cy.get('[data-testid="overview-pair-topology"]').should('not.exist');
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /fallback/i);
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /At 100, .+ leads/);
     cy.contains('Database snapshot through Jul 18').should('exist');
     cy.get('[data-testid="overview-desktop-matrix"]')
       .should('be.visible')
@@ -74,8 +200,7 @@ describe('Overview page', () => {
           );
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MODEL_LABELS.length);
-        cy.get('[data-testid="overview-baseline"]').should('have.length', MODEL_LABELS.length);
-        cy.get('[data-testid="overview-pair"]').should('have.length', MODEL_LABELS.length * 4);
+        cy.get('[data-testid="overview-platform"]').should('have.length', MODEL_LABELS.length * 5);
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');
       });
@@ -84,21 +209,24 @@ describe('Overview page', () => {
     }
   });
 
-  it('shows per-cell best reads with precision badges, dates, links, and matched deltas', () => {
+  it('shows per-cell best reads with precision badges, dates, and evidence links', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      cy.get('[data-testid="overview-baseline"][data-hardware="b200"]')
-        .should('contain.text', '900')
-        .and('contain.text', 'FP8');
-      pair('mi355x-vs-b200').within(() => {
+      platform('b200').should('contain.text', '734').and('contain.text', 'FP4');
+      platform('mi355x').within(() => {
         cy.contains('SGLang · FP8').should('exist');
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]')
           .should('contain.text', '760')
           .find('a')
-          .should('have.attr', 'title', 'MI355X · SGLang · FP8 · MTP');
-        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"] a')
+          .should('not.exist');
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"] a')
+          .should(
+            'have.attr',
+            'title',
+            'Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
+          )
           .should('have.attr', 'href')
           .and('include', 'g_model=Qwen-3.5-397B-A17B')
           .and('include', 'i_prec=fp8')
@@ -107,97 +235,54 @@ describe('Overview page', () => {
           'have.text',
           'Jul 18',
         );
-        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '−16% vs B200');
-        cy.contains('At 100, MI355X leads').should('exist');
       });
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      cy.get('[data-testid="overview-baseline"][data-hardware="b200"]')
-        .should('contain.text', '900')
-        .and('contain.text', 'FP4');
-      pair('b300-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
-          'contain.text',
-          '1,122',
-        );
-        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="b300"]').should(
+      platform('b200').should('contain.text', '900').and('contain.text', 'FP4');
+      platform('gb300').within(() => {
+        cy.get(
+          '[data-testid="overview-pair-value"][data-hardware="gb300"] [data-testid="overview-estimate-visible"]',
+        ).should('have.text', '≈922');
+        cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="gb300"]').should(
           'have.text',
-          'Jun 24–Jul 4',
+          'Jul 18',
         );
-        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '+25% vs B200');
       });
     });
   });
 
-  it('never mixes precisions or releases in a delta and says so instead', () => {
+  it('distinguishes per-platform and whole-row missing results without a percent', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      pair('gb200-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="gb200"]')
-          .should('contain.text', '600')
-          .parents('[data-testid="overview-pair"]')
-          .should('contain.text', 'FP8');
-        cy.get('[data-testid="overview-pair-mismatch"]').should(
-          'have.text',
-          'FP8 vs FP4 · no comparable delta',
-        );
-        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
-      });
-    });
-
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      pair('b300-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
-          'contain.text',
-          '1,151',
-        );
-        cy.get('[data-testid="overview-pair-mismatch"]').should(
-          'have.text',
-          'FP4 vs FP8 · no comparable delta',
-        );
-        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
-      });
-    });
-  });
-
-  it('distinguishes candidate, baseline, and whole-row missing results without a percent', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-
-    desktopModel('DeepSeek-V4-Pro').within(() => {
-      pair('mi355x-vs-b200').within(() => {
+      platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="mi355x"]')
           .should('contain.text', '∞')
           .and('have.attr', 'title', 'no exact @50 result');
       });
-      pair('gb300-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
-          .should('contain.text', '∞')
-          .and('have.attr', 'title', 'cannot reach @50');
-      });
+      platform('gb300')
+        .find('[data-testid="overview-estimate-visible"]')
+        .should('have.text', '≈922');
     });
 
     desktopModel('MiniMax-M3').within(() => {
-      cy.get('[data-testid="overview-baseline"] [data-testid="overview-pair-missing"]')
+      platform('b200')
+        .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '∞')
         .and('have.attr', 'title', 'no 8K/1K data');
-      pair('gb300-vs-b200').within(() => {
+      platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="gb300"]').should(
           'contain.text',
           '700',
         );
-        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
-        cy.get('[data-testid="overview-pair-mismatch"]').should('not.exist');
       });
     });
 
-    desktopModel('Kimi-K2.5').within(() => {
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
-      cy.get('[data-testid="overview-pair-value"]').should('not.exist');
-    });
+    desktopModel('GLM-5.2')
+      .find('[data-testid="overview-model-coverage-note"]')
+      .should('have.text', 'No GLM‑5.2 single-turn 8K/1K benchmark yet');
     cy.contains('∞ = no comparable result').should('exist');
     cy.get('body')
       .invoke('text')
@@ -216,25 +301,21 @@ describe('Overview page', () => {
     });
 
     cy.location('search').should('eq', '?tier=100');
-    cy.contains('Output tok/s/GPU @100 tok/s/user').should('exist');
+    cy.contains('Output tok/s per deployed GPU @100 tok/s/user').should('exist');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[aria-current="page"]').should('have.text', '100');
       cy.contains('a', '50').should('have.attr', 'href', '/overview');
     });
 
     desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      cy.get('[data-testid="overview-baseline"][data-hardware="b200"]')
-        .should('contain.text', '432')
-        .and('contain.text', 'FP8');
-      pair('mi355x-vs-b200').within(() => {
+      platform('b200').should('contain.text', '432').and('contain.text', 'FP8');
+      platform('mi355x').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
           'contain.text',
           '635',
         );
-        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '+47% vs B200');
-        cy.contains('At 100, MI355X leads').should('not.exist');
       });
-      pair('b300-vs-b200').within(() => {
+      platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
           .should('contain.text', '∞')
           .and('have.attr', 'title', 'cannot reach @100');
@@ -243,14 +324,13 @@ describe('Overview page', () => {
 
     cy.visit('/overview?tier=30');
     desktopModel('DeepSeek-V4-Pro').within(() => {
-      pair('b300-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
-          'contain.text',
-          '1,300',
-        );
-        cy.get('[data-testid="overview-pair-delta"]').should('not.exist');
+      platform('b300').within(() => {
+        cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
+          .should('contain.text', '∞')
+          .and('have.attr', 'title', 'no exact @30 result');
       });
-      cy.get('[data-testid="overview-baseline"] [data-testid="overview-pair-missing"]')
+      platform('b200')
+        .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '∞')
         .and('have.attr', 'title', 'no exact @30 result');
     });
@@ -259,13 +339,13 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
 
     cy.visit('/overview?tier=100');
-    cy.contains('Output tok/s/GPU @100 tok/s/user').should('exist');
+    cy.contains('Output tok/s per deployed GPU @100 tok/s/user').should('exist');
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?tier=100')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
-    cy.contains('每 GPU 输出 tok/s @100 tok/s/用户').should('exist');
+    cy.contains('每张已部署 GPU 的输出 tok/s @100 tok/s/用户').should('exist');
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
@@ -276,20 +356,60 @@ describe('Overview page', () => {
       cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
       cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
+      cy.get('[data-testid="overview-engine-scope-switcher"]')
+        .should('be.visible')
+        .find('[data-overview-engine-scope]')
+        .each(($option) => {
+          expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
+        });
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.be.visible');
       mobileModel('Qwen-3.5-397B-A17B').within(() => {
-        cy.get('[data-testid="overview-pair"]').should('have.length', 4);
-        pair('mi355x-vs-b200').within(() => {
+        cy.get('[data-testid="overview-platform"]').should('have.length', 5);
+        platform('mi355x').within(() => {
           cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').should(
             'contain.text',
             '760',
           );
-          cy.get('[data-testid="overview-pair-delta"]').should('have.text', '−16% vs B200');
         });
       });
+      mobileModel('DeepSeek-V4-Pro')
+        .find(
+          '[data-testid="overview-pair-value"][data-hardware="gb300"] [data-testid="overview-estimate-visible"]',
+        )
+        .should('have.text', '≈922');
       expectNoHorizontalOverflow();
       expectNoHorizontalScroller('overview-mobile-list');
+      expectNoHorizontalScroller('overview-engine-scope-switcher');
     }
+  });
+
+  it('keeps the value and evidence date aligned above configuration metadata', () => {
+    cy.viewport(390, 844);
+    cy.visit('/overview');
+
+    mobileModel('Kimi-K2.5').within(() => {
+      platform('mi355x').within(() => {
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
+          cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').then(
+            ([date]) => {
+              const valueRect = textRect(value);
+              const dateRect = textRect(date);
+
+              expect(dateRect.bottom).to.be.closeTo(valueRect.bottom, 1);
+            },
+          );
+        });
+
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
+          cy.contains('span', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
+            const valueRect = textRect(value);
+            const metadataRect = textRect(metadata);
+
+            expect(metadataRect.top).to.be.at.least(valueRect.bottom);
+          });
+        });
+      });
+    });
   });
 
   it('renders the Chinese sibling with equivalent matrix copy and semantics', () => {
@@ -303,29 +423,40 @@ describe('Overview page', () => {
     cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
       'exist',
     );
-    cy.contains('各平台最佳验证配置').should('exist');
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      pair('mi355x-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '相对 B200 −16%');
-        cy.contains('100 档由 MI355X 领先').should('exist');
-      });
-      pair('b300-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-mismatch"]').should(
-          'have.text',
-          'FP4 与 FP8 · 无可比差值',
-        );
-      });
+    cy.contains('优先采用推测解码与 FP4；否则采用最佳可用平台服务包络线').should('exist');
+    cy.contains('各活跃模型在当前关键平台上的最佳观测平台服务包络线').should('exist');
+    cy.contains('每张已部署 GPU 的输出 tok/s @50 tok/s/用户').should('exist');
+    cy.contains('分离式结果的分母同时计入预填充与解码 GPU。').should('exist');
+    cy.contains(
+      '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
+    ).should('exist');
+    desktopModel('DeepSeek-V4-Pro')
+      .find('[data-testid="overview-pair-value"][data-hardware="gb300"]')
+      .as('estimatedGb300')
+      .should('have.attr', 'title', '根据已验证的基准运行结果估算。')
+      .and('not.have.attr', 'aria-label');
+    cy.get('@estimatedGb300')
+      .find('[data-testid="overview-estimate-visible"]')
+      .should('have.text', '≈922')
+      .siblings('.sr-only')
+      .should('have.text', '约 922。根据已验证的基准运行结果估算。');
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /回退/);
+    cy.get('body')
+      .invoke('text')
+      .should('not.match', /100 档由.+领先/);
+    desktopModel('Kimi-K2.5').within(() => {
+      platform('mi355x').should('contain.text', 'SGLang · FP4 · 标准解码');
+      platform('b300').should('contain.text', 'SGLang · FP8 · 标准解码');
     });
+    desktopModel('GLM-5.2')
+      .find('[data-testid="overview-model-coverage-note"]')
+      .should('have.text', '暂无 GLM‑5.2 单轮 8K/1K 基准结果');
     cy.contains('∞ = 无可比结果').should('exist');
 
     cy.visit('/zh/overview?tier=100');
-    cy.contains('每 GPU 输出 tok/s @100 tok/s/用户').should('exist');
-    desktopModel('Qwen-3.5-397B-A17B').within(() => {
-      pair('mi355x-vs-b200').within(() => {
-        cy.get('[data-testid="overview-pair-delta"]').should('have.text', '相对 B200 +47%');
-        cy.contains('100 档由 MI355X 领先').should('not.exist');
-      });
-    });
+    cy.contains('每张已部署 GPU 的输出 tok/s @100 tok/s/用户').should('exist');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
     });

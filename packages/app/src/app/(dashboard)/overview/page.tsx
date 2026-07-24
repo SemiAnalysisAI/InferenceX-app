@@ -4,13 +4,13 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { OverviewPageContent } from '@/components/overview/overview-page';
 import { enAlternates } from '@/lib/i18n';
-import { resolveOverviewTier } from '@/lib/overview-data';
+import { resolveOverviewEngineScope, resolveOverviewTier } from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
 
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Every active model across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload — each platform’s best validated speculative-decode serving result at 50 tok/s/user, with same-precision deltas against B200.';
+  'Best observed platform serving envelopes across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload, prioritizing speculative decode and FP4.';
 
 export const metadata: Metadata = {
   title: 'AI Inference Overview',
@@ -35,6 +35,9 @@ interface Props {
 
 export default async function OverviewPage({ searchParams }: Props) {
   const sp = await searchParams;
-  const data = await getOverviewPageData(resolveOverviewTier(sp.tier));
+  const data = await getOverviewPageData(
+    resolveOverviewTier(sp.tier),
+    resolveOverviewEngineScope(sp.engine),
+  );
   return <OverviewPageContent data={data} locale="en" />;
 }
