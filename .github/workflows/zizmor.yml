@@ -1,0 +1,36 @@
+name: Zizmor
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, ready_for_review]
+    paths:
+      - '.github/dependabot.yml'
+      - '.github/zizmor.yml'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'action.yml'
+      - 'action.yaml'
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: Audit GitHub Actions
+    if: ${{ !github.event.pull_request.draft }}
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Audit workflows
+        run: uvx --exclude-newer P1D zizmor@latest --strict-collection --pedantic --no-ignores .

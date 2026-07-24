@@ -1,7 +1,7 @@
 'use client';
 
 import { MessageSquareText } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
@@ -58,8 +58,14 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
   const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
+  const [sharedTarget, setSharedTarget] = useState<{
+    evalResultId: number;
+    docId?: number;
+  } | null>(null);
+  const trackedSharedEvalId = useRef<number | null>(null);
 
   const openDrawer = (row: EvaluationChartData) => {
+    setSharedTarget(null);
     setDrawerRow(row);
     // Notify the first-visit nudge to dismiss itself once the user has
     // discovered the affordance on their own.
@@ -72,6 +78,48 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       hw_key: row.hwKey,
     });
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const evalParam = params.get('eval');
+    if (evalParam === null) return;
+
+    const evalResultId = Number(evalParam);
+    if (!Number.isInteger(evalResultId) || evalResultId <= 0) return;
+
+    const sampleParam = params.get('sample');
+    const docId = sampleParam === null ? undefined : Number(sampleParam);
+    setSharedTarget({
+      evalResultId,
+      ...(docId !== undefined && Number.isInteger(docId) && docId >= 0 ? { docId } : {}),
+    });
+  }, []);
+
+  const closeDrawer = () => {
+    setDrawerRow(null);
+    setSharedTarget(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('eval');
+    url.searchParams.delete('sample');
+    window.history.replaceState(window.history.state, '', url);
+  };
+
+  const sharedRow = sharedTarget
+    ? (data.find((row) => Number(row.evalResultId) === sharedTarget.evalResultId) ?? null)
+    : null;
+  const activeDrawerRow = drawerRow ?? sharedRow;
+
+  useEffect(() => {
+    if (!sharedRow || trackedSharedEvalId.current === sharedTarget?.evalResultId) return;
+    trackedSharedEvalId.current = sharedTarget?.evalResultId ?? null;
+    window.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
+    track('evaluation_samples_open', {
+      eval_result_id: sharedRow.evalResultId,
+      task: sharedRow.benchmark,
+      hw_key: sharedRow.hwKey,
+      source: 'shared_link',
+    });
+  }, [sharedRow, sharedTarget?.evalResultId]);
 
   const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(
     () => [
@@ -206,7 +254,11 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         testId="evaluation-results-table"
         analyticsPrefix="evaluation_table"
       />
-      <EvalSamplesDrawer row={drawerRow} onClose={() => setDrawerRow(null)} />
+      <EvalSamplesDrawer
+        row={activeDrawerRow}
+        initialDocId={drawerRow === null ? (sharedTarget?.docId ?? null) : null}
+        onClose={closeDrawer}
+      />
     </>
   );
 }

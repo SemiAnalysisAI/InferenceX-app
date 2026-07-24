@@ -12,11 +12,44 @@ import {
   cumulativeUniqueInputTokens,
   inflightUniqueTokens,
   interpAt,
+  maxTimeSeriesValue,
   rollingAverage,
   rollingRequestMetric,
   timeRollingAverage,
   toggleThroughputSeries,
 } from './time-series-math';
+
+describe('maxTimeSeriesValue', () => {
+  it('finds the maximum across more samples than browsers accept as function arguments', () => {
+    const series = [
+      {
+        name: 'P90 interactivity',
+        color: '#3b82f6',
+        data: Array.from({ length: 40_000 }, (_, index) => ({ t: index, value: index })),
+      },
+      {
+        name: 'Cumulative P90 interactivity',
+        color: '#10b981',
+        data: Array.from({ length: 40_000 }, (_, index) => ({
+          t: index,
+          value: 80_000 - index,
+        })),
+      },
+    ];
+
+    expect(maxTimeSeriesValue(series, 1e-9)).toBe(80_000);
+  });
+
+  it('keeps the supplied floor for empty and negative-only series', () => {
+    expect(maxTimeSeriesValue([], 1e-9)).toBe(1e-9);
+    expect(
+      maxTimeSeriesValue(
+        [{ name: 'Negative', color: '#000000', data: [{ t: 0, value: -1 }] }],
+        1e-9,
+      ),
+    ).toBe(1e-9);
+  });
+});
 
 const request = (
   endS: number,

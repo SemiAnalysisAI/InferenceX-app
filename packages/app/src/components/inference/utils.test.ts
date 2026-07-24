@@ -279,4 +279,201 @@ describe('processOverlayChartData', () => {
     expect(result).toHaveLength(1);
     expect(result[0].y).toBe(0.5);
   });
+
+  // Regression: overlay points must sit on the SAME x column as the official run.
+  // useChartData plots agentic interactivity at withPercentile('median_intvty',
+  // selectedPercentile) (e.g. p90_intvty). The overlay previously ignored the
+  // percentile and used the raw median_intvty, so an `?unofficialrun=` overlay of
+  // the very same run rendered to the right of its own official points on the
+  // "P90 Interactivity" chart. See InferenceX_GLM.png misalignment report.
+  it('applies the selected percentile to the natural interactivity x-axis for agentic overlays', () => {
+    const data = [
+      pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200, p90_intvty: 130 } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+    });
+    expect(result).toHaveLength(1);
+    // Must land on p90_intvty (130), NOT the raw median_intvty (200).
+    expect(result[0].x).toBe(130);
+  });
+
+  it('applies the selected percentile to the natural e2e x-axis for agentic overlays', () => {
+    const data = [pt({ tpPerGpu: { y: 42, roof: false }, median_e2el: 2.5, p99_e2el: 9 } as any)];
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p99',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(9);
+  });
+
+  it('keeps the natural median x-axis for non-agentic overlays regardless of percentile', () => {
+    // Fixed-seq rows have no p90_/p99_ columns; the percentile selector is hidden
+    // and forced to median. A stale 'p90' must NOT be applied to fixed-seq overlays.
+    const data = [
+      pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200, p90_intvty: 130 } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: false,
+      selectedPercentile: 'p90',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(200);
+  });
+
+  // Anti-benchmark-hacking parity: the agentic interactivity roofline is
+  // restricted to configs that ALSO win on end-to-end latency. The overlay must
+  // stamp `isOnE2eFrontier` the same way the official path does, so
+  // overlayRooflines draws the same e2e-restricted frontier instead of a fresh
+  // interactivity-plane one that rides above the official line. See uno.png.
+  it('stamps isOnE2eFrontier on agentic interactivity overlays (restricts to e2e-Pareto winners)', () => {
+    // e2e roofline for tpPerGpu is upper_right on (e2el, tput). With e2el 1/2/3
+    // and tput 100/200/150, the frontier keeps A(1,100) and B(2,200); C(3,150)
+    // is dominated (lower tput at higher latency) → NOT on the e2e frontier,
+    // even though its higher interactivity would put it on a naive intvty front.
+    const A = pt({
+      tpPerGpu: { y: 100, roof: false },
+      p90_e2el: 1,
+      p90_intvty: 130,
+    } as any);
+    const B = pt({
+      tpPerGpu: { y: 200, roof: false },
+      p90_e2el: 2,
+      p90_intvty: 90,
+    } as any);
+    const C = pt({
+      tpPerGpu: { y: 150, roof: false },
+      p90_e2el: 3,
+      p90_intvty: 200,
+    } as any);
+    const result = processOverlayChartData([A, B, C], 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
+    });
+    const frontierByY = Object.fromEntries(result.map((p) => [p.y, p.isOnE2eFrontier]));
+    expect(frontierByY[100]).toBe(true); // A
+    expect(frontierByY[200]).toBe(true); // B
+    expect(frontierByY[150]).toBe(false); // C — interactivity-optimal but not e2e-optimal
+  });
+
+  it('does not stamp isOnE2eFrontier for non-agentic overlays', () => {
+    // ChartDisplay computes restrictToE2eFrontier = isAgentic && mode !== 'e2e',
+    // so fixed-seq always passes false.
+    const data = [pt({ tpPerGpu: { y: 100, roof: false }, median_intvty: 50, p90_e2el: 1 } as any)];
+    const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: false,
+      selectedPercentile: 'median',
+      restrictToE2eFrontier: false,
+    });
+    expect(result[0].isOnE2eFrontier).toBeUndefined();
+  });
+
+  it('does not stamp isOnE2eFrontier in the e2e x-mode (it already IS the e2e frontier)', () => {
+    const data = [pt({ tpPerGpu: { y: 100, roof: false }, median_e2el: 1, p90_e2el: 1 } as any)];
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+      restrictToE2eFrontier: false,
+    });
+    expect(result[0].isOnE2eFrontier).toBeUndefined();
+  });
+
+  it('stamps isOnE2eFrontier on the e2e chart when x is overridden to TTFT (ttft mode)', () => {
+    // The 'ttft' x-axis mode renders the e2e chartType with a *_ttft override.
+    // Official stamps the e2e-frontier flag for every non-e2e x-mode, so the
+    // overlay must too — otherwise the TTFT overlay roofline draws a fresh
+    // TTFT-plane frontier instead of the e2e-restricted one.
+    const A = pt({
+      tpPerGpu: { y: 100, roof: false },
+      p90_e2el: 1,
+      p90_ttft: 0.2,
+    } as any);
+    const B = pt({
+      tpPerGpu: { y: 150, roof: false },
+      p90_e2el: 3, // dominated on e2e? No — higher tput at higher e2el stays on upper_right
+      p90_ttft: 0.4,
+    } as any);
+    const C = pt({
+      tpPerGpu: { y: 90, roof: false },
+      p90_e2el: 5, // dominated: lower tput than B at higher e2el
+      p90_ttft: 0.1,
+    } as any);
+    const result = processOverlayChartData([A, B, C], 'e2e', 'y_tpPerGpu', 'p90_ttft', {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
+    });
+    const byY = Object.fromEntries(result.map((p) => [p.y, p.isOnE2eFrontier]));
+    expect(byY[100]).toBe(true); // A
+    expect(byY[150]).toBe(true); // B
+    expect(byY[90]).toBe(false); // C — TTFT-optimal but not e2e-optimal
+  });
+
+  it('seeds the agentic e2e frontier per unofficial run (runs do not cross-dominate)', () => {
+    // Merged across runs, run-2's point (higher e2el, lower tput) would be
+    // dominated by run-1's and dropped. Per run, each is on its own frontier.
+    const r1 = pt({
+      tpPerGpu: { y: 500, roof: false },
+      p90_e2el: 1,
+      p90_intvty: 100,
+      run_url: 'https://gh/runs/1',
+    } as any);
+    const r2 = pt({
+      tpPerGpu: { y: 100, roof: false },
+      p90_e2el: 5,
+      p90_intvty: 40,
+      run_url: 'https://gh/runs/2',
+    } as any);
+    const result = processOverlayChartData([r1, r2], 'interactivity', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
+    });
+    const byUrl = Object.fromEntries(result.map((p) => [p.run_url, p.isOnE2eFrontier]));
+    expect(byUrl['https://gh/runs/1']).toBe(true);
+    expect(byUrl['https://gh/runs/2']).toBe(true); // false if runs were merged
+  });
+
+  it('leaves isOnE2eFrontier unset for metrics with no e2e roofline direction', () => {
+    // y_measuredAvgPower has no `_roofline` on the e2e chart def, so no e2e
+    // restriction applies. The official path leaves the flag undefined and
+    // draws the roofline unrestricted; the overlay must do the same — an
+    // all-false stamping here would seed an EMPTY overlay frontier and (with
+    // Optimal Only on) hide every overlay point.
+    const data = [
+      pt({
+        measuredAvgPower: { y: 700, roof: false },
+        p90_intvty: 100,
+        p90_e2el: 10,
+      } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_measuredAvgPower', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+      restrictToE2eFrontier: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].isOnE2eFrontier).toBeUndefined();
+  });
+
+  it('applies the selected percentile to an agentic input-metric x override', () => {
+    // Input metrics on the interactivity chart override x to *_ttft; agentic must
+    // carry the chosen percentile onto that override (p90_ttft) too.
+    const data = [
+      pt({
+        inputTputPerGpu: { y: 5, roof: false },
+        median_ttft: 0.1,
+        p90_ttft: 0.4,
+      } as any),
+    ];
+    const result = processOverlayChartData(data, 'interactivity', 'y_inputTputPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile: 'p90',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(0.4);
+  });
 });

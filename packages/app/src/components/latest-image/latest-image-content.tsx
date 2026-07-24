@@ -24,6 +24,7 @@ import {
   AGE_MAX_RED_DAYS,
   ageColorStyle,
   ageRowStyle,
+  baseFramework,
   daysSince,
   getActualLatestTag,
   isOutdated,
@@ -48,14 +49,14 @@ const STRINGS = {
     tooltipGpuSku: 'Filter by GPU model (e.g. H200, MI300X, B200).',
     labelNodeType: 'Node Type',
     tooltipNodeType:
-      'Single node = vLLM/SGLang/TRTLLM. Disagg = NVIDIA Dynamo or AMD Mori with separate prefill/decode pools.',
+      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
     labelFramework: 'Framework',
     tooltipFramework:
-      'Filter by inference engine (sglang, vllm, TensorRT, atom). Disagg variants (dynamo-*, mori-*) collapse into their base engine. Empty = all frameworks.',
+      'Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks.',
     allModels: 'All Models',
     all: 'All',
     singleNode: 'Single Node',
-    disagg: 'Disagg (Dynamo / Mori)',
+    disagg: 'Disaggregated',
     allFrameworks: 'All frameworks',
     thModel: 'Model',
     thPrecision: 'Precision',
@@ -83,14 +84,14 @@ const STRINGS = {
     tooltipGpuSku: '按 GPU 型号筛选（如 H200、MI300X、B200）。',
     labelNodeType: '节点类型',
     tooltipNodeType:
-      '单节点 = vLLM/SGLang/TRTLLM。分离式 = NVIDIA Dynamo 或 AMD Mori，分开的预填充/解码池。',
+      '单节点 = 非分离式服务。分离式 = 使用独立预填充/解码池，包括 Dynamo、Mori 和 llm-d。',
     labelFramework: '框架',
     tooltipFramework:
-      '按推理引擎筛选（sglang、vllm、TensorRT、atom）。分离式变体（dynamo-*、mori-*）归入基础引擎。留空 = 全部框架。',
+      '按推理引擎筛选（sglang、vllm、TensorRT、atom）。分离式框架变体归入基础引擎。留空 = 全部框架。',
     allModels: '全部模型',
     all: '全部',
     singleNode: '单节点',
-    disagg: '分离式（Dynamo / Mori）',
+    disagg: '分离式',
     allFrameworks: '全部框架',
     thModel: '模型',
     thPrecision: '精度',
@@ -101,26 +102,6 @@ const STRINGS = {
     thDaysSince: '距上次更新天数',
   },
 } as const;
-
-/**
- * Disaggregated frameworks pair a separate prefill/decode pool — identified by
- * `dynamo-*` (NVIDIA Dynamo) or `mori-*` (AMD Mori) prefix on the framework key.
- */
-function isDisaggFramework(framework: string): boolean {
-  return framework.startsWith('dynamo-') || framework.startsWith('mori-');
-}
-
-/**
- * Strip the disagg prefix to get the base engine ID. `dynamo-trt` → `trt`,
- * `mori-sglang` → `sglang`, plain `vllm` stays `vllm`. Used by the framework
- * multi-select so users pick engines (sglang / vllm / trt / atom) without
- * having to think about whether they're disagg variants.
- */
-function baseFramework(framework: string): string {
-  if (framework.startsWith('dynamo-')) return framework.slice('dynamo-'.length);
-  if (framework.startsWith('mori-')) return framework.slice('mori-'.length);
-  return framework;
-}
 
 type NodeType = 'single' | 'disagg' | 'all';
 
@@ -192,7 +173,7 @@ export function CurrentImageContent() {
       if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
       if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
       if (selectedNodeType !== 'all') {
-        const disagg = isDisaggFramework(row.framework);
+        const disagg = row.disagg;
         if (selectedNodeType === 'single' && disagg) return false;
         if (selectedNodeType === 'disagg' && !disagg) return false;
       }

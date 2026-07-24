@@ -122,6 +122,7 @@ export const TAB_INTRO_ZH: Record<ZhTabKey, string> = {
 
 /** Chinese labels for the dashboard tab bar (TabNav) on /zh pages. */
 export const TAB_LABELS_ZH: Record<string, string> = {
+  overview: '总览',
   inference: '推理性能',
   evaluation: '准确率评估',
   historical: '历史趋势',

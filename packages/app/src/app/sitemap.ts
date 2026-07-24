@@ -11,6 +11,7 @@ import {
   canonicalPrecisionCompareSlug,
   canonicalSpecDecodeCompareSlug,
 } from '@/lib/compare-variant-slug';
+import { getAllGlossaryEntries } from '@/lib/glossary';
 import { languageAlternates, zhPath } from '@/lib/i18n';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -58,6 +59,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...localizedPair('/', { lastModified: now, changeFrequency: 'daily', priority: 1 }),
+    ...localizedPair('/overview', {
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    }),
     ...TABS.flatMap((tab) =>
       localizedPair(`/${tab}`, {
         lastModified: now,
@@ -90,6 +96,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     ...localizedPair('/datasets', { lastModified: now, changeFrequency: 'weekly', priority: 0.6 }),
     ...localizedPair('/blog', { lastModified: now, changeFrequency: 'weekly', priority: 0.8 }),
+    ...localizedPair('/glossary', {
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }),
+    ...getAllGlossaryEntries().flatMap((entry) =>
+      localizedPair(`/glossary/${entry.slug}`, {
+        lastModified: now,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      }),
+    ),
     ...getAllPosts().flatMap((post) => {
       const entry = {
         lastModified: new Date(`${post.modifiedDate ?? post.date}T00:00:00Z`).toISOString(),

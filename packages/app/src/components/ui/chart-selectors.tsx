@@ -77,7 +77,7 @@ function CategorySectionTitle({ label, reason }: { label: string; reason: string
             data-testid={`selector-category-${label.toLowerCase().replaceAll(' ', '-')}-info`}
           />
         </TooltipTrigger>
-        <TooltipContent side="top" collisionPadding={10}>
+        <TooltipContent side="top" collisionPadding={10} className="z-[130]">
           <span>{reason}</span>
         </TooltipContent>
       </TooltipRoot>
@@ -315,7 +315,8 @@ export function ScenarioSelector({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {/* Agentic first — preferred default scenario when available. */}
+          {/* Agentic group listed first when available (display order only —
+              the app default scenario is 8K/1K). */}
           {agentic.length > 0 && (
             <SelectGroup>
               <SelectLabel>Agentic</SelectLabel>

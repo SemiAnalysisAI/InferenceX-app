@@ -7,8 +7,18 @@ export const FRAMEWORK_TO_BASE: Record<string, string> = {
   vllm: 'vllm',
   sglang: 'sglang',
   'dynamo-sglang': 'sglang',
+  'llmd-vllm': 'vllm',
   'mori-sglang': 'sglang',
 };
+
+/** Collapse framework variants into the engine family used by the UI filter. */
+export function baseFramework(framework: string): string {
+  const mapped = FRAMEWORK_TO_BASE[framework];
+  if (mapped) return mapped;
+  if (framework.startsWith('dynamo-')) return framework.slice('dynamo-'.length);
+  if (framework.startsWith('mori-')) return framework.slice('mori-'.length);
+  return framework;
+}
 
 /**
  * Substrings that mark an image tag as unstable / pre-release. Lowercased

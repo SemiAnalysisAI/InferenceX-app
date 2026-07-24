@@ -36,8 +36,8 @@ describe('resolveEffectiveSequence', () => {
 
   describe('honors a valid selection (rule 2a)', () => {
     it('keeps AgenticTraces when the model actually has agentic data (dsr1 case)', () => {
-      // DeepSeek-R1 in the seeded DB has both agentic and 8k/1k — the agentic
-      // default must survive so the PR intent (agentic-preferred) holds.
+      // DeepSeek-R1 in the seeded DB has both agentic and 8k/1k — an explicit
+      // agentic selection (e.g. a shared ?i_seq= link) must survive.
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.AgenticTraces,
@@ -59,8 +59,8 @@ describe('resolveEffectiveSequence', () => {
   });
 
   describe('fallback ordering when the selection is unavailable (rule 2b/2c)', () => {
-    it('for a fixed-seq-only model, agentic default falls back to 8k/1k, not the raw first entry (llama70b case)', () => {
-      // Llama-3.3-70B has only 8k/1k in the seeded DB. The agentic default is
+    it('for a fixed-seq-only model, an agentic selection falls back to 8k/1k, not the raw first entry (llama70b case)', () => {
+      // Llama-3.3-70B has only 8k/1k in the seeded DB. An agentic selection is
       // unavailable, so it must resolve to a fixed-seq scenario — here the sole
       // available one.
       expect(
@@ -73,8 +73,8 @@ describe('resolveEffectiveSequence', () => {
     });
 
     it('prefers 8k/1k over availableSequences[0] when both 1k/1k and 8k/1k exist', () => {
-      // DB row order can surface 1k/1k first. Master defaulted non-agentic
-      // models to 8k/1k, so prefer it rather than snapping to 1k/1k.
+      // DB row order can surface 1k/1k first. 8k/1k is the app default
+      // scenario, so prefer it rather than snapping to 1k/1k.
       expect(
         resolveEffectiveSequence({
           selectedSequence: Sequence.AgenticTraces,

@@ -78,10 +78,15 @@ API routes (`packages/app/src/app/api/v1/`):
   from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
   assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
+- `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
-(Exception: the CollectiveX routes assemble raw stored documents through the shared reader in
-`packages/db/src/collectivex/` — see [docs/collectivex.md](./docs/collectivex.md) for why.)
+Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in
+`packages/db/src/collectivex/` (see [docs/collectivex.md](./docs/collectivex.md) for why); and
+`tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers
+(spreadsheets) cannot execute the TS transforms — its assumptions (tier weights, workload mix, α)
+enter only as explicit query params with documented defaults, so a published sheet's URL fully
+records its methodology.
 
 Static content routes (no DB):
 

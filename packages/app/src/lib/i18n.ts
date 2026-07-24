@@ -36,6 +36,7 @@ export function isZhPathname(pathname: string): boolean {
  */
 export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = [
   { path: '/', exact: true },
+  { path: '/overview', exact: true },
   { path: '/inference', exact: true },
   { path: '/inference/agentic' },
   { path: '/evaluation', exact: true },
@@ -57,6 +58,7 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/compare-precision' },
   { path: '/compare-spec-decode' },
   { path: '/blog' },
+  { path: '/glossary' },
   { path: '/datasets' },
 ];
 

@@ -49,8 +49,8 @@ describe('Dropdown one-click switching', () => {
 
     cy.contains('Maintenance Mode').scrollIntoView().should('be.visible');
     cy.contains('[role="option"]', 'DeepSeek R1 0528 671B').scrollIntoView().should('be.visible');
-    cy.contains('[role="option"]', 'gpt-oss 120B').scrollIntoView().should('be.visible');
     cy.contains('Deprecated').scrollIntoView().should('be.visible');
+    cy.contains('[role="option"]', 'gpt-oss 120B').scrollIntoView().should('be.visible');
     cy.contains('[role="option"]', 'Llama 3.3 70B Instruct').scrollIntoView().should('be.visible');
   });
 

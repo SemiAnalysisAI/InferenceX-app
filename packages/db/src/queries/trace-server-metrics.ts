@@ -24,6 +24,12 @@ import { writeBackTraceReplayJsonb } from './agentic-shared';
 
 export type { TimeSeriesPoint, QueueDepthPoint } from '../etl/compute-chart-series';
 
+// The endpoint payload combines chart_series with separately queried point
+// metadata. Keep a composite response version so metadata-shape changes roll
+// the blob-cache namespace without forcing an expensive chart_series backfill.
+const POINT_META_VERSION = 2;
+export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
+
 export interface PointMeta {
   id: number;
   hardware: string;
@@ -34,6 +40,12 @@ export interface PointMeta {
   disagg: boolean;
   conc: number;
   offload_mode: string | null;
+  kv_offloading: string | null;
+  kv_offload_backend: string | null;
+  kv_offload_backend_version: string | null;
+  kv_p2p_transfer: string | null;
+  router_name: string | null;
+  router_version: string | null;
   isl: number | null;
   osl: number | null;
   benchmark_type: string;
@@ -114,6 +126,12 @@ function buildMeta(row: RawMetaRow): PointMeta {
     disagg: row.disagg,
     conc: row.conc,
     offload_mode: row.offload_mode,
+    kv_offloading: row.kv_offloading,
+    kv_offload_backend: row.kv_offload_backend,
+    kv_offload_backend_version: row.kv_offload_backend_version,
+    kv_p2p_transfer: row.kv_p2p_transfer,
+    router_name: row.router_name,
+    router_version: row.router_version,
     isl: row.isl,
     osl: row.osl,
     benchmark_type: row.benchmark_type,
@@ -167,6 +185,12 @@ export async function getTraceServerMetrics(
       br.conc, br.offload_mode, br.isl, br.osl, br.benchmark_type,
       br.date::text,
       case when wr.html_url is not null then wr.html_url || '/attempts/' || wr.run_attempt else null end as run_url,
+      nullif(br.metrics ->> 'kv_offloading', '') as kv_offloading,
+      nullif(br.metrics ->> 'kv_offload_backend', '') as kv_offload_backend,
+      nullif(br.metrics ->> 'kv_offload_backend_version', '') as kv_offload_backend_version,
+      nullif(br.metrics ->> 'kv_p2p_transfer', '') as kv_p2p_transfer,
+      nullif(br.metrics ->> 'router_name', '') as router_name,
+      nullif(br.metrics ->> 'router_version', '') as router_version,
       (br.metrics ->> 'server_gpu_cache_hit_rate')::numeric as server_gpu_cache_hit_rate,
       (br.metrics ->> 'server_cpu_cache_hit_rate')::numeric as server_cpu_cache_hit_rate,
       (br.metrics ->> 'kv_cache_pool_tokens')::numeric as kv_cache_pool_tokens

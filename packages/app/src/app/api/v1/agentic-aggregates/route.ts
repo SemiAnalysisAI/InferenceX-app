@@ -1,5 +1,5 @@
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   getAgenticAggregates,
   STATS_VERSION,
@@ -24,10 +24,7 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `agentic-aggregates-v${STATS_VERSION}`;
 
 const getCachedAgenticAggregates = cachedQuery(
-  (ids: number[]): Promise<AgenticAggregateMap> => {
-    if (JSON_MODE) return Promise.resolve(jsonProvider.getAgenticAggregates(ids));
-    return getAgenticAggregates(getDb(), ids);
-  },
+  (ids: number[]): Promise<AgenticAggregateMap> => getAgenticAggregates(getDb(), ids),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );

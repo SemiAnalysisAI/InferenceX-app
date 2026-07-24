@@ -26,6 +26,7 @@ import { TAB_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 const VISIBLE_TABS = [
+  { href: '/overview', label: 'Overview', testId: 'tab-trigger-overview' },
   { href: '/inference', label: 'Inference Performance', testId: 'tab-trigger-inference' },
   { href: '/evaluation', label: 'Accuracy Evals', testId: 'tab-trigger-evaluation' },
   { href: '/historical', label: 'Historical Trends', testId: 'tab-trigger-historical' },

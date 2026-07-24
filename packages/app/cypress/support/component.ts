@@ -1,5 +1,7 @@
 import { mount } from 'cypress/react';
 
+import '@/app/globals.css';
+
 declare global {
   namespace Cypress {
     interface Chainable {

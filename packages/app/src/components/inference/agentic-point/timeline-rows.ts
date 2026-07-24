@@ -401,7 +401,9 @@ export function buildRequestTimelineRows(
       // Union of primary stream requests for collapsed-view bars. Aux lanes
       // stay separate so their overlap remains visible as parallel work.
       const allReqs: RequestRecord[] = [];
-      for (const reqs of lanes.streams.values()) allReqs.push(...reqs);
+      for (const reqs of lanes.streams.values()) {
+        for (const request of reqs) allReqs.push(request);
+      }
       allReqs.sort((a, b) => a.start - b.start);
       const streamCount = lanes.streams.size;
       rows.push({

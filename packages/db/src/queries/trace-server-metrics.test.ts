@@ -41,6 +41,12 @@ function metaRow(overrides: Record<string, unknown> = {}) {
     disagg: true,
     conc: 128,
     offload_mode: 'off',
+    kv_offloading: null,
+    kv_offload_backend: null,
+    kv_offload_backend_version: null,
+    kv_p2p_transfer: null,
+    router_name: null,
+    router_version: null,
     isl: null,
     osl: null,
     benchmark_type: 'agentic_traces',
@@ -65,13 +71,33 @@ function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
 
 describe('getTraceServerMetrics', () => {
   it('returns current precomputed series without selecting the raw blob', async () => {
-    const { sql, calls } = mockSql([[metaRow()]]);
+    const { sql, calls } = mockSql([
+      [
+        metaRow({
+          kv_offloading: 'dram',
+          kv_offload_backend: 'lmcache',
+          kv_offload_backend_version: '0.5.1',
+          kv_p2p_transfer: 'mooncake',
+          router_name: 'vllm-router',
+          router_version: '0.1.14',
+        }),
+      ],
+    ]);
 
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 100 }]);
+    expect(result?.meta).toMatchObject({
+      kv_offloading: 'dram',
+      kv_offload_backend: 'lmcache',
+      kv_offload_backend_version: '0.5.1',
+      kv_p2p_transfer: 'mooncake',
+      router_name: 'vllm-router',
+      router_version: '0.1.14',
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
+    expect(calls[0]).toContain("br.metrics ->> 'kv_offload_backend'");
   });
 
   it('fetches and computes the raw blob only when chart_series is stale', async () => {

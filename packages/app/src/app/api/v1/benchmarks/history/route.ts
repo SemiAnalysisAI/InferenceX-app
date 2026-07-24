@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+
 import { getAllBenchmarksForHistory } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
@@ -11,11 +11,8 @@ import { loadFixture } from '@/lib/test-fixtures';
 export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarkHistory = cachedQuery(
-  (modelKeys: string[], isl: number, osl: number) => {
-    if (JSON_MODE)
-      return Promise.resolve(jsonProvider.getAllBenchmarksForHistory(modelKeys, isl, osl));
-    return getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl);
-  },
+  (modelKeys: string[], isl: number, osl: number) =>
+    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl),
   'benchmark-history',
   { blobOnly: true },
 );

@@ -4,6 +4,8 @@ import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
   getModelLabel,
+  getModelExclusion,
+  getSequenceExclusion,
   getSequenceLabel,
   getPrecisionLabel,
   getEvalBenchmarkLabel,
@@ -53,6 +55,11 @@ describe('getModelAndSequence', () => {
   it('parses artifact name with kimik2.5 model prefix', () => {
     const result = getModelAndSequence('results_kimik2.5_1k1k');
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
+  });
+
+  it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
+    const result = getModelAndSequence('results_glm5.2_1k1k');
+    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
   });
 
   it('returns undefined for unrecognized model prefix', () => {
@@ -156,12 +163,20 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
   });
 
-  it('returns false for non-deprecated model DeepSeek_R1', () => {
-    expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
+  it('returns true for deprecated model GptOss', () => {
+    expect(isModelDeprecated(Model.GptOss)).toBe(true);
   });
 
-  it('returns false for non-deprecated model GptOss', () => {
-    expect(isModelDeprecated(Model.GptOss)).toBe(false);
+  it('returns true for deprecated GLM-5/5.1', () => {
+    expect(isModelDeprecated(Model.GLM_5)).toBe(true);
+  });
+
+  it('keeps GLM-5.2 active', () => {
+    expect(isModelDeprecated(Model.GLM_5_2)).toBe(false);
+  });
+
+  it('returns false for non-deprecated model DeepSeek_R1', () => {
+    expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
   });
 });
 
@@ -171,12 +186,12 @@ describe('isModelDeprecated', () => {
 describe('isModelMaintenance', () => {
   it('returns true for maintenance-mode models', () => {
     expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
-    expect(isModelMaintenance(Model.GptOss)).toBe(true);
   });
 
   it('keeps deprecated and default models out of maintenance mode', () => {
     expect(isModelMaintenance(Model.Llama3_3_70B)).toBe(false);
     expect(isModelMaintenance(Model.MiniMax_M2_5)).toBe(false);
+    expect(isModelMaintenance(Model.GptOss)).toBe(false);
   });
 });
 
@@ -188,12 +203,25 @@ describe('isSequenceDeprecated', () => {
     expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
   });
 
-  it('returns false for non-deprecated sequence OneK_OneK', () => {
-    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(false);
+  it('returns true for deprecated sequence OneK_OneK', () => {
+    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(true);
   });
 
   it('returns false for non-deprecated sequence EightK_OneK', () => {
     expect(isSequenceDeprecated(Sequence.EightK_OneK)).toBe(false);
+  });
+});
+
+describe('comparison exclusions', () => {
+  it('keeps the existing DeepSeek V4 MTP rule model-scoped', () => {
+    expect(getModelExclusion(Model.DeepSeek_V4_Pro).map((spec) => spec.suffix)).toEqual(['_mtp']);
+    expect(getModelExclusion(Model.DeepSeek_R1)).toEqual([]);
+  });
+
+  it('applies the unsuffixed STP rule only to Agentic Traces', () => {
+    expect(getSequenceExclusion(Sequence.AgenticTraces).map((spec) => spec.suffix)).toEqual([null]);
+    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual([]);
+    expect(getSequenceExclusion(Sequence.OneK_OneK)).toEqual([]);
   });
 });
 
@@ -210,6 +238,7 @@ describe('getModelLabel', () => {
     expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B');
     expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6/2.7-Code 1T');
     expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1 744B');
+    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2');
     expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5/2.7 230B');
   });
 

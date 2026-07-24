@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   getConversation,
   type ConversationDetail,
@@ -12,10 +12,8 @@ import { cachedJson, cachedQuery } from '@/lib/api-cache';
 export const dynamic = 'force-dynamic';
 
 const getCachedConversation = cachedQuery(
-  (slug: string, convId: string): Promise<ConversationDetail | null> => {
-    if (JSON_MODE) return Promise.resolve(jsonProvider.getConversation(slug, convId));
-    return getConversation(getDb(), slug, convId);
-  },
+  (slug: string, convId: string): Promise<ConversationDetail | null> =>
+    getConversation(getDb(), slug, convId),
   'dataset-conversation',
 );
 

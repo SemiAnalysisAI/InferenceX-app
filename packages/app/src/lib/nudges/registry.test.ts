@@ -65,6 +65,7 @@ describe('NUDGE_REGISTRY integrity', () => {
       'eval-samples',
       'export',
       'feedback-modal',
+      'filter-hint',
       'github-star-modal',
       'gradient-label',
       'minimax-m3-launch-banner',

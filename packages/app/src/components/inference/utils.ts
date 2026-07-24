@@ -5,6 +5,8 @@
  */
 
 import chartDefinitions from '@/components/inference/inference-chart-config.json';
+import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
+import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 
 import type { ChartDefinition, InferenceData, YAxisMetricKey } from './types';
 
@@ -81,42 +83,44 @@ export const filterDataByCostLimit = (
 /**
  * Process overlay (unofficial run) data to match the same pipeline as official data.
  *
- * Applies: metric field filtering, x/y remapping (including x-axis overrides for
- * input metrics on the interactivity chart), and cost limit filtering.
+ * Applies: metric field filtering, x/y remapping (via the resolveXAxisField
+ * resolver shared with `useChartData`, so the overlay of a run lands on the
+ * identical x column as that run's official points), the e2e-Pareto frontier
+ * stamping for agentic non-e2e x-modes, and cost limit filtering.
+ *
+ * `options.restrictToE2eFrontier` is the caller-computed official gate
+ * (`isAgentic && selectedXAxisMode !== 'e2e'`) — passed in rather than
+ * re-derived from chartType so the overlay can't drift from `useChartData`'s
+ * stamping condition.
  */
 export function processOverlayChartData(
   data: InferenceData[],
   chartType: 'e2e' | 'interactivity',
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
-  options?: { isAgentic?: boolean },
+  options?: {
+    isAgentic?: boolean;
+    selectedPercentile?: string;
+    restrictToE2eFrontier?: boolean;
+  },
 ): InferenceData[] {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
   if (!chartDef) return [];
 
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isAgentic = options?.isAgentic === true;
+  const selectedPercentile = options?.selectedPercentile ?? 'median';
 
-  // Resolve x-axis field (must match useChartData logic)
-  const metricTitle =
-    (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-  const isInputMetric = metricTitle.toLowerCase().includes('input');
-  let xAxisField: string = chartDef.x;
   // selectedXAxisMetric is already the effective metric for this chart type
   // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric).
-  // Match any *_ttft metric — the x-axis-mode picker can now select any
-  // percentile (median/p75/p90/p99) depending on sequence kind.
-  const isTtftOverride =
-    typeof selectedXAxisMetric === 'string' && selectedXAxisMetric.endsWith('_ttft');
+  const { xAxisField } = resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric, {
+    isAgentic,
+    percentile: selectedPercentile,
+  });
 
-  if (selectedXAxisMetric && chartDef.chartType === 'interactivity' && isInputMetric) {
-    xAxisField = selectedXAxisMetric;
-  } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
-    const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
-    xAxisField = (chartDef[xOverrideKey] as string) || chartDef.x;
-  } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
-    xAxisField = selectedXAxisMetric!;
-  }
+  // The latency limit targets overload outliers on the TTFT axis only; skip it
+  // for the natural axis and for agentic (long TTFTs are normal there).
+  const isTtftX = xAxisField.endsWith('_ttft');
 
   const processedData = data
     .filter((d) => metricKey in d)
@@ -126,14 +130,38 @@ export function processOverlayChartData(
       return { ...d, x: xValue, y: yValue };
     })
     .filter(
-      (d) =>
-        // Skip the latency limit for the natural x-axis or for agentic
-        // (long TTFTs are normal there, not overload outliers).
-        xAxisField === chartDef.x ||
-        isAgentic ||
-        !chartDef.y_latency_limit ||
-        d.x <= chartDef.y_latency_limit,
+      (d) => !isTtftX || isAgentic || !chartDef.y_latency_limit || d.x <= chartDef.y_latency_limit,
     );
 
-  return filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
+  const costFiltered = filterDataByCostLimit(processedData, chartDef, selectedYAxisMetric);
+
+  // Anti-benchmark-hacking parity: on agentic charts whose x-axis is NOT the
+  // natural e2e latency, the official roofline is restricted to configs that
+  // ALSO win on end-to-end latency (useChartData stamps `isOnE2eFrontier`,
+  // ScatterGraph's rooflines honor it via e2eRestrictedSeed). Stamp the same
+  // flag on overlay points, seeded per run (matching overlayRooflines' per-run
+  // grouping) so points from one unofficial run can't dominate another's.
+  // A null winner set means the y-metric declares no e2e roofline direction —
+  // no restriction applies, so the flag stays unset (matching the official
+  // path, which draws those rooflines unrestricted).
+  if (options?.restrictToE2eFrontier) {
+    const byRun = new Map<string, InferenceData[]>();
+    for (const p of costFiltered) {
+      const runKey = p.run_url ?? '';
+      let bucket = byRun.get(runKey);
+      if (!bucket) {
+        bucket = [];
+        byRun.set(runKey, bucket);
+      }
+      bucket.push(p);
+    }
+    for (const runPoints of byRun.values()) {
+      const winners = e2eFrontierWinners(runPoints, selectedYAxisMetric, selectedPercentile);
+      // Direction-less metrics resolve null for every run — stop entirely.
+      if (winners === null) break;
+      for (const p of runPoints) p.isOnE2eFrontier = winners.has(p);
+    }
+  }
+
+  return costFiltered;
 }

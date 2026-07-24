@@ -1,13 +1,14 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, Search, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics';
 import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
+import { buildShareUrl } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
 
 const PAGE_SIZE = 50;
@@ -44,6 +45,8 @@ const STRINGS = {
       total === 0 ? '0 of 0' : `${start}–${end} of ${total}`,
     prevPage: 'Previous page',
     nextPage: 'Next page',
+    shareSample: 'Share',
+    copied: 'Copied',
   },
   zh: {
     score: '得分',
@@ -73,6 +76,8 @@ const STRINGS = {
       total === 0 ? '共 0 条' : `第 ${start}–${end} 条，共 ${total} 条`,
     prevPage: '上一页',
     nextPage: '下一页',
+    shareSample: '分享',
+    copied: '已复制',
   },
 } as const;
 
@@ -80,6 +85,8 @@ interface EvalSamplesDrawerProps {
   /** The selected row from the EvaluationTable, or null when closed. */
   row: EvaluationChartData | null;
   onClose: () => void;
+  /** Sample selected by a shared URL. */
+  initialDocId?: number | null;
 }
 
 /**
@@ -91,7 +98,11 @@ interface EvalSamplesDrawerProps {
  * Inspired by the vLLM eval dashboard PoC
  * (credit: @khluu, @simon-mo, @robertgshaw2-redhat).
  */
-export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerProps) {
+export default function EvalSamplesDrawer({
+  row,
+  onClose,
+  initialDocId = null,
+}: EvalSamplesDrawerProps) {
   const open = row !== null;
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -99,6 +110,9 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [requestedDocId, setRequestedDocId] = useState<number | null>(initialDocId);
+  const [copiedTarget, setCopiedTarget] = useState<number | 'drawer' | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   // Reset transient state whenever a new row is opened.
   useEffect(() => {
@@ -107,7 +121,9 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
     setPage(0);
     setSearch('');
     setExpanded(new Set());
-  }, [row?.evalResultId, open]);
+    setRequestedDocId(initialDocId);
+    setCopiedTarget(null);
+  }, [row?.evalResultId, open, initialDocId]);
 
   // Build a live-fetch context for unofficial runs from the row's identifying
   // fields. The hook ignores this when `evalResultId > 0` (DB-backed path).
@@ -134,6 +150,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
     filter,
     offset: page * PAGE_SIZE,
     limit: PAGE_SIZE,
+    docId: requestedDocId,
   });
 
   // Client-side substring filter on the page slice — server-side full-text
@@ -156,6 +173,19 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
 
+  useEffect(() => {
+    if (requestedDocId === null || !data || data.offset === undefined) return;
+    if (!data.samples.some((sample) => sample.docId === requestedDocId)) return;
+    setPage(Math.floor(data.offset / PAGE_SIZE));
+    setExpanded(new Set([requestedDocId]));
+    requestAnimationFrame(() => {
+      bodyRef.current
+        ?.querySelector<HTMLElement>(`[data-eval-sample-id="${requestedDocId}"]`)
+        ?.scrollIntoView({ block: 'center' });
+    });
+    setRequestedDocId(null);
+  }, [data, requestedDocId]);
+
   const handleFilterChange = (next: EvalSamplesFilter) => {
     setFilter(next);
     setPage(0);
@@ -175,6 +205,33 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
   const handlePageChange = (delta: 1 | -1) => {
     setPage((p) => Math.max(0, Math.min(totalPages - 1, p + delta)));
     track('evaluation_samples_paged', { direction: delta > 0 ? 'next' : 'prev' });
+  };
+
+  const handleShare = async (docId?: number) => {
+    if (!row || row.evalResultId <= 0) return;
+    const url = new URL(buildShareUrl());
+    url.searchParams.set('eval', String(row.evalResultId));
+    if (docId === undefined) url.searchParams.delete('sample');
+    else url.searchParams.set('sample', String(docId));
+
+    try {
+      await navigator.clipboard.writeText(url.toString());
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = url.toString();
+      document.body.append(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      textArea.remove();
+    }
+
+    const target = docId ?? 'drawer';
+    setCopiedTarget(target);
+    setTimeout(() => setCopiedTarget((current) => (current === target ? null : current)), 2000);
+    track(docId === undefined ? 'evaluation_drawer_link_copied' : 'evaluation_sample_link_copied', {
+      eval_result_id: row.evalResultId,
+      ...(docId === undefined ? {} : { doc_id: docId }),
+    });
   };
 
   const isUnofficial = row !== null && row.evalResultId <= 0;
@@ -229,6 +286,23 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
               </div>
             )}
           </div>
+          {row && row.evalResultId > 0 && (
+            <button
+              type="button"
+              onClick={() => handleShare()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label={t.shareSample}
+              title={t.shareSample}
+              data-testid="eval-drawer-share-button"
+            >
+              {copiedTarget === 'drawer' ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Share2 className="size-3.5" />
+              )}
+              {copiedTarget === 'drawer' ? t.copied : t.shareSample}
+            </button>
+          )}
         </div>
 
         {/* Filter chips + search */}
@@ -267,7 +341,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
         </div>
 
         {/* Body */}
-        <div className="overflow-auto px-4 py-3">
+        <div ref={bodyRef} className="overflow-auto px-4 py-3">
           {liveUnavailable && (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               {t.liveUnavailable}
@@ -300,6 +374,7 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
             {filteredSamples.map((s) => (
               <li
                 key={s.docId}
+                data-eval-sample-id={s.docId}
                 className="rounded-md border border-border/70 bg-card/30 transition-colors hover:bg-card/50"
               >
                 <button
@@ -342,6 +417,23 @@ export default function EvalSamplesDrawer({ row, onClose }: EvalSamplesDrawerPro
                           .join('\n')}
                         emptyText={t.empty}
                       />
+                    )}
+                    {row && row.evalResultId > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleShare(s.docId)}
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        aria-label={t.shareSample}
+                        title={t.shareSample}
+                        data-testid={`eval-sample-share-${s.docId}`}
+                      >
+                        {copiedTarget === s.docId ? (
+                          <Check className="size-3.5" />
+                        ) : (
+                          <Share2 className="size-3.5" />
+                        )}
+                        {copiedTarget === s.docId ? t.copied : t.shareSample}
+                      </button>
                     )}
                   </div>
                 )}

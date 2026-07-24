@@ -19,6 +19,16 @@ describe('Unofficial-run watermark', () => {
           ],
           benchmarks: benchmarks.map((row: Record<string, unknown>) => ({
             ...row,
+            is_multinode: true,
+            metrics: {
+              ...(row.metrics as Record<string, unknown> | undefined),
+              kv_offloading: 'dram',
+              kv_offload_backend: 'hicache',
+              kv_p2p_transfer: 'nixl',
+              router_name: 'sglang-router',
+              router_version: '0.3.2',
+              server_gpu_cache_hit_rate: 0.875,
+            },
             run_url: runUrl,
           })),
           evaluations: [],
@@ -56,6 +66,20 @@ describe('Unofficial-run watermark', () => {
       .each(($image) => {
         cy.wrap($image).should('have.attr', 'href', '/decorative/kanye-west.png');
         cy.wrap($image).parent('svg').find('.unofficial-watermark-image').should('have.length', 1);
+      });
+
+    cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt')
+      .first()
+      .then(($point) => {
+        $point[0].dispatchEvent(new MouseEvent('mouseenter'));
+        const tooltip = $point[0].ownerDocument.querySelector<HTMLElement>('[data-chart-tooltip]');
+        expect(tooltip).not.to.equal(null);
+        expect(tooltip!.style.display).to.equal('block');
+        expect(tooltip).to.contain.text('Offload Type: DRAM');
+        expect(tooltip).to.contain.text('KV Offload Engine: HiCache');
+        expect(tooltip).to.contain.text('KV Transfer Engine: NIXL');
+        expect(tooltip).to.contain.text('Router: SGLang Router 0.3.2');
+        expect(tooltip).to.contain.text('GPU Cache Hit Rate: 87.5%');
       });
 
     cy.get('[data-testid="scatter-graph"]').first().scrollIntoView();

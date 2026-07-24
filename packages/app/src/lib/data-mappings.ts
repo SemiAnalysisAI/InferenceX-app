@@ -10,6 +10,7 @@ export enum Model {
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
   GLM_5 = 'GLM-5',
+  GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
 }
 
@@ -59,7 +60,26 @@ interface ModelConfig {
  * comparability group; vLLM is its own group.
  */
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
-  { suffix: '_mtp', stripPrefixes: ['dynamo-', 'mori-'], groupAliases: { atom: 'sglang' } },
+  {
+    suffix: '_mtp',
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+  },
+];
+
+/**
+ * AgentX STP exclusion: unsuffixed standard-token configs for the same hardware
+ * SKU can't mix engine families. Different hardware may use different engines
+ * on one graph. Fixed-sequence STP comparisons remain available; this rule is
+ * attached only to the Agentic Traces sequence.
+ */
+const AGENTIC_STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+  {
+    suffix: null,
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+    scope: 'hardware',
+  },
 ];
 
 // Total parameter counts appended to each label so users can compare model
@@ -92,9 +112,10 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'dsr1',
     category: 'maintenance',
   },
-  [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'default' },
+  [Model.GLM_5]: { label: 'GLM5/5.1 744B', prefix: 'glm5', category: 'deprecated' },
+  [Model.GLM_5_2]: { label: 'GLM5.2', prefix: 'glm5.2', category: 'default' },
   [Model.Qwen3_5]: { label: 'Qwen3.5 397B', prefix: 'qwen3.5', category: 'default' },
-  [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'maintenance' },
+  [Model.GptOss]: { label: 'gpt-oss 120B', prefix: 'gptoss', category: 'deprecated' },
   [Model.MiniMax_M2_5]: {
     // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
     // Superseded by MiniMax M3, so it's deprecated (no longer actively benchmarked).
@@ -172,6 +193,12 @@ export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
     .map(([m, c]) => [c.prefix, m]),
 );
 
+// Specific point-release prefixes must win over family prefixes such as
+// `glm5`; precompute once rather than sorting for every artifact.
+const MODEL_PREFIXES_LONGEST_FIRST = Object.keys(MODEL_PREFIX_MAPPING).toSorted(
+  (a, b) => b.length - a.length,
+);
+
 // ---------------------------------------------------------------------------
 // Sequences
 // ---------------------------------------------------------------------------
@@ -193,14 +220,19 @@ export function sequenceKind(seq: Sequence): ScenarioKind {
   return seq === Sequence.AgenticTraces ? 'agentic' : 'fixed-seq';
 }
 
-const SEQUENCE_CONFIG: Record<
-  Sequence,
-  { label: string; compact: string; category: CategoryTag; kind: ScenarioKind }
-> = {
+interface SequenceConfig {
+  label: string;
+  compact: string;
+  category: CategoryTag;
+  kind: ScenarioKind;
+  exclusion?: ExclusionSpec[];
+}
+
+const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
   [Sequence.OneK_OneK]: {
     label: '1K / 1K',
     compact: '1k1k',
-    category: 'default',
+    category: 'deprecated',
     kind: 'fixed-seq',
   },
   [Sequence.OneK_EightK]: {
@@ -220,8 +252,17 @@ const SEQUENCE_CONFIG: Record<
     compact: 'agentic',
     category: 'default',
     kind: 'agentic',
+    exclusion: AGENTIC_STP_ENGINE_EXCLUSION,
   },
 };
+
+/** Exclusion specs configured for a sequence. Empty when no rule applies. */
+export function getSequenceExclusion(
+  sequence: Sequence | string | null | undefined,
+): ExclusionSpec[] {
+  if (!sequence) return [];
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+}
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
 
@@ -323,7 +364,7 @@ export function getModelAndSequence(
   let model: Model | undefined;
   let sequence: Sequence | undefined;
 
-  for (const key in MODEL_PREFIX_MAPPING) {
+  for (const key of MODEL_PREFIXES_LONGEST_FIRST) {
     if (artifactName.includes(key)) {
       model = MODEL_PREFIX_MAPPING[key];
       break;

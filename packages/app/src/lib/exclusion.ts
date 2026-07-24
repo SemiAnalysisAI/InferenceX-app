@@ -1,28 +1,33 @@
-import { computeToggle } from '@/hooks/useTogglableSet';
+import { SPEC_METHOD_KEYS } from '@semianalysisai/inferencex-constants';
+
+import { computeToggle } from '@/lib/toggle-set';
 
 /**
  * Data-driven config exclusion.
  *
- * Some models can't show certain config variants on the same graph because the
- * numbers aren't directly comparable. The first case is dsv4 MTP: different
- * engines force speculative acceptance differently, so two engines' MTP curves
- * mean different things side by side.
+ * Some models or scenarios can't show certain config variants on the same graph
+ * because the numbers aren't directly comparable. DeepSeek V4 MTP configs use
+ * engine-specific acceptance forcing; AgentX also keeps standard-token (STP)
+ * results from different engines separate while the benchmark is new.
  *
- * The rule is expressed as DATA — an `ExclusionSpec[]` declared on the model
- * (see `data-mappings.ts`) — then compiled into resolvers by `buildExclusion`.
- * Every helper here operates on a compiled `Exclusion`, so adding a new
- * exclusivity rule means adding data, not code.
+ * Rules are expressed as DATA — `ExclusionSpec[]` values declared by model or
+ * sequence in `data-mappings.ts` — then compiled into resolvers by
+ * `buildExclusion`. Every helper here operates on a compiled `Exclusion`, so
+ * adding an exclusivity rule means adding data, not branching UI code.
  *
- * Model: participating keys are partitioned into comparability GROUPS. Keys in
- * the same group may be active together; keys in different groups are mutually
- * exclusive — at most one group active at a time. (For dsv4 MTP, ATOM and SGLang
- * share the upstream ROCm path → one group; vLLM is its own group.)
+ * Participating keys are partitioned into comparability GROUPS. Keys in the
+ * same group may be active together; keys in different groups are mutually
+ * exclusive — at most one group active at a time. ATOM and SGLang may share a
+ * group while vLLM remains separate.
  */
 
 /** Data params defining one exclusion rule. */
 export interface ExclusionSpec {
-  /** Only hwKeys ending in this suffix participate in the rule (e.g. `_mtp`). */
-  suffix: string;
+  /**
+   * Non-empty hwKey suffix for a variant (for example `_mtp`), or `null` for
+   * standard-token configs whose hwKeys have no speculative-method suffix.
+   */
+  suffix: string | null;
   /**
    * Engine-family prefixes stripped from the framework segment before grouping
    * (e.g. `dynamo-`, `mori-`), so `h100_dynamo-vllm_mtp` resolves to `vllm`.
@@ -34,24 +39,44 @@ export interface ExclusionSpec {
    * own group. (e.g. `{ atom: 'sglang' }` — ATOM and SGLang are comparable.)
    */
   groupAliases?: Record<string, string>;
+  /**
+   * Restrict mutual exclusion to configs on the same hardware SKU. Different
+   * hardware may use different engine groups on the same graph.
+   */
+  scope?: 'hardware';
 }
 
-/** Compiled resolvers for a model's exclusion specs. */
+/** Compiled resolvers for model- or sequence-scoped exclusion specs. */
 export interface Exclusion {
   /** Literal engine family of a participating key (for display), else null. */
   familyOf: (hwKey: string) => string | null;
   /** Comparability-group id of a participating key (for exclusion), else null. */
   groupOf: (hwKey: string) => string | null;
+  /** Mutual-exclusion scopes of a participating key. Empty when it does not participate. */
+  scopesOf: (hwKey: string) => readonly string[];
 }
+
+const ACTIVE_SPEC_SUFFIXES = [...SPEC_METHOD_KEYS]
+  .filter((method) => method !== 'none')
+  .map((method) => `_${method}`);
+
+const GLOBAL_SCOPE = '*';
 
 /**
  * Extract the literal engine family for `hwKey` under a single spec: strip the
- * trailing suffix, drop the leading GPU segment, then strip any configured
- * engine-family prefix. Returns null if the key doesn't participate.
+ * configured variant suffix (or require an unsuffixed STP key), drop the leading
+ * GPU segment, then strip any configured engine-family prefix. Returns null if
+ * the key doesn't participate.
  */
 function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
-  if (!hwKey.endsWith(spec.suffix)) return null;
-  const head = hwKey.slice(0, -spec.suffix.length);
+  let head: string;
+  if (spec.suffix === null) {
+    if (ACTIVE_SPEC_SUFFIXES.some((suffix) => hwKey.endsWith(suffix))) return null;
+    head = hwKey;
+  } else {
+    if (spec.suffix.length === 0 || !hwKey.endsWith(spec.suffix)) return null;
+    head = hwKey.slice(0, -spec.suffix.length);
+  }
   const firstUnderscore = head.indexOf('_');
   if (firstUnderscore === -1) return null;
   let framework = head.slice(firstUnderscore + 1);
@@ -65,11 +90,11 @@ function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
 }
 
 /**
- * Compile a list of `ExclusionSpec`s into `familyOf` / `groupOf` resolvers.
- * The first spec that matches a key wins (specs are expected to be disjoint by
- * suffix in practice).
+ * Compile a list of `ExclusionSpec`s into family, group, and scope resolvers.
+ * The first spec that matches a key wins; variant-specific suffixes and the
+ * unsuffixed STP matcher are disjoint.
  */
-export function buildExclusion(specs: ExclusionSpec[]): Exclusion {
+export function buildExclusion(specs: readonly ExclusionSpec[]): Exclusion {
   return {
     familyOf(hwKey: string): string | null {
       for (const spec of specs) {
@@ -85,19 +110,40 @@ export function buildExclusion(specs: ExclusionSpec[]): Exclusion {
       }
       return null;
     },
+    scopesOf(hwKey: string): readonly string[] {
+      for (const spec of specs) {
+        const fam = familyForSpec(hwKey, spec);
+        if (!fam) continue;
+        const firstUnderscore = hwKey.indexOf('_');
+        const hardwareScope =
+          firstUnderscore === -1 ? GLOBAL_SCOPE : hwKey.slice(0, firstUnderscore);
+        return spec.scope === 'hardware' ? [hardwareScope] : [GLOBAL_SCOPE, hardwareScope];
+      }
+      return [];
+    },
   };
 }
 
-function groupKeysByGroup(keys: Iterable<string>, ex: Exclusion): Map<string, string[]> {
-  const byGroup = new Map<string, string[]>();
+function groupKeysByScope(
+  keys: Iterable<string>,
+  ex: Exclusion,
+): Map<string, Map<string, string[]>> {
+  const byScope = new Map<string, Map<string, string[]>>();
   for (const key of keys) {
     const group = ex.groupOf(key);
     if (!group) continue;
-    const existing = byGroup.get(group);
-    if (existing) existing.push(key);
-    else byGroup.set(group, [key]);
+    for (const scope of ex.scopesOf(key)) {
+      let byGroup = byScope.get(scope);
+      if (!byGroup) {
+        byGroup = new Map();
+        byScope.set(scope, byGroup);
+      }
+      const existing = byGroup.get(group);
+      if (existing) existing.push(key);
+      else byGroup.set(group, [key]);
+    }
   }
-  return byGroup;
+  return byScope;
 }
 
 /**
@@ -109,22 +155,24 @@ function groupKeysByGroup(keys: Iterable<string>, ex: Exclusion): Map<string, st
  */
 function activeFamilyInGroup(
   keys: Iterable<string>,
-  group: string | null,
+  group: string,
+  scope: string,
   ex: Exclusion,
 ): string | null {
-  if (!group) return null;
   const families: string[] = [];
   for (const key of keys) {
     const fam = ex.familyOf(key);
-    if (fam && ex.groupOf(key) === group) families.push(fam);
+    if (fam && ex.groupOf(key) === group && ex.scopesOf(key).includes(scope)) families.push(fam);
   }
   return families.length > 0 ? families.toSorted()[0] : null;
 }
 
 /**
  * Pick a single comparability group to keep when `proposed` contains keys from
- * multiple groups. Sticks to a group already present in `prev`; otherwise falls
- * back to the alphabetically-first group. Drops other groups' participating keys.
+ * multiple groups. Sticks to a group already present in `prev`; for a shared
+ * scope with no direct prior key (for example the global MTP scope), also honors
+ * a prior key from the same group on an overlapping hardware scope. Otherwise
+ * falls back to the alphabetically-first group.
  *
  * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
  */
@@ -133,53 +181,110 @@ export function pickStickyGroup(
   prev: Set<string>,
   ex: Exclusion,
 ): { result: Set<string>; keptGroup: string | null; droppedGroups: string[] } {
-  const byGroup = groupKeysByGroup(proposed, ex);
-  if (byGroup.size <= 1) {
-    return {
-      result: proposed,
-      keptGroup: byGroup.size === 1 ? [...byGroup.keys()][0] : null,
-      droppedGroups: [],
-    };
-  }
-  const prevGroups = new Set<string>();
-  for (const key of prev) {
-    const group = ex.groupOf(key);
-    if (group) prevGroups.add(group);
-  }
-  const groups = [...byGroup.keys()];
-  const sticky = groups.find((g) => prevGroups.has(g));
-  const winner = sticky ?? [...groups].toSorted()[0];
+  const byScope = groupKeysByScope(proposed, ex);
+  const allGroups = new Set([...byScope.values()].flatMap((byGroup) => [...byGroup.keys()]));
   const result = new Set(proposed);
-  const dropped: string[] = [];
-  for (const [group, keys] of byGroup) {
-    if (group === winner) continue;
-    for (const k of keys) result.delete(k);
-    dropped.push(group);
+  const winners = new Set<string>();
+  const dropped = new Set<string>();
+
+  for (const [scope, byGroup] of byScope) {
+    if (byGroup.size <= 1) continue;
+    const directPrevGroups = new Set<string>();
+    for (const key of prev) {
+      if (!ex.scopesOf(key).includes(scope)) continue;
+      const group = ex.groupOf(key);
+      if (group) directPrevGroups.add(group);
+    }
+    const groups = [...byGroup.keys()];
+    const correlatedPrevGroups = new Set<string>();
+    if (directPrevGroups.size === 0) {
+      for (const [group, keys] of byGroup) {
+        const relatedScopes = new Set(
+          [...keys].flatMap((key) => ex.scopesOf(key).filter((candidate) => candidate !== scope)),
+        );
+        if (
+          [...prev].some(
+            (key) =>
+              ex.groupOf(key) === group &&
+              ex.scopesOf(key).some((candidate) => relatedScopes.has(candidate)),
+          )
+        ) {
+          correlatedPrevGroups.add(group);
+        }
+      }
+    }
+    const winner =
+      groups.filter((group) => directPrevGroups.has(group)).toSorted()[0] ??
+      groups.filter((group) => correlatedPrevGroups.has(group)).toSorted()[0] ??
+      groups.toSorted()[0];
+    winners.add(winner);
+    for (const [group, keys] of byGroup) {
+      if (group === winner) continue;
+      for (const key of keys) result.delete(key);
+      dropped.add(group);
+    }
   }
-  return { result, keptGroup: winner, droppedGroups: dropped };
+
+  return {
+    result: dropped.size === 0 ? proposed : result,
+    keptGroup:
+      winners.size === 1
+        ? [...winners][0]
+        : winners.size === 0 && allGroups.size === 1
+          ? [...allGroups][0]
+          : null,
+    droppedGroups: [...dropped],
+  };
 }
 
 /**
  * Compute the effective legend universe for solo/restore-all toggle semantics
- * under exclusion. Participating keys whose group is not currently active are
- * dropped, so the default-deselected state (e.g. DSv4 MTP on first load) counts
- * as "all selected" — clicking an entry then solos it instead of just removing
- * it.
+ * under exclusion. Participating keys whose group is not active or remembered
+ * for one of their scopes are dropped. Remembered groups preserve each
+ * hardware's selection while it is temporarily absent in solo mode; an idle
+ * global scope without a remembered selection remains excluded so default-
+ * deselected variants (e.g. DSv4 MTP) still count as deselected.
  */
 export function effectiveLegendItems(
   allItems: Set<string>,
   active: Set<string>,
   ex: Exclusion,
+  preferred: Set<string> = active,
 ): Set<string> {
-  const activeGroups = new Set<string>();
-  for (const k of active) {
-    const group = ex.groupOf(k);
-    if (group) activeGroups.add(group);
+  const activeGroupsByScope = new Map<string, Set<string>>();
+  for (const key of active) {
+    const group = ex.groupOf(key);
+    if (!group) continue;
+    for (const scope of ex.scopesOf(key)) {
+      const groups = activeGroupsByScope.get(scope);
+      if (groups) groups.add(group);
+      else activeGroupsByScope.set(scope, new Set([group]));
+    }
+  }
+  const preferredGroupsByScope = new Map<string, Set<string>>();
+  for (const key of preferred) {
+    const group = ex.groupOf(key);
+    if (!group) continue;
+    for (const scope of ex.scopesOf(key)) {
+      const groups = preferredGroupsByScope.get(scope);
+      if (groups) groups.add(group);
+      else preferredGroupsByScope.set(scope, new Set([group]));
+    }
   }
   const result = new Set<string>();
-  for (const k of allItems) {
-    const group = ex.groupOf(k);
-    if (!group || activeGroups.has(group)) result.add(k);
+  for (const key of allItems) {
+    const group = ex.groupOf(key);
+    const scopes = ex.scopesOf(key);
+    const effectiveScopeGroups = scopes
+      .map((scope) => activeGroupsByScope.get(scope) ?? preferredGroupsByScope.get(scope))
+      .filter((groups): groups is Set<string> => groups !== undefined);
+    const idleGlobalScope =
+      scopes.includes(GLOBAL_SCOPE) &&
+      !activeGroupsByScope.has(GLOBAL_SCOPE) &&
+      !preferredGroupsByScope.has(GLOBAL_SCOPE);
+    if (!group || (!idleGlobalScope && effectiveScopeGroups.every((groups) => groups.has(group)))) {
+      result.add(key);
+    }
   }
   return result;
 }
@@ -195,15 +300,65 @@ export function clearAllExclusionGroups(
   proposed: Set<string>,
   ex: Exclusion,
 ): { result: Set<string>; droppedGroups: string[] } {
-  const byGroup = groupKeysByGroup(proposed, ex);
-  if (byGroup.size <= 1) {
-    return { result: proposed, droppedGroups: [] };
-  }
+  const byScope = groupKeysByScope(proposed, ex);
   const result = new Set(proposed);
-  for (const keys of byGroup.values()) {
-    for (const k of keys) result.delete(k);
+  const dropped = new Set<string>();
+  for (const byGroup of byScope.values()) {
+    if (byGroup.size <= 1) continue;
+    for (const [group, keys] of byGroup) {
+      for (const key of keys) result.delete(key);
+      dropped.add(group);
+    }
   }
-  return { result, droppedGroups: [...byGroup.keys()] };
+  return {
+    result: dropped.size === 0 ? proposed : result,
+    droppedGroups: [...dropped],
+  };
+}
+
+export type ExclusionConflictPolicy = 'clear-all' | 'keep-sticky';
+
+export interface ExclusionResolution {
+  result: Set<string>;
+  keptGroup: string | null;
+  droppedGroups: string[];
+}
+
+/** Resolve a multi-group set according to the view's default-selection policy. */
+export function resolveExclusionGroups(
+  proposed: Set<string>,
+  prev: Set<string>,
+  ex: Exclusion,
+  policy: ExclusionConflictPolicy = 'clear-all',
+): ExclusionResolution {
+  if (policy === 'keep-sticky') return pickStickyGroup(proposed, prev, ex);
+  const cleared = clearAllExclusionGroups(proposed, ex);
+  return { ...cleared, keptGroup: null };
+}
+
+/** Engine families wholly retained, wholly removed, or retained only on other scopes. */
+export function exclusionResolutionFamilies(
+  proposed: Iterable<string>,
+  result: ReadonlySet<string>,
+  ex: Exclusion,
+): { kept: string[]; dropped: string[]; partial: string[] } {
+  const kept = new Set<string>();
+  const dropped = new Set<string>();
+  for (const key of proposed) {
+    const family = ex.familyOf(key);
+    if (!family) continue;
+    (result.has(key) ? kept : dropped).add(family);
+  }
+  const partial = new Set([...kept].filter((family) => dropped.has(family)));
+  for (const family of partial) {
+    kept.delete(family);
+    dropped.delete(family);
+  }
+  return {
+    kept: [...kept].toSorted(),
+    dropped: [...dropped].toSorted(),
+    partial: [...partial].toSorted(),
+  };
 }
 
 /**
@@ -213,14 +368,14 @@ export function clearAllExclusionGroups(
  *    the group already active. The provider should refuse the toggle (no state
  *    change) and surface a toast. `attempted` / `existing` name the literal
  *    engine families for display.
- *  - `silent-disable-all`: the toggle would surface multiple groups (e.g. via
- *    solo→restore-all). Replace the active set with `result` and don't show a
- *    toast — the user didn't explicitly try to add anything.
+ *  - `silent-resolve`: the toggle would surface multiple groups (e.g. via
+ *    solo→restore-all). Replace the active set with the policy-resolved `result`
+ *    and don't show a toast — the user didn't explicitly try to add anything.
  *  - `fallthrough`: the toggle is fine, run the normal toggle path.
  */
 export type ExclusionToggleDecision =
   | { kind: 'block'; attempted: string; existing: string | null }
-  | { kind: 'silent-disable-all'; result: Set<string> }
+  | { kind: 'silent-resolve'; result: Set<string> }
   | { kind: 'fallthrough' };
 
 export function resolveExclusionToggle(
@@ -228,30 +383,35 @@ export function resolveExclusionToggle(
   hw: string,
   allItems: Set<string>,
   ex: Exclusion,
+  policy: ExclusionConflictPolicy = 'clear-all',
 ): ExclusionToggleDecision {
   const proposed = computeToggle(prev, hw, allItems);
   const wasActive = prev.has(hw);
   const willBeActive = proposed.has(hw);
   const newFamily = ex.familyOf(hw);
   const newGroup = ex.groupOf(hw);
+  const newScopes = ex.scopesOf(hw);
 
-  // Hard-block the explicit ADD that introduces a cross-group conflict. Compare
-  // on the comparability group (so adding an engine in the already-active group,
-  // e.g. ATOM alongside SGLang, is allowed), but surface the literal engine
-  // label in the toast.
-  if (!wasActive && willBeActive && newGroup) {
-    const sticky = pickStickyGroup(proposed, prev, ex);
-    if (sticky.droppedGroups.length > 0 && sticky.keptGroup !== newGroup) {
-      const existing = activeFamilyInGroup(prev, sticky.keptGroup, ex) ?? sticky.keptGroup;
+  // Hard-block only an explicit add that introduces a second group in an
+  // overlapping exclusion scope. Global rules also participate in their
+  // hardware scope, preserving same-SKU STP/MTP conflicts.
+  if (!wasActive && willBeActive && newGroup && newScopes.length > 0) {
+    for (const newScope of newScopes) {
+      const existingGroup = [...prev]
+        .filter((key) => ex.scopesOf(key).includes(newScope))
+        .map((key) => ex.groupOf(key))
+        .find((group) => group !== null && group !== newGroup);
+      if (!existingGroup) continue;
+      const existing = activeFamilyInGroup(prev, existingGroup, newScope, ex) ?? existingGroup;
       return { kind: 'block', attempted: newFamily ?? newGroup, existing };
     }
   }
 
-  // Other paths (e.g. solo→restore-all surfacing a hidden second group) —
-  // disable every group silently.
-  const cleared = clearAllExclusionGroups(proposed, ex);
-  if (cleared.droppedGroups.length > 0) {
-    return { kind: 'silent-disable-all', result: cleared.result };
+  // Other paths (e.g. solo→restore-all surfacing a hidden second group) are
+  // normalized silently because the user didn't explicitly add a conflict.
+  const resolved = resolveExclusionGroups(proposed, prev, ex, policy);
+  if (resolved.droppedGroups.length > 0) {
+    return { kind: 'silent-resolve', result: resolved.result };
   }
 
   return { kind: 'fallthrough' };

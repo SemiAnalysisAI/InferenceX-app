@@ -9,9 +9,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export interface ArtifactMeta {
+  id?: number;
   name: string;
   archive_download_url: string;
   created_at: string;
+  expired?: boolean;
 }
 
 /**

@@ -1,5 +1,5 @@
-import { JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   getBenchmarkSiblings,
   type BenchmarkSiblings,
@@ -11,10 +11,10 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedSiblings = cachedQuery((id: number): Promise<BenchmarkSiblings | null> => {
-  if (JSON_MODE) return Promise.resolve(jsonProvider.getBenchmarkSiblings(id));
-  return getBenchmarkSiblings(getDb(), id);
-}, 'benchmark-siblings');
+const getCachedSiblings = cachedQuery(
+  (id: number): Promise<BenchmarkSiblings | null> => getBenchmarkSiblings(getDb(), id),
+  'benchmark-siblings',
+);
 
 /**
  * GET /api/v1/benchmark-siblings?id=N

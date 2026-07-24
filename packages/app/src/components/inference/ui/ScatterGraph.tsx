@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import { useInference } from '@/components/inference/InferenceContext';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
+import { computeToggle } from '@/hooks/useTogglableSet';
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import {
   labelOpacityForActiveState,
@@ -14,7 +15,6 @@ import {
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { computeToggle } from '@/hooks/useTogglableSet';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import {
   getChartWatermark,
@@ -52,11 +52,8 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import {
-  isFrontierEligible,
-  paretoFrontForDirection,
-  type ParetoDirection,
-} from '@/lib/chart-utils';
+import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
+import { e2eRestrictedSeed } from '@/components/inference/utils/e2eFrontier';
 import { type RooflineDirection, getSpeedOverlayCorners } from '@/lib/speed-overlay';
 import type {
   ChartDefinition,
@@ -84,6 +81,7 @@ import {
   renderKnownIssueAnnotations,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { changelogConfigToHwKey } from '@/components/inference/utils/changelogFormatters';
 
 // Greedy label-collision avoidance.
 // Each candidate is the y-position of the FIRST baseline (relative to point
@@ -102,11 +100,13 @@ function avoidLabelCollisions(
     nLines: number;
     defaultFirstY: number;
   }
-  const labels: LabelInfo[] = [];
+  const pending: Omit<LabelInfo, 'w'>[] = [];
   const ASCENT = 9;
   const DESCENT = 3;
   const LINE_H = 11;
 
+  // Pass 1 — writes only: reset every label to its default position so prior
+  // positioning doesn't bias the measurement.
   zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
     const labelEl = this.querySelector<SVGTextElement>('.point-label');
     if (!labelEl) return;
@@ -120,20 +120,21 @@ function avoidLabelCollisions(
     const cy = parseFloat(m[2]);
     const nLines = tspans.length;
     const defaultFirstY = -(8 + (nLines - 1) * LINE_H); // last baseline 8px above point
-    // Reset to default before measuring so prior positioning doesn't bias bbox
     tspans[0].setAttribute('dy', `${defaultFirstY}px`);
     labelEl.style.opacity = '1';
-    const bbox = labelEl.getBBox();
-    labels.push({
+    pending.push({
       el: labelEl,
       firstTspan: tspans[0],
       cx,
       cy,
-      w: bbox.width,
       nLines,
       defaultFirstY,
     });
   });
+
+  // Pass 2 — reads only: measure after all writes so the whole batch costs a
+  // single forced layout instead of one per label.
+  const labels: LabelInfo[] = pending.map((lab) => ({ ...lab, w: lab.el.getBBox().width }));
 
   labels.sort((a, b) => a.cx - b.cx);
   const placed: { left: number; right: number; top: number; bottom: number }[] = [];
@@ -235,6 +236,14 @@ const pointLabelText = (d: InferenceData, advanced: boolean): string =>
 
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
+
+function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
+}
 
 /** Which legend series' points table is open (per-series drill-down dialog). */
 type LegendPointsTarget =
@@ -338,6 +347,7 @@ const ScatterGraph = React.memo(
       toggleHwType,
       removeHwType,
       hwTypesWithData,
+      resolveComparisonSelection,
       selectedPrecisions,
       selectedYAxisMetric,
       availableRuns,
@@ -369,18 +379,17 @@ const ScatterGraph = React.memo(
       removeTrackedConfig,
       selectedXAxisMode,
       selectedSequence,
+      selectedModel,
       quickFilters,
+      loading,
     } = useInference();
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
 
     const {
       isUnofficialRun,
-      activeOverlayHwTypes,
+      activeOverlayHwTypes: providerActiveOverlayHwTypes,
       setActiveOverlayHwTypes,
-      allOverlayHwTypes,
-      toggleOverlayHwType: _toggleOverlayHwType,
-      resetOverlayHwTypes,
       localOfficialOverride,
       setLocalOfficialOverride,
       runIndexByUrl,
@@ -393,41 +402,185 @@ const ScatterGraph = React.memo(
     // replay animation. Only read/written when `pinLineLabels` is true.
     const lineLabelAnchorRef = useRef<Map<string, number>>(new Map());
 
-    // Effective active hw types for rendering — shared override when present, else global
-    const effectiveOfficialHwTypes = localOfficialOverride ?? activeHwTypes;
+    const scopedOverlayHwTypes = useMemo(() => {
+      const keys = new Set<string>();
+      for (const point of overlayData?.data ?? []) {
+        if (
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters)
+        ) {
+          keys.add(String(point.hwKey));
+        }
+      }
+      return keys;
+    }, [overlayData, selectedPrecisions, quickFilters]);
+    const overlayScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(',')}`;
+    const previousOverlayScopeRef = useRef(overlayScopeKey);
+    // Scope seeding is preview-only. Official charts have no overlay lifecycle
+    // to commit the ref below, so treating their key changes as pending would
+    // bypass subsequent activeHwTypes legend toggles indefinitely.
+    const overlayScopeChanged =
+      Boolean(overlayData) && previousOverlayScopeRef.current !== overlayScopeKey;
 
-    // Unified toggle across official + overlay items (shared via context)
+    const localOfficialOverrideIsStale = useMemo(() => {
+      if (localOfficialOverride === null) return false;
+      if (overlayScopeChanged) return true;
+      if (localOfficialOverride.size === 0) return false;
+      for (const key of localOfficialOverride) {
+        if (hwTypesWithData.has(key)) return false;
+      }
+      return true;
+    }, [localOfficialOverride, overlayScopeChanged, hwTypesWithData]);
+    const rawOfficialHwTypes = useMemo(() => {
+      const source = overlayScopeChanged
+        ? hwTypesWithData
+        : localOfficialOverrideIsStale
+          ? activeHwTypes
+          : (localOfficialOverride ?? activeHwTypes);
+      return new Set([...source].filter((key) => hwTypesWithData.has(key)));
+    }, [
+      activeHwTypes,
+      hwTypesWithData,
+      localOfficialOverride,
+      localOfficialOverrideIsStale,
+      overlayScopeChanged,
+    ]);
+    const rawOverlayHwTypes = useMemo(
+      () =>
+        overlayScopeChanged
+          ? scopedOverlayHwTypes
+          : new Set(
+              [...providerActiveOverlayHwTypes].filter((key) => scopedOverlayHwTypes.has(key)),
+            ),
+      [overlayScopeChanged, providerActiveOverlayHwTypes, scopedOverlayHwTypes],
+    );
     const allUnifiedHwTypes = useMemo(() => {
-      const all = new Set<string>();
-      hwTypesWithData.forEach((k) => all.add(k));
-      allOverlayHwTypes.forEach((k) => all.add(`overlay:${k}`));
+      const all = new Set(hwTypesWithData);
+      scopedOverlayHwTypes.forEach((key) => all.add(`overlay:${key}`));
       return all;
-    }, [hwTypesWithData, allOverlayHwTypes]);
+    }, [hwTypesWithData, scopedOverlayHwTypes]);
+    const rawUnifiedSelection = useMemo(() => {
+      const combined = new Set(rawOfficialHwTypes);
+      rawOverlayHwTypes.forEach((key) => combined.add(`overlay:${key}`));
+      return combined;
+    }, [rawOfficialHwTypes, rawOverlayHwTypes]);
+    // Preview mode is diagnostic: official and unofficial runs may use different
+    // engines, and all of them must remain comparable on the same graph. Keep the
+    // production cross-engine guard only when no unofficial overlay is present.
+    const resolvedUnifiedSelection = useMemo(
+      () =>
+        overlayData
+          ? rawUnifiedSelection
+          : resolveComparisonSelection(
+              rawUnifiedSelection,
+              rawOfficialHwTypes.size > 0 ? rawOfficialHwTypes : rawUnifiedSelection,
+            ).result,
+      [overlayData, rawUnifiedSelection, rawOfficialHwTypes, resolveComparisonSelection],
+    );
+    const resolvedHwTypes = useMemo(() => {
+      const official = new Set<string>();
+      const overlay = new Set<string>();
+      for (const key of resolvedUnifiedSelection) {
+        if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
+        else official.add(key);
+      }
+      return { official, overlay };
+    }, [resolvedUnifiedSelection]);
+    const effectiveOfficialHwTypes = resolvedHwTypes.official;
+    // Official-only toggles must not rebuild the D3 overlay layer. Preserve the
+    // overlay Set identity when its contents did not change.
+    const activeOverlayHwTypesRef = useRef(resolvedHwTypes.overlay);
+    if (!setsEqual(activeOverlayHwTypesRef.current, resolvedHwTypes.overlay)) {
+      activeOverlayHwTypesRef.current = resolvedHwTypes.overlay;
+    }
+    const activeOverlayHwTypes = activeOverlayHwTypesRef.current;
+    const mergeScopedOverlaySelection = useCallback(
+      (scopedSelection: Set<string>) => {
+        const merged = new Set(providerActiveOverlayHwTypes);
+        scopedOverlayHwTypes.forEach((key) => merged.delete(key));
+        scopedSelection.forEach((key) => merged.add(key));
+        return merged;
+      },
+      [providerActiveOverlayHwTypes, scopedOverlayHwTypes],
+    );
 
+    useEffect(() => {
+      if (!overlayData) return;
+      // Keep the scope pending while the official query is between scopes.
+      // ChartDisplay uses the same readiness rule before seeding the full
+      // mixed-engine override, so a rerender from overlay reconciliation cannot
+      // fall back to the production-filtered active set in the meantime.
+      if (!overlayScopeChanged || !loading || hwTypesWithData.size > 0) {
+        previousOverlayScopeRef.current = overlayScopeKey;
+      }
+      // ChartDisplay seeds the new preview scope with every eligible official
+      // series. Avoid replacing it with the production-filtered active set while
+      // that parent update is being committed.
+      if (localOfficialOverrideIsStale && !overlayScopeChanged) {
+        setLocalOfficialOverride(null);
+      } else if (
+        !overlayScopeChanged &&
+        localOfficialOverride !== null &&
+        !setsEqual(localOfficialOverride, effectiveOfficialHwTypes)
+      ) {
+        setLocalOfficialOverride(effectiveOfficialHwTypes);
+      }
+      const mergedOverlaySelection = mergeScopedOverlaySelection(activeOverlayHwTypes);
+      if (!setsEqual(providerActiveOverlayHwTypes, mergedOverlaySelection)) {
+        setActiveOverlayHwTypes(mergedOverlaySelection);
+      }
+    }, [
+      overlayData,
+      overlayScopeKey,
+      overlayScopeChanged,
+      loading,
+      hwTypesWithData,
+      localOfficialOverride,
+      localOfficialOverrideIsStale,
+      effectiveOfficialHwTypes,
+      activeOverlayHwTypes,
+      providerActiveOverlayHwTypes,
+      setLocalOfficialOverride,
+      setActiveOverlayHwTypes,
+      mergeScopedOverlaySelection,
+    ]);
+
+    const commitUnifiedSelection = useCallback(
+      (selection: Set<string>) => {
+        const official = new Set<string>();
+        const overlay = new Set<string>();
+        for (const key of selection) {
+          if (key.startsWith('overlay:')) overlay.add(key.slice('overlay:'.length));
+          else official.add(key);
+        }
+        setLocalOfficialOverride(official);
+        setActiveOverlayHwTypes(mergeScopedOverlaySelection(overlay));
+      },
+      [setLocalOfficialOverride, setActiveOverlayHwTypes, mergeScopedOverlaySelection],
+    );
     const unifiedToggle = useCallback(
       (key: string, isOverlay: boolean) => {
         const prefixedKey = isOverlay ? `overlay:${key}` : key;
-        const prev = new Set<string>();
-        effectiveOfficialHwTypes.forEach((k) => prev.add(k));
-        activeOverlayHwTypes.forEach((k) => prev.add(`overlay:${k}`));
-        const next = computeToggle(prev, prefixedKey, allUnifiedHwTypes);
-        const nextOfficial = new Set<string>();
-        const nextOverlay = new Set<string>();
-        for (const k of next) {
-          if (k.startsWith('overlay:')) nextOverlay.add(k.slice(8));
-          else nextOfficial.add(k);
-        }
-        setLocalOfficialOverride(nextOfficial);
-        setActiveOverlayHwTypes(nextOverlay);
+        commitUnifiedSelection(
+          computeToggle(resolvedUnifiedSelection, prefixedKey, allUnifiedHwTypes),
+        );
       },
-      [
-        effectiveOfficialHwTypes,
-        activeOverlayHwTypes,
-        allUnifiedHwTypes,
-        setLocalOfficialOverride,
-        setActiveOverlayHwTypes,
-      ],
+      [resolvedUnifiedSelection, allUnifiedHwTypes, commitUnifiedSelection],
     );
+    const resetUnifiedSelection = useCallback(() => {
+      selectAllHwTypes();
+      if (!overlayData) {
+        setLocalOfficialOverride(null);
+        return;
+      }
+      commitUnifiedSelection(allUnifiedHwTypes);
+    }, [
+      selectAllHwTypes,
+      overlayData,
+      setLocalOfficialOverride,
+      allUnifiedHwTypes,
+      commitUnifiedSelection,
+    ]);
 
     // When no overlay data, delegate to context's toggleHwType (preserves setActivePresetId)
     const handleToggleHwType = useCallback(
@@ -435,11 +588,31 @@ const ScatterGraph = React.memo(
       [overlayData, unifiedToggle, toggleHwType],
     );
 
+    // Legend "X" (remove) — same overlay split as handleToggleHwType. With an
+    // overlay loaded the chart reads localOfficialOverride, which the context's
+    // removeHwType (activeHwTypes) never touches, so routing the X through it
+    // left the official series visibly un-removed. Commit the removal through
+    // the unified selection instead; context state stays untouched so
+    // dismissing the overlay restores the pre-overlay official selection, same
+    // as the toggle path.
+    const handleRemoveHwType = useCallback(
+      (key: string) => {
+        if (!overlayData) {
+          removeHwType(key);
+          return;
+        }
+        const next = new Set(resolvedUnifiedSelection);
+        next.delete(key);
+        commitUnifiedSelection(next);
+      },
+      [overlayData, removeHwType, resolvedUnifiedSelection, commitUnifiedSelection],
+    );
+
     // --- Theme ---
     const hardwareConfig = hardwareConfigOverride || contextHardwareConfig;
     const activeHwKeys = useMemo(() => {
       const keys = [...effectiveOfficialHwTypes];
-      activeOverlayHwTypes.forEach((k) => keys.push(`overlay:${k}`));
+      activeOverlayHwTypes.forEach((key) => keys.push(`overlay:${key}`));
       return keys;
     }, [effectiveOfficialHwTypes, activeOverlayHwTypes]);
     const activeOfficialKeys = useMemo(
@@ -462,16 +635,17 @@ const ScatterGraph = React.memo(
 
     // --- Changelog ---
     const changelog = availableRuns ? availableRuns[selectedRunId]?.changelog || null : null;
-    const highlightConfigSuffixes = useMemo(() => {
+    const highlightedHwKeys = useMemo(() => {
       if (availableRuns) {
         const cl = availableRuns[selectedRunId]?.changelog;
         if (cl) {
-          const suffixes = cl.entries.flatMap((entry: any) =>
+          const hwKeys = cl.entries.flatMap((entry: any) =>
             (entry.config_keys ?? entry['config-keys'] ?? [])
               .filter((key: string) => selectedPrecisions.includes(key.split('-')[1]))
-              .map((key: string) => key.split('-').slice(2).join('-')),
+              .map(changelogConfigToHwKey)
+              .filter((key: string | null): key is string => key !== null),
           );
-          return new Set(suffixes);
+          return new Set(hwKeys);
         }
       }
       return new Set<string>();
@@ -504,17 +678,9 @@ const ScatterGraph = React.memo(
       for (const hwKey of Object.keys(groupedData)) {
         const combined: InferenceData[] = [];
         for (const datePoints of groupPointsByDate(groupedData[hwKey]).values()) {
-          // In non-e2e xmodes, useChartData stamps every point with an
-          // `isOnE2eFrontier` flag so the line is restricted to the
-          // e2e-Pareto winners — same set of points across every chart,
-          // just re-plotted at the chosen x metric. When the flag is
-          // present on ANY point in the bucket, narrow to the winners
-          // before paretoing (otherwise we'd recompute a fresh frontier
-          // on the swapped x axis and reintroduce the benchmark hack).
-          const flagged = datePoints.some((p) => p.isOnE2eFrontier !== undefined);
-          const seedPoints = (
-            flagged ? datePoints.filter((p) => p.isOnE2eFrontier === true) : datePoints
-          ).filter(isFrontierEligible);
+          // e2eRestrictedSeed narrows to the e2e-Pareto winners when the
+          // isOnE2eFrontier flag is present (agentic non-e2e xmodes).
+          const seedPoints = e2eRestrictedSeed(datePoints);
           if (seedPoints.length === 0) continue;
           combined.push(...frontierFn(seedPoints));
         }
@@ -577,12 +743,15 @@ const ScatterGraph = React.memo(
       // precision changes — it feeds the `layers` memo, and a new identity
       // there forces a full chart rebuild.
       if (!overlayData?.data) return EMPTY_OVERLAY_DATA;
-      // Mirror the official path's quick filters (vendor / agg-disagg / mtp-stp)
-      // so overlay points obey the same coarse filters the user picked.
+      // Mirror the official path's precision/quick filters and remove inactive
+      // overlay hardware before any points or rooflines are constructed.
       return overlayData.data.filter(
-        (p) => selectedPrecisions.includes(p.precision) && matchesQuickFilters(p, quickFilters),
+        (point) =>
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeOverlayHwTypes.has(String(point.hwKey)),
       );
-    }, [overlayData, selectedPrecisions, quickFilters]);
+    }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
 
     // Warning annotations for visible series (official + unofficial overlay)
     // with known upstream issues. Drawn as an SVG layer (box + arrow to the
@@ -633,12 +802,39 @@ const ScatterGraph = React.memo(
       const frontierFn = paretoFrontForDirection(dir ?? 'lower_right');
       const result: Record<string, Entry> = {};
       for (const [key, group] of Object.entries(grouped)) {
-        const front = frontierFn(group.points.filter(isFrontierEligible));
+        // Same e2e-winner narrowing the official `rooflines` memo applies
+        // (flags stamped per run in processOverlayChartData).
+        const front = frontierFn(e2eRestrictedSeed(group.points));
         front.sort((a, b) => a.x - b.x);
         result[key] = { hwKey: group.hwKey, runIndex: group.runIndex, points: front };
       }
       return result;
     }, [processedOverlayData, selectedYAxisMetric, chartDefinition, runIndexByUrl]);
+
+    // Overlay counterpart of `optimalPointKeys`: the points on any overlay
+    // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
+    // Frontier arrays hold the same object references as `processedOverlayData`
+    // items — the pareto fns return the refs they're handed — so identity
+    // membership is exact, and unlike composite string keys it can't collide
+    // across runs sharing a (hw, precision, tp, conc) tuple.
+    const overlayOptimalPoints = useMemo(() => {
+      const set = new Set<InferenceData>();
+      for (const group of Object.values(overlayRooflines)) {
+        for (const p of group.points) set.add(p);
+      }
+      return set;
+    }, [overlayRooflines]);
+
+    // Overlay points respect the Optimal Only toggle exactly like official
+    // points do — "optimal" = on the overlay run's drawn roofline. Without
+    // this, an e2e-dominated overlay config (hidden on the official side) kept
+    // its X marker sitting on the dashed roofline and read as a pareto point.
+    // Hardware/precision/quick filters are applied upstream in
+    // `processedOverlayData`, so optimality is the only condition here.
+    const isOverlayPointVisible = useCallback(
+      (d: InferenceData) => !hideNonOptimal || overlayOptimalPoints.has(d),
+      [hideNonOptimal, overlayOptimalPoints],
+    );
 
     // All official points for rendering (unfiltered — visibility via opacity)
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
@@ -682,11 +878,13 @@ const ScatterGraph = React.memo(
         };
       }
       const { runIndex, runId, branch } = pointsTableTarget;
-      // Overlay series: this run's points, respecting the overlay hw toggles.
+      // Overlay series: this run's points, respecting the overlay hw toggles
+      // and Optimal Only (same visibility filters as the official branch above).
       const pts = processedOverlayData.filter(
         (p) =>
           overlayRunIndex(p.run_url ?? null, runIndexByUrl) === runIndex &&
-          activeOverlayHwTypes.has(p.hwKey as string),
+          activeOverlayHwTypes.has(p.hwKey as string) &&
+          isOverlayPointVisible(p),
       );
       return {
         hw: `overlay-run-${runId}`,
@@ -702,6 +900,7 @@ const ScatterGraph = React.memo(
       selectedPrecisions,
       hideNonOptimal,
       optimalPointKeys,
+      isOverlayPointVisible,
       resolveColor,
       processedOverlayData,
       runIndexByUrl,
@@ -749,8 +948,17 @@ const ScatterGraph = React.memo(
       if (hideNonOptimal) {
         pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
-      return processedOverlayData.length > 0 ? [...pts, ...processedOverlayData] : pts;
-    }, [filteredData, processedOverlayData, hideNonOptimal, optimalPointKeys]);
+      // Overlay points hidden by Optimal Only are excluded from the domain too
+      // so hidden outliers don't stretch the axes.
+      const overlayPts = processedOverlayData.filter(isOverlayPointVisible);
+      return overlayPts.length > 0 ? [...pts, ...overlayPts] : pts;
+    }, [
+      filteredData,
+      processedOverlayData,
+      hideNonOptimal,
+      optimalPointKeys,
+      isOverlayPointVisible,
+    ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
 
@@ -863,6 +1071,7 @@ const ScatterGraph = React.memo(
     // Handlers".
     const interactionRef = useRef({
       isPointVisible,
+      isOverlayPointVisible,
       effectiveActiveHwTypes,
       selectedPrecisions,
       activeOverlayHwTypes,
@@ -872,6 +1081,7 @@ const ScatterGraph = React.memo(
     });
     interactionRef.current = {
       isPointVisible,
+      isOverlayPointVisible,
       effectiveActiveHwTypes,
       selectedPrecisions,
       activeOverlayHwTypes,
@@ -884,6 +1094,13 @@ const ScatterGraph = React.memo(
     // restyle with the same layout/scales the chart was drawn with.
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
 
+    // Hover dimming animates via the inline `transition: opacity 150ms ease`
+    // the render path puts on dots, rooflines, and labels — a single style
+    // write per node. A d3 `.transition()` here would re-write opacity every
+    // animation frame, and each of those writes restarts the CSS transition:
+    // one hover used to emit transitionrun/transitioncancel per node per
+    // frame (tens of thousands of events per session) and feed the same
+    // mutation churn to the PostHog recorder.
     const handleLegendHover = useCallback(
       (hwKey: string) => {
         const svg = chartRef.current?.getSvgElement?.();
@@ -891,23 +1108,15 @@ const ScatterGraph = React.memo(
         const root = d3.select(svg);
         root
           .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .transition('legend-hover')
-          .duration(150)
           .style('opacity', (d) =>
             isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
           );
-        root
-          .selectAll<SVGPathElement, unknown>('.roofline-path')
-          .transition('legend-hover')
-          .duration(150)
-          .style('opacity', function () {
-            if (!isRooflineVisible(this)) return 0;
-            return this.dataset.hwKey === hwKey ? null : '0.15';
-          });
+        root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
+          if (!isRooflineVisible(this)) return 0;
+          return this.dataset.hwKey === hwKey ? null : '0.15';
+        });
         root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
-          .transition('legend-hover')
-          .duration(150)
           .style('opacity', function () {
             return labelOpacityForHover((this as SVGGElement).dataset, hwKey);
           });
@@ -921,20 +1130,12 @@ const ScatterGraph = React.memo(
       const root = d3.select(svg);
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .transition('legend-hover')
-        .duration(150)
         .style('opacity', (d) => (isPointVisible(d) ? 1 : 0));
-      root
-        .selectAll<SVGPathElement, unknown>('.roofline-path')
-        .transition('legend-hover')
-        .duration(150)
-        .style('opacity', function () {
-          return isRooflineVisible(this) ? 1 : 0;
-        });
+      root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
+        return isRooflineVisible(this) ? 1 : 0;
+      });
       root
         .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
-        .transition('legend-hover')
-        .duration(150)
         .style('opacity', function () {
           return labelOpacityForActiveState(
             (this as SVGGElement).dataset,
@@ -1005,6 +1206,7 @@ const ScatterGraph = React.memo(
             isTracked: trackedConfigIdsRef.current.has(buildPointConfigId(d)),
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace: typeof d.id === 'number' ? traceAvailability?.[d.id] === true : false,
+            locale,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
@@ -1071,6 +1273,7 @@ const ScatterGraph = React.memo(
         // tooltip content closure (the "View charts" button), so rebuild the
         // config when the presence fetch resolves.
         traceAvailability,
+        locale,
       ],
     );
 
@@ -1257,7 +1460,7 @@ const ScatterGraph = React.memo(
             });
           }
 
-          zoomGroup
+          const plSel = zoomGroup
             .selectAll<SVGGElement, LabelSeg>('.parallelism-label')
             .data(labelSegments, (d) => d.segKey)
             .join(
@@ -1288,20 +1491,31 @@ const ScatterGraph = React.memo(
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
-            .style('opacity', (d) => (d.visible ? 1 : 0))
-            .each(function (d) {
-              const g = d3.select(this);
-              const text = g.select<SVGTextElement>('.pl-text').text(d.label);
-              const bbox = (text.node() as SVGTextElement).getBBox();
-              const px = 4;
-              const py = 2;
-              g.select('.pl-bg')
-                .attr('x', bbox.x - px)
-                .attr('y', bbox.y - py)
-                .attr('width', bbox.width + px * 2)
-                .attr('height', bbox.height + py * 2)
-                .attr('fill', d.color);
-            });
+            .style('transition', 'opacity 150ms ease')
+            .style('opacity', (d) => (d.visible ? 1 : 0));
+
+          // Size each label's background to its text in two passes — write all
+          // texts, then measure all bboxes — so the batch forces one layout
+          // instead of one per label.
+          plSel.each(function (d) {
+            d3.select(this).select<SVGTextElement>('.pl-text').text(d.label);
+          });
+          const plMeasured: { node: SVGGElement; d: LabelSeg; bbox: DOMRect }[] = [];
+          plSel.each(function (d) {
+            const text = this.querySelector<SVGTextElement>('.pl-text');
+            if (text) plMeasured.push({ node: this, d, bbox: text.getBBox() });
+          });
+          for (const { node, d, bbox } of plMeasured) {
+            const px = 4;
+            const py = 2;
+            d3.select(node)
+              .select('.pl-bg')
+              .attr('x', bbox.x - px)
+              .attr('y', bbox.y - py)
+              .attr('width', bbox.width + px * 2)
+              .attr('height', bbox.height + py * 2)
+              .attr('fill', d.color);
+          }
 
           // ── Line labels (run name along each roofline) ──
           interface LineLabel {
@@ -1554,7 +1768,7 @@ const ScatterGraph = React.memo(
             }
           }
 
-          zoomGroup
+          const llSel = zoomGroup
             .selectAll<SVGGElement, LineLabel>('.line-label')
             .data(lineLabels, (d) => d.key)
             .join(
@@ -1589,20 +1803,30 @@ const ScatterGraph = React.memo(
             // share the same `data-hw-key`. See GH #470.
             .attr('data-visible', (d) => (d.visible ? '1' : '0'))
             .attr('transform', (d) => `translate(${d.x + 8},${d.y - 14})`)
-            .style('opacity', (d) => (d.visible ? 1 : 0))
-            .each(function (d) {
-              const g = d3.select(this);
-              const text = g.select<SVGTextElement>('.ll-text').text(d.label);
-              const bbox = (text.node() as SVGTextElement).getBBox();
-              const px = 5;
-              const py = 3;
-              g.select('.ll-bg')
-                .attr('x', bbox.x - px)
-                .attr('y', bbox.y - py)
-                .attr('width', bbox.width + px * 2)
-                .attr('height', bbox.height + py * 2)
-                .attr('fill', d.color);
-            });
+            .style('transition', 'opacity 150ms ease')
+            .style('opacity', (d) => (d.visible ? 1 : 0));
+
+          // Two-pass text/bbox sizing — same batching rationale as the
+          // parallelism labels above.
+          llSel.each(function (d) {
+            d3.select(this).select<SVGTextElement>('.ll-text').text(d.label);
+          });
+          const llMeasured: { node: SVGGElement; d: LineLabel; bbox: DOMRect }[] = [];
+          llSel.each(function (d) {
+            const text = this.querySelector<SVGTextElement>('.ll-text');
+            if (text) llMeasured.push({ node: this, d, bbox: text.getBBox() });
+          });
+          for (const { node, d, bbox } of llMeasured) {
+            const px = 5;
+            const py = 3;
+            d3.select(node)
+              .select('.ll-bg')
+              .attr('x', bbox.x - px)
+              .attr('y', bbox.y - py)
+              .attr('width', bbox.width + px * 2)
+              .attr('height', bbox.height + py * 2)
+              .attr('fill', d.color);
+          }
         },
         onZoom: (zoomGroup, ctx) => {
           const ir = interactionRef.current;
@@ -1948,6 +2172,15 @@ const ScatterGraph = React.memo(
 
               overlayPoints.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
               overlayPoints.style('filter', null);
+              // Optimal Only parity with official points (see isOverlayPointVisible).
+              // Read through the interaction ref so this long-lived closure sees
+              // the current toggle state on zoom/label re-renders.
+              overlayPoints.each(function (d) {
+                const visible = interactionRef.current.isOverlayPointVisible(d);
+                d3.select(this)
+                  .style('opacity', visible ? 1 : 0)
+                  .style('pointer-events', visible ? 'auto' : 'none');
+              });
               overlayPoints
                 .select('.overlay-x')
                 .attr('stroke', (d) =>
@@ -1982,8 +2215,7 @@ const ScatterGraph = React.memo(
               // Overlay tooltip handlers
               const svgNode = ctx.layout.svg.node()!;
               const container = svgNode.parentElement as HTMLDivElement;
-              const tooltipDiv = svgNode.nextElementSibling as HTMLDivElement;
-              const tooltip = d3.select(tooltipDiv);
+              const tooltip = d3.select(ctx.tooltipElement);
 
               const createOverlayConfig = (d: InferenceData, pinned: boolean) => ({
                 data: d,
@@ -1993,6 +2225,7 @@ const ScatterGraph = React.memo(
                 selectedYAxisMetric,
                 hardwareConfig: overlayData.hardwareConfig,
                 overlayData,
+                locale,
               });
 
               overlayPoints
@@ -2201,12 +2434,17 @@ const ScatterGraph = React.memo(
           xScale,
           yScale,
           annotations: ir.knownIssueAnnotations,
-          rightInset: measureLegendRightInset(
-            chartId,
-            ctx.layout.svg.node(),
-            ctx.layout.margin.left,
-            ctx.width,
-          ),
+          // Only measure the legend overlap when there are boxes to place —
+          // this runs on every zoom frame, and the measurement forces layout.
+          rightInset:
+            ir.knownIssueAnnotations.length === 0
+              ? 0
+              : measureLegendRightInset(
+                  chartId,
+                  ctx.layout.svg.node(),
+                  ctx.layout.margin.left,
+                  ctx.width,
+                ),
           background: ir.getCssColor('--background'),
           foreground: ir.getCssColor('--foreground'),
           mutedForeground: ir.getCssColor('--muted-foreground'),
@@ -2259,6 +2497,7 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       chartDefinition,
+      locale,
     ]);
 
     // Layers handle for the decoration effect — lets it re-run individual
@@ -2416,6 +2655,16 @@ const ScatterGraph = React.memo(
         sel.select('.tracked-ring').attr('stroke', color);
       });
 
+      // Overlay X markers: Optimal Only visibility (mirrors the official dot
+      // loop above — the overlay layer render applies the same predicate, but
+      // a toggle flip must restyle existing DOM without a chart rebuild).
+      zoomGroup.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (d) {
+        const visible = ir.isOverlayPointVisible(d);
+        d3.select(this)
+          .style('opacity', visible ? 1 : 0)
+          .style('pointer-events', visible ? 'auto' : 'none');
+      });
+
       // Rooflines: visibility + solid-stroke recolor as direct writes (never
       // `d`). Gradient strokes keep their url(#…) reference — gradient stop
       // colors come from the fixed parallelism palette and don't change with
@@ -2481,6 +2730,7 @@ const ScatterGraph = React.memo(
       }
     }, [
       isPointVisible,
+      isOverlayPointVisible,
       effectiveActiveHwTypes,
       selectedPrecisions,
       activeOverlayHwTypes,
@@ -2491,6 +2741,16 @@ const ScatterGraph = React.memo(
       showLineLabels,
       gradientColorByPoint,
     ]);
+
+    // D3 custom layers are keyed additions, so removing the overlay layer from
+    // the config does not delete DOM that the previous render created. Clear
+    // those marks explicitly when the last unofficial run is dismissed.
+    useLayoutEffect(() => {
+      if (overlayData) return;
+      const svg = chartRef.current?.getSvgElement?.();
+      if (!svg) return;
+      d3.select(svg).selectAll('.unofficial-overlay-pt, .overlay-roofline-path').remove();
+    }, [overlayData]);
 
     // Dismiss tooltip on filter changes
     useEffect(() => {
@@ -2585,7 +2845,7 @@ const ScatterGraph = React.memo(
               variant="sidebar"
               onItemHover={handleLegendHover}
               onItemHoverEnd={handleLegendHoverEnd}
-              onItemRemove={showAllHardwareTypes ? undefined : removeHwType}
+              onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
               legendItems={[
                 // Overlay legend: one entry per loaded unofficial run that actually
                 // contributes points to this chart. Colored from the shared palette
@@ -2655,7 +2915,7 @@ const ScatterGraph = React.memo(
                     label: getDisplayLabel(hwConfig),
                     color: resolveColor(key),
                     title: hwConfig.gpu,
-                    isHighlighted: highlightConfigSuffixes.has(key.replaceAll('_', '-')),
+                    isHighlighted: highlightedHwKeys.has(key),
                     hw: key,
                     isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
                     onClick: showAllHardwareTypes
@@ -2806,15 +3066,13 @@ const ScatterGraph = React.memo(
               }}
               actions={
                 effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < allOverlayHwTypes.size
+                activeOverlayHwTypes.size < scopedOverlayHwTypes.size
                   ? [
                       {
                         id: 'scatter-reset-filter',
                         label: legendT.resetFilter,
                         onClick: () => {
-                          selectAllHwTypes();
-                          setLocalOfficialOverride(null);
-                          resetOverlayHwTypes();
+                          resetUnifiedSelection();
                           track('latency_legend_filter_reset');
                         },
                       },

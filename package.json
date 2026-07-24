@@ -32,10 +32,9 @@
     "admin:db:ingest:run": "pnpm --filter *db db:ingest:run",
     "admin:db:ingest:ci": "pnpm --filter *db db:ingest:ci",
     "admin:db:ingest:collectivex": "pnpm --filter *db db:ingest:collectivex",
+    "admin:db:prepare:ci": "pnpm --filter *db db:prepare:ci",
     "admin:db:ingest:gcs": "pnpm --filter *db db:ingest:gcs",
     "admin:db:ingest:supplemental": "pnpm --filter *db db:ingest:supplemental",
-    "admin:db:dump": "pnpm --filter *db db:dump",
-    "admin:db:load-dump": "pnpm --filter *db db:load-dump --",
     "admin:db:migrate": "pnpm --filter *db db:migrate",
     "admin:db:migrate:collectivex": "pnpm --filter *db db:migrate:collectivex",
     "admin:db:apply-overrides": "pnpm --filter *db db:apply-overrides",
@@ -46,12 +45,12 @@
     "@babel/core": "^8.0.1",
     "audit-ci": "^7.1.0",
     "is-ci": "^4.1.0",
-    "lefthook": "^2.1.9",
-    "oxfmt": "^0.56.0",
-    "oxlint": "^1.71.0",
+    "lefthook": "^2.1.10",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
     "rimraf": "^6.1.3",
     "typescript": "^6.0.3",
-    "vite": "^8.1.0"
+    "vite": "^8.1.4"
   },
   "engines": {
     "node": ">=24.11.0",

@@ -4,19 +4,20 @@ import { unlockAgenticGate } from '../support/e2e';
 // Spec-scoped fixture helpers
 //
 // The shared cypress/fixtures/api/*.json files contain ZERO agentic_traces rows
-// (by design — adding them flips the bare /inference default to the agentic
-// scenario and regresses other specs). This spec therefore injects minimal
-// agentic data via spec-scoped cy.intercept overrides that shadow the fixture
-// server, following the same pattern used in ttft-x-axis-toggle.cy.ts.
+// (by design — agentic coverage is injected per-spec so fixed-seq specs stay
+// lean). This spec therefore injects minimal agentic data via spec-scoped
+// cy.intercept overrides that shadow the fixture server, following the same
+// pattern used in ttft-x-axis-toggle.cy.ts.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro
 const AGENTIC_DATE = '2026-06-12';
 
-// Two GPUs with agentic + single_turn entries so the scenario selector resolves
+// Three configs with agentic + single_turn entries so the scenario selector resolves
 // to agentic (agentic preferred when both types exist for the same model).
 const AGENTIC_HARDWARE = [
   { hardware: 'b200', framework: 'vllm', disagg: false },
+  { hardware: 'b200', framework: 'sglang', disagg: false },
   { hardware: 'b300', framework: 'vllm', disagg: false },
 ];
 
@@ -107,10 +108,18 @@ const agenticBenchmarks = AGENTIC_HARDWARE.flatMap((g) =>
     isl: null,
     osl: null,
     conc,
-    offload_mode: 'off',
+    offload_mode: 'on',
     benchmark_type: 'agentic_traces',
     image: 'vllm/vllm-openai:v0.9.0',
-    metrics: agenticMetrics(conc),
+    metrics: {
+      ...agenticMetrics(conc),
+      kv_offloading: 'dram',
+      kv_offload_backend: 'mooncake',
+      kv_offload_backend_version: '0.3.11.post1',
+      router_name: 'vllm-router',
+      router_version: '0.1.14',
+      server_gpu_cache_hit_rate: 0.875,
+    },
     workers: null,
     date: AGENTIC_DATE,
     run_url: null,
@@ -176,6 +185,12 @@ describe('GPU comparison agentic point detail', () => {
       });
 
     cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain', 'Offload Type: DRAM')
+      .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
+      .and('contain', 'Router: vLLM Router 0.1.14')
+      .and('contain', 'GPU Cache Hit Rate: 87.5%')
+      .and('not.contain', 'Offload Mode');
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')
       .then(($link) => {
@@ -184,5 +199,30 @@ describe('GPU comparison agentic point detail', () => {
         expect($link.attr('href')).to.match(/^\/inference\/agentic\/\d+$/u);
       });
     cy.location('pathname').should('eq', '/inference');
+  });
+
+  it('surfaces automatic resolution of conflicting GPU URL state', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
+      'agenticAvailability',
+    );
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
+
+    cy.visit(
+      '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+
+    cy.get('[data-testid="engine-comparison-conflict-toast"]')
+      .should('be.visible')
+      .and('contain.text', 'Kept SGLang and removed vLLM configs');
+    cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
+      .should('contain.text', 'SGLang')
+      .and('not.contain.text', 'vLLM');
+    cy.contains('button', 'Jun 12, 2026').should('be.visible');
   });
 });

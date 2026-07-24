@@ -94,3 +94,20 @@ export async function getEvalSamples(
     failedTotal: counts.failed_total,
   };
 }
+
+/** Return the zero-based position of one sample in the unfiltered doc-id ordering. */
+export async function getEvalSampleOffset(
+  sql: DbClient,
+  evalResultId: number,
+  docId: number,
+): Promise<number | null> {
+  const [row] = (await sql`
+    select
+      count(*) filter (where doc_id < ${docId})::int as offset,
+      count(*) filter (where doc_id = ${docId})::int as matches
+    from eval_samples
+    where eval_result_id = ${evalResultId}
+  `) as unknown as { offset: number; matches: number }[];
+
+  return row?.matches === 1 ? row.offset : null;
+}

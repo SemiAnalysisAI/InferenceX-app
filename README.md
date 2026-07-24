@@ -55,30 +55,37 @@ cd InferenceX-app
 pnpm install
 ```
 
-### 2. Set Up Data Source
+### 2. Set Up a Database
 
-You can run the dashboard against either a live database or a static JSON dump. The JSON dump approach requires no database setup and is the easiest way to get started.
+The dashboard requires a live PostgreSQL database. Set `DATABASE_READONLY_URL` in `.env`; the application supports both standard PostgreSQL servers and Neon.
 
-#### Option A: JSON Dump (no database required, local dev only)
+#### Option A: Standard PostgreSQL
 
-Download the latest DB dump from [GitHub Releases](https://github.com/SemiAnalysisAI/InferenceX-app/releases), unpack it, and point `DUMP_DIR` at the directory. The dump is xz-compressed and split into one or more `.tar.xz.part*` files; reassemble them by piping `cat` through `xz`. This only works with `pnpm dev`; production builds require a live database.
+Use the `postgres` driver for a local or remotely hosted PostgreSQL server:
 
 ```bash
 cp .env.example .env
-
-# Download and unpack the latest dump (requires xz; `brew install xz` on macOS)
-gh release download db-dump/2026-03-30 -p 'inferencex-dump-*.tar.xz.part*'
-cat inferencex-dump-2026-03-30.tar.xz.part* | xz -d -T0 | tar -x
-
-# Add to .env
-echo 'DUMP_DIR=./inferencex-dump-2026-03-30' >> .env
+cat >> .env <<'EOF'
+DATABASE_READONLY_URL=postgresql://postgres:postgres@localhost:5432/postgres
+DATABASE_DRIVER=postgres
+DATABASE_SSL=false
+EOF
 ```
 
-Make sure `DATABASE_READONLY_URL` is not set (or is commented out) in your `.env`.
+Remote PostgreSQL servers use TLS by default. Omit `DATABASE_SSL` unless the server explicitly requires it to be disabled.
 
-#### Option B: Live Database
+#### Option B: Neon
 
-Set `DATABASE_READONLY_URL` in your `.env` to a Neon PostgreSQL connection string. See [`.env.example`](.env.example) for details.
+Set `DATABASE_READONLY_URL` to a Neon PostgreSQL connection string. Neon hosts use the serverless HTTP driver automatically; `DATABASE_DRIVER=neon` can be set explicitly.
+
+```bash
+cp .env.example .env
+cat >> .env <<'EOF'
+DATABASE_READONLY_URL=postgresql://user:password@ep-example.us-east-1.aws.neon.tech/database
+DATABASE_DRIVER=neon
+DATABASE_SSL=true
+EOF
+```
 
 ### 3. Run the Development Server
 
@@ -119,18 +126,20 @@ Some of these may require additional setup or environment variables.
 These are meant to be used for database and cache management and maintenance tasks, and should not be necessary during regular development.
 However, using `pnpm admin:cache:invalidate` pointed at your local development server can be useful to test after making changes to the database or API routes.
 
-| Script                              | Description                            |
-| ----------------------------------- | -------------------------------------- |
-| `pnpm admin:db:migrate`             | Run database migrations                |
-| `pnpm admin:db:ingest:run`          | Ingest benchmark data from GitHub runs |
-| `pnpm admin:db:ingest:ci`           | Ingest benchmark data (CI mode)        |
-| `pnpm admin:db:ingest:gcs`          | Ingest benchmark data from GCS         |
-| `pnpm admin:db:ingest:supplemental` | Ingest supplemental data               |
-| `pnpm admin:db:apply-overrides`     | Apply data overrides                   |
-| `pnpm admin:db:reset`               | Reset the database                     |
-| `pnpm admin:db:verify`              | Verify database integrity              |
-| `pnpm admin:cache:invalidate`       | Invalidate API cache                   |
-| `pnpm admin:cache:warmup`           | Warm up API cache                      |
+Changes to `packages/db/src/etl/run-overrides.ts` that reach `main` or `master` are applied to the production database automatically by CI, followed by database verification, cache invalidation, and cache warmup. The override command remains available for local previews and manual recovery.
+
+| Script                              | Description                              |
+| ----------------------------------- | ---------------------------------------- |
+| `pnpm admin:db:migrate`             | Run database migrations                  |
+| `pnpm admin:db:ingest:run`          | Ingest benchmark data from GitHub runs   |
+| `pnpm admin:db:ingest:ci`           | Ingest benchmark data (CI mode)          |
+| `pnpm admin:db:ingest:gcs`          | Ingest benchmark data from GCS           |
+| `pnpm admin:db:ingest:supplemental` | Ingest supplemental data                 |
+| `pnpm admin:db:apply-overrides`     | Preview or apply data overrides manually |
+| `pnpm admin:db:reset`               | Reset the database                       |
+| `pnpm admin:db:verify`              | Verify database integrity                |
+| `pnpm admin:cache:invalidate`       | Invalidate API cache                     |
+| `pnpm admin:cache:warmup`           | Warm up API cache                        |
 
 ## Deployment
 

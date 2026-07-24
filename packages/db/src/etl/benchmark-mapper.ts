@@ -18,6 +18,7 @@ import {
   parseNum,
   parseInt2,
 } from './normalizers';
+import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
 
@@ -65,6 +66,8 @@ const NON_METRIC_KEYS = new Set([
   // to offloadMode / stringified metrics explicitly in mapBenchmarkRow.
   'kv_offloading',
   'kv_offload_backend',
+  'kv_p2p_transfer',
+  'router',
   // v3 agentic nested containers — flattened by flattenAgenticAggRow before
   // the auto-capture loop runs; the raw objects themselves are not metrics.
   'request_metrics',
@@ -233,18 +236,13 @@ export function mapBenchmarkRow(
   const metrics = captureNumericMetrics(row);
 
   // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
-  // — preserve as a stringified metric so the frontend can expose it in tooltips.
-  // v3 rows additionally carry the offload tier + backend ('dram'/'mooncake');
-  // keep them so the UI can say *what kind* of offload, not just on/off.
+  // — preserve as a stringified metric for legacy readers. Runtime cache
+  // descriptors are kept for every benchmark type so fixed-sequence multinode
+  // rows can expose their P2P transfer engine alongside agentic offload details.
   if (isAgentic) {
     (metrics as Record<string, unknown>).offload_mode = offloadModeRaw;
-    if (typeof row.kv_offloading === 'string' && row.kv_offloading.length > 0) {
-      (metrics as Record<string, unknown>).kv_offloading = row.kv_offloading;
-    }
-    if (typeof row.kv_offload_backend === 'string' && row.kv_offload_backend.length > 0) {
-      (metrics as Record<string, unknown>).kv_offload_backend = row.kv_offload_backend;
-    }
   }
+  Object.assign(metrics, extractRuntimeMetadata(row));
 
   // Slow-tail interactivity invariant. Agentic artifacts ship `*_intvty`, but the
   // definition has drifted across harness versions: some emit `1/p(ITL)`

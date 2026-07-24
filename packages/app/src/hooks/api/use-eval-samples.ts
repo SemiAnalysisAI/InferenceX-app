@@ -15,6 +15,8 @@ interface UseEvalSamplesArgs {
   filter: EvalSamplesFilter;
   offset: number;
   limit: number;
+  /** Shared sample to resolve into its containing page. DB-backed runs only. */
+  docId?: number | null;
 }
 
 /**
@@ -37,6 +39,7 @@ export function useEvalSamples({
   filter,
   offset,
   limit,
+  docId,
 }: UseEvalSamplesArgs) {
   const useLive = evalResultId !== null && evalResultId <= 0 && Boolean(liveContext);
   const useDb = evalResultId !== null && evalResultId > 0;
@@ -44,11 +47,11 @@ export function useEvalSamples({
   return useQuery({
     queryKey: useLive
       ? ['eval-samples-live', liveContext, filter, offset, limit]
-      : ['eval-samples', evalResultId, filter, offset, limit],
+      : ['eval-samples', evalResultId, filter, offset, limit, docId],
     queryFn: ({ signal }) =>
       useLive
         ? fetchEvalSamplesLive(liveContext!, filter, offset, limit, signal)
-        : fetchEvalSamples(evalResultId!, filter, offset, limit, signal),
+        : fetchEvalSamples(evalResultId!, filter, offset, limit, docId, signal),
     enabled: useDb || useLive,
     placeholderData: keepPreviousData,
   });

@@ -262,15 +262,22 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"]').should('be.visible');
     });
 
-    it('table row count matches bar count', () => {
+    it('table total matches bar count (first page caps at 10 rows)', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar')
         .its('length')
         .then((barCount) => {
           cy.get('[data-testid="calculator-table-view-btn"]').click();
           cy.get('[data-testid="calculator-results-table"] tbody tr').should(
             'have.length',
-            barCount,
+            Math.min(barCount, 10),
           );
+          if (barCount > 10) {
+            // The pagination footer carries the full result count
+            cy.get('[data-testid="calculator-chart-section"]').should(
+              'contain.text',
+              `of ${barCount}`,
+            );
+          }
         });
     });
 
@@ -537,6 +544,116 @@ describe('TCO Calculator', () => {
       });
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
       cy.get('[data-testid="calc-model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Fleet planner (MW projection + cost-target inverse lookup)
+  // ---------------------------------------------------------------------------
+
+  describe('fleet planner', () => {
+    before(() => {
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      });
+      cy.visit('/calculator');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
+    });
+
+    it('renders both fleet planner cards with empty states', () => {
+      cy.get('[data-testid="calculator-fleet-section"]').should('be.visible');
+      cy.get('[data-testid="calculator-fleet-section"]').should('contain.text', 'Fleet Projection');
+      cy.get('[data-testid="calculator-fleet-empty"]').should('be.visible');
+      cy.get('[data-testid="calculator-costcap-section"]').should('be.visible');
+      cy.get('[data-testid="calculator-costcap-empty"]').should('be.visible');
+    });
+
+    it('entering a MW budget renders the fleet projection table', () => {
+      cy.get('[data-testid="calc-fleet-mw-input"]').type('10');
+      cy.get('[data-testid="calculator-fleet-table"]').should('be.visible');
+      cy.get('[data-testid="calculator-fleet-table"]').within(() => {
+        cy.contains('th', 'GPUs').should('exist');
+        cy.contains('th', 'Concurrent Users').should('exist');
+        cy.contains('th', 'Fleet $/mo').should('exist');
+        cy.get('tbody tr').should('have.length.greaterThan', 0);
+        // GPU counts are whole, comma-grouped numbers
+        cy.get('tbody tr')
+          .first()
+          .find('td')
+          .eq(1)
+          .invoke('text')
+          .should('match', /^[\d,]+$/u);
+      });
+      cy.get('[data-testid="calculator-fleet-empty"]').should('not.exist');
+    });
+
+    it('fleet table shows the utilization and facility-power assumptions', () => {
+      cy.get('[data-testid="calculator-fleet-section"]').should(
+        'contain.text',
+        'Assumes 100% utilization',
+      );
+      cy.get('[data-testid="calculator-fleet-section"]').should(
+        'contain.text',
+        'SemiAnalysis Datacenter Industry Model',
+      );
+    });
+
+    it('entering a generous cost target renders reachable interactivity per GPU', () => {
+      cy.get('[data-testid="calc-costcap-input"]').type('100');
+      cy.get('[data-testid="calculator-costcap-table"]').should('be.visible');
+      cy.get('[data-testid="calculator-costcap-table"]').within(() => {
+        cy.contains('th', 'Max Interactivity (tok/s/user)').should('exist');
+        cy.get('tbody tr').should('have.length.greaterThan', 0);
+        // At $100/M tok everything is affordable — values must be numeric
+        cy.get('tbody tr')
+          .first()
+          .find('td')
+          .eq(1)
+          .invoke('text')
+          .should('match', /^\d+(?:\.\d+)?$/u);
+      });
+    });
+
+    it('an unreachably low cost target shows Not reachable rows', () => {
+      cy.get('[data-testid="calc-costcap-input"]').clear();
+      cy.get('[data-testid="calc-costcap-input"]').type('0.000001');
+      cy.get('[data-testid="calculator-costcap-table"]').should('contain.text', 'Not reachable');
+    });
+
+    it('a budget too small for one GPU shows a dedicated message, not the enter-a-value prompt', () => {
+      cy.get('[data-testid="calc-fleet-mw-input"]').clear();
+      cy.get('[data-testid="calc-fleet-mw-input"]').type('0.0001');
+      cy.get('[data-testid="calculator-fleet-empty"]')
+        .should('be.visible')
+        .and('contain.text', 'too small to power a single GPU');
+      cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
+    });
+
+    it('clearing the MW input restores the empty state', () => {
+      cy.get('[data-testid="calc-fleet-mw-input"]').clear();
+      cy.get('[data-testid="calculator-fleet-empty"]')
+        .should('be.visible')
+        .and('contain.text', 'Enter a facility power budget');
+      cy.get('[data-testid="calculator-fleet-table"]').should('not.exist');
+    });
+
+    it('cost-cap table follows legend visibility (soloing a GPU filters its rows)', () => {
+      cy.get('[data-testid="calc-costcap-input"]').clear();
+      cy.get('[data-testid="calc-costcap-input"]').type('100');
+      cy.get('[data-testid="calculator-costcap-table"] tbody tr').then(($rows) => {
+        const fullCount = $rows.length;
+        // Clicking a legend item while all GPUs are visible solos it
+        cy.get('.sidebar-legend label').first().click();
+        cy.get('[data-testid="calculator-costcap-table"] tbody tr')
+          .should('have.length.lessThan', fullCount)
+          .and('have.length.greaterThan', 0);
+        // Clicking the solo GPU again restores all
+        cy.get('.sidebar-legend label').first().click();
+        cy.get('[data-testid="calculator-costcap-table"] tbody tr').should(
+          'have.length',
+          fullCount,
+        );
+      });
     });
   });
 });

@@ -31,8 +31,10 @@ describe('Blog', () => {
       cy.visit('/blog/inferencemax-open-source-inference-benchmarking');
     });
 
-    it('renders the post title', () => {
-      cy.get('h2').should('contain.text', 'InferenceMAX');
+    it('renders the post title as the one and only h1', () => {
+      // The title is the page's single <h1> (primary-keyword top heading);
+      // MDX body sections map to <h2>, so there must be exactly one h1.
+      cy.get('h1').should('have.length', 1).and('contain.text', 'InferenceMAX');
     });
 
     it('displays post metadata', () => {

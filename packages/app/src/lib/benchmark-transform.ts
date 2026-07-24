@@ -56,6 +56,10 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const offloadMode =
     row.offload_mode ??
     (typeof rawMetrics.offload_mode === 'string' ? rawMetrics.offload_mode : undefined);
+  const stringMetric = (key: string): string | undefined => {
+    const value = rawMetrics[key];
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+  };
   // Postgres bigint comes through the SQL client as a string; coerce it. Overlay
   // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
   // is NaN — collapse any non-persisted value to undefined so downstream link /
@@ -160,6 +164,12 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     isl: row.isl,
     osl: row.osl,
     offload_mode: offloadMode,
+    kv_offloading: stringMetric('kv_offloading'),
+    kv_offload_backend: stringMetric('kv_offload_backend'),
+    kv_offload_backend_version: stringMetric('kv_offload_backend_version'),
+    kv_p2p_transfer: stringMetric('kv_p2p_transfer'),
+    router_name: stringMetric('router_name'),
+    router_version: stringMetric('router_version'),
     server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
     server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,

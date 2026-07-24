@@ -126,6 +126,27 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('tp');
       expect(result!.metrics).not.toHaveProperty('ep');
     });
+
+    it('preserves the KV transfer engine for fixed-sequence multinode rows', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV1Row({ is_multinode: true, kv_p2p_transfer: 'nixl' }),
+        tracker,
+      );
+
+      expect((result!.metrics as Record<string, unknown>).kv_p2p_transfer).toBe('nixl');
+    });
+
+    it('flattens router metadata for fixed-sequence rows', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV1Row({ router: { name: 'sglang-router', version: '0.3.2' } }),
+        tracker,
+      );
+
+      expect((result!.metrics as Record<string, unknown>).router_name).toBe('sglang-router');
+      expect((result!.metrics as Record<string, unknown>).router_version).toBe('0.3.2');
+    });
   });
 
   describe('v2 schema', () => {
@@ -854,6 +875,31 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(result!.offloadMode).toBe('on');
     expect((result!.metrics as Record<string, unknown>).kv_offloading).toBe('dram');
     expect((result!.metrics as Record<string, unknown>).kv_offload_backend).toBe('mooncake');
+  });
+
+  it('flattens current backend metadata and preserves its independent version', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({
+        kv_offloading: 'dram',
+        kv_offload_backend: { name: 'lmcache', version: '0.5.1' },
+      }),
+      tracker,
+    );
+    const metrics = result!.metrics as Record<string, unknown>;
+    expect(metrics.kv_offload_backend).toBe('lmcache');
+    expect(metrics.kv_offload_backend_version).toBe('0.5.1');
+  });
+
+  it('flattens agentic router metadata and preserves its version', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({ router: { name: 'vllm-router', version: '0.1.14' } }),
+      tracker,
+    );
+    const metrics = result!.metrics as Record<string, unknown>;
+    expect(metrics.router_name).toBe('vllm-router');
+    expect(metrics.router_version).toBe('0.1.14');
   });
 
   it('still applies the failed-run guard to v3 rows', () => {

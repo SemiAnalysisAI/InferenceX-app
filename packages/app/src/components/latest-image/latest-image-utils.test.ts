@@ -4,6 +4,7 @@ import {
   AGE_MAX_RED_DAYS,
   ageColorStyle,
   ageRowStyle,
+  baseFramework,
   daysSince,
   getActualLatestTag,
   isOutdated,
@@ -111,6 +112,21 @@ describe('isOutdated', () => {
   });
 });
 
+describe('baseFramework', () => {
+  it('collapses llmd-vllm into the vLLM engine family', () => {
+    expect(baseFramework('llmd-vllm')).toBe('vllm');
+  });
+
+  it.each([
+    ['dynamo-vllm', 'vllm'],
+    ['mori-sglang', 'sglang'],
+    ['atom', 'atom'],
+    ['vllm', 'vllm'],
+  ])('maps %s to the %s engine family', (framework, expected) => {
+    expect(baseFramework(framework)).toBe(expected);
+  });
+});
+
 describe('getActualLatestTag', () => {
   it('looks up the base framework from FRAMEWORK_TO_BASE and returns its release', () => {
     const releases = { vllm: 'v0.21.0', sglang: 'v0.5.12' };
@@ -118,6 +134,11 @@ describe('getActualLatestTag', () => {
     expect(getActualLatestTag('sglang', releases)).toBe('v0.5.12');
     expect(getActualLatestTag('dynamo-sglang', releases)).toBe('v0.5.12');
     expect(getActualLatestTag('mori-sglang', releases)).toBe('v0.5.12');
+  });
+
+  it('uses the vLLM release stream for llmd-vllm', () => {
+    const releases = { vllm: 'v0.21.0', sglang: 'v0.5.12' };
+    expect(getActualLatestTag('llmd-vllm', releases)).toBe('v0.21.0');
   });
 
   it('returns null when releases is undefined (API still loading)', () => {

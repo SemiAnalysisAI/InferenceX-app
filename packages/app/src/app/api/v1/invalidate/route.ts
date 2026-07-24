@@ -9,10 +9,22 @@ export async function POST(request: Request) {
   const authHeader = request.headers.get('Authorization') ?? '';
   const provided = Buffer.from(authHeader);
   const expected = Buffer.from(`Bearer ${secret}`);
+  // The shared staging deployment is already protected by Vercel. Its CI
+  // caller must present the project-scoped automation bypass before Vercel
+  // forwards this header to the route, so a second app secret is redundant.
+  // Keep this exception branch-specific; production and every other preview
+  // continue to require INVALIDATE_SECRET below.
+  const isProtectedStagingRequest =
+    process.env.VERCEL_ENV === 'preview' &&
+    process.env.VERCEL_GIT_COMMIT_REF === 'staging' &&
+    Boolean(request.headers.get('x-vercel-protection-bypass'));
 
   // Compare BYTE lengths — a multibyte char can make the JS string lengths
   // equal while the buffers differ, and timingSafeEqual throws on that.
-  if (!secret || provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+  if (
+    !isProtectedStagingRequest &&
+    (!secret || provided.length !== expected.length || !timingSafeEqual(provided, expected))
+  ) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

@@ -7,16 +7,11 @@ const { mockListConversations, mockGetDb } = vi.hoisted(() => ({
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
-  JSON_MODE: false,
   FIXTURES_MODE: false,
 }));
 
 vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
   listConversations: mockListConversations,
-}));
-
-vi.mock('@semianalysisai/inferencex-db/json-provider', () => ({
-  listConversations: vi.fn(),
 }));
 
 vi.mock('@/lib/api-cache', () => ({

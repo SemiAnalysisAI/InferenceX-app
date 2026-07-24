@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { languageAlternates } from '@/lib/i18n';
@@ -15,11 +10,14 @@ import {
   canonicalCompareSlug,
   compareDisplayLabel,
   compareModelDisplayLabel,
+  compareModelSeoName,
+  compareSeoTitle,
   parseCompareSlug,
 } from '@/lib/compare-slug';
 import {
   buildBreadcrumbJsonLd,
   buildJsonLd,
+  compareMetaDescription,
   compareTableNarrative,
   computeCompareTableData,
   dateRangeForPair,
@@ -46,16 +44,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!parsed) return {};
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
-  const url = `${SITE_URL}/compare/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`;
-  const description = `${gpuLabel} inference benchmark on ${parsed.model.label}: verified, reproducible head-to-head results from InferenceX, the independent open-source GPU benchmark by SemiAnalysis. ${SUPPORTERS_LINE} Compare latency, throughput & cost.`;
+  const modelSeoName = compareModelSeoName(parsed.model);
+  const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
+  const url = `${SITE_URL}/compare/${canonical}`;
+
+  // Lead the SEO title with the GPU pair — that's the phrase people search
+  // ("b200 vs b300") and must survive Google's ~60-char SERP truncation. The
+  // `absolute` form bypasses the long "%s | InferenceX by SemiAnalysis" root
+  // template so the query isn't pushed off the end.
+  const title = `${compareSeoTitle(gpuLabel, modelSeoName)} | ${SITE_NAME}`;
+
+  // Stat-led meta description built from the interpolated head-to-head numbers
+  // at the slug's default operating point (falls back to boilerplate for
+  // sparse-data pairs). Fetch is blob-cached and shared with the page render.
+  const rows = await getCachedBenchmarks(parsed.model.dbKeys);
+  const { sequence, precision } = pickPairDefaults(rows, parsed.a, parsed.b);
+  const { ssrRows } = computeCompareTableData(rows, parsed.a, parsed.b, sequence, precision);
+  const description = compareMetaDescription(parsed.model, parsed.a, parsed.b, ssrRows);
+
   return {
-    title: `${fullLabel} Inference Benchmark`,
+    title: { absolute: title },
     description,
     alternates: {
       canonical: url,
-      languages: languageAlternates(
-        `/compare/${canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b)}`,
-      ),
+      languages: languageAlternates(`/compare/${canonical}`),
     },
     openGraph: {
       title: `${fullLabel} | ${SITE_NAME}`,

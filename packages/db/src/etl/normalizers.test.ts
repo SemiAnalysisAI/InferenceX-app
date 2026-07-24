@@ -82,6 +82,11 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('gb300-cw')).toBe('gb300');
   });
 
+  it('strips -lat suffix for RTX PRO 6000 (latency-optimized PCIe SKU)', () => {
+    expect(hwToGpuKey('rtx6000pro-lat')).toBe('rtx6000pro');
+    expect(hwToGpuKey('rtx6000pro')).toBe('rtx6000pro');
+  });
+
   it('strips runner index suffix before other suffixes', () => {
     expect(hwToGpuKey('mi355x-amd_0')).toBe('mi355x');
     expect(hwToGpuKey('mi355x-amd_2')).toBe('mi355x');
@@ -135,6 +140,21 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'dsv4pro-fp8' })).toBe('dsv4');
   });
 
+  it('resolves AMD Kimi-K2.7-Code identifiers to the canonical kimik2.7-code key', () => {
+    // AMD AgentX sweeps emit the bare prefix `kimik2.7` (no `-code`) and the
+    // MXFP4 model path `amd/Kimi-K2.7-Code-MXFP4`; both must fold into the
+    // canonical `kimik2.7-code` DB bucket. Regression for GitHub Actions run
+    // 29975243963, whose overlay rendered nothing because every row was skipped
+    // as an unmapped model.
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7-fp4' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ model_prefix: 'kimik2.7' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ model: 'amd/Kimi-K2.7-Code-MXFP4' })).toBe('kimik2.7-code');
+    // Canonical identifiers still resolve to the same bucket.
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7-code' })).toBe('kimik2.7-code');
+    expect(resolveModelKey({ model: 'moonshotai/Kimi-K2.7-Code' })).toBe('kimik2.7-code');
+  });
+
   it('falls back to MODEL_TO_KEY when prefix not present', () => {
     expect(resolveModelKey({ model: 'deepseek-ai/DeepSeek-R1' })).toBe('dsr1');
     expect(resolveModelKey({ model: 'nvidia/Llama-3.3-70B-Instruct-FP8' })).toBe('llama70b');
@@ -171,13 +191,16 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ model: 'moonshotai/Kimi-K2.5' })).toBe('kimik2.5');
     expect(resolveModelKey({ model: 'MiniMaxAI/MiniMax-M2.5' })).toBe('minimaxm2.5');
     expect(resolveModelKey({ model: 'zai-org/GLM-5-FP8' })).toBe('glm5');
+    expect(resolveModelKey({ model: 'zai-org/GLM-5.2-FP8' })).toBe('glm5.2');
   });
 
   it('resolves point-release variants to their own DB key (faithful to submitted data)', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'glm5.1' })).toBe('glm5.1');
+    expect(resolveModelKey({ infmax_model_prefix: 'glm5.2' })).toBe('glm5.2');
     expect(resolveModelKey({ infmax_model_prefix: 'kimik2.6' })).toBe('kimik2.6');
     expect(resolveModelKey({ infmax_model_prefix: 'minimaxm2.7' })).toBe('minimaxm2.7');
     expect(resolveModelKey({ model: 'amd/GLM-5.1-MXFP4' })).toBe('glm5.1');
+    expect(resolveModelKey({ model: 'zai-org/GLM-5.2-FP8' })).toBe('glm5.2');
   });
 });
 

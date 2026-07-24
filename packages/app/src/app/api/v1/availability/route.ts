@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+
 import { getAvailabilityData } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
@@ -9,10 +9,7 @@ import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedAvailability = cachedQuery(() => {
-  if (JSON_MODE) return Promise.resolve(jsonProvider.getAvailabilityData());
-  return getAvailabilityData(getDb());
-}, 'availability');
+const getCachedAvailability = cachedQuery(() => getAvailabilityData(getDb()), 'availability');
 
 export async function GET() {
   if (FIXTURES_MODE) return cachedJson(loadFixture('availability'));

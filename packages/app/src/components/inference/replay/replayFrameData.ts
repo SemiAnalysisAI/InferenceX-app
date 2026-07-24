@@ -5,11 +5,17 @@ import { interpolateAtStep } from './interpolateAtTime';
 
 export function buildFrameData(timeline: ReplayTimeline, fraction: number): InferenceData[] {
   const idxFloat = stepFloatAtFraction(fraction, timeline.dates.length);
+  // A replay frame is a single point in time, so every point gets the
+  // playhead's date. Each template keeps its config's first-observation date,
+  // and ScatterGraph scopes Pareto frontiers and line paths per date — leaving
+  // mixed template dates in one frame splits a hardware series into several
+  // same-colored lines (with duplicated line labels) mid-replay.
+  const frameDate = dateAtFraction(timeline, fraction);
   const out: InferenceData[] = [];
   for (const c of timeline.configs) {
     const r = interpolateAtStep(c.stepValues, idxFloat);
     if (!r.visible) continue;
-    out.push({ ...c.template, x: r.x, y: r.y });
+    out.push({ ...c.template, x: r.x, y: r.y, date: frameDate });
   }
   return out;
 }

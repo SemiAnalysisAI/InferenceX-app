@@ -16,8 +16,11 @@ import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-butt
 import { Card } from '@/components/ui/card';
 import { JsonLd } from '@/components/json-ld';
 import {
+  blogDescription,
   getAllPosts,
   getAdjacentPosts,
+  buildBlogBreadcrumbJsonLd,
+  buildBlogPostingJsonLd,
   extractHeadings,
   getPostBySlug,
   hasZhTranslation,
@@ -43,10 +46,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const result = getPostBySlug(slug);
   if (!result) return {};
   const { meta } = result;
+  const description = blogDescription(meta);
 
   return {
-    title: meta.title,
-    description: meta.subtitle,
+    // `absolute` keeps a short " | InferenceX" suffix instead of the long
+    // "%s | InferenceX by SemiAnalysis" root template, leaving more room for
+    // the headline before Google truncates the SERP title.
+    title: { absolute: `${meta.title} | ${SITE_NAME}` },
+    description,
     keywords: meta.tags,
     authors: [{ name: AUTHOR_NAME }],
     alternates: {
@@ -56,7 +63,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     openGraph: {
       title: `${meta.title} | ${SITE_NAME}`,
-      description: meta.subtitle,
+      description,
       url: `${SITE_URL}/blog/${slug}`,
       type: 'article',
       publishedTime: `${meta.date}T00:00:00Z`,
@@ -67,7 +74,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: 'summary_large_image',
       title: meta.title,
-      description: meta.subtitle,
+      description,
       site: AUTHOR_HANDLE,
       creator: AUTHOR_HANDLE,
     },
@@ -131,31 +138,21 @@ export default async function BlogPostPage({ params }: Props) {
     },
   });
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: meta.title,
-    author: { '@type': 'Person', name: AUTHOR_NAME },
-    publisher: { '@type': 'Organization', name: AUTHOR_NAME },
-    datePublished: `${meta.date}T00:00:00Z`,
-    ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
-    description: meta.subtitle,
-    url: `${SITE_URL}/blog/${slug}`,
-    wordCount: raw.trim().split(/\s+/u).length,
-    timeRequired: `PT${meta.readingTime}M`,
-  };
+  const jsonLd = buildBlogPostingJsonLd(meta, raw);
+  const breadcrumbJsonLd = buildBlogBreadcrumbJsonLd(slug, meta.title);
 
   return (
     <main className="relative">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
       <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <section data-blog-section="true" className="flex flex-col gap-4">
           <Card>
             <BlogBackLink />
             <header>
-              <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h2>
+              <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{meta.title}</h1>
               <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.subtitle}</p>
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
                 <span>{AUTHOR_NAME}</span>

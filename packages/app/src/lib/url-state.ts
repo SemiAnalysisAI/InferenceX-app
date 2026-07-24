@@ -8,6 +8,7 @@
  *   i_ = inference chart
  *   e_ = evaluation chart
  *   r_ = reliability chart
+ *   c_ = TCO calculator
  *
  * Only non-default values are written to keep URLs short.
  */
@@ -64,6 +65,9 @@ const URL_STATE_KEYS = [
   'r_hc',
   'r_legend',
   'r_active',
+  // Calculator (fleet planner)
+  'c_mw',
+  'c_costcap',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -74,12 +78,13 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
-  // No strippable default: the UI default scenario (gate-unlocked) is
-  // AgenticTraces, not 8k/1k, so an '8k/1k' default here would strip an explicit
-  // 8K/1K selection from the URL — on reload the empty i_seq resolves back to the
-  // agentic default. Empty means the resolved scenario is ALWAYS written
-  // explicitly (effectiveSequence is never ''), so a shared/reloaded link keeps
-  // whatever the user picked. The no-param case still resolves via availability.
+  // No strippable default: per-route `initialSequence` seeds (e.g. the /compare
+  // pages) make the no-param resolution route-dependent, so stripping '8k/1k'
+  // (the global default) would revert an explicit 8K/1K pick back to the route's
+  // seeded scenario on reload. Empty means the resolved scenario is ALWAYS
+  // written explicitly (effectiveSequence is never ''), so a shared/reloaded
+  // link keeps whatever the user picked. The no-param case still resolves via
+  // availability.
   i_seq: '',
   // No strippable default: precision is only written to the URL once chosen
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
@@ -122,6 +127,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_hc: '',
   r_legend: '',
   r_active: '',
+  c_mw: '',
+  c_costcap: '',
 };
 
 /** Which param prefixes are relevant per tab. */
@@ -129,6 +136,9 @@ const TAB_PARAM_PREFIXES: Record<string, string[]> = {
   inference: ['g_', 'i_'],
   evaluation: ['g_', 'e_'],
   reliability: ['r_'],
+  // The calculator reuses the global model + inference sequence/precision
+  // params, plus its own c_ scope (fleet planner MW / cost cap).
+  calculator: ['g_', 'i_', 'c_'],
 };
 
 /** In-memory store of current param values (kept in sync via writeUrlParams). */

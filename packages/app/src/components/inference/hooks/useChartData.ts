@@ -23,15 +23,12 @@ import {
   getModelSortIndex,
   hardwareKeyMatchesAnyBase,
 } from '@/lib/constants';
-import {
-  mergeRunScopedRows,
-  transformBenchmarkRows,
-  withPercentile,
-} from '@/lib/benchmark-transform';
+import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
-import { paretoFrontForDirection, type ParetoDirection } from '@/lib/chart-utils';
+import { e2eFrontierWinners } from '@/components/inference/utils/e2eFrontier';
+import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import {
   applyQuickFilters,
   computeAvailableQuickFilters,
@@ -86,39 +83,14 @@ function e2eParetoIds(
   selectedYAxisMetric: string,
   percentile: string,
 ): Set<number> | null {
-  const e2eChartDef = (chartDefinitions as ChartDefinition[]).find((c) => c.chartType === 'e2e');
-  if (!e2eChartDef) return null;
-  const dir = e2eChartDef[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition] as
-    | ParetoDirection
-    | undefined;
-  if (!dir) return null;
-  const frontierFn = paretoFrontForDirection(dir);
-  // Percentile-prefixed e2e-latency field name (e.g. 'p90_e2el').
-  const e2elField = withPercentile('median_e2el', percentile);
-  const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
-
-  // Re-frame each candidate point in (e2el, y) space, then compute the
-  // pareto per (hwKey, precision, date) bucket — frontiers don't span dates
-  // (a May 17 point can't dominate a May 15 plot).
-  const byGroup = new Map<string, InferenceData[]>();
-  for (const p of points) {
-    const yValue = (p[metricKey] as { y?: number } | undefined)?.y;
-    const xValue = (p as unknown as Record<string, unknown>)[e2elField];
-    if (typeof xValue !== 'number' || !Number.isFinite(xValue)) continue;
-    if (typeof yValue !== 'number' || !Number.isFinite(yValue)) continue;
-    const key = `${p.hwKey}|${p.precision}|${p.date}`;
-    let bucket = byGroup.get(key);
-    if (!bucket) {
-      bucket = [];
-      byGroup.set(key, bucket);
-    }
-    bucket.push({ ...p, x: xValue, y: yValue });
-  }
+  // Shared seed with the overlay path (processOverlayChartData) so both draw
+  // the SAME e2e-restricted frontier. null = the y-metric has no e2e roofline
+  // direction → caller skips filtering. Only persisted DB rows carry ids to pin.
+  const winners = e2eFrontierWinners(points, selectedYAxisMetric, percentile);
+  if (winners === null) return null;
   const ids = new Set<number>();
-  for (const bucket of byGroup.values()) {
-    for (const f of frontierFn(bucket)) {
-      if (isPersistedBenchmarkId(f.id)) ids.add(f.id);
-    }
+  for (const winner of winners) {
+    if (isPersistedBenchmarkId(winner.id)) ids.add(winner.id);
   }
   return ids;
 }
@@ -399,81 +371,49 @@ export function useChartData(
       (chartDefinitions as ChartDefinition[]).map((chartDef) => {
         const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
-        // Default x-axis = chart's natural latency metric, percentile-adjusted
-        // for the agentic case (median_e2el → p99_e2el etc.). Percentiles only
-        // exist for agentic scenarios; fixed-seq benchmarks have no p90_/p99_
-        // columns, and the percentile selector is hidden for them — but its
-        // state persists at the 'p90' default across mode/sequence switches.
-        // Applying that stale percentile to a fixed-seq metric yields a null
-        // column (e.g. p90_intvty), which renders as x=0/NaN and drops the
-        // point from the chart. Force median for non-agentic so the natural
-        // metric (median_intvty / median_e2el) is used.
+        // Resolve which data field the x-axis plots — shared with the overlay
+        // path (processOverlayChartData) via resolveXAxisField so the two
+        // can't drift. Labels/headings stay here (display-only) and follow the
+        // resolver's branch discriminant.
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
-        const naturalX = withPercentile(
-          chartDef.x,
-          isAgentic ? selectedPercentile : 'median',
-        ) as keyof AggDataEntry;
-        let xAxisField: keyof AggDataEntry = naturalX;
-        let xAxisLabel = chartDef.x_label;
-
-        const metricTitle =
-          (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-        const isInputMetric = metricTitle.toLowerCase().includes('input');
-
-        // Resolve the effective x-axis override per chart type
         const effectiveXMetric =
           chartDef.chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
-        // The TTFT override is now any *_ttft metric (not just p90_ttft) — the
-        // x-axis-mode picker reconciles the percentile prefix based on sequence
-        // kind (fixed-seq → median, agentic → user-picked percentile).
-        const isTtftOverride =
-          typeof effectiveXMetric === 'string' && effectiveXMetric.endsWith('_ttft');
+        const resolved = resolveXAxisField(chartDef, selectedYAxisMetric, effectiveXMetric, {
+          isAgentic,
+          percentile: selectedPercentile,
+        });
+        const naturalX = resolved.naturalX as keyof AggDataEntry;
+        const xAxisField = resolved.xAxisField as keyof AggDataEntry;
+        const { isTtftOverride } = resolved;
+
         const ttftPctl = isTtftOverride
           ? (effectiveXMetric as string).replace(/_ttft$/u, '')
           : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
 
-        if (
-          effectiveXMetric &&
-          chartDef.chartType === 'interactivity' &&
-          isInputMetric &&
-          !isAgentic
-        ) {
-          xAxisField = effectiveXMetric as keyof AggDataEntry;
+        let xAxisLabel = chartDef.x_label;
+        if (resolved.branch === 'user-input-override') {
           const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
           if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
             xAxisLabel = (chartDef[labelKey] as string) || chartDef.x_label;
           } else {
             xAxisLabel = isTtftOverride ? ttftLabel : chartDef.x_label;
           }
-        } else if (chartDef.chartType === 'interactivity' && isInputMetric) {
-          // Agentic falls through here too — the manual X-axis dropdown is
-          // hidden in agentic mode (would double up with the percentile
-          // selector), so the config default + percentile post-processing
-          // below drives the x axis.
-          const xOverrideKey = `${selectedYAxisMetric}_x` as keyof ChartDefinition;
+        } else if (resolved.branch === 'config-input-override') {
           const xLabelOverrideKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
-          xAxisField = (chartDef[xOverrideKey] as keyof AggDataEntry) || chartDef.x;
           xAxisLabel = (chartDef[xLabelOverrideKey] as string) || chartDef.x_label;
-        } else if (chartDef.chartType === 'e2e' && isTtftOverride) {
-          xAxisField = effectiveXMetric as keyof AggDataEntry;
+        } else if (resolved.branch === 'e2e-ttft-override') {
           xAxisLabel = ttftLabel;
         }
 
-        // Agentic: rewrite the resolved x metric to the chosen percentile,
-        // and relabel accordingly. Both have to be updated unconditionally —
-        // xAxisField may already be percentile-adjusted (via naturalX) while
-        // xAxisLabel still carries the raw chartDef.x_label prefix.
-        // The chart heading ("vs. <latency>") is also rewritten to include
-        // the percentile so the title above the plot reflects what's drawn.
+        // Agentic: relabel to the chosen percentile (the resolver already
+        // rewrote the field) — xAxisLabel still carries the raw chartDef
+        // prefix. The chart heading ("vs. <latency>") is also rewritten so the
+        // title above the plot reflects what's drawn.
         const headingKey = `${selectedYAxisMetric}_heading` as keyof ChartDefinition;
         let chartHeading = (chartDef[headingKey] as string) || chartDef.heading;
         if (isAgentic) {
-          xAxisField = withPercentile(
-            xAxisField as string,
-            selectedPercentile,
-          ) as keyof AggDataEntry;
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = xAxisLabel.replace(/^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b/iu, pctlWord);
           chartHeading = chartHeading.replace(

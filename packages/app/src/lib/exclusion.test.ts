@@ -6,7 +6,9 @@ import {
   buildExclusion,
   clearAllExclusionGroups,
   effectiveLegendItems,
+  exclusionResolutionFamilies,
   pickStickyGroup,
+  resolveExclusionGroups,
   resolveExclusionToggle,
   type ExclusionSpec,
 } from './exclusion';
@@ -14,9 +16,30 @@ import {
 // The dsv4 MTP rule: `*_mtp` keys participate, dynamo-/mori- prefixes are
 // stripped, and ATOM shares SGLang's comparability group.
 const MTP_SPEC: ExclusionSpec[] = [
-  { suffix: '_mtp', stripPrefixes: ['dynamo-', 'mori-'], groupAliases: { atom: 'sglang' } },
+  {
+    suffix: '_mtp',
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+  },
 ];
 const ex = buildExclusion(MTP_SPEC);
+const STP_SPEC: ExclusionSpec[] = [
+  {
+    suffix: null,
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    groupAliases: { atom: 'sglang' },
+    scope: 'hardware',
+  },
+];
+const agenticEx = buildExclusion([...MTP_SPEC, ...STP_SPEC]);
+const namespacedAgenticEx = {
+  familyOf: (key: string) =>
+    agenticEx.familyOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+  groupOf: (key: string) =>
+    agenticEx.groupOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+  scopesOf: (key: string) =>
+    agenticEx.scopesOf(key.startsWith('overlay:') ? key.slice('overlay:'.length) : key),
+};
 
 describe('buildExclusion — familyOf', () => {
   it('returns null for non-participating keys', () => {
@@ -38,6 +61,8 @@ describe('buildExclusion — familyOf', () => {
     expect(ex.familyOf('gb300_dynamo-sglang_mtp')).toBe('sglang');
     expect(ex.familyOf('h100_dynamo-trt_mtp')).toBe('trt');
     expect(ex.familyOf('mi355x_mori-sglang_mtp')).toBe('sglang');
+    expect(ex.familyOf('b300_llmd-vllm_mtp')).toBe('vllm');
+    expect(ex.familyOf('mi355x_mooncake-atom_mtp')).toBe('atom');
   });
 });
 
@@ -62,6 +87,160 @@ describe('buildExclusion — groupOf', () => {
     const eagle = buildExclusion([{ suffix: '_eagle' }]);
     expect(eagle.groupOf('h100_vllm_eagle')).toBe('vllm');
     expect(eagle.groupOf('h100_vllm_mtp')).toBeNull();
+  });
+});
+
+describe('exclusionResolutionFamilies', () => {
+  it('reports literal aliased families rather than comparability group ids', () => {
+    const proposed = new Set(['mi355x_atom_mtp', 'gb300_sglang_mtp', 'h100_vllm_mtp', 'h100_vllm']);
+    const result = new Set(['mi355x_atom_mtp', 'gb300_sglang_mtp', 'h100_vllm']);
+
+    expect(exclusionResolutionFamilies(proposed, result, ex)).toEqual({
+      kept: ['atom', 'sglang'],
+      dropped: ['vllm'],
+      partial: [],
+    });
+  });
+
+  it('reports families retained only on other hardware scopes as partial', () => {
+    const proposed = new Set(['b200_vllm', 'b200_sglang', 'mi355x_sglang']);
+    const result = new Set(['b200_vllm', 'mi355x_sglang']);
+
+    expect(exclusionResolutionFamilies(proposed, result, agenticEx)).toEqual({
+      kept: ['vllm'],
+      dropped: [],
+      partial: ['sglang'],
+    });
+  });
+});
+
+describe('AgentX STP engine exclusion', () => {
+  it('classifies unsuffixed STP keys without capturing speculative variants', () => {
+    const stpEx = buildExclusion(STP_SPEC);
+    expect(stpEx.familyOf('b300_vllm')).toBe('vllm');
+    expect(stpEx.familyOf('gb300_dynamo-sglang')).toBe('sglang');
+    expect(stpEx.groupOf('mi355x_atom')).toBe('sglang');
+    expect(stpEx.familyOf('b300_vllm_mtp')).toBeNull();
+    expect(stpEx.familyOf('b300_llmd-vllm')).toBe('vllm');
+    expect(stpEx.groupOf('mi355x_mooncake-atom')).toBe('sglang');
+  });
+
+  it('blocks adding vLLM STP while SGLang STP is active', () => {
+    const prev = new Set(['b300_sglang']);
+    const all = new Set(['b300_sglang', 'b300_vllm']);
+    expect(resolveExclusionToggle(prev, 'b300_vllm', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'block',
+      attempted: 'vllm',
+      existing: 'sglang',
+    });
+  });
+
+  it('allows different engine families on different hardware SKUs', () => {
+    const prev = new Set(['b200_sglang']);
+    const all = new Set(['b200_sglang', 'mi355x_vllm']);
+    expect(resolveExclusionToggle(prev, 'mi355x_vllm', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'fallthrough',
+    });
+  });
+
+  it('allows STP and MTP configs from the same engine family', () => {
+    const prev = new Set(['b300_vllm']);
+    const all = new Set(['b300_vllm', 'b300_vllm_mtp']);
+    expect(resolveExclusionToggle(prev, 'b300_vllm_mtp', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'fallthrough',
+    });
+  });
+
+  it('blocks cross-engine STP and MTP configs on the same hardware SKU', () => {
+    const prev = new Set(['b300_sglang']);
+    const all = new Set(['b300_sglang', 'b300_vllm_mtp']);
+    expect(resolveExclusionToggle(prev, 'b300_vllm_mtp', all, agenticEx, 'keep-sticky')).toEqual({
+      kind: 'block',
+      attempted: 'vllm',
+      existing: 'sglang',
+    });
+  });
+
+  it('keeps the active engine during automatic AgentX selection resolution', () => {
+    const proposed = new Set(['b300_sglang', 'b300_vllm', 'b300_vllm_mtp']);
+    const resolved = resolveExclusionGroups(
+      proposed,
+      new Set(['b300_vllm']),
+      agenticEx,
+      'keep-sticky',
+    );
+    expect([...resolved.result].toSorted()).toEqual(['b300_vllm', 'b300_vllm_mtp']);
+    expect(resolved.keptGroup).toBe('vllm');
+    expect(resolved.droppedGroups).toEqual(['sglang']);
+  });
+
+  it('uses hardware STP state to choose the compatible global MTP engine', () => {
+    const proposed = new Set(['b200_vllm', 'b200_vllm_mtp', 'mi355x_sglang_mtp']);
+    const resolved = resolveExclusionGroups(
+      proposed,
+      new Set(['b200_vllm']),
+      agenticEx,
+      'keep-sticky',
+    );
+
+    expect(resolved.result).toEqual(new Set(['b200_vllm', 'b200_vllm_mtp']));
+    expect(resolved.keptGroup).toBe('vllm');
+    expect(resolved.droppedGroups).toEqual(['sglang']);
+  });
+
+  it.each([
+    ['SGLang MTP first', ['b200_sglang', 'mi355x_vllm', 'b200_sglang_mtp', 'mi355x_vllm_mtp']],
+    ['vLLM MTP first', ['b200_sglang', 'mi355x_vllm', 'mi355x_vllm_mtp', 'b200_sglang_mtp']],
+  ])('breaks multiple correlated MTP ties alphabetically with %s', (_label, keys) => {
+    const resolved = resolveExclusionGroups(
+      new Set(keys),
+      new Set(['b200_sglang', 'mi355x_vllm']),
+      agenticEx,
+      'keep-sticky',
+    );
+
+    expect(resolved.result).toEqual(new Set(['b200_sglang', 'mi355x_vllm', 'b200_sglang_mtp']));
+    expect(resolved.keptGroup).toBe('sglang');
+    expect(resolved.droppedGroups).toEqual(['vllm']);
+  });
+
+  it('blocks cross-engine adds across official and overlay namespaces', () => {
+    const prev = new Set(['overlay:b300_sglang']);
+    const all = new Set(['overlay:b300_sglang', 'b300_vllm']);
+    expect(
+      resolveExclusionToggle(prev, 'b300_vllm', all, namespacedAgenticEx, 'keep-sticky'),
+    ).toEqual({
+      kind: 'block',
+      attempted: 'vllm',
+      existing: 'sglang',
+    });
+  });
+
+  it('keeps whichever engine family the sticky set names when a load conflicts', () => {
+    const proposed = new Set(['b300_sglang', 'overlay:b300_vllm']);
+
+    // Official-sticky prev: the official engine wins, overlay dropped.
+    const officialSticky = resolveExclusionGroups(
+      proposed,
+      new Set(['b300_sglang']),
+      namespacedAgenticEx,
+      'keep-sticky',
+    );
+    expect([...officialSticky.result]).toEqual(['b300_sglang']);
+    expect(officialSticky.keptGroup).toBe('sglang');
+    expect(officialSticky.droppedGroups).toEqual(['vllm']);
+
+    // Overlay-sticky prev (what ScatterGraph passes while an unofficial run is
+    // loaded): the run's engine wins and the official series is dropped.
+    const overlaySticky = resolveExclusionGroups(
+      proposed,
+      new Set(['overlay:b300_vllm']),
+      namespacedAgenticEx,
+      'keep-sticky',
+    );
+    expect([...overlaySticky.result]).toEqual(['overlay:b300_vllm']);
+    expect(overlaySticky.keptGroup).toBe('vllm');
+    expect(overlaySticky.droppedGroups).toEqual(['sglang']);
   });
 });
 
@@ -237,6 +416,27 @@ describe('effectiveLegendItems', () => {
     expect([...out].toSorted()).toEqual(['h100_dynamo-vllm_mtp', 'h100_vllm', 'h100_vllm_mtp']);
   });
 
+  it('keeps idle hardware scopes in the restore-all universe', () => {
+    const all = new Set(['b200_sglang', 'b200_vllm', 'mi355x_vllm']);
+    const active = new Set(['b200_sglang']);
+    const effective = effectiveLegendItems(all, active, agenticEx);
+
+    expect(effective).toEqual(new Set(['b200_sglang', 'mi355x_vllm']));
+    expect(computeToggle(active, 'b200_sglang', effective)).toEqual(effective);
+  });
+
+  it('restores the remembered engine for a temporarily idle hardware scope', () => {
+    const all = new Set(['b200_sglang', 'mi355x_sglang', 'mi355x_vllm']);
+    const preferred = new Set(['b200_sglang', 'mi355x_vllm']);
+    const initialUniverse = effectiveLegendItems(all, preferred, agenticEx, preferred);
+    const solo = computeToggle(preferred, 'b200_sglang', initialUniverse);
+    const restoreUniverse = effectiveLegendItems(all, solo, agenticEx, preferred);
+
+    expect(solo).toEqual(new Set(['b200_sglang']));
+    expect(restoreUniverse).toEqual(preferred);
+    expect(computeToggle(solo, 'b200_sglang', restoreUniverse)).toEqual(preferred);
+  });
+
   it('makes computeToggle solo on click in the default-deselected state', () => {
     // Default DSv4 state: all non-MTP active, MTP keys exist in data but
     // are deselected. The effective universe matches active → computeToggle
@@ -274,14 +474,14 @@ describe('resolveExclusionToggle', () => {
     });
   });
 
-  it('silent-disable-all when solo→restore would surface multiple groups', () => {
+  it('silently resolves when solo→restore would surface multiple groups', () => {
     // prev is a single non-MTP item; toggling it triggers "restore all", which
     // would surface all items including two groups.
     const prev = new Set(['h100_vllm']);
     const all = new Set(['h100_vllm', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
     const decision = resolveExclusionToggle(prev, 'h100_vllm', all, ex);
-    expect(decision.kind).toBe('silent-disable-all');
-    if (decision.kind !== 'silent-disable-all') return;
+    expect(decision.kind).toBe('silent-resolve');
+    if (decision.kind !== 'silent-resolve') return;
     expect([...decision.result].toSorted()).toEqual(['h100_vllm']);
   });
 

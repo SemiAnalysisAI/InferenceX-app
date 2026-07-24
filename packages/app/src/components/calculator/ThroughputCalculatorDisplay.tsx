@@ -7,6 +7,7 @@ import { useLocale } from '@/lib/use-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
+import FleetPlanner from '@/components/calculator/FleetPlanner';
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { GlobalFilterProvider, useGlobalFilters } from '@/components/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
@@ -285,8 +286,16 @@ function ThroughputCalculatorInner() {
     return viewModeOptions.map(({ testId: _testId, ...opt }) => opt);
   }, [locale, viewModeOptions]);
 
-  const { hardwareConfig, ranges, getResults, loading, error, hasData, availableHwKeys } =
-    useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
+  const {
+    gpuDataByGroupKey,
+    hardwareConfig,
+    ranges,
+    getResults,
+    loading,
+    error,
+    hasData,
+    availableHwKeys,
+  } = useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
 
   // Dynamic vendor-aware colors for visible GPUs
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
@@ -1025,6 +1034,19 @@ function ThroughputCalculatorInner() {
             </div>
           </Card>
         </section>
+      )}
+
+      {/* Fleet planner: MW-budget projection + cost-target inverse lookup */}
+      {!loading && hasData && (
+        <FleetPlanner
+          results={results}
+          gpuDataByGroupKey={gpuDataByGroupKey}
+          hardwareConfig={hardwareConfig}
+          costProvider={costProvider}
+          costType={costType}
+          targetValue={targetValue}
+          visibleHwKeys={visibleHwKeys}
+        />
       )}
     </div>
   );

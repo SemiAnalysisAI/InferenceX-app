@@ -78,12 +78,12 @@ describe('GPU_SPECS', () => {
 
   it('B200 SXM and GB200 NVL72 have different memory capacities', () => {
     expect(findGpu('B200 SXM').memory).toBe('180 GB');
-    expect(findGpu('GB200 NVL72').memory).toBe('192 GB');
+    expect(findGpu('GB200 NVL72').memory).toBe('186 GB');
   });
 
-  it('B300 SXM and GB300 NVL72 have different memory capacities', () => {
+  it('Blackwell Ultra memory is usable capacity, not the 288 GB physical total', () => {
     expect(findGpu('B300 SXM').memory).toBe('268 GB');
-    expect(findGpu('GB300 NVL72').memory).toBe('288 GB');
+    expect(findGpu('GB300 NVL72').memory).toBe('278 GB');
   });
 
   it('NIC values have name first then port spec', () => {
@@ -191,10 +191,10 @@ describe('GPU_SPECS', () => {
     expect(findGpu('GB200 NVL72').scaleUpBandwidth).toBe('900 GB/s');
     expect(findGpu('GB300 NVL72').scaleUpBandwidth).toBe('900 GB/s');
 
-    // AMD Infinity Fabric: MI300X/MI325X = 448 GB/s, MI355X = 576 GB/s (5th Gen IF)
+    // AMD Infinity Fabric: MI300X/MI325X = 448 GB/s, MI355X = 538 GB/s (5th Gen IF)
     expect(findGpu('MI300X').scaleUpBandwidth).toBe('448 GB/s');
     expect(findGpu('MI325X').scaleUpBandwidth).toBe('448 GB/s');
-    expect(findGpu('MI355X').scaleUpBandwidth).toBe('576 GB/s');
+    expect(findGpu('MI355X').scaleUpBandwidth).toBe('538 GB/s');
   });
 
   it('MI355X has higher scale-up bandwidth than MI300X/MI325X (5th Gen IF)', () => {
@@ -362,8 +362,8 @@ describe('getScaleUpDomainMemory', () => {
   });
 
   it('computes domain memory for NVL72 systems', () => {
-    const spec = { memory: '192 GB', scaleUpWorldSize: 72 } as GpuSpec;
-    expect(getScaleUpDomainMemory(spec)).toBe('13.82 TB');
+    const spec = { memory: '186 GB', scaleUpWorldSize: 72 } as GpuSpec;
+    expect(getScaleUpDomainMemory(spec)).toBe('13.39 TB');
   });
 
   it('returns TB for all values including sub-1 TB (H100)', () => {
@@ -382,8 +382,8 @@ describe('getScaleUpDomainMemory', () => {
   });
 
   it('computes GB300 NVL72 domain memory correctly', () => {
-    const spec = { memory: '288 GB', scaleUpWorldSize: 72 } as GpuSpec;
-    expect(getScaleUpDomainMemory(spec)).toBe('20.74 TB');
+    const spec = { memory: '278 GB', scaleUpWorldSize: 72 } as GpuSpec;
+    expect(getScaleUpDomainMemory(spec)).toBe('20.02 TB');
   });
 
   it('computes MI325X domain memory correctly', () => {
@@ -609,7 +609,7 @@ describe('getScaleUpTopologyConfig', () => {
     const config = getScaleUpTopologyConfig(mi355);
     expect(config.type).toBe('mesh');
     expect(config.techName).toBe('5th Gen Infinity Fabric');
-    expect(config.totalBandwidth).toBe('576 GB/s');
+    expect(config.totalBandwidth).toBe('538 GB/s');
   });
 
   it('all GPUs return a valid scale-up topology config', () => {
@@ -659,8 +659,8 @@ describe('getScaleUpDomainMemoryNumeric', () => {
   });
 
   it('computes domain memory in TB for NVL72 system', () => {
-    const spec = { memory: '192 GB', scaleUpWorldSize: 72 } as GpuSpec;
-    expect(getScaleUpDomainMemoryNumeric(spec)).toBeCloseTo(13.824, 2);
+    const spec = { memory: '186 GB', scaleUpWorldSize: 72 } as GpuSpec;
+    expect(getScaleUpDomainMemoryNumeric(spec)).toBeCloseTo(13.392, 2);
   });
 
   it('computes H100 domain memory correctly', () => {
@@ -738,7 +738,7 @@ describe('GPU_CHART_METRICS', () => {
   it('domainMemory metric computes correct value for GB300 NVL72', () => {
     const gb300 = GPU_SPECS.find((s) => s.name === 'GB300 NVL72')!;
     const domainMemMetric = GPU_CHART_METRICS.find((m) => m.key === 'domainMemory')!;
-    expect(domainMemMetric.getValue(gb300)).toBeCloseTo(20.736, 2);
+    expect(domainMemMetric.getValue(gb300)).toBeCloseTo(20.016, 2);
   });
 
   it('domainMemoryBandwidth metric computes correct value for B300 SXM', () => {
@@ -754,7 +754,7 @@ describe('GPU_CHART_METRICS', () => {
     const mi355x = GPU_SPECS.find((s) => s.name === 'MI355X')!;
     expect(metric.getValue(h100)).toBe(450);
     expect(metric.getValue(b200)).toBe(900);
-    expect(metric.getValue(mi355x)).toBe(576);
+    expect(metric.getValue(mi355x)).toBe(538);
   });
 
   it('all metrics return a number (not null) for at least some GPUs', () => {

@@ -142,3 +142,103 @@ describe('Evaluation Chart — Content & Interactions', () => {
       .should('be.checked');
   });
 });
+
+describe('Evaluation sample sharing', () => {
+  beforeEach(() => {
+    cy.intercept('GET', '/api/v1/eval-samples*', {
+      statusCode: 200,
+      body: {
+        samples: [
+          {
+            docId: 0,
+            prompt: 'What is 1 + 1?',
+            target: '2',
+            response: '2',
+            rawResponse: null,
+            demonstrations: null,
+            passed: true,
+            score: 1,
+            metrics: {},
+          },
+        ],
+        total: 1,
+        passedTotal: 1,
+        failedTotal: 0,
+        source: 'db',
+        offset: 0,
+      },
+    });
+    cy.visit('/evaluation');
+    cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
+    cy.get('[data-testid="evaluation-view-toggle"]').contains('Table').click();
+  });
+
+  it('copies and restores a link to the prompt drawer', () => {
+    cy.on(
+      'uncaught:exception',
+      (error) =>
+        !error.message.includes('Hydration failed') &&
+        !error.message.includes('Minified React error #418'),
+    );
+    cy.get('[title="View per-sample prompts and responses"]').first().click();
+
+    cy.window().then((win) => {
+      cy.stub(win.navigator.clipboard, 'writeText').as('writeDrawerLink').resolves();
+    });
+    cy.get('[data-testid="eval-drawer-share-button"]').click();
+    cy.contains('[data-testid="eval-drawer-share-button"]', 'Copied').should('be.visible');
+
+    cy.get('@writeDrawerLink')
+      .should('have.been.calledOnce')
+      .then((stub) => {
+        const sharedUrl = String((stub as sinon.SinonStub).firstCall.args[0]);
+        const params = new URL(sharedUrl).searchParams;
+        expect(params.get('eval')).to.match(/^\d+$/);
+        expect(params.has('sample')).to.equal(false);
+        cy.visit(sharedUrl);
+      });
+
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[data-testid="eval-drawer-share-button"]').should('be.visible');
+    cy.get('[role="dialog"] li > button[aria-expanded="true"]').should('not.exist');
+  });
+
+  it('does not apply a stale sample id to a manually opened drawer', () => {
+    cy.visit('/evaluation?sample=0');
+    cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
+    cy.get('[title="View per-sample prompts and responses"]').first().click();
+
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"] li > button[aria-expanded="true"]').should('not.exist');
+  });
+
+  it('copies and restores a link to one expanded sample', () => {
+    cy.on(
+      'uncaught:exception',
+      (error) =>
+        !error.message.includes('Hydration failed') &&
+        !error.message.includes('Minified React error #418'),
+    );
+    cy.get('[title="View per-sample prompts and responses"]').first().click();
+    cy.get('[role="dialog"] li > button').first().click();
+
+    cy.window().then((win) => {
+      cy.stub(win.navigator.clipboard, 'writeText').as('writeShareLink').resolves();
+    });
+    cy.get('[data-testid^="eval-sample-share-"]').click();
+    cy.contains('[data-testid^="eval-sample-share-"]', 'Copied').should('be.visible');
+
+    cy.get('@writeShareLink')
+      .should('have.been.calledOnce')
+      .then((stub) => {
+        const sharedUrl = String((stub as sinon.SinonStub).firstCall.args[0]);
+        expect(new URL(sharedUrl).searchParams.get('eval')).to.match(/^\d+$/);
+        expect(new URL(sharedUrl).searchParams.get('sample')).to.match(/^\d+$/);
+        cy.visit(sharedUrl);
+      });
+
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[aria-expanded="true"]').should('exist');
+    cy.get('[data-testid^="eval-sample-share-"]').scrollIntoView().should('be.visible');
+  });
+});

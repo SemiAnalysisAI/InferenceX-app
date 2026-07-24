@@ -245,6 +245,147 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('FP8');
   });
 
+  it('shows offload type, backend, and version instead of the binary offload mode', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          offload_mode: 'on',
+          kv_offloading: 'dram',
+          kv_offload_backend: 'mooncake',
+          kv_offload_backend_version: '0.3.11.post1',
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>Offload Type:</strong> DRAM');
+    expect(html).toContain('<strong>KV Offload Engine:</strong> Mooncake 0.3.11.post1');
+    expect(html).not.toContain('Offload Mode');
+  });
+
+  it('keeps a clearly marked binary fallback for legacy agentic rows', () => {
+    const enabled = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          offload_mode: 'on',
+          kv_offloading: undefined,
+        }),
+      }),
+    );
+    const disabledZh = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          offload_mode: 'off',
+          kv_offloading: undefined,
+        }),
+      }),
+    );
+
+    expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
+    expect(disabledZh).toContain('<strong>卸载类型:</strong> 已禁用（旧版数据）');
+  });
+
+  it('does not treat the fixed-sequence offload default as legacy metadata', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'single_turn',
+          offload_mode: 'off',
+          kv_offloading: undefined,
+        }),
+      }),
+    );
+
+    expect(html).not.toContain('Offload Type');
+    expect(html).not.toContain('legacy data');
+  });
+
+  it('shows multinode KV transfer and cache-hit metadata for fixed-sequence points', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          benchmark_type: 'single_turn',
+          is_multinode: true,
+          kv_p2p_transfer: 'nixl',
+          server_gpu_cache_hit_rate: 0.875,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
+    expect(html).toContain('<strong>GPU Cache Hit Rate:</strong> 87.5%');
+  });
+
+  it('hides stale CPU cache hits when offload is disabled', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          kv_offloading: 'none',
+          offload_mode: 'on',
+          server_gpu_cache_hit_rate: 0.8,
+          server_cpu_cache_hit_rate: 0.42,
+          theoretical_cache_hit_rate: 0.9,
+        }),
+      }),
+    );
+
+    expect(html).not.toContain('CPU Cache Hit Rate');
+    expect(html).toContain('<strong>GPU Cache Hit Rate:</strong> 80.0%');
+    expect(html).toContain('<strong>Theoretical Cache Hit Rate:</strong> 90.0%');
+  });
+
+  it('uses legacy offload mode to gate CPU cache hits when no descriptor exists', () => {
+    const disabled = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          kv_offloading: undefined,
+          offload_mode: 'off',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+    const enabled = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          kv_offloading: undefined,
+          offload_mode: 'on',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+
+    expect(disabled).not.toContain('CPU Cache Hit Rate');
+    expect(enabled).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+  });
+
+  it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale: 'zh',
+        data: pt({
+          kv_offloading: 'dram',
+          kv_offload_backend: 'lmcache',
+          router_name: 'vllm-router',
+          router_version: '0.1.14',
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>卸载类型:</strong> DRAM');
+    expect(html).toContain('<strong>KV 卸载引擎:</strong> LMCache');
+    expect(html).toContain('<strong>路由器:</strong> vLLM Router 0.1.14');
+  });
+
+  it('omits the offload type row when the canonical tier is none', () => {
+    const en = generateTooltipContent(tooltipConfig({ data: pt({ kv_offloading: 'none' }) }));
+    const zh = generateTooltipContent(
+      tooltipConfig({ locale: 'zh', data: pt({ kv_offloading: 'none' }) }),
+    );
+
+    expect(en).not.toContain('Offload Type');
+    expect(zh).not.toContain('卸载类型');
+  });
+
   it('falls back to hwKey when hardware config entry is missing', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ hwKey: 'unknown_gpu' }) }));
     expect(html).toContain('unknown_gpu');
@@ -327,6 +468,43 @@ describe('generateOverlayTooltipContent', () => {
     const html = generateOverlayTooltipContent(overlayConfig());
     expect(html).toContain('Concurrency');
     expect(html).toContain('64');
+  });
+
+  it('shows cache metadata for unofficial agentic overlays', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          kv_offloading: 'dram',
+          kv_offload_backend: 'hicache',
+          kv_p2p_transfer: 'nixl',
+          router_name: 'sglang-router',
+          router_version: '0.3.2',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+    expect(html).toContain('<strong>Offload Type:</strong> DRAM');
+    expect(html).toContain('<strong>KV Offload Engine:</strong> HiCache');
+    expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
+    expect(html).toContain('<strong>Router:</strong> SGLang Router 0.3.2');
+    expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+  });
+
+  it('hides stale CPU cache hits for unofficial overlays without offload', () => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({
+        data: pt({
+          benchmark_type: 'agentic_traces',
+          kv_offloading: 'none',
+          offload_mode: 'off',
+          server_cpu_cache_hit_rate: 0.42,
+        }),
+      }),
+    );
+
+    expect(html).not.toContain('Offload Type');
+    expect(html).not.toContain('CPU Cache Hit Rate');
   });
 });
 

@@ -6,7 +6,7 @@ import type { WorkerPower } from '../etl/benchmark-mapper.js';
  * per-worker payload. Structurally identical to the ingest-side {@link WorkerPower},
  * so it is aliased to that single definition rather than redeclared, keeping the
  * shape from drifting within this package. The read side keeps the
- * `BenchmarkWorkerRow` name it's referenced by (json-provider, BenchmarkRow.workers).
+ * `BenchmarkWorkerRow` name used by `BenchmarkRow.workers`.
  */
 export type BenchmarkWorkerRow = WorkerPower;
 

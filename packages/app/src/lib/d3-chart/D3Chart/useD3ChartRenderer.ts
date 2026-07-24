@@ -209,6 +209,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       // ── Render context ──
       const ctx: RenderContext = {
         layout,
+        tooltipElement: tooltipRef.current,
         xScale,
         yScale,
         width,

@@ -4,6 +4,7 @@ import {
   MessageSquareText,
   Palette,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Star,
 } from 'lucide-react';
@@ -30,6 +31,17 @@ const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
  * Exported so the dispatch site can import a stable constant.
  */
 export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
+
+/**
+ * The inference chart lives at `/`, `/inference`, and their `/zh` siblings.
+ * Used to scope the filter-hint nudge so it only fires on the inference tab.
+ */
+function isOnInferenceTab(): boolean {
+  if (typeof window === 'undefined') return false;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  if (segments[0] === 'zh') segments.shift();
+  return (segments[0] ?? 'inference') === 'inference';
+}
 
 // ---------------------------------------------------------------------------
 // Registry — every engagement nudge in one place
@@ -165,6 +177,37 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       shown: 'gradient_nudge_shown',
       dismissed: 'gradient_nudge_dismissed',
       action: 'gradient_nudge_accepted',
+    },
+  },
+
+  {
+    id: 'filter-hint',
+    type: 'toast',
+    // Show shortly after landing on the inference tab, and re-attempt on tab
+    // switches so users who arrive via another tab still see it once.
+    trigger: [
+      { type: 'timer', delayMs: 2500 },
+      { type: 'event', event: 'inferencex:tab-change', delayMs: 800 },
+    ],
+    dismissal: { type: 'permanent' },
+    storageKey: 'inferencex-filter-hint-nudge-dismissed',
+    conditions: [{ check: isOnInferenceTab, listenEvent: 'inferencex:tab-change' }],
+    priority: 12,
+    scope: 'dashboard',
+    content: {
+      icon: SlidersHorizontal,
+      iconClassName: 'text-brand',
+      title: 'Too much on the chart?',
+      titleZh: '图表太拥挤？',
+      description:
+        'Use the legend filters on the right to focus — toggle NVIDIA vs AMD vendors, disaggregated vs aggregated (disagg/agg) serving, precision (FP8/FP4), and more to compare just what you care about.',
+      descriptionZh:
+        '使用右侧图例筛选器聚焦对比——切换 NVIDIA 与 AMD 厂商、分离式与聚合式 (disagg/agg) 服务模式、精度 (FP8/FP4) 等，只查看您关心的内容。',
+      testId: 'filter-hint-nudge',
+    },
+    analytics: {
+      shown: 'filter_hint_nudge_shown',
+      dismissed: 'filter_hint_nudge_dismissed',
     },
   },
 

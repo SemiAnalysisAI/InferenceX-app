@@ -190,9 +190,21 @@ export interface AggDataEntry {
   isl?: number | null;
   /** OSL in tokens — null for agentic_traces. */
   osl?: number | null;
-  // ── Agentic-only fields (populated from metrics JSONB for `agentic_traces` rows) ──
+  // ── Runtime cache metadata (populated from metrics JSONB when emitted) ──
   /** "on" | "off" — whether KV cache offload to CPU was enabled. */
   offload_mode?: string;
+  /** Offload tier/type, for example `dram` or `none`. */
+  kv_offloading?: string;
+  /** Offload implementation, for example `mooncake`, `lmcache`, or `hicache`. */
+  kv_offload_backend?: string;
+  /** Optional version independently declared for the offload backend. */
+  kv_offload_backend_version?: string;
+  /** P2P engine used to move KV state between workers on multinode runs. */
+  kv_p2p_transfer?: string;
+  /** Request router implementation, for example `vllm-router` or `sglang-router`. */
+  router_name?: string;
+  /** Version independently declared for the request router. */
+  router_version?: string;
   /** Actual server-observed GPU prefix-cache hit rate (0..1). */
   server_gpu_cache_hit_rate?: number;
   /** Actual server-observed CPU prefix-cache hit rate (0..1). */
@@ -704,6 +716,17 @@ export interface InferenceChartContextType {
   toggleHwType: (hw: string) => void;
   removeHwType: (hw: string) => void;
   selectAllHwTypes: () => void;
+  /** Resolve automatic official + `overlay:` hardware selections under the active scope rule. */
+  resolveComparisonSelection: (
+    proposed: Set<string>,
+    prev?: Set<string>,
+  ) => { result: Set<string>; keptGroup: string | null; droppedGroups: string[] };
+  /** Apply one official/overlay toggle; returns null when a cross-engine add is blocked. */
+  toggleComparisonSelection: (
+    prev: Set<string>,
+    item: string,
+    allItems: Set<string>,
+  ) => Set<string> | null;
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
   selectedModel: Model;

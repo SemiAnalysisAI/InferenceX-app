@@ -40,6 +40,7 @@ describe('hasZhSibling', () => {
   it('matches mirrored exact routes', () => {
     expect(hasZhSibling('/')).toBe(true);
     expect(hasZhSibling('/inference')).toBe(true);
+    expect(hasZhSibling('/overview')).toBe(true);
     expect(hasZhSibling('/about')).toBe(true);
     expect(hasZhSibling('/collectivex')).toBe(true);
   });
@@ -74,6 +75,7 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/')).toBe('/zh');
     expect(switchLocalePath('/inference')).toBe('/zh/inference');
     expect(switchLocalePath('/collectivex')).toBe('/zh/collectivex');
+    expect(switchLocalePath('/overview')).toBe('/zh/overview');
     expect(switchLocalePath('/blog/some-post')).toBe('/zh/blog/some-post');
   });
 
@@ -81,6 +83,7 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/zh')).toBe('/');
     expect(switchLocalePath('/zh/quotes')).toBe('/quotes');
     expect(switchLocalePath('/zh/collectivex')).toBe('/collectivex');
+    expect(switchLocalePath('/zh/overview')).toBe('/overview');
     expect(switchLocalePath('/zh/blog/some-post')).toBe('/blog/some-post');
   });
 

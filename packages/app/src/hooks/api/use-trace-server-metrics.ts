@@ -21,6 +21,12 @@ export interface PointMeta {
   disagg: boolean;
   conc: number;
   offload_mode: string | null;
+  kv_offloading: string | null;
+  kv_offload_backend: string | null;
+  kv_offload_backend_version: string | null;
+  kv_p2p_transfer: string | null;
+  router_name: string | null;
+  router_version: string | null;
   isl: number | null;
   osl: number | null;
   benchmark_type: string;

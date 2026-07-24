@@ -53,6 +53,13 @@ export default async function ZhBlogPage({
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">
               关于 AI 推理基准测试、GPU 性能与 ML 基础设施的深度洞见。
             </p>
+            <p className="text-sm text-muted-foreground">
+              不熟悉相关概念？{' '}
+              <Link href="/zh/glossary" className="font-medium text-brand hover:underline">
+                浏览 AI 推理术语表
+              </Link>
+              。
+            </p>
             {allTags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-4">
                 <Link

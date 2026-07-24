@@ -31,10 +31,11 @@ describe('PARAM_DEFAULTS', () => {
   });
 
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
-    // The UI default scenario (gate-unlocked) is AgenticTraces, not 8k/1k. An
-    // '8k/1k' default would strip an explicit 8K/1K selection from the URL, which
-    // then resolves back to the agentic default on reload/share. Empty means no
-    // scenario value ever matches the default, so it's always persisted.
+    // Per-route `initialSequence` seeds (e.g. /compare pages) make the no-param
+    // resolution route-dependent. An '8k/1k' default would strip an explicit
+    // 8K/1K selection from the URL, which then resolves back to the route's
+    // seeded scenario on reload/share. Empty means no scenario value ever
+    // matches the default, so it's always persisted.
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
@@ -66,6 +67,12 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_active).toBe('');
     expect(PARAM_DEFAULTS.e_active).toBe('');
     expect(PARAM_DEFAULTS.r_active).toBe('');
+  });
+
+  it('has empty string defaults for calculator fleet-planner params', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.c_mw).toBe('');
+    expect(PARAM_DEFAULTS.c_costcap).toBe('');
   });
 });
 
@@ -190,8 +197,9 @@ describe('writeUrlParams + buildShareUrl', () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
 
-    // Picking the fixed-seq scenario must survive into the share URL; before the
-    // fix this matched the '8k/1k' default and was dropped, reverting to agentic.
+    // Picking the fixed-seq scenario must survive into the share URL; on routes
+    // seeded with a different initialSequence (e.g. /compare pages), stripping
+    // it would revert the pick back to the seeded scenario on reload.
     writeUrlParams({ i_seq: '8k/1k' });
     await vi.advanceTimersByTimeAsync(200);
 
@@ -301,6 +309,27 @@ describe('buildShareUrl tab filtering', () => {
     const url = buildShareUrl();
     expect(url).toContain('r_range=last-7-days');
     expect(url).not.toContain('g_model');
+  });
+
+  it('includes global, inference and c_ params when on /calculator', async () => {
+    setupWindow('', '/calculator');
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
+
+    writeUrlParams({
+      g_model: 'x',
+      i_seq: 'y',
+      c_mw: '10',
+      c_costcap: '0.5',
+      r_range: 'last-7-days',
+    });
+    await vi.advanceTimersByTimeAsync(200);
+
+    const url = buildShareUrl();
+    expect(url).toContain('g_model=x');
+    expect(url).toContain('i_seq=y');
+    expect(url).toContain('c_mw=10');
+    expect(url).toContain('c_costcap=0.5');
+    expect(url).not.toContain('r_range');
   });
 
   it('defaults to inference tab prefixes when on root path', async () => {

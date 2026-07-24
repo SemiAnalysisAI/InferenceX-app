@@ -127,6 +127,9 @@ async function warmupCaches() {
 
   const elapsed = ((performance.now() - start) / 1000).toFixed(1);
   console.log(`\nDone: ${ok}/${total} succeeded, ${failed} failed (${elapsed}s)`);
+  if (failed > 0) {
+    throw new Error(`${failed} cache warmup request${failed === 1 ? '' : 's'} failed`);
+  }
 }
 
 warmupCaches().catch((error) => {

@@ -1,0 +1,256 @@
+name: Stage InferenceX Results
+
+run-name: Stage InferenceX PR #${{ github.event.client_payload.pr-number || inputs.pr-number }} run ${{ github.event.client_payload.run-id || inputs.run-id }}
+
+on:
+  repository_dispatch:
+    types: [stage-results]
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: InferenceX Actions run ID to stage
+        required: true
+        type: string
+      run-attempt:
+        description: InferenceX Actions run attempt to stage
+        required: false
+        default: '1'
+        type: string
+      run-date:
+        description: UTC date of the InferenceX run (YYYY-MM-DD)
+        required: true
+        type: string
+      pr-number:
+        description: InferenceX pull request number
+        required: true
+        type: string
+      requested-by:
+        description: GitHub login that requested staging
+        required: true
+        type: string
+      comment-id:
+        description: Existing InferenceX acknowledgment comment to update
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: inferencex-shared-staging
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate staging request
+    runs-on: ubuntu-latest
+    outputs:
+      run-id: ${{ steps.request.outputs.run-id }}
+      run-attempt: ${{ steps.request.outputs.run-attempt }}
+      run-date: ${{ steps.request.outputs.run-date }}
+      pr-number: ${{ steps.request.outputs.pr-number }}
+      requested-by: ${{ steps.request.outputs.requested-by }}
+      comment-id: ${{ steps.request.outputs.comment-id }}
+    steps:
+      - name: Validate request payload
+        id: request
+        env:
+          RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
+          RUN_ATTEMPT: ${{ github.event.client_payload.run-attempt || inputs.run-attempt || '1' }}
+          RUN_DATE: ${{ github.event.client_payload.run-date || inputs.run-date }}
+          PR_NUMBER: ${{ github.event.client_payload.pr-number || inputs.pr-number }}
+          REQUESTED_BY: ${{ github.event.client_payload.requested-by || inputs.requested-by }}
+          COMMENT_ID: ${{ github.event.client_payload.comment-id || inputs.comment-id }}
+          SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || 'SemiAnalysisAI/InferenceX' }}
+        run: |
+          if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::run-id must be numeric"
+            exit 1
+          fi
+          if [[ ! "$RUN_ATTEMPT" =~ ^[0-9]+$ ]]; then
+            echo "::error::run-attempt must be numeric"
+            exit 1
+          fi
+          if [[ ! "$RUN_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "::error::run-date must use YYYY-MM-DD"
+            exit 1
+          fi
+          if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number must be numeric"
+            exit 1
+          fi
+          if [[ ! "$REQUESTED_BY" =~ ^[A-Za-z0-9-]+$ ]]; then
+            echo "::error::requested-by is not a valid GitHub login"
+            exit 1
+          fi
+          if [ -n "$COMMENT_ID" ] && [[ ! "$COMMENT_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::comment-id must be numeric when provided"
+            exit 1
+          fi
+          if [ "$SOURCE_REPOSITORY" != "SemiAnalysisAI/InferenceX" ]; then
+            echo "::error::Unsupported source repository: $SOURCE_REPOSITORY"
+            exit 1
+          fi
+
+          {
+            echo "run-id=$RUN_ID"
+            echo "run-attempt=$RUN_ATTEMPT"
+            echo "run-date=$RUN_DATE"
+            echo "pr-number=$PR_NUMBER"
+            echo "requested-by=$REQUESTED_BY"
+            echo "comment-id=$COMMENT_ID"
+          } >> "$GITHUB_OUTPUT"
+
+  sync-staging-branch:
+    name: Fast-forward Git staging branch
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Point the shared staging Git branch at master
+    steps:
+      - name: Point staging at master
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const source = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/master',
+            });
+            const sha = source.data.object.sha;
+            try {
+              const target = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/staging',
+              });
+              if (target.data.object.sha !== sha) {
+                await github.rest.git.updateRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/staging',
+                  sha,
+                  force: true,
+                });
+              }
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/heads/staging',
+                sha,
+              });
+            }
+            core.notice(`staging now points to ${sha}`);
+
+  refresh-staging-database:
+    name: Refresh Neon staging branch
+    needs: [validate, sync-staging-branch]
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+    steps:
+      - name: Restore staging from production head
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
+            exit 1
+          fi
+
+          api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID"
+          branches=$(curl --retry 3 --retry-all-errors -sSf \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "$api/branches?limit=100")
+          source_branch_id=$(jq -r '.branches[] | select(.default == true) | .id' <<<"$branches" | head -n 1)
+          staging_branch_id=$(jq -r '.branches[] | select(.name == "staging") | .id' <<<"$branches" | head -n 1)
+
+          if [ -z "$source_branch_id" ] || [ "$source_branch_id" = "null" ]; then
+            echo "::error::Neon default production branch was not found"
+            exit 1
+          fi
+          if [ -z "$staging_branch_id" ] || [ "$staging_branch_id" = "null" ]; then
+            echo "::error::Neon branch named staging was not found"
+            exit 1
+          fi
+          if [ "$source_branch_id" = "$staging_branch_id" ]; then
+            echo "::error::Refusing to restore the production branch"
+            exit 1
+          fi
+
+          payload=$(jq -cn --arg source_branch_id "$source_branch_id" '{source_branch_id: $source_branch_id}')
+          # This destructive refresh removes the previous unofficial staging ingest.
+          # Every request therefore starts with production data and replaces the shared staged run.
+          curl --retry 3 --retry-all-errors -sSf -X POST \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$api/branches/$staging_branch_id/restore" >/dev/null
+
+          for attempt in $(seq 1 60); do
+            branch=$(curl --retry 3 --retry-all-errors -sSf \
+              -H "Authorization: Bearer $NEON_API_KEY" \
+              "$api/branches/$staging_branch_id")
+            state=$(jq -r '.branch.current_state' <<<"$branch")
+            pending=$(jq -r '.branch.pending_state // empty' <<<"$branch")
+            if [ "$state" = "ready" ] && [ -z "$pending" ]; then
+              echo "Neon staging branch is ready"
+              exit 0
+            fi
+            echo "Waiting for Neon staging branch (state=$state, pending=${pending:-none}, attempt=$attempt/60)"
+            sleep 10
+          done
+
+          echo "::error::Timed out waiting for Neon staging branch restore"
+          exit 1
+
+  ingest:
+    name: Ingest selected run
+    needs: [validate, refresh-staging-database]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ingest-agentic-results.yml
+    with:
+      run-id: ${{ needs.validate.outputs.run-id }}
+      run-attempt: ${{ needs.validate.outputs.run-attempt }}
+      database-target: staging
+    secrets:
+      DATABASE_STAGING_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+      VERCEL_STAGING_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
+      INFX_MAIN_PAT: ${{ secrets.INFX_MAIN_PAT }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  report:
+    name: Report staging result
+    if: ${{ always() && needs.validate.result == 'success' }}
+    needs: [validate, sync-staging-branch, refresh-staging-database, ingest]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Dispatch result to source repository
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RUN_ID: ${{ needs.validate.outputs.run-id }}
+          RUN_DATE: ${{ needs.validate.outputs.run-date }}
+          PR_NUMBER: ${{ needs.validate.outputs.pr-number }}
+          REQUESTED_BY: ${{ needs.validate.outputs.requested-by }}
+          COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
+          STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['refresh-staging-database'].result == 'success' && needs.ingest.result == 'success' }}
+        with:
+          github-token: ${{ secrets.PAT }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'SemiAnalysisAI',
+              repo: 'InferenceX',
+              event_type: 'stage-results-completed',
+              client_payload: {
+                'source-repository': `${context.repo.owner}/${context.repo.repo}`,
+                'pr-number': process.env.PR_NUMBER,
+                'run-id': process.env.RUN_ID,
+                'run-date': process.env.RUN_DATE,
+                'requested-by': process.env.REQUESTED_BY,
+                'comment-id': process.env.COMMENT_ID,
+                'stage-succeeded': process.env.STAGE_SUCCEEDED,
+                'app-run-id': String(context.runId),
+              },
+            });

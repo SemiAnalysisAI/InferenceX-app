@@ -1,7 +1,4 @@
 import { revalidateTag, unstable_cache } from 'next/cache';
-
-import { JSON_MODE } from '@semianalysisai/inferencex-db/connection';
-
 import { blobGet, blobPurge, blobSet } from './blob-cache';
 
 /**
@@ -21,6 +18,20 @@ export const COLLECTIVEX_CACHE_SCOPE = 'collectivex';
 export const COLLECTIVEX_CACHE_CONTROL =
   'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
 
+function cacheNamespace(): string {
+  return process.env.CACHE_NAMESPACE?.trim() ?? '';
+}
+
+function cacheKey(keyPrefix: string): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${namespace}:${keyPrefix}` : keyPrefix;
+}
+
+function cacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `db:${namespace}` : 'db';
+}
+
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
@@ -31,16 +42,12 @@ interface CachedQueryOptions {
 /**
  * Cache a function's result using unstable_cache (fast, local).
  * Set `blobOnly: true` for payloads known to exceed Next.js's 2MB unstable_cache limit.
- * In JSON_MODE, skip all caching — data is already in memory.
  */
 export function cachedQuery<T, Args extends unknown[]>(
   fn: (...args: Args) => Promise<T>,
   keyPrefix: string,
   options?: CachedQueryOptions,
 ): (...args: Args) => Promise<T> {
-  // JSON dump mode: data is in-memory, no blob/cache needed
-  if (JSON_MODE) return fn;
-
   if (options?.blobOnly) {
     return async (...args: Args): Promise<T> => {
       const blobKey = args.length > 0 ? `${keyPrefix}:${args.join(':')}` : keyPrefix;
@@ -54,14 +61,16 @@ export function cachedQuery<T, Args extends unknown[]>(
     };
   }
 
-  const nextCached = unstable_cache(fn, [keyPrefix], { tags: [options?.tag ?? 'db'] });
+  const nextCached = unstable_cache(fn, [cacheKey(keyPrefix)], {
+    tags: [options?.tag ?? cacheTag()],
+  });
   return (...args: Args): Promise<T> => nextCached(...args);
 }
 
 /** Purge both unstable_cache (via revalidateTag) and blob storage. */
 export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge();
-  revalidateTag('db', { expire: 0 });
+  revalidateTag(cacheTag(), { expire: 0 });
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly — this line is the sole
   // mechanism that clears CollectiveX from the CDN.
@@ -78,12 +87,31 @@ export function purgeCollectiveX(): void {
   revalidateTag(COLLECTIVEX_CACHE_SCOPE, { expire: 0 });
 }
 
-/** 1 day unless overridden. Purged on demand via revalidateTag with the matching tag. */
-const cdnHeaders = (tag: string, cacheControl?: string) => ({
-  'Cache-Control': cacheControl ?? 'public, max-age=0, s-maxage=86400',
-  'Vercel-Cache-Tag': tag,
-  'X-Content-Type-Options': 'nosniff',
-});
+/**
+ * 1 day unless overridden. Purged on demand via revalidateTag with the matching
+ * tag. `tag` defaults to the environment-scoped database tag; CollectiveX routes
+ * pass their own scope (and a shorter cacheControl).
+ */
+function cdnHeaders(tag: string = cacheTag(), cacheControl?: string): Record<string, string> {
+  return {
+    'Cache-Control': cacheControl ?? 'public, max-age=0, s-maxage=86400',
+    'Vercel-Cache-Tag': tag,
+    'X-Content-Type-Options': 'nosniff',
+  };
+}
+
+/**
+ * CDN-cached plain-text response (e.g. CSV) with the same cache headers and
+ * purge tag as cachedJson. Uncompressed — use only for small payloads.
+ */
+export function cachedText(data: string, contentType: string): Response {
+  return new Response(data, {
+    headers: {
+      'Content-Type': contentType,
+      ...cdnHeaders(),
+    },
+  });
+}
 
 /** CDN-cached streamed + gzip-compressed JSON response — supports up to 20 MB on Vercel CDN. */
 export function cachedJson<T>(
@@ -105,7 +133,7 @@ export function cachedJson<T>(
     headers: {
       'Content-Type': 'application/json',
       'Content-Encoding': 'gzip',
-      ...cdnHeaders(options?.tag ?? 'db', options?.cacheControl),
+      ...cdnHeaders(options?.tag, options?.cacheControl),
     },
   });
 }

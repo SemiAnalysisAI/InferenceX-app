@@ -15,12 +15,7 @@ import {
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
-  JSON_MODE: false,
   getDb: vi.fn(),
-}));
-
-vi.mock('@semianalysisai/inferencex-db/json-provider', () => ({
-  getAvailabilityData: vi.fn(),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/queries/workflow-info', () => ({

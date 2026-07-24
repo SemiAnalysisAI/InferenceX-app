@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, JSON_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import * as jsonProvider from '@semianalysisai/inferencex-db/json-provider';
+import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+
 import {
   getBenchmarksForRun,
   getLatestBenchmarks,
@@ -14,11 +14,8 @@ import { loadFixture } from '@/lib/test-fixtures';
 export const dynamic = 'force-dynamic';
 
 const getCachedBenchmarks = cachedQuery(
-  (dbModelKeys: string[], date?: string, exact?: boolean, runId?: string) => {
-    if (JSON_MODE)
-      return Promise.resolve(jsonProvider.getLatestBenchmarks(dbModelKeys, date, exact, runId));
-    return getLatestBenchmarks(getDb(), dbModelKeys, date, exact, runId);
-  },
+  (dbModelKeys: string[], date?: string, exact?: boolean, runId?: string) =>
+    getLatestBenchmarks(getDb(), dbModelKeys, date, exact, runId),
   'benchmarks',
   { blobOnly: true },
 );
@@ -26,10 +23,7 @@ const getCachedBenchmarks = cachedQuery(
 // Exactly one run's results (GPU comparison of individual same-day runs). Cached
 // under a distinct key prefix so it never collides with the latest/as-of query.
 const getCachedBenchmarksForRun = cachedQuery(
-  (dbModelKeys: string[], runId: string) => {
-    if (JSON_MODE) return Promise.resolve(jsonProvider.getBenchmarksForRun(dbModelKeys, runId));
-    return getBenchmarksForRun(getDb(), dbModelKeys, runId);
-  },
+  (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
   'benchmarks-run',
   { blobOnly: true },
 );

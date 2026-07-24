@@ -41,6 +41,16 @@ export const QUOTES: Quote[] = [
     link: 'https://qwen.ai',
   },
   {
+    text: 'GLM was built for agentic coding and long-horizon autonomous execution, the kind of workloads where real inference performance is everything. Developers are running GLM-5.2 inside coding agents and multi-step tool-calling pipelines every day, so transparent data on how it actually performs across accelerators matters enormously. InferenceX™ gives the community exactly that: open, reproducible, vendor-neutral benchmarks on real hardware. We’re proud to see rigorous measurement helping developers deploy open models with confidence.',
+    textZh:
+      'GLM 为智能体编程和长程自主执行而生——在这类工作负载中，真实推理性能就是一切。开发者每天都在编程智能体和多步工具调用流水线中运行 GLM-5.2，因此关于它在各类加速器上实际表现的透明数据至关重要。InferenceX™ 为社区提供的正是这些：基于真实硬件的开放、可复现、厂商中立的基准测试。看到严谨的测量帮助开发者自信地部署开源模型，我们深感自豪。',
+    name: 'Zhipu GLM',
+    title: '',
+    org: 'Zhipu GLM',
+    logo: 'zhipu.webp',
+    link: 'https://z.ai/',
+  },
+  {
     text: "As we build systems at unprecedented scale, it's critical for the ML community to have open, transparent benchmarks that reflect how inference really performs across hardware and software. InferenceMAX™'s head-to-head benchmarks cut through the noise and provide a living picture of token throughput, performance per dollar, and tokens per Megawatt. This kind of open source effort strengthens the entire ecosystem and helps everyone, from researchers to operators of frontier datacenters, make smarter decisions.",
     textZh:
       '在我们以前所未有的规模构建系统之际，机器学习社区拥有开放、透明的基准测试至关重要——它们真实反映了推理在不同硬件和软件上的表现。InferenceMAX™ 的对比基准测试穿透噪音，提供了关于 token 吞吐量、每美元性能和每兆瓦 token 数的动态全景。这种开源努力增强了整个生态，帮助从研究者到前沿数据中心运营者的每一个人做出更明智的决策。',
@@ -452,6 +462,26 @@ export const QUOTES: Quote[] = [
     logo: 'embeddedllm.webp',
     link: 'https://www.linkedin.com/in/tanpinsiang',
   },
+  {
+    text: 'Agentic workloads are where context caching starts to matter in a very concrete way. The same tools, instructions, documents, and conversation state get reused across many steps, and every recomputed prefix adds latency and GPU cost. Tensormesh is built to make that reuse visible and usable in production, whether teams run through an OpenAI-compatible API or on reserved capacity. InferenceX is useful because it tests these workloads the way they actually behave, with long sessions, repeated context, and enough cache pressure to show whether the serving system is doing the right thing.',
+    textZh:
+      '智能体工作负载让上下文缓存的价值以非常具体的方式显现出来。相同的工具、指令、文档和对话状态会在许多步骤中被反复使用，而每一次重新计算的前缀都会增加延迟和 GPU 成本。Tensormesh 的目标就是让这种复用在生产环境中可见、可用——无论团队是通过 OpenAI 兼容 API 还是在预留算力上运行。InferenceX 的价值在于它按照这些工作负载的真实行为进行测试：长会话、重复上下文，以及足够的缓存压力，足以检验服务系统是否做对了。',
+    name: 'Kuntai Du',
+    title: 'Chief Scientist at Tensormesh & Co-Creator of LMCache',
+    org: 'Tensormesh',
+    logo: 'tensormesh.svg',
+    link: 'https://www.linkedin.com/in/kuntai-du/',
+  },
+  {
+    text: 'LMCache started from a simple observation: KV cache should be managed by the serving system, not treated as disposable state inside one engine. Agentic traces make that especially clear. They create repeated prefixes, shared context, long conversations, and opportunities to move cache between GPU memory, host memory, storage, and other workers. InferenceX gives the community a way to measure those behaviors directly, including KV offload, cache sharing, and prefill efficiency, on workloads that look much closer to real agent use than a fixed prompt benchmark.',
+    textZh:
+      'LMCache 源于一个简单的观察：KV cache 应该由服务系统统一管理，而不是被当作单个引擎内部用完即弃的状态。智能体轨迹让这一点尤为清晰：它们会产生重复前缀、共享上下文、长对话，以及在 GPU 显存、主机内存、存储和其他 worker 之间迁移缓存的机会。InferenceX 让社区能够直接测量这些行为——包括 KV 卸载、缓存共享和预填充效率——而所用的工作负载远比固定提示词基准测试更接近真实的智能体使用场景。',
+    name: 'Yihua Cheng',
+    title: 'Co-Creator of LMCache & CTO at Tensormesh',
+    org: 'LMCache',
+    logo: 'lmcache.webp',
+    link: 'https://www.linkedin.com/in/yihuacheng-215133327/',
+  },
 ];
 
 /**
@@ -463,6 +493,7 @@ export const CAROUSEL_ORGS = [
   'MiniMax',
   'Moonshot AI',
   'Alibaba Qwen',
+  'Zhipu GLM',
   'OpenAI',
   'Microsoft',
   'Meta Superintelligence Labs',
