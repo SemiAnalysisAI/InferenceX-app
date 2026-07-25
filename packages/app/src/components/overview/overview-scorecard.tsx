@@ -27,10 +27,9 @@ export const OVERVIEW_STRINGS = {
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
     engineScopeOptions: {
-      all: 'All engines',
-      community: 'Community',
+      all: 'All Platforms',
+      community: 'Open Source Community Engines (vLLM/SGLang)',
     },
-    engineScopeHint: 'Community = vLLM/SGLang',
     snapshot: (through: string) => `Database snapshot through ${through}`,
     caption:
       "Cost per million output tokens from the best observed platform serving envelopes for every active model across today's key platforms, prioritizing speculative decode and FP4.",
@@ -77,10 +76,9 @@ export const OVERVIEW_STRINGS = {
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
     engineScopeOptions: {
-      all: '全部引擎',
-      community: '社区',
+      all: '所有平台',
+      community: '开源社区引擎（vLLM/SGLang）',
     },
-    engineScopeHint: '社区 = vLLM/SGLang',
     snapshot: (through: string) => `数据库快照截至 ${through}`,
     caption:
       '基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本；优先采用推测解码与 FP4。',
@@ -646,7 +644,6 @@ export function OverviewEngineScopeSwitcher({
           ),
         )}
       </div>
-      <span className="text-muted-foreground/80">{strings.engineScopeHint}</span>
     </nav>
   );
 }

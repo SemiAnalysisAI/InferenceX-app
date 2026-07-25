@@ -70,11 +70,11 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Community')
+          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?engine=all')
-          .and('have.text', 'All engines');
+          .and('have.text', 'All Platforms');
       });
 
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
@@ -117,9 +117,12 @@ describe('Overview page', () => {
       cy.get('[data-overview-engine-scope="all"]')
         .should('have.attr', 'aria-current', 'true')
         .and('match', 'span')
-        .and('have.text', '全部引擎')
+        .and('have.text', '所有平台')
         .and('not.have.attr', 'href');
-      cy.get('[data-overview-engine-scope="community"]').should('have.text', '社区');
+      cy.get('[data-overview-engine-scope="community"]').should(
+        'have.text',
+        '开源社区引擎（vLLM/SGLang）',
+      );
     });
   });
 
