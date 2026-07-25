@@ -289,7 +289,7 @@ function CellValue({
     <div className="min-w-0 space-y-0.5 text-sm">
       {/* Fixed cost | delta | date grid on desktop keeps every column scannable;
           the delta slot is reserved even on B200 so numbers align across rows. */}
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 xl:grid xl:grid-cols-[minmax(0,1fr)_3.75rem_auto]">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.75rem_auto]">
         <span
           data-testid="overview-pair-value"
           data-hardware={member.hardware}
@@ -403,11 +403,8 @@ interface SurfaceProps {
 export function DesktopOverviewMatrix({ models, locale, formatters, strings }: SurfaceProps) {
   const platforms = models[0]?.platforms ?? [];
   return (
-    <div className="hidden xl:block">
-      <table
-        data-testid="overview-desktop-matrix"
-        className="w-full table-fixed border-collapse text-sm"
-      >
+    <div className="hidden overflow-x-auto xl:block">
+      <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">{strings.caption}</caption>
         <colgroup>
           <col className="w-[17%]" />
