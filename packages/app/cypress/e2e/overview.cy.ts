@@ -454,7 +454,7 @@ describe('Overview page', () => {
     }
   });
 
-  it('keeps the value and evidence date aligned above configuration metadata', () => {
+  it('keeps the evidence date beside configuration metadata below the value', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
 
@@ -466,28 +466,36 @@ describe('Overview page', () => {
               const valueRect = textRect(value);
               const dateRect = textRect(date);
 
-              expect(dateRect.bottom).to.be.closeTo(valueRect.bottom, 1);
+              expect(dateRect.top).to.be.at.least(valueRect.bottom);
             },
           );
         });
 
-        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
-          cy.contains('div', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
-            const valueRect = textRect(value);
-            const metadataRect = textRect(metadata);
+        cy.contains('span', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
+          cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').then(
+            ([date]) => {
+              const metadataRect = textRect(metadata);
+              const dateRect = textRect(date);
 
-            expect(metadataRect.top).to.be.at.least(valueRect.bottom);
-          });
+              expect(dateRect.top).to.be.at.least(metadataRect.top);
+            },
+          );
         });
       });
     });
   });
 
-  it('never overlaps cost, delta, and date at the narrowest desktop width', () => {
+  it('fits the full matrix without overlap or clipping at the narrowest desktop width', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
+    cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
+      const wrapper = table.parentElement as HTMLElement;
+      expect(wrapper.scrollWidth, 'matrix scrolls horizontally').to.be.at.most(
+        wrapper.clientWidth + 1,
+      );
+    });
     cy.get('[data-testid="overview-cost-delta"]').then(($badges) => {
       const problems: string[] = [];
       $badges.each((_, badge) => {
@@ -495,21 +503,11 @@ describe('Overview page', () => {
         if (badgeRect.width === 0) return;
         const cell = badge.parentElement as HTMLElement;
         const value = cell.querySelector('[data-testid="overview-pair-value"]');
-        const date = cell.querySelector('[data-testid="overview-pair-evidence-date"]');
         const hardware = badge.dataset.hardware;
         if (value) {
           const valueRect = value.getBoundingClientRect();
           if (valueRect.right > badgeRect.left + 0.5) {
             problems.push(`${hardware}: cost overlaps delta badge`);
-          }
-        }
-        if (date) {
-          const dateRect = date.getBoundingClientRect();
-          if (badgeRect.right > dateRect.left + 0.5) {
-            problems.push(`${hardware}: delta badge overlaps date`);
-          }
-          if (dateRect.top >= badgeRect.bottom) {
-            problems.push(`${hardware}: date wrapped below delta badge`);
           }
         }
       });
