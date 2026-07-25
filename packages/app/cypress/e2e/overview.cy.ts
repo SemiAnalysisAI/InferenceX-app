@@ -70,11 +70,11 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Community')
+          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?engine=all')
-          .and('have.text', 'All engines');
+          .and('have.text', 'All Platforms');
       });
 
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
@@ -117,9 +117,12 @@ describe('Overview page', () => {
       cy.get('[data-overview-engine-scope="all"]')
         .should('have.attr', 'aria-current', 'true')
         .and('match', 'span')
-        .and('have.text', '全部引擎')
+        .and('have.text', '所有平台')
         .and('not.have.attr', 'href');
-      cy.get('[data-overview-engine-scope="community"]').should('have.text', '社区');
+      cy.get('[data-overview-engine-scope="community"]').should(
+        'have.text',
+        '开源社区引擎（vLLM/SGLang）',
+      );
     });
   });
 
@@ -451,6 +454,91 @@ describe('Overview page', () => {
     }
   });
 
+  it('aligns every platform to the same compact row axes on phones', () => {
+    for (const width of [390, 320]) {
+      cy.viewport(width, 844);
+      cy.visit('/overview');
+
+      mobileModel('DeepSeek-V4-Pro').within(() => {
+        cy.get('[data-testid="overview-mobile-platform-row"]')
+          .should('have.length', 5)
+          .then(($rows) => {
+            const rows = [...$rows];
+            const rects = rows.map((row) => row.getBoundingClientRect());
+            for (let index = 1; index < rects.length; index += 1) {
+              expect(rects[index - 1].bottom).to.be.at.most(rects[index].top + 1);
+            }
+            expect(rows.every((row) => row.getBoundingClientRect().height <= 88)).to.equal(true);
+          });
+
+        cy.get('[data-testid="overview-mobile-hardware"]').then(($labels) => {
+          const lefts = [...$labels].map((label) => label.getBoundingClientRect().left);
+          expect(Math.max(...lefts) - Math.min(...lefts)).to.be.at.most(1);
+        });
+        cy.get('[data-testid="overview-pair-value"]').then(($values) => {
+          const lefts = [...$values].map((value) => textRect(value).left);
+          expect(Math.max(...lefts) - Math.min(...lefts)).to.be.at.most(1);
+        });
+        cy.get('[data-testid="overview-pair-evidence-date"]').then(($dates) => {
+          const rights = [...$dates].map((date) => textRect(date).right);
+          expect(Math.max(...rights) - Math.min(...rights)).to.be.at.most(1);
+        });
+      });
+    }
+  });
+
+  it('uses the same five-row comparison layout on phones and tablets', () => {
+    for (const width of [320, 390, 768, 1024, 1279]) {
+      cy.viewport(width, 900);
+      cy.visit('/overview');
+
+      mobileModel('DeepSeek-V4-Pro').within(() => {
+        cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
+          const rows = [...$rows];
+          expect(rows).to.have.length(5);
+
+          const rects = rows.map((row) => row.getBoundingClientRect());
+          for (let index = 1; index < rects.length; index += 1) {
+            expect(rects[index - 1].bottom).to.be.at.most(rects[index].top + 1);
+          }
+        });
+      });
+    }
+  });
+
+  it('keeps percentage badges beside the value and typographically aligned below desktop', () => {
+    for (const width of [320, 390, 768, 1024, 1279]) {
+      cy.viewport(width, 900);
+      cy.visit('/overview');
+
+      mobileModel('Qwen-3.5-397B-A17B').within(() => {
+        platform('mi355x').within(() => {
+          cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
+            cy.get('[data-testid="overview-cost-delta"][data-hardware="mi355x"]').then(
+              ([badge]) => {
+                cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').then(
+                  ([date]) => {
+                    const valueRect = value.getBoundingClientRect();
+                    const badgeRect = badge.getBoundingClientRect();
+                    const badgeText = badge.querySelector('[aria-hidden="true"]');
+                    expect(badgeText).not.to.equal(null);
+
+                    expect(badgeRect.left - valueRect.right).to.be.at.most(8);
+                    expect(textRect(badgeText as Element).bottom).to.be.closeTo(
+                      textRect(value).bottom,
+                      1,
+                    );
+                    expect(textRect(date).bottom).to.be.closeTo(textRect(value).bottom, 1);
+                  },
+                );
+              },
+            );
+          });
+        });
+      });
+    }
+  });
+
   it('keeps the value and evidence date aligned above configuration metadata', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
@@ -474,17 +562,24 @@ describe('Overview page', () => {
             const metadataRect = textRect(metadata);
 
             expect(metadataRect.top).to.be.at.least(valueRect.bottom);
+            expect(getComputedStyle(metadata).fontSize).to.equal('11px');
           });
         });
       });
     });
   });
 
-  it('never overlaps cost, delta, and date at the narrowest desktop width', () => {
+  it('fits the full matrix without overlap or clipping at the narrowest desktop width', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
     cy.get('[data-testid="overview-desktop-matrix"]').should('be.visible');
+    cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
+      const wrapper = table.parentElement as HTMLElement;
+      expect(wrapper.scrollWidth, 'matrix scrolls horizontally').to.be.at.most(
+        wrapper.clientWidth + 1,
+      );
+    });
     cy.get('[data-testid="overview-cost-delta"]').then(($badges) => {
       const problems: string[] = [];
       $badges.each((_, badge) => {
@@ -492,21 +587,11 @@ describe('Overview page', () => {
         if (badgeRect.width === 0) return;
         const cell = badge.parentElement as HTMLElement;
         const value = cell.querySelector('[data-testid="overview-pair-value"]');
-        const date = cell.querySelector('[data-testid="overview-pair-evidence-date"]');
         const hardware = badge.dataset.hardware;
         if (value) {
           const valueRect = value.getBoundingClientRect();
           if (valueRect.right > badgeRect.left + 0.5) {
             problems.push(`${hardware}: cost overlaps delta badge`);
-          }
-        }
-        if (date) {
-          const dateRect = date.getBoundingClientRect();
-          if (badgeRect.right > dateRect.left + 0.5) {
-            problems.push(`${hardware}: delta badge overlaps date`);
-          }
-          if (dateRect.top >= badgeRect.bottom) {
-            problems.push(`${hardware}: date wrapped below delta badge`);
           }
         }
       });

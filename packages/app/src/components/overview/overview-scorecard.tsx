@@ -12,7 +12,6 @@ import {
   overviewTierHref,
 } from '@/lib/overview-links';
 
-import { ExternalLinkIcon } from '../ui/external-link-icon';
 import { OverviewDetailLink } from './overview-detail-link';
 
 export type OverviewLocale = 'en' | 'zh';
@@ -27,10 +26,9 @@ export const OVERVIEW_STRINGS = {
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
     engineScopeOptions: {
-      all: 'All engines',
-      community: 'Community',
+      all: 'All Platforms',
+      community: 'Open Source Community Engines (vLLM/SGLang)',
     },
-    engineScopeHint: 'Community = vLLM/SGLang',
     snapshot: (through: string) => `Database snapshot through ${through}`,
     caption:
       "Cost per million output tokens from the best observed platform serving envelopes for every active model across today's key platforms, prioritizing speculative decode and FP4.",
@@ -77,10 +75,9 @@ export const OVERVIEW_STRINGS = {
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
     engineScopeOptions: {
-      all: '全部引擎',
-      community: '社区',
+      all: '所有平台',
+      community: '开源社区引擎（vLLM/SGLang）',
     },
-    engineScopeHint: '社区 = vLLM/SGLang',
     snapshot: (through: string) => `数据库快照截至 ${through}`,
     caption:
       '基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本；优先采用推测解码与 FP4。',
@@ -212,11 +209,13 @@ function CostDeltaBadge({
   hardware,
   formatters,
   strings,
+  phoneRow,
 }: {
   pct: number;
   hardware: string;
   formatters: Formatters;
   strings: OverviewStrings;
+  phoneRow: boolean;
 }) {
   const polarity = costDeltaPolarity(pct);
   const aria =
@@ -234,7 +233,9 @@ function CostDeltaBadge({
           ? undefined
           : { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${costDeltaAlpha(pct)})` }
       }
-      className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums xl:col-start-2 xl:justify-self-end ${COST_DELTA_CLASS[polarity]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
+        phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
+      } ${COST_DELTA_CLASS[polarity]}`}
     >
       <span aria-hidden="true">{formatters.percent.format(pct)}</span>
       <span className="sr-only">{aria}</span>
@@ -248,12 +249,14 @@ function CellValue({
   member,
   formatters,
   strings,
+  phoneRow = false,
 }: {
   locale: OverviewLocale;
   model: OverviewModelSummary;
   member: OverviewPlatformResult;
   formatters: Formatters;
   strings: OverviewStrings;
+  phoneRow?: boolean;
 }) {
   const { value, config, evidenceDate, evidenceTopologies } = member.read;
   if (member.missingReason !== null || value === null || member.costPerMtok === null) {
@@ -287,9 +290,15 @@ function CellValue({
     : undefined;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
-      {/* Fixed cost | delta | date grid on desktop keeps every column scannable;
+      {/* Fixed cost | delta | date grids keep comparisons scannable on desktop and phones;
           the delta slot is reserved even on B200 so numbers align across rows. */}
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.75rem_auto]">
+      <div
+        className={
+          phoneRow
+            ? 'grid grid-cols-[max-content_max-content_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5'
+            : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem_auto]'
+        }
+      >
         <span
           data-testid="overview-pair-value"
           data-hardware={member.hardware}
@@ -316,13 +325,16 @@ function CellValue({
             hardware={member.hardware}
             formatters={formatters}
             strings={strings}
+            phoneRow={phoneRow}
           />
         )}
         {evidenceDate === null ? null : (
           <span
             data-testid="overview-pair-evidence-date"
             data-hardware={member.hardware}
-            className="whitespace-nowrap text-xs text-muted-foreground/80 tabular-nums xl:col-start-3 xl:justify-self-end"
+            className={`whitespace-nowrap text-[11px] text-muted-foreground/80 tabular-nums ${
+              phoneRow ? 'col-start-3 justify-self-end' : 'xl:col-start-3 xl:justify-self-end'
+            }`}
           >
             {config === null || stack === null ? (
               evidenceDateLabel
@@ -334,14 +346,13 @@ function CellValue({
                 className={RAW_SOURCE_LINK_CLASS}
               >
                 {evidenceDateLabel}
-                <ExternalLinkIcon aria-hidden="true" />
               </a>
             )}
           </span>
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-[10px] leading-tight font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
           {config === null ? member.precision.toUpperCase() : stackBadge}
         </div>
       )}
@@ -355,6 +366,7 @@ function PlatformCell(props: {
   platform: OverviewPlatformResult;
   formatters: Formatters;
   strings: OverviewStrings;
+  phoneRow?: boolean;
 }) {
   return (
     <div data-testid="overview-platform" data-hardware={props.platform.hardware}>
@@ -364,6 +376,7 @@ function PlatformCell(props: {
         member={props.platform}
         formatters={props.formatters}
         strings={props.strings}
+        phoneRow={props.phoneRow}
       />
     </div>
   );
@@ -422,7 +435,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-4 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                className={`px-3 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
               >
                 {platform.hardware === 'b200'
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -442,18 +455,18 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               data-model={model.model}
               className="border-b border-border/50 align-top last:border-b-0"
             >
-              <th scope="row" className="px-4 py-3 text-left align-top font-normal lg:px-6">
+              <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
                 <ModelName model={model} />
               </th>
               {hasNo8k1kResult(model) ? (
-                <td colSpan={model.platforms.length} className="px-4 py-3 align-top">
+                <td colSpan={model.platforms.length} className="px-4 py-4 align-top">
                   <CoverageNote strings={strings} />
                 </td>
               ) : (
                 model.platforms.map((platform) => (
                   <td
                     key={platform.hardware}
-                    className={`px-4 py-3 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                    className={`px-3 py-4 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
                   >
                     <PlatformCell
                       locale={locale}
@@ -465,7 +478,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                   </td>
                 ))
               )}
-              <td className="px-4 py-3 align-top">
+              <td className="px-4 py-4 align-top">
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
                   model={model.model}
@@ -496,48 +509,31 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
             {hasNo8k1kResult(model) ? (
               <CoverageNote strings={strings} />
             ) : (
-              <>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                  {model.platforms
-                    .filter(
-                      (platform) => platform.hardware === 'b200' || platform.hardware === 'mi355x',
-                    )
-                    .map((platform) => (
-                      <div key={platform.hardware} className="min-w-0 space-y-0.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {platform.hardwareLabel}
-                        </span>
-                        <PlatformCell
-                          locale={locale}
-                          model={model}
-                          platform={platform}
-                          formatters={formatters}
-                          strings={strings}
-                        />
-                      </div>
-                    ))}
-                </div>
-                <div className="grid grid-cols-3 gap-x-3 gap-y-1 border-t border-border/40 pt-2">
-                  {model.platforms
-                    .filter(
-                      (platform) => platform.hardware !== 'b200' && platform.hardware !== 'mi355x',
-                    )
-                    .map((platform) => (
-                      <div key={platform.hardware} className="min-w-0 space-y-0.5">
-                        <span className="text-[11px] font-medium text-muted-foreground/80">
-                          {platform.hardwareLabel}
-                        </span>
-                        <PlatformCell
-                          locale={locale}
-                          model={model}
-                          platform={platform}
-                          formatters={formatters}
-                          strings={strings}
-                        />
-                      </div>
-                    ))}
-                </div>
-              </>
+              <div className="grid grid-cols-1">
+                {model.platforms.map((platform) => (
+                  <div
+                    key={platform.hardware}
+                    data-testid="overview-mobile-platform-row"
+                    data-hardware={platform.hardware}
+                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-2.5 last:border-b-0"
+                  >
+                    <span
+                      data-testid="overview-mobile-hardware"
+                      className="pt-0.5 text-xs font-medium text-muted-foreground"
+                    >
+                      {platform.hardwareLabel}
+                    </span>
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      phoneRow
+                    />
+                  </div>
+                ))}
+              </div>
             )}
             <OverviewDetailLink
               href={detailHref(locale, model)}
@@ -646,7 +642,6 @@ export function OverviewEngineScopeSwitcher({
           ),
         )}
       </div>
-      <span className="text-muted-foreground/80">{strings.engineScopeHint}</span>
     </nav>
   );
 }
