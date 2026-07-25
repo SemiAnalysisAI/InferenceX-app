@@ -10,7 +10,7 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  '在固定单轮 8K 输入 / 1K 输出负载下，对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的最佳观测平台服务包络线；优先采用推测解码与 FP4。';
+  '在固定单轮 8K 输入 / 1K 输出负载下，基于最佳观测平台服务包络线对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的每百万输出 token 成本；优先采用推测解码与 FP4。';
 
 export const metadata: Metadata = {
   title: 'AI 推理总览',

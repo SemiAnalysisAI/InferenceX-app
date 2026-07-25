@@ -91,12 +91,12 @@ export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): st
 export function overviewHref(
   locale: 'en' | 'zh',
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
-  engineScope: OverviewEngineScope = 'all',
+  engineScope: OverviewEngineScope = 'community',
 ): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
   const query = new URLSearchParams();
   if (tier !== OVERVIEW_PRIMARY_TIER) query.set('tier', String(tier));
-  if (engineScope !== 'all') query.set('engine', engineScope);
+  if (engineScope !== 'community') query.set('engine', engineScope);
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
@@ -105,7 +105,7 @@ export function overviewHref(
 export function overviewTierHref(
   locale: 'en' | 'zh',
   tier: OverviewTier,
-  engineScope: OverviewEngineScope = 'all',
+  engineScope: OverviewEngineScope = 'community',
 ): string {
   return overviewHref(locale, tier, engineScope);
 }

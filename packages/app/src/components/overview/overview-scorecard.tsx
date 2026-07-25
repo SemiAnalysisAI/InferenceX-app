@@ -22,7 +22,7 @@ export const OVERVIEW_STRINGS = {
     title: 'AI Inference Overview',
     purpose: 'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     scope: (tier: number) =>
-      `8K→1K · Single-turn · Output tok/s per deployed GPU @${tier} tok/s/user · Prioritizes speculative decode and FP4; otherwise uses the best available platform envelope`,
+      `8K→1K · Single-turn · $ per million output tokens @${tier} tok/s/user · Prioritizes speculative decode and FP4; otherwise uses the best available platform envelope`,
     tierNavLabel: 'Service level',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
@@ -32,7 +32,7 @@ export const OVERVIEW_STRINGS = {
     },
     snapshot: (through: string) => `Database snapshot through ${through}`,
     caption:
-      "Best observed platform serving envelopes for every active model across today's key platforms, prioritizing speculative decode and FP4.",
+      "Cost per million output tokens from the best observed platform serving envelopes for every active model across today's key platforms, prioritizing speculative decode and FP4.",
     modelHeader: 'Model',
     detailsHeader: 'Details',
     detailLink: 'View details',
@@ -54,6 +54,10 @@ export const OVERVIEW_STRINGS = {
       no_exact_at_tier: `no exact @${tier} result`,
     }),
     methodologyNote: 'Priority: speculative FP4 → speculative FP8 → standard FP4 → standard FP8.',
+    costNote:
+      'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. Lower is better; % compares against B200.',
+    costDeltaAria: (pct: string, cheaper: boolean) =>
+      `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
     normalizationNote:
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
     interpolationNote:
@@ -63,7 +67,7 @@ export const OVERVIEW_STRINGS = {
     title: 'AI 推理总览',
     purpose: '一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。',
     scope: (tier: number) =>
-      `8K→1K · 单轮 · 每张已部署 GPU 的输出 tok/s @${tier} tok/s/用户 · 优先采用推测解码与 FP4；否则采用最佳可用平台服务包络线`,
+      `8K→1K · 单轮 · 每百万输出 token 成本（美元）@${tier} tok/s/用户 · 优先采用推测解码与 FP4；否则采用最佳可用平台服务包络线`,
     tierNavLabel: '服务档位',
     tierUnit: 'tok/s/用户',
     engineScopeNavLabel: '引擎范围',
@@ -72,7 +76,8 @@ export const OVERVIEW_STRINGS = {
       community: '开源社区引擎（vLLM/SGLang）',
     },
     snapshot: (through: string) => `数据库快照截至 ${through}`,
-    caption: '各活跃模型在当前关键平台上的最佳观测平台服务包络线；优先采用推测解码与 FP4。',
+    caption:
+      '基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本；优先采用推测解码与 FP4。',
     modelHeader: '模型',
     detailsHeader: '详情',
     detailLink: '查看详情',
@@ -94,6 +99,9 @@ export const OVERVIEW_STRINGS = {
       no_exact_at_tier: `无精确 @${tier} 结果`,
     }),
     methodologyNote: '优先顺序：推测解码 FP4 → 推测解码 FP8 → 标准解码 FP4 → 标准解码 FP8。',
+    costNote:
+      '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。数值越低越好；% 为相对 B200 的差异。',
+    costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
       '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
@@ -103,7 +111,9 @@ export const OVERVIEW_STRINGS = {
 export type OverviewStrings = (typeof OVERVIEW_STRINGS)[OverviewLocale];
 
 interface Formatters {
-  number: Intl.NumberFormat;
+  cost: Intl.NumberFormat;
+  percent: Intl.NumberFormat;
+  percentAbs: Intl.NumberFormat;
   shortDate: (date: string) => string;
 }
 
@@ -115,7 +125,18 @@ export function overviewFormatters(locale: OverviewLocale): Formatters {
     timeZone: 'UTC',
   });
   return {
-    number: new Intl.NumberFormat(tag, { maximumFractionDigits: 0 }),
+    cost: new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+    percent: new Intl.NumberFormat(tag, {
+      style: 'percent',
+      maximumFractionDigits: 0,
+      signDisplay: 'exceptZero',
+    }),
+    percentAbs: new Intl.NumberFormat(tag, { style: 'percent', maximumFractionDigits: 0 }),
     shortDate: (date) => shortDateFormat.format(new Date(`${date}T00:00:00Z`)),
   };
 }
@@ -152,6 +173,50 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
   );
 }
 
+const COST_DELTA_SHADES = {
+  cheaper: [
+    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500',
+    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+    'bg-emerald-500/25 text-emerald-800 dark:text-emerald-300',
+  ],
+  pricier: [
+    'bg-red-500/10 text-red-600 dark:text-red-500',
+    'bg-red-500/15 text-red-700 dark:text-red-400',
+    'bg-red-500/25 text-red-800 dark:text-red-300',
+  ],
+} as const;
+
+function costDeltaClasses(pct: number): string {
+  const magnitude = Math.abs(pct);
+  const shade = magnitude >= 0.25 ? 2 : magnitude >= 0.1 ? 1 : 0;
+  return COST_DELTA_SHADES[pct < 0 ? 'cheaper' : 'pricier'][shade];
+}
+
+function CostDeltaBadge({
+  pct,
+  hardware,
+  formatters,
+  strings,
+}: {
+  pct: number;
+  hardware: string;
+  formatters: Formatters;
+  strings: OverviewStrings;
+}) {
+  const aria = strings.costDeltaAria(formatters.percentAbs.format(Math.abs(pct)), pct < 0);
+  return (
+    <span
+      data-testid="overview-cost-delta"
+      data-hardware={hardware}
+      title={aria}
+      className={`inline-flex items-center rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${costDeltaClasses(pct)}`}
+    >
+      <span aria-hidden="true">{formatters.percent.format(pct)}</span>
+      <span className="sr-only">{aria}</span>
+    </span>
+  );
+}
+
 function CellValue({
   locale,
   model,
@@ -166,7 +231,7 @@ function CellValue({
   strings: OverviewStrings;
 }) {
   const { value, config, evidenceDate, evidenceTopologies } = member.read;
-  if (member.missingReason !== null || value === null) {
+  if (member.missingReason !== null || value === null || member.costPerMtok === null) {
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
@@ -191,30 +256,40 @@ function CellValue({
         ].join(' · ');
   const evidenceDateLabel =
     evidenceDate === null ? '' : formatEvidenceDate(formatters, evidenceDate);
-  const formattedValue = formatters.number.format(value);
+  const formattedValue = formatters.cost.format(member.costPerMtok);
   const estimateExplanation = member.read.estimated
     ? strings.estimatedTooltip(evidenceTopologies)
     : undefined;
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 gap-y-0.5 text-sm">
-      <span
-        data-testid="overview-pair-value"
-        data-hardware={member.hardware}
-        title={estimateExplanation}
-        className="min-w-0 justify-self-start font-semibold tabular-nums"
-      >
-        {estimateExplanation === undefined ? (
-          formattedValue
-        ) : (
-          <>
-            <span className="sr-only">
-              {strings.estimatedAria(formattedValue, estimateExplanation)}
-            </span>
-            <span data-testid="overview-estimate-visible" aria-hidden="true">
-              {'≈'}
-              {formattedValue}
-            </span>
-          </>
+      <span className="inline-flex min-w-0 items-baseline gap-1.5 justify-self-start">
+        <span
+          data-testid="overview-pair-value"
+          data-hardware={member.hardware}
+          title={estimateExplanation}
+          className="min-w-0 font-semibold tabular-nums"
+        >
+          {estimateExplanation === undefined ? (
+            formattedValue
+          ) : (
+            <>
+              <span className="sr-only">
+                {strings.estimatedAria(formattedValue, estimateExplanation)}
+              </span>
+              <span data-testid="overview-estimate-visible" aria-hidden="true">
+                {'≈'}
+                {formattedValue}
+              </span>
+            </>
+          )}
+        </span>
+        {member.costVsB200Pct === null ? null : (
+          <CostDeltaBadge
+            pct={member.costVsB200Pct}
+            hardware={member.hardware}
+            formatters={formatters}
+            strings={strings}
+          />
         )}
       </span>
       {evidenceDate === null ? null : (
@@ -510,6 +585,7 @@ export function OverviewMethodology({ strings }: { strings: OverviewStrings }) {
   return (
     <div className="space-y-1 border-t border-border/50 px-4 py-3 text-xs leading-snug text-muted-foreground lg:px-6">
       <p>{strings.methodologyNote}</p>
+      <p>{strings.costNote}</p>
       <p>{strings.normalizationNote}</p>
       <p>{strings.infinityLegend}</p>
       <p>{strings.interpolationNote}</p>

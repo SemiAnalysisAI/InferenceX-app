@@ -2,7 +2,7 @@ import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants'
 
 import type { BenchmarkRow } from './api';
 import { buildAvailabilityHwKey } from './chart-utils';
-import { getHardwareConfig } from './constants';
+import { getGpuSpecs, getHardwareConfig } from './constants';
 import { DEFAULT_MODELS, getModelLabel, Precision, type Model } from './data-mappings';
 import { frameworkFamily } from './framework-family';
 import { computeTcoFeed, type TcoTierBoundary } from './tco-feed';
@@ -18,7 +18,7 @@ export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
 ): OverviewEngineScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
-  return candidate === 'community' ? 'community' : 'all';
+  return candidate === 'all' ? 'all' : 'community';
 }
 
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
@@ -85,6 +85,11 @@ export interface OverviewPlatformResult {
   decodeMode: OverviewDecodeMode | null;
   read: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
+  /** $ per million output tokens at the retail-rental $/GPU/hr tier. */
+  costPerMtok: number | null;
+  /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
+   *  cell itself and whenever either cost is unavailable. */
+  costVsB200Pct: number | null;
 }
 
 export interface OverviewModelSummary {
@@ -147,7 +152,7 @@ function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
  *  engine still dates the dataset it was measured in. */
 export function overviewDatasetThroughDate(
   rows: readonly BenchmarkRow[],
-  engineScope: OverviewEngineScope = 'all',
+  engineScope: OverviewEngineScope = 'community',
 ): string | null {
   return overviewWorkloadRows(overviewEngineRows(rows, engineScope)).reduce<string | null>(
     (latest, row) => (latest === null || row.date > latest ? row.date : latest),
@@ -303,6 +308,16 @@ function missingReasonForPlatform(
     : 'no_exact_at_tier';
 }
 
+export function overviewCostPerMtok(
+  hardware: string,
+  outputTputPerGpu: number | null,
+): number | null {
+  if (outputTputPerGpu === null || outputTputPerGpu <= 0) return null;
+  const costPerGpuHour = getGpuSpecs(hardware).costr;
+  if (costPerGpuHour <= 0) return null;
+  return (costPerGpuHour * 1_000_000) / (outputTputPerGpu * 3600);
+}
+
 function buildPlatformResults(
   model: Model,
   workloadRows: readonly BenchmarkRow[],
@@ -314,7 +329,7 @@ function buildPlatformResults(
       .filter((config) => config.hardware === hardware)
       .map((config) => readConfigAtTier(config, tier));
 
-  return OVERVIEW_HARDWARE.map((hardware) => {
+  const platforms = OVERVIEW_HARDWARE.map((hardware) => {
     const read = selectPlatformRead(configs, hardware, tier);
     return {
       hardware,
@@ -328,8 +343,18 @@ function buildPlatformResults(
         read,
         readsForHardware(hardware),
       ),
+      costPerMtok: overviewCostPerMtok(hardware, read.value),
     };
   });
+
+  const b200Cost = platforms.find((platform) => platform.hardware === 'b200')?.costPerMtok ?? null;
+  return platforms.map((platform) => ({
+    ...platform,
+    costVsB200Pct:
+      platform.hardware === 'b200' || b200Cost === null || platform.costPerMtok === null
+        ? null
+        : platform.costPerMtok / b200Cost - 1,
+  }));
 }
 
 function buildConfigResult(
@@ -404,7 +429,7 @@ export function buildOverviewModelSummary(
   model: Model,
   rows: BenchmarkRow[],
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
-  engineScope: OverviewEngineScope = 'all',
+  engineScope: OverviewEngineScope = 'community',
 ): OverviewModelSummary {
   const scopedRows = overviewEngineRows(rows, engineScope);
   return {
@@ -419,7 +444,7 @@ export function buildOverviewModelSummary(
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
-  engineScope: OverviewEngineScope = 'all',
+  engineScope: OverviewEngineScope = 'community',
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {

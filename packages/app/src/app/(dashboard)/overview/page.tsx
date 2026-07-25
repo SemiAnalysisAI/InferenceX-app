@@ -10,7 +10,7 @@ import { getOverviewPageData } from '@/lib/overview-data.server';
 export const dynamic = 'force-dynamic';
 
 const DESCRIPTION =
-  'Best observed platform serving envelopes across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload, prioritizing speculative decode and FP4.';
+  'Cost per million output tokens from the best observed platform serving envelopes across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload, prioritizing speculative decode and FP4.';
 
 export const metadata: Metadata = {
   title: 'AI Inference Overview',

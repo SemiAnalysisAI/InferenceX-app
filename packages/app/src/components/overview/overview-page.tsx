@@ -37,7 +37,7 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
           {snapshot === null ? null : (
             <p className="mt-1 text-xs text-muted-foreground/80 tabular-nums">{snapshot}</p>
           )}
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-6">
             <OverviewTierSwitcher
               tier={data.tier}
               engineScope={data.engineScope}

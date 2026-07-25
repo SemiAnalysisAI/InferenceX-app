@@ -15,7 +15,7 @@ import { loadFixture } from '@/lib/test-fixtures';
 
 export async function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
-  engineScope: OverviewEngineScope = 'all',
+  engineScope: OverviewEngineScope = 'community',
 ): Promise<OverviewPageData> {
   // Synthetic rows go through the same assembler as the live path, so a
   // contract drift breaks the fixture tests instead of stranding the page.

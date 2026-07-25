@@ -119,14 +119,14 @@ describe('detailHref', () => {
 
 describe('overviewHref', () => {
   it.each([
-    ['en', 50, 'all', '/overview'],
-    ['en', 50, 'community', '/overview?engine=community'],
-    ['en', 100, 'all', '/overview?tier=100'],
-    ['en', 100, 'community', '/overview?tier=100&engine=community'],
-    ['zh', 50, 'all', '/zh/overview'],
-    ['zh', 50, 'community', '/zh/overview?engine=community'],
-    ['zh', 100, 'all', '/zh/overview?tier=100'],
-    ['zh', 100, 'community', '/zh/overview?tier=100&engine=community'],
+    ['en', 50, 'community', '/overview'],
+    ['en', 50, 'all', '/overview?engine=all'],
+    ['en', 100, 'community', '/overview?tier=100'],
+    ['en', 100, 'all', '/overview?tier=100&engine=all'],
+    ['zh', 50, 'community', '/zh/overview'],
+    ['zh', 50, 'all', '/zh/overview?engine=all'],
+    ['zh', 100, 'community', '/zh/overview?tier=100'],
+    ['zh', 100, 'all', '/zh/overview?tier=100&engine=all'],
   ] as const)(
     'builds the canonical %s URL for tier %s and engine scope %s',
     (locale, tier, engineScope, expected) => {
@@ -135,16 +135,16 @@ describe('overviewHref', () => {
   );
 
   it('omits default values and always emits tier before engine', () => {
-    expect(overviewHref('en', 50, 'all')).toBe('/overview');
-    expect(overviewHref('en', 30, 'community')).toBe('/overview?tier=30&engine=community');
+    expect(overviewHref('en', 50, 'community')).toBe('/overview');
+    expect(overviewHref('en', 30, 'all')).toBe('/overview?tier=30&engine=all');
   });
 });
 
 describe('overview switch links', () => {
   it.each([
-    ['en', 100, 'all', '/overview?tier=100'],
-    ['en', 100, 'community', '/overview?tier=100&engine=community'],
-    ['zh', 30, 'community', '/zh/overview?tier=30&engine=community'],
+    ['en', 100, 'community', '/overview?tier=100'],
+    ['en', 100, 'all', '/overview?tier=100&engine=all'],
+    ['zh', 30, 'all', '/zh/overview?tier=30&engine=all'],
   ] as const)(
     'preserves engine scope when changing tiers',
     (locale, tier, engineScope, expected) => {
@@ -155,9 +155,9 @@ describe('overview switch links', () => {
   );
 
   it.each([
-    ['en', 'community', 50, '/overview?engine=community'],
-    ['en', 'community', 100, '/overview?tier=100&engine=community'],
-    ['zh', 'all', 100, '/zh/overview?tier=100'],
+    ['en', 'all', 50, '/overview?engine=all'],
+    ['en', 'all', 100, '/overview?tier=100&engine=all'],
+    ['zh', 'community', 100, '/zh/overview?tier=100'],
   ] as const)(
     'preserves tier when changing engine scope',
     (locale, engineScope, tier, expected) => {

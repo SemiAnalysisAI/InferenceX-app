@@ -85,13 +85,36 @@ function headlinePairOf(summary: OverviewModelSummary, id: string) {
 }
 
 describe('overview engine scope and comparable fallbacks', () => {
-  it('resolves valid engine scopes and defaults invalid values to all', () => {
+  it('resolves valid engine scopes and defaults invalid values to community', () => {
     expect(resolveOverviewEngineScope('community')).toBe('community');
     expect(resolveOverviewEngineScope('all')).toBe('all');
-    expect(resolveOverviewEngineScope(['community', 'all'])).toBe('community');
-    expect(resolveOverviewEngineScope('trt')).toBe('all');
-    expect(resolveOverviewEngineScope('')).toBe('all');
-    expect(resolveOverviewEngineScope(undefined)).toBe('all');
+    expect(resolveOverviewEngineScope(['all', 'community'])).toBe('all');
+    expect(resolveOverviewEngineScope('trt')).toBe('community');
+    expect(resolveOverviewEngineScope('')).toBe('community');
+    expect(resolveOverviewEngineScope(undefined)).toBe('community');
+  });
+
+  it('derives cost per Mtok from retail rental $/GPU/hr and compares against B200', () => {
+    const rows = [
+      ...frontier([1200, 800, 700, 600], { hardware: 'b200', precision: Precision.FP4 }),
+      ...frontier([1400, 1000, 900, 800], { hardware: 'mi355x', precision: Precision.FP4 }),
+      ...frontier([1300, 900, 800, 700], { hardware: 'gb300', precision: Precision.FP4 }),
+    ];
+    const summary = buildOverviewModelSummary(Model.Qwen3_5, rows, 50, 'community');
+    const byHardware = Object.fromEntries(summary.platforms.map((p) => [p.hardware, p]));
+
+    // Note (wenyao): expected $/GPU/hr from HW_REGISTRY costr — b200 2.90, mi355x 2.10, gb300 3.96.
+    expect(byHardware.b200.costPerMtok).toBeCloseTo(2_900_000 / (800 * 3600), 6);
+    expect(byHardware.b200.costVsB200Pct).toBeNull();
+    expect(byHardware.mi355x.costPerMtok).toBeCloseTo(2_100_000 / (1000 * 3600), 6);
+    expect(byHardware.mi355x.costVsB200Pct).toBeCloseTo(
+      2_100_000 / (1000 * 3600) / (2_900_000 / (800 * 3600)) - 1,
+      6,
+    );
+    expect(byHardware.mi355x.costVsB200Pct).toBeLessThan(0);
+    expect(byHardware.gb300.costVsB200Pct).toBeGreaterThan(0);
+    expect(byHardware.b300.costPerMtok).toBeNull();
+    expect(byHardware.b300.costVsB200Pct).toBeNull();
   });
 
   it('includes vLLM and SGLang wrapper families in community scope and excludes ATOM/TRTLLM', () => {
@@ -128,7 +151,7 @@ describe('overview engine scope and comparable fallbacks', () => {
       }),
     ];
 
-    const all = buildOverviewModelSummary(Model.Qwen3_5, rows);
+    const all = buildOverviewModelSummary(Model.Qwen3_5, rows, 50, 'all');
     const community = buildOverviewModelSummary(Model.Qwen3_5, rows, 50, 'community');
 
     expect(headlinePairOf(all, 'mi355x-vs-b200')?.candidate.read.config?.framework).toBe('atom');
