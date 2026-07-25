@@ -58,6 +58,7 @@ export const OVERVIEW_STRINGS = {
       'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. Lower is better; % compares against B200.',
     costDeltaAria: (pct: string, cheaper: boolean) =>
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
+    costDeltaEvenAria: 'About the same cost as B200',
     normalizationNote:
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
     interpolationNote:
@@ -102,6 +103,7 @@ export const OVERVIEW_STRINGS = {
     costNote:
       '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。数值越低越好；% 为相对 B200 的差异。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
+    costDeltaEvenAria: '与 B200 成本基本持平',
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
       '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
@@ -173,23 +175,29 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
   );
 }
 
-const COST_DELTA_SHADES = {
-  cheaper: [
-    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500',
-    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-    'bg-emerald-500/25 text-emerald-800 dark:text-emerald-300',
-  ],
-  pricier: [
-    'bg-red-500/10 text-red-600 dark:text-red-500',
-    'bg-red-500/15 text-red-700 dark:text-red-400',
-    'bg-red-500/25 text-red-800 dark:text-red-300',
-  ],
+/** Deltas inside this band read as parity, not polarity. */
+const COST_DELTA_NEUTRAL_BAND = 0.05;
+/** Magnitudes at or beyond this saturate the shade ramp. */
+const COST_DELTA_SATURATION = 0.5;
+const COST_DELTA_CLASS = {
+  cheaper: 'text-emerald-700 dark:text-emerald-400',
+  pricier: 'text-red-700 dark:text-red-400',
+  even: 'bg-muted text-muted-foreground',
 } as const;
+const COST_DELTA_HUE = { cheaper: '16 185 129', pricier: '239 68 68' } as const;
 
-function costDeltaClasses(pct: number): string {
-  const magnitude = Math.abs(pct);
-  const shade = magnitude >= 0.25 ? 2 : magnitude >= 0.1 ? 1 : 0;
-  return COST_DELTA_SHADES[pct < 0 ? 'cheaper' : 'pricier'][shade];
+type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
+
+function costDeltaPolarity(pct: number): CostDeltaPolarity {
+  if (Math.abs(pct) < COST_DELTA_NEUTRAL_BAND) return 'even';
+  return pct < 0 ? 'cheaper' : 'pricier';
+}
+
+/** Continuous shade: only background alpha tracks the magnitude, so every
+ *  badge reads on one ramp instead of stepping through discrete bins. */
+function costDeltaAlpha(pct: number): string {
+  const strength = Math.min(Math.abs(pct), COST_DELTA_SATURATION) / COST_DELTA_SATURATION;
+  return (0.08 + strength * 0.32).toFixed(2);
 }
 
 function CostDeltaBadge({
@@ -203,13 +211,23 @@ function CostDeltaBadge({
   formatters: Formatters;
   strings: OverviewStrings;
 }) {
-  const aria = strings.costDeltaAria(formatters.percentAbs.format(Math.abs(pct)), pct < 0);
+  const polarity = costDeltaPolarity(pct);
+  const aria =
+    polarity === 'even'
+      ? strings.costDeltaEvenAria
+      : strings.costDeltaAria(formatters.percentAbs.format(Math.abs(pct)), polarity === 'cheaper');
   return (
     <span
       data-testid="overview-cost-delta"
       data-hardware={hardware}
+      data-cost-polarity={polarity}
       title={aria}
-      className={`inline-flex items-center rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${costDeltaClasses(pct)}`}
+      style={
+        polarity === 'even'
+          ? undefined
+          : { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${costDeltaAlpha(pct)})` }
+      }
+      className={`inline-flex items-center rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${COST_DELTA_CLASS[polarity]}`}
     >
       <span aria-hidden="true">{formatters.percent.format(pct)}</span>
       <span className="sr-only">{aria}</span>

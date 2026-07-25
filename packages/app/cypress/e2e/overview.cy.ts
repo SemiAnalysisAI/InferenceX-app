@@ -179,19 +179,28 @@ describe('Overview page', () => {
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.text', '-42%42% cheaper than B200')
-        .and('have.class', 'bg-emerald-500/25')
-        .and('have.attr', 'title', '42% cheaper than B200');
+        .and('have.attr', 'data-cost-polarity', 'cheaper')
+        .and('have.attr', 'title', '42% cheaper than B200')
+        .then(($badge) => {
+          expect($badge.attr('style')).to.contain('rgb(16 185 129 / 0.35)');
+        });
       platform('b300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+7%')
-        .and('have.class', 'bg-red-500/10');
+        .and('have.attr', 'data-cost-polarity', 'pricier')
+        .then(($badge) => {
+          expect($badge.attr('style')).to.contain('rgb(239 68 68 / 0.12)');
+        });
     });
 
     desktopModel('DeepSeek-V4-Pro').within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+33%')
-        .and('have.class', 'bg-red-500/25');
+        .and('have.attr', 'data-cost-polarity', 'pricier')
+        .then(($badge) => {
+          expect($badge.attr('style')).to.contain('rgb(239 68 68 / 0.29)');
+        });
     });
 
     desktopModel('MiniMax-M3').within(() => {
