@@ -454,6 +454,57 @@ describe('Overview page', () => {
     }
   });
 
+  it('aligns every platform to the same compact row axes on phones', () => {
+    for (const width of [390, 320]) {
+      cy.viewport(width, 844);
+      cy.visit('/overview');
+
+      mobileModel('DeepSeek-V4-Pro').within(() => {
+        cy.get('[data-testid="overview-mobile-platform-row"]')
+          .should('have.length', 5)
+          .then(($rows) => {
+            const rows = [...$rows];
+            const rects = rows.map((row) => row.getBoundingClientRect());
+            for (let index = 1; index < rects.length; index += 1) {
+              expect(rects[index - 1].bottom).to.be.at.most(rects[index].top + 1);
+            }
+            expect(rows.every((row) => row.getBoundingClientRect().height <= 88)).to.equal(true);
+          });
+
+        cy.get('[data-testid="overview-mobile-hardware"]').then(($labels) => {
+          const lefts = [...$labels].map((label) => label.getBoundingClientRect().left);
+          expect(Math.max(...lefts) - Math.min(...lefts)).to.be.at.most(1);
+        });
+        cy.get('[data-testid="overview-pair-value"]').then(($values) => {
+          const lefts = [...$values].map((value) => textRect(value).left);
+          expect(Math.max(...lefts) - Math.min(...lefts)).to.be.at.most(1);
+        });
+        cy.get('[data-testid="overview-pair-evidence-date"]').then(($dates) => {
+          const rights = [...$dates].map((date) => textRect(date).right);
+          expect(Math.max(...rights) - Math.min(...rights)).to.be.at.most(1);
+        });
+      });
+    }
+  });
+
+  it('keeps the two-plus-three comparison grouping on tablet widths', () => {
+    cy.viewport(768, 900);
+    cy.visit('/overview');
+
+    mobileModel('DeepSeek-V4-Pro').within(() => {
+      cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
+        const rows = [...$rows];
+        expect(rows).to.have.length(5);
+
+        const [b200, mi355x, b300, gb200, gb300] = rows.map((row) => row.getBoundingClientRect());
+        expect(b200.top).to.be.closeTo(mi355x.top, 1);
+        expect(b300.top).to.be.closeTo(gb200.top, 1);
+        expect(gb200.top).to.be.closeTo(gb300.top, 1);
+        expect(b300.top).to.be.greaterThan(Math.max(b200.bottom, mi355x.bottom));
+      });
+    });
+  });
+
   it('keeps the value and evidence date aligned above configuration metadata', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
