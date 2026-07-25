@@ -337,7 +337,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-[10px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
+        <div className="min-w-0 text-[11px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
           {config === null ? member.precision.toUpperCase() : stackBadge}
         </div>
       )}

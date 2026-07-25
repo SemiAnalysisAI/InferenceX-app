@@ -477,6 +477,7 @@ describe('Overview page', () => {
             const metadataRect = textRect(metadata);
 
             expect(metadataRect.top).to.be.at.least(valueRect.bottom);
+            expect(getComputedStyle(metadata).fontSize).to.equal('11px');
           });
         });
       });
