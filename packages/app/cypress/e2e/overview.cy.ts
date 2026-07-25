@@ -454,7 +454,7 @@ describe('Overview page', () => {
     }
   });
 
-  it('keeps the evidence date beside configuration metadata below the value', () => {
+  it('keeps the value and evidence date aligned above configuration metadata', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
 
@@ -466,20 +466,18 @@ describe('Overview page', () => {
               const valueRect = textRect(value);
               const dateRect = textRect(date);
 
-              expect(dateRect.top).to.be.at.least(valueRect.bottom);
+              expect(dateRect.bottom).to.be.closeTo(valueRect.bottom, 1);
             },
           );
         });
 
-        cy.contains('span', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
-          cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').then(
-            ([date]) => {
-              const metadataRect = textRect(metadata);
-              const dateRect = textRect(date);
+        cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
+          cy.contains('div', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
+            const valueRect = textRect(value);
+            const metadataRect = textRect(metadata);
 
-              expect(dateRect.top).to.be.at.least(metadataRect.top);
-            },
-          );
+            expect(metadataRect.top).to.be.at.least(valueRect.bottom);
+          });
         });
       });
     });

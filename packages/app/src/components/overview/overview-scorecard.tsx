@@ -12,7 +12,6 @@ import {
   overviewTierHref,
 } from '@/lib/overview-links';
 
-import { ExternalLinkIcon } from '../ui/external-link-icon';
 import { OverviewDetailLink } from './overview-detail-link';
 
 export type OverviewLocale = 'en' | 'zh';
@@ -285,9 +284,9 @@ function CellValue({
     : undefined;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
-      {/* Fixed cost | delta grid on desktop keeps every column scannable;
+      {/* Fixed cost | delta | date grid on desktop keeps every column scannable;
           the delta slot is reserved even on B200 so numbers align across rows. */}
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.75rem]">
+      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem_auto]">
         <span
           data-testid="overview-pair-value"
           data-hardware={member.hardware}
@@ -316,33 +315,30 @@ function CellValue({
             strings={strings}
           />
         )}
+        {evidenceDate === null ? null : (
+          <span
+            data-testid="overview-pair-evidence-date"
+            data-hardware={member.hardware}
+            className="whitespace-nowrap text-[11px] text-muted-foreground/80 tabular-nums xl:col-start-3 xl:justify-self-end"
+          >
+            {config === null || stack === null ? (
+              evidenceDateLabel
+            ) : (
+              <a
+                href={buildOverviewDashboardHref(locale, model, config)}
+                title={strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack)}
+                aria-label={strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack)}
+                className={RAW_SOURCE_LINK_CLASS}
+              >
+                {evidenceDateLabel}
+              </a>
+            )}
+          </span>
+        )}
       </div>
-      {member.precision === null && evidenceDate === null ? null : (
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[10px] leading-tight font-semibold uppercase tracking-wider text-muted-foreground">
-          {member.precision === null ? null : (
-            <span>{config === null ? member.precision.toUpperCase() : stackBadge}</span>
-          )}
-          {evidenceDate === null ? null : (
-            <span
-              data-testid="overview-pair-evidence-date"
-              data-hardware={member.hardware}
-              className="whitespace-nowrap font-normal normal-case tracking-normal text-muted-foreground/80 tabular-nums"
-            >
-              {config === null || stack === null ? (
-                evidenceDateLabel
-              ) : (
-                <a
-                  href={buildOverviewDashboardHref(locale, model, config)}
-                  title={strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack)}
-                  aria-label={strings.rawDashboardAria(evidenceDateLabel, model.modelLabel, stack)}
-                  className={RAW_SOURCE_LINK_CLASS}
-                >
-                  {evidenceDateLabel}
-                  <ExternalLinkIcon aria-hidden="true" />
-                </a>
-              )}
-            </span>
-          )}
+      {member.precision === null ? null : (
+        <div className="min-w-0 text-[10px] leading-tight font-semibold uppercase tracking-wider text-muted-foreground">
+          {config === null ? member.precision.toUpperCase() : stackBadge}
         </div>
       )}
     </div>
@@ -422,7 +418,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-4 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                className={`px-3 py-2 text-left font-semibold ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
               >
                 {platform.hardware === 'b200'
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -453,7 +449,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                 model.platforms.map((platform) => (
                   <td
                     key={platform.hardware}
-                    className={`px-4 py-3 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                    className={`px-3 py-3 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
                   >
                     <PlatformCell
                       locale={locale}
