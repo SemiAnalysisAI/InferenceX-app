@@ -2,16 +2,24 @@ import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants'
 
 import type { BenchmarkRow } from './api';
 import { buildAvailabilityHwKey } from './chart-utils';
-import { getHardwareConfig, getModelSortIndex } from './constants';
+import { getGpuSpecs, getHardwareConfig } from './constants';
 import { DEFAULT_MODELS, getModelLabel, Precision, type Model } from './data-mappings';
-import { overviewConfigIdentityKey } from './overview-config-identity';
+import { frameworkFamily } from './framework-family';
 import { computeTcoFeed, type TcoTierBoundary } from './tco-feed';
 
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
 export const OVERVIEW_TIERS = [30, 50, 75, 100] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
 export const OVERVIEW_PRIMARY_TIER = 50;
-export const OVERVIEW_HIGH_TIER = 100;
+export type OverviewEngineScope = 'all' | 'community';
+export type OverviewDecodeMode = 'speculative' | 'standard';
+
+export function resolveOverviewEngineScope(
+  raw: string | string[] | undefined,
+): OverviewEngineScope {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return candidate === 'all' ? 'all' : 'community';
+}
 
 export function resolveOverviewTier(raw: string | string[] | undefined): OverviewTier {
   const candidate = Number(Array.isArray(raw) ? raw[0] : raw);
@@ -22,13 +30,17 @@ export interface OverviewTierValue {
   tier: number;
   value: number | null;
   boundary: TcoTierBoundary;
-  /** Bracketing frontier points when interpolated, the single point twice when
-   *  clamped; always from this config's own frontier, never a sibling's. */
+  /** True only when the tier value falls between observed frontier knots. */
+  estimated: boolean;
+  /** Bracketing frontier points when estimated, one observed point when the
+   *  tier lands on a knot, and the minimum point when clamped. */
   evidenceDate: { from: string; to: string } | null;
+  /** P/D topology labels from the frontier knot(s) backing this tier read. */
+  evidenceTopologies: string[];
 }
 
-/** One deployable serving configuration (exact topology identity); tier values
- *  come from its own Pareto frontier only, never blended across configs. */
+/** One chart-equivalent serving series. Topology and GPU-count variants may
+ *  contribute points, while release/framework/spec/precision/disagg stay exact. */
 export interface OverviewConfigResult {
   key: string;
   dbModel: string;
@@ -49,68 +61,83 @@ export interface OverviewTierRead {
   tier: number;
   value: number | null;
   boundary: TcoTierBoundary | null;
+  estimated: boolean;
   evidenceDate: { from: string; to: string } | null;
+  evidenceTopologies: string[];
   config: OverviewConfigResult | null;
 }
 
-/** Why a member shows `∞`. The subtle pair: `cannot_reach_at_tier` = every
- *  speculative stack tops out below the tier; `no_exact_at_tier` = merely
+/** Why a platform shows `∞`. `cannot_reach_at_tier` = every
+ *  eligible serving series tops out below the tier; `no_exact_at_tier` = merely
  *  under-swept. */
 export type OverviewMissingReason =
-  | 'standard_decode_only'
   | 'int4_bf16_only'
   | 'no_8k1k_data'
   | 'cannot_reach_at_tier'
   | 'no_exact_at_tier';
 
-export const OVERVIEW_HEADLINE_PAIR_DEFINITIONS = [
-  { id: 'mi355x-vs-b200', candidateHardware: 'mi355x', baselineHardware: 'b200' },
-  { id: 'b300-vs-b200', candidateHardware: 'b300', baselineHardware: 'b200' },
-  { id: 'gb200-vs-b200', candidateHardware: 'gb200', baselineHardware: 'b200' },
-  { id: 'gb300-vs-b200', candidateHardware: 'gb300', baselineHardware: 'b200' },
-] as const;
+export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
 
-export type OverviewHeadlinePairId = (typeof OVERVIEW_HEADLINE_PAIR_DEFINITIONS)[number]['id'];
-
-export interface OverviewHeadlinePairMember {
+export interface OverviewPlatformResult {
   hardware: string;
   hardwareLabel: string;
   precision: string | null;
-  dbModel: string | null;
+  decodeMode: OverviewDecodeMode | null;
   read: OverviewTierRead;
-  /** The 100 view's own re-selected read, so the leader line can never disagree with ?tier=100. */
-  highRead: OverviewTierRead;
   missingReason: OverviewMissingReason | null;
-}
-
-export interface OverviewHeadlinePairComparison {
-  id: OverviewHeadlinePairId;
-  label: string;
-  precision: string | null;
-  dbModel: string | null;
-  candidate: OverviewHeadlinePairMember;
-  baseline: OverviewHeadlinePairMember;
-  /** Non-null only for exact reads sharing precision AND dbModel — never FP4
-   *  vs FP8 or cross-release. */
-  directDeltaPercent: number | null;
-  deltaUnavailableReason: 'precision_mismatch' | 'version_mismatch' | null;
-  highLeaderTransition: 'same_hardware' | 'changed_hardware' | null;
+  /** $ per million output tokens at the retail-rental $/GPU/hr tier. */
+  costPerMtok: number | null;
+  /** Cost delta vs this row's B200 cell; negative = cheaper. Null on the B200
+   *  cell itself and whenever either cost is unavailable. */
+  costVsB200Pct: number | null;
 }
 
 export interface OverviewModelSummary {
   model: Model;
   modelLabel: string;
-  headlinePairs: OverviewHeadlinePairComparison[];
+  platforms: OverviewPlatformResult[];
 }
 
 export interface OverviewPageData {
   models: OverviewModelSummary[];
   datasetThroughDate: string | null;
   tier: OverviewTier;
+  engineScope: OverviewEngineScope;
 }
 
-/** In preference order — FP4 wins ties. */
+const OVERVIEW_SLICE_PRIORITY = [
+  { decodeMode: 'speculative', precision: Precision.FP4 },
+  { decodeMode: 'speculative', precision: Precision.FP8 },
+  { decodeMode: 'standard', precision: Precision.FP4 },
+  { decodeMode: 'standard', precision: Precision.FP8 },
+] as const satisfies readonly {
+  decodeMode: OverviewDecodeMode;
+  precision: string;
+}[];
 const OVERVIEW_PRECISIONS: readonly string[] = [Precision.FP4, Precision.FP8];
+const OVERVIEW_HARDWARE_LABELS: Readonly<Record<string, string>> = {
+  gb200: 'GB200',
+  gb300: 'GB300',
+};
+
+function overviewHardwareLabel(hardware: string, model: Model): string {
+  return OVERVIEW_HARDWARE_LABELS[hardware] ?? getHardwareConfig(hardware, model).label;
+}
+
+function decodeModeForSpecMethod(specMethod: string): OverviewDecodeMode {
+  return specMethod === 'none' || specMethod === '' ? 'standard' : 'speculative';
+}
+
+function overviewEngineRows(
+  rows: readonly BenchmarkRow[],
+  engineScope: OverviewEngineScope,
+): BenchmarkRow[] {
+  if (engineScope === 'all') return [...rows];
+  return rows.filter((row) => {
+    const family = frameworkFamily(row.framework);
+    return family === 'vllm' || family === 'sglang';
+  });
+}
 
 function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
   return rows.filter(
@@ -123,23 +150,34 @@ function overviewWorkloadRows(rows: readonly BenchmarkRow[]): BenchmarkRow[] {
 
 /** Deliberately from raw rows, not retained winners: an unranked precision or
  *  engine still dates the dataset it was measured in. */
-export function overviewDatasetThroughDate(rows: readonly BenchmarkRow[]): string | null {
-  return overviewWorkloadRows(rows).reduce<string | null>(
+export function overviewDatasetThroughDate(
+  rows: readonly BenchmarkRow[],
+  engineScope: OverviewEngineScope = 'community',
+): string | null {
+  return overviewWorkloadRows(overviewEngineRows(rows, engineScope)).reduce<string | null>(
     (latest, row) => (latest === null || row.date > latest ? row.date : latest),
     null,
   );
 }
 
-/** Speculative-only configs for one precision, grouped by exact deployment identity. */
-function buildPrecisionConfigs(
-  model: Model,
-  workloadRows: readonly BenchmarkRow[],
-  precision: string,
-): OverviewConfigResult[] {
+function overviewServingSeriesKey(row: BenchmarkRow): string {
+  return JSON.stringify([
+    row.model,
+    row.hardware,
+    row.framework,
+    row.spec_method,
+    row.precision,
+    row.disagg,
+    row.offload_mode ?? 'off',
+  ]);
+}
+
+/** Chart-equivalent serving series: topology variants are points on one curve. */
+function buildConfigs(model: Model, workloadRows: readonly BenchmarkRow[]): OverviewConfigResult[] {
   const rowsByConfig = new Map<string, BenchmarkRow[]>();
   for (const row of workloadRows) {
-    if (row.precision !== precision || row.spec_method === 'none') continue;
-    const key = overviewConfigIdentityKey(row);
+    if (!OVERVIEW_PRECISIONS.includes(row.precision)) continue;
+    const key = overviewServingSeriesKey(row);
     const configRows = rowsByConfig.get(key);
     if (configRows) configRows.push(row);
     else rowsByConfig.set(key, [row]);
@@ -147,7 +185,12 @@ function buildPrecisionConfigs(
 
   const configs: OverviewConfigResult[] = [];
   for (const [key, configRows] of rowsByConfig) {
-    const config = buildConfigResult(model, precision, key, configRows);
+    const latestDate = configRows.reduce(
+      (latest, row) => (row.date > latest ? row.date : latest),
+      configRows[0].date,
+    );
+    const latestRows = configRows.filter((row) => row.date === latestDate);
+    const config = buildConfigResult(model, latestRows[0].precision, key, latestRows);
     if (config) configs.push(config);
   }
   return configs;
@@ -159,7 +202,9 @@ function readConfigAtTier(config: OverviewConfigResult, tier: number): OverviewT
     tier,
     value: tierValue?.value ?? null,
     boundary: tierValue?.boundary ?? null,
+    estimated: tierValue?.estimated ?? false,
     evidenceDate: tierValue?.evidenceDate ?? null,
+    evidenceTopologies: tierValue?.evidenceTopologies ?? [],
     config,
   };
 }
@@ -168,41 +213,34 @@ interface ConfigTierRead extends OverviewTierRead {
   config: OverviewConfigResult;
 }
 
-/** In-range reads only: a clamped/unreachable read is a coverage gap and never
- *  leads a tier or anchors a delta. */
-const isExactTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
+/** In-range reads only: a clamped or unreachable read remains a coverage gap. */
+const isInRangeTierRead = <T extends OverviewTierRead>(read: T): read is T & { value: number } =>
   read.value !== null && read.boundary === 'interpolated';
+
+function readFreshness(read: ConfigTierRead): string {
+  return read.evidenceDate?.to ?? read.config.latestDate;
+}
 
 function compareTierReads(a: ConfigTierRead, b: ConfigTierRead): number {
   return (
+    Number(isInRangeTierRead(b)) - Number(isInRangeTierRead(a)) ||
     (b.value ?? -1) - (a.value ?? -1) ||
-    getModelSortIndex(a.config.hardware) - getModelSortIndex(b.config.hardware) ||
+    readFreshness(b).localeCompare(readFreshness(a)) ||
+    b.config.latestDate.localeCompare(a.config.latestDate) ||
     a.config.key.localeCompare(b.config.key)
   );
 }
 
-/** Best exact read per hardware; a hardware with no exact read keeps its best
- *  out-of-range read so it surfaces as a gap instead of disappearing. */
-function readsByHardwareAtTier(
-  configs: readonly OverviewConfigResult[],
-  tier: number,
-): Map<string, ConfigTierRead> {
-  const reads = configs
-    .map((config): ConfigTierRead => ({ ...readConfigAtTier(config, tier), config }))
-    .toSorted(compareTierReads);
-
-  const byHardware = new Map<string, ConfigTierRead>();
-  for (const read of reads.filter(isExactTierRead)) {
-    if (!byHardware.has(read.config.hardware)) byHardware.set(read.config.hardware, read);
-  }
-  for (const read of reads) {
-    if (!byHardware.has(read.config.hardware)) byHardware.set(read.config.hardware, read);
-  }
-  return byHardware;
-}
-
 function nullTierRead(tier: number): OverviewTierRead {
-  return { tier, value: null, boundary: null, evidenceDate: null, config: null };
+  return {
+    tier,
+    value: null,
+    boundary: null,
+    estimated: false,
+    evidenceDate: null,
+    evidenceTopologies: [],
+    config: null,
+  };
 }
 
 function nonComparableAsMissing(
@@ -210,201 +248,113 @@ function nonComparableAsMissing(
   tier: number,
 ): OverviewTierRead {
   if (read === undefined) return nullTierRead(tier);
-  return isExactTierRead(read) ? read : { ...read, value: null, evidenceDate: null };
+  return isInRangeTierRead(read)
+    ? read
+    : { ...read, value: null, estimated: false, evidenceDate: null, evidenceTopologies: [] };
 }
 
-interface OverviewHeadlinePairBucket {
-  precision: string;
-  dbModel: string;
-  configs: OverviewConfigResult[];
-  tierReads: Map<string, ConfigTierRead>;
-  newestEvidence: string;
+function configPriorityIndex(config: OverviewConfigResult): number {
+  return OVERVIEW_SLICE_PRIORITY.findIndex(
+    (priority) =>
+      priority.precision === config.precision &&
+      priority.decodeMode === decodeModeForSpecMethod(config.specMethod),
+  );
 }
 
-function buildHeadlinePairBuckets(
-  configsByPrecision: ReadonlyMap<string, readonly OverviewConfigResult[]>,
-  hardware: ReadonlySet<string>,
+function selectPlatformRead(
+  configs: readonly OverviewConfigResult[],
+  hardware: string,
   tier: OverviewTier,
-): OverviewHeadlinePairBucket[] {
-  const buckets: OverviewHeadlinePairBucket[] = [];
-  for (const precision of OVERVIEW_PRECISIONS) {
-    const byDbModel = new Map<string, OverviewConfigResult[]>();
-    for (const config of configsByPrecision.get(precision) ?? []) {
-      if (!hardware.has(config.hardware)) continue;
-      const configs = byDbModel.get(config.dbModel);
-      if (configs) configs.push(config);
-      else byDbModel.set(config.dbModel, [config]);
-    }
+): OverviewTierRead {
+  const reads = configs
+    .filter((config) => config.hardware === hardware)
+    .map((config): ConfigTierRead => ({ ...readConfigAtTier(config, tier), config }));
 
-    for (const [dbModel, configs] of byDbModel) {
-      const tierReads = readsByHardwareAtTier(configs, tier);
-      const exactReads = [...tierReads.values()].filter(isExactTierRead);
-      buckets.push({
-        precision,
-        dbModel,
-        configs,
-        tierReads,
-        newestEvidence: exactReads.reduce(
-          (latest, read) =>
-            read.evidenceDate !== null && read.evidenceDate.to > latest
-              ? read.evidenceDate.to
-              : latest,
-          configs.reduce(
-            (latest, config) => (config.latestDate > latest ? config.latestDate : latest),
-            '',
-          ),
-        ),
-      });
-    }
+  for (const priority of OVERVIEW_SLICE_PRIORITY) {
+    const exact = reads
+      .filter(
+        (read) =>
+          read.config.precision === priority.precision &&
+          decodeModeForSpecMethod(read.config.specMethod) === priority.decodeMode &&
+          isInRangeTierRead(read),
+      )
+      .toSorted(compareTierReads)[0];
+    if (exact) return exact;
   }
-  return buckets;
+
+  const fallback = reads.toSorted(
+    (a, b) =>
+      configPriorityIndex(a.config) - configPriorityIndex(b.config) || compareTierReads(a, b),
+  )[0];
+  return fallback ? nonComparableAsMissing(fallback, tier) : nullTierRead(tier);
 }
 
-function missingReasonForHeadlineMember(
+function missingReasonForPlatform(
   workloadRows: readonly BenchmarkRow[],
   hardware: string,
   read: OverviewTierRead,
   bucketReads: readonly OverviewTierRead[],
 ): OverviewMissingReason | null {
-  if (isExactTierRead(read)) return null;
+  if (isInRangeTierRead(read)) return null;
   const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
   if (hardwareRows.length === 0) return 'no_8k1k_data';
   const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
   if (supportedRows.length === 0) return 'int4_bf16_only';
-  if (!supportedRows.some((row) => row.spec_method !== 'none')) return 'standard_decode_only';
   // `cannot reach` is a claim about the whole platform, so it holds only when
-  // EVERY qualified speculative stack tops out below the tier — one merely
+  // EVERY qualified serving series tops out below the tier — one merely
   // under-swept stack downgrades the gap to a missing exact read.
   return bucketReads.length > 0 && bucketReads.every((r) => r.boundary === 'unreachable')
     ? 'cannot_reach_at_tier'
     : 'no_exact_at_tier';
 }
 
-function headlineLeaderTransition(
-  candidatePrimary: OverviewTierRead,
-  baselinePrimary: OverviewTierRead,
-  candidateHigh: OverviewTierRead,
-  baselineHigh: OverviewTierRead,
-): OverviewHeadlinePairComparison['highLeaderTransition'] {
-  // A cross-precision or cross-release @100 pair carries no leader claim,
-  // mirroring the delta rule.
-  if (
-    !isExactTierRead(candidatePrimary) ||
-    !isExactTierRead(baselinePrimary) ||
-    !isExactTierRead(candidateHigh) ||
-    !isExactTierRead(baselineHigh) ||
-    candidateHigh.config === null ||
-    baselineHigh.config === null ||
-    candidateHigh.config.precision !== baselineHigh.config.precision ||
-    candidateHigh.config.dbModel !== baselineHigh.config.dbModel ||
-    candidatePrimary.value === baselinePrimary.value ||
-    candidateHigh.value === baselineHigh.value
-  ) {
-    return null;
-  }
-  const primaryLeaderIsCandidate = candidatePrimary.value > baselinePrimary.value;
-  const highLeaderIsCandidate = candidateHigh.value > baselineHigh.value;
-  return primaryLeaderIsCandidate === highLeaderIsCandidate ? 'same_hardware' : 'changed_hardware';
+export function overviewCostPerMtok(
+  hardware: string,
+  outputTputPerGpu: number | null,
+): number | null {
+  if (outputTputPerGpu === null || outputTputPerGpu <= 0) return null;
+  const costPerGpuHour = getGpuSpecs(hardware).costr;
+  if (costPerGpuHour <= 0) return null;
+  return (costPerGpuHour * 1_000_000) / (outputTputPerGpu * 3600);
 }
 
-function buildHeadlinePairs(
+function buildPlatformResults(
   model: Model,
   workloadRows: readonly BenchmarkRow[],
   tier: OverviewTier,
-): OverviewHeadlinePairComparison[] {
-  const configsByPrecision = new Map(
-    OVERVIEW_PRECISIONS.map(
-      (precision) => [precision, buildPrecisionConfigs(model, workloadRows, precision)] as const,
-    ),
-  );
-  // Per-platform best bucket (dbModel × precision): exact first, then value,
-  // tie → FP4, newest evidence, lexical dbModel — one bucket per member so
-  // point releases never blend within a read.
-  const selectRead = (memberHardware: string, atTier: OverviewTier) => {
-    const candidates = buildHeadlinePairBuckets(
-      configsByPrecision,
-      new Set([memberHardware]),
-      atTier,
-    ).map((memberBucket) => ({
-      bucket: memberBucket,
-      read: nonComparableAsMissing(memberBucket.tierReads.get(memberHardware), atTier),
-    }));
-    const best = candidates.toSorted(
-      (a, b) =>
-        Number(isExactTierRead(b.read)) - Number(isExactTierRead(a.read)) ||
-        (b.read.value ?? -1) - (a.read.value ?? -1) ||
-        OVERVIEW_PRECISIONS.indexOf(a.bucket.precision) -
-          OVERVIEW_PRECISIONS.indexOf(b.bucket.precision) ||
-        b.bucket.newestEvidence.localeCompare(a.bucket.newestEvidence) ||
-        a.bucket.dbModel.localeCompare(b.bucket.dbModel),
-    )[0];
-    return {
-      reads: candidates.map(({ read }) => read),
-      bucket: best?.bucket ?? null,
-      read: best?.read ?? nullTierRead(atTier),
-    };
-  };
+): OverviewPlatformResult[] {
+  const configs = buildConfigs(model, workloadRows);
+  const readsForHardware = (hardware: string): OverviewTierRead[] =>
+    configs
+      .filter((config) => config.hardware === hardware)
+      .map((config) => readConfigAtTier(config, tier));
 
-  const buildMember = (memberHardware: string): OverviewHeadlinePairMember => {
-    const primary = selectRead(memberHardware, tier);
-    const high =
-      tier === OVERVIEW_HIGH_TIER ? primary : selectRead(memberHardware, OVERVIEW_HIGH_TIER);
+  const platforms = OVERVIEW_HARDWARE.map((hardware) => {
+    const read = selectPlatformRead(configs, hardware, tier);
     return {
-      hardware: memberHardware,
-      hardwareLabel: getHardwareConfig(memberHardware, model).label,
-      precision: primary.bucket?.precision ?? null,
-      dbModel: primary.bucket?.dbModel ?? null,
-      read: primary.read,
-      highRead: high.read,
-      missingReason: missingReasonForHeadlineMember(
+      hardware,
+      hardwareLabel: overviewHardwareLabel(hardware, model),
+      precision: read.config?.precision ?? null,
+      decodeMode: read.config === null ? null : decodeModeForSpecMethod(read.config.specMethod),
+      read,
+      missingReason: missingReasonForPlatform(
         workloadRows,
-        memberHardware,
-        primary.read,
-        primary.reads,
+        hardware,
+        read,
+        readsForHardware(hardware),
       ),
-    };
-  };
-
-  return OVERVIEW_HEADLINE_PAIR_DEFINITIONS.map((definition) => {
-    const candidate = buildMember(definition.candidateHardware);
-    const baseline = buildMember(definition.baselineHardware);
-    const bothExact = isExactTierRead(candidate.read) && isExactTierRead(baseline.read);
-    const comparable =
-      bothExact &&
-      candidate.precision === baseline.precision &&
-      candidate.dbModel === baseline.dbModel;
-    return {
-      id: definition.id,
-      label: `${candidate.hardwareLabel} vs ${baseline.hardwareLabel}`,
-      precision: comparable ? candidate.precision : null,
-      dbModel: comparable ? candidate.dbModel : null,
-      candidate,
-      baseline,
-      directDeltaPercent:
-        comparable &&
-        candidate.read.value !== null &&
-        baseline.read.value !== null &&
-        baseline.read.value > 0
-          ? (candidate.read.value / baseline.read.value - 1) * 100
-          : null,
-      deltaUnavailableReason: bothExact
-        ? candidate.precision === baseline.precision
-          ? candidate.dbModel === baseline.dbModel
-            ? null
-            : 'version_mismatch'
-          : 'precision_mismatch'
-        : null,
-      highLeaderTransition:
-        comparable && tier !== OVERVIEW_HIGH_TIER
-          ? headlineLeaderTransition(
-              candidate.read,
-              baseline.read,
-              candidate.highRead,
-              baseline.highRead,
-            )
-          : null,
+      costPerMtok: overviewCostPerMtok(hardware, read.value),
     };
   });
+
+  const b200Cost = platforms.find((platform) => platform.hardware === 'b200')?.costPerMtok ?? null;
+  return platforms.map((platform) => ({
+    ...platform,
+    costVsB200Pct:
+      platform.hardware === 'b200' || b200Cost === null || platform.costPerMtok === null
+        ? null
+        : platform.costPerMtok / b200Cost - 1,
+  }));
 }
 
 function buildConfigResult(
@@ -413,7 +363,31 @@ function buildConfigResult(
   key: string,
   rows: BenchmarkRow[],
 ): OverviewConfigResult | null {
-  const feed = computeTcoFeed(rows, [OVERVIEW_WORKLOAD], OVERVIEW_TIERS);
+  const feedRows = rows.map((row) => {
+    const outputTputPerGpu = row.metrics.output_tput_per_gpu;
+    const totalGpus = row.num_prefill_gpu + row.num_decode_gpu;
+    const comparableOutputTputPerGpu =
+      row.disagg &&
+      row.num_prefill_gpu > 0 &&
+      row.num_decode_gpu > 0 &&
+      totalGpus > 0 &&
+      Number.isFinite(outputTputPerGpu)
+        ? (outputTputPerGpu * row.num_decode_gpu) / totalGpus
+        : outputTputPerGpu;
+    const evidenceLabel =
+      row.disagg && row.num_prefill_gpu > 0 && row.num_decode_gpu > 0
+        ? `${row.num_prefill_gpu}P+${row.num_decode_gpu}D`
+        : undefined;
+    return {
+      ...row,
+      metrics: {
+        ...row.metrics,
+        output_tput_per_gpu: comparableOutputTputPerGpu,
+      },
+      evidence_label: evidenceLabel,
+    };
+  });
+  const feed = computeTcoFeed(feedRows, [OVERVIEW_WORKLOAD], OVERVIEW_TIERS);
   if (feed.length === 0) return null;
 
   const first = rows[0];
@@ -442,7 +416,9 @@ function buildConfigResult(
         tier: row.tier,
         value,
         boundary: row.boundary,
+        estimated: value !== null && row.is_interpolated,
         evidenceDate: value === null ? null : row.evidence_date,
+        evidenceTopologies: value === null ? [] : (row.evidence_labels ?? []),
       };
     }),
     latestDate: feed[0].latest_date,
@@ -453,24 +429,33 @@ export function buildOverviewModelSummary(
   model: Model,
   rows: BenchmarkRow[],
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
 ): OverviewModelSummary {
+  const scopedRows = overviewEngineRows(rows, engineScope);
   return {
     model,
     modelLabel: getModelLabel(model),
-    headlinePairs: buildHeadlinePairs(model, overviewWorkloadRows(rows), tier),
+    platforms: buildPlatformResults(model, overviewWorkloadRows(scopedRows), tier),
   };
 }
 
-/** DEFAULT_MODELS fixes the row order; a rowless model still renders four
- *  pairs with missing reasons. Live and fixture paths both feed this. */
+/** DEFAULT_MODELS fixes the row order; a rowless model still renders all
+ *  platforms with missing reasons. Live and fixture paths both feed this. */
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
 ): OverviewPageData {
   const perModel = [...DEFAULT_MODELS].map((model) => ({ model, rows: rowsByModel[model] ?? [] }));
   return {
-    models: perModel.map(({ model, rows }) => buildOverviewModelSummary(model, rows, tier)),
-    datasetThroughDate: overviewDatasetThroughDate(perModel.flatMap(({ rows }) => rows)),
+    models: perModel.map(({ model, rows }) =>
+      buildOverviewModelSummary(model, rows, tier, engineScope),
+    ),
+    datasetThroughDate: overviewDatasetThroughDate(
+      perModel.flatMap(({ rows }) => rows),
+      engineScope,
+    ),
     tier,
+    engineScope,
   };
 }
