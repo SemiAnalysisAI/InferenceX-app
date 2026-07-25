@@ -234,9 +234,7 @@ function CostDeltaBadge({
           : { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${costDeltaAlpha(pct)})` }
       }
       className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold tabular-nums ${
-        phoneRow
-          ? 'col-start-2 justify-self-end sm:col-auto sm:justify-self-auto'
-          : 'xl:col-start-2 xl:justify-self-end'
+        phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
       <span aria-hidden="true">{formatters.percent.format(pct)}</span>
@@ -297,7 +295,7 @@ function CellValue({
       <div
         className={
           phoneRow
-            ? 'grid grid-cols-[minmax(max-content,1fr)_3.5rem_auto] items-baseline gap-x-1.5 gap-y-0.5 sm:flex sm:flex-wrap'
+            ? 'grid grid-cols-[max-content_max-content_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5'
             : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem_auto]'
         }
       >
@@ -335,9 +333,7 @@ function CellValue({
             data-testid="overview-pair-evidence-date"
             data-hardware={member.hardware}
             className={`whitespace-nowrap text-[11px] text-muted-foreground/80 tabular-nums ${
-              phoneRow
-                ? 'col-start-3 justify-self-end sm:col-auto sm:justify-self-auto'
-                : 'xl:col-start-3 xl:justify-self-end'
+              phoneRow ? 'col-start-3 justify-self-end' : 'xl:col-start-3 xl:justify-self-end'
             }`}
           >
             {config === null || stack === null ? (
@@ -513,37 +509,30 @@ export function MobileOverviewList({ models, locale, formatters, strings }: Surf
             {hasNo8k1kResult(model) ? (
               <CoverageNote strings={strings} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-6 sm:gap-x-3 sm:gap-y-1">
-                {model.platforms.map((platform) => {
-                  const isPrimary = platform.hardware === 'b200' || platform.hardware === 'mi355x';
-                  return (
-                    <div
-                      key={platform.hardware}
-                      data-testid="overview-mobile-platform-row"
-                      data-hardware={platform.hardware}
-                      className={`grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-2.5 last:border-b-0 sm:block sm:space-y-0.5 sm:border-b-0 sm:py-0 ${
-                        isPrimary
-                          ? 'sm:col-span-3'
-                          : 'sm:col-span-2 sm:border-t sm:border-border/40 sm:pt-2'
-                      }`}
+              <div className="grid grid-cols-1">
+                {model.platforms.map((platform) => (
+                  <div
+                    key={platform.hardware}
+                    data-testid="overview-mobile-platform-row"
+                    data-hardware={platform.hardware}
+                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-2.5 last:border-b-0"
+                  >
+                    <span
+                      data-testid="overview-mobile-hardware"
+                      className="pt-0.5 text-xs font-medium text-muted-foreground"
                     >
-                      <span
-                        data-testid="overview-mobile-hardware"
-                        className="pt-0.5 text-xs font-medium text-muted-foreground sm:pt-0"
-                      >
-                        {platform.hardwareLabel}
-                      </span>
-                      <PlatformCell
-                        locale={locale}
-                        model={model}
-                        platform={platform}
-                        formatters={formatters}
-                        strings={strings}
-                        phoneRow
-                      />
-                    </div>
-                  );
-                })}
+                      {platform.hardwareLabel}
+                    </span>
+                    <PlatformCell
+                      locale={locale}
+                      model={model}
+                      platform={platform}
+                      formatters={formatters}
+                      strings={strings}
+                      phoneRow
+                    />
+                  </div>
+                ))}
               </div>
             )}
             <OverviewDetailLink

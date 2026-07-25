@@ -487,22 +487,56 @@ describe('Overview page', () => {
     }
   });
 
-  it('keeps the two-plus-three comparison grouping on tablet widths', () => {
-    cy.viewport(768, 900);
-    cy.visit('/overview');
+  it('uses the same five-row comparison layout on phones and tablets', () => {
+    for (const width of [320, 390, 768, 1024, 1279]) {
+      cy.viewport(width, 900);
+      cy.visit('/overview');
 
-    mobileModel('DeepSeek-V4-Pro').within(() => {
-      cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
-        const rows = [...$rows];
-        expect(rows).to.have.length(5);
+      mobileModel('DeepSeek-V4-Pro').within(() => {
+        cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
+          const rows = [...$rows];
+          expect(rows).to.have.length(5);
 
-        const [b200, mi355x, b300, gb200, gb300] = rows.map((row) => row.getBoundingClientRect());
-        expect(b200.top).to.be.closeTo(mi355x.top, 1);
-        expect(b300.top).to.be.closeTo(gb200.top, 1);
-        expect(gb200.top).to.be.closeTo(gb300.top, 1);
-        expect(b300.top).to.be.greaterThan(Math.max(b200.bottom, mi355x.bottom));
+          const rects = rows.map((row) => row.getBoundingClientRect());
+          for (let index = 1; index < rects.length; index += 1) {
+            expect(rects[index - 1].bottom).to.be.at.most(rects[index].top + 1);
+          }
+        });
       });
-    });
+    }
+  });
+
+  it('keeps percentage badges beside the value and typographically aligned below desktop', () => {
+    for (const width of [320, 390, 768, 1024, 1279]) {
+      cy.viewport(width, 900);
+      cy.visit('/overview');
+
+      mobileModel('Qwen-3.5-397B-A17B').within(() => {
+        platform('mi355x').within(() => {
+          cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
+            cy.get('[data-testid="overview-cost-delta"][data-hardware="mi355x"]').then(
+              ([badge]) => {
+                cy.get('[data-testid="overview-pair-evidence-date"][data-hardware="mi355x"]').then(
+                  ([date]) => {
+                    const valueRect = value.getBoundingClientRect();
+                    const badgeRect = badge.getBoundingClientRect();
+                    const badgeText = badge.querySelector('[aria-hidden="true"]');
+                    expect(badgeText).not.to.equal(null);
+
+                    expect(badgeRect.left - valueRect.right).to.be.at.most(8);
+                    expect(textRect(badgeText as Element).bottom).to.be.closeTo(
+                      textRect(value).bottom,
+                      1,
+                    );
+                    expect(textRect(date).bottom).to.be.closeTo(textRect(value).bottom, 1);
+                  },
+                );
+              },
+            );
+          });
+        });
+      });
+    }
   });
 
   it('keeps the value and evidence date aligned above configuration metadata', () => {
