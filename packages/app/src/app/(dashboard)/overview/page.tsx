@@ -13,18 +13,18 @@ const DESCRIPTION =
   'Cost per million output tokens from the best observed platform serving envelopes across MI355X, B200, B300, GB200 and GB300 at a fixed single-turn 8K input / 1K output workload, prioritizing speculative decode and FP4.';
 
 export const metadata: Metadata = {
-  title: 'AI Inference Overview',
+  title: 'Inference Cost Overview',
   description: DESCRIPTION,
   alternates: enAlternates('/overview'),
   openGraph: {
-    title: `AI Inference Overview | ${SITE_NAME}`,
+    title: `Inference Cost Overview | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/overview`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `AI Inference Overview | ${SITE_NAME}`,
+    title: `Inference Cost Overview | ${SITE_NAME}`,
     description: DESCRIPTION,
   },
 };

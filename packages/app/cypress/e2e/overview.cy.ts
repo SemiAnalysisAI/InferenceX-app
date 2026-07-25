@@ -6,7 +6,15 @@ const MODEL_LABELS = [
   'Qwen3.5 397B',
 ];
 
-const PLATFORM_HEADERS = ['Model', 'B200', 'MI355X', 'B300', 'GB200', 'GB300', 'Details'];
+const PLATFORM_HEADERS = [
+  'Model',
+  'B200 · Reference',
+  'MI355X',
+  'B300',
+  'GB200',
+  'GB300',
+  'Details',
+];
 
 function expectNoHorizontalOverflow() {
   cy.document().then((doc) => {
@@ -62,11 +70,11 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)')
+          .and('have.text', 'Community')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?engine=all')
-          .and('have.text', 'All Platforms');
+          .and('have.text', 'All engines');
       });
 
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
@@ -81,17 +89,16 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2')
-      .find(
-        '[data-testid="overview-platform"][data-hardware="b300"] [data-testid="overview-pair-missing"]',
-      )
-      .should('contain.text', '∞');
+      .find('[data-testid="overview-model-coverage-note"]')
+      .should('have.text', 'No 8K/1K results');
+    desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('not.exist');
     cy.get(
       '[data-testid="overview-engine-scope-switcher"] [data-overview-engine-scope="all"]',
     ).click();
     cy.location('search').should('eq', '?engine=all');
     desktopModel('GLM-5.2')
       .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', 'No GLM‑5.2 single-turn 8K/1K benchmark yet');
+      .should('have.text', 'No 8K/1K results');
     cy.get('[data-testid="overview-tier-switcher"]')
       .contains('a', '100')
       .should('have.attr', 'href', '/overview?tier=100&engine=all')
@@ -110,12 +117,9 @@ describe('Overview page', () => {
       cy.get('[data-overview-engine-scope="all"]')
         .should('have.attr', 'aria-current', 'true')
         .and('match', 'span')
-        .and('have.text', '所有平台')
+        .and('have.text', '全部引擎')
         .and('not.have.attr', 'href');
-      cy.get('[data-overview-engine-scope="community"]').should(
-        'have.text',
-        '开源社区引擎（vLLM/SGLang）',
-      );
+      cy.get('[data-overview-engine-scope="community"]').should('have.text', '社区');
     });
   });
 
@@ -176,9 +180,6 @@ describe('Overview page', () => {
 
     desktopModel('Kimi-K2.5').within(() => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
-      platform('b200')
-        .find('[data-testid="overview-cost-baseline"]')
-        .should('have.text', 'baseline');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.text', '-42%42% cheaper than B200')
@@ -221,19 +222,18 @@ describe('Overview page', () => {
       .and('have.class', 'border-secondary');
     cy.get('[data-testid="nav-link-dashboard"]').should('have.class', 'text-brand');
 
-    cy.contains('h1', 'AI Inference Overview').should('exist');
+    cy.contains('h1', 'Inference Cost Overview').should('exist');
     cy.contains(
       'Every active model across MI355X, B200, B300, GB200 and GB300 at a glance.',
     ).should('exist');
     cy.contains(
-      'Prioritizes speculative decode and FP4; otherwise uses the best available platform envelope',
-    ).should('exist');
-    cy.contains(
       'Cost per million output tokens from the best observed platform serving envelopes',
     ).should('exist');
-    cy.contains('$ per million output tokens @50 tok/s/user').should('exist');
     cy.contains(
-      'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. Lower is better; % compares against B200.',
+      'GPU rental cost / 1M output tokens · 8K→1K · @50 tok/s/user · ↓ lower is better',
+    ).should('exist');
+    cy.contains(
+      'Cost = 3-yr rental $/GPU/hr ÷ output tok/s per deployed GPU. All percentages compare against B200.',
     ).should('exist');
     cy.contains(
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
@@ -258,7 +258,11 @@ describe('Overview page', () => {
           );
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MODEL_LABELS.length);
-        cy.get('[data-testid="overview-platform"]').should('have.length', MODEL_LABELS.length * 5);
+        // GLM's zero-coverage row collapses to a single note instead of 5 cells.
+        cy.get('[data-testid="overview-platform"]').should(
+          'have.length',
+          (MODEL_LABELS.length - 1) * 5,
+        );
         cy.get('details, summary, button').should('not.exist');
         cy.contains(/PRIMARY|Ranked results/).should('not.exist');
       });
@@ -340,7 +344,7 @@ describe('Overview page', () => {
 
     desktopModel('GLM-5.2')
       .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', 'No GLM‑5.2 single-turn 8K/1K benchmark yet');
+      .should('have.text', 'No 8K/1K results');
     cy.contains('∞ = no comparable result').should('exist');
     cy.get('body')
       .invoke('text')
@@ -359,7 +363,9 @@ describe('Overview page', () => {
     });
 
     cy.location('search').should('eq', '?tier=100');
-    cy.contains('$ per million output tokens @100 tok/s/user').should('exist');
+    cy.contains(
+      'GPU rental cost / 1M output tokens · 8K→1K · @100 tok/s/user · ↓ lower is better',
+    ).should('exist');
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[aria-current="page"]').should('have.text', '100');
       cy.contains('a', '50').should('have.attr', 'href', '/overview');
@@ -397,13 +403,17 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
 
     cy.visit('/overview?tier=100');
-    cy.contains('$ per million output tokens @100 tok/s/user').should('exist');
+    cy.contains(
+      'GPU rental cost / 1M output tokens · 8K→1K · @100 tok/s/user · ↓ lower is better',
+    ).should('exist');
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?tier=100')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
-    cy.contains('每百万输出 token 成本（美元）@100 tok/s/用户').should('exist');
+    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @100 tok/s/用户 · ↓ 越低越好').should(
+      'exist',
+    );
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
@@ -459,7 +469,7 @@ describe('Overview page', () => {
         });
 
         cy.get('[data-testid="overview-pair-value"][data-hardware="mi355x"]').then(([value]) => {
-          cy.contains('span', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
+          cy.contains('div', 'SGLang · FP4 · Standard decode').then(([metadata]) => {
             const valueRect = textRect(value);
             const metadataRect = textRect(metadata);
 
@@ -477,13 +487,14 @@ describe('Overview page', () => {
     cy.get('[data-testid="tab-trigger-overview"]')
       .should('have.attr', 'href', '/zh/overview')
       .and('contain.text', '总览');
-    cy.contains('h1', 'AI 推理总览').should('exist');
+    cy.contains('h1', '推理成本总览').should('exist');
     cy.contains('一眼对比各活跃模型在 MI355X、B200、B300、GB200 与 GB300 上的表现。').should(
       'exist',
     );
-    cy.contains('优先采用推测解码与 FP4；否则采用最佳可用平台服务包络线').should('exist');
     cy.contains('基于最佳观测平台服务包络线计算的各活跃模型每百万输出 token 成本').should('exist');
-    cy.contains('每百万输出 token 成本（美元）@50 tok/s/用户').should('exist');
+    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @50 tok/s/用户 · ↓ 越低越好').should(
+      'exist',
+    );
     cy.contains('成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。').should('exist');
     cy.contains('分离式结果的分母同时计入预填充与解码 GPU。').should('exist');
     cy.contains(
@@ -508,15 +519,17 @@ describe('Overview page', () => {
     desktopModel('Kimi-K2.5').within(() => {
       platform('mi355x').should('contain.text', 'SGLang · FP4 · 标准解码');
       platform('b300').should('contain.text', 'SGLang · FP8 · 标准解码');
-      platform('b200').find('[data-testid="overview-cost-baseline"]').should('have.text', '基准');
+      platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
     desktopModel('GLM-5.2')
       .find('[data-testid="overview-model-coverage-note"]')
-      .should('have.text', '暂无 GLM‑5.2 单轮 8K/1K 基准结果');
+      .should('have.text', '暂无 8K/1K 结果');
     cy.contains('∞ = 无可比结果').should('exist');
 
     cy.visit('/zh/overview?tier=100');
-    cy.contains('每百万输出 token 成本（美元）@100 tok/s/用户').should('exist');
+    cy.contains('GPU 租赁成本 / 每百万输出 token · 8K→1K · @100 tok/s/用户 · ↓ 越低越好').should(
+      'exist',
+    );
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.contains('a', '50').should('have.attr', 'href', '/zh/overview');
     });
