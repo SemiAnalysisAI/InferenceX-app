@@ -337,7 +337,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-[10px] leading-tight font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="min-w-0 text-[10px] leading-tight font-normal uppercase tracking-wider text-muted-foreground/70">
           {config === null ? member.precision.toUpperCase() : stackBadge}
         </div>
       )}
@@ -438,18 +438,18 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
               data-model={model.model}
               className="border-b border-border/50 align-top last:border-b-0"
             >
-              <th scope="row" className="px-4 py-3 text-left align-top font-normal lg:px-6">
+              <th scope="row" className="px-4 py-4 text-left align-top font-normal lg:px-6">
                 <ModelName model={model} />
               </th>
               {hasNo8k1kResult(model) ? (
-                <td colSpan={model.platforms.length} className="px-4 py-3 align-top">
+                <td colSpan={model.platforms.length} className="px-4 py-4 align-top">
                   <CoverageNote strings={strings} />
                 </td>
               ) : (
                 model.platforms.map((platform) => (
                   <td
                     key={platform.hardware}
-                    className={`px-3 py-3 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
+                    className={`px-3 py-4 align-top ${platform.hardware === 'b200' ? 'bg-muted/30' : ''}`}
                   >
                     <PlatformCell
                       locale={locale}
@@ -461,7 +461,7 @@ export function DesktopOverviewMatrix({ models, locale, formatters, strings }: S
                   </td>
                 ))
               )}
-              <td className="px-4 py-3 align-top">
+              <td className="px-4 py-4 align-top">
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
                   model={model.model}
