@@ -53,15 +53,41 @@ describe('computeTcoFeed — frontier reads', () => {
     expect(rows).toHaveLength(4);
 
     // Exact knots read exactly.
-    expect(findRow(rows, 'gb200', '8192x1024', 20)?.output_tput_per_gpu).toBe(1000);
-    expect(findRow(rows, 'gb200', '8192x1024', 50)?.output_tput_per_gpu).toBe(400);
-    expect(findRow(rows, 'gb200', '8192x1024', 100)?.output_tput_per_gpu).toBe(100);
+    expect(findRow(rows, 'gb200', '8192x1024', 20)).toMatchObject({
+      output_tput_per_gpu: 1000,
+      is_interpolated: false,
+    });
+    expect(findRow(rows, 'gb200', '8192x1024', 50)).toMatchObject({
+      output_tput_per_gpu: 400,
+      is_interpolated: false,
+    });
+    expect(findRow(rows, 'gb200', '8192x1024', 100)).toMatchObject({
+      output_tput_per_gpu: 100,
+      is_interpolated: false,
+    });
 
     // Between knots: strictly inside the neighboring knots' range.
     const mid = findRow(rows, 'gb200', '8192x1024', 35)!;
     expect(mid.boundary).toBe('interpolated');
+    expect(mid.is_interpolated).toBe(true);
     expect(mid.output_tput_per_gpu).toBeGreaterThan(400);
     expect(mid.output_tput_per_gpu).toBeLessThan(1000);
+  });
+
+  it('keeps same-topology interpolation distinct from an observed knot', () => {
+    const rows = computeTcoFeed(
+      [
+        makeRow({ itl: 1 / 40, otput: 800, evidence_label: '4P+8D' }),
+        makeRow({ itl: 1 / 60, otput: 400, evidence_label: '4P+8D' }),
+      ],
+      WORKLOAD_8K1K,
+      [50],
+    );
+
+    expect(findRow(rows, 'gb200', '8192x1024', 50)).toMatchObject({
+      is_interpolated: true,
+      evidence_labels: ['4P+8D'],
+    });
   });
 
   it('excludes Pareto-dominated points from the frontier and from provenance dates', () => {
@@ -101,13 +127,16 @@ describe('computeTcoFeed — frontier reads', () => {
 
     const low = findRow(rows, 'gb200', '8192x1024', 30)!;
     expect(low.boundary).toBe('clamped_low');
+    expect(low.is_interpolated).toBe(false);
     expect(low.output_tput_per_gpu).toBe(800); // min-iv knot = highest measured tput
 
     const mid = findRow(rows, 'gb200', '8192x1024', 60)!;
     expect(mid.boundary).toBe('interpolated');
+    expect(mid.is_interpolated).toBe(true);
 
     const high = findRow(rows, 'gb200', '8192x1024', 100)!;
     expect(high.boundary).toBe('unreachable');
+    expect(high.is_interpolated).toBe(false);
     expect(high.output_tput_per_gpu).toBe(0);
 
     expect(low.frontier_min_interactivity).toBe(40);

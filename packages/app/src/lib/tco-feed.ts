@@ -35,6 +35,8 @@ export interface TcoFeedSourceRow {
   osl: number | null;
   metrics: Record<string, number>;
   date: string;
+  /** Optional caller-owned label carried through to the tier's bracketing evidence. */
+  evidence_label?: string;
 }
 
 export interface TcoFeedWorkload {
@@ -53,6 +55,12 @@ export interface TcoFeedRow {
   /** Output tokens/s per GPU on the frontier at `tier`; 0 when unreachable. */
   output_tput_per_gpu: number;
   boundary: TcoTierBoundary;
+  /**
+   * True only when `tier` falls strictly between two observed frontier knots.
+   * `boundary: interpolated` also covers an exact in-range knot, so consumers
+   * that distinguish measured points from estimates must use this flag.
+   */
+  is_interpolated: boolean;
   /** Number of Pareto-frontier knots backing this hardware × workload. */
   frontier_points: number;
   frontier_min_interactivity: number;
@@ -69,6 +77,8 @@ export interface TcoFeedRow {
    * downstream result can carry its own evidence date. Ordered ascending.
    */
   evidence_date: { from: string; to: string } | null;
+  /** Distinct caller-owned labels from the bracketing frontier knot(s). */
+  evidence_labels?: string[];
 }
 
 export const DEFAULT_TIERS: readonly number[] = [30, 50, 75, 100];
@@ -201,6 +211,7 @@ interface FrontierPoint {
   interactivity: number;
   throughput: number;
   date: string;
+  evidenceLabel?: string;
 }
 
 const round3 = (v: number): number => Math.round(v * 1000) / 1000;
@@ -208,6 +219,11 @@ const round3 = (v: number): number => Math.round(v * 1000) / 1000;
 /** Two knots' dates as an ascending {from,to} evidence range. */
 function evidenceRange(a: FrontierPoint, b: FrontierPoint): { from: string; to: string } {
   return a.date <= b.date ? { from: a.date, to: b.date } : { from: b.date, to: a.date };
+}
+
+function evidenceLabels(a: FrontierPoint, b: FrontierPoint): string[] | undefined {
+  const labels = [...new Set([a.evidenceLabel, b.evidenceLabel].filter(Boolean))] as string[];
+  return labels.length === 0 ? undefined : labels;
 }
 
 /**
@@ -263,7 +279,12 @@ export function computeTcoFeed(
       const otput = row.metrics.output_tput_per_gpu;
       if (interactivity === undefined) continue;
       if (!Number.isFinite(otput) || otput <= 0) continue;
-      const point = { interactivity, throughput: otput, date: row.date };
+      const point = {
+        interactivity,
+        throughput: otput,
+        date: row.date,
+        evidenceLabel: row.evidence_label,
+      };
       const bucket = byHardware.get(row.hardware);
       if (bucket) bucket.push(point);
       else byHardware.set(row.hardware, [point]);
@@ -298,7 +319,9 @@ export function computeTcoFeed(
       for (const tier of tiers) {
         let value: number;
         let boundary: TcoTierBoundary;
+        let isInterpolated = false;
         let evidenceDate: { from: string; to: string } | null;
+        let tierEvidenceLabels: string[] | undefined;
         if (tier > maxIv) {
           value = 0;
           boundary = 'unreachable';
@@ -308,12 +331,15 @@ export function computeTcoFeed(
           boundary = 'clamped_low';
           // The clamped read is the min-interactivity knot's throughput.
           evidenceDate = evidenceRange(frontier[0], frontier[0]);
+          tierEvidenceLabels = evidenceLabels(frontier[0], frontier[0]);
         } else {
+          const [lo, hi] = bracketKnots(frontier, tier);
           const raw = hermiteInterpolate(xs, ys, slopes, tier);
           value = Math.max(yLo, Math.min(yHi, raw));
           boundary = 'interpolated';
-          const [lo, hi] = bracketKnots(frontier, tier);
+          isInterpolated = lo.interactivity !== hi.interactivity;
           evidenceDate = evidenceRange(lo, hi);
+          tierEvidenceLabels = evidenceLabels(lo, hi);
         }
         out.push({
           hardware,
@@ -321,12 +347,14 @@ export function computeTcoFeed(
           tier,
           output_tput_per_gpu: round3(value),
           boundary,
+          is_interpolated: isInterpolated,
           frontier_points: frontier.length,
           frontier_min_interactivity: round3(minIv),
           frontier_max_interactivity: round3(maxIv),
           latest_date: latest,
           oldest_frontier_date: oldest,
           evidence_date: evidenceDate,
+          ...(tierEvidenceLabels === undefined ? {} : { evidence_labels: tierEvidenceLabels }),
         });
       }
     }
@@ -347,6 +375,9 @@ const CSV_COLUMNS = [
   'latest_date',
   'oldest_frontier_date',
 ] as const;
+
+// `is_interpolated` is JSON-only provenance. Keep the long-lived Power Query
+// CSV schema stable; Overview consumes the typed in-process rows.
 
 /**
  * Serialize feed rows as CSV for one-line Power Query consumption.

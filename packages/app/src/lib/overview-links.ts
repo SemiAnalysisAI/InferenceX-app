@@ -2,6 +2,7 @@ import { runIdFromRunUrl } from './known-issues';
 import {
   OVERVIEW_PRIMARY_TIER,
   type OverviewConfigResult,
+  type OverviewEngineScope,
   type OverviewModelSummary,
   type OverviewTier,
 } from './overview-data';
@@ -58,6 +59,7 @@ export function buildOverviewDashboardHref(
     g_runid: soleSourceRun(config)?.id,
     i_seq: OVERVIEW_WORKLOAD_SEQ,
     i_prec: config.precision,
+    i_metric: 'y_outputTputPerGpu',
     i_gpus: config.hwKey,
     i_spec: dashboardSpecMode(config.specMethod),
     i_disagg: config.disagg ? 'disagg' : 'agg',
@@ -85,12 +87,34 @@ export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): st
   return `${inferenceRoute(locale)}?${query}`;
 }
 
-/**
- * The overview itself at another service point. The default tier keeps the bare
- * canonical URL; other tiers ride a plain `?tier=` query the server re-renders
- * from, so any view is a copyable link.
- */
-export function overviewTierHref(locale: 'en' | 'zh', tier: OverviewTier): string {
+/** Canonical overview URL. Defaults are omitted and params always use this order. */
+export function overviewHref(
+  locale: 'en' | 'zh',
+  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
+): string {
   const base = locale === 'zh' ? '/zh/overview' : '/overview';
-  return tier === OVERVIEW_PRIMARY_TIER ? base : `${base}?tier=${tier}`;
+  const query = new URLSearchParams();
+  if (tier !== OVERVIEW_PRIMARY_TIER) query.set('tier', String(tier));
+  if (engineScope !== 'community') query.set('engine', engineScope);
+  const search = query.toString();
+  return search === '' ? base : `${base}?${search}`;
+}
+
+/** Tier switch preserving the active engine scope. */
+export function overviewTierHref(
+  locale: 'en' | 'zh',
+  tier: OverviewTier,
+  engineScope: OverviewEngineScope = 'community',
+): string {
+  return overviewHref(locale, tier, engineScope);
+}
+
+/** Engine-scope switch preserving the active service tier. */
+export function overviewEngineScopeHref(
+  locale: 'en' | 'zh',
+  engineScope: OverviewEngineScope,
+  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+): string {
+  return overviewHref(locale, tier, engineScope);
 }
