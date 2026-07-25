@@ -176,6 +176,9 @@ describe('Overview page', () => {
 
     desktopModel('Kimi-K2.5').within(() => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
+      platform('b200')
+        .find('[data-testid="overview-cost-baseline"]')
+        .should('have.text', 'baseline');
       platform('mi355x')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.text', '-42%42% cheaper than B200')
@@ -505,6 +508,7 @@ describe('Overview page', () => {
     desktopModel('Kimi-K2.5').within(() => {
       platform('mi355x').should('contain.text', 'SGLang · FP4 · 标准解码');
       platform('b300').should('contain.text', 'SGLang · FP8 · 标准解码');
+      platform('b200').find('[data-testid="overview-cost-baseline"]').should('have.text', '基准');
     });
     desktopModel('GLM-5.2')
       .find('[data-testid="overview-model-coverage-note"]')

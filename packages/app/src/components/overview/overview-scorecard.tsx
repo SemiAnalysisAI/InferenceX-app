@@ -59,6 +59,7 @@ export const OVERVIEW_STRINGS = {
     costDeltaAria: (pct: string, cheaper: boolean) =>
       `${pct} ${cheaper ? 'cheaper' : 'more expensive'} than B200`,
     costDeltaEvenAria: 'About the same cost as B200',
+    costBaseline: 'baseline',
     normalizationNote:
       'Disaggregated results include both prefill and decode GPUs in the denominator.',
     interpolationNote:
@@ -104,6 +105,7 @@ export const OVERVIEW_STRINGS = {
       '成本 = 3 年期租赁 $/GPU/小时 ÷ 每张已部署 GPU 的输出 tok/s。数值越低越好；% 为相对 B200 的差异。',
     costDeltaAria: (pct: string, cheaper: boolean) => `比 B200 ${cheaper ? '便宜' : '昂贵'} ${pct}`,
     costDeltaEvenAria: '与 B200 成本基本持平',
+    costBaseline: '基准',
     normalizationNote: '分离式结果的分母同时计入预填充与解码 GPU。',
     interpolationNote:
       '各档位数值采用最佳观测平台服务包络线；≈ 表示根据已验证运行结果估算。不会外推。',
@@ -280,7 +282,7 @@ function CellValue({
     : undefined;
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 gap-y-0.5 text-sm">
-      <span className="inline-flex min-w-0 items-baseline gap-1.5 justify-self-start">
+      <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 justify-self-start">
         <span
           data-testid="overview-pair-value"
           data-hardware={member.hardware}
@@ -301,7 +303,14 @@ function CellValue({
             </>
           )}
         </span>
-        {member.costVsB200Pct === null ? null : (
+        {member.hardware === 'b200' ? (
+          <span
+            data-testid="overview-cost-baseline"
+            className="inline-flex items-center rounded-sm bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground"
+          >
+            {strings.costBaseline}
+          </span>
+        ) : member.costVsB200Pct === null ? null : (
           <CostDeltaBadge
             pct={member.costVsB200Pct}
             hardware={member.hardware}
