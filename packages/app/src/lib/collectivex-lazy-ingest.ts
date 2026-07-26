@@ -26,6 +26,10 @@ import {
   isMatrixDoc,
   matrixVersion,
 } from '@semianalysisai/inferencex-db/collectivex/reader';
+import {
+  matrixArtifactName,
+  selectShardArtifacts,
+} from '@semianalysisai/inferencex-db/collectivex/artifact-selection';
 import type { CollectiveXVersion } from '@semianalysisai/inferencex-db/collectivex/types';
 import { getCollectiveXDb, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import {
@@ -39,10 +43,6 @@ const WORKFLOW_FILE = 'collectivex-sweep.yml';
 const WORKFLOW_NAME = 'CollectiveX Sweep';
 const RUNS_PER_PAGE = 100;
 const ARTIFACTS_PER_PAGE = 100;
-
-// Artifact families uploaded by the sweep.
-const MATRIX_PREFIX = 'cxsweep-matrix-';
-const SHARD_PREFIX = 'cxshard-';
 
 const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const MAX_RUN_BYTES = 256 * 1024 * 1024;
@@ -302,7 +302,7 @@ async function listArtifacts(runId: number, token: string): Promise<GithubArtifa
 }
 
 function hasMatrixArtifact(artifacts: GithubArtifact[], run: WorkflowRun): boolean {
-  return artifacts.some((artifact) => artifact.name === `${MATRIX_PREFIX}${run.id}`);
+  return artifacts.some((artifact) => artifact.name === matrixArtifactName(String(run.id)));
 }
 
 async function collectDocs(artifact: GithubArtifact, token: string): Promise<unknown[]> {
@@ -361,25 +361,9 @@ interface MatrixCandidate {
 }
 
 function resultArtifactsForRun(artifacts: GithubArtifact[], run: WorkflowRun): GithubArtifact[] {
-  const suffix = new RegExp(`^${SHARD_PREFIX}(.+)-${run.id}-([1-9][0-9]*)$`, 'u');
-  const selected = new Map<string, { artifact: GithubArtifact; attempt: number }>();
-  for (const artifact of artifacts) {
-    const match = suffix.exec(artifact.name);
-    if (!match) continue;
-    const attempt = Number(match[2]);
-    if (attempt > run.run_attempt) continue;
-    const previous = selected.get(match[1]);
-    if (
-      !previous ||
-      attempt > previous.attempt ||
-      (attempt === previous.attempt && artifact.id > previous.artifact.id)
-    ) {
-      selected.set(match[1], { artifact, attempt });
-    }
-  }
-  return [...selected.values()]
-    .map(({ artifact }) => artifact)
-    .toSorted((left, right) => left.name.localeCompare(right.name));
+  return selectShardArtifacts(artifacts, String(run.id), run.run_attempt).toSorted((left, right) =>
+    left.name.localeCompare(right.name),
+  );
 }
 
 async function loadMatrixCandidate(
@@ -388,7 +372,7 @@ async function loadMatrixCandidate(
   run: WorkflowRun,
 ): Promise<MatrixCandidate> {
   const matrixArtifacts = artifacts
-    .filter((artifact) => artifact.name === `${MATRIX_PREFIX}${run.id}`)
+    .filter((artifact) => artifact.name === matrixArtifactName(String(run.id)))
     .toSorted((left, right) => right.id - left.id)
     .slice(0, 1);
   if (matrixArtifacts.length === 0) {

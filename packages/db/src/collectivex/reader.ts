@@ -228,22 +228,29 @@ function reasonId(value: string): string {
 
 function measuredPoints(shard: RawShard, kase: RawCase): CollectiveXCoveragePoint[] {
   const rows = new Map(shard.measurement.rows.map((row) => [row.tokens_per_rank, row]));
-  const largestMeasured = Math.max(...rows.keys());
+  // null when the shard measured nothing. `Math.max()` of an empty list is
+  // -Infinity, which would put every ladder point above the largest measured
+  // value and report a backend token-capacity limit that was never observed —
+  // an unmeasured case would read as a hard capability wall.
+  const largestMeasured = rows.size > 0 ? Math.max(...rows.keys()) : null;
   return ladderTokens(kase).map((tokens) => {
     const row = rows.get(tokens);
-    return row
-      ? {
-          tokens_per_rank: tokens,
-          global_tokens: row.global_tokens,
-          terminal_status: 'measured',
-          reason: null,
-        }
-      : {
-          tokens_per_rank: tokens,
-          global_tokens: tokens * kase.ep,
-          terminal_status: tokens > largestMeasured ? 'unsupported' : 'pending',
-          reason: tokens > largestMeasured ? 'backend-token-capacity' : 'not-measured',
-        };
+    if (row) {
+      return {
+        tokens_per_rank: tokens,
+        global_tokens: row.global_tokens,
+        terminal_status: 'measured' as const,
+        reason: null,
+      };
+    }
+    // Only a point beyond something we actually measured is evidence of a capacity limit.
+    const beyondCapacity = largestMeasured !== null && tokens > largestMeasured;
+    return {
+      tokens_per_rank: tokens,
+      global_tokens: tokens * kase.ep,
+      terminal_status: beyondCapacity ? ('unsupported' as const) : ('pending' as const),
+      reason: beyondCapacity ? 'backend-token-capacity' : 'not-measured',
+    };
   });
 }
 

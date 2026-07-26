@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { matrixArtifactName, selectShardArtifactNames } from './artifact-selection';
+import {
+  matrixArtifactName,
+  selectShardArtifactNames,
+  selectShardArtifacts,
+} from './artifact-selection';
 
-describe('selectShardArtifactNames', () => {
+describe('shard artifact selection', () => {
   it('selects one artifact per cell, sorted by name', () => {
     expect(
       selectShardArtifactNames(
@@ -32,6 +36,30 @@ describe('selectShardArtifactNames', () => {
     expect(
       selectShardArtifactNames(['cxshard-a-160-0', 'other-160-1', 'cxshard-a-999-1'], '160', 1),
     ).toEqual([]);
+  });
+  it('breaks same-attempt ties on the later artifact id', () => {
+    // GitHub permits a repeated artifact name within one run; the lazy ingest has
+    // ids and must keep the later upload. Both ingest paths share this selector,
+    // so the tie-break cannot drift between them again.
+    const artifacts = [
+      { name: 'cxshard-a-160-1', id: 10 },
+      { name: 'cxshard-a-160-1', id: 42 },
+    ];
+    expect(selectShardArtifacts(artifacts, '160', 1)).toEqual([
+      { name: 'cxshard-a-160-1', id: 42 },
+    ]);
+  });
+
+  it('keeps the first match when callers supply no ids', () => {
+    // The names-only path has no id to compare, so it stays deterministic on input order.
+    expect(
+      selectShardArtifacts([{ name: 'cxshard-a-160-1' }, { name: 'cxshard-a-160-1' }], '160', 1),
+    ).toHaveLength(1);
+  });
+
+  it('treats a run id with regex metacharacters literally', () => {
+    // The id is interpolated into the pattern; an unescaped '.' would match any char.
+    expect(selectShardArtifactNames(['cxshard-a-1x0-1'], '1.0', 1)).toEqual([]);
   });
 });
 

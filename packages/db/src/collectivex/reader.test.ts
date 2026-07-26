@@ -145,6 +145,16 @@ describe('CollectiveX artifact assembly', () => {
     });
   });
 
+  it('does not read a success shard with no rows as a capacity wall', () => {
+    // Math.max() of no rows is -Infinity, which would put every ladder point
+    // "beyond the largest measured" and report a token-capacity limit that was
+    // never observed. Nothing was measured, so every point is pending.
+    const dataset = buildDataset({ shards: [makeRawShard({ rows: [] })] });
+    const points = dataset.coverage[0].points;
+    expect(points.map((point) => point.terminal_status)).toEqual(points.map(() => 'pending'));
+    expect(points.every((point) => point.reason === 'not-measured')).toBe(true);
+  });
+
   it('keeps unsupported and pending cases distinct', () => {
     const dataset = makeCollectiveXDataset();
     expect(dataset.coverage.find((row) => row.sku === 'b300')).toMatchObject({

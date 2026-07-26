@@ -133,6 +133,26 @@ describe('deleteCollectiveXRun', () => {
     const { sql } = fakeSql([[{ runs_deleted: 0 }]]);
     await expect(deleteCollectiveXRun(sql, '160')).resolves.toBe(false);
   });
+
+  it('cannot reach anything but the one run it is given', async () => {
+    // The delete route's Bearer token is held in browser localStorage, so the
+    // blast radius of a stolen token is whatever this statement can touch. It
+    // must stay: one run, in the two CollectiveX tables, and recoverable by
+    // re-ingesting the run from its GitHub artifacts.
+    const { sql, calls } = fakeSql([[{ runs_deleted: 1 }]]);
+    await deleteCollectiveXRun(sql, '160');
+    // The run id is the only value bound into the statement — no other row is nameable.
+    expect(calls[0].values).toEqual(['160']);
+    // Documents go only via the tombstoned CTE, never a free-standing predicate.
+    expect(calls[0].text).toContain(
+      'DELETE FROM cx_run_docs WHERE run_id IN (SELECT run_id FROM tombstoned)',
+    );
+    // No table outside the CollectiveX pair is referenced, and nothing is dropped.
+    expect(new Set([...calls[0].text.matchAll(/\bcx_[a-z_]+/gu)].map((match) => match[0]))).toEqual(
+      new Set(['cx_runs', 'cx_run_docs']),
+    );
+    expect(calls[0].text).not.toMatch(/\b(?:DROP|TRUNCATE|ALTER)\b/iu);
+  });
 });
 
 describe('collectiveXDatasetFromRow', () => {
