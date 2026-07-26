@@ -99,6 +99,119 @@ export const fmt = (v: number): string => {
   return String(rounded);
 };
 
+const CONVERGENCE_STRINGS = {
+  en: {
+    title: 'Cumulative convergence',
+    stabilized: (duration: string, tolerance: string) =>
+      `Stabilized by ${duration} at ${tolerance}`,
+    notStabilized: (duration: string, tolerance: string) =>
+      `Not stabilized within the ${duration} run at ${tolerance}`,
+    span: 'Post-stabilization span',
+    requests: 'Requests at stabilization',
+    maxDeviation: 'Maximum later deviation',
+    method: (checkpoint: string, confirmation: string) =>
+      `Retrospective within-run diagnostic using ${checkpoint} cumulative checkpoints and at least ${confirmation} of later confirmation; not a confidence interval or rerun prediction.`,
+    rootTrajectories: 'Root trajectories',
+    kishCoverage: 'Kish-effective root coverage',
+    kishExplanation: 'coverage diversity, not a statistical effective sample size',
+  },
+  zh: {
+    title: '累计收敛',
+    stabilized: (duration: string, tolerance: string) =>
+      `在 ${duration}时已稳定至 ${tolerance} 范围内`,
+    notStabilized: (duration: string, tolerance: string) =>
+      `在 ${duration}运行期内未稳定至 ${tolerance} 范围内`,
+    span: '稳定后的累计范围',
+    requests: '达到稳定时的请求数',
+    maxDeviation: '后续最大偏差',
+    method: (checkpoint: string, confirmation: string) =>
+      `回溯性单次运行诊断：每 ${checkpoint}计算一次累计指标，并要求之后至少连续 ${confirmation}满足稳定条件；并非置信区间，也不预测复跑结果。`,
+    rootTrajectories: '根轨迹数',
+    kishCoverage: 'Kish 有效根轨迹覆盖数',
+    kishExplanation: '仅表示覆盖多样性，并非统计有效样本量',
+  },
+} as const;
+
+const convergenceDuration = (
+  seconds: number | undefined,
+  locale: Locale,
+  adjective = false,
+): string => {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) {
+    return locale === 'zh' ? '未知时长' : 'unknown duration';
+  }
+  const minutes = seconds / 60;
+  if (locale === 'zh') {
+    return Number.isInteger(minutes) ? `${minutes} 分钟` : `${seconds} 秒`;
+  }
+  if (!Number.isInteger(minutes)) return adjective ? `${seconds}-second` : `${seconds} seconds`;
+  if (adjective) return `${minutes}-minute`;
+  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+};
+
+/**
+ * Retrospective cumulative-prefix convergence for the current x metric. The
+ * result describes one run; it is neither a sampling confidence interval nor
+ * a prediction of how a rerun will behave.
+ */
+const generateConvergenceHTML = (d: InferenceData, locale: Locale): string => {
+  if (!d.convergenceEvaluated) return '';
+
+  const t = CONVERGENCE_STRINGS[locale];
+  const tolerance = `±${Number(((d.convergence_tolerance_ratio ?? 0) * 100).toFixed(2))}%`;
+  const stabilized = typeof d.convergenceTimeSeconds === 'number' && d.convergenceTimeSeconds > 0;
+  const status = stabilized
+    ? t.stabilized(convergenceDuration(d.convergenceTimeSeconds, locale), tolerance)
+    : t.notStabilized(convergenceDuration(d.convergence_horizon_seconds, locale, true), tolerance);
+  const method = t.method(
+    convergenceDuration(d.convergence_checkpoint_seconds, locale, true),
+    convergenceDuration(d.convergence_min_confirmation_seconds, locale),
+  );
+
+  const coverageRows: string[] = [];
+  if (
+    stabilized &&
+    typeof d.convergenceXMin === 'number' &&
+    Number.isFinite(d.convergenceXMin) &&
+    typeof d.convergenceXMax === 'number' &&
+    Number.isFinite(d.convergenceXMax)
+  ) {
+    coverageRows.push(tooltipLine(t.span, `${fmt(d.convergenceXMin)}–${fmt(d.convergenceXMax)}`));
+  }
+  if (stabilized && typeof d.convergenceRequests === 'number') {
+    coverageRows.push(tooltipLine(t.requests, d.convergenceRequests));
+  }
+  if (stabilized && typeof d.convergenceMaxRelativeDeviation === 'number') {
+    coverageRows.push(
+      tooltipLine(
+        t.maxDeviation,
+        `${Number((d.convergenceMaxRelativeDeviation * 100).toFixed(2))}%`,
+      ),
+    );
+  }
+  if (typeof d.root_trajectory_count === 'number') {
+    coverageRows.push(tooltipLine(t.rootTrajectories, d.root_trajectory_count));
+  }
+  if (typeof d.root_trajectory_kish_effective_count === 'number') {
+    coverageRows.push(
+      tooltipLine(
+        t.kishCoverage,
+        `${fmt(d.root_trajectory_kish_effective_count)} <span style="font-size: 10px; opacity: 0.8;">(${t.kishExplanation})</span>`,
+      ),
+    );
+  }
+  return `
+    <div data-testid="convergence-diagnostic-tooltip" style="border-top: 1px solid var(--border); margin-top: 7px; padding-top: 7px; margin-bottom: 5px;">
+      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 3px;">
+        <strong>${t.title}:</strong> ${status}
+      </div>
+      <div style="color: var(--muted-foreground); font-size: 10px; line-height: 1.35; margin-bottom: 5px; max-width: 280px;">
+        ${method}
+      </div>
+      ${coverageRows.join('')}
+    </div>`;
+};
+
 const CACHE_STRINGS = {
   en: {
     offloadType: 'Offload Type',
@@ -313,6 +426,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           </div>`
           : ''
       }
+      ${generateConvergenceHTML(d, locale)}
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
@@ -373,6 +487,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>${yLabel}:</strong> ${fmt(d.y)}
       </div>
+      ${generateConvergenceHTML(d, locale)}
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
@@ -444,6 +559,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           </div>`
           : ''
       }
+      ${generateConvergenceHTML(d, locale)}
       ${tooltipLine('Total GPUs', d.tp)}
       ${generateParallelismHTML(d)}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">

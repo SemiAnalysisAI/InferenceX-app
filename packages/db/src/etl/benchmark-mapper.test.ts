@@ -772,6 +772,61 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
         },
       },
       cache: { theoretical_cache_hit_rate: 0.97509 },
+      stability: {
+        window_seconds: 600,
+        expected_window_count: 6,
+        observed_window_count: 6,
+        min_window_requests: 190,
+        root_trajectory_count: 25,
+        root_trajectory_kish_effective_count: 14.767,
+        root_trajectory_largest_share: 0.159,
+        observed_ranges: {
+          ttft: {
+            p75: { min: 0.941, max: 1.758 },
+            p90: { min: 1.416, max: 4.114 },
+          },
+          e2el: {
+            p75: { min: 42.1, max: 79.2 },
+            p90: { min: 57.456, max: 110.924 },
+          },
+          intvty: {
+            p75: { min: 24.5, max: 31.2 },
+            p90: { min: 22.621, max: 30.653 },
+          },
+        },
+        convergence: {
+          checkpoint_seconds: 300,
+          tolerance_ratio: 0.05,
+          min_confirmation_seconds: 1200,
+          horizon_seconds: 3600,
+          metrics: {
+            ttft: {
+              p75: {
+                time_seconds: 900,
+                requests: 300,
+                min: 1.21,
+                max: 1.27,
+                max_relative_deviation: 0.031,
+              },
+              p90: null,
+            },
+            e2el: {
+              p75: null,
+              p90: null,
+            },
+            intvty: {
+              p75: null,
+              p90: {
+                time_seconds: 1200,
+                requests: 407,
+                min: 43.36036,
+                max: 46.97824,
+                max_relative_deviation: 0.04385,
+              },
+            },
+          },
+        },
+      },
     },
     server_metrics: {
       present: true,
@@ -841,6 +896,31 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m.total_prompt_tokens).toBe(261750519);
     expect(m.total_generation_tokens).toBe(1422696);
     expect(m.total_requests_completed).toBe(1648);
+    // realized coverage + non-overlapping-window diagnostics
+    expect(m.observed_window_seconds).toBe(600);
+    expect(m.observed_window_count).toBe(6);
+    expect(m.observed_window_min_requests).toBe(190);
+    expect(m.root_trajectory_count).toBe(25);
+    expect(m.root_trajectory_kish_effective_count).toBeCloseTo(14.767, 3);
+    expect(m.observed_window_p90_ttft_min).toBeCloseTo(1.416, 3);
+    expect(m.observed_window_p90_ttft_max).toBeCloseTo(4.114, 3);
+    expect(m.observed_window_p75_e2el_max).toBeCloseTo(79.2, 3);
+    expect(m.observed_window_p90_intvty_min).toBeCloseTo(22.621, 3);
+    // retrospective cumulative-prefix convergence
+    expect(m.convergence_checkpoint_seconds).toBe(300);
+    expect(m.convergence_tolerance_ratio).toBe(0.05);
+    expect(m.convergence_min_confirmation_seconds).toBe(1200);
+    expect(m.convergence_horizon_seconds).toBe(3600);
+    expect(m.convergence_p75_ttft_time_seconds).toBe(900);
+    expect(m.convergence_p75_ttft_requests).toBe(300);
+    expect(m.convergence_p75_ttft_min).toBeCloseTo(1.21, 5);
+    expect(m.convergence_p75_ttft_max_relative_deviation).toBeCloseTo(0.031, 5);
+    expect(m.convergence_p90_intvty_time_seconds).toBe(1200);
+    expect(m.convergence_p90_intvty_requests).toBe(407);
+    expect(m.convergence_p90_intvty_min).toBeCloseTo(43.36036, 5);
+    expect(m.convergence_p90_intvty_max).toBeCloseTo(46.97824, 5);
+    expect(m.convergence_p90_intvty_max_relative_deviation).toBeCloseTo(0.04385, 5);
+    expect(m).not.toHaveProperty('convergence_p90_ttft_time_seconds');
     // nested containers must not leak into metrics
     expect(m).not.toHaveProperty('request_metrics');
     expect(m).not.toHaveProperty('server_metrics');

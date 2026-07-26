@@ -233,6 +233,30 @@ describe('processOverlayChartData', () => {
     expect(result[0].x).toBe(0.12);
   });
 
+  it('stamps convergence bounds matching the overlay x-axis metric', () => {
+    const data = [
+      pt({
+        tpPerGpu: { y: 42, roof: false },
+        p90_ttft: 2,
+        convergence_checkpoint_seconds: 300,
+        convergence_tolerance_ratio: 0.05,
+        convergence_min_confirmation_seconds: 1200,
+        convergence_horizon_seconds: 3600,
+        convergence_p90_ttft_time_seconds: 1200,
+        convergence_p90_ttft_requests: 407,
+        convergence_p90_ttft_min: 1.4,
+        convergence_p90_ttft_max: 1.52,
+        convergence_p90_ttft_max_relative_deviation: 0.043,
+      } as any),
+    ];
+    const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p90_ttft');
+
+    expect(result[0].convergenceXMin).toBe(1.4);
+    expect(result[0].convergenceXMax).toBe(1.52);
+    expect(result[0].convergenceTimeSeconds).toBe(1200);
+    expect(result[0].convergenceRequests).toBe(407);
+  });
+
   it('filters e2e TTFT outliers exceeding y_latency_limit', () => {
     const data = [
       pt({ tpPerGpu: { y: 10, roof: false }, p90_ttft: 0.5, median_e2el: 1 } as any),

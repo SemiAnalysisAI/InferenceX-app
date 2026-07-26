@@ -90,6 +90,57 @@ describe('rowToAggDataEntry', () => {
     expect(entry.median_intvty).toBe(12.5);
   });
 
+  it('passes AgentX window, coverage, and convergence diagnostics through', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: {
+          observed_window_seconds: 600,
+          observed_window_expected_count: 6,
+          observed_window_count: 6,
+          observed_window_min_requests: 21,
+          root_trajectory_count: 3,
+          root_trajectory_kish_effective_count: 1.69,
+          root_trajectory_largest_share: 0.74,
+          observed_window_p90_ttft_min: 1.416,
+          observed_window_p90_ttft_max: 4.114,
+          observed_window_p75_e2el_min: 42.1,
+          observed_window_p75_e2el_max: 79.2,
+          observed_window_p90_intvty_min: 22.6,
+          observed_window_p90_intvty_max: 30.7,
+          convergence_checkpoint_seconds: 300,
+          convergence_tolerance_ratio: 0.05,
+          convergence_min_confirmation_seconds: 1200,
+          convergence_horizon_seconds: 3600,
+          convergence_p90_intvty_time_seconds: 1200,
+          convergence_p90_intvty_requests: 407,
+          convergence_p90_intvty_min: 43.36036,
+          convergence_p90_intvty_max: 46.97824,
+          convergence_p90_intvty_max_relative_deviation: 0.04385,
+        } as unknown as BenchmarkRow['metrics'],
+      }),
+    );
+
+    expect(entry.observed_window_seconds).toBe(600);
+    expect(entry.observed_window_count).toBe(6);
+    expect(entry.observed_window_min_requests).toBe(21);
+    expect(entry.root_trajectory_count).toBe(3);
+    expect(entry.root_trajectory_kish_effective_count).toBe(1.69);
+    expect(entry.root_trajectory_largest_share).toBe(0.74);
+    expect(entry.observed_window_p90_ttft_min).toBe(1.416);
+    expect(entry.observed_window_p90_ttft_max).toBe(4.114);
+    expect(entry.observed_window_p75_e2el_max).toBe(79.2);
+    expect(entry.observed_window_p90_intvty_min).toBe(22.6);
+    expect(entry.convergence_checkpoint_seconds).toBe(300);
+    expect(entry.convergence_tolerance_ratio).toBe(0.05);
+    expect(entry.convergence_min_confirmation_seconds).toBe(1200);
+    expect(entry.convergence_horizon_seconds).toBe(3600);
+    expect(entry.convergence_p90_intvty_time_seconds).toBe(1200);
+    expect(entry.convergence_p90_intvty_requests).toBe(407);
+    expect(entry.convergence_p90_intvty_min).toBe(43.36036);
+    expect(entry.convergence_p90_intvty_max).toBe(46.97824);
+    expect(entry.convergence_p90_intvty_max_relative_deviation).toBe(0.04385);
+  });
+
   it('defaults missing metrics to 0', () => {
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.tput_per_gpu).toBe(0);

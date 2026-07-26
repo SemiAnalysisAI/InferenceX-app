@@ -5,7 +5,10 @@ import {
   dedupeRowsToLatestPerConfig,
   filterByGPU,
   flipRooflineDirection,
+  remapChartPoint,
 } from './useChartData';
+
+import type { InferenceData } from '@/components/inference/types';
 
 interface DedupeInput {
   id: number;
@@ -149,5 +152,27 @@ describe('flipRooflineDirection', () => {
     for (const dir of ['upper_left', 'upper_right', 'lower_left', 'lower_right'] as const) {
       expect(flipRooflineDirection(flipRooflineDirection(dir))).toBe(dir);
     }
+  });
+});
+
+describe('remapChartPoint', () => {
+  it('preserves the selected metric roof flag while flattening its y value', () => {
+    const point = {
+      x: 1,
+      y: 2,
+      hwKey: 'h100',
+      date: '2026-06-01',
+      tp: 100,
+      conc: 1,
+      precision: 'fp8',
+      p90_ttft: 3,
+      tpPerGpu: { y: 42, roof: true },
+    } as InferenceData;
+
+    expect(remapChartPoint(point, 'tpPerGpu', 'p90_ttft')).toMatchObject({
+      x: 3,
+      y: 42,
+      roof: true,
+    });
   });
 });
