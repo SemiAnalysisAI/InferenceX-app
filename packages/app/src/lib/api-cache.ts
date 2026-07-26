@@ -11,6 +11,19 @@ import { blobGet, blobPurge, blobSet } from './blob-cache';
 export const COLLECTIVEX_CACHE_SCOPE = 'collectivex';
 
 /**
+ * CDN/unstable_cache tag for CollectiveX responses, namespaced the same way as
+ * the main database tag. Environments that share a Vercel project share its
+ * cache tags, so an unnamespaced `collectivex` would let a purge in one
+ * environment drop another's cached responses. `COLLECTIVEX_CACHE_SCOPE` stays
+ * unnamespaced on purpose — it is the public identifier callers pass to
+ * `/api/v1/invalidate?scope=`.
+ */
+export function collectiveXCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${COLLECTIVEX_CACHE_SCOPE}:${namespace}` : COLLECTIVEX_CACHE_SCOPE;
+}
+
+/**
  * Short CDN window shared by the CollectiveX latest/runs routes: new sweep
  * runs are discovered lazily at the origin, so freshness is bounded by this
  * TTL rather than by an ingest-time purge.
@@ -84,7 +97,7 @@ export async function purgeAll(): Promise<number> {
  * tag.
  */
 export function purgeCollectiveX(): void {
-  revalidateTag(COLLECTIVEX_CACHE_SCOPE, { expire: 0 });
+  revalidateTag(collectiveXCacheTag(), { expire: 0 });
 }
 
 /**

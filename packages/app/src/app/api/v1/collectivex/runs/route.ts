@@ -4,7 +4,7 @@ import { parseCollectiveXVersion } from '@semianalysisai/inferencex-db/collectiv
 import { FIXTURES_MODE, getCollectiveXDb } from '@semianalysisai/inferencex-db/connection';
 import { listCollectiveXRuns } from '@semianalysisai/inferencex-db/queries/collectivex';
 
-import { COLLECTIVEX_CACHE_CONTROL, COLLECTIVEX_CACHE_SCOPE, cachedJson } from '@/lib/api-cache';
+import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/api-cache';
 import {
   collectiveXSweepErrorStatus,
   ensureCollectiveXRunsList,
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
     return cachedJson(
       { version, runs },
-      { tag: COLLECTIVEX_CACHE_SCOPE, cacheControl: COLLECTIVEX_CACHE_CONTROL },
+      { tag: collectiveXCacheTag(), cacheControl: COLLECTIVEX_CACHE_CONTROL },
     );
   } catch (error) {
     console.error('Error listing CollectiveX runs:', error);

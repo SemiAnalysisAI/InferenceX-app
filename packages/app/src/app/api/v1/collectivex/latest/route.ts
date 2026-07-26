@@ -7,7 +7,7 @@ import {
   getLatestCollectiveXRun,
 } from '@semianalysisai/inferencex-db/queries/collectivex';
 
-import { COLLECTIVEX_CACHE_CONTROL, COLLECTIVEX_CACHE_SCOPE, cachedJson } from '@/lib/api-cache';
+import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/api-cache';
 import {
   collectiveXSweepErrorStatus,
   ensureLatestCollectiveXRun,
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       if (ensureError)
         console.error('CollectiveX discovery failed; serving stored run:', ensureError);
       return cachedJson(collectiveXDatasetFromRow(row), {
-        tag: COLLECTIVEX_CACHE_SCOPE,
+        tag: collectiveXCacheTag(),
         cacheControl: COLLECTIVEX_CACHE_CONTROL,
       });
     }

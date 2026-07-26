@@ -33,6 +33,7 @@ vi.mock('@/lib/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
   cachedJson: (data: unknown) => Response.json(data),
+  collectiveXCacheTag: () => 'collectivex',
 }));
 
 import { NextRequest } from 'next/server';

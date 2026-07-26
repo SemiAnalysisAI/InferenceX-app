@@ -16,7 +16,7 @@ import {
 
 import {
   COLLECTIVEX_CACHE_CONTROL,
-  COLLECTIVEX_CACHE_SCOPE,
+  collectiveXCacheTag,
   cachedJson,
   purgeCollectiveX,
 } from '@/lib/api-cache';
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     // Short window like the sibling routes: a GitHub re-run of failed shards
     // refreshes this run's stored contents, and deletion must not linger.
     return cachedJson(collectiveXDatasetFromRow(row), {
-      tag: COLLECTIVEX_CACHE_SCOPE,
+      tag: collectiveXCacheTag(),
       cacheControl: COLLECTIVEX_CACHE_CONTROL,
     });
   } catch (error) {
