@@ -101,8 +101,21 @@ export interface RunMeta {
   created_at?: string | null;
 }
 
-/** Fetch a workflow run's metadata via `gh api`. */
+/**
+ * Fetch a workflow run's metadata via `gh api`.
+ *
+ * Both arguments land in a shell-interpolated command, so they are validated
+ * here rather than trusted from the caller: this helper is exported and its
+ * callers' own checks are not guaranteed. A run id is always digits and a repo
+ * slug is `owner/name`, so anything else is rejected outright.
+ */
 export function fetchRunMeta(repo: string, runId: string): RunMeta {
+  if (!/^[\w.-]+\/[\w.-]+$/u.test(repo)) {
+    throw new Error(`Invalid repo slug: ${repo}`);
+  }
+  if (!/^\d+$/u.test(runId)) {
+    throw new Error(`Invalid run id: ${runId}`);
+  }
   const json = execSync(`gh api "repos/${repo}/actions/runs/${runId}"`, {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,

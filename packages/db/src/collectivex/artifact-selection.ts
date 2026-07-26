@@ -14,6 +14,11 @@ export function matrixArtifactName(runId: string): string {
   return `${MATRIX_PREFIX}${runId}`;
 }
 
+/** Escape regex metacharacters so an interpolated value matches literally. */
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+}
+
 /**
  * Pick the shard artifact names to ingest: keep the highest attempt ≤ the
  * run's current attempt per cell (a re-run attempt supersedes its
@@ -25,7 +30,13 @@ export function selectShardArtifactNames(
   runId: string,
   runAttempt: number,
 ): string[] {
-  const pattern = new RegExp(`^${SHARD_PREFIX}(?<cell>.+)-${runId}-(?<attempt>[1-9][0-9]*)$`, 'u');
+  // runId is interpolated into a pattern, so escape it: an unescaped caller value
+  // would change what this matches (regular expression injection), and a crafted
+  // one could make the `.+` prefix backtrack pathologically.
+  const pattern = new RegExp(
+    `^${SHARD_PREFIX}(?<cell>.+)-${escapeRegExp(runId)}-(?<attempt>[1-9][0-9]*)$`,
+    'u',
+  );
   const selected = new Map<string, { name: string; attempt: number }>();
   for (const name of names) {
     const match = pattern.exec(name);

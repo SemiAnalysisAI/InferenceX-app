@@ -97,9 +97,15 @@ if (isDownloadMode) {
   artifactsDir = artifactsPath;
 }
 
-// The repo slug reaches shell-interpolated `gh api` calls — reject metachars.
+// Both reach shell-interpolated `gh api` calls — reject metachars. --download
+// parses its run id out of a URL or a digits-only argument, but the env-var path
+// takes INGEST_RUN_ID verbatim, so validate here where both modes converge.
 if (!/^[\w.-]+\/[\w.-]+$/u.test(REPO)) {
   console.error(`Invalid repo slug: ${REPO}`);
+  process.exit(1);
+}
+if (!/^\d+$/u.test(runIdStr)) {
+  console.error(`Invalid run id: ${runIdStr}`);
   process.exit(1);
 }
 
