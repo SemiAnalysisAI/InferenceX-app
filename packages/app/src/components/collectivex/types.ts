@@ -10,7 +10,34 @@ import type {
   CollectiveXVersion,
 } from '@semianalysisai/inferencex-db/collectivex/types';
 
-export * from '@semianalysisai/inferencex-db/collectivex/types';
+// Re-exported explicitly rather than with `export *`: Next's SWC loader rejects a
+// star re-export anywhere in a page's module graph ("Using `export * from '...'` in
+// a page is disallowed"), and this module is reached from the /collectivex page.
+export type {
+  CollectiveXComponent,
+  CollectiveXCoverage,
+  CollectiveXCoveragePoint,
+  CollectiveXDataset,
+  CollectiveXMode,
+  CollectiveXOperation,
+  CollectiveXOutcome,
+  CollectiveXPercentile,
+  CollectiveXPercentiles,
+  CollectiveXPhase,
+  CollectiveXPoint,
+  CollectiveXPrecision,
+  CollectiveXRun,
+  CollectiveXRunSummary,
+  CollectiveXSeries,
+  CollectiveXTerminalStatus,
+  CollectiveXTopology,
+  CollectiveXVersion,
+} from '@semianalysisai/inferencex-db/collectivex/types';
+export {
+  COLLECTIVEX_DEFAULT_VERSION,
+  COLLECTIVEX_VERSIONS,
+  parseCollectiveXVersion,
+} from '@semianalysisai/inferencex-db/collectivex/types';
 
 export const collectiveXVersionLabel = (version: CollectiveXVersion): string => `V${version}`;
 
