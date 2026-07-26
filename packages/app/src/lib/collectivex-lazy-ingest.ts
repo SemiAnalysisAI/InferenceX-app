@@ -100,8 +100,7 @@ export function collectiveXSweepErrorStatus(error: unknown): 404 | 502 | 503 | n
   return null;
 }
 
-// Concurrent requests for the same target share one discovery pass; the DB is
-// the cache, so nothing is memoized beyond the in-flight promise.
+// Concurrent requests for the same target share one discovery pass.
 const inFlight = new Map<string, Promise<void>>();
 
 function dedupe(key: string, work: () => Promise<void>): Promise<void> {
@@ -110,6 +109,57 @@ function dedupe(key: string, work: () => Promise<void>): Promise<void> {
   const promise = work().finally(() => inFlight.delete(key));
   inFlight.set(key, promise);
   return promise;
+}
+
+// Cooldown for the two walking paths. The DB is the durable cache, but sharing
+// only the in-flight promise still left every read walking GitHub: the routes
+// are force-dynamic and call ensure* per request, so even a fully warm page
+// spent a `list workflow runs` call just to conclude "already known" — GitHub
+// latency on every response, and rate-limit burn that scales with traffic
+// rather than with how often a sweep actually lands.
+//
+// Only `latest:`/`list:` need this. ensureCollectiveXRun returns on a DB hit
+// before it touches GitHub, and throttling it would keep answering 404 for a
+// run that has just appeared.
+//
+// Failures are remembered too, and rethrown for the rest of their (shorter)
+// window: swallowing them would let a GitHub outage read as "discovery fine,
+// nothing found", which downgrades the routes' 502/503 to a 404 when the DB is
+// empty. The window is the upper bound on how stale "latest" can be.
+const DISCOVERY_COOLDOWN_MS = 60_000;
+const DISCOVERY_FAILURE_COOLDOWN_MS = 10_000;
+
+interface DiscoveryOutcome {
+  until: number;
+  error: unknown;
+}
+
+const discoveryCooldown = new Map<string, DiscoveryOutcome>();
+
+function throttled(key: string, work: () => Promise<void>): () => Promise<void> {
+  return async () => {
+    const settled = discoveryCooldown.get(key);
+    if (settled && Date.now() < settled.until) {
+      if (settled.error !== null) throw settled.error;
+      return;
+    }
+    try {
+      await work();
+    } catch (error) {
+      discoveryCooldown.set(key, { until: Date.now() + DISCOVERY_FAILURE_COOLDOWN_MS, error });
+      throw error;
+    }
+    discoveryCooldown.set(key, { until: Date.now() + DISCOVERY_COOLDOWN_MS, error: null });
+  };
+}
+
+/**
+ * Test-only: drop every discovery cooldown. The module keeps this state for the
+ * lifetime of the process, so a suite driving successive passes must clear it
+ * between cases.
+ */
+export function resetCollectiveXDiscoveryCooldown(): void {
+  discoveryCooldown.clear();
 }
 
 function githubHeaders(token: string) {
@@ -465,12 +515,16 @@ async function considerCandidate(
  * artifact failures (callers fall back to whatever the DB already holds).
  */
 export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise<void> {
-  return dedupe(`latest:${version}`, async () => {
-    const token = requireToken();
-    for await (const run of sweepRuns(token)) {
-      if ((await considerCandidate(run, version, token)) === 'match') return;
-    }
-  });
+  const key = `latest:${version}`;
+  return dedupe(
+    key,
+    throttled(key, async () => {
+      const token = requireToken();
+      for await (const run of sweepRuns(token)) {
+        if ((await considerCandidate(run, version, token)) === 'match') return;
+      }
+    }),
+  );
 }
 
 /**
@@ -479,14 +533,18 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
  * live matches count toward the cap — tombstoned runs never fill a slot.
  */
 export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<void> {
-  return dedupe(`list:${version}`, async () => {
-    const token = requireToken();
-    let matched = 0;
-    for await (const run of sweepRuns(token)) {
-      if ((await considerCandidate(run, version, token)) === 'match') matched += 1;
-      if (matched >= MAX_DISCOVERED_RUNS) return;
-    }
-  });
+  const key = `list:${version}`;
+  return dedupe(
+    key,
+    throttled(key, async () => {
+      const token = requireToken();
+      let matched = 0;
+      for await (const run of sweepRuns(token)) {
+        if ((await considerCandidate(run, version, token)) === 'match') matched += 1;
+        if (matched >= MAX_DISCOVERED_RUNS) return;
+      }
+    }),
+  );
 }
 
 /**

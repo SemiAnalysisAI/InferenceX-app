@@ -27,6 +27,7 @@ import {
   ensureCollectiveXRun,
   ensureCollectiveXRunsList,
   ensureLatestCollectiveXRun,
+  resetCollectiveXDiscoveryCooldown,
 } from './collectivex-lazy-ingest';
 
 const mockFetch = vi.fn();
@@ -91,6 +92,13 @@ function runObject(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** One page of the run listing. A Response body reads once, so build a fresh one per call. */
+function runListing(...runs: ReturnType<typeof runObject>[]) {
+  return Response.json({ total_count: runs.length, workflow_runs: runs });
+}
+
+const twoRunListing = () => runListing(runObject({ id: 161 }), runObject({ id: 160 }));
+
 function artifactsBody(runId = 160, runAttempt = 1) {
   return {
     total_count: 2,
@@ -117,6 +125,9 @@ beforeEach(() => {
   mockInsert.mockReset().mockResolvedValue(true);
   mockRefresh.mockReset().mockResolvedValue(true);
   process.env.GITHUB_TOKEN = 'test-token';
+  // Module-level state outlives a case; without this every test after the first
+  // would be answered from the discovery cooldown and issue no requests.
+  resetCollectiveXDiscoveryCooldown();
 });
 
 afterAll(() => {
@@ -168,12 +179,7 @@ describe('ensureLatestCollectiveXRun', () => {
       ),
     );
     mockFetch
-      .mockResolvedValueOnce(
-        Response.json({
-          total_count: 2,
-          workflow_runs: [runObject({ id: 161 }), runObject({ id: 160 })],
-        }),
-      )
+      .mockResolvedValueOnce(twoRunListing())
       .mockResolvedValueOnce(Response.json(artifactsBody()))
       .mockResolvedValueOnce(new Response(matrixZip))
       .mockResolvedValueOnce(new Response(shardZip));
@@ -186,12 +192,7 @@ describe('ensureLatestCollectiveXRun', () => {
 
   it('skips runs tagged for another version', async () => {
     mockFetch
-      .mockResolvedValueOnce(
-        Response.json({
-          total_count: 2,
-          workflow_runs: [runObject({ id: 161 }), runObject({ id: 160 })],
-        }),
-      )
+      .mockResolvedValueOnce(twoRunListing())
       // Run 161 carries a v2 matrix — requesting v1 must move on.
       .mockResolvedValueOnce(Response.json(artifactsBody(161)))
       .mockResolvedValueOnce(new Response(matrixZipV2))
@@ -288,6 +289,51 @@ describe('ensureLatestCollectiveXRun', () => {
   });
 });
 
+describe('discovery cooldown', () => {
+  it('serves a warm target from the cooldown without calling GitHub again', async () => {
+    mockGetStates.mockResolvedValue({ '160': { state: 'live', version: 1, run_attempt: 1 } });
+    mockFetch.mockImplementation(() => Promise.resolve(runListing(runObject())));
+
+    await ensureLatestCollectiveXRun(1);
+    const afterFirst = mockFetch.mock.calls.length;
+    expect(afterFirst).toBeGreaterThan(0);
+
+    await ensureLatestCollectiveXRun(1);
+    await ensureLatestCollectiveXRun(1);
+    expect(mockFetch.mock.calls.length).toBe(afterFirst);
+  });
+
+  it('walks again once the cooldown window has elapsed', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetStates.mockResolvedValue({ '160': { state: 'live', version: 1, run_attempt: 1 } });
+      mockFetch.mockImplementation(() => Promise.resolve(runListing(runObject())));
+
+      await ensureLatestCollectiveXRun(1);
+      const afterFirst = mockFetch.mock.calls.length;
+
+      vi.advanceTimersByTime(61_000);
+      await ensureLatestCollectiveXRun(1);
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(afterFirst);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rethrows a remembered failure so an outage stays 502/503 rather than 404', async () => {
+    mockFetch.mockResolvedValue(new Response('nope', { status: 500 }));
+
+    const first = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
+    expect(collectiveXSweepErrorCode(first)).toBe('unavailable');
+    const afterFirst = mockFetch.mock.calls.length;
+
+    // Same error object, and no fresh requests while the failure window holds.
+    const second = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
+    expect(second).toBe(first);
+    expect(mockFetch.mock.calls.length).toBe(afterFirst);
+  });
+});
+
 describe('ensureCollectiveXRunsList', () => {
   it('backfills absent recent runs and counts live ones toward the cap', async () => {
     mockGetStates.mockImplementation((_sql: unknown, ids: string[]) =>
@@ -296,12 +342,7 @@ describe('ensureCollectiveXRunsList', () => {
       ),
     );
     mockFetch
-      .mockResolvedValueOnce(
-        Response.json({
-          total_count: 2,
-          workflow_runs: [runObject({ id: 161 }), runObject({ id: 160 })],
-        }),
-      )
+      .mockResolvedValueOnce(twoRunListing())
       .mockResolvedValueOnce(Response.json(artifactsBody()))
       .mockResolvedValueOnce(new Response(matrixZip))
       .mockResolvedValueOnce(new Response(shardZip));
