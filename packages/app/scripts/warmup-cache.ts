@@ -5,8 +5,8 @@ import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
  * Warm up API caches by querying all endpoints the frontend uses.
  *
  * Usage:
- *   pnpm admin:cache:warmup [url]           (default: http://localhost:3000)
- *   pnpm admin:cache:warmup https://inferencex.semianalysis.com
+ *   bun run admin:cache:warmup [url]           (default: http://localhost:3000)
+ *   bun run admin:cache:warmup https://inferencex.semianalysis.com
  */
 
 const MODELS = MODEL_OPTIONS;

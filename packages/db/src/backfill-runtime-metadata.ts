@@ -8,8 +8,8 @@
  * rows. It never replaces measured metrics or topology/config data.
  *
  * Usage:
- *   pnpm --filter @semianalysisai/inferencex-db db:backfill-runtime-metadata
- *   pnpm --filter @semianalysisai/inferencex-db db:backfill-runtime-metadata --yes
+ *   bun run --cwd packages/db db:backfill-runtime-metadata
+ *   bun run --cwd packages/db db:backfill-runtime-metadata --yes
  */
 
 import fs from 'node:fs';

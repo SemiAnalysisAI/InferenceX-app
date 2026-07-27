@@ -7,7 +7,7 @@
  * pass. Run after the agentic schema migration and any time the version bumps.
  *
  * Usage:
- *   pnpm --filter @semianalysisai/inferencex-db db:backfill-request-timeline
+ *   bun run --cwd packages/db db:backfill-request-timeline
  *     [--limit N]   only process the first N candidate rows
  *     [--force]     recompute every row, even if version already matches
  *     [--yes]       skip the confirmation prompt

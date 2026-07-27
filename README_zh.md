@@ -34,13 +34,18 @@ packages/
 ## 前置条件
 
 - **Node.js**：24.x
-- **pnpm**：10+
+- **Bun**：1.3.14+
 
-通过 Corepack（随 Node.js 附带）安装 pnpm：
+在 macOS 或 Linux 上安装 Bun：
 
 ```bash
-corepack enable
-corepack prepare pnpm@latest --activate
+curl -fsSL https://bun.sh/install | bash
+```
+
+在 Windows PowerShell 上安装 Bun：
+
+```powershell
+powershell -c "irm bun.sh/install.ps1|iex"
 ```
 
 ## 快速开始
@@ -52,7 +57,7 @@ corepack prepare pnpm@latest --activate
 ```bash
 git clone https://github.com/SemiAnalysisAI/InferenceX-app.git
 cd InferenceX-app
-pnpm install
+bun install
 ```
 
 ### 2. 配置数据库
@@ -90,7 +95,7 @@ EOF
 ### 3. 启动开发服务器
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 用浏览器打开 [http://localhost:3000](http://localhost:3000)。
@@ -100,46 +105,48 @@ pnpm dev
 以下是开发过程中的常用脚本。数据库与缓存管理的运维脚本单独列在下方。
 部分脚本可能需要额外的配置或环境变量。
 
-| 脚本                        | 说明                              |
-| --------------------------- | --------------------------------- |
-| `pnpm dev`                  | 启动开发服务器（Turbopack）       |
-| `pnpm build`                | 生产构建                          |
-| `pnpm start`                | 启动生产服务器                    |
-| `pnpm preview`              | 本地构建并启动生产服务器          |
-| `pnpm typecheck`            | TypeScript 类型检查（所有包）     |
-| `pnpm lint`                 | 使用 oxlint 进行 lint             |
-| `pnpm lint:fix`             | 自动修复 lint 问题                |
-| `pnpm fmt`                  | 使用 oxfmt 检查格式               |
-| `pnpm fmt:fix`              | 自动修复格式                      |
-| `pnpm security`             | 安全审计（pnpm audit + audit-ci） |
-| `pnpm test`                 | 运行所有测试（单元 + E2E）        |
-| `pnpm test:unit`            | Vitest 单元测试                   |
-| `pnpm test:unit:coverage`   | Vitest 单元测试（含覆盖率）       |
-| `pnpm test:e2e`             | Cypress E2E 测试                  |
-| `pnpm test:e2e:component`   | 仅 Cypress 组件测试               |
-| `pnpm test:e2e:integration` | 仅 Cypress 集成测试               |
-| `pnpm clean`                | 清除构建产物                      |
-| `pnpm clean:all`            | 清除构建产物 + node_modules       |
+| 脚本                           | 说明                          |
+| ------------------------------ | ----------------------------- |
+| `bun run dev`                  | 启动开发服务器（Turbopack）   |
+| `bun run build`                | 生产构建                      |
+| `bun run start`                | 启动生产服务器                |
+| `bun run preview`              | 本地构建并启动生产服务器      |
+| `bun run typecheck`            | TypeScript 类型检查（所有包） |
+| `bun run lint`                 | 使用 oxlint 进行 lint         |
+| `bun run lint:fix`             | 自动修复 lint 问题            |
+| `bun run fmt`                  | 使用 oxfmt 检查格式           |
+| `bun run fmt:fix`              | 自动修复格式                  |
+| `bun run security`             | 安全审计                      |
+| `bun run test`                 | 运行所有测试（单元 + E2E）    |
+| `bun run test:unit`            | Vitest 单元测试               |
+| `bun run test:unit:coverage`   | Vitest 单元测试（含覆盖率）   |
+| `bun run test:e2e`             | Cypress E2E 测试              |
+| `bun run test:e2e:component`   | 仅 Cypress 组件测试           |
+| `bun run test:e2e:integration` | 仅 Cypress 集成测试           |
+| `bun run clean`                | 清除构建产物                  |
+| `bun run clean:all`            | 清除构建产物 + node_modules   |
+
+本项目使用 Vitest 和 Cypress。请使用上表中的 `bun run test:*` 脚本；`bun test` 会调用 Bun 自带的另一套测试运行器，本项目不支持该命令。
 
 ### 运维脚本
 
 以下脚本用于数据库与缓存的管理维护，常规开发中一般不需要。
-不过在改动数据库或 API 路由后，将 `pnpm admin:cache:invalidate` 指向本地开发服务器进行测试会很有用。
+不过在改动数据库或 API 路由后，将 `bun run admin:cache:invalidate` 指向本地开发服务器进行测试会很有用。
 
 合并到 `main` 或 `master` 的 `packages/db/src/etl/run-overrides.ts` 变更会由 CI 自动应用到生产数据库，随后执行数据库校验、缓存失效和缓存预热。覆盖命令仍可用于本地预览和手动恢复。
 
-| 脚本                                | 说明                           |
-| ----------------------------------- | ------------------------------ |
-| `pnpm admin:db:migrate`             | 运行数据库迁移                 |
-| `pnpm admin:db:ingest:run`          | 从 GitHub 运行摄取基准测试数据 |
-| `pnpm admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）    |
-| `pnpm admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据        |
-| `pnpm admin:db:ingest:supplemental` | 摄取补充数据                   |
-| `pnpm admin:db:apply-overrides`     | 手动预览或应用数据覆盖         |
-| `pnpm admin:db:reset`               | 重置数据库                     |
-| `pnpm admin:db:verify`              | 校验数据库完整性               |
-| `pnpm admin:cache:invalidate`       | 失效 API 缓存                  |
-| `pnpm admin:cache:warmup`           | 预热 API 缓存                  |
+| 脚本                                   | 说明                           |
+| -------------------------------------- | ------------------------------ |
+| `bun run admin:db:migrate`             | 运行数据库迁移                 |
+| `bun run admin:db:ingest:run`          | 从 GitHub 运行摄取基准测试数据 |
+| `bun run admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）    |
+| `bun run admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据        |
+| `bun run admin:db:ingest:supplemental` | 摄取补充数据                   |
+| `bun run admin:db:apply-overrides`     | 手动预览或应用数据覆盖         |
+| `bun run admin:db:reset`               | 重置数据库                     |
+| `bun run admin:db:verify`              | 校验数据库完整性               |
+| `bun run admin:cache:invalidate`       | 失效 API 缓存                  |
+| `bun run admin:cache:warmup`           | 预热 API 缓存                  |
 
 ## 部署
 

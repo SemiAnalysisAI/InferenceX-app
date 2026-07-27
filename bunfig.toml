@@ -1,0 +1,5 @@
+env = false
+
+[install]
+# Preserve the one-day supply-chain gate.
+minimumReleaseAge = 86400

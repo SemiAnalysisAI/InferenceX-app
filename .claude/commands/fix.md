@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(pnpm build*), Bash(pnpm typecheck*), Bash(pnpm lint*), Bash(pnpm fmt*), Read, Edit, Glob, Grep
+allowed-tools: Bash(bun run build*), Bash(bun run typecheck*), Bash(bun run lint*), Bash(bun run fmt*), Read, Edit, Glob, Grep
 description: Incrementally fix build, type, and lint errors with minimal safe changes
 ---
 
@@ -12,14 +12,14 @@ Incrementally fix build and type errors with minimal, safe changes.
 Run all checks and capture errors:
 
 ```bash
-pnpm typecheck 2>&1
-pnpm lint 2>&1
+bun run typecheck 2>&1
+bun run lint 2>&1
 ```
 
 If both pass, run the full build:
 
 ```bash
-pnpm build 2>&1
+bun run build 2>&1
 ```
 
 If everything passes, announce "All checks pass — nothing to fix." and stop.
@@ -47,7 +47,7 @@ For each error:
 - A fix introduces **more errors than it resolves**
 - The **same error persists after 3 attempts**
 - The fix requires **architectural changes** or touching >3 files
-- Errors stem from **missing dependencies** (need `pnpm install`)
+- Errors stem from **missing dependencies** (need `bun install`)
 
 ## Step 5: Summary
 

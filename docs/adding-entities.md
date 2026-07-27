@@ -168,7 +168,7 @@ From the model name, derive (MiniMax M3 shown as the worked example):
 
 ### Verify
 
-`pnpm typecheck && pnpm lint && pnpm fmt && pnpm test:unit`, then `rg` for the old slug to confirm only the intentional hidden preset + blog links remain. Final gate: `pnpm test:e2e` and a manual `pnpm dev` check that the banner/modal/preset read `DISPLAY` and `/inference?preset=SLUG-launch` renders data.
+`bun run typecheck && bun run lint && bun run fmt && bun run test:unit`, then `rg` for the old slug to confirm only the intentional hidden preset + blog links remain. Final gate: `bun run test:e2e` and a manual `bun run dev` check that the banner/modal/preset read `DISPLAY` and `/inference?preset=SLUG-launch` renders data.
 
 ---
 
@@ -320,8 +320,8 @@ Present what you inferred and ask about anything not visible in artifacts:
 **Always offer to ingest and invalidate** after adding any entity. Ask only which invalidation URL to use (`http://localhost:3000` or `https://inferencex.semianalysis.com`).
 
 ```bash
-pnpm admin:db:ingest:run <run-url-or-id>
-pnpm admin:cache:invalidate <url>
+bun run admin:db:ingest:run <run-url-or-id>
+bun run admin:cache:invalidate <url>
 ```
 
 Both require `DATABASE_WRITE_URL` and `GITHUB_TOKEN` env vars.
@@ -333,6 +333,6 @@ Both require `DATABASE_WRITE_URL` and `GITHUB_TOKEN` env vars.
 After all changes:
 
 ```bash
-pnpm typecheck
-pnpm test:unit
+bun run typecheck
+bun run test:unit
 ```

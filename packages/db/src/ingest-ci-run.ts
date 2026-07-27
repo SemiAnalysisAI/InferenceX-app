@@ -6,10 +6,10 @@
  *   (no flag)                          Read from INGEST_ARTIFACTS_PATH (CI mode)
  *
  * Usage:
- *   pnpm admin:db:ingest:run https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123
- *   pnpm admin:db:ingest:run 123
- *   pnpm admin:db:ingest:run 123 SemiAnalysisAI/InferenceX
- *   pnpm admin:db:ingest:ci   (reads INGEST_* env vars, used by CI workflow)
+ *   bun run admin:db:ingest:run https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123
+ *   bun run admin:db:ingest:run 123
+ *   bun run admin:db:ingest:run 123 SemiAnalysisAI/InferenceX
+ *   bun run admin:db:ingest:ci   (reads INGEST_* env vars, used by CI workflow)
  *
  * Environment variables:
  *   DATABASE_WRITE_URL     — Postgres connection string (direct, non-pooled)
@@ -100,11 +100,11 @@ function fileSize(pathname: string | null | undefined): number | null {
 
 if (isDownloadMode) {
   // --download <run-url-or-id> [repo]
-  // Filter out '--' injected by pnpm arg passthrough
+  // Filter out '--' package-script separators.
   const args = process.argv.slice(3).filter((a) => a !== '--');
   const input = args[0];
   if (!input) {
-    console.error('Usage: pnpm admin:db:ingest:run <run-url-or-id> [repo]');
+    console.error('Usage: bun run admin:db:ingest:run <run-url-or-id> [repo]');
     process.exit(1);
   }
 
@@ -887,7 +887,7 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
-  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
+  console.log('  Invalidate API cache: bun run admin:cache:invalidate');
 }
 
 main()

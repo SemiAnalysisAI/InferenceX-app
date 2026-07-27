@@ -3,7 +3,7 @@
  *
  * Entries are enforced at ingest time. Changes merged to main or master are also applied
  * automatically to production by CI, followed by database verification, cache invalidation,
- * and cache warmup. Use `pnpm db:apply-overrides` only for local preview or manual recovery.
+ * and cache warmup. Use `bun run db:apply-overrides` only for local preview or manual recovery.
  *
  * CONCLUSION_OVERRIDES — force the conclusion for a run (e.g. 'success' when
  *   the benchmark ran fine but CI failed on a non-benchmark step).

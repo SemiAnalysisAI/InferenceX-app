@@ -34,13 +34,18 @@ packages/
 ## Prerequisites
 
 - **Node.js**: 24.x
-- **pnpm**: 10+
+- **Bun**: 1.3.14+
 
-Install pnpm via Corepack (bundled with Node.js):
+Install Bun on macOS or Linux:
 
 ```bash
-corepack enable
-corepack prepare pnpm@latest --activate
+curl -fsSL https://bun.sh/install | bash
+```
+
+Install Bun on Windows PowerShell:
+
+```powershell
+powershell -c "irm bun.sh/install.ps1|iex"
 ```
 
 ## Getting Started
@@ -52,7 +57,7 @@ feel free to file an github issue if u need help setting up the dashboard
 ```bash
 git clone https://github.com/SemiAnalysisAI/InferenceX-app.git
 cd InferenceX-app
-pnpm install
+bun install
 ```
 
 ### 2. Set Up a Database
@@ -90,7 +95,7 @@ EOF
 ### 3. Run the Development Server
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
@@ -100,46 +105,48 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 These are the main scripts you'll use during development. Admin scripts for database and cache management are listed separately below.
 Some of these may require additional setup or environment variables.
 
-| Script                      | Description                                |
-| --------------------------- | ------------------------------------------ |
-| `pnpm dev`                  | Start development server with Turbopack    |
-| `pnpm build`                | Production build                           |
-| `pnpm start`                | Start production server                    |
-| `pnpm preview`              | Build then start production server locally |
-| `pnpm typecheck`            | TypeScript type checking (all packages)    |
-| `pnpm lint`                 | Lint with oxlint                           |
-| `pnpm lint:fix`             | Auto-fix lint issues                       |
-| `pnpm fmt`                  | Format check with oxfmt                    |
-| `pnpm fmt:fix`              | Auto-fix formatting                        |
-| `pnpm security`             | Security audit (pnpm audit + audit-ci)     |
-| `pnpm test`                 | Run all tests (unit + E2E)                 |
-| `pnpm test:unit`            | Vitest unit tests                          |
-| `pnpm test:unit:coverage`   | Vitest unit tests with coverage            |
-| `pnpm test:e2e`             | Cypress E2E tests                          |
-| `pnpm test:e2e:component`   | Cypress component tests only               |
-| `pnpm test:e2e:integration` | Cypress integration tests only             |
-| `pnpm clean`                | Remove build artifacts                     |
-| `pnpm clean:all`            | Remove build artifacts + node_modules      |
+| Script                         | Description                                |
+| ------------------------------ | ------------------------------------------ |
+| `bun run dev`                  | Start development server with Turbopack    |
+| `bun run build`                | Production build                           |
+| `bun run start`                | Start production server                    |
+| `bun run preview`              | Build then start production server locally |
+| `bun run typecheck`            | TypeScript type checking (all packages)    |
+| `bun run lint`                 | Lint with oxlint                           |
+| `bun run lint:fix`             | Auto-fix lint issues                       |
+| `bun run fmt`                  | Format check with oxfmt                    |
+| `bun run fmt:fix`              | Auto-fix formatting                        |
+| `bun run security`             | Security audit                             |
+| `bun run test`                 | Run all tests (unit + E2E)                 |
+| `bun run test:unit`            | Vitest unit tests                          |
+| `bun run test:unit:coverage`   | Vitest unit tests with coverage            |
+| `bun run test:e2e`             | Cypress E2E tests                          |
+| `bun run test:e2e:component`   | Cypress component tests only               |
+| `bun run test:e2e:integration` | Cypress integration tests only             |
+| `bun run clean`                | Remove build artifacts                     |
+| `bun run clean:all`            | Remove build artifacts + node_modules      |
+
+This repository uses Vitest and Cypress. Use the `bun run test:*` scripts above; `bun test` invokes Bun's separate built-in test runner and is not supported.
 
 ### Admin Scripts
 
 These are meant to be used for database and cache management and maintenance tasks, and should not be necessary during regular development.
-However, using `pnpm admin:cache:invalidate` pointed at your local development server can be useful to test after making changes to the database or API routes.
+However, using `bun run admin:cache:invalidate` pointed at your local development server can be useful to test after making changes to the database or API routes.
 
 Changes to `packages/db/src/etl/run-overrides.ts` that reach `main` or `master` are applied to the production database automatically by CI, followed by database verification, cache invalidation, and cache warmup. The override command remains available for local previews and manual recovery.
 
-| Script                              | Description                              |
-| ----------------------------------- | ---------------------------------------- |
-| `pnpm admin:db:migrate`             | Run database migrations                  |
-| `pnpm admin:db:ingest:run`          | Ingest benchmark data from GitHub runs   |
-| `pnpm admin:db:ingest:ci`           | Ingest benchmark data (CI mode)          |
-| `pnpm admin:db:ingest:gcs`          | Ingest benchmark data from GCS           |
-| `pnpm admin:db:ingest:supplemental` | Ingest supplemental data                 |
-| `pnpm admin:db:apply-overrides`     | Preview or apply data overrides manually |
-| `pnpm admin:db:reset`               | Reset the database                       |
-| `pnpm admin:db:verify`              | Verify database integrity                |
-| `pnpm admin:cache:invalidate`       | Invalidate API cache                     |
-| `pnpm admin:cache:warmup`           | Warm up API cache                        |
+| Script                                 | Description                              |
+| -------------------------------------- | ---------------------------------------- |
+| `bun run admin:db:migrate`             | Run database migrations                  |
+| `bun run admin:db:ingest:run`          | Ingest benchmark data from GitHub runs   |
+| `bun run admin:db:ingest:ci`           | Ingest benchmark data (CI mode)          |
+| `bun run admin:db:ingest:gcs`          | Ingest benchmark data from GCS           |
+| `bun run admin:db:ingest:supplemental` | Ingest supplemental data                 |
+| `bun run admin:db:apply-overrides`     | Preview or apply data overrides manually |
+| `bun run admin:db:reset`               | Reset the database                       |
+| `bun run admin:db:verify`              | Verify database integrity                |
+| `bun run admin:cache:invalidate`       | Invalidate API cache                     |
+| `bun run admin:cache:warmup`           | Warm up API cache                        |
 
 ## Deployment
 

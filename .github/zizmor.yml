@@ -1,5 +1,5 @@
 rules:
   dependabot-cooldown:
     config:
-      # Match pnpm-workspace.yaml's minimumReleaseAge of 1,440 minutes.
+      # Match bunfig.toml's minimumReleaseAge of one day.
       days: 1
