@@ -224,9 +224,8 @@ export async function getTraceServerMetrics(
   const blob = blobRows[0]?.blob;
   if (!blob) return null;
 
-  // `computeChartSeries` handles
-  // ERR_STRING_TOO_LONG via a stream-parse fallback so high-conc TP+EP
-  // rows succeed even before the backfill drains them.
+  // `computeChartSeries` streams blobs that exceed its in-memory fast-path
+  // ceiling so high-conc TP+EP rows succeed before the backfill drains them.
   const series = await computeChartSeries(blob, {
     framework: row.framework,
     disagg: row.disagg,

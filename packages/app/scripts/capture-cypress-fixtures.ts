@@ -6,8 +6,8 @@
  * fixtures via cy.intercept so tests run with no database.
  *
  * Usage:
- *   pnpm --filter app capture:fixtures                              (prod)
- *   pnpm --filter app capture:fixtures http://localhost:3000        (local dev)
+ *   bun run --cwd packages/app capture:fixtures                              (prod)
+ *   bun run --cwd packages/app capture:fixtures http://localhost:3000        (local dev)
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -17,10 +17,7 @@ const baseUrl = (
   process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'https://inferencex.semianalysis.com'
 ).replace(/\/$/u, '');
 
-// `import.meta.dirname` is undefined when this script runs through tsx's CJS
-// loader (no `"type": "module"` in packages/app/package.json). `__dirname` is
-// reliably defined in that mode.
-const fixturesDir = resolve(__dirname, '..', 'cypress', 'fixtures', 'api');
+const fixturesDir = resolve(import.meta.dirname, '..', 'cypress', 'fixtures', 'api');
 
 // Defaults chosen to land on common, well-populated rows. The cypress suite
 // doesn't assert on specific values, so any realistic snapshot suffices.

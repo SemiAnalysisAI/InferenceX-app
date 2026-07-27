@@ -18,12 +18,12 @@ This prompt is runtime context. Do not assume any file path from it without veri
   - If you touched inference or evaluation, verify the unofficial-run overlay path too. AGENTS.md §"Unofficial Run Support" lists the exact code paths and the `?unofficialrun=<github-actions-run-id>` URL pattern; do not skip it.
   - New interactive elements get a `track()` call per AGENTS.md §"Analytics Requirement" (`[section]_[action]` naming).
   - Tests added/updated per `docs/testing.md` (unit tests colocated as `<module>.test.ts`; E2E tests in `packages/app/cypress/e2e/`). Missing or low-quality tests are blocking.
-  - Run `pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:e2e` — all green before commit.
+  - Run `bun run typecheck && bun run lint && bun run test:unit && bun run test:e2e` — all green before commit.
 - code — backend / DB / ETL / ingest / lib / API-route logic, no UI surface:
-  - Add or update colocated unit tests (`<module>.test.ts`) per `docs/testing.md`; run `pnpm typecheck && pnpm lint && pnpm test:unit`.
+  - Add or update colocated unit tests (`<module>.test.ts`) per `docs/testing.md`; run `bun run typecheck && bun run lint && bun run test:unit`.
   - Only if your change turns out to be user-visible: self-provision a browser (see "Browser verification"), then apply the `ui` rules above.
 - docs — markdown / blog content / config / CI workflow files:
-  - Make the change; sanity-check links, frontmatter, and formatting. No app build, browser, or e2e ceremony is required. Run `pnpm typecheck` / `pnpm lint` only if you touched TS/JS.
+  - Make the change; sanity-check links, frontmatter, and formatting. No app build, browser, or e2e ceremony is required. Run `bun run typecheck` / `bun run lint` only if you touched TS/JS.
 - question — a question or code explanation with no file change:
   - Answer concisely and accurately, citing `file:line`. Do not modify code unless the user asks you to.
 
@@ -33,7 +33,7 @@ A browser MCP server is always wired (see "Routing" for which). Browsers and the
 
 - Playwright MCP (server "playwright"): DOM interactions, screenshots, and coordinate-based mouse wheel + drag (needed for D3 zoom/pan). Console via `mcp__playwright__browser_console_messages`, network via `mcp__playwright__browser_network_requests`, JS via `mcp__playwright__browser_evaluate`.
 - Chrome DevTools MCP (server "chrome"): uid-driven. Call `mcp__chrome__take_snapshot` BEFORE click/fill/hover (uids change after navigation — re-snapshot if one fails); screenshot with `take_screenshot`; debug with `list_console_messages` / `list_network_requests` / `evaluate_script`.
-- If the dev server shows as "not started" but your task needs a browser: run `npx -y playwright install --with-deps chromium`, then `pnpm run dev > /tmp/next-dev.log 2>&1 &`, then wait for `curl -sSf http://localhost:3000`.
+- If the dev server shows as "not started" but your task needs a browser: run `bunx playwright install --with-deps chromium`, then `bun run dev > /tmp/next-dev.log 2>&1 &`, then wait for `curl -sSf http://localhost:3000`.
 - The app runs at http://localhost:3000. For docs or external URLs, use WebFetch.
 
 ## Workflow

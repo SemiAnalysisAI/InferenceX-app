@@ -5,13 +5,13 @@ Local MCP (Model Context Protocol) server for querying the InferenceX benchmark 
 ## Setup
 
 ```bash
-pnpm mcp
+bun run mcp
 ```
 
 Or add to Claude Code:
 
 ```bash
-claude mcp add --transport stdio inferencex -- pnpm mcp
+claude mcp add --transport stdio inferencex -- bun run mcp
 ```
 
 ## Tools

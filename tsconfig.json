@@ -16,6 +16,6 @@
       "@/*": ["./packages/app/src/*"]
     }
   },
-  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts"],
   "exclude": ["packages/*/node_modules", "packages/*/.next", "packages/*/scratch"]
 }
