@@ -16,6 +16,7 @@ import {
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
+  OVERLAY_ONLY_SEQUENCE_LABEL,
   OVERLAY_RUN_ID,
   SECOND_OFFICIAL_HARDWARE,
 } from '../support/overlay-fixtures';
@@ -169,6 +170,29 @@ describe('TCO calculator — unofficial run overlay', () => {
       // hidden B200 must stay hidden.
       cy.get(BARS).should('have.length', 3);
       cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
+    });
+  });
+
+  describe('sequence covered only by the run', () => {
+    beforeEach(visitCalculatorWithOverlay);
+
+    it('drops stale official hardware from the legend selection', () => {
+      // Regression: the reset effect bailed out when the official hardware list
+      // was empty, treating "no official data for this selection" as "still
+      // loading". The previous selection's official keys stayed in
+      // `visibleHwKeys`, so the solo/show-all arithmetic in the toggle counted
+      // hardware that is not on the chart.
+      selectSequence(OVERLAY_ONLY_SEQUENCE_LABEL);
+      cy.get(BARS).should('have.length', 2); // both overlay-only, no official data
+      cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
+
+      // With a clean selection this solos B300. With stale official keys still
+      // counted, `allVisible` is false and the same click REMOVES B300 instead,
+      // leaving MI355X — one bar either way, but the wrong one.
+      cy.get('.sidebar-legend label').contains('B300').click();
+      cy.get(BARS).should('have.length', 1);
+      cy.get(Y_TICKS).should('contain.text', 'B300');
+      cy.get(Y_TICKS).should('not.contain.text', OVERLAY_ONLY_HARDWARE.toUpperCase());
     });
   });
 

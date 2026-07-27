@@ -131,6 +131,14 @@ export const OTHER_MODEL_DB_KEY = 'glm5';
 export const OVERLAY_ONLY_HARDWARE = 'mi355x';
 /** A second official GPU, so a hardware filter set before the run lands is observable. */
 export const SECOND_OFFICIAL_HARDWARE = 'b200';
+/**
+ * A sequence the unofficial run covers but the DB does not — the "this
+ * model/sequence exists only in the run" case the overlay feature exists for.
+ * Selecting it leaves the calculator with zero official hardware.
+ */
+export const OVERLAY_ONLY_ISL = 1024;
+export const OVERLAY_ONLY_OSL = 8192;
+export const OVERLAY_ONLY_SEQUENCE_LABEL = '1K / 8K';
 
 /** conc, interactivity (tok/s/user), tput_per_gpu */
 export const SINGLE_TURN_CONFIGS: [number, number, number][] = [
@@ -285,6 +293,21 @@ export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: num
         ...singleTurnRows(OVERLAY_RUN_URL, { tputScale: 1.3 }),
         ...singleTurnRows(OVERLAY_RUN_URL, { hardware: OVERLAY_ONLY_HARDWARE, tputScale: 0.8 }),
         ...singleTurnRows(OVERLAY_RUN_URL, { model: OTHER_MODEL_DB_KEY, tputScale: 5 }),
+        // 1k/8k: covered by the run only, so selecting it leaves zero official
+        // hardware. Same two GPUs as 1k/1k, which keeps `overlayAvailableHwKeys`
+        // unchanged across the switch — the adversarial case, since only the
+        // official-list reset can clear the now-stale official keys.
+        ...singleTurnRows(OVERLAY_RUN_URL, {
+          tputScale: 1.1,
+          isl: OVERLAY_ONLY_ISL,
+          osl: OVERLAY_ONLY_OSL,
+        }),
+        ...singleTurnRows(OVERLAY_RUN_URL, {
+          hardware: OVERLAY_ONLY_HARDWARE,
+          tputScale: 0.9,
+          isl: OVERLAY_ONLY_ISL,
+          osl: OVERLAY_ONLY_OSL,
+        }),
       ],
       evaluations: [],
     },

@@ -369,13 +369,19 @@ function ThroughputCalculatorInner() {
   // the benchmarks, so keying on the merged list would let a late overlay
   // arrival — or a run dismissal — wipe GPU filters the user had already set.
   useEffect(() => {
-    if (availableHwKeys.length === 0) return;
+    // Nothing to seed from yet (first load, before either source has resolved).
+    // Note this guards on the MERGED list: an empty official list is a real
+    // state, not just a loading one — it is exactly the "this model/sequence
+    // exists only in the unofficial run" case — and bailing on it would leave
+    // stale official keys in `visibleHwKeys`, which then throw off the
+    // solo/show-all arithmetic in `toggleGpuVisibility`.
+    if (legendHwKeys.length === 0) return;
     const key = [...availableHwKeys].toSorted().join(',');
     if (key !== prevAvailableKeyRef.current) {
       prevAvailableKeyRef.current = key;
-      setVisibleHwKeys(new Set([...availableHwKeys, ...overlayAvailableHwKeys]));
+      setVisibleHwKeys(new Set(legendHwKeys));
     }
-  }, [availableHwKeys, overlayAvailableHwKeys]);
+  }, [availableHwKeys, legendHwKeys]);
 
   // Overlay hardware arriving or leaving is additive: newly available overlay
   // GPUs start visible, ones that are gone stop being tracked, and every other
@@ -527,14 +533,17 @@ function ThroughputCalculatorInner() {
   const toggleGpuVisibility = useCallback(
     (hwKey: string) => {
       setVisibleHwKeys((prev) => {
-        const allVisible = prev.size === legendHwKeys.length;
+        // Count against the legend rather than the raw set size, so an entry
+        // that is no longer in the legend can never skew solo/show-all.
+        const visibleLegendKeys = legendHwKeys.filter((k) => prev.has(k));
+        const allVisible = visibleLegendKeys.length === legendHwKeys.length;
         const isVisible = prev.has(hwKey);
 
         if (isVisible) {
           if (allVisible) {
             // If all visible and clicking one, solo it
             return new Set([hwKey]);
-          } else if (prev.size === 1) {
+          } else if (visibleLegendKeys.length === 1) {
             // If only one visible and clicking it, show all
             return new Set(legendHwKeys);
           }
