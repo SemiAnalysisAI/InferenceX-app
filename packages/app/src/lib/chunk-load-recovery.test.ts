@@ -51,7 +51,7 @@ describe('installChunkLoadRecovery', () => {
     expect(sessionStorage.getItem(KEY)).toBe('1');
   });
 
-  it('only sets the gate once across multiple chunk errors in one session', () => {
+  it('reloads only once across multiple chunk errors in one session', () => {
     const reload = vi.mocked(window.location.reload);
     reload.mockClear();
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
@@ -66,7 +66,7 @@ describe('installChunkLoadRecovery', () => {
     expect(sessionStorage.getItem(KEY)).toBe('1');
   });
 
-  it('is idempotent: repeated installs do not duplicate the gate write', () => {
+  it('does not duplicate reloads when installed repeatedly', () => {
     const reload = vi.mocked(window.location.reload);
     reload.mockClear();
     installChunkLoadRecovery();
