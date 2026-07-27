@@ -8,9 +8,7 @@
  * `CHART_SERIES_VERSION` whenever the extraction algorithm changes.
  */
 
-import { gunzipSync } from 'node:zlib';
-
-import { isStringTooLongError, streamCollectKeys } from './gzip-json-stream';
+import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
 import {
   selectServerMetricsAdapter,
   type MetricSource,
@@ -213,8 +211,8 @@ function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMa
 
 /**
  * Stream-parse fallback: collect the chart's metric subtrees from both phase
- * blocks and merge (see v11). Avoids Node's 512 MB max-string-length cap that
- * `gunzipSync(buffer).toString('utf8')` trips on high-conc TP+EP rows.
+ * blocks and merge (see v11) when the full JSON exceeds the in-memory
+ * fast-path ceiling.
  */
 async function streamCollectMetrics(buffer: Buffer): Promise<MetricsMap> {
   const [profiling, warmup] = await Promise.all([
@@ -225,22 +223,18 @@ async function streamCollectMetrics(buffer: Buffer): Promise<MetricsMap> {
 }
 
 /**
- * Parse the gzipped server_metrics blob into the metric map. Tries the
- * synchronous fast path first; falls back to stream-parse on
- * ERR_STRING_TOO_LONG so high-conc TP+EP rows succeed. Merges the warmup block
- * into the profiling one (v11) so the series span both phases.
+ * Parse the gzipped server_metrics blob into the metric map. Small blobs use
+ * the synchronous fast path; oversized blobs use the streaming parser. Merges
+ * the warmup block into the profiling one (v11) so the series span both phases.
  */
 async function parseMetrics(buffer: Buffer): Promise<MetricsMap> {
-  try {
-    const obj = JSON.parse(gunzipSync(buffer).toString('utf8')) as {
-      metrics?: MetricsMap;
-      warmup_metrics?: MetricsMap;
-    };
-    return mergePhaseMetrics(obj.metrics ?? {}, obj.warmup_metrics ?? {});
-  } catch (error) {
-    if (isStringTooLongError(error)) return await streamCollectMetrics(buffer);
-    throw error;
-  }
+  const json = gunzipJsonWithinLimit(buffer);
+  if (json === null) return await streamCollectMetrics(buffer);
+  const obj = JSON.parse(json) as {
+    metrics?: MetricsMap;
+    warmup_metrics?: MetricsMap;
+  };
+  return mergePhaseMetrics(obj.metrics ?? {}, obj.warmup_metrics ?? {});
 }
 
 /**

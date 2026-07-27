@@ -2,25 +2,22 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { isStringTooLongError, streamCollectKeys } from './gzip-json-stream.js';
+import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream.js';
 
-describe('isStringTooLongError', () => {
-  it('matches the ERR_STRING_TOO_LONG code', () => {
-    const err = new Error('Cannot create a string longer than ...') as NodeJS.ErrnoException;
-    err.code = 'ERR_STRING_TOO_LONG';
-    expect(isStringTooLongError(err)).toBe(true);
+describe('gunzipJsonWithinLimit', () => {
+  const json = JSON.stringify({ metrics: { value: 1 } });
+  const blob = gzipSync(json);
+
+  it('returns decompressed JSON within the configured limit', () => {
+    expect(gunzipJsonWithinLimit(blob, Buffer.byteLength(json))).toBe(json);
   });
 
-  it('matches the message-only variant', () => {
-    expect(isStringTooLongError(new Error('Cannot create a string longer than 0x1fffffe8'))).toBe(
-      true,
-    );
+  it('returns null when decompressed JSON exceeds the configured limit', () => {
+    expect(gunzipJsonWithinLimit(blob, Buffer.byteLength(json) - 1)).toBeNull();
   });
 
-  it('rejects unrelated errors and non-errors', () => {
-    expect(isStringTooLongError(new Error('unexpected token'))).toBe(false);
-    expect(isStringTooLongError(null)).toBe(false);
-    expect(isStringTooLongError('ERR_STRING_TOO_LONG-ish string')).toBe(false);
+  it('throws for malformed gzip data', () => {
+    expect(() => gunzipJsonWithinLimit(Buffer.from('not gzip'))).toThrow();
   });
 });
 
