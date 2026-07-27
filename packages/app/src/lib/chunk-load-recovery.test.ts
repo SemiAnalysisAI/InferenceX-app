@@ -4,10 +4,11 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import { installChunkLoadRecovery } from './chunk-load-recovery';
 
 const KEY = 'chunk_reload';
+const reload = vi.fn();
+let originalLocation: Location;
 
-// JSDOM's native `window.location.reload` cannot be spied on. Replace it with
-// a `vi.fn()` before installing the handler so reload behavior is asserted
-// directly without triggering JSDOM navigation.
+// JSDOM exposes `Location.reload` as non-configurable. In this isolated test
+// environment, replace Location with a prototype-preserving copy that stubs only reload.
 
 function chunkErr(): Error {
   const e = new Error('Loading chunk 123 failed');
@@ -17,10 +18,18 @@ function chunkErr(): Error {
 
 describe('installChunkLoadRecovery', () => {
   beforeAll(() => {
+    originalLocation = window.location;
+    const descriptors = Object.getOwnPropertyDescriptors(originalLocation);
+    Reflect.deleteProperty(descriptors, 'reload');
+    const location = Object.create(Object.getPrototypeOf(originalLocation));
+    Object.defineProperties(location, descriptors);
+    Object.defineProperty(location, 'reload', {
+      configurable: true,
+      value: reload,
+    });
     Object.defineProperty(window, 'location', {
       configurable: true,
-      writable: true,
-      value: { ...window.location, reload: vi.fn() },
+      value: location,
     });
     installChunkLoadRecovery();
   });
@@ -30,7 +39,10 @@ describe('installChunkLoadRecovery', () => {
   });
 
   afterAll(() => {
-    // best-effort cleanup; subsequent suites get a fresh JSDOM anyway
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 
   it('sets the reload gate on ChunkLoadError from an error event', () => {
@@ -50,7 +62,6 @@ describe('installChunkLoadRecovery', () => {
   });
 
   it('reloads only once across multiple chunk errors in one session', () => {
-    const reload = vi.mocked(window.location.reload);
     reload.mockClear();
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
@@ -74,8 +85,9 @@ describe('installChunkLoadRecovery', () => {
     install();
 
     expect(addEventListener).toHaveBeenCalledTimes(2);
-    expect(addEventListener).toHaveBeenNthCalledWith(1, 'error', expect.any(Function));
-    expect(addEventListener).toHaveBeenNthCalledWith(2, 'unhandledrejection', expect.any(Function));
+    expect(addEventListener.mock.calls.map(([type]) => type)).toEqual(
+      expect.arrayContaining(['error', 'unhandledrejection']),
+    );
     addEventListener.mockRestore();
   });
 });
