@@ -52,13 +52,11 @@ describe('installChunkLoadRecovery', () => {
   });
 
   it('only sets the gate once across multiple chunk errors in one session', () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    setItemSpy.mockClear();
+    const reload = vi.mocked(window.location.reload);
+    reload.mockClear();
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
-    const writes = setItemSpy.mock.calls.filter((c) => c[0] === KEY);
-    expect(writes).toHaveLength(1);
-    setItemSpy.mockRestore();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('sets the gate on an unhandled rejection with a chunk-error reason', () => {
@@ -69,13 +67,11 @@ describe('installChunkLoadRecovery', () => {
   });
 
   it('is idempotent: repeated installs do not duplicate the gate write', () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    setItemSpy.mockClear();
+    const reload = vi.mocked(window.location.reload);
+    reload.mockClear();
     installChunkLoadRecovery();
     installChunkLoadRecovery();
     window.dispatchEvent(new ErrorEvent('error', { error: chunkErr() }));
-    const writes = setItemSpy.mock.calls.filter((c) => c[0] === KEY);
-    expect(writes).toHaveLength(1);
-    setItemSpy.mockRestore();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
