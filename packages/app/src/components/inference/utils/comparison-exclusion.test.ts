@@ -1,11 +1,54 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveExclusionToggle } from '@/lib/exclusion';
+import { resolveExclusionGroups, resolveExclusionToggle } from '@/lib/exclusion';
 import { Model, Sequence } from '@/lib/data-mappings';
 
-import { comparisonExclusion } from './comparison-exclusion';
+import { comparisonDefaultGroup, comparisonExclusion } from './comparison-exclusion';
 
 describe('comparisonExclusion', () => {
+  it('defaults official DeepSeek V4 Pro Agentic charts to vLLM', () => {
+    const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false)!;
+    const fallbackGroup = comparisonDefaultGroup(
+      Model.DeepSeek_V4_Pro,
+      Sequence.AgenticTraces,
+      false,
+    );
+    const resolved = resolveExclusionGroups(
+      new Set(['b200_sglang', 'b200_vllm']),
+      new Set(),
+      exclusion,
+      'keep-sticky',
+      fallbackGroup,
+    );
+
+    expect(fallbackGroup).toBe('vllm');
+    expect(resolved.result).toEqual(new Set(['b200_vllm']));
+    expect(resolved.droppedGroups).toEqual(['sglang']);
+  });
+
+  it.each([
+    {
+      name: 'fixed-sequence DeepSeek V4 Pro',
+      model: Model.DeepSeek_V4_Pro,
+      sequence: Sequence.EightK_OneK,
+      isUnofficialRun: false,
+    },
+    {
+      name: 'another Agentic model',
+      model: Model.DeepSeek_R1,
+      sequence: Sequence.AgenticTraces,
+      isUnofficialRun: false,
+    },
+    {
+      name: 'an unofficial DeepSeek V4 Pro Agentic preview',
+      model: Model.DeepSeek_V4_Pro,
+      sequence: Sequence.AgenticTraces,
+      isUnofficialRun: true,
+    },
+  ])('does not impose the vLLM default on $name', ({ model, sequence, isUnofficialRun }) => {
+    expect(comparisonDefaultGroup(model, sequence, isUnofficialRun)).toBeNull();
+  });
+
   it('keeps the engine-family guard for official Agentic Traces charts', () => {
     const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false);
 

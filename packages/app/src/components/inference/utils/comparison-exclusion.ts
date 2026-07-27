@@ -1,5 +1,20 @@
-import { getModelExclusion, getSequenceExclusion } from '@/lib/data-mappings';
+import { getModelExclusion, getSequenceExclusion, Model, Sequence } from '@/lib/data-mappings';
 import { buildExclusion, type Exclusion } from '@/lib/exclusion';
+
+/**
+ * Preferred engine group when an official comparison first encounters multiple
+ * valid groups and has no sticky user selection to preserve.
+ */
+export function comparisonDefaultGroup(
+  model: Parameters<typeof getModelExclusion>[0],
+  sequence: Parameters<typeof getSequenceExclusion>[0],
+  isUnofficialRun: boolean,
+): string | null {
+  if (!isUnofficialRun && model === Model.DeepSeek_V4_Pro && sequence === Sequence.AgenticTraces) {
+    return 'vllm';
+  }
+  return null;
+}
 
 /**
  * Resolve the production comparability guard for the current chart scope.
