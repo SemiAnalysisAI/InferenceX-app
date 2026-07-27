@@ -35,6 +35,27 @@ export function updateRepoUrl(url: string): string {
 }
 
 /**
+ * Escape a string for interpolation into an HTML string.
+ *
+ * D3 tooltips are built as HTML strings and injected with `.html()`, so any
+ * value that did not originate in this codebase must be escaped on the way in.
+ * The motivating case is unofficial-run branch names: they come from the GitHub
+ * API for whatever run id the user pastes into `?unofficialrun=`, and git
+ * permits `<` and `>` in a branch name.
+ *
+ * @param value - Untrusted text to interpolate into markup
+ * @returns The text with HTML-significant characters escaped
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/**
  * Formats a number for display - returns plain string for numbers < 10000,
  * and formatted number with commas for larger numbers.
  *

@@ -1138,3 +1138,43 @@ describe('buildGpuGroups', () => {
     expect(overlayHw).toBe(officialHw);
   });
 });
+
+// =========================================================================
+// interpolateForGPU() — clamped reporting
+// =========================================================================
+
+describe('interpolateForGPU clamped flag', () => {
+  const points = [
+    makePoint({ interactivity: 20, throughput: 900 }),
+    makePoint({ interactivity: 50, throughput: 600 }),
+    makePoint({ interactivity: 80, throughput: 300 }),
+  ];
+
+  it('is falsy for a target inside the measured range', () => {
+    const result = interpolateForGPU(points, 50, 'interactivity_to_throughput', 'costh');
+    expect(result?.clamped).toBeFalsy();
+  });
+
+  it('is set for a target above every measured point', () => {
+    const result = interpolateForGPU(points, 200, 'interactivity_to_throughput', 'costh');
+    // Still returns a value (the calculator never drops a bar), but the caller
+    // can now tell the user it is the nearest edge point, not a measurement.
+    expect(result?.value).toBeGreaterThan(0);
+    expect(result?.clamped).toBe(true);
+  });
+
+  it('is set for a target below every measured point', () => {
+    const result = interpolateForGPU(points, 1, 'interactivity_to_throughput', 'costh');
+    expect(result?.clamped).toBe(true);
+  });
+
+  it('is set on the single-point path when the target misses that point', () => {
+    const single = [makePoint({ interactivity: 40, throughput: 700 })];
+    expect(
+      interpolateForGPU(single, 40, 'interactivity_to_throughput', 'costh')?.clamped,
+    ).toBeFalsy();
+    expect(interpolateForGPU(single, 90, 'interactivity_to_throughput', 'costh')?.clamped).toBe(
+      true,
+    );
+  });
+});

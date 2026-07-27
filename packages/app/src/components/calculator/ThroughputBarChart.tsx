@@ -20,7 +20,7 @@ import type {
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
-import { getDisplayLabel } from '@/lib/utils';
+import { escapeHtml, getDisplayLabel } from '@/lib/utils';
 
 import type {
   BarMetric,
@@ -39,11 +39,13 @@ const OVERLAY_STRINGS = {
     unofficialRun: 'UNOFFICIAL RUN',
     branch: 'Branch',
     viewRun: 'View workflow run',
+    clamped: 'Outside measured range — showing nearest data point',
   },
   zh: {
     unofficialRun: '非官方运行',
     branch: '分支',
     viewRun: '查看工作流运行',
+    clamped: '超出实测范围——显示最接近的数据点',
   },
 } as const;
 
@@ -248,7 +250,10 @@ export function generateTooltipHTML(
   isPinned?: boolean,
   overlayStrings: OverlayTooltipStrings = OVERLAY_STRINGS.en,
 ): string {
-  const label = getResultLabel(d, hardwareConfig);
+  // Everything interpolated below is escaped if it can carry text this codebase
+  // did not author — today that is the overlay branch name and run URL, which
+  // come from the GitHub API for whatever run id the user pasted.
+  const label = escapeHtml(getResultLabel(d, hardwareConfig));
   const costLabel = getCostTypeLabel(costType);
   const costValue = getCostForType(d, costType);
 
@@ -298,12 +303,20 @@ export function generateTooltipHTML(
   const effectiveRunUrl = d.isOverlay ? d.runUrl : runUrl;
   const runLinkLabel = d.isOverlay ? overlayStrings.viewRun : 'View raw result on GitHub';
   const runLinkHtml = effectiveRunUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${effectiveRunUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
+    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
+    : '';
+
+  // The target can sit outside a given series' measured range — series ranges
+  // differ, and a loaded unofficial run widens the slider to cover its own
+  // operating points. Say so rather than letting a clamped edge value read as a
+  // measurement at the current target.
+  const clampedHtml = d.clamped
+    ? `<div style="color: var(--muted-foreground); font-size: 10px; font-style: italic; margin-bottom: 4px;">${overlayStrings.clamped}</div>`
     : '';
 
   const overlayBranchHtml =
     d.isOverlay && d.runLabel
-      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}:</strong> ${d.runLabel}</div>`
+      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}:</strong> ${escapeHtml(d.runLabel)}</div>`
       : '';
   const overlayHeaderHtml = d.isOverlay
     ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${overlayStrings.unofficialRun}</div>${overlayBranchHtml}`
@@ -316,6 +329,7 @@ export function generateTooltipHTML(
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
       </div>
+      ${clampedHtml}
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>${metricName}:</strong> ${metricDisplay}
       </div>
@@ -328,7 +342,7 @@ export function generateTooltipHTML(
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <strong>Concurrency:</strong> ~${d.concurrency}
       </div>
-      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Precision:</strong> ${precision.toUpperCase()}</div>` : ''}
+      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Precision:</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
       ${parallelismHtml}
       ${disagg ? '<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>Disaggregated:</strong> Yes</div>' : ''}
       ${runLinkHtml}

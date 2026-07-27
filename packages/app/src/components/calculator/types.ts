@@ -48,6 +48,12 @@ export interface InterpolatedResult {
   concurrency: number; // concurrency at that operating point
   nearestPoints: GPUDataPoint[]; // the data points used for interpolation
   /**
+   * True when the requested target fell outside this series' measured range and
+   * the value is its nearest edge point rather than an interpolation. Shown in
+   * the tooltip so a clamped bar isn't read as measured at the current target.
+   */
+  clamped?: boolean;
+  /**
    * True when this result was interpolated from an unofficial-run overlay
    * (`?unofficialrun=…`) rather than official DB data. Overlay results are
    * rendered in the run's palette color and never mixed into the official

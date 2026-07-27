@@ -609,7 +609,12 @@ describe('generateTooltipHTML overlay treatment', () => {
       'total',
       undefined,
       false,
-      { unofficialRun: '非官方运行', branch: '分支', viewRun: '查看工作流运行' },
+      {
+        unofficialRun: '非官方运行',
+        branch: '分支',
+        viewRun: '查看工作流运行',
+        clamped: '超出实测范围——显示最接近的数据点',
+      },
     );
     expect(html).toContain('非官方运行');
     expect(html).toContain('分支');
