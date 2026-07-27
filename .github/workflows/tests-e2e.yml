@@ -42,7 +42,7 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Cache Cypress binary
-        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/Cypress
           key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -90,8 +90,9 @@ jobs:
       # the incremental fetch cache), per
       # https://nextjs.org/docs/pages/guides/ci-build-caching#github-actions.
       # Runs before `pnpm install` so hashFiles never scans node_modules.
-      - name: Cache Next.js build
-        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
+      - name: Restore Next.js build cache
+        id: nextjs-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packages/app/.next/cache
           # New cache whenever packages or source files change; fall back to
@@ -105,8 +106,9 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      - name: Cache Cypress binary
-        uses: useblacksmith/cache@c5fe29eb0efdf1cf4186b9f7fcbbcbc0cf025662 # v5.1.0
+      - name: Restore Cypress binary cache
+        id: cypress-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/Cypress
           key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -115,10 +117,22 @@ jobs:
       - name: Install Cypress binary if missing
         working-directory: packages/app
         run: pnpm exec cypress verify || pnpm exec cypress install
+      - name: Save Cypress binary cache
+        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 && steps.cypress-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/Cypress
+          key: ${{ steps.cypress-cache.outputs.cache-primary-key }}
       - name: Build app
         run: pnpm build
         env:
           E2E_FIXTURES: '1'
+      - name: Save Next.js build cache
+        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 && steps.nextjs-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/app/.next/cache
+          key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
       - name: Run integration tests
         uses: cypress-io/github-action@fa4a118725a8f001170d49631ea89e5d66fee626 # v7.4.1
         with:
