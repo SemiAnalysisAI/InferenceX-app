@@ -43,6 +43,7 @@ const B200_GLM5 = 'b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar';
 const B200_MINIMAX = 'b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar';
 const B200_KIMI = 'b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar';
 const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
+const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
 
 const entries = [
   {
@@ -336,7 +337,7 @@ const entries = [
       'tokens-per-megawatt',
       'throughput',
     ],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN],
   },
   {
     slug: 'tokens-per-megawatt',
@@ -360,7 +361,7 @@ const entries = [
       'total-cost-of-ownership',
       'performance-per-dollar',
     ],
-    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4],
+    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN],
   },
   {
     slug: 'prefill',
@@ -705,7 +706,7 @@ const entries = [
     benchmarkContext:
       'InferenceX compares both node-level GPUs and NVL72 systems. Interpret the system topology and parallel group width before attributing the entire result to per-GPU compute.',
     relatedTerms: ['scale-up-vs-scale-out', 'all-to-all', 'all-reduce', 'wide-expert-parallelism'],
-    articleSlugs: [GB200_R1, GB200_KIMI, INFERENCEX_V2],
+    articleSlugs: [GB200_R1, GB200_KIMI, INFERENCEX_V2, VR_RUBIN],
   },
   {
     slug: 'quantization',
