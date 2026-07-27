@@ -1,3 +1,10 @@
+// React requires this flag for warnings about updates outside `act()` to be meaningful.
+Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
+  configurable: true,
+  writable: true,
+  value: true,
+});
+
 class MemoryStorage implements Storage {
   readonly #values = new Map<string, string>();
 
