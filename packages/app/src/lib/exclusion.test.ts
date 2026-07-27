@@ -344,6 +344,22 @@ describe('pickStickyGroup', () => {
     expect(out.droppedGroups).toEqual(['vllm']);
   });
 
+  it('uses an available fallback group when there is no sticky selection', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = pickStickyGroup(proposed, new Set(), ex, 'vllm');
+    expect(out.keptGroup).toBe('vllm');
+    expect([...out.result]).toEqual(['h100_vllm_mtp']);
+    expect(out.droppedGroups).toEqual(['sglang']);
+  });
+
+  it('keeps a sticky selection ahead of the fallback group', () => {
+    const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
+    const out = pickStickyGroup(proposed, new Set(['gb300_sglang_mtp']), ex, 'vllm');
+    expect(out.keptGroup).toBe('sglang');
+    expect([...out.result]).toEqual(['gb300_sglang_mtp']);
+    expect(out.droppedGroups).toEqual(['vllm']);
+  });
+
   it('treats dynamo/mori variants as the same group', () => {
     const proposed = new Set(['h100_vllm_mtp', 'h100_dynamo-vllm_mtp', 'gb300_dynamo-sglang_mtp']);
     const out = pickStickyGroup(proposed, new Set(['h100_vllm_mtp']), ex);

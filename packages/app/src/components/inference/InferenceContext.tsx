@@ -67,7 +67,10 @@ import {
   type XAxisMode,
 } from './hooks/useChartData';
 import { resolveComparisonEntries } from './utils/comparisonEntry';
-import { comparisonExclusion as resolveComparisonExclusion } from './utils/comparison-exclusion';
+import {
+  comparisonDefaultGroup,
+  comparisonExclusion as resolveComparisonExclusion,
+} from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import {
   EMPTY_QUICK_FILTERS,
@@ -141,6 +144,10 @@ export function InferenceProvider({
     () => resolveComparisonExclusion(selectedModel, effectiveSequence, isUnofficialRun),
     [selectedModel, effectiveSequence, isUnofficialRun],
   );
+  const defaultExclusionGroup = useMemo(
+    () => comparisonDefaultGroup(selectedModel, effectiveSequence, isUnofficialRun),
+    [selectedModel, effectiveSequence, isUnofficialRun],
+  );
   const exclusionPolicy: ExclusionConflictPolicy =
     sequenceKind(effectiveSequence) === 'agentic' ? 'keep-sticky' : 'clear-all';
 
@@ -183,6 +190,7 @@ export function InferenceProvider({
       new Set(),
       exclusion,
       exclusionPolicy,
+      defaultExclusionGroup,
     );
     const selection = [...resolution.result];
     if (
@@ -195,7 +203,7 @@ export function InferenceProvider({
       selection,
       ...exclusionResolutionFamilies(selectedGpuState, resolution.result, exclusion),
     };
-  }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy]);
+  }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy, defaultExclusionGroup]);
   const selectedGPUs = selectedGpuResolution?.selection ?? selectedGpuState;
   useEffect(() => {
     if (!selectedGpuResolution) return;
@@ -816,6 +824,8 @@ export function InferenceProvider({
   exclusionRef.current = comparisonExclusion;
   const exclusionPolicyRef = useRef(exclusionPolicy);
   exclusionPolicyRef.current = exclusionPolicy;
+  const defaultExclusionGroupRef = useRef(defaultExclusionGroup);
+  defaultExclusionGroupRef.current = defaultExclusionGroup;
   const resolveHwSelection = useCallback((proposed: Set<string>, prev?: Set<string>) => {
     const currentExclusion = exclusionRef.current;
     if (!currentExclusion) {
@@ -826,6 +836,7 @@ export function InferenceProvider({
       prev ?? activeHwTypesRef.current,
       currentExclusion,
       exclusionPolicyRef.current,
+      defaultExclusionGroupRef.current,
     );
   }, []);
   const toggleComparisonSelection = useCallback(
@@ -841,6 +852,7 @@ export function InferenceProvider({
           toggleUniverse,
           currentExclusion,
           exclusionPolicyRef.current,
+          defaultExclusionGroupRef.current,
         );
         if (decision.kind === 'block') {
           setEngineConflict({

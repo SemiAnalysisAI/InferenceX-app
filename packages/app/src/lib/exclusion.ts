@@ -172,7 +172,8 @@ function activeFamilyInGroup(
  * multiple groups. Sticks to a group already present in `prev`; for a shared
  * scope with no direct prior key (for example the global MTP scope), also honors
  * a prior key from the same group on an overlapping hardware scope. Otherwise
- * falls back to the alphabetically-first group.
+ * uses `fallbackGroup` when that group is available, then falls back to the
+ * alphabetically-first group.
  *
  * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
  */
@@ -180,6 +181,7 @@ export function pickStickyGroup(
   proposed: Set<string>,
   prev: Set<string>,
   ex: Exclusion,
+  fallbackGroup?: string | null,
 ): { result: Set<string>; keptGroup: string | null; droppedGroups: string[] } {
   const byScope = groupKeysByScope(proposed, ex);
   const allGroups = new Set([...byScope.values()].flatMap((byGroup) => [...byGroup.keys()]));
@@ -216,6 +218,7 @@ export function pickStickyGroup(
     const winner =
       groups.filter((group) => directPrevGroups.has(group)).toSorted()[0] ??
       groups.filter((group) => correlatedPrevGroups.has(group)).toSorted()[0] ??
+      (fallbackGroup && groups.includes(fallbackGroup) ? fallbackGroup : undefined) ??
       groups.toSorted()[0];
     winners.add(winner);
     for (const [group, keys] of byGroup) {
@@ -330,8 +333,9 @@ export function resolveExclusionGroups(
   prev: Set<string>,
   ex: Exclusion,
   policy: ExclusionConflictPolicy = 'clear-all',
+  fallbackGroup?: string | null,
 ): ExclusionResolution {
-  if (policy === 'keep-sticky') return pickStickyGroup(proposed, prev, ex);
+  if (policy === 'keep-sticky') return pickStickyGroup(proposed, prev, ex, fallbackGroup);
   const cleared = clearAllExclusionGroups(proposed, ex);
   return { ...cleared, keptGroup: null };
 }
@@ -384,6 +388,7 @@ export function resolveExclusionToggle(
   allItems: Set<string>,
   ex: Exclusion,
   policy: ExclusionConflictPolicy = 'clear-all',
+  fallbackGroup?: string | null,
 ): ExclusionToggleDecision {
   const proposed = computeToggle(prev, hw, allItems);
   const wasActive = prev.has(hw);
@@ -409,7 +414,7 @@ export function resolveExclusionToggle(
 
   // Other paths (e.g. solo→restore-all surfacing a hidden second group) are
   // normalized silently because the user didn't explicitly add a conflict.
-  const resolved = resolveExclusionGroups(proposed, prev, ex, policy);
+  const resolved = resolveExclusionGroups(proposed, prev, ex, policy, fallbackGroup);
   if (resolved.droppedGroups.length > 0) {
     return { kind: 'silent-resolve', result: resolved.result };
   }
