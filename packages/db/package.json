@@ -43,7 +43,7 @@
     "@types/stream-json": "^1.7.8",
     "@vitest/coverage-v8": "^4.1.10",
     "adm-zip": "^0.6.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }
