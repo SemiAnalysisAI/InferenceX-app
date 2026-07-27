@@ -79,6 +79,13 @@ Legend behavior:
 
 - One entry per run that contributes bars, same shape as the inference/evaluation overlay legends (`✕ <branch>`, palette swatch, workflow link). The entry is inert — per-run removal happens in the banner.
 - Hardware entries merge official hardware with hardware only the run has data for (`legendHwKeys`), otherwise an overlay-only bar would be unhideable.
-- Toggling a hardware entry mirrors into the provider's shared `activeOverlayHwTypes`, so one click hides both a GPU's official and overlay bar. The mirror is scoped to hardware in the current selection — that set is shared with the inference and evaluation tabs, and out-of-scope keys must keep whatever the user set there.
+- `visibleHwKeys` is the **single source of truth** for both series: one legend entry governs a GPU's official and overlay bars together.
+
+That last point is deliberate and worth not "fixing" back. The obvious-looking alternative — read/write the provider's shared `activeOverlayHwTypes` for the overlay series — gives the one legend two backing sets, and every way they drift renders a legend entry that contradicts the bar beside it:
+
+- the reset effect reseeds `visibleHwKeys` when the available hardware changes but has no business reseeding a set two other tabs share, so a GPU hidden before a model/sequence switch comes back as "active" in the legend with its overlay bar still hidden;
+- the inference or evaluation tab re-enabling a GPU resurrects its calculator overlay bar while this tab's legend still marks it inactive.
+
+Per-tab hardware visibility is already how the calculator treats official data — `visibleHwKeys` has never been shared with the inference tab — so the overlay series just follows the same rule. AGENTS.md's "respect `activeOverlayHwTypes`" exists so overlay points can't ignore a user's hide action; here the calculator's own legend _is_ that hide action. `calculator-overlay.cy.ts` pins the first scenario ("brings hidden overlay bars back when the available hardware changes").
 
 Note the calculator only supports fixed-sequence data (`sequenceToIslOsl`: 1k/1k, 1k/8k, 8k/1k). Agentic-traces rows carry null isl/osl and are invisible here for official and unofficial data alike. E2E fixtures therefore use `singleTurnRows` from `cypress/support/overlay-fixtures.ts`, not the agentic `b300Rows` the inference specs use.

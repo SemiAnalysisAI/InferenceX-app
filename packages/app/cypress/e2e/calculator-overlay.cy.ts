@@ -12,6 +12,7 @@
  * agentic overlay fixtures used by the inference specs never reach it.
  */
 import {
+  ALT_SEQUENCE_LABEL,
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
@@ -22,12 +23,24 @@ import {
 const TOTAL_BARS = 3;
 const OVERLAY_BARS = 2;
 
+const SEQUENCE = '1k/1k';
+const SEQUENCE_LABEL = '1K / 1K';
 const BARS = '[data-testid="calculator-bar-chart"] svg .bar';
 const Y_TICKS = '[data-testid="calculator-bar-chart"] svg .y-axis .tick text';
 
+const selectSequence = (label: string) => {
+  cy.get('[data-testid="calc-sequence-selector"]').click();
+  cy.get('[role="option"]').contains(label).click();
+};
+
+/**
+ * `i_seq` is pinned because the global default sequence is 8k/1k, which the
+ * fixtures also cover (with different hardware) — without pinning, the default
+ * view would be the alt sequence rather than the overlay-carrying 1k/1k one.
+ */
 const visitCalculatorWithOverlay = () => {
   interceptCalculatorOverlayRun();
-  cy.visit(`/calculator?unofficialrun=${OVERLAY_RUN_ID}`, {
+  cy.visit(`/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -87,9 +100,26 @@ describe('TCO calculator — unofficial run overlay', () => {
       // Clicking one entry while all are visible solos it.
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       // Only the MI355X overlay bar survives — both B300 bars (official AND
-      // overlay) are gone, proving the toggle mirrors into activeOverlayHwTypes.
+      // overlay) are gone, proving one legend entry governs both series.
       cy.get(BARS).should('have.length', 1);
       cy.get(Y_TICKS).should('not.contain.text', 'B300');
+    });
+
+    it('brings hidden overlay bars back when the available hardware changes', () => {
+      // Regression: overlay visibility used to live in a second, provider-shared
+      // set that the legend reset did not reseed. Hiding a GPU, then changing
+      // the selection, left the legend showing it as active while its overlay
+      // bar stayed hidden by the earlier filter.
+      cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
+      cy.get(BARS).should('have.length', 1);
+
+      // 8k/1k covers different hardware, so switching there and back reseeds
+      // the legend's available set.
+      selectSequence(ALT_SEQUENCE_LABEL);
+      cy.get(BARS).should('have.length', 1); // H100 only, no overlay data
+      selectSequence(SEQUENCE_LABEL);
+
+      cy.get(BARS).should('have.length', TOTAL_BARS);
     });
 
     it('restores every bar via reset filter', () => {
@@ -116,11 +146,14 @@ describe('TCO calculator — unofficial run overlay', () => {
   describe('Chinese page', () => {
     before(() => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/zh/calculator?unofficialrun=${OVERLAY_RUN_ID}`, {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      cy.visit(
+        `/zh/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+        {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
         },
-      });
+      );
       cy.wait('@unofficialRun');
       cy.get(BARS).should('have.length', TOTAL_BARS);
     });

@@ -298,16 +298,8 @@ function ThroughputCalculatorInner() {
   // Unofficial-run overlay (`?unofficialrun=…`). Overlay bars are interpolated
   // separately from official ones and only ever reach the bar chart — the
   // table, CSV export, and fleet planner stay official-only.
-  const {
-    isUnofficialRun,
-    unofficialBenchmarkRows,
-    unofficialRunInfos,
-    runIndexByUrl,
-    activeOverlayHwTypes,
-    setActiveOverlayHwTypes,
-    allOverlayHwTypes,
-    resetOverlayHwTypes,
-  } = useUnofficialRun();
+  const { isUnofficialRun, unofficialBenchmarkRows, unofficialRunInfos, runIndexByUrl } =
+    useUnofficialRun();
 
   const overlayInput = useMemo(
     () => ({ rows: unofficialBenchmarkRows, runIndexByUrl }),
@@ -338,6 +330,22 @@ function ThroughputCalculatorInner() {
    * Hardware listed in the legend: official hardware, plus hardware that only
    * the loaded unofficial run has data for (otherwise there'd be no way to hide
    * an overlay-only bar).
+   *
+   * `visibleHwKeys` — seeded from this list — is the SINGLE source of truth for
+   * what the calculator draws, official bars and overlay bars alike. It is
+   * deliberately not cross-wired to the provider's shared `activeOverlayHwTypes`
+   * (which the inference and evaluation tabs read/write): two visibility sets
+   * for one legend can only drift, and every way they drift renders a legend
+   * entry whose active state contradicts the bar next to it — e.g. a selection
+   * change reseeds the local set but not the shared one, or another tab
+   * re-enables a GPU this tab has hidden.
+   *
+   * Per-tab hardware visibility is already how the calculator treats official
+   * data (it has never shared `visibleHwKeys` with the inference tab), so the
+   * overlay series simply follows the same rule. AGENTS.md's "respect
+   * `activeOverlayHwTypes`" exists so overlay points can't ignore the user's
+   * hide action; here the calculator's own legend IS that hide action, and it
+   * is respected.
    */
   const legendHwKeys = useMemo(() => {
     if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
@@ -393,14 +401,14 @@ function ThroughputCalculatorInner() {
 
   const overlayResults: InterpolatedResult[] = useMemo(() => {
     if (!hasOverlayData) return [];
-    return getOverlayResults(targetValue, mode, costProvider, activeOverlayHwTypes, runInfoByIndex);
+    return getOverlayResults(targetValue, mode, costProvider, visibleHwKeys, runInfoByIndex);
   }, [
     hasOverlayData,
     targetValue,
     mode,
     costProvider,
     getOverlayResults,
-    activeOverlayHwTypes,
+    visibleHwKeys,
     runInfoByIndex,
   ]);
 
@@ -483,74 +491,41 @@ function ThroughputCalculatorInner() {
     track('calculator_bar_metric_changed', { metric: value });
   }, []);
 
-  /**
-   * Mirror a hardware-visibility change into the provider's shared overlay set
-   * so one legend click hides both a GPU's official bar and its overlay bar.
-   *
-   * Scoped to hardware the current selection actually has overlay data for —
-   * `activeOverlayHwTypes` is shared with the inference and evaluation tabs, so
-   * out-of-scope keys must be left exactly as the user set them there.
-   */
-  const mirrorOverlayVisibility = useCallback(
-    (nextVisible: Set<string>) => {
-      if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return;
-      const next = new Set(activeOverlayHwTypes);
-      let changed = false;
-      for (const key of overlayAvailableHwKeys) {
-        const shouldBeActive = nextVisible.has(key);
-        if (shouldBeActive && !next.has(key)) {
-          next.add(key);
-          changed = true;
-        } else if (!shouldBeActive && next.has(key)) {
-          next.delete(key);
-          changed = true;
-        }
-      }
-      if (changed) {
-        setActiveOverlayHwTypes(next);
-        track('calculator_overlay_hw_toggled', { count: next.size });
-      }
-    },
-    [isUnofficialRun, overlayAvailableHwKeys, activeOverlayHwTypes, setActiveOverlayHwTypes],
-  );
-
   const toggleGpuVisibility = useCallback(
     (hwKey: string) => {
-      const allVisible = visibleHwKeys.size === legendHwKeys.length;
-      const isVisible = visibleHwKeys.has(hwKey);
+      setVisibleHwKeys((prev) => {
+        const allVisible = prev.size === legendHwKeys.length;
+        const isVisible = prev.has(hwKey);
 
-      let next: Set<string>;
-      if (isVisible) {
-        if (allVisible) {
-          // If all visible and clicking one, solo it
-          next = new Set([hwKey]);
-        } else if (visibleHwKeys.size === 1) {
-          // If only one visible and clicking it, show all
-          next = new Set(legendHwKeys);
-        } else {
-          next = new Set(visibleHwKeys);
+        if (isVisible) {
+          if (allVisible) {
+            // If all visible and clicking one, solo it
+            return new Set([hwKey]);
+          } else if (prev.size === 1) {
+            // If only one visible and clicking it, show all
+            return new Set(legendHwKeys);
+          }
+          // Remove it
+          const next = new Set(prev);
           next.delete(hwKey);
+          return next;
         }
-      } else {
-        next = new Set([...visibleHwKeys, hwKey]);
-      }
-
-      setVisibleHwKeys(next);
-      mirrorOverlayVisibility(next);
+        // Add it
+        const next = new Set([...prev, hwKey]);
+        return next;
+      });
       track('calculator_gpu_toggled', { gpu: hwKey });
     },
-    [visibleHwKeys, legendHwKeys, mirrorOverlayVisibility],
+    [legendHwKeys],
   );
 
-  const removeGpu = useCallback(
-    (hwKey: string) => {
-      const next = new Set(visibleHwKeys);
+  const removeGpu = useCallback((hwKey: string) => {
+    setVisibleHwKeys((prev) => {
+      const next = new Set(prev);
       next.delete(hwKey);
-      setVisibleHwKeys(next);
-      mirrorOverlayVisibility(next);
-    },
-    [visibleHwKeys, mirrorOverlayVisibility],
-  );
+      return next;
+    });
+  }, []);
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = calculatorChartToCsv(results, targetValue, (hwKey) => {
@@ -567,9 +542,8 @@ function ThroughputCalculatorInner() {
 
   const handleResetGpus = useCallback(() => {
     setVisibleHwKeys(new Set(legendHwKeys));
-    resetOverlayHwTypes();
     track('calculator_gpu_reset', { gpuCount: legendHwKeys.length });
-  }, [legendHwKeys, resetOverlayHwTypes]);
+  }, [legendHwKeys]);
 
   // Derive runUrl from workflowInfo for the selected sequence
   const runUrl = useMemo(() => {
@@ -1120,8 +1094,7 @@ function ThroughputCalculatorInner() {
                               },
                             ]}
                             actions={
-                              visibleHwKeys.size < legendHwKeys.length ||
-                              activeOverlayHwTypes.size < allOverlayHwTypes.size
+                              visibleHwKeys.size < legendHwKeys.length
                                 ? [
                                     {
                                       id: 'calc-reset-filter',

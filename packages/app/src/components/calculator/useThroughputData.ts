@@ -347,15 +347,15 @@ export function useThroughputData(
    * Kept separate from `getResults` so official bars keep their own Pareto
    * frontier — overlay points never enter the official interpolation.
    *
-   * `activeOverlayHwTypes` is the provider's shared overlay visibility set, so
-   * hiding hardware in the legend hides its overlay bar too.
+   * `visibleHwKeys` is the same legend selection `getResults` is filtered by,
+   * so one legend entry governs a GPU's official and overlay bars together.
    */
   const getOverlayResults = useCallback(
     (
       targetValue: number,
       mode: 'interactivity_to_throughput' | 'throughput_to_interactivity',
       costProvider: CostProvider,
-      activeOverlayHwTypes?: Set<string>,
+      visibleHwKeys?: Set<string>,
       runInfoByIndex?: Record<number, { branch: string; url: string }>,
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
@@ -363,7 +363,7 @@ export function useThroughputData(
       for (const [groupKey, points] of Object.entries(overlayGpuDataByGroupKey)) {
         const meta = overlayGroupMeta[groupKey];
         if (!meta) continue;
-        if (activeOverlayHwTypes && !activeOverlayHwTypes.has(meta.hwKey)) continue;
+        if (visibleHwKeys && !visibleHwKeys.has(meta.hwKey)) continue;
 
         const result = interpolateForGPU(points, targetValue, mode, costProvider);
         if (result && result.value > 0) {

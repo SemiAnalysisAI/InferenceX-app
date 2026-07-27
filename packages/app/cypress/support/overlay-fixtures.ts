@@ -119,6 +119,12 @@ export const countVisible = ($els: JQuery<HTMLElement>): number =>
 export const SINGLE_TURN_DATE = '2026-07-19';
 export const SINGLE_TURN_ISL = 1024;
 export const SINGLE_TURN_OSL = 1024;
+/** A second sequence, covering different hardware — switching to it and back
+ *  changes the calculator's available-hardware set, which reseeds the legend. */
+export const ALT_SEQUENCE_ISL = 8192;
+export const ALT_SEQUENCE_OSL = 1024;
+export const ALT_SEQUENCE_LABEL = '8K / 1K';
+export const ALT_SEQUENCE_HARDWARE = 'h100';
 /** A model the calculator is NOT showing — used to prove overlay model filtering. */
 export const OTHER_MODEL_DB_KEY = 'glm5';
 /** Hardware present only in the unofficial run, never in the official rows. */
@@ -156,7 +162,15 @@ export const singleTurnRows = (
     hardware = 'b300',
     model = DEFAULT_MODEL_DB_KEY,
     tputScale = 1,
-  }: { hardware?: string; model?: string; tputScale?: number } = {},
+    isl = SINGLE_TURN_ISL,
+    osl = SINGLE_TURN_OSL,
+  }: {
+    hardware?: string;
+    model?: string;
+    tputScale?: number;
+    isl?: number;
+    osl?: number;
+  } = {},
 ) =>
   SINGLE_TURN_CONFIGS.map(([conc, intvty, tput]) => ({
     id: runUrl ? 0 : singleTurnIdCursor++,
@@ -171,8 +185,8 @@ export const singleTurnRows = (
     decode_tp: 8,
     num_prefill_gpu: 8,
     num_decode_gpu: 8,
-    isl: SINGLE_TURN_ISL,
-    osl: SINGLE_TURN_OSL,
+    isl,
+    osl,
     conc,
     offload_mode: 'off',
     benchmark_type: 'single_turn',
@@ -196,6 +210,18 @@ export const singleTurnAvailability = [
     benchmark_type: 'single_turn',
     date: SINGLE_TURN_DATE,
   },
+  {
+    model: DEFAULT_MODEL_DB_KEY,
+    isl: ALT_SEQUENCE_ISL,
+    osl: ALT_SEQUENCE_OSL,
+    precision: 'fp4',
+    hardware: ALT_SEQUENCE_HARDWARE,
+    framework: 'sglang',
+    spec_method: 'none',
+    disagg: false,
+    benchmark_type: 'single_turn',
+    date: SINGLE_TURN_DATE,
+  },
 ];
 
 /**
@@ -210,7 +236,18 @@ export const singleTurnAvailability = [
  */
 export const interceptCalculatorOverlayRun = () => {
   cy.intercept('GET', '/api/v1/availability', { body: singleTurnAvailability }).as('availability');
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: singleTurnRows(null) }).as('benchmarks');
+  cy.intercept('GET', '/api/v1/benchmarks*', {
+    // The route is intercepted regardless of query params; the hook filters by
+    // isl/osl client-side, so both sequences ship in one payload.
+    body: [
+      ...singleTurnRows(null),
+      ...singleTurnRows(null, {
+        hardware: ALT_SEQUENCE_HARDWARE,
+        isl: ALT_SEQUENCE_ISL,
+        osl: ALT_SEQUENCE_OSL,
+      }),
+    ],
+  }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
     body: {
       runInfos: [
