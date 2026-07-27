@@ -125,21 +125,18 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
   },
   // NVIDIA RTX PRO 6000 Blackwell Server Edition (GB202, PCIe Gen5, 96 GB GDDR7).
   // A workstation-class PCIe card benchmarked in 8× TP configs (no NVLink/NVSwitch);
-  // sorts last, after the datacenter SXM/OAM parts.
-  // TODO: power (all-in kW/GPU) and cost tiers are placeholders (9.99) pending the
-  // official values from the SemiAnalysis AI Cloud TCO model. TDP is the datasheet
-  // 600 W max board power. Until real numbers land, $/token and per-MW metrics for
-  // this SKU are not meaningful.
+  // sorts last, after the datacenter SXM/OAM parts. TDP is the datasheet 600 W max
+  // board power; power and cost tiers are from the SemiAnalysis AI Cloud TCO model.
   rtx6000pro: {
     vendor: 'NVIDIA',
     arch: 'Blackwell',
     label: 'RTX PRO 6000',
     sort: 9,
     tdp: 600,
-    power: 9.99,
-    costh: 9.99,
-    costn: 9.99,
-    costr: 9.99,
+    power: 0.975,
+    costh: 0.43,
+    costn: 0.676,
+    costr: 0.52,
   },
 };
 
