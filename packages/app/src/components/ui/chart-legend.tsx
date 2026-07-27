@@ -133,11 +133,16 @@ export default function ChartLegend({
   const advancedControlsId = useId();
 
   const effectiveExpanded = isLegendExpanded;
+  // Counts only removable series: the guard below exists to stop the user
+  // emptying the chart, and label-only entries (unofficial runs) are not
+  // something removing leaves you without.
   const activeCount = useMemo(
-    () => legendItems.filter((item) => item.isActive).length,
+    () => legendItems.filter((item) => item.isActive && item.isRemovable !== false).length,
     [legendItems],
   );
   const effectiveRemove = onItemRemove && activeCount > 1 ? onItemRemove : undefined;
+  const removeFor = (item: CommonLegendItemProps) =>
+    item.isRemovable === false ? undefined : effectiveRemove;
 
   useLayoutEffect(() => {
     setHasLongText(legendItems.some((item) => item.label && item.label.length > 8));
@@ -453,7 +458,7 @@ export default function ChartLegend({
         onClick={item.onClick}
         onHover={onItemHover}
         onHoverEnd={onItemHoverEnd}
-        onRemove={effectiveRemove}
+        onRemove={removeFor(item)}
         onShowPoints={item.onShowPoints}
         asFragment
         isLegendExpanded={effectiveExpanded}
@@ -549,7 +554,7 @@ export default function ChartLegend({
                         onClick={item.onClick}
                         onHover={onItemHover}
                         onHoverEnd={onItemHoverEnd}
-                        onRemove={effectiveRemove}
+                        onRemove={removeFor(item)}
                         onShowPoints={item.onShowPoints}
                         sidebarMode={isSidebar}
                         asFragment

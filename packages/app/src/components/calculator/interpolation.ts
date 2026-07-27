@@ -265,6 +265,12 @@ export function interpolateForGPU(
 
   // Clamp target value to the data range to avoid null returns and prevent extrapolation
   const clampedTarget = Math.max(minInput, Math.min(maxInput, targetValue));
+  // Surfaced on the result so callers can tell the user this series was NOT
+  // measured at the requested target — it is showing its nearest edge point.
+  // Series can have different ranges (and an unofficial run can widen the
+  // slider past every official point), so a clamped bar sitting next to an
+  // unclamped one is a comparison the user needs to be able to see.
+  const clamped = targetValue < minInput || targetValue > maxInput;
 
   if (sorted.length === 1) {
     return {
@@ -281,6 +287,7 @@ export function interpolateForGPU(
       outputTpPerMw: sorted[0].outputTpPerMw,
       concurrency: sorted[0].concurrency,
       nearestPoints: [sorted[0]],
+      clamped,
     };
   }
 
@@ -332,5 +339,6 @@ export function interpolateForGPU(
     outputTpPerMw,
     concurrency,
     nearestPoints: [sorted[lowerIdx], sorted[upperIdx]],
+    clamped,
   };
 }

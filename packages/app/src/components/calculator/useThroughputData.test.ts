@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import type { BenchmarkRow } from '@/lib/api';
+import { overlayRunIndex } from '@/lib/overlay-run-style';
+
 import type { GPUDataPoint } from './types';
 import {
+  buildGpuGroups,
   getCostField,
   hermiteInterpolate,
   interpolateForGPU,
@@ -969,5 +973,208 @@ describe('maxInteractivityAtCost', () => {
     // Even though the dominated point is dirt cheap, it is off the frontier,
     // so a 0.1 budget still fits nothing.
     expect(maxInteractivityAtCost(withDominated, 0.1, 'costh', 'total')).toBeNull();
+  });
+});
+
+// =========================================================================
+// buildGpuGroups() — shared by the official and unofficial-run overlay paths
+// =========================================================================
+
+function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
+  return {
+    id: 1,
+    hardware: 'b300',
+    framework: 'sglang',
+    model: 'dsv4',
+    precision: 'fp4',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 8,
+    prefill_dp_attention: false,
+    prefill_num_workers: 1,
+    decode_tp: 8,
+    decode_ep: 8,
+    decode_dp_attention: false,
+    decode_num_workers: 1,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    benchmark_type: 'single_turn',
+    isl: 1024,
+    osl: 1024,
+    conc: 8,
+    offload_mode: 'off',
+    image: 'sglang:test',
+    metrics: {
+      median_intvty: 50,
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 300,
+      input_tput_per_gpu: 600,
+    },
+    date: '2026-07-19',
+    run_url: null,
+    ...overrides,
+  };
+}
+
+/** The official path's classifier: one group per hwKey (per precision when multi). */
+const singlePrecisionClassify = (hwKey: string) => ({ key: hwKey, meta: { hwKey } });
+
+describe('buildGpuGroups', () => {
+  const shared = { isl: 1024, osl: 1024, precisions: ['fp4'] };
+
+  it('groups rows by the caller-supplied key and derives cost + power metrics', () => {
+    const { grouped, groupMeta, hwConfigMap } = buildGpuGroups(
+      [
+        makeRow({ conc: 8 }),
+        makeRow({ conc: 16, metrics: { median_intvty: 30, tput_per_gpu: 1500 } }),
+      ],
+      { ...shared, classify: singlePrecisionClassify },
+    );
+
+    const keys = Object.keys(grouped);
+    expect(keys).toHaveLength(1);
+    const [hwKey] = keys;
+    expect(grouped[hwKey]).toHaveLength(2);
+    expect(groupMeta[hwKey]).toEqual({ hwKey });
+    expect(hwConfigMap[hwKey]).toBeDefined();
+
+    const [first] = grouped[hwKey];
+    expect(first.interactivity).toBe(50);
+    expect(first.throughput).toBe(900);
+    expect(first.concurrency).toBe(8);
+    // Cost per million tokens is derived, not passed through.
+    expect(first.costh).toBeGreaterThan(0);
+    expect(first.tpPerMw).toBeGreaterThan(0);
+  });
+
+  it('drops rows whose isl/osl do not match the selected sequence', () => {
+    const { grouped } = buildGpuGroups(
+      [makeRow({ isl: 8192, osl: 1024 }), makeRow({ isl: null, osl: null })],
+      { ...shared, classify: singlePrecisionClassify },
+    );
+    expect(Object.keys(grouped)).toHaveLength(0);
+  });
+
+  it('drops rows whose precision is not selected', () => {
+    const { grouped } = buildGpuGroups([makeRow({ precision: 'fp8' })], {
+      ...shared,
+      classify: singlePrecisionClassify,
+    });
+    expect(Object.keys(grouped)).toHaveLength(0);
+  });
+
+  it('drops rows the caller classifies as null', () => {
+    const { grouped } = buildGpuGroups([makeRow()], {
+      ...shared,
+      classify: () => null,
+    });
+    expect(Object.keys(grouped)).toHaveLength(0);
+  });
+
+  it('splits into one group per precision when multiple precisions are selected', () => {
+    const { grouped, groupMeta } = buildGpuGroups(
+      [makeRow({ precision: 'fp4' }), makeRow({ precision: 'fp8' })],
+      {
+        isl: 1024,
+        osl: 1024,
+        precisions: ['fp4', 'fp8'],
+        classify: (hwKey, row) => ({
+          key: `${hwKey}__${row.precision}`,
+          meta: { hwKey, precision: row.precision },
+        }),
+      },
+    );
+
+    const keys = Object.keys(grouped).toSorted();
+    expect(keys).toHaveLength(2);
+    expect(keys.every((k) => k.includes('__fp4') || k.includes('__fp8'))).toBe(true);
+    for (const key of keys) {
+      expect(groupMeta[key].precision).toBe(key.endsWith('fp4') ? 'fp4' : 'fp8');
+    }
+  });
+
+  it('keys overlay rows per run so two runs never share a group', () => {
+    const runA = 'https://github.com/org/repo/actions/runs/111';
+    const runB = 'https://github.com/org/repo/actions/runs/222';
+    const runIndexByUrl = { [runA]: 0, [runB]: 1 };
+
+    const { grouped, groupMeta } = buildGpuGroups(
+      [makeRow({ run_url: runA }), makeRow({ run_url: runB, conc: 16 })],
+      {
+        ...shared,
+        classify: (hwKey, row) => {
+          const runIndex = overlayRunIndex(row.run_url, runIndexByUrl);
+          return { key: `${hwKey}__run${runIndex}`, meta: { hwKey, runIndex } };
+        },
+      },
+    );
+
+    const keys = Object.keys(grouped).toSorted();
+    expect(keys).toHaveLength(2);
+    expect(keys.map((k) => groupMeta[k].runIndex).toSorted()).toEqual([0, 1]);
+    // Each run keeps its own points — no cross-run mixing into one frontier.
+    expect(grouped[keys[0]]).toHaveLength(1);
+    expect(grouped[keys[1]]).toHaveLength(1);
+  });
+
+  it('shares the same hwKey between an official row and its overlay twin', () => {
+    const official = buildGpuGroups([makeRow()], {
+      ...shared,
+      classify: singlePrecisionClassify,
+    });
+    const overlay = buildGpuGroups(
+      [makeRow({ run_url: 'https://github.com/org/repo/actions/runs/111' })],
+      {
+        ...shared,
+        classify: (hwKey) => ({ key: `${hwKey}__run0`, meta: { hwKey, runIndex: 0 } }),
+      },
+    );
+
+    const officialHw = Object.values(official.groupMeta)[0].hwKey;
+    const overlayHw = Object.values(overlay.groupMeta)[0].hwKey;
+    // Legend visibility is keyed on hwKey, so the two must agree.
+    expect(overlayHw).toBe(officialHw);
+  });
+});
+
+// =========================================================================
+// interpolateForGPU() — clamped reporting
+// =========================================================================
+
+describe('interpolateForGPU clamped flag', () => {
+  const points = [
+    makePoint({ interactivity: 20, throughput: 900 }),
+    makePoint({ interactivity: 50, throughput: 600 }),
+    makePoint({ interactivity: 80, throughput: 300 }),
+  ];
+
+  it('is falsy for a target inside the measured range', () => {
+    const result = interpolateForGPU(points, 50, 'interactivity_to_throughput', 'costh');
+    expect(result?.clamped).toBeFalsy();
+  });
+
+  it('is set for a target above every measured point', () => {
+    const result = interpolateForGPU(points, 200, 'interactivity_to_throughput', 'costh');
+    // Still returns a value (the calculator never drops a bar), but the caller
+    // can now tell the user it is the nearest edge point, not a measurement.
+    expect(result?.value).toBeGreaterThan(0);
+    expect(result?.clamped).toBe(true);
+  });
+
+  it('is set for a target below every measured point', () => {
+    const result = interpolateForGPU(points, 1, 'interactivity_to_throughput', 'costh');
+    expect(result?.clamped).toBe(true);
+  });
+
+  it('is set on the single-point path when the target misses that point', () => {
+    const single = [makePoint({ interactivity: 40, throughput: 700 })];
+    expect(
+      interpolateForGPU(single, 40, 'interactivity_to_throughput', 'costh')?.clamped,
+    ).toBeFalsy();
+    expect(interpolateForGPU(single, 90, 'interactivity_to_throughput', 'costh')?.clamped).toBe(
+      true,
+    );
   });
 });
