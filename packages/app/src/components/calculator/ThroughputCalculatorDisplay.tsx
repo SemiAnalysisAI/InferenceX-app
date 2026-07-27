@@ -24,6 +24,8 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { overlayRunColor } from '@/lib/overlay-run-style';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -47,6 +49,7 @@ import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
 import ThroughputBarChart, {
   getChartTitle,
   getCostProviderLabel,
+  getResultLabel,
   getThroughputForType,
   getTpPerMwForType,
 } from './ThroughputBarChart';
@@ -141,6 +144,9 @@ const STRINGS = {
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
+    unofficialRun: 'UNOFFICIAL RUN',
+    branch: 'Branch',
+    viewRun: 'View workflow run',
   },
   zh: {
     title: 'TCO 计算器',
@@ -184,6 +190,9 @@ const STRINGS = {
     compMetricThroughput: '吞吐量',
     compMetricCost: '成本效率',
     compMetricPower: 'tok/s/MW',
+    unofficialRun: '非官方运行',
+    branch: '分支',
+    viewRun: '查看工作流运行',
   },
 } as const;
 
@@ -286,16 +295,54 @@ function ThroughputCalculatorInner() {
     return viewModeOptions.map(({ testId: _testId, ...opt }) => opt);
   }, [locale, viewModeOptions]);
 
+  // Unofficial-run overlay (`?unofficialrun=…`). Overlay bars are interpolated
+  // separately from official ones and only ever reach the bar chart — the
+  // table, CSV export, and fleet planner stay official-only.
+  const {
+    isUnofficialRun,
+    unofficialBenchmarkRows,
+    unofficialRunInfos,
+    runIndexByUrl,
+    activeOverlayHwTypes,
+    setActiveOverlayHwTypes,
+    allOverlayHwTypes,
+    resetOverlayHwTypes,
+  } = useUnofficialRun();
+
+  const overlayInput = useMemo(
+    () => ({ rows: unofficialBenchmarkRows, runIndexByUrl }),
+    [unofficialBenchmarkRows, runIndexByUrl],
+  );
+
   const {
     gpuDataByGroupKey,
     hardwareConfig,
     ranges,
     getResults,
+    getOverlayResults,
     loading,
     error,
     hasData,
+    hasOverlayData,
     availableHwKeys,
-  } = useThroughputData(selectedModel, selectedSequence, selectedPrecisions, selectedRunDate);
+    overlayAvailableHwKeys,
+  } = useThroughputData(
+    selectedModel,
+    selectedSequence,
+    selectedPrecisions,
+    selectedRunDate,
+    overlayInput,
+  );
+
+  /**
+   * Hardware listed in the legend: official hardware, plus hardware that only
+   * the loaded unofficial run has data for (otherwise there'd be no way to hide
+   * an overlay-only bar).
+   */
+  const legendHwKeys = useMemo(() => {
+    if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
+    return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
+  }, [isUnofficialRun, availableHwKeys, overlayAvailableHwKeys]);
 
   // Dynamic vendor-aware colors for visible GPUs
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
@@ -309,29 +356,64 @@ function ThroughputCalculatorInner() {
 
   // Reset visible GPUs when the available set changes (model/sequence/precision change or customer filter toggle)
   useEffect(() => {
-    if (availableHwKeys.length === 0) return;
-    const key = [...availableHwKeys].toSorted().join(',');
+    if (legendHwKeys.length === 0) return;
+    const key = [...legendHwKeys].toSorted().join(',');
     if (key !== prevAvailableKeyRef.current) {
       prevAvailableKeyRef.current = key;
-      setVisibleHwKeys(new Set(availableHwKeys));
+      setVisibleHwKeys(new Set(legendHwKeys));
     }
-  }, [availableHwKeys]);
+  }, [legendHwKeys]);
+
+  const hasAnyData = hasData || hasOverlayData;
 
   // Clamp target into range when data changes
   useEffect(() => {
-    if (!hasData) return;
+    if (!hasAnyData) return;
     const { min, max } = ranges.interactivity;
     if (targetValue < min || targetValue > max) {
       const clamped = Math.max(min, Math.min(max, targetValue));
       setTargetValue(clamped);
       setInputValue(String(clamped));
     }
-  }, [hasData, ranges]);
+  }, [hasAnyData, ranges]);
 
   const results: InterpolatedResult[] = useMemo(() => {
     if (!hasData) return [];
     return getResults(targetValue, mode, costProvider, visibleHwKeys);
   }, [hasData, targetValue, mode, costProvider, getResults, visibleHwKeys]);
+
+  /** Branch + URL per run index, stamped onto overlay results for labels/tooltips. */
+  const runInfoByIndex = useMemo(() => {
+    const map: Record<number, { branch: string; url: string }> = {};
+    unofficialRunInfos.forEach((info, idx) => {
+      map[idx] = { branch: info.branch || `run ${info.id}`, url: info.url };
+    });
+    return map;
+  }, [unofficialRunInfos]);
+
+  const overlayResults: InterpolatedResult[] = useMemo(() => {
+    if (!hasOverlayData) return [];
+    return getOverlayResults(targetValue, mode, costProvider, activeOverlayHwTypes, runInfoByIndex);
+  }, [
+    hasOverlayData,
+    targetValue,
+    mode,
+    costProvider,
+    getOverlayResults,
+    activeOverlayHwTypes,
+    runInfoByIndex,
+  ]);
+
+  /**
+   * Bars drawn in the chart: official + overlay. Deliberately NOT used by the
+   * table, the CSV export, or the fleet planner — those stay official-only, so
+   * an exported sheet or a fleet projection never silently mixes in numbers
+   * from an unmerged branch.
+   */
+  const barResults = useMemo(
+    () => (overlayResults.length > 0 ? [...results, ...overlayResults] : results),
+    [results, overlayResults],
+  );
 
   const currentRange = useMemo(() => ranges.interactivity, [ranges]);
 
@@ -401,41 +483,74 @@ function ThroughputCalculatorInner() {
     track('calculator_bar_metric_changed', { metric: value });
   }, []);
 
-  const toggleGpuVisibility = useCallback(
-    (hwKey: string) => {
-      setVisibleHwKeys((prev) => {
-        const allVisible = prev.size === availableHwKeys.length;
-        const isVisible = prev.has(hwKey);
-
-        if (isVisible) {
-          if (allVisible) {
-            // If all visible and clicking one, solo it
-            return new Set([hwKey]);
-          } else if (prev.size === 1) {
-            // If only one visible and clicking it, show all
-            return new Set(availableHwKeys);
-          }
-          // Remove it
-          const next = new Set(prev);
-          next.delete(hwKey);
-          return next;
+  /**
+   * Mirror a hardware-visibility change into the provider's shared overlay set
+   * so one legend click hides both a GPU's official bar and its overlay bar.
+   *
+   * Scoped to hardware the current selection actually has overlay data for —
+   * `activeOverlayHwTypes` is shared with the inference and evaluation tabs, so
+   * out-of-scope keys must be left exactly as the user set them there.
+   */
+  const mirrorOverlayVisibility = useCallback(
+    (nextVisible: Set<string>) => {
+      if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return;
+      const next = new Set(activeOverlayHwTypes);
+      let changed = false;
+      for (const key of overlayAvailableHwKeys) {
+        const shouldBeActive = nextVisible.has(key);
+        if (shouldBeActive && !next.has(key)) {
+          next.add(key);
+          changed = true;
+        } else if (!shouldBeActive && next.has(key)) {
+          next.delete(key);
+          changed = true;
         }
-        // Add it
-        const next = new Set([...prev, hwKey]);
-        return next;
-      });
-      track('calculator_gpu_toggled', { gpu: hwKey });
+      }
+      if (changed) {
+        setActiveOverlayHwTypes(next);
+        track('calculator_overlay_hw_toggled', { count: next.size });
+      }
     },
-    [availableHwKeys],
+    [isUnofficialRun, overlayAvailableHwKeys, activeOverlayHwTypes, setActiveOverlayHwTypes],
   );
 
-  const removeGpu = useCallback((hwKey: string) => {
-    setVisibleHwKeys((prev) => {
-      const next = new Set(prev);
+  const toggleGpuVisibility = useCallback(
+    (hwKey: string) => {
+      const allVisible = visibleHwKeys.size === legendHwKeys.length;
+      const isVisible = visibleHwKeys.has(hwKey);
+
+      let next: Set<string>;
+      if (isVisible) {
+        if (allVisible) {
+          // If all visible and clicking one, solo it
+          next = new Set([hwKey]);
+        } else if (visibleHwKeys.size === 1) {
+          // If only one visible and clicking it, show all
+          next = new Set(legendHwKeys);
+        } else {
+          next = new Set(visibleHwKeys);
+          next.delete(hwKey);
+        }
+      } else {
+        next = new Set([...visibleHwKeys, hwKey]);
+      }
+
+      setVisibleHwKeys(next);
+      mirrorOverlayVisibility(next);
+      track('calculator_gpu_toggled', { gpu: hwKey });
+    },
+    [visibleHwKeys, legendHwKeys, mirrorOverlayVisibility],
+  );
+
+  const removeGpu = useCallback(
+    (hwKey: string) => {
+      const next = new Set(visibleHwKeys);
       next.delete(hwKey);
-      return next;
-    });
-  }, []);
+      setVisibleHwKeys(next);
+      mirrorOverlayVisibility(next);
+    },
+    [visibleHwKeys, mirrorOverlayVisibility],
+  );
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = calculatorChartToCsv(results, targetValue, (hwKey) => {
@@ -451,9 +566,10 @@ function ThroughputCalculatorInner() {
   }, []);
 
   const handleResetGpus = useCallback(() => {
-    setVisibleHwKeys(new Set(availableHwKeys));
-    track('calculator_gpu_reset', { gpuCount: availableHwKeys.length });
-  }, [availableHwKeys]);
+    setVisibleHwKeys(new Set(legendHwKeys));
+    resetOverlayHwTypes();
+    track('calculator_gpu_reset', { gpuCount: legendHwKeys.length });
+  }, [legendHwKeys, resetOverlayHwTypes]);
 
   // Derive runUrl from workflowInfo for the selected sequence
   const runUrl = useMemo(() => {
@@ -480,21 +596,17 @@ function ThroughputCalculatorInner() {
   // Clear bar selection when results change (data/filter changes)
   useEffect(() => {
     setSelectedBars(new Set());
-  }, [results]);
+  }, [barResults]);
 
-  // Generate comparison text when 2+ bars are selected
+  // Generate comparison text when 2+ bars are selected. Overlay bars are
+  // selectable too, so this reads the combined chart list.
   const comparisonText = useMemo(() => {
     if (selectedBars.size < 2) return null;
 
-    const selectedResults = results.filter((r) => selectedBars.has(r.resultKey));
+    const selectedResults = barResults.filter((r) => selectedBars.has(r.resultKey));
     if (selectedResults.length < 2) return null;
 
-    const getLabel = (r: InterpolatedResult) => {
-      const config = hardwareConfig[r.hwKey] || getHardwareConfig(r.hwKey);
-      const baseName = config ? getDisplayLabel(config) : r.hwKey;
-      if (r.precision) return `${baseName} (${r.precision.toUpperCase()})`;
-      return baseName;
-    };
+    const getLabel = (r: InterpolatedResult) => getResultLabel(r, hardwareConfig);
 
     const metricName =
       barMetric === 'power'
@@ -551,24 +663,72 @@ function ThroughputCalculatorInner() {
     }
 
     return comparisons;
-  }, [selectedBars, results, hardwareConfig, barMetric, costType, mode, locale, t]);
+  }, [selectedBars, barResults, hardwareConfig, barMetric, costType, mode, locale, t]);
+
+  /**
+   * Overlay legend: one entry per loaded unofficial run that contributes bars
+   * to the chart, in the same palette color as its bars. Same shape as the
+   * inference scatter and evaluation bar chart legends.
+   */
+  const overlayLegendItems = useMemo(() => {
+    if (overlayResults.length === 0) return [];
+    return unofficialRunInfos
+      .map((info, idx) => {
+        if (!overlayResults.some((r) => r.runIndex === idx)) return null;
+        const branch = info.branch || `run ${info.id}`;
+        return {
+          name: `✕ unofficial-run-${info.id}`,
+          label: `✕ ${branch}`,
+          color: overlayRunColor(idx),
+          title: `${t.unofficialRun}: ${branch}`,
+          isHighlighted: true,
+          hw: `overlay-run-${info.id}`,
+          isActive: true,
+          onClick: () => {},
+          tooltip: (
+            <div className="font-normal text-xs">
+              <div className="text-red-500 font-semibold">{t.unofficialRun}</div>
+              <div>
+                {t.branch}: {branch}
+              </div>
+              {info.url && (
+                <a href={info.url} target="_blank" rel="noopener noreferrer" className="underline">
+                  {t.viewRun}
+                </a>
+              )}
+            </div>
+          ),
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [overlayResults, unofficialRunInfos, t]);
 
   // Build legend items for ChartLegend sidebar, sorted by MODEL_ORDER (same as Inference Performance tab)
   const legendItems = useMemo(() => {
-    const availableSet = new Set(availableHwKeys);
-    return Object.entries(hardwareConfig)
-      .filter(([key]) => availableSet.has(key))
-      .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
-      .map(([key, config]) => ({
-        name: config.name,
-        label: getDisplayLabel(config),
-        color: resolveColor(key),
-        title: config.gpu,
-        hw: key,
-        isActive: visibleHwKeys.has(key),
-        onClick: () => toggleGpuVisibility(key),
-      }));
-  }, [availableHwKeys, hardwareConfig, visibleHwKeys, toggleGpuVisibility, resolveColor]);
+    const availableSet = new Set(legendHwKeys);
+    return [
+      ...overlayLegendItems,
+      ...Object.entries(hardwareConfig)
+        .filter(([key]) => availableSet.has(key))
+        .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+        .map(([key, config]) => ({
+          name: config.name,
+          label: getDisplayLabel(config),
+          color: resolveColor(key),
+          title: config.gpu,
+          hw: key,
+          isActive: visibleHwKeys.has(key),
+          onClick: () => toggleGpuVisibility(key),
+        })),
+    ];
+  }, [
+    legendHwKeys,
+    overlayLegendItems,
+    hardwareConfig,
+    visibleHwKeys,
+    toggleGpuVisibility,
+    resolveColor,
+  ]);
 
   if (!loading && error) {
     console.error(error);
@@ -719,7 +879,7 @@ function ThroughputCalculatorInner() {
                 </div>
               </div>
               {/* Target value slider + input */}
-              {!loading && hasData && (
+              {!loading && hasAnyData && (
                 <div className="space-y-2">
                   <LabelWithTooltip
                     htmlFor="calc-target"
@@ -835,7 +995,7 @@ function ThroughputCalculatorInner() {
                           </>
                         )}
                       </p>
-                      {barMetric === 'power' && results.length > 0 && (
+                      {barMetric === 'power' && barResults.length > 0 && (
                         <>
                           <p
                             className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
@@ -863,7 +1023,7 @@ function ThroughputCalculatorInner() {
                           </p>
                         </>
                       )}
-                      {barMetric === 'cost' && results.length > 0 && (
+                      {barMetric === 'cost' && barResults.length > 0 && (
                         <>
                           <p
                             className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
@@ -927,7 +1087,7 @@ function ThroughputCalculatorInner() {
                   return viewMode === 'chart' ? (
                     <ThroughputBarChart
                       caption={captionContent}
-                      results={results}
+                      results={barResults}
                       hardwareConfig={hardwareConfig}
                       mode={mode}
                       targetValue={targetValue}
@@ -938,7 +1098,7 @@ function ThroughputCalculatorInner() {
                       onBarSelect={handleBarSelect}
                       colorResolver={resolveColor}
                       legendElement={
-                        availableHwKeys.length > 0 ? (
+                        legendHwKeys.length > 0 ? (
                           <ChartLegend
                             variant="sidebar"
                             legendItems={legendItems}
@@ -960,7 +1120,8 @@ function ThroughputCalculatorInner() {
                               },
                             ]}
                             actions={
-                              visibleHwKeys.size < availableHwKeys.length
+                              visibleHwKeys.size < legendHwKeys.length ||
+                              activeOverlayHwTypes.size < allOverlayHwTypes.size
                                 ? [
                                     {
                                       id: 'calc-reset-filter',
@@ -1002,11 +1163,9 @@ function ThroughputCalculatorInner() {
                   <p className="text-sm text-muted-foreground">
                     {(() => {
                       const resultKey = [...selectedBars][0];
-                      const r = results.find((res) => res.resultKey === resultKey);
+                      const r = barResults.find((res) => res.resultKey === resultKey);
                       if (!r) return resultKey;
-                      const config = hardwareConfig[r.hwKey] || getHardwareConfig(r.hwKey);
-                      const baseName = config ? getDisplayLabel(config) : r.hwKey;
-                      return r.precision ? `${baseName} (${r.precision.toUpperCase()})` : baseName;
+                      return getResultLabel(r, hardwareConfig);
                     })()}{' '}
                     {t.clickToCompare}
                   </p>

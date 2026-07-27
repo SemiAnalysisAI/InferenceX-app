@@ -62,3 +62,23 @@ Adding another context provider to the nesting hierarchy would increase re-rende
 ## Bar Selection & Comparison
 
 Click-to-compare uses `resultKey` (not hwKey) because multi-precision mode produces multiple bars per GPU. Comparison ratios use the lower value as denominator (ratio >= 1.0). Both metric and token type are reflected in the comparison text to avoid ambiguity.
+
+## Unofficial-Run Overlays (`?unofficialrun=`)
+
+A loaded unofficial run contributes an extra bar per (hardware × run) to the bar chart, in the run's palette color (`overlayRunColor`) and labeled `B300 (✕ my-branch)`. The label keeps the branch inside the same paren group as the precision so the `twoRowYAxisLabels({ split: 'parens' })` y-axis customizer still splits it into two rows.
+
+**Overlay results are interpolated separately from official ones.** `useThroughputData` builds two group maps — `gpuDataByGroupKey` (official) and `overlayGpuDataByGroupKey` (per-run, keyed `hwKey[__precision]__run<idx>`) — and runs `interpolateForGPU` over each independently. Folding overlay points into the official Pareto front would silently move the official numbers, and you'd lose the before/after delta that makes the overlay useful in the first place.
+
+Both paths share one row → `GPUDataPoint` mapper, `buildGpuGroups`, so an overlay bar and its official twin can never differ because of a mapping drift. Group identity is carried in `gpuGroupMeta` / `overlayGroupMeta` rather than re-parsed out of the key string; `FleetPlanner` still splits keys itself, which is safe because official keys are unchanged.
+
+Overlay rows arrive unfiltered by model (the unofficial-run API returns every model in the run, while `/api/v1/benchmarks` is already model-scoped), so the hook filters them with `DB_MODEL_TO_DISPLAY`.
+
+**Only the bar chart and its legend show overlay data.** The table view, CSV export, and fleet planner deliberately stay official-only — an exported sheet or an MW projection that silently blends in numbers from an unmerged branch is worse than one that omits them. This is why `barResults` (official + overlay) exists separately from `results` (official) and only reaches `ThroughputBarChart`.
+
+Legend behavior:
+
+- One entry per run that contributes bars, same shape as the inference/evaluation overlay legends (`✕ <branch>`, palette swatch, workflow link). The entry is inert — per-run removal happens in the banner.
+- Hardware entries merge official hardware with hardware only the run has data for (`legendHwKeys`), otherwise an overlay-only bar would be unhideable.
+- Toggling a hardware entry mirrors into the provider's shared `activeOverlayHwTypes`, so one click hides both a GPU's official and overlay bar. The mirror is scoped to hardware in the current selection — that set is shared with the inference and evaluation tabs, and out-of-scope keys must keep whatever the user set there.
+
+Note the calculator only supports fixed-sequence data (`sequenceToIslOsl`: 1k/1k, 1k/8k, 8k/1k). Agentic-traces rows carry null isl/osl and are invisible here for official and unofficial data alike. E2E fixtures therefore use `singleTurnRows` from `cypress/support/overlay-fixtures.ts`, not the agentic `b300Rows` the inference specs use.

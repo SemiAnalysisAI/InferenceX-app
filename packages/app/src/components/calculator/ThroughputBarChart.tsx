@@ -8,6 +8,7 @@ import { useLocale } from '@/lib/use-locale';
 import type { HardwareConfig } from '@/components/inference/types';
 import { getHardwareConfig } from '@/lib/constants';
 import { getChartWatermark } from '@/lib/data-mappings';
+import { overlayRunColor } from '@/lib/overlay-run-style';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
@@ -28,6 +29,25 @@ import type {
   CostType,
   InterpolatedResult,
 } from './types';
+
+/**
+ * Overlay-only tooltip strings. The rest of the tooltip is English-only today;
+ * these are new user-visible strings, so they ship with a Chinese version.
+ */
+const OVERLAY_STRINGS = {
+  en: {
+    unofficialRun: 'UNOFFICIAL RUN',
+    branch: 'Branch',
+    viewRun: 'View workflow run',
+  },
+  zh: {
+    unofficialRun: '非官方运行',
+    branch: '分支',
+    viewRun: '查看工作流运行',
+  },
+} as const;
+
+export type OverlayTooltipStrings = (typeof OVERLAY_STRINGS)[keyof typeof OVERLAY_STRINGS];
 
 interface ThroughputBarChartProps {
   results: InterpolatedResult[];
@@ -201,6 +221,23 @@ export function getCostTypeLabel(costType: CostType): string {
   return '/M tok';
 }
 
+/**
+ * Display label for a result: `B300`, `B300 (FP4)` when multiple precisions are
+ * selected, and `B300 (✕ my-branch)` / `B300 (FP4 · ✕ my-branch)` for an
+ * unofficial-run overlay bar.
+ *
+ * The suffix always stays inside one pair of parens so the y-axis customizer
+ * `twoRowYAxisLabels({ split: 'parens' })` keeps splitting it into two rows.
+ */
+export function getResultLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
+  const baseName = config ? getDisplayLabel(config) : d.hwKey;
+  const parts: string[] = [];
+  if (d.precision) parts.push(d.precision.toUpperCase());
+  if (d.isOverlay) parts.push(`✕ ${d.runLabel ?? 'unofficial'}`);
+  return parts.length > 0 ? `${baseName} (${parts.join(' · ')})` : baseName;
+}
+
 export function generateTooltipHTML(
   d: InterpolatedResult,
   hardwareConfig: HardwareConfig,
@@ -209,10 +246,9 @@ export function generateTooltipHTML(
   costType: CostType,
   runUrl?: string,
   isPinned?: boolean,
+  overlayStrings: OverlayTooltipStrings = OVERLAY_STRINGS.en,
 ): string {
-  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
-  const baseName = config ? getDisplayLabel(config) : d.hwKey;
-  const label = d.precision ? `${baseName} (${d.precision.toUpperCase()})` : baseName;
+  const label = getResultLabel(d, hardwareConfig);
   const costLabel = getCostTypeLabel(costType);
   const costValue = getCostForType(d, costType);
 
@@ -257,13 +293,26 @@ export function generateTooltipHTML(
       ? `$${metricValue.toFixed(3)}${metricUnit}`
       : `${metricValue.toFixed(barMetric === 'power' ? 0 : 1)} ${metricUnit}`;
 
-  const runLinkHtml = runUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">View raw result on GitHub &#8599;</a></div>`
+  // Overlay bars link to their own workflow run, not the official run behind
+  // the DB data — the two are unrelated.
+  const effectiveRunUrl = d.isOverlay ? d.runUrl : runUrl;
+  const runLinkLabel = d.isOverlay ? overlayStrings.viewRun : 'View raw result on GitHub';
+  const runLinkHtml = effectiveRunUrl
+    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${effectiveRunUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
+    : '';
+
+  const overlayBranchHtml =
+    d.isOverlay && d.runLabel
+      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}:</strong> ${d.runLabel}</div>`
+      : '';
+  const overlayHeaderHtml = d.isOverlay
+    ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${overlayStrings.unofficialRun}</div>${overlayBranchHtml}`
     : '';
 
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? '<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">Click elsewhere to dismiss</div>' : ''}
+      ${overlayHeaderHtml}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
       </div>
@@ -289,12 +338,7 @@ export function generateTooltipHTML(
 
 // ── Helpers at module scope for use in memos and layers ──
 
-function getLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
-  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
-  const baseName = config ? getDisplayLabel(config) : d.hwKey;
-  if (d.precision) return `${baseName} (${d.precision.toUpperCase()})`;
-  return baseName;
-}
+const getLabel = getResultLabel;
 
 function getColor(): string {
   return 'var(--foreground)';
@@ -357,9 +401,17 @@ export default function ThroughputBarChart({
   colorResolver,
 }: ThroughputBarChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
+  const locale = useLocale();
 
-  // Color resolution: prefer dynamic colorResolver, fall back to static config
-  const resolveBarColor = (hwKey: string) => (colorResolver ? colorResolver(hwKey) : getColor());
+  // Color resolution: unofficial-run overlay bars take the run's palette color
+  // (so they match the banner + legend swatch — see lib/overlay-run-style.ts);
+  // official bars prefer the dynamic colorResolver, falling back to static config.
+  const resolveBarColor = (d: InterpolatedResult) =>
+    d.isOverlay
+      ? overlayRunColor(d.runIndex ?? 0)
+      : colorResolver
+        ? colorResolver(d.hwKey)
+        : getColor();
 
   // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
@@ -414,7 +466,7 @@ export default function ThroughputBarChart({
       config: {
         getY: (d) => d.resultKey,
         getX: (d) => getMetricValue(d, barMetric, costType),
-        getColor: (d) => resolveBarColor(d.hwKey),
+        getColor: (d) => resolveBarColor(d),
         rx: 4,
         opacity: 0.85,
         keyFn: (d) => d.resultKey,
@@ -466,12 +518,12 @@ export default function ThroughputBarChart({
           });
 
         // Position both labels together using the longer text width
-        const barColor = (d: InterpolatedResult) => resolveBarColor(d.hwKey);
+        const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-        const barColor = (d: InterpolatedResult) => resolveBarColor(d.hwKey);
+        const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
       },
     };
@@ -485,7 +537,16 @@ export default function ThroughputBarChart({
     () => ({
       rulerType: 'vertical' as const,
       content: (d: InterpolatedResult, isPinned: boolean) =>
-        generateTooltipHTML(d, hardwareConfig, mode, barMetric, costType, runUrl, isPinned),
+        generateTooltipHTML(
+          d,
+          hardwareConfig,
+          mode,
+          barMetric,
+          costType,
+          runUrl,
+          isPinned,
+          OVERLAY_STRINGS[locale],
+        ),
       getRulerX: () => hoveredBarXRef.current,
       onHoverStart: (sel: d3.Selection<any, InterpolatedResult, any, any>) => {
         hoveredBarXRef.current = parseFloat(sel.attr('width') || '0');
@@ -507,7 +568,7 @@ export default function ThroughputBarChart({
       },
       attachToLayer: 0,
     }),
-    [hardwareConfig, mode, barMetric, costType, runUrl],
+    [hardwareConfig, mode, barMetric, costType, runUrl, locale],
   );
 
   // ── Y axis customize: map resultKey → display label, then split into two-line GPU labels ──
@@ -554,8 +615,6 @@ export default function ThroughputBarChart({
     const svg = d3.select(svgEl);
     applySelectionOpacities(svg as any, selectedBars);
   }, [selectedBars]);
-
-  const locale = useLocale();
 
   if (results.length === 0) {
     return (
