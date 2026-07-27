@@ -5,11 +5,9 @@ import { installChunkLoadRecovery } from './chunk-load-recovery';
 
 const KEY = 'chunk_reload';
 
-// JSDOM forbids spying on `window.location.reload`, but the implementation
-// always sets the sessionStorage gate immediately BEFORE calling reload(),
-// so the gate's `'1'` state is a 1:1 proxy for "reload was attempted." We
-// also stub `reload` to a no-op via Object.defineProperty so the bare
-// `window.location.reload()` call doesn't blow up the JSDOM test environment.
+// JSDOM's native `window.location.reload` cannot be spied on. Replace it with
+// a `vi.fn()` before installing the handler so reload behavior is asserted
+// directly without triggering JSDOM navigation.
 
 function chunkErr(): Error {
   const e = new Error('Loading chunk 123 failed');
