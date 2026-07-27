@@ -14,7 +14,7 @@
  *     path uses, so behavior cannot drift.
  *
  * Usage:
- *   pnpm --filter @semianalysisai/inferencex-db db:backfill-aggregate-stats
+ *   bun run --cwd packages/db db:backfill-aggregate-stats
  *     [--limit N]   only process the first N candidate rows (useful for
  *                   smoke-tests on a fresh deploy)
  *     [--force]     recompute every row, even if version already matches

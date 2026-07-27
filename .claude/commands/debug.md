@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git blame:*), Bash(pnpm test:*), Bash(pnpm typecheck*), Bash(pnpm lint*), Bash(pnpm dev*), Bash(curl:*), Read, Glob, Grep
+allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git blame:*), Bash(bun run test:*), Bash(bun run typecheck*), Bash(bun run lint*), Bash(bun run dev*), Bash(curl:*), Read, Glob, Grep
 description: Systematic debugging — root cause before fixes
 ---
 
@@ -57,7 +57,7 @@ BEFORE attempting ANY fix:
 
 1. **Create Failing Test** — regression test reproducing the bug with exact triggering input (per CLAUDE.md testing requirements)
 2. **Implement Single Fix** — address root cause, ONE change, no "while I'm here" improvements
-3. **Verify Fix** — run `pnpm test:unit` and `pnpm typecheck`, confirm no other tests broken
+3. **Verify Fix** — run `bun run test:unit` and `bun run typecheck`, confirm no other tests broken
 
 ## Red Flags — STOP and Return to Phase 1
 

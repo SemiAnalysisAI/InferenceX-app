@@ -11,7 +11,7 @@
 
 import { gunzipSync } from 'node:zlib';
 
-import { isStringTooLongError, streamCollectKeys } from './gzip-json-stream';
+import { gunzipJsonWithinLimit, streamCollectKeys } from './gzip-json-stream';
 import { computeDerivedFromBlob } from '../queries/derived-agentic-metrics';
 import {
   STATS_VERSION,
@@ -71,8 +71,8 @@ const TARGET_METRIC_KEYS = new Set([
 
 /**
  * Stream-parse the gzipped server_metrics_json and collect just the metric
- * subtrees we care about. Avoids Node's 512 MB max-string-length cap that
- * `gunzipSync().toString('utf8')` hits on high-conc TP+EP rows.
+ * subtrees we care about when the full JSON exceeds the in-memory fast-path
+ * ceiling.
  */
 async function streamExtractServer(
   buffer: Buffer,
@@ -116,19 +116,13 @@ export async function computeAggregateStats(args: {
   if (args.serverBlob) {
     let server: { kvCacheUtil: number[]; prefixCacheHitRate: number[] } | null = null;
     try {
-      const json = gunzipSync(args.serverBlob).toString('utf8');
-      server = extractServerMetricSamples(json);
-    } catch (error) {
-      // ERR_STRING_TOO_LONG hits on high-conc TP+EP rows. Stream-parse to
-      // pull just the metric subtrees we need without materializing the
-      // full 500+ MB JSON string.
-      if (isStringTooLongError(error)) {
-        try {
-          server = await streamExtractServer(args.serverBlob);
-        } catch {
-          // stream fallback failed too — leave nulls
-        }
-      }
+      const json = gunzipJsonWithinLimit(args.serverBlob);
+      server =
+        json === null
+          ? await streamExtractServer(args.serverBlob)
+          : extractServerMetricSamples(json);
+    } catch {
+      // malformed blob or failed stream fallback — leave nulls
     }
     if (server) {
       kvPct = percentilesOf(server.kvCacheUtil);

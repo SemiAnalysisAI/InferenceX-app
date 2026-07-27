@@ -2,8 +2,8 @@
  * Invalidate the Next.js data cache by hitting the /api/v1/invalidate endpoint.
  *
  * Usage:
- *   pnpm admin:cache:invalidate [url]           (default: http://localhost:3000)
- *   pnpm admin:cache:invalidate https://inferencex.semianalysis.com
+ *   bun run admin:cache:invalidate [url]           (default: http://localhost:3000)
+ *   bun run admin:cache:invalidate https://inferencex.semianalysis.com
  */
 
 if (!process.env.INVALIDATE_SECRET) {

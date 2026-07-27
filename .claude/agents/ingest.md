@@ -23,7 +23,7 @@ You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into t
 cd /Users/quilicic/InferenceX-app/packages/db
 DATABASE_WRITE_URL='<provided direct non-pooled write URL>' \
 GITHUB_TOKEN=$(gh auth token) \
-pnpm exec tsx src/ingest-ci-run.ts --download <RUN_ID> SemiAnalysisAI/InferenceX
+bun src/ingest-ci-run.ts --download <RUN_ID> SemiAnalysisAI/InferenceX
 ```
 
 Then refresh the materialized view (the script's auto-refresh sometimes races):
@@ -118,7 +118,7 @@ cd /Users/quilicic/InferenceX-app/packages/db
 INGEST_RUN_ID=$RID INGEST_RUN_ATTEMPT=1 INGEST_ARTIFACTS_PATH=$TMPDIR INGEST_REPO=SemiAnalysisAI/InferenceX \
 DATABASE_WRITE_URL='<provided direct non-pooled write URL>' \
 GITHUB_TOKEN=$(gh auth token) \
-pnpm exec tsx src/ingest-ci-run.ts
+bun src/ingest-ci-run.ts
 rm -rf $TMPDIR
 ```
 
@@ -162,7 +162,7 @@ If the user doesn't specify a description, DO NOT skip the entry and DO NOT bloc
 - **Multi-attempt artifacts**: a single GitHub run can spill across runners (`h200-cw_00` + `h200-dgxc-slurm_1`); the logical-name dedup strips the `_<runner>_<attempt>` suffix.
 - **Materialized view dedup tiebreaker**: `latest_benchmarks` picks rows by `date DESC, wr.run_started_at DESC`. Backfilling old data may not surface unless dates align with the user's date picker selection.
 - **Date alignment for partial runs**: when a re-run only covers a subset of concs (`replace ONLY the points this run produces`), align dates with prior full sweep via `UPDATE benchmark_results.date = '<full-sweep-date>'` so the frontend's max-date-per-group dedup doesn't drop the older sweep.
-- **Agentic interactivity normalization (`*_intvty`)**: for `agentic_traces` runs, interactivity MUST be the slow-tail reciprocal of the ITL percentile — `*_intvty = 1/*_itl` (so `p90_intvty = 1/p90_itl`). Some harness versions emit `*_intvty` as `p(1/ITL)` instead (fast-tail — inverts percentile order, e.g. p90 shows ~`1/p10(ITL)`), which silently contaminates cross-run Pareto comparisons. The ingest mapper (`benchmark-mapper.ts`) now **derives `*_intvty` from `*_itl` and discards the artifact's value** for agentic rows, so a normal ingest is self-correcting — no manual step needed. The frontend `agenticAliases` does the same for overlay / `?unofficialrun=` rows. If you ever load agentic data through a path that bypasses the mapper, run `pnpm --filter @semianalysisai/inferencex-db db:backfill-agentic-intvty --yes` (idempotent; rewrites `mean/p75/p90/p95 _intvty = 1/_itl`) then refresh the MV + purge cache. `std_intvty` is intentionally left alone (the reciprocal of a std is meaningless; the API strips it anyway).
+- **Agentic interactivity normalization (`*_intvty`)**: for `agentic_traces` runs, interactivity MUST be the slow-tail reciprocal of the ITL percentile, so `p90_intvty = 1/p90_itl`. Some harness versions emit `p(1/ITL)` instead, which inverts percentile order and contaminates cross-run Pareto comparisons. The ingest mapper derives `*_intvty` from `*_itl` and discards the artifact value for agentic rows. The frontend `agenticAliases` does the same for overlay and `?unofficialrun=` rows. Do not ingest through a path that bypasses these normalizers; the retired one-shot backfill is no longer available. `std_intvty` stays unchanged because the reciprocal of a standard deviation is meaningless, and the API strips it.
 
 ## Process
 
@@ -180,7 +180,7 @@ This agent ingests **benchmark runs**. The HF agentic trace **datasets** (`semia
 
 ```bash
 cd packages/db && DATABASE_WRITE_URL='<direct write url>' \
-  pnpm exec tsx src/ingest-weka-dataset.ts <hf-dataset-id> \
+  bun src/ingest-weka-dataset.ts <hf-dataset-id> \
   [--label "…"] [--variant full|256k] [--description "…"] [--limit N]
 ```
 

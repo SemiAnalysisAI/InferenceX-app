@@ -7,7 +7,7 @@
  *   - Sample rows
  *
  * Usage:
- *   pnpm admin:db:verify
+ *   bun run admin:db:verify
  */
 
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';

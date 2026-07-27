@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm fmt:fix; pnpm lint:fix; true",
+            "command": "bun run fmt:fix; bun run lint:fix; true",
             "timeout": 10,
             "async": true
           }

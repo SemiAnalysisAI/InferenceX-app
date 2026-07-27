@@ -5,7 +5,7 @@
  *   - supplemental-bmk.json    (extra benchmark results)
  *
  * Usage:
- *   pnpm --filter *inferencex-db db:ingest:supplemental
+ *   bun run --cwd packages/db db:ingest:supplemental
  */
 
 import fs from 'fs';
@@ -357,7 +357,7 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== db:ingest:supplemental complete ===');
-  console.log('  Invalidate API cache: pnpm admin:cache:invalidate');
+  console.log('  Invalidate API cache: bun run admin:cache:invalidate');
 }
 
 main()

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "inferencex": {
-      "command": "pnpm",
-      "args": ["--silent", "mcp"]
+      "command": "bun",
+      "args": ["run", "mcp"]
     }
   }
 }

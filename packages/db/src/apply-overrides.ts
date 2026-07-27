@@ -7,8 +7,8 @@
  * Previews changes (read-only), then confirms before writing.
  *
  * Usage:
- *   pnpm db:apply-overrides            # preview + confirm
- *   pnpm db:apply-overrides --yes      # skip confirmation
+ *   bun run db:apply-overrides            # preview + confirm
+ *   bun run db:apply-overrides --yes      # skip confirmation
  *
  * Commits to run-overrides.ts are applied to production automatically after merge.
  * Use this command directly only for local preview or manual recovery.
@@ -331,7 +331,7 @@ async function main(): Promise<void> {
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
-  console.log('  Manual runs: invalidate the API cache with pnpm admin:cache:invalidate');
+  console.log('  Manual runs: invalidate the API cache with bun run admin:cache:invalidate');
   console.log('  Merged run-overrides changes: production cache refresh is handled by CI.');
 }
 

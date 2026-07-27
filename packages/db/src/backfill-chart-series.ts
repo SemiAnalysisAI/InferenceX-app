@@ -16,7 +16,7 @@
  *     path uses, so behavior cannot drift.
  *
  * Usage:
- *   pnpm --filter @semianalysisai/inferencex-db db:backfill-chart-series
+ *   bun run --cwd packages/db db:backfill-chart-series
  *     [--limit N]   only process the first N candidate rows
  *     [--force]     recompute every row, even if version already matches
  *     [--yes]       skip the confirmation prompt

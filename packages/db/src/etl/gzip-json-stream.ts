@@ -1,15 +1,14 @@
 /**
- * Shared stream-parse helpers for gzipped server-metrics blobs.
+ * Shared bounded and streaming parsers for gzipped server-metrics blobs.
  *
- * `gunzipSync(buffer).toString('utf8')` trips Node's 512 MB max-string-length
- * cap on high-conc TP+EP rows, so the compute-* ETL helpers fall back to a
- * stream-json pipeline that collects only the top-level subtrees they need.
- * Both the fast-path error detection and the pipeline itself live here so
- * chart-series and aggregate-stats stay byte-identical in how they parse.
+ * High-conc TP+EP rows can exceed 500 MB when decompressed. The bounded
+ * synchronous helper preserves the historical Node string-size guard when
+ * these scripts run under runtimes with larger string limits, while the
+ * stream-json pipeline collects only the top-level subtrees callers need.
  */
 
 import { Readable } from 'node:stream';
-import { createGunzip } from 'node:zlib';
+import { createGunzip, gunzipSync } from 'node:zlib';
 
 import { chain } from 'stream-chain';
 
@@ -17,15 +16,33 @@ import { parser } from 'stream-json';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
 
-/**
- * True when `error` is Node's max-string-length failure (`ERR_STRING_TOO_LONG`
- * or the older message-only variant) — the signal to switch from
- * `gunzipSync().toString()` to the streaming parser.
- */
-export function isStringTooLongError(error: unknown): boolean {
+/** Bound peak memory while retaining the fast path for ordinary metric blobs. */
+const MAX_IN_MEMORY_JSON_BYTES = 128 * 1024 * 1024;
+
+function isSizeLimitError(error: unknown): boolean {
   const code = error && (error as NodeJS.ErrnoException).code;
   const msg = error instanceof Error ? error.message : String(error);
-  return code === 'ERR_STRING_TOO_LONG' || msg.includes('longer than 0x1fffffe8');
+  return (
+    code === 'ERR_BUFFER_TOO_LARGE' ||
+    code === 'ERR_STRING_TOO_LONG' ||
+    msg.includes('longer than 0x1fffffe8')
+  );
+}
+
+/**
+ * Gunzip a JSON blob only while its output stays within the in-memory fast-path
+ * ceiling. Returns null when the caller must use the streaming parser instead.
+ */
+export function gunzipJsonWithinLimit(
+  buffer: Buffer,
+  maxOutputLength = MAX_IN_MEMORY_JSON_BYTES,
+): string | null {
+  try {
+    return gunzipSync(buffer, { maxOutputLength }).toString('utf8');
+  } catch (error) {
+    if (isSizeLimitError(error)) return null;
+    throw error;
+  }
 }
 
 /**
