@@ -363,25 +363,28 @@ function ThroughputCalculatorInner() {
   const prevAvailableKeyRef = useRef<string>('');
   const prevOverlayKeyRef = useRef<string>('');
 
-  // Reset visible GPUs when the OFFICIAL available set changes (model, sequence,
-  // or precision change). Keyed on `availableHwKeys` rather than `legendHwKeys`
-  // on purpose: an unofficial run is fetched separately and usually lands after
-  // the benchmarks, so keying on the merged list would let a late overlay
-  // arrival — or a run dismissal — wipe GPU filters the user had already set.
+  // Reset visible GPUs on a user-driven selection change. The key is the
+  // selection itself PLUS the official hardware list — the selection so an
+  // overlay-only model/sequence (where the official list is empty and stays
+  // empty) still reseeds, the official list so anything else that changes which
+  // GPUs have data still reseeds. Deliberately NOT keyed on the merged list: an
+  // unofficial run is fetched separately and usually lands after the
+  // benchmarks, so a late arrival — or a run dismissal — would otherwise wipe
+  // GPU filters the user had already set.
+  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+    .toSorted()
+    .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
   useEffect(() => {
     // Nothing to seed from yet (first load, before either source has resolved).
-    // Note this guards on the MERGED list: an empty official list is a real
-    // state, not just a loading one — it is exactly the "this model/sequence
-    // exists only in the unofficial run" case — and bailing on it would leave
-    // stale official keys in `visibleHwKeys`, which then throw off the
-    // solo/show-all arithmetic in `toggleGpuVisibility`.
+    // Guards on the MERGED list: an empty official list is a real state, not
+    // just a loading one, and bailing on it would leave stale official keys in
+    // `visibleHwKeys` and throw off the solo/show-all arithmetic below.
     if (legendHwKeys.length === 0) return;
-    const key = [...availableHwKeys].toSorted().join(',');
-    if (key !== prevAvailableKeyRef.current) {
-      prevAvailableKeyRef.current = key;
+    if (selectionKey !== prevAvailableKeyRef.current) {
+      prevAvailableKeyRef.current = selectionKey;
       setVisibleHwKeys(new Set(legendHwKeys));
     }
-  }, [availableHwKeys, legendHwKeys]);
+  }, [selectionKey, legendHwKeys]);
 
   // Overlay hardware arriving or leaving is additive: newly available overlay
   // GPUs start visible, ones that are gone stop being tracked, and every other
@@ -404,9 +407,11 @@ function ThroughputCalculatorInner() {
       const next = new Set(cur);
       added.forEach((k) => next.add(k));
       removed.forEach((k) => next.delete(k));
-      // Never strand the user with an empty chart: if the only visible hardware
-      // was overlay-only and the run just went away, fall back to everything.
-      if (next.size === 0) return new Set(availableHwKeys);
+      // Never strand the user with an empty chart. Falls back to everything
+      // that still has data, official AND overlay — on an overlay-only
+      // selection the official list is empty, so falling back to it would blank
+      // the chart while overlay bars were still available.
+      if (next.size === 0) return new Set([...availableHwKeys, ...overlayAvailableHwKeys]);
       return next;
     });
   }, [overlayAvailableHwKeys, availableHwKeys]);

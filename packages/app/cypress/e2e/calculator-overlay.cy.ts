@@ -13,12 +13,15 @@
  */
 import {
   ALT_SEQUENCE_LABEL,
+  interceptCalculatorMultiRunOverlay,
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
   OVERLAY_ONLY_SEQUENCE_LABEL,
   OVERLAY_RUN_ID,
   SECOND_OFFICIAL_HARDWARE,
+  SECOND_OVERLAY_RUN_BRANCH,
+  SECOND_OVERLAY_RUN_ID,
 } from '../support/overlay-fixtures';
 
 /** Official data covers B300 + B200; the run adds a B300 bar and an MI355X bar. */
@@ -193,6 +196,40 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(BARS).should('have.length', 1);
       cy.get(Y_TICKS).should('contain.text', 'B300');
       cy.get(Y_TICKS).should('not.contain.text', OVERLAY_ONLY_HARDWARE.toUpperCase());
+    });
+  });
+
+  describe('dismissing one of several runs on an overlay-only sequence', () => {
+    it('keeps the surviving run visible instead of blanking the chart', () => {
+      // Regression: when the additive overlay effect cleared the last visible
+      // key it fell back to the OFFICIAL hardware list — which is empty on an
+      // overlay-only sequence, so the chart went blank even though the other
+      // run still had data. The official-list reset cannot recover it either:
+      // that list stays empty across the change, so it never reseeds.
+      interceptCalculatorMultiRunOverlay();
+      cy.visit(
+        `/calculator?unofficialruns=${OVERLAY_RUN_ID},${SECOND_OVERLAY_RUN_ID}` +
+          `&i_seq=${encodeURIComponent('1k/8k')}`,
+        {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        },
+      );
+      cy.wait('@unofficialRun');
+
+      // One bar per run, no official data on this sequence.
+      cy.get(BARS).should('have.length', 2);
+
+      // Solo the GPU that belongs to the first run.
+      cy.get('.sidebar-legend label').contains('B300').click();
+      cy.get(BARS).should('have.length', 1);
+
+      // Dismissing that run empties the visible set — the fallback has to reach
+      // for the surviving run's hardware, not the (empty) official list.
+      cy.get(`[aria-label="Dismiss ${OVERLAY_RUN_BRANCH}"]`).click();
+      cy.get(BARS).should('have.length', 1);
+      cy.get(Y_TICKS).should('contain.text', SECOND_OVERLAY_RUN_BRANCH);
     });
   });
 
