@@ -1,0 +1,381 @@
+---
+title: 'Vera Rubin NVL72 对比 GB200 NVL72？推理 TCO 与架构分析'
+subtitle: 'Rubin 基于 LUT 的 Tensor Core、Feynman、机架级架构、每兆瓦性能、每美元性能、软件改进、Rubin 公开软件栈、PyTorch、vLLM、OpenAI Triton'
+date: '2026-07-23'
+publishDate: '2026-07-23'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - nvidia
+  - rubin
+  - gb200
+  - gb300
+  - deepseek
+  - trtllm
+  - dynamo
+---
+
+_本文最初于 2026 年 7 月 23 日发布在 [SemiAnalysis 通讯](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference)。_
+
+[Vera Rubin NVL72 是 Nvidia 机架级 Oberon 架构的第二代产品，其推理性能的提升来自极致的软硬件协同设计（extreme co-design）](https://newsletter.semianalysis.com/p/vera-rubin-extreme-co-design-an-evolution)。工程样机的早期结果令人鼓舞。运行 DeepSeek R1 时，Vera Rubin NVL72 相比当前的 GB200 NVL72 可提供 5.4 倍的每兆瓦性能和 5 倍的每美元性能；若与 2025 年早期 bringup 阶段的 GB200 NVL72 相比，差距还要更大。Vera Rubin 目前也仍处于 bringup 早期，因此我们预计这一差距会继续拉大。随着软件的成熟，Rubin 的推理性能将持续提升——这与我们在 [InferenceX 基准测试](https://github.com/SemiAnalysisAI/InferenceX)中为 Blackwell 展示的规律如出一辙，而 Rubin 前面还有很长的提升空间。
+
+[Nvidia 最近还随 CUDA 13.4 发布了首个公开版本的 Rubin (SM_107) 软件栈](https://docs.nvidia.com/cuda/developer-preview/13.4/cuda-toolkit-release-notes/index.html)，并已向 PyTorch、vLLM 和 OpenAI Triton Compiler 上游提交了 Rubin 相关 PR。Blackwell 无法复用 Hopper 的 WGMMA kernel，而 Rubin 可以复用 Blackwell 的 kernel，这让软件 bringup 过程顺畅得多。要达到理论极限（speed of light，SOL）性能，工程师仍需针对性地调优和重写 kernel；但对于追求上市速度的团队来说，Blackwell kernel 可以直接复用。我们还将解析 Rubin 全新的 3-bit 可编程 LUT tensor core。
+
+NVIDIA 也已在 GitHub 上披露 Feynman 为 SM_140。[与 Blackwell 到 Rubin 不同，Rubin 到 Feynman 在 kernel 层面将是一次复杂得多的迁移。](https://semianalysis.com/accelerator-hbm-model/)
+
+_相关阅读：[Vera Rubin – 极致协同设计：从 Grace Blackwell Oberon 演进而来](https://newsletter.semianalysis.com/p/vera-rubin-extreme-co-design-an-evolution)_
+
+目前 VR NVL72 的早期指标均来自 CoreWeave，我们尚未独立验证。Nvidia 已承诺在 2026 自然年第三季度前向 InferenceX 提交可验证的数据。Google 预计将在未来几个月内提交 TPUv7 结果，AMD 也已承诺提交 MI455X UALoE72。等这些数据落地后，整个生态系统将获得一份跨系统的客观对比。
+
+在本文中，我们将对照多条基线来拆解 Nvidia 的 Rubin 性能宣称，展示 Rubin 明显领先 Blackwell 的地方，以及领先幅度较薄弱的地方。我们还将基于已有的 Rubin 总拥有成本（TCO）估算来分析其每 TCO 性能。Rubin 及众多其他系统的 TCO 数据来自我们的 [AI TCO 模型，该模型追踪各类 AI 芯片的总拥有成本，涵盖资本开支（capex）、运营开支（opex）及其他各项费用。](https://semianalysis.com/ai-cloud-tco-model/)我们还使用[数据中心模型中的全口径公用电力配置估算（All-in Utility Provisioned Power Estimates）](https://semianalysis.com/datacenter-industry-model/)来考察每瓦性能。
+
+最后，我们将呈现 [VR NVL72 逐组件构建的物料清单（BoM）。这部分内容收录于即将发布的 SemiAnalysis 物料清单（BoM）模型。](https://semianalysis.com/vr-nvl72-model/)
+
+Rubin Oberon NVL72 相比 Blackwell Oberon NVL72 的另一优势在于量产爬坡周期会快得多。这得益于 Rubin 更简洁的无线缆计算托盘设计，以及 Nvidia 在部署机架级铜背板上积累的经验——他们为解决 Blackwell 铜背板的问题投入了大量精力。[我们的加速器模型逐季度追踪 Rubin 在封装层面和机架层面的出货量。](https://semianalysis.com/accelerator-hbm-model/)
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/vr-nvl72-bom-buildup.png"
+  alt="VR NVL72 机架逐组件构建的物料清单（BoM）"
+  caption="来源：SemiAnalysis VR NVL72 BoM 模型"
+/>
+
+## Rubin 芯片级微架构特性简析
+
+要对 Rubin 微架构做完整拆解，需要等到我们拿到 Rubin 系统的 ssh 访问权限，才能运行[类似我们首次分析 Blackwell 时所做的基准测试。](https://newsletter.semianalysis.com/p/dissecting-nvidia-blackwell-tensor)不过，目前仍有一些值得展开的有趣观察。
+
+我们预计 Rubin 的 bringup 会比 Hopper 到 Blackwell 的迁移顺畅得多——当年工程师光是把 kernel 移植到 Blackwell 就耗费了大量精力。这种顺畅源于 Rubin 能够直接运行 Blackwell SM100 系列的 kernel，覆盖 DeepGEMM、FlashMLA、CUTLASS 等所有重要的 kernel 库。而从 Hopper 迁移到 Blackwell 意味着从零重写 kernel：Hopper 的 kernel 在 Blackwell 上完全无法运行。
+
+复用 Blackwell SM100 kernel 意味着明确的上市时间优势；但要达到理论极限（SOL）性能，工程师仍需专门针对 Rubin 架构调优和重写 kernel——好在 kernel 复用为他们腾出了更多时间去专注这类调优。
+
+谈到架构细节，Rubin 的 SMEM 从 Blackwell 的 228 KiB 增加到 328 KiB。默认 SMEM 容量仍为 228 KiB，但 [Rubin 提供了一种超大共享内存模式](https://github.com/triton-lang/triton/blob/24fcd59d53e42c7fe7b696c235d12ce039af1015/third_party/nvidia/backend/driver.c#L984-L993)，可将其提升至 328 KiB。此外，TMEM 从 Blackwell 的 256 KiB 增加到 288 KiB，列数从 512 增至 576。新增的列可用于暂存 block scale factor，同时让累加器的 TMEM 区域与之保持独立。[这大幅简化了块缩放（block-scaled）kernel 的逻辑](https://x.com/ReubenConducts/status/2078514481261400109)：kernel 作者不必再小心翼翼地做 MMA 矩阵加载与 block scaling factor 加载的流水线重叠。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-smem-triton-pr.png"
+  alt="Triton 驱动代码展示 Rubin 的超大共享内存模式，可将 SMEM 容量提升至 328 KiB"
+  caption="来源：OpenAI"
+/>
+
+[来源](https://github.com/triton-lang/triton/pull/10936)
+
+Rubin 的 TMA 现已支持内联描述符更新（inline descriptor update）。它的用途非常广泛。以 MoE 层为例，每个 expert 都是一个独立的权重矩阵，位于 HBM 中各自的地址上，因此每次切换 expert 时 TMA 描述符都要指向新位置。在 Blackwell 上，这意味着要在内存中重写描述符并在下一次加载前同步。而在 Rubin 上，每个 expert 的偏移量以内联方式传入 TMA 指令，一个描述符即可覆盖所有 expert，中间无需任何内存内重写。这消除了 token 分发（dispatch）期间的开销，并提升了小 batch 下的解码速度。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-tma-inline-descriptor.png"
+  alt="NVIDIA 示意图：Rubin TMA 内联描述符更新，消除了 expert 权重加载之间的内存内描述符重写"
+  caption="来源：Nvidia"
+/>
+
+[来源](https://developer.nvidia.com/blog/inside-nvidia-rubin-gpu-architecture-powering-the-era-of-agentic-ai/)
+
+内联 TMA 描述符更新对应 [ISA 特性 `.override` 限定符](https://docs.nvidia.com/cuda/developer-preview/13.4/parallel-thread-execution/index.html#data-movement-and-conversion-instructions-overriding-tensor-property-value)。TMA 指令需要一个描述布局与格式元数据的 `tensorMap` 对象。借助 `.override` 限定符，批量异步拷贝指令可以将 `tensorMap` 对象当作模板复用，仅替换其中的某些元数据字段（例如 stride）。在 MoE 场景中，各 expert 权重的形状、数据类型和属性完全一致，kernel 作者只需覆写全局地址，就能避免在加载不同 expert 时重复创建或替换 `tensorMap` 对象。
+
+Rubin 将每 SM 每时钟周期的 BF16/FP16 指数运算吞吐量再次翻倍，这有助于在 attention 中将 Tensor Core 计算与 softmax 重叠。FP32 吞吐量与 Blackwell Ultra 持平。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-exp-throughput.png"
+  alt="NVIDIA 图表：Rubin 将每 SM 每时钟周期的 BF16/FP16 指数运算吞吐量相比 Blackwell 翻倍"
+  caption="来源：Nvidia"
+/>
+
+Blackwell 的 NVFP4/MXFP4 Tensor Core 只能接受 UE4M3/UE8M0 格式的 block scale factor，而 Rubin Tensor Core 现在还能接受 UE5M3 8-bit block scale factor。这一新增的块缩放格式带来更高的灵活性，且凭借更宽的动态范围，在某些情况下能降低量化误差。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-ue5m3-block-scale.png"
+  alt="NVIDIA PTX 表格：Rubin Tensor Core 在 UE4M3/UE8M0 之外新增支持 UE5M3 8-bit block scale factor 格式"
+  caption="来源：NVIDIA PTX"
+/>
+
+同样值得注意的是，通过使用计数写入（counted writes），SM 驱动的 NVLink 通信延迟得到了改善——它减少了 GPU 之间经由铜背板传输数据所需的往返消息数量。这一点意义重大，因为 Blackwell 的 NVLink 延迟是 TPU 和 Trainium 的数倍。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-nvlink-counted-writes.png"
+  alt="NVIDIA 示意图：计数写入（counted writes）减少了 Rubin 上 SM 驱动 NVLink 通信的往返消息数量"
+  caption="来源：Nvidia"
+/>
+
+Rubin 的 Tensor Core 在 FP8 和 FP4 上的吞吐量是 Blackwell 的两倍。驱动这一提升的关键改动是将 k 维度翻倍——理论上这意味着一次 GEMM 只需一半的时钟周期即可完成。此外，Blackwell Ultra 上那些别扭的 K=96/3xFP4 指令依然保留，但新增了 K=128 的变体。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-tensor-core-k-dim.png"
+  alt="NVIDIA 表格：Rubin Tensor Core 将 K 维度翻倍至 128，使 FP8 和 FP4 吞吐量翻倍"
+  caption="来源：Nvidia"
+/>
+
+在 Blackwell 上，PDL 只允许 grid 级别的重叠：依赖方 grid 必须等前一个 kernel 的所有 threadblock 全部完成后才能启动。这可以实现一定程度的重叠，掩盖 kernel 之间的收尾与启动时间，但远达不到当下流行的 megakernel 作者所追求的极细粒度重叠。在 Rubin 上，重叠粒度进一步细化：依赖方 kernel 可以改为在 threadblock 级别与前一个 kernel 同步。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-pdl-threadblock-overlap.png"
+  alt="NVIDIA 示意图：Rubin 的程序化依赖启动（PDL）在 threadblock 级别而非 grid 级别同步"
+  caption="来源：Nvidia"
+/>
+
+借助 3D 堆叠的 HBM4 内存，Rubin 的全局内存带宽比 Blackwell Ultra 高 2.8 倍。不过在内存系统延迟方面，Rubin 相比 Blackwell 大概率没有改进。[我们的加速器与 HBM 模型对 Rubin 所用内存容量估算及供应商有完整拆解。](https://semianalysis.com/accelerator-hbm-model/)
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-hbm4-bandwidth.png"
+  alt="NVIDIA 图表：Rubin 的 3D 堆叠 HBM4 提供比 Blackwell Ultra 高 2.8 倍的全局内存带宽"
+  caption="来源：Nvidia"
+/>
+
+Rubin 为激活值（activation）新增了 2:4 稀疏支持。每四个值为一组，保留两个、置零两个。由于模式规则固定，Tensor Core 知道保留值的位置，跳过其余部分，以两倍速率执行 MMA。一个小的元数据字段记录哪些槽位被保留。
+
+早在 Ampere 时代，Nvidia 就为权重提供了 2:4 稀疏，但没人使用，因为那需要对模型剪枝并重新训练。Rubin 将其应用于运行时的激活值，无需重新训练。在 attention 中，QK^T 以稠密方式计算，随后分数在移出 Tensor Memory 时被压缩。Softmax 只处理保留下来的值，接下来与 V 的 GEMM 以稀疏方式执行。输出保持稠密，因此模型的其他部分无需任何改动。该机制同样适用于 MLP 激活值。
+
+Nvidia 尚未公布任何精度数据，而在 softmax 之前丢弃一半的 attention 分数显然不是无代价的。CoreWeave 的 DeepSeek R1 结果似乎也没有启用它——这使其成为又一个「硅片已就绪、但尚无调优 kernel 跟进」的 Rubin 特性。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-activation-sparsity.png"
+  alt="NVIDIA 示意图：Rubin 的 2:4 激活稀疏，每四个值保留两个，MMA 以两倍速率执行"
+  caption="来源：Nvidia"
+/>
+
+### Rubin SM107 Tensor Core 的查找表权重解压
+
+Rubin 新增了 LUT B——一种从查找表解压权重操作数的 Tensor Core MMA 模式。在该模式下，B 操作数是一个由索引组成的压缩矩阵。在标准推理 GEMM 中，B 操作数存放权重；而这里权重值存放在 Tensor Memory 的查找表中。Tensor Core 读取每个索引，并在 MMA 内部重建权重值，不存在独立的反量化（dequantization）步骤。查表完成后，乘法以 FP8 执行。
+
+在 LUT B 中，每个权重位置存储的是一个 3-bit 索引，而非完整数值。索引在该权重所属 8×64 块共享的查找表中选取八个 E4M3 值之一。例如，若存储的索引为 5，Tensor Core 就取该块查找表的第 5 项作为权重。查表发生在 MMA 内部，kernel 完全不需要构建一个解压后的权重矩阵。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-lut-mma-ptx.png"
+  alt="NVIDIA PTX ISA 9.4 文档图 280：LUT B 压缩权重 MMA 数据通路"
+  caption="来源：图 280，Nvidia"
+/>
+
+[来源](https://docs.nvidia.com/cuda/developer-preview/13.4/pdf/ptx_isa_9.4.pdf)
+
+查找表（LUT）不必遵循常规均匀网格或浮点网格的间距。量化算法因此可以在权重密集聚集处布置更多取值，为长尾使用不均匀间距，或在正负权重分布不同时选择非对称码本（codebook）。
+
+这种灵活性带来了每存储位（bit）精度更优的可能。Rubin LUT B 的可用码字比 FP4 少，但它可以把码字放在特定权重组最需要的位置，而不必接受 E2M1 的固定比例。然而它并不天然比 MXFP4 或 NVFP4 更精确：一个码本由 512 个权重共享，而 NVFP4 以小得多的 16 个一组自适应调整缩放。最终效果取决于码本拟合算法、校准数据、量化感知训练（quantization-aware training），以及敏感层是否保留更高精度。
+
+每个索引 3 bit，查找表有 8 个表项，每项一个字节——参考 kernel 中为 E4M3 8-bit 浮点。折算下来每权重 3.125 bit：索引占 3 bit，外加 64 bit 码本分摊到 512 个权重上。码本与索引一同存放在 HBM 中，因此 3.125 bit/权重就是完整的存储占用。
+
+该指令将压缩权重加载到 collector buffer 中。Tensor Core 可以将其驻留在那里，在一连串激活 tile 之间复用，这是一种权重驻留（weight stationary）模式。该模式也有限制：不支持 B 矩阵转置。
+
+块缩放格式 NVFP4 和 MXFP 同样在 MMA 内部解压，但它们对每块应用单一的均匀缩放，而非码本。AWQ 等软件方案通过在矩阵乘法之前运行独立的反量化步骤来实现低位宽，而 Rubin 是 NVIDIA 首个在 MMA 内部重建非均匀码本的 Tensor Core 输入格式。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-lut-formats-comparison.png"
+  alt="SemiAnalysis 对比：块缩放格式与 Rubin 3.125-bit 查找表格式的每权重存储位数"
+  caption="来源：SemiAnalysis"
+/>
+
+更低的位率减少了权重所需的 HBM 容量，也减少了 GPU 读取每个权重的字节数。在小 batch 下，权重带宽是解码步骤的瓶颈，每权重字节数减少便能直接提升解码吞吐量。在相同位数下，非均匀码本的精度保持能力也优于均匀舍入。该特性对能效同样有益：每 flop 需要经过内存系统搬运的位数变少了。
+
+以 Kimi K3 2.8T 为例：按每权重约 4.25 bit 计，MXFP4 需存储 2.8e12 x 4.25 / 8 = 约 1,487.5 GB（此处 GB = 1e9 字节）。按每权重 3.125 bit 计，Rubin 查找表格式需存储 2.8e12 x 3.125 / 8 = 约 1,094 GB（约 1.09 TB），两者相差约 393.5 GB。这些数字仅覆盖原始权重本身，不包括 KV cache、激活值及任何并行复制。按每个 Rubin 封装 288 GB HBM4 计算，仅权重就需要约 6 个 NVFP4 封装，而新的 Rubin 格式只需约 4 个。
+
+## Feynman 架构抢先看
+
+从 Blackwell (SM100)/Blackwell Ultra 到 Rubin (SM107)，微架构层面的跨度相对较小，因此 Rubin 可以被视为 Blackwell 的增强版（kicker）架构。相比之下，Feynman (sm_140) 是一个全新的架构家族。这意味着从 Rubin 到 Feynman 需要重写大量 kernel，类似于当年从 Hopper WGMMA 到 Blackwell tcgen05 的过程。[我们的加速器与 HBM 模型提供 Feynman 逐季度出货量估算的完整拆解。](https://semianalysis.com/accelerator-hbm-model/)
+
+Feynman 的 3D 堆叠将与 AMD 自 MI300X CDNA3 以来一直采用的 3D 堆叠方案类似。
+
+Feynman 架构的新特性之一是包含稀疏感知的数据搬运操作（sparsity aware data movement ops）。它们可用于稀疏 GEMM，通过避免无意义的加载、存储和 FMA 来提升性能。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/feynman-sparsity-data-movement.png"
+  alt="幻灯片：Feynman 面向稀疏 GEMM 的稀疏感知数据搬运操作"
+/>
+
+## CoreWeave VR NVL72 结果的细微之处
+
+昨天，[CoreWeave 发布了他们对 Vera Rubin NVL72 的推理基准测试结果](https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell)，以每单位功耗（MW）的性能（tokens/sec）为单位。我们将拆解其数据中的细微之处，并以我们自己的 InferenceX 2026 年 7 月结果为基线，对比其结果与 Blackwell 的性能。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/zh/inference">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-rubin-10x-per-mw.png"
+  alt="CoreWeave 图表：在约 150 tok/s/user 下，Vera Rubin NVL72 每兆瓦 token 数是 GB200 NVL72 的 10 倍"
+  caption="来源：CoreWeave"
+/>
+
+CoreWeave-Nvidia 图表上第一个值得注意的宣称是：在约 150 tok/s/user 的相同交互性（iso-interactivity）下，VR NVL72 的每兆瓦 token 吞吐量比 GB200 NVL72 高 10 倍。这一交互性比当今前沿模型的「快速模式」还要快约 50%。
+
+关于他们的图表有三点说明。基准测试为单轮对话，输入 8k、输出 1k；y 轴是每兆瓦的输出 token 吞吐量，而非总吞吐量；其功耗数字涵盖 **prefill 和 decode 两类 GPU**，尽管只统计输出 token。InferenceX 是以**仅 decode GPU 的功耗**来衡量输出吞吐量的，因此为了本次对比，我们对自己的数据做了重新归一化以对齐口径。
+
+需要指出的是，CoreWeave 声称在其 GB200 NVL72 基线和 Rubin NVL72 性能结果上都启用了以下全部推理优化，包括但不限于：
+
+- NVFP4 精度
+- 投机解码（使用 MTP）
+- 分离式服务（使用 Dynamo）
+- 宽专家并行（Wide Expert Parallelism）
+- 基于 TensorRT-LLM
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-optimizations.png"
+  alt="CoreWeave 列出的在 GB200 NVL72 与 Vera Rubin NVL72 上均启用的推理优化：NVFP4、MTP 投机解码、Dynamo 分离式服务、宽专家并行，基于 TensorRT-LLM"
+  caption="来源：CoreWeave"
+/>
+
+上述结果似乎表明 Rubin 一上市就对 Blackwell 建立了强劲的性能优势。不过，其中有几处细节值得展开。
+
+首先，细心的读者会注意到 CoreWeave 是拿 Rubin 与 **GB200 NVL72 的 2025 年基线**对比的。从某种角度看，与 GB200 NVL72 生命周期早期的性能对比是公平的，因为 Rubin 的性能同样预计会从其生命周期的早期阶段大幅提升。我们的分析也会使用 2025 年的 GB200 NVL72 早期性能结果，但我们还会对比 GB200 NVL72 到 2026 年的表现，以及当前最值得对比的 GPU：**GB300 NVL72**。我们将直接用 2026 年初的 GB300 NVL72 性能，与 Rubin 处于类似生命周期早期的性能进行对比。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-2025-baseline.png"
+  alt="CoreWeave 脚注：GB200 NVL72 对比基线测量于 2025 年"
+  caption="来源：CoreWeave"
+/>
+
+CoreWeave 性能结果的第二个细节是他们使用的是 DeepSeek R1 671B——一个如今已不再广泛使用的模型。人们或许更希望 CoreWeave 使用 GLM5.2、Kimi K2.5、Qwen3.5 或 DeepSeek V4 这类更现代的模型，若能用上 Kimi K3 或 Qwen3.8 就更好了——两者都[即将登陆 InferenceX](https://inferencemax.ai/)！至少 CoreWeave 没有[像 AMD 给 MI455X UALoE72 测性能那样，在 2026 年夏天还在用 GPTOSS 120B](https://github.com/ROCm/aiter/pull/3676)。我们预计，等 Nvidia 于 2026 自然年第三季度开始在 InferenceX 上用更现代的模型架构对 Rubin 做基准测试后，用旧模型测试制造的迷雾将被驱散。
+
+有趣的是，CoreWeave 选择 DeepSeek R1 671B 在理论上反而更有利于 Blackwell 基线，而非 Rubin。Rubin 的主要优势在于更大的 HBM 容量、更大的 CPU DRAM 容量和更高的 HBM 带宽，这意味着 Rubin 更适合 Fable 5、Gemini Pro、Kimi K3、Qwen3.8 2.4T 这类多万亿参数模型。
+
+第三点值得注意的是，CoreWeave 只使用了单轮 8k/1k 输入/输出 token。理论上，Agentic Coding 这类多轮长上下文工作负载在 Rubin 上应有更好表现（得益于其更大的 HBM 容量和带宽），但简单的单轮基准测试无法体现这一点。[我们即将推出的 AgentX 基准测试场景由 Weka、LMCache、vLLM/SGLang 社区、Nvidia、AMD 及社区众多伙伴合作打造，将提供真实的 agentic 工作负载来评测推理性能。](https://inferencex.semianalysis.com/datasets/cc-traces-weka-062126)我们鼓励所有人采用这一推理基准测试！
+
+最后，我们注意到 CoreWeave 的测试是在一台没有 scale-out 网络的预量产机架上完成的。具体来说，CoreWeave 使用的是 Dell 工程样机（Engineering Sample，ES）机架。我们仍然认为这些结果有价值：它们启用了宽 EP 和 PD 分离，用到了 NVL72 的 scale-up 背板，证明其工作良好。这块背板在 GB200 NVL72 Oberon 爬坡期间曾面临诸多可靠性挑战，[我们在加速器模型中有过记录。](https://semianalysis.com/accelerator-hbm-model/)
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-vr-nvl72-es-rack.jpg"
+  alt="CoreWeave 的 Dell 工程样机 Vera Rubin NVL72 机架，未接 scale-out 网络布线"
+  caption="来源：CoreWeave"
+/>
+
+[来源](https://x.com/CoreWeave/status/2061146723200962763/photo/2)
+
+### Rubin 对比 Blackwell：每兆瓦性能
+
+Nvidia 选择主打的指标是「每全口径公用兆瓦的每秒输出 token 数」，统计系统内的所有 GPU。为了实现同口径对比，我们将自己的 InferenceX 基准测试数据重新归一化到同样的全 GPU 基准上。下面，我们将 VR NVL72 与我们 2026 年 7 月的 GB200、GB300 官方基准测试结果以及 CoreWeave 的 2025 年 GB200 基线放在一起对比。
+
+Nvidia 图表中那些抢眼的倍数全部来自 2025 年基线。我们认为对比基准测试数据时应使用同一时期的数字，因此 2026 年 7 月的 GB200 和 GB300 基准测试才是更有参考价值的对比。
+
+理论上，Vera Rubin 的数据中心 PUE 可以更低，[因为 Vera Rubin 可以在定制数据中心中以 45 摄氏度的冷却液温度运行，无需冷水机组](https://blogs.nvidia.com/blog/liquid-cooling-ai-factories/)。不过在我们的对比中，考虑到大多数数据中心的设计要兼容多种系统，我们对所有 DLC 液冷芯片采用相同的 PUE。
+
+以下 Pareto 曲线以交互性为横轴，绘制每全 GPU 兆瓦的输出吞吐量。每条线终止于其配方（recipe）前沿的尽头。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-per-mw-pareto.png"
+  alt="Pareto 曲线：Vera Rubin NVL72、GB200 NVL72 与 GB300 NVL72（2026 年 7 月基线）及 CoreWeave 2025 年 GB200 基线在 DeepSeek R1 8k/1k 上的每全口径公用兆瓦输出 token 吞吐量对比交互性"
+  caption="来源：SemiAnalysis"
+/>
+
+接下来我们以表格形式提供同一组数据。当单元格标注 "impossible" 时，表示该交互性已超出该配方的前沿——该配置根本无法以这一速度服务该工作负载。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-per-mw-table.png"
+  alt="表格：Vera Rubin NVL72 与 Blackwell 各配方在固定交互性下的每全口径公用兆瓦每秒输出 token 数，前沿之外的单元格标注 impossible"
+  caption="来源：SemiAnalysis"
+/>
+
+下面是同一前沿的柱状图版本，覆盖 100 到 300 tok/s/user 区间。四个配方的数据都覆盖到 250 tok/s/user，只有 Rubin 和 GB300 达到 300 tok/s/user。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-per-mw-bars.png"
+  alt="柱状图：Vera Rubin NVL72、GB200 NVL72、GB300 NVL72 及 CoreWeave 2025 年 GB200 基线在 100 至 300 tok/s/user 区间的每全口径公用兆瓦输出 token 吞吐量"
+/>
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/per-mw-bars-legend.png"
+  alt="图例：GB200 NVL72（2026 年 7 月）、GB300 NVL72（2026 年 7 月）、CoreWeave GB200（2025 年）、CoreWeave Vera Rubin（2026 年 7 月）"
+  caption="来源：SemiAnalysis"
+/>
+
+先来对比 Rubin 与 2026 年 7 月的 GB300 NVL72 基线。Rubin 的领先幅度在低交互性时最小，并在交互性曲线的中段持续扩大。在 100 tok/s/user 及以下，Rubin 的吞吐量接近 Blackwell 的 2 倍；到 200 tok/s/user 附近扩大至约 4 倍，达到峰值；随后差距又开始收窄。头条式的「300 tok/s/user 下相比 GB300 5.4 倍性能提升」并非 Rubin 进一步拉开差距，而是 GB300 在其前沿上勉强可行的最后一个点上运行，导致比值急剧膨胀。GB200 则完全达不到 300 tok/s/user。在高交互性下，batch 缩小时 Blackwell 的单 GPU 吞吐量迅速下坠，而 Rubin 仍处于其前沿较平缓的部分。
+
+Rubin 与 2025 年 GB200 NVL72 基线的对比则不同：最大领先出现在曲线中段。差距在低速端不到 3 倍，到 150 tok/s/user（Nvidia 在图表中强调的点）增至约 10 倍，随后在 200 tok/s/user 附近回落至 6 倍。那条线的数据本身是准确的，但如前所述，它使用的是一年前的软件栈，而不是你今天会运行的 GB200。
+
+在交互性区间的最顶端，Blackwell 的曲线双双跌落。到 350 tok/s/user 时，GB200 和 GB300 都完全无法服务该工作负载，只剩 Rubin 仍有真实曲线：在 300 tok/s/user 下提供 96,446 tok/s/MW，在 350 tok/s/user 下提供 70,703 tok/s/MW。
+
+显然，Rubin 将带给我们比 Blackwell 多得多的「快速模式」。
+
+### Rubin 对比 Blackwell：每 TCO 性能
+
+每兆瓦性能只衡量性能与功耗的关系。每百万输出 token 成本则纳入了硬件的总拥有成本（TCO），包括 IT 资本成本、电力和数据中心成本。[我们的 TCO 模型对此有全面拆解，提供各代服务器的资本成本与运营成本。](https://semianalysis.com/ai-cloud-tco-model/)这里我们用每款 SKU 的全口径 TCO 除以前述重新归一化后的输出吞吐量，数值越低越好。Rubin 的单 GPU TCO 高于 Blackwell：在运营方自有（而非租赁价格）场景下，Rubin 为每 GPU 每小时 $3.57，GB200 为 $1.84，GB300 为 $2.36。下面的图表将展示 Rubin 在每 token 成本上的领先幅度略小于其每兆瓦领先幅度。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-blackwell-tco-per-gpu-hr.png"
+  alt="表格：运营方自有场景下的全口径 TCO——Vera Rubin NVL72 每 GPU 每小时 $3.57，GB200 NVL72 $1.84，GB300 NVL72 $2.36"
+  caption="来源：TCO 模型"
+/>
+
+与每兆瓦分析一样，2025 年 GB200 基线给 Rubin 带来的性能领先最大，但对今天购买算力的人来说，2026 年 7 月的 GB200 和 GB300 数字才是更有参考意义的对比基线。
+
+以下 Pareto 曲线以交互性为横轴，绘制每百万输出 token 成本。每条线终止于其配方前沿的尽头。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-cost-pareto.png"
+  alt="Pareto 曲线：Vera Rubin NVL72、GB200 NVL72 与 GB300 NVL72（2026 年 7 月基线）及 CoreWeave 2025 年 GB200 基线在 DeepSeek R1 8k/1k 上的每百万输出 token 成本对比交互性"
+  caption="来源：SemiAnalysis"
+/>
+
+接下来同样以表格形式提供数据，其中比值列显示 Rubin 在各交互性下便宜多少倍。同样地，标注 "impossible" 的单元格表示该配方的前沿无法达到这一速度。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-cost-table.png"
+  alt="表格：固定交互性下的每百万输出 token 成本，比值列显示 Vera Rubin NVL72 相比各 Blackwell 基线便宜多少倍"
+  caption="来源：SemiAnalysis，TCO 模型"
+/>
+
+下图以柱状图形式绘制 100 到 300 tok/s/user 区间的前沿。四个配方的数据都覆盖到 250 tok/s/user，只有 Rubin 和 GB300 达到 300 tok/s/user。
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-cost-bars.png"
+  alt="柱状图：Vera Rubin NVL72、GB200 NVL72、GB300 NVL72 及 CoreWeave 2025 年 GB200 基线在 100 至 300 tok/s/user 区间的每百万输出 token 成本"
+/>
+
+<Figure
+  src="/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/cost-bars-legend.png"
+  alt="图例：GB200 NVL72（2026 年 7 月）、GB300 NVL72（2026 年 7 月）、CoreWeave GB200（2025 年）、CoreWeave Vera Rubin（2026 年 7 月）"
+  caption="来源：SemiAnalysis"
+/>
+
+与 2026 年 7 月的 GB200 和 GB300 相比，Rubin 在所有交互性下都更便宜，且差距随交互性上升而扩大。相比 GB200，差距从 100 tok/s/user 及以下的约 1.5 倍起步，到 200 tok/s/user 并延续至 250 tok/s/user 时扩大到 3 倍。300 tok/s/user 下相对 GB300 的 5 倍优势与每兆瓦视角一致——此时 GB300 几乎无法产出 token，而 GB200 在这一交互性水平下完全无法服务。
+
+2025 年 GB200 NVL72 基线的对比再次更具戏剧性，峰值出现在曲线中段。Rubin 在低速端便宜 2 倍多，在 150 tok/s/user 附近达到近 8 倍的峰值，随后到 200 tok/s/user 回落至 5 倍。与每兆瓦版本的评论相同：2025 年 GB200 基线测的是一年前的软件栈，而不是你今天会运行的 GB200。
+
+在区间最顶端，情况依旧。GB200 在 250 tok/s/user 之后没有任何工作点，GB300 在 300 tok/s/user 之后也没有，因此到 350 tok/s/user 时只有 Rubin 还能服务，每百万输出 token 成本为 $4.18。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/zh/inference">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+_本文后续将 Rubin 的性能与目前公开已知的最佳 MI355X 分布式推理性能进行对比，并简要分析 Triton Compiler、PyTorch、vLLM 和 Dynamo 软件将如何在 Rubin 上运行，详见 [SemiAnalysis 通讯订阅版](https://newsletter.semianalysis.com/p/vera-rubin-nvl72-vs-gb200-nvl72-inference)。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Vera Rubin NVL72 的推理性能比 GB200 NVL72 快多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在单轮 8k 输入 / 1k 输出工作负载上运行 DeepSeek R1 时，Vera Rubin NVL72 工程样机的结果相比 2026 年 7 月软件栈上的 GB200 NVL72 提供 5.4 倍的每兆瓦性能和 5 倍的每美元性能。与 CoreWeave 的 2025 年 GB200 NVL72 基线相比，每兆瓦差距在 150 tok/s/user 处达到近 10 倍的峰值，但该基线测的是一年前的软件栈。Rubin 仍处于 bringup 早期，随着软件成熟，差距预计会继续扩大。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Rubin 基于 LUT 的 Tensor Core 权重解压格式是什么？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Rubin SM107 新增了 LUT B——一种 Tensor Core MMA 模式，其权重操作数是由 3-bit 索引组成的压缩矩阵。每个索引在 8x64 权重块共享的查找表中选取八个 E4M3 表项之一，重建发生在 MMA 内部，乘法以 FP8 执行，无需独立的反量化步骤。存储占用为每权重 3.125 bit：3 bit 索引，外加 64 bit 码本分摊到 512 个权重上。以 Kimi K3 这样的 2.8T 参数模型为例，权重约需 1,094 GB，而 MXFP4 约需 1,487.5 GB——原本需要 6 个 288 GB HBM4 封装的权重可省下约 2 个。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "CoreWeave 的 Vera Rubin 每兆瓦 token 数 10 倍宣称有哪些注意事项？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "有四点细节。第一，10 倍是 Rubin 与运行一年前软件栈的 2025 年 GB200 NVL72 基线的对比；若对比 2026 年 7 月的 GB200 和 GB300 InferenceX 基线，每兆瓦领先在 100 tok/s/user 及以下约为 2 倍，在 200 tok/s/user 附近相对 GB300 达到约 4 倍的峰值。第二，基准测试使用的是 DeepSeek R1 671B 这一较旧的模型，理论上反而有利于 Blackwell 基线，因为 Rubin 的优势在于适合多万亿参数模型的 HBM 容量和带宽。第三，它是单轮 8k 输入 / 1k 输出工作负载，无法体现 Rubin 应更擅长的多轮 agentic 服务。第四，测试是在没有 scale-out 网络的 Dell 预量产工程样机机架上进行的。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Rubin GPU 能运行现有的 Blackwell CUDA kernel 吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "可以。Rubin (SM107) 能运行 Blackwell SM100 系列 kernel，覆盖 DeepGEMM、FlashMLA、CUTLASS 等重要 kernel 库，这让 bringup 比 Hopper 到 Blackwell 的迁移顺畅得多——当年 kernel 必须从零重写。要在 Rubin 上达到理论极限性能，工程师仍需调优和重写 kernel。Feynman (SM140) 则是全新的架构家族，Rubin 到 Feynman 的迁移将再次需要重写大量 kernel。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Vera Rubin NVL72 与 Blackwell 的每百万 token 成本相比如何？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "根据 SemiAnalysis AI Cloud TCO 模型，在运营方自有场景下 Rubin 的 TCO 更高：每 GPU 每小时 $3.57，而 GB200 为 $1.84，GB300 为 $2.36。即便如此，在 DeepSeek R1 上对比 2026 年 7 月的 GB200 和 GB300 基线，Rubin 在所有交互性下的每百万输出 token 成本都更低：相比 GB200 在 100 tok/s/user 及以下约便宜 1.5 倍，到 200 至 250 tok/s/user 提升至 3 倍，在 300 tok/s/user 下相比 GB300 约便宜 5 倍。GB200 在 250 tok/s/user 之后没有工作点，GB300 在 300 之后也没有，因此到 350 tok/s/user 时只有 Rubin 能够服务，成本为每百万输出 token $4.18。"
+      }
+    }
+  ]
+}`}</JsonLd>
