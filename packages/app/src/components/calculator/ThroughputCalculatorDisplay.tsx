@@ -361,16 +361,49 @@ function ThroughputCalculatorInner() {
 
   // Track previous available keys to detect when the GPU set changes
   const prevAvailableKeyRef = useRef<string>('');
+  const prevOverlayKeyRef = useRef<string>('');
 
-  // Reset visible GPUs when the available set changes (model/sequence/precision change or customer filter toggle)
+  // Reset visible GPUs when the OFFICIAL available set changes (model, sequence,
+  // or precision change). Keyed on `availableHwKeys` rather than `legendHwKeys`
+  // on purpose: an unofficial run is fetched separately and usually lands after
+  // the benchmarks, so keying on the merged list would let a late overlay
+  // arrival — or a run dismissal — wipe GPU filters the user had already set.
   useEffect(() => {
-    if (legendHwKeys.length === 0) return;
-    const key = [...legendHwKeys].toSorted().join(',');
+    if (availableHwKeys.length === 0) return;
+    const key = [...availableHwKeys].toSorted().join(',');
     if (key !== prevAvailableKeyRef.current) {
       prevAvailableKeyRef.current = key;
-      setVisibleHwKeys(new Set(legendHwKeys));
+      setVisibleHwKeys(new Set([...availableHwKeys, ...overlayAvailableHwKeys]));
     }
-  }, [legendHwKeys]);
+  }, [availableHwKeys, overlayAvailableHwKeys]);
+
+  // Overlay hardware arriving or leaving is additive: newly available overlay
+  // GPUs start visible, ones that are gone stop being tracked, and every other
+  // entry keeps whatever the user set.
+  useEffect(() => {
+    const key = overlayAvailableHwKeys.join(',');
+    if (key === prevOverlayKeyRef.current) return;
+    const prev = prevOverlayKeyRef.current ? prevOverlayKeyRef.current.split(',') : [];
+    prevOverlayKeyRef.current = key;
+
+    const added = overlayAvailableHwKeys.filter((k) => !prev.includes(k));
+    // Only drop hardware that has no official data either — otherwise dismissing
+    // a run would hide a GPU whose official bar is still on the chart.
+    const removed = prev.filter(
+      (k) => !overlayAvailableHwKeys.includes(k) && !availableHwKeys.includes(k),
+    );
+    if (added.length === 0 && removed.length === 0) return;
+
+    setVisibleHwKeys((cur) => {
+      const next = new Set(cur);
+      added.forEach((k) => next.add(k));
+      removed.forEach((k) => next.delete(k));
+      // Never strand the user with an empty chart: if the only visible hardware
+      // was overlay-only and the run just went away, fall back to everything.
+      if (next.size === 0) return new Set(availableHwKeys);
+      return next;
+    });
+  }, [overlayAvailableHwKeys, availableHwKeys]);
 
   const hasAnyData = hasData || hasOverlayData;
 
@@ -658,6 +691,10 @@ function ThroughputCalculatorInner() {
           isHighlighted: true,
           hw: `overlay-run-${info.id}`,
           isActive: true,
+          // A label, not a series: dismissing a run happens in the banner, and
+          // counting it as removable would let the hide control empty the chart
+          // of real GPUs.
+          isRemovable: false,
           onClick: () => {},
           tooltip: (
             <div className="font-normal text-xs">

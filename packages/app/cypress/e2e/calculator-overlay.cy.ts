@@ -17,10 +17,11 @@ import {
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
   OVERLAY_RUN_ID,
+  SECOND_OFFICIAL_HARDWARE,
 } from '../support/overlay-fixtures';
 
-/** Official data covers B300 only; the run adds a B300 bar and an MI355X bar. */
-const TOTAL_BARS = 3;
+/** Official data covers B300 + B200; the run adds a B300 bar and an MI355X bar. */
+const TOTAL_BARS = 4;
 const OVERLAY_BARS = 2;
 
 const SEQUENCE = '1k/1k';
@@ -122,11 +123,52 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(BARS).should('have.length', TOTAL_BARS);
     });
 
+    it('does not offer a hide control on the run legend entry', () => {
+      // Run entries are labels, not series: they must not render the hide "×"
+      // (it would call removeGpu with an overlay-run-* key and do nothing) nor
+      // count toward the guard that stops the user emptying the chart.
+      // Sanity-check the selector against a real GPU entry, so a markup change
+      // can't turn the assertion below into a no-op.
+      cy.get(`[aria-label="Hide B300 (SGLang)"]`).should('exist');
+      cy.get(`[aria-label="Hide ✕ ${OVERLAY_RUN_BRANCH}"]`).should('not.exist');
+    });
+
     it('restores every bar via reset filter', () => {
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       cy.get(BARS).should('have.length', 1);
       cy.contains('button', 'Reset filter').click();
       cy.get(BARS).should('have.length', TOTAL_BARS);
+    });
+  });
+
+  describe('late overlay arrival', () => {
+    it('keeps a GPU filter the user set before the run landed', () => {
+      // Regression: the reset effect keyed on the MERGED official+overlay
+      // hardware list. The unofficial run is fetched separately and usually
+      // resolves after the benchmarks, so when it landed and added
+      // overlay-only hardware the legend reseeded and wiped filters the user
+      // had already set. Reseeding on a user-driven model/sequence change is
+      // intentional; reseeding on async overlay arrival is not.
+      interceptCalculatorOverlayRun({ runDelayMs: 2000 });
+      cy.visit(
+        `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+        {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        },
+      );
+
+      // Official data only, for now: B300 + B200.
+      cy.get(BARS).should('have.length', 2);
+      cy.get('.sidebar-legend label').contains('B300').click(); // solo B300
+      cy.get(BARS).should('have.length', 1);
+
+      cy.wait('@unofficialRun');
+      // The run adds its own B300 bar and the overlay-only MI355X bar, but the
+      // hidden B200 must stay hidden.
+      cy.get(BARS).should('have.length', 3);
+      cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
     });
   });
 

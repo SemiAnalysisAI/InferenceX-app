@@ -129,6 +129,8 @@ export const ALT_SEQUENCE_HARDWARE = 'h100';
 export const OTHER_MODEL_DB_KEY = 'glm5';
 /** Hardware present only in the unofficial run, never in the official rows. */
 export const OVERLAY_ONLY_HARDWARE = 'mi355x';
+/** A second official GPU, so a hardware filter set before the run lands is observable. */
+export const SECOND_OFFICIAL_HARDWARE = 'b200';
 
 /** conc, interactivity (tok/s/user), tput_per_gpu */
 export const SINGLE_TURN_CONFIGS: [number, number, number][] = [
@@ -212,6 +214,18 @@ export const singleTurnAvailability = [
   },
   {
     model: DEFAULT_MODEL_DB_KEY,
+    isl: SINGLE_TURN_ISL,
+    osl: SINGLE_TURN_OSL,
+    precision: 'fp4',
+    hardware: SECOND_OFFICIAL_HARDWARE,
+    framework: 'sglang',
+    spec_method: 'none',
+    disagg: false,
+    benchmark_type: 'single_turn',
+    date: SINGLE_TURN_DATE,
+  },
+  {
+    model: DEFAULT_MODEL_DB_KEY,
     isl: ALT_SEQUENCE_ISL,
     osl: ALT_SEQUENCE_OSL,
     precision: 'fp4',
@@ -234,13 +248,14 @@ export const singleTurnAvailability = [
  * - `OVERLAY_ONLY_HARDWARE` rows, hardware with no official data at all, which
  *   must still get a legend entry so its overlay bar can be hidden.
  */
-export const interceptCalculatorOverlayRun = () => {
+export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: number } = {}) => {
   cy.intercept('GET', '/api/v1/availability', { body: singleTurnAvailability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', {
     // The route is intercepted regardless of query params; the hook filters by
     // isl/osl client-side, so both sequences ship in one payload.
     body: [
       ...singleTurnRows(null),
+      ...singleTurnRows(null, { hardware: SECOND_OFFICIAL_HARDWARE, tputScale: 0.6 }),
       ...singleTurnRows(null, {
         hardware: ALT_SEQUENCE_HARDWARE,
         isl: ALT_SEQUENCE_ISL,
@@ -249,6 +264,9 @@ export const interceptCalculatorOverlayRun = () => {
     ],
   }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
+    // A delay lets a spec set a GPU filter in the window after the official
+    // benchmarks land but before the run does — the real-world ordering.
+    delay: runDelayMs,
     body: {
       runInfos: [
         {
