@@ -51,8 +51,8 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      - name: Cache Cypress binary
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore Cypress binary cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/Cypress
           key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}
