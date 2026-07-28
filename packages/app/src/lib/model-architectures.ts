@@ -119,6 +119,17 @@ export interface ModelArchitecture {
    * interleave (gpt-oss, DeepSeek V4). Set it when the split is uneven.
    */
   alternatingNote?: string;
+  /**
+   * Attention label for the dense-FFN prefix block, when that layer's mechanism
+   * differs from the model-wide `attentionType`. Only matters for hybrids whose
+   * dense layer belongs to one specific category — Kimi K3's dense layer is a
+   * KDA layer, so the model-wide "Hybrid Attention" label would misdescribe it.
+   */
+  denseLayerAttentionLabel?: string;
+  /** GLU variant of the FFN / expert blocks. Defaults to `SwiGLU`. */
+  ffnVariant?: string;
+  /** Elementwise activation applied to the gate projection. Defaults to `SiLU`. */
+  ffnGateActivation?: string;
 }
 
 /**
@@ -378,6 +389,13 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     // Not a 1:1 interleave — full attention lands on layers 4, 8, … 92 plus the
     // final layer 93.
     alternatingNote: 'gated MLA every 4th layer',
+    // The dense-FFN prefix is layer 1, which config.json lists under
+    // `kda_layers` — the model-wide "Hybrid Attention" label would be wrong for
+    // that single block.
+    denseLayerAttentionLabel: 'Kimi Delta Attention (KDA)',
+    // hidden_act = "situ"; the model card calls the FFN SiTU-GLU.
+    ffnVariant: 'SiTU-GLU',
+    ffnGateActivation: 'SiTU',
     contextWindow: 1048576, // 1M
     features: [
       'Kimi Delta Attention (KDA linear attention)',
@@ -481,6 +499,25 @@ export function getArchitectureSummary(arch: ModelArchitecture): string {
     return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParams)} active)`;
   }
   return `Dense ${formatParamCount(arch.totalParams)}`;
+}
+
+/** GLU variant of the FFN / expert blocks, e.g. `SwiGLU` or K3's `SiTU-GLU`. */
+export function ffnVariantLabel(arch: ModelArchitecture): string {
+  return arch.ffnVariant ?? 'SwiGLU';
+}
+
+/** Elementwise activation on the gate projection, e.g. `SiLU` or K3's `SiTU`. */
+export function ffnGateActivationLabel(arch: ModelArchitecture): string {
+  return arch.ffnGateActivation ?? 'SiLU';
+}
+
+/**
+ * Attention label for the dense-FFN prefix block. Falls back to the model-wide
+ * attention type, which is right for every uniform-attention model; hybrids
+ * whose dense layer is one specific category override it.
+ */
+export function denseLayerAttentionLabel(arch: ModelArchitecture): string {
+  return arch.denseLayerAttentionLabel ?? getAttentionLabel(arch.attentionType);
 }
 
 /** Shared experts counted inside `numExperts`. Zero when the model has none. */
@@ -683,7 +720,7 @@ export function getFFNSubBlocks(
         type: 'projection',
       },
       {
-        name: 'SiLU Activation',
+        name: `${ffnGateActivationLabel(arch)} Activation`,
         detail: 'Applied to gate output',
         type: 'activation',
       },

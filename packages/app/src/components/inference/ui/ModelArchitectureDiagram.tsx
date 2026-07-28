@@ -19,6 +19,8 @@ import {
   getAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
+  denseLayerAttentionLabel,
+  ffnVariantLabel,
   getHybridAttentionSubBlocks,
   getModelArchitecture,
   sharedExpertCount,
@@ -118,6 +120,7 @@ function renderDiagram(
   // Shared experts are counted inside `numExperts`; read the model's own count
   // rather than assuming the DeepSeek-style single shared expert.
   const sharedExperts = sharedExpertCount(arch);
+  const ffnVariant = ffnVariantLabel(arch);
   const hasDenseLayers = isMoE && (arch.denseFFNLayers ?? 0) > 0;
   const denseLayerCount = arch.denseFFNLayers ?? 0;
   const moeLayerCount = (arch.numLayers ?? 0) - denseLayerCount;
@@ -1526,7 +1529,7 @@ function renderDiagram(
       drawArrow(denseNorm1Y + smallH, denseAttnY);
 
       // Attention (expandable only for non-MLA types)
-      const denseAttnLabel = getAttentionLabel(arch.attentionType);
+      const denseAttnLabel = denseLayerAttentionLabel(arch);
       const denseHeadSub = arch.numHeads ? `${arch.numHeads} heads` : undefined;
       if (isAttnExpandable) {
         drawExpandableBlock(
@@ -1575,7 +1578,7 @@ function renderDiagram(
       );
 
       if (denseFFNExpanded && denseFFNFlow) {
-        drawFlow(denseFFNFlow, denseFFNExpandedStartY, innerX, innerW, 'SwiGLU FFN');
+        drawFlow(denseFFNFlow, denseFFNExpandedStartY, innerX, innerW, `${ffnVariant} FFN`);
       }
 
       const denseFFNBottom = denseFFNExpanded
@@ -1738,7 +1741,7 @@ function renderDiagram(
       });
 
     if (isExpExpanded) {
-      drawFlow(ffnFlow, expandedStartY, innerX, innerW, 'Expert FFN (SwiGLU)');
+      drawFlow(ffnFlow, expandedStartY, innerX, innerW, `Expert FFN (${ffnVariant})`);
     }
 
     const expertBottom = isExpExpanded ? expandedStartY + expandedH : eY + expertGridH;
@@ -2123,7 +2126,7 @@ function renderDiagram(
       // === FFN (expandable) for dense models ===
       const ffnSub = arch.ffnDim
         ? `intermediate = ${arch.ffnDim.toLocaleString()}`
-        : 'SwiGLU activation';
+        : `${ffnVariant} activation`;
       drawExpandableBlock(
         innerX,
         ffnY,
@@ -2137,7 +2140,7 @@ function renderDiagram(
       );
 
       if (ffnExpanded) {
-        drawFlow(ffnFlow, ffnExpandedStartY, innerX, innerW, 'SwiGLU Details');
+        drawFlow(ffnFlow, ffnExpandedStartY, innerX, innerW, `${ffnVariant} Details`);
       }
 
       const ffnBottom = ffnExpanded ? ffnExpandedStartY + ffnExpandedH : ffnY + blockH;

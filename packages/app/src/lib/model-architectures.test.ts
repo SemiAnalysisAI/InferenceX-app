@@ -12,7 +12,10 @@ import {
   getFFNSubBlocks,
   getHybridAttentionSubBlocks,
   getModelArchitecture,
+  denseLayerAttentionLabel,
   expertRouterSummary,
+  ffnGateActivationLabel,
+  ffnVariantLabel,
   sharedExpertCount,
   MODEL_ARCHITECTURES,
 } from './model-architectures';
@@ -328,6 +331,33 @@ describe('getModelArchitecture', () => {
     );
     // gpt-oss has no shared expert — no suffix, no subtraction.
     expect(expertRouterSummary(getModelArchitecture(Model.GptOss)!)).toBe('Top-4 of 128 routed');
+  });
+
+  it('names K3’s FFN SiTU-GLU and leaves every other model on SwiGLU', () => {
+    const k3 = getModelArchitecture(Model.Kimi_K3)!;
+    expect(ffnVariantLabel(k3)).toBe('SiTU-GLU');
+    expect(ffnGateActivationLabel(k3)).toBe('SiTU');
+    const k3Ffn = getFFNSubBlocks(k3);
+    expect(k3Ffn.layout).toBe('parallel');
+    if (k3Ffn.layout !== 'parallel') throw new Error('expected a parallel FFN flow');
+    expect(k3Ffn.leftPath[1]?.name).toBe('SiTU Activation');
+    for (const arch of Object.values(MODEL_ARCHITECTURES)) {
+      if (!arch || arch.model === Model.Kimi_K3) continue;
+      expect(ffnVariantLabel(arch), `ffn variant for ${arch.model}`).toBe('SwiGLU');
+      expect(ffnGateActivationLabel(arch), `gate activation for ${arch.model}`).toBe('SiLU');
+    }
+  });
+
+  it('labels K3’s dense prefix block KDA, not the model-wide hybrid type', () => {
+    // The dense-FFN layer is layer 1, which config.json lists under kda_layers,
+    // so the model-wide "Hybrid Attention" label would misdescribe that block.
+    expect(denseLayerAttentionLabel(getModelArchitecture(Model.Kimi_K3)!)).toBe(
+      'Kimi Delta Attention (KDA)',
+    );
+    // Uniform-attention models keep falling back to their attention type.
+    expect(denseLayerAttentionLabel(getModelArchitecture(Model.DeepSeek_R1)!)).toBe(
+      'Multi-head Latent Attention',
+    );
   });
 
   it('defaults the shared-expert count to 1 and to 0 without a shared expert', () => {

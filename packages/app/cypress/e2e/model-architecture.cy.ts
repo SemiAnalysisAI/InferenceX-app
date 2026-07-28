@@ -508,7 +508,13 @@ describe('Model Architecture Diagram', () => {
       // K3's hybrid is KDA + gated MLA, not DeepSeek V4's local/compressed CSA-HCA
       // pair, so `alternatingAttentionExpandable: false` must suppress both the
       // drill-down and the caption that explains it. DeepSeek V4 keeps both.
-      cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+      // Retries re-run this test with the block already expanded, so expand
+      // only when it is still collapsed.
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="expand-altBlock0"]').length > 0) {
+          cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+        }
+      });
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
       cy.get('[data-testid="expand-altAttention0"]').should('not.exist');
       cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
@@ -521,6 +527,28 @@ describe('Model Architecture Diagram', () => {
       // Same count drives the Experts figure in the specs bar: 16 routed + 2
       // shared active out of 898, not the assumed "+1".
       cy.get('[data-testid="model-architecture-svg"]').contains('16+2/898').should('exist');
+      // K3's FFN is SiTU-GLU, so the drill-down must not claim SwiGLU/SiLU.
+      // The flow caption renders uppercased, so match case-insensitively.
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains(/expert ffn \(situ-glu\)/iu)
+        .should('exist');
+      cy.get('[data-testid="model-architecture-svg"]').contains('SiTU Activation').should('exist');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains(/swiglu|silu/iu)
+        .should('not.exist');
+    });
+
+    it('labels the dense prefix block KDA rather than the model-wide hybrid type', () => {
+      // Layer 1 is the dense-FFN layer and a KDA layer, so "Hybrid Attention"
+      // would misdescribe it next to correctly labelled KDA/MLA blocks.
+      cy.get('[data-testid="expand-denseTransformer"]').should('exist').click({ force: true });
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('Kimi Delta Attention (KDA)')
+        .should('exist');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .contains('Hybrid Attention')
+        .should('not.exist');
+      cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
     });
 
     it('shows Kimi K3 features and developer info', () => {
