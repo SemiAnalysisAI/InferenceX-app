@@ -9,6 +9,14 @@ export type BarMetric = 'throughput' | 'power' | 'cost';
 export interface GPUDataPoint {
   hwKey: string;
   interactivity: number; // tokens/sec/user (median_intvty = x in interactivity chart)
+  /**
+   * End-to-end latency at the selected percentile. Agentic calculator groups
+   * use this to keep only the same anti-benchmark-hacking Pareto winners as the
+   * main interactivity chart before interpolation.
+   */
+  e2eLatency?: number;
+  /** Run date used to keep agentic end-to-end frontiers date-scoped. */
+  date?: string;
   throughput: number; // tokens/sec/gpu total (tput_per_gpu = y in interactivity chart)
   outputThroughput: number; // output tokens/sec/gpu
   inputThroughput: number; // input tokens/sec/gpu

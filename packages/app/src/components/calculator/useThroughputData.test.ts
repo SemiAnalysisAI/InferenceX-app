@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
+import { Percentile, Sequence } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
 
 import type { GPUDataPoint } from './types';
@@ -1022,7 +1023,7 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 const singlePrecisionClassify = (hwKey: string) => ({ key: hwKey, meta: { hwKey } });
 
 describe('buildGpuGroups', () => {
-  const shared = { isl: 1024, osl: 1024, precisions: ['fp4'] };
+  const shared = { sequence: Sequence.OneK_OneK, precisions: ['fp4'] };
 
   it('groups rows by the caller-supplied key and derives cost + power metrics', () => {
     const { grouped, groupMeta, hwConfigMap } = buildGpuGroups(
@@ -1077,8 +1078,7 @@ describe('buildGpuGroups', () => {
     const { grouped, groupMeta } = buildGpuGroups(
       [makeRow({ precision: 'fp4' }), makeRow({ precision: 'fp8' })],
       {
-        isl: 1024,
-        osl: 1024,
+        sequence: Sequence.OneK_OneK,
         precisions: ['fp4', 'fp8'],
         classify: (hwKey, row) => ({
           key: `${hwKey}__${row.precision}`,
@@ -1136,6 +1136,130 @@ describe('buildGpuGroups', () => {
     const overlayHw = Object.values(overlay.groupMeta)[0].hwKey;
     // Legend visibility is keyed on hwKey, so the two must agree.
     expect(overlayHw).toBe(officialHw);
+  });
+
+  it('calculates agentic groups from null-ISL/OSL rows at the selected percentile', () => {
+    const agenticMetrics = {
+      p75_itl: 0.02,
+      p75_ttlt: 12,
+      p90_itl: 0.05,
+      p90_ttlt: 20,
+      // Deliberately wrong artifact values: rowToAggDataEntry must derive
+      // interactivity as 1 / ITL for official and overlay parity.
+      p75_intvty: 999,
+      p90_intvty: 999,
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 300,
+      input_tput_per_gpu: 600,
+    };
+    const rows = [
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics: agenticMetrics,
+      }),
+    ];
+
+    const p90 = buildGpuGroups(rows, {
+      sequence: Sequence.AgenticTraces,
+      precisions: ['fp4'],
+      percentile: Percentile.P90,
+      classify: singlePrecisionClassify,
+    });
+    const p75 = buildGpuGroups(rows, {
+      sequence: Sequence.AgenticTraces,
+      precisions: ['fp4'],
+      percentile: Percentile.P75,
+      classify: singlePrecisionClassify,
+    });
+
+    expect(Object.values(p90.grouped)[0][0]).toMatchObject({
+      interactivity: 20,
+      e2eLatency: 20,
+    });
+    expect(Object.values(p75.grouped)[0][0]).toMatchObject({
+      interactivity: 50,
+      e2eLatency: 12,
+    });
+  });
+
+  it('restricts agentic interpolation to the same date-scoped e2e Pareto winners as the chart', () => {
+    const agenticRow = (
+      conc: number,
+      interactivity: number,
+      e2eLatency: number,
+      throughput: number,
+      date = '2026-07-19',
+    ) =>
+      makeRow({
+        id: conc,
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc,
+        date,
+        metrics: {
+          p90_itl: 1 / interactivity,
+          p90_ttlt: e2eLatency,
+          tput_per_gpu: throughput,
+          output_tput_per_gpu: throughput * 0.3,
+          input_tput_per_gpu: throughput * 0.7,
+        },
+      });
+
+    const { grouped } = buildGpuGroups(
+      [
+        agenticRow(1, 100, 20, 900),
+        agenticRow(2, 80, 30, 800), // e2e-dominated by concurrency 1
+        agenticRow(4, 60, 40, 1200),
+        // A different date gets its own e2e frontier and must survive.
+        agenticRow(8, 40, 50, 700, '2026-07-20'),
+      ],
+      {
+        sequence: Sequence.AgenticTraces,
+        precisions: ['fp4'],
+        percentile: Percentile.P90,
+        classify: singlePrecisionClassify,
+      },
+    );
+
+    const points = Object.values(grouped)[0];
+    expect(points.map((point) => point.concurrency).toSorted()).toEqual([1, 4, 8]);
+  });
+
+  it('keeps agentic overlay frontiers isolated per unofficial run', () => {
+    const runA = 'https://github.com/org/repo/actions/runs/111';
+    const runB = 'https://github.com/org/repo/actions/runs/222';
+    const rows = [
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        run_url: runA,
+        metrics: { p90_itl: 0.02, p90_ttlt: 50, tput_per_gpu: 500 },
+      }),
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        run_url: runB,
+        metrics: { p90_itl: 0.01, p90_ttlt: 20, tput_per_gpu: 1000 },
+      }),
+    ];
+
+    const { grouped } = buildGpuGroups(rows, {
+      sequence: Sequence.AgenticTraces,
+      precisions: ['fp4'],
+      percentile: Percentile.P90,
+      classify: (hwKey, row) => {
+        const runIndex = overlayRunIndex(row.run_url, { [runA]: 0, [runB]: 1 });
+        return { key: `${hwKey}__run${runIndex}`, meta: { hwKey, runIndex } };
+      },
+    });
+
+    expect(Object.keys(grouped)).toHaveLength(2);
+    expect(Object.values(grouped).map((points) => points.length)).toEqual([1, 1]);
   });
 });
 

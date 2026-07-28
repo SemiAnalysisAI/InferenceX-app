@@ -102,4 +102,22 @@ The reset's early-out guards on the **merged** list, not the official one. An em
 - **Clamped values.** `interpolateForGPU` clamps the target into each series' measured range and always returns a value, so a bar can be showing its nearest edge point rather than an interpolation. This is pre-existing across GPUs with different ranges, but widening the slider to cover overlay operating points makes it reachable for every official bar at once — which would turn a side-by-side overlay delta into a real-vs-clamped comparison. Results carry a `clamped` flag and the tooltip says so. (Narrowing the slider back is not the fix: it only moves the clamping onto the overlay bars, and an overlay-only model loses its bounds entirely.)
 - **Escaping.** The tooltip is a hand-built HTML string injected with `.html()`, and branch names and run URLs come from the GitHub API for whatever run id the user pasted. Everything untrusted goes through `escapeHtml` (`lib/utils`). The y-axis tick labels render the same branch but go through d3 `.text()`, and the legend entry is React — both already safe.
 
-Note the calculator only supports fixed-sequence data (`sequenceToIslOsl`: 1k/1k, 1k/8k, 8k/1k). Agentic-traces rows carry null isl/osl and are invisible here for official and unofficial data alike. E2E fixtures therefore use `singleTurnRows` from `cypress/support/overlay-fixtures.ts`, not the agentic `b300Rows` the inference specs use.
+The calculator supports both fixed-sequence and Agentic Traces scenarios through
+the shared `rowToSequence` classifier. Agentic rows carry null `isl`/`osl`, so
+filtering them by numeric sequence lengths would silently drop every point.
+
+Agentic interactivity follows the same definition as the main inference chart:
+
+- P90 by default, with P75 selectable and shareable through `i_pctl`
+- interactivity derived as `1 / ITL`, never trusted from a potentially stale
+  artifact-supplied `*_intvty` field
+- interpolation seeded only by points that also win on the selected
+  percentile's end-to-end-latency Pareto frontier, preventing a configuration
+  from winning the calculator by improving interactivity while degrading the
+  full session
+- official and unofficial-run agentic frontiers remain separate, just like
+  their fixed-sequence counterparts
+
+`b300Rows` in `cypress/support/overlay-fixtures.ts` covers the agentic calculator
+path; `singleTurnRows` remains the fixture for fixed-sequence visibility and
+sequence-switching behavior.

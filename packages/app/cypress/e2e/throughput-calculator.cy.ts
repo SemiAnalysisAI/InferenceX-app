@@ -1,3 +1,8 @@
+import {
+  availability as agenticAvailability,
+  b300Rows as agenticB300Rows,
+} from '../support/overlay-fixtures';
+
 describe('TCO Calculator', () => {
   // ---------------------------------------------------------------------------
   // Tab navigation (must start from /inference to test tab switching)
@@ -544,6 +549,58 @@ describe('TCO Calculator', () => {
       });
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
       cy.get('[data-testid="calc-model-selector"]').should('contain.text', 'DeepSeek V4 Pro 1.6T');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // DeepSeek V4 agentic trace calculations
+  // ---------------------------------------------------------------------------
+
+  describe('DeepSeek V4 agentic calculations', () => {
+    beforeEach(() => {
+      cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
+        'agenticAvailability',
+      );
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticB300Rows(null) }).as(
+        'agenticBenchmarks',
+      );
+      cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.wait('@agenticBenchmarks');
+    });
+
+    it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
+      cy.get('[data-testid="calc-sequence-selector"]').should('contain.text', 'Agentic Traces');
+      cy.get('[data-testid="calc-percentile-selector"]').should('contain.text', 'p90');
+      cy.get('[data-testid="calculator-no-data"]').should('not.exist');
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .first()
+        .should('contain.text', 'P90 Interactivity');
+
+      cy.get('[data-testid="calculator-metric-cost"]').click();
+      cy.get('[data-testid="calculator-bar-chart"] svg .value-label')
+        .first()
+        .should('contain.text', '$');
+    });
+
+    it('recalculates agentic results at P75 and includes it in the share link', () => {
+      cy.get('[data-testid="calc-percentile-selector"]').click();
+      cy.get('[role="option"]').contains('p75').click();
+
+      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
+      cy.get('[data-testid="calculator-chart-section"] h2')
+        .first()
+        .should('contain.text', 'P75 Interactivity');
+      cy.get('[data-testid="calculator-controls"]').should(
+        'contain.text',
+        'Target P75 Interactivity',
+      );
+      cy.get('[data-testid="share-button"]').click();
+      cy.get('[data-testid="share-url-input"]').invoke('val').should('include', 'i_pctl=p75');
     });
   });
 

@@ -333,6 +333,18 @@ describe('getChartTitle', () => {
     expect(title).toBe('Total Token Throughput per GPU at 30 tok/s/user Interactivity');
   });
 
+  it('includes the selected percentile in an agentic interactivity title', () => {
+    const title = getChartTitle(
+      'throughput',
+      'interactivity_to_throughput',
+      30,
+      'total',
+      undefined,
+      'p90',
+    );
+    expect(title).toBe('Total Token Throughput per GPU at 30 tok/s/user P90 Interactivity');
+  });
+
   it('returns input throughput title when costType is input', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'input');
     expect(title).toBe('Input Token Throughput per GPU at 30 tok/s/user Interactivity');

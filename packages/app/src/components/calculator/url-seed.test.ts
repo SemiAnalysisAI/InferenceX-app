@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveCalculatorUrlSeed } from './url-seed';
-import { Model, Precision, Sequence } from '@/lib/data-mappings';
+import { Model, Percentile, Precision, Sequence } from '@/lib/data-mappings';
 
 describe('resolveCalculatorUrlSeed', () => {
   it('returns the model when g_model is a known enum value', () => {
@@ -30,17 +30,29 @@ describe('resolveCalculatorUrlSeed', () => {
     expect(resolveCalculatorUrlSeed({ i_prec: 'garbage' })).toEqual({});
   });
 
+  it('returns the agentic latency percentile when i_pctl is known', () => {
+    expect(resolveCalculatorUrlSeed({ i_pctl: 'p75' })).toEqual({
+      percentile: Percentile.P75,
+    });
+  });
+
+  it('ignores an unknown agentic latency percentile', () => {
+    expect(resolveCalculatorUrlSeed({ i_pctl: 'p99' })).toEqual({});
+  });
+
   it('combines model, sequence, and precisions from the same URL', () => {
     expect(
       resolveCalculatorUrlSeed({
         g_model: 'DeepSeek-V4-Pro',
         i_seq: '1k/8k',
         i_prec: 'fp4,fp8',
+        i_pctl: 'p75',
       }),
     ).toEqual({
       model: Model.DeepSeek_V4_Pro,
       sequence: Sequence.OneK_EightK,
       precisions: [Precision.FP4, Precision.FP8],
+      percentile: Percentile.P75,
     });
   });
 

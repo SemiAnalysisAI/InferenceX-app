@@ -17,8 +17,9 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import {
   ModelSelector,
-  SequenceSelector,
+  PercentileSelector,
   PrecisionSelector,
+  ScenarioSelector,
 } from '@/components/ui/chart-selectors';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
@@ -31,9 +32,10 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Percentile,
+  Sequence,
   type Model,
   type Precision,
-  type Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
@@ -41,6 +43,7 @@ import {
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useUrlState } from '@/hooks/useUrlState';
 
 import { getDisplayLabel } from '@/lib/utils';
 import { exportToCsv } from '@/lib/csv-export';
@@ -119,6 +122,9 @@ const STRINGS = {
     targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Adjust the slider to compare GPU throughput, cost, and power efficiency at different interactivity levels.',
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
+    targetAgenticTooltip: (percentile: string) =>
+      `The ${percentile} interactivity operating point used for agentic trace interpolation. Adjust the slider to compare GPU throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
     metricCost: 'Cost',
     viewChart: 'Chart',
@@ -165,6 +171,9 @@ const STRINGS = {
     targetLabel: '目标交互性 (tok/s/user)',
     targetTooltip:
       '用于插值的交互性操作点。调整滑块以比较不同交互性级别下 GPU 的吞吐量、成本和能效。',
+    targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
+    targetAgenticTooltip: (percentile: string) =>
+      `用于智能体轨迹插值的 ${percentile} 交互性操作点。调整滑块以比较 GPU 的吞吐量、成本和能效。`,
     metricThroughput: '吞吐量',
     metricCost: '成本',
     viewChart: '图表',
@@ -202,10 +211,14 @@ function getChartTitleZh(
   targetValue: number,
   costType: CostType,
   costProvider?: CostProvider,
+  interactivityPercentile?: string,
 ): string {
+  const percentilePrefix = interactivityPercentile
+    ? `${interactivityPercentile.toUpperCase()} `
+    : '';
   const targetLabel =
     mode === 'interactivity_to_throughput'
-      ? `${targetValue} tok/s/user 交互性`
+      ? `${targetValue} tok/s/user ${percentilePrefix}交互性`
       : `${targetValue} tok/s/gpu 吞吐量`;
   const tokenTypeLabel = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '总';
   switch (barMetric) {
@@ -225,6 +238,9 @@ function getChartTitleZh(
 }
 
 export default function ThroughputCalculatorDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+  const inner = (
+    <ThroughputCalculatorInner initialPercentile={urlSeed?.percentile ?? Percentile.P90} />
+  );
   if (urlSeed && (urlSeed.model || urlSeed.sequence || urlSeed.precisions)) {
     return (
       <GlobalFilterProvider
@@ -232,16 +248,17 @@ export default function ThroughputCalculatorDisplay({ urlSeed }: { urlSeed?: Cal
         initialSequence={urlSeed.sequence}
         initialPrecisions={urlSeed.precisions}
       >
-        <ThroughputCalculatorInner />
+        {inner}
       </GlobalFilterProvider>
     );
   }
-  return <ThroughputCalculatorInner />;
+  return inner;
 }
 
-function ThroughputCalculatorInner() {
+function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: Percentile }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const { setUrlParam } = useUrlState();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const handleDropdownOpenChange = (dropdownKey: string) => (isOpen: boolean) => {
     if (isOpen) {
@@ -271,6 +288,7 @@ function ThroughputCalculatorInner() {
   const [targetValue, setTargetValue] = useState<number>(35);
   const [inputValue, setInputValue] = useState<string>('35');
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
+  const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [visibleHwKeys, setVisibleHwKeys] = useState<Set<string>>(new Set());
   const [selectedBars, setSelectedBars] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
@@ -324,7 +342,11 @@ function ThroughputCalculatorInner() {
     selectedPrecisions,
     selectedRunDate,
     overlayInput,
+    selectedPercentile,
   );
+
+  const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  const percentileLabel = selectedPercentile.toUpperCase();
 
   /**
    * Hardware listed in the legend: official hardware, plus hardware that only
@@ -371,7 +393,9 @@ function ThroughputCalculatorInner() {
   // unofficial run is fetched separately and usually lands after the
   // benchmarks, so a late arrival — or a run dismissal — would otherwise wipe
   // GPU filters the user had already set.
-  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+  const selectionKey = `${selectedModel}|${selectedSequence}|${selectedPercentile}|${[
+    ...selectedPrecisions,
+  ]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
   useEffect(() => {
@@ -528,6 +552,15 @@ function ThroughputCalculatorInner() {
       track('calculator_precision_selected', { precision: value.join(',') });
     },
     [setSelectedPrecisions],
+  );
+
+  const handlePercentileChange = useCallback(
+    (value: Percentile) => {
+      setSelectedPercentile(value);
+      setUrlParam('i_pctl', value);
+      track('calculator_percentile_selected', { percentile: value });
+    },
+    [setUrlParam],
   );
 
   const handleBarMetricChange = useCallback((value: BarMetric) => {
@@ -781,7 +814,11 @@ function ThroughputCalculatorInner() {
 
             {/* Controls — grid layout matching inference chart controls */}
             <TooltipProvider delayDuration={0}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+                  isAgenticSequence ? 'lg:grid-cols-7' : 'lg:grid-cols-6'
+                }`}
+              >
                 <ModelSelector
                   id="calc-model"
                   data-testid="calc-model-selector"
@@ -791,7 +828,7 @@ function ThroughputCalculatorInner() {
                   onOpenChange={handleDropdownOpenChange('model')}
                   availableModels={availableModels}
                 />
-                <SequenceSelector
+                <ScenarioSelector
                   id="calc-sequence"
                   data-testid="calc-sequence-selector"
                   value={selectedSequence}
@@ -800,6 +837,14 @@ function ThroughputCalculatorInner() {
                   onOpenChange={handleDropdownOpenChange('sequence')}
                   availableSequences={availableSequences}
                 />
+                {isAgenticSequence && (
+                  <PercentileSelector
+                    id="calc-percentile"
+                    data-testid="calc-percentile-selector"
+                    value={selectedPercentile}
+                    onChange={handlePercentileChange}
+                  />
+                )}
                 <PrecisionSelector
                   id="calc-precision"
                   data-testid="calc-precision-selector"
@@ -908,8 +953,12 @@ function ThroughputCalculatorInner() {
                 <div className="space-y-2">
                   <LabelWithTooltip
                     htmlFor="calc-target"
-                    label={t.targetLabel}
-                    tooltip={t.targetTooltip}
+                    label={
+                      isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                    }
+                    tooltip={
+                      isAgenticSequence ? t.targetAgenticTooltip(percentileLabel) : t.targetTooltip
+                    }
                   />
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
@@ -996,8 +1045,22 @@ function ThroughputCalculatorInner() {
                       <div className="flex items-start justify-between gap-4">
                         <h2 className="text-lg font-semibold">
                           {locale === 'zh'
-                            ? getChartTitleZh(barMetric, mode, targetValue, costType, costProvider)
-                            : getChartTitle(barMetric, mode, targetValue, costType, costProvider)}
+                            ? getChartTitleZh(
+                                barMetric,
+                                mode,
+                                targetValue,
+                                costType,
+                                costProvider,
+                                isAgenticSequence ? selectedPercentile : undefined,
+                              )
+                            : getChartTitle(
+                                barMetric,
+                                mode,
+                                targetValue,
+                                costType,
+                                costProvider,
+                                isAgenticSequence ? selectedPercentile : undefined,
+                              )}
                         </h2>
                         <SegmentedToggle
                           value={viewMode}
@@ -1012,7 +1075,8 @@ function ThroughputCalculatorInner() {
                         {selectedPrecisions
                           .map((p) => getPrecisionLabel(p as Precision))
                           .join(', ')}{' '}
-                        • {getSequenceLabel(selectedSequence)} • {t.source}SemiAnalysis InferenceX™
+                        • {getSequenceLabel(selectedSequence, locale)} • {t.source}SemiAnalysis
+                        InferenceX™
                         {selectedRunDate && (
                           <>
                             {t.updated}

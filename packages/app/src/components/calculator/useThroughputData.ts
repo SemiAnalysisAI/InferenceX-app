@@ -2,15 +2,15 @@
 
 import { useCallback, useMemo } from 'react';
 
-import { DB_MODEL_TO_DISPLAY, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import type { HardwareConfig } from '@/components/inference/types';
+import type { AggDataEntry, HardwareConfig, InferenceData } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { getHardwareKey } from '@/lib/chart-utils';
+import { getHardwareKey, paretoFrontUpperRight } from '@/lib/chart-utils';
 import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
 
 import {
@@ -52,6 +52,59 @@ export interface OverlayGroupMeta extends GroupMeta {
   runIndex: number;
 }
 
+interface AgenticFrontierPoint {
+  x: number;
+  y: number;
+  orig: GPUDataPoint;
+}
+
+/**
+ * Match the main agentic interactivity chart's anti-benchmark-hacking seed:
+ * within each date, only points that also win on the (end-to-end latency,
+ * total throughput) upper-right Pareto frontier may feed interpolation.
+ *
+ * The chart's shared Pareto helper operates on `InferenceData.x/y` only, so
+ * minimal projections keep this path aligned without running the full chart
+ * transformation pipeline.
+ */
+export function restrictAgenticPointsToE2eFrontier(points: GPUDataPoint[]): GPUDataPoint[] {
+  const byDate = new Map<string, AgenticFrontierPoint[]>();
+
+  for (const point of points) {
+    if (
+      typeof point.e2eLatency !== 'number' ||
+      !Number.isFinite(point.e2eLatency) ||
+      !Number.isFinite(point.throughput)
+    ) {
+      continue;
+    }
+    const date = point.date ?? '';
+    let bucket = byDate.get(date);
+    if (!bucket) {
+      bucket = [];
+      byDate.set(date, bucket);
+    }
+    bucket.push({ x: point.e2eLatency, y: point.throughput, orig: point });
+  }
+
+  const winners = new Set<GPUDataPoint>();
+  for (const bucket of byDate.values()) {
+    for (const winner of paretoFrontUpperRight(bucket as unknown as InferenceData[])) {
+      winners.add((winner as unknown as AgenticFrontierPoint).orig);
+    }
+  }
+  return points.filter((point) => winners.has(point));
+}
+
+function getAgenticMetric(
+  entry: AggDataEntry,
+  percentile: Percentile,
+  suffix: 'intvty' | 'e2el',
+): number {
+  const value = entry[`${percentile}_${suffix}` as keyof AggDataEntry];
+  return typeof value === 'number' ? value : 0;
+}
+
 /**
  * Build `GPUDataPoint` groups from raw benchmark rows.
  *
@@ -62,9 +115,10 @@ export interface OverlayGroupMeta extends GroupMeta {
 export function buildGpuGroups<M extends GroupMeta>(
   rows: BenchmarkRow[],
   options: {
-    isl: number;
-    osl: number;
+    sequence: Sequence;
     precisions: string[];
+    /** Agentic x/e2e latency percentile. Fixed-sequence rows keep the median. */
+    percentile?: Percentile;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -73,13 +127,13 @@ export function buildGpuGroups<M extends GroupMeta>(
   groupMeta: Record<string, M>;
   hwConfigMap: HardwareConfig;
 } {
-  const { isl, osl, precisions, classify } = options;
+  const { sequence, precisions, percentile = Percentile.P90, classify } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
   const groupMeta: Record<string, M> = {};
   const hwConfigMap: HardwareConfig = {};
 
   for (const row of rows) {
-    if (row.isl !== isl || row.osl !== osl) continue;
+    if (rowToSequence(row) !== sequence) continue;
     if (!precisions.includes(row.precision)) continue;
 
     const entry = rowToAggDataEntry(row);
@@ -105,7 +159,16 @@ export function buildGpuGroups<M extends GroupMeta>(
 
     grouped[groupKey].push({
       hwKey,
-      interactivity: m.median_intvty ?? 0,
+      interactivity:
+        sequence === Sequence.AgenticTraces
+          ? getAgenticMetric(entry, percentile, 'intvty')
+          : entry.median_intvty,
+      ...(sequence === Sequence.AgenticTraces
+        ? {
+            e2eLatency: getAgenticMetric(entry, percentile, 'e2el'),
+            date: row.date,
+          }
+        : {}),
       throughput: tput,
       outputThroughput: outputTput,
       inputThroughput: inputTput,
@@ -130,6 +193,18 @@ export function buildGpuGroups<M extends GroupMeta>(
     });
   }
 
+  if (sequence === Sequence.AgenticTraces) {
+    for (const groupKey of Object.keys(grouped)) {
+      const restricted = restrictAgenticPointsToE2eFrontier(grouped[groupKey]);
+      if (restricted.length === 0) {
+        delete grouped[groupKey];
+        delete groupMeta[groupKey];
+      } else {
+        grouped[groupKey] = restricted;
+      }
+    }
+  }
+
   return { grouped, groupMeta, hwConfigMap };
 }
 
@@ -151,6 +226,7 @@ export function useThroughputData(
   selectedPrecisions: string[],
   selectedRunDate: string,
   overlay?: OverlayInput,
+  selectedPercentile: Percentile = Percentile.P90,
 ) {
   // Reuse the same API + React Query cache as the inference charts
   const {
@@ -186,14 +262,12 @@ export function useThroughputData(
       hasOverlayData: false,
     };
     if (!allRows) return empty;
-    const seqIslOsl = sequenceToIslOsl(selectedSequence);
-    if (!seqIslOsl) return empty;
 
     const multiPrecision = selectedPrecisions.length > 1;
     const shared = {
-      isl: seqIslOsl.isl,
-      osl: seqIslOsl.osl,
+      sequence: selectedSequence,
       precisions: selectedPrecisions,
+      percentile: selectedPercentile,
     };
 
     const official = buildGpuGroups<GroupMeta>(allRows, {
@@ -241,7 +315,15 @@ export function useThroughputData(
       hasData: Object.keys(official.grouped).length > 0,
       hasOverlayData: Object.keys(overlayGroups.grouped).length > 0,
     };
-  }, [allRows, selectedModel, selectedSequence, selectedPrecisions, overlayRows, runIndexByUrl]);
+  }, [
+    allRows,
+    selectedModel,
+    selectedSequence,
+    selectedPrecisions,
+    selectedPercentile,
+    overlayRows,
+    runIndexByUrl,
+  ]);
 
   // All available GPU hardware keys from data, ordered by hardwareConfig (HARDWARE_CONFIG order)
   // This returns unique GPU-level hwKeys (not composite keys) for the legend

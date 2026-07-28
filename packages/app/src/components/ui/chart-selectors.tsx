@@ -48,6 +48,11 @@ const STRINGS = {
     precision: 'Precision',
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
+    agenticGroup: 'Agentic',
+    fixedSequenceLength: 'Fixed Sequence Length',
+    deprecated: 'Deprecated',
+    deprecatedSequenceReason:
+      'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
   },
   zh: {
     model: '模型',
@@ -63,6 +68,10 @@ const STRINGS = {
     precision: '精度',
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
+    agenticGroup: '智能体',
+    fixedSequenceLength: '固定序列长度',
+    deprecated: '已弃用',
+    deprecatedSequenceReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
   },
 } as const;
 
@@ -211,14 +220,15 @@ export function SequenceSelector({
   availableSequences,
   'data-testid': testId,
 }: SequenceSelectorProps) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const groups = groupByCategory(availableSequences, (s) => getSequenceCategory(s as Sequence));
   const sections = [
     {
       id: 'default',
       options: groups.default.map((seq) => ({
         value: seq,
-        label: getSequenceLabel(seq as Sequence),
+        label: getSequenceLabel(seq as Sequence, locale),
       })),
     },
     ...(groups.deprecated.length > 0
@@ -233,7 +243,7 @@ export function SequenceSelector({
             ),
             options: groups.deprecated.map((seq) => ({
               value: seq,
-              label: getSequenceLabel(seq as Sequence),
+              label: getSequenceLabel(seq as Sequence, locale),
             })),
           },
         ]
@@ -294,7 +304,8 @@ export function ScenarioSelector({
   availableSequences,
   'data-testid': testId,
 }: ScenarioSelectorProps) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
   const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
   const fixedGroups = groupByCategory(fixedSeq, (s) => getSequenceCategory(s as Sequence));
@@ -319,33 +330,33 @@ export function ScenarioSelector({
               the app default scenario is 8K/1K). */}
           {agentic.length > 0 && (
             <SelectGroup>
-              <SelectLabel>Agentic</SelectLabel>
+              <SelectLabel>{t.agenticGroup}</SelectLabel>
               {agentic.map((seq) => (
                 <SelectItem key={seq} value={seq}>
-                  {getSequenceLabel(seq as Sequence)}
+                  {getSequenceLabel(seq as Sequence, locale)}
                 </SelectItem>
               ))}
             </SelectGroup>
           )}
           {fixedSeq.length > 0 && (
             <SelectGroup>
-              <SelectLabel>Fixed Sequence Length</SelectLabel>
+              <SelectLabel>{t.fixedSequenceLength}</SelectLabel>
               {fixedGroups.default.map((seq) => (
                 <SelectItem key={seq} value={seq}>
-                  {getSequenceLabel(seq as Sequence)}
+                  {getSequenceLabel(seq as Sequence, locale)}
                 </SelectItem>
               ))}
               {fixedGroups.deprecated.length > 0 && (
                 <>
                   <SelectLabel>
                     <CategorySectionTitle
-                      label="Deprecated"
-                      reason="CI capacity was reallocated to agentic coding and multi-turn chat scenarios."
+                      label={t.deprecated}
+                      reason={t.deprecatedSequenceReason}
                     />
                   </SelectLabel>
                   {fixedGroups.deprecated.map((seq) => (
                     <SelectItem key={seq} value={seq}>
-                      {getSequenceLabel(seq as Sequence)}
+                      {getSequenceLabel(seq as Sequence, locale)}
                     </SelectItem>
                   ))}
                 </>

@@ -24,9 +24,11 @@ export const REAL_CONFIGS: [number, number, number, number][] = [
 export const metricsFor = (intvty: number, tput: number, e2el: number): Record<string, number> => ({
   // intvty is ALWAYS derived as 1/itl by the agentic aliases — feed itl.
   median_itl: 1 / (intvty * 1.2),
+  p75_itl: 1 / (intvty * 1.1),
   p90_itl: 1 / intvty,
   p99_itl: 1 / (intvty * 0.8),
   median_e2el: e2el * 0.8,
+  p75_e2el: e2el * 0.9,
   p90_e2el: e2el,
   p99_e2el: e2el * 1.3,
   median_ttft: 0.5,
@@ -108,13 +110,12 @@ export const countVisible = ($els: JQuery<HTMLElement>): number =>
   [...$els].filter((el) => getComputedStyle(el).opacity !== '0').length;
 
 // ---------------------------------------------------------------------------
-// Single-turn (fixed-sequence) overlay fixtures — for the TCO calculator
+// Single-turn (fixed-sequence) overlay fixtures — for fixed-sequence calculator specs
 // ---------------------------------------------------------------------------
 //
-// The agentic rows above are invisible to the calculator: it resolves the
-// selected sequence through `sequenceToIslOsl`, which only maps 1k/1k, 1k/8k
-// and 8k/1k, then filters rows on `row.isl`/`row.osl`. Agentic rows carry
-// null isl/osl, so they never match. Calculator specs need fixed-sequence rows.
+// The calculator supports the agentic rows above as well. These fixtures remain
+// useful for fixed-sequence coverage and for hardware/sequence combinations
+// tailored to the calculator overlay visibility tests.
 
 export const SINGLE_TURN_DATE = '2026-07-19';
 export const SINGLE_TURN_ISL = 1024;
